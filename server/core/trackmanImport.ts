@@ -1,5 +1,6 @@
 import { db } from '../db';
-import { users, bookingRequests, trackmanUnmatchedBookings, trackmanImportRuns, notifications, bookingMembers, bookingGuests } from '../../shared/schema';
+import { pool } from './db';
+import { users, bookingRequests, trackmanUnmatchedBookings, trackmanImportRuns, notifications, bookingMembers, bookingGuests, bookingSessions, bookingParticipants, usageLedger, guests as guestsTable } from '../../shared/schema';
 import { eq, or, ilike, sql } from 'drizzle-orm';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -7,6 +8,8 @@ import { getTodayPacific, getPacificDateParts, formatNotificationDateTime } from
 import { sendPushNotification } from '../routes/push';
 import { getHubSpotClient } from './integrations';
 import { bookingEvents } from './bookingEvents';
+import { getMemberTierByEmail } from './tierService';
+import { createSession, recordUsage, ParticipantInput } from './bookingService/sessionManager';
 
 interface ParsedPlayer {
   type: 'member' | 'guest';
@@ -354,6 +357,161 @@ function extractDate(dateTimeStr: string): string {
   if (!dateTimeStr) return getTodayPacific();
   const parts = dateTimeStr.split(' ');
   return parts[0];
+}
+
+interface SessionCreationInput {
+  bookingId: number;
+  trackmanBookingId: string;
+  resourceId: number;
+  sessionDate: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  ownerEmail: string;
+  ownerName: string;
+  parsedPlayers: ParsedPlayer[];
+  membersByEmail: Map<string, string>;
+  isPast: boolean;
+}
+
+async function getUserIdByEmail(email: string): Promise<string | null> {
+  const result = await pool.query(
+    `SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+    [email]
+  );
+  return result.rows[0]?.id || null;
+}
+
+async function createTrackmanSessionAndParticipants(input: SessionCreationInput): Promise<void> {
+  try {
+    // Gather all participants with resolved user IDs
+    const participantInputs: ParticipantInput[] = [];
+    const memberData: { userId: string; tier: string }[] = [];
+    
+    // Resolve owner's user ID and tier
+    const ownerUserId = await getUserIdByEmail(input.ownerEmail);
+    const ownerTier = await getMemberTierByEmail(input.ownerEmail) || 'social';
+    
+    // Calculate per-participant duration (split equally among all participants)
+    const totalParticipants = 1 + 
+      input.parsedPlayers.filter(p => p.type === 'member' && p.email && p.email.toLowerCase() !== input.ownerEmail.toLowerCase()).length +
+      input.parsedPlayers.filter(p => p.type === 'guest').length;
+    const perParticipantMinutes = totalParticipants > 0 
+      ? Math.floor(input.durationMinutes / totalParticipants) 
+      : input.durationMinutes;
+    
+    participantInputs.push({
+      userId: ownerUserId || undefined,
+      participantType: 'owner',
+      displayName: input.ownerName || input.ownerEmail,
+      slotDuration: perParticipantMinutes
+    });
+    
+    if (ownerUserId) {
+      memberData.push({ userId: ownerUserId, tier: ownerTier });
+    }
+    
+    // Add members from parsed notes
+    const memberPlayers = input.parsedPlayers.filter(p => p.type === 'member' && p.email);
+    for (const member of memberPlayers) {
+      if (member.email && member.email.toLowerCase() !== input.ownerEmail.toLowerCase()) {
+        const realEmail = input.membersByEmail.get(member.email.toLowerCase()) || member.email;
+        const memberUserId = await getUserIdByEmail(realEmail);
+        const memberTier = await getMemberTierByEmail(realEmail) || 'social';
+        
+        participantInputs.push({
+          userId: memberUserId || undefined,
+          participantType: 'member',
+          displayName: member.name || realEmail,
+          slotDuration: perParticipantMinutes
+        });
+        
+        if (memberUserId) {
+          memberData.push({ userId: memberUserId, tier: memberTier });
+        }
+      }
+    }
+    
+    // Add guests from parsed notes
+    const guestPlayers = input.parsedPlayers.filter(p => p.type === 'guest');
+    for (const guest of guestPlayers) {
+      let guestId: number | undefined;
+      if (guest.name) {
+        const existingGuest = await db.select()
+          .from(guestsTable)
+          .where(sql`LOWER(display_name) = LOWER(${guest.name})`)
+          .limit(1);
+        
+        if (existingGuest.length > 0) {
+          guestId = existingGuest[0].id;
+        } else {
+          const [newGuest] = await db.insert(guestsTable).values({
+            displayName: guest.name,
+            email: guest.email,
+            addedByEmail: input.ownerEmail,
+            isRecurring: false
+          }).returning();
+          guestId = newGuest?.id;
+        }
+      }
+      
+      participantInputs.push({
+        guestId,
+        participantType: 'guest',
+        displayName: guest.name || 'Guest',
+        slotDuration: perParticipantMinutes
+      });
+    }
+    
+    // Use sessionManager.createSession to create session and participants
+    const { session, participants } = await createSession(
+      {
+        resourceId: input.resourceId,
+        sessionDate: input.sessionDate,
+        startTime: input.startTime,
+        endTime: input.endTime,
+        trackmanBookingId: input.trackmanBookingId,
+        createdBy: 'trackman_import'
+      },
+      participantInputs,
+      'trackman_import'
+    );
+
+    // Link the booking_request to the session
+    await db.update(bookingRequests)
+      .set({ sessionId: session.id })
+      .where(eq(bookingRequests.id, input.bookingId));
+
+    // Update payment_status for past bookings (sessionManager defaults to 'pending')
+    if (input.isPast && participants.length > 0) {
+      const participantIds = participants.map(p => p.id);
+      await db.execute(sql`
+        UPDATE booking_participants 
+        SET payment_status = 'paid' 
+        WHERE id = ANY(${participantIds})
+      `);
+    }
+
+    // Create usage_ledger entries for members using recordUsage
+    for (const md of memberData) {
+      await recordUsage(
+        session.id,
+        {
+          memberId: md.userId,
+          minutesCharged: perParticipantMinutes,
+          overageFee: 0,
+          guestFee: 0,
+          tierAtBooking: md.tier,
+          paymentMethod: input.isPast ? 'credit_card' : 'unpaid'
+        },
+        'trackman_import'
+      );
+    }
+
+    process.stderr.write(`[Trackman Import] Created session #${session.id} with ${participants.length} participants for Trackman ID ${input.trackmanBookingId}\n`);
+  } catch (error: any) {
+    process.stderr.write(`[Trackman Import] Error creating session for ${input.trackmanBookingId}: ${error.message}\n`);
+  }
 }
 
 export async function importTrackmanBookings(csvPath: string, importedBy?: string): Promise<{
@@ -747,6 +905,23 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                   }
                 }
                 
+                // Create booking_session for linked booking
+                const linkedParsedPlayers = parseNotesForPlayers(row.notes);
+                await createTrackmanSessionAndParticipants({
+                  bookingId: existing.id,
+                  trackmanBookingId: row.bookingId,
+                  resourceId: parsedBayId!,
+                  sessionDate: bookingDate,
+                  startTime: startTime,
+                  endTime: endTime,
+                  durationMinutes: row.durationMins,
+                  ownerEmail: matchedEmail,
+                  ownerName: row.userName,
+                  parsedPlayers: linkedParsedPlayers,
+                  membersByEmail: membersByEmail,
+                  isPast: !isUpcoming
+                });
+                
                 process.stderr.write(`[Trackman Import] Auto-linked Trackman ID ${row.bookingId} to existing app booking #${existing.id} (${matchedEmail}) - exact time match\n`);
                 linkedRows++;
                 continue;
@@ -816,6 +991,23 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                   }
                 }
               }
+              
+              // Create booking_session for linked booking (tolerance match)
+              const toleranceParsedPlayers = parseNotesForPlayers(row.notes);
+              await createTrackmanSessionAndParticipants({
+                bookingId: existing.id,
+                trackmanBookingId: row.bookingId,
+                resourceId: parsedBayId!,
+                sessionDate: bookingDate,
+                startTime: startTime,
+                endTime: endTime,
+                durationMinutes: row.durationMins,
+                ownerEmail: matchedEmail,
+                ownerName: row.userName,
+                parsedPlayers: toleranceParsedPlayers,
+                membersByEmail: membersByEmail,
+                isPast: !isUpcoming
+              });
               
               process.stderr.write(`[Trackman Import] Auto-linked Trackman ID ${row.bookingId} to existing app booking #${existing.id} (${matchedEmail}) - time tolerance match (${existing.startTime} vs ${startTime})\n`);
               linkedRows++;
@@ -953,6 +1145,22 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 });
               }
             }
+            
+            // Create booking_session, booking_participants, and usage_ledger entries
+            await createTrackmanSessionAndParticipants({
+              bookingId: bookingId,
+              trackmanBookingId: row.bookingId,
+              resourceId: parsedBayId!,
+              sessionDate: bookingDate,
+              startTime: startTime,
+              endTime: endTime,
+              durationMinutes: row.durationMins,
+              ownerEmail: matchedEmail,
+              ownerName: row.userName,
+              parsedPlayers: parsedPlayers,
+              membersByEmail: membersByEmail,
+              isPast: !isUpcoming
+            });
           }
 
           if (normalizedStatus === 'attended') {
