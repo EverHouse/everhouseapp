@@ -33,6 +33,7 @@ import {
   type Participant as UsageParticipant
 } from '../core/bookingService/usageCalculator';
 import { getTierLimits, getMemberTierByEmail } from '../core/tierService';
+import { useGuestPass, refundGuestPass, ensureGuestPassRecord } from './guestPasses';
 
 const router = Router();
 
@@ -331,6 +332,17 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
         displayName,
       };
     } else {
+      // Ensure guest pass record exists and decrement guest pass
+      await ensureGuestPassRecord(booking.owner_email, ownerTier || undefined);
+      
+      const guestPassResult = await useGuestPass(booking.owner_email, guest.name, true);
+      if (!guestPassResult.success) {
+        return res.status(400).json({ 
+          error: guestPassResult.error || 'No guest passes remaining',
+          errorType: 'no_guest_passes'
+        });
+      }
+      
       const guestId = await createOrFindGuest(
         guest.name, 
         guest.email, 
@@ -343,9 +355,33 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
         participantType: 'guest',
         displayName: guest.name,
       };
+      
+      logger.info('[roster] Guest pass decremented', {
+        extra: { 
+          bookingId, 
+          ownerEmail: booking.owner_email, 
+          guestName: guest.name,
+          remainingPasses: guestPassResult.remaining 
+        }
+      });
     }
 
     const [newParticipant] = await linkParticipants(sessionId, [participantInput]);
+
+    // For guests, mark the payment_status as 'paid' (via guest pass)
+    let guestPassesRemaining: number | undefined;
+    if (type === 'guest' && newParticipant) {
+      await db.update(bookingParticipants)
+        .set({ paymentStatus: 'paid' })
+        .where(eq(bookingParticipants.id, newParticipant.id));
+      
+      // Get updated guest pass count for response
+      const passResult = await pool.query(
+        `SELECT passes_total - passes_used as remaining FROM guest_passes WHERE LOWER(member_email) = LOWER($1)`,
+        [booking.owner_email]
+      );
+      guestPassesRemaining = passResult.rows[0]?.remaining ?? 0;
+    }
 
     // For members, also add to booking_members so the booking shows on their schedule
     if (type === 'member' && memberInfo) {
@@ -414,7 +450,8 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
     res.status(201).json({
       success: true,
       participant: newParticipant,
-      message: `${type === 'member' ? 'Member' : 'Guest'} added successfully`
+      message: `${type === 'member' ? 'Member' : 'Guest'} added successfully`,
+      ...(type === 'guest' && { guestPassesRemaining })
     });
   } catch (error: any) {
     logAndRespond(req, res, 500, 'Failed to add participant', error);
@@ -484,6 +521,36 @@ router.delete('/api/bookings/:bookingId/participants/:participantId', async (req
       return res.status(400).json({ error: 'Cannot remove the booking owner' });
     }
 
+    // If removing a guest, refund the guest pass to the booking owner
+    let guestPassesRemaining: number | undefined;
+    if (participant.participantType === 'guest') {
+      const refundResult = await refundGuestPass(
+        booking.owner_email, 
+        participant.displayName || undefined,
+        true
+      );
+      
+      if (refundResult.success) {
+        guestPassesRemaining = refundResult.remaining;
+        logger.info('[roster] Guest pass refunded on participant removal', {
+          extra: { 
+            bookingId, 
+            ownerEmail: booking.owner_email, 
+            guestName: participant.displayName,
+            remainingPasses: refundResult.remaining 
+          }
+        });
+      } else {
+        logger.warn('[roster] Failed to refund guest pass (non-blocking)', {
+          extra: { 
+            bookingId, 
+            ownerEmail: booking.owner_email,
+            error: refundResult.error 
+          }
+        });
+      }
+    }
+
     await db
       .delete(bookingParticipants)
       .where(eq(bookingParticipants.id, participantId));
@@ -522,7 +589,8 @@ router.delete('/api/bookings/:bookingId/participants/:participantId', async (req
 
     res.json({
       success: true,
-      message: 'Participant removed successfully'
+      message: 'Participant removed successfully',
+      ...(participant.participantType === 'guest' && guestPassesRemaining !== undefined && { guestPassesRemaining })
     });
   } catch (error: any) {
     logAndRespond(req, res, 500, 'Failed to remove participant', error);

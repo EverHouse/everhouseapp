@@ -129,4 +129,113 @@ router.put('/api/guest-passes/:email', async (req, res) => {
   }
 });
 
+export async function useGuestPass(
+  memberEmail: string, 
+  guestName?: string,
+  sendNotification: boolean = true
+): Promise<{ success: boolean; error?: string; remaining?: number }> {
+  try {
+    const result = await db.update(guestPasses)
+      .set({ passesUsed: sql`${guestPasses.passesUsed} + 1` })
+      .where(and(
+        eq(guestPasses.memberEmail, memberEmail),
+        lt(guestPasses.passesUsed, guestPasses.passesTotal)
+      ))
+      .returning();
+    
+    if (result.length === 0) {
+      return { success: false, error: 'No guest passes remaining' };
+    }
+    
+    const data = result[0];
+    const remaining = data.passesTotal - data.passesUsed;
+    
+    if (sendNotification) {
+      const message = guestName 
+        ? `Guest pass used for ${guestName}. You have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`
+        : `Guest pass used. You have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`;
+      
+      await db.insert(notifications).values({
+        userEmail: memberEmail,
+        title: 'Guest Pass Used',
+        message: message,
+        type: 'guest_pass',
+        relatedType: 'guest_pass'
+      });
+      
+      sendPushNotification(memberEmail, {
+        title: 'Guest Pass Used',
+        body: message,
+        url: '/#/profile'
+      }).catch(err => console.error('Push notification failed:', err));
+    }
+    
+    return { success: true, remaining };
+  } catch (error) {
+    console.error('[useGuestPass] Error:', error);
+    return { success: false, error: 'Failed to use guest pass' };
+  }
+}
+
+export async function refundGuestPass(
+  memberEmail: string,
+  guestName?: string,
+  sendNotification: boolean = true
+): Promise<{ success: boolean; error?: string; remaining?: number }> {
+  try {
+    const result = await db.update(guestPasses)
+      .set({ passesUsed: sql`GREATEST(0, ${guestPasses.passesUsed} - 1)` })
+      .where(eq(guestPasses.memberEmail, memberEmail))
+      .returning();
+    
+    if (result.length === 0) {
+      return { success: false, error: 'Member guest pass record not found' };
+    }
+    
+    const data = result[0];
+    const remaining = data.passesTotal - data.passesUsed;
+    
+    if (sendNotification) {
+      const message = guestName 
+        ? `Guest pass refunded for ${guestName}. You now have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`
+        : `Guest pass refunded. You now have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`;
+      
+      await db.insert(notifications).values({
+        userEmail: memberEmail,
+        title: 'Guest Pass Refunded',
+        message: message,
+        type: 'guest_pass',
+        relatedType: 'guest_pass'
+      });
+    }
+    
+    return { success: true, remaining };
+  } catch (error) {
+    console.error('[refundGuestPass] Error:', error);
+    return { success: false, error: 'Failed to refund guest pass' };
+  }
+}
+
+export async function ensureGuestPassRecord(memberEmail: string, tier?: string): Promise<void> {
+  try {
+    const tierLimits = tier ? await getTierLimits(tier) : null;
+    const passesTotal = tierLimits?.guest_passes_per_month ?? 0;
+    
+    const existing = await db.select()
+      .from(guestPasses)
+      .where(eq(guestPasses.memberEmail, memberEmail));
+    
+    if (existing.length === 0) {
+      await db.insert(guestPasses)
+        .values({
+          memberEmail,
+          passesUsed: 0,
+          passesTotal
+        });
+    }
+  } catch (error) {
+    console.error('[ensureGuestPassRecord] Error:', error);
+  }
+}
+
 export default router;
