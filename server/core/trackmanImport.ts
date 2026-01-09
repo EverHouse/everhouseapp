@@ -1735,9 +1735,9 @@ export async function resolveUnmatchedBooking(
     }).catch(err => process.stderr.write(`[Trackman Resolve] Booking event publish failed: ${err}\n`));
   }
 
-  // Auto-resolve other unmatched bookings with the same placeholder email
+  // Auto-resolve other unmatched bookings with the same original email
   let autoResolved = 0;
-  if (originalEmail && isPlaceholderEmail(originalEmail)) {
+  if (originalEmail) {
     const otherUnmatched = await db.select()
       .from(trackmanUnmatchedBookings)
       .where(sql`LOWER(TRIM(original_email)) = ${originalEmail} AND resolved_email IS NULL AND id != ${unmatchedId}`);
