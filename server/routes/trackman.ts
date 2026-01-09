@@ -3,7 +3,7 @@ import { importTrackmanBookings, getUnmatchedBookings, resolveUnmatchedBooking, 
 import path from 'path';
 import multer from 'multer';
 import fs from 'fs';
-import { isAdmin } from '../core/middleware';
+import { isStaffOrAdmin } from '../core/middleware';
 import { pool } from '../core/db';
 import { sendPushNotification } from './push';
 
@@ -37,7 +37,7 @@ const upload = multer({
   }
 });
 
-router.get('/api/admin/trackman/unmatched', isAdmin, async (req, res) => {
+router.get('/api/admin/trackman/unmatched', isStaffOrAdmin, async (req, res) => {
   try {
     const resolved = req.query.resolved === 'true' ? true : req.query.resolved === 'false' ? false : undefined;
     const limit = parseInt(req.query.limit as string) || 100;
@@ -52,7 +52,7 @@ router.get('/api/admin/trackman/unmatched', isAdmin, async (req, res) => {
   }
 });
 
-router.get('/api/admin/trackman/unmatched-calendar', isAdmin, async (req, res) => {
+router.get('/api/admin/trackman/unmatched-calendar', isStaffOrAdmin, async (req, res) => {
   try {
     const { start_date, end_date } = req.query;
     
@@ -84,7 +84,7 @@ router.get('/api/admin/trackman/unmatched-calendar', isAdmin, async (req, res) =
   }
 });
 
-router.get('/api/admin/trackman/import-runs', isAdmin, async (req, res) => {
+router.get('/api/admin/trackman/import-runs', isStaffOrAdmin, async (req, res) => {
   try {
     const runs = await getImportRuns();
     res.json(runs);
@@ -94,7 +94,7 @@ router.get('/api/admin/trackman/import-runs', isAdmin, async (req, res) => {
   }
 });
 
-router.post('/api/admin/trackman/import', isAdmin, async (req, res) => {
+router.post('/api/admin/trackman/import', isStaffOrAdmin, async (req, res) => {
   try {
     const { filename } = req.body;
     const user = (req as any).session?.user?.email || 'admin';
@@ -118,7 +118,7 @@ router.post('/api/admin/trackman/import', isAdmin, async (req, res) => {
   }
 });
 
-router.post('/api/admin/trackman/upload', isAdmin, upload.single('file'), async (req, res) => {
+router.post('/api/admin/trackman/upload', isStaffOrAdmin, upload.single('file'), async (req, res) => {
   let csvPath: string | undefined;
   try {
     if (!req.file) {
@@ -149,7 +149,7 @@ router.post('/api/admin/trackman/upload', isAdmin, upload.single('file'), async 
   }
 });
 
-router.put('/api/admin/trackman/unmatched/:id/resolve', isAdmin, async (req, res) => {
+router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { memberEmail } = req.body;
@@ -179,7 +179,7 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isAdmin, async (req, res
   }
 });
 
-router.delete('/api/admin/trackman/linked-email', isAdmin, async (req, res) => {
+router.delete('/api/admin/trackman/linked-email', isStaffOrAdmin, async (req, res) => {
   try {
     const { memberEmail, linkedEmail } = req.body;
     
@@ -214,7 +214,7 @@ router.delete('/api/admin/trackman/linked-email', isAdmin, async (req, res) => {
   }
 });
 
-router.get('/api/admin/trackman/matched', isAdmin, async (req, res) => {
+router.get('/api/admin/trackman/matched', isStaffOrAdmin, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 100;
     const offset = parseInt(req.query.offset as string) || 0;
@@ -328,7 +328,7 @@ router.get('/api/admin/trackman/matched', isAdmin, async (req, res) => {
   }
 });
 
-router.put('/api/admin/trackman/matched/:id/reassign', isAdmin, async (req, res) => {
+router.put('/api/admin/trackman/matched/:id/reassign', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { newMemberEmail } = req.body;
@@ -399,7 +399,7 @@ router.put('/api/admin/trackman/matched/:id/reassign', isAdmin, async (req, res)
   }
 });
 
-router.post('/api/admin/trackman/unmatch-member', isAdmin, async (req, res) => {
+router.post('/api/admin/trackman/unmatch-member', isStaffOrAdmin, async (req, res) => {
   try {
     const { email } = req.body;
     const unmatchedBy = (req as any).session?.user?.email || 'admin';
@@ -485,7 +485,7 @@ router.post('/api/admin/trackman/unmatch-member', isAdmin, async (req, res) => {
 });
 
 // Get booking members for a specific booking
-router.get('/api/admin/booking/:id/members', isAdmin, async (req, res) => {
+router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -585,7 +585,7 @@ router.get('/api/admin/booking/:id/members', isAdmin, async (req, res) => {
 });
 
 // Link a member to an empty slot
-router.put('/api/admin/booking/:bookingId/members/:slotId/link', isAdmin, async (req, res) => {
+router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin, async (req, res) => {
   try {
     const { bookingId, slotId } = req.params;
     const { memberEmail } = req.body;
@@ -668,7 +668,7 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isAdmin, async 
 });
 
 // Unlink a member from a slot
-router.put('/api/admin/booking/:bookingId/members/:slotId/unlink', isAdmin, async (req, res) => {
+router.put('/api/admin/booking/:bookingId/members/:slotId/unlink', isStaffOrAdmin, async (req, res) => {
   try {
     const { bookingId, slotId } = req.params;
     
@@ -706,7 +706,7 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/unlink', isAdmin, asyn
 });
 
 // GET /api/admin/trackman/needs-players - Returns bookings with unfilled player slots
-router.get('/api/admin/trackman/needs-players', isAdmin, async (req, res) => {
+router.get('/api/admin/trackman/needs-players', isStaffOrAdmin, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 100;
     const offset = parseInt(req.query.offset as string) || 0;
@@ -838,7 +838,7 @@ function timeToMinutes(timeStr: string): number {
 }
 
 // GET /api/admin/trackman/potential-matches - Returns unmatched bookings with potential app booking matches
-router.get('/api/admin/trackman/potential-matches', isAdmin, async (req, res) => {
+router.get('/api/admin/trackman/potential-matches', isStaffOrAdmin, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 100;
     const offset = parseInt(req.query.offset as string) || 0;
@@ -937,7 +937,7 @@ router.get('/api/admin/trackman/potential-matches', isAdmin, async (req, res) =>
 });
 
 // Data reset endpoint - wipes all Trackman-imported booking data for clean re-import
-router.delete('/api/admin/trackman/reset-data', isAdmin, async (req, res) => {
+router.delete('/api/admin/trackman/reset-data', isStaffOrAdmin, async (req, res) => {
   const client = await pool.connect();
   try {
     const user = (req as any).session?.user?.email || 'admin';
@@ -1034,7 +1034,7 @@ router.delete('/api/admin/trackman/reset-data', isAdmin, async (req, res) => {
 });
 
 // Task 6E: Fuzzy match API endpoint for partial names
-router.get('/api/admin/trackman/fuzzy-matches/:id', isAdmin, async (req, res) => {
+router.get('/api/admin/trackman/fuzzy-matches/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -1152,7 +1152,7 @@ function calculateMatchScore(searchName: string, firstName: string | null, lastN
 }
 
 // Task 6E: Get unmatched bookings that require review (fuzzy match candidates)
-router.get('/api/admin/trackman/requires-review', isAdmin, async (req, res) => {
+router.get('/api/admin/trackman/requires-review', isStaffOrAdmin, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
