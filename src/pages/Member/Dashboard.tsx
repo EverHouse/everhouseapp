@@ -985,15 +985,6 @@ const Dashboard: React.FC = () => {
             </div>
           )}
 
-          {/* DEBUG BANNER - REMOVE AFTER TESTING */}
-          <div style={{background: 'red', color: 'white', padding: '10px', marginBottom: '10px', fontSize: '11px', whiteSpace: 'pre-wrap'}}>
-            DEBUG - Booking Requests Raw Data:
-            {dbBookingRequests.slice(0, 3).map(r => `\nID: ${r.id} | is_linked: ${r.is_linked_member} | invite_status: ${r.invite_status} | owner: ${r.user_email?.substring(0,10)}`).join('')}
-            {`\n\nPending Invites Count: ${pendingInvites.length}`}
-            {pendingInvites.map(p => `\nPending ID: ${p.id}`).join('')}
-            {`\n\nFiltered Schedule Count: ${upcomingItemsFiltered.length}`}
-          </div>
-
           {/* Your Schedule - Combined Bookings, Events & Wellness */}
           <div className="animate-pop-in" style={{animationDelay: '0.15s'}}>
             <div className="flex justify-between items-center mb-4 px-1">

@@ -304,7 +304,7 @@ router.get('/api/booking-requests', async (req, res) => {
       
       // Check if the requesting user is a linked member (not the primary booker)
       const isPrimaryBooker = booking.user_email?.toLowerCase() === requestingUserEmail;
-      const isLinkedMember = !isPrimaryBooker && requestingUserEmail;
+      const isLinkedMember = !isPrimaryBooker && !!requestingUserEmail;
       
       // For linked members, include the primary booker's name
       const primaryBookerName = isLinkedMember ? (booking.user_name || booking.user_email) : null;
