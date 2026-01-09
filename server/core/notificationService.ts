@@ -11,6 +11,7 @@ export type NotificationType =
   | 'booking_declined'
   | 'booking_cancelled'
   | 'booking_reminder'
+  | 'booking_invite'
   | 'event'
   | 'event_reminder'
   | 'wellness'

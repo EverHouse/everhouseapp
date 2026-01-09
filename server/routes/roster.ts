@@ -377,34 +377,17 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
       
       // Send notification to invited member
       try {
-        const { createNotification } = await import('../core/notificationService');
+        const { notifyMember } = await import('../core/notificationService');
         const formattedDate = booking.request_date || 'upcoming date';
         const formattedTime = booking.start_time ? booking.start_time.substring(0, 5) : '';
         const timeDisplay = formattedTime ? ` at ${formattedTime}` : '';
         
-        // Calculate expiry date safely
-        let expiresAt: Date | undefined;
-        if (booking.request_date && booking.start_time) {
-          const dateTimeStr = `${booking.request_date}T${booking.start_time}`;
-          const bookingDate = new Date(dateTimeStr);
-          if (!isNaN(bookingDate.getTime())) {
-            expiresAt = new Date(bookingDate.getTime() + 24 * 60 * 60 * 1000);
-          }
-        }
-        
-        await createNotification({
+        await notifyMember({
           userEmail: memberInfo.email.toLowerCase(),
           type: 'booking_invite',
           title: 'You\'ve been added to a booking',
           message: `${booking.owner_name || 'A member'} has added you to their simulator booking on ${formattedDate}${timeDisplay}`,
-          metadata: {
-            bookingId,
-            ownerEmail: booking.owner_email,
-            ownerName: booking.owner_name,
-            date: booking.request_date,
-            startTime: booking.start_time
-          },
-          ...(expiresAt && { expiresAt })
+          relatedId: bookingId
         });
         
         logger.info('[roster] Invite notification sent', {
