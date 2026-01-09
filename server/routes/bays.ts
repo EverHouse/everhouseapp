@@ -330,7 +330,7 @@ router.post('/api/booking-requests', async (req, res) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
     
-    const { user_email, user_name, resource_id, resource_preference, request_date, start_time, duration_minutes, notes, user_tier, reschedule_booking_id } = req.body;
+    const { user_email, user_name, resource_id, resource_preference, request_date, start_time, duration_minutes, notes, user_tier, reschedule_booking_id, declared_player_count, member_notes } = req.body;
     
     if (!user_email || !request_date || !start_time || !duration_minutes) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -433,7 +433,9 @@ router.post('/api/booking-requests', async (req, res) => {
       durationMinutes: duration_minutes,
       endTime: end_time,
       notes: notes,
-      rescheduleBookingId: reschedule_booking_id || null
+      rescheduleBookingId: reschedule_booking_id || null,
+      declaredPlayerCount: declared_player_count && declared_player_count >= 1 && declared_player_count <= 4 ? declared_player_count : null,
+      memberNotes: member_notes ? String(member_notes).slice(0, 280) : null
     }).returning();
     
     const row = result[0];

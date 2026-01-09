@@ -150,7 +150,9 @@ const BookGolf: React.FC = () => {
   const isDark = effectiveTheme === 'dark';
   const initialTab = searchParams.get('tab') === 'conference' ? 'conference' : 'simulator';
   const [activeTab, setActiveTab] = useState<'simulator' | 'conference'>(initialTab);
+  const [playerCount, setPlayerCount] = useState<number>(1);
   const [duration, setDuration] = useState<number>(60);
+  const [memberNotes, setMemberNotes] = useState<string>('');
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
@@ -164,6 +166,7 @@ const BookGolf: React.FC = () => {
   const [closures, setClosures] = useState<Closure[]>([]);
   const [expandedHour, setExpandedHour] = useState<string | null>(null);
   const [hasUserSelectedDuration, setHasUserSelectedDuration] = useState(false);
+  const [showPlayerTooltip, setShowPlayerTooltip] = useState(false);
   
   const [rescheduleBookingId, setRescheduleBookingId] = useState<number | null>(null);
   const [originalBooking, setOriginalBooking] = useState<BookingRequest | null>(null);
@@ -701,6 +704,8 @@ const BookGolf: React.FC = () => {
           start_time: selectedSlot.startTime24,
           duration_minutes: duration,
           notes: activeTab === 'conference' ? 'Conference room booking' : null,
+          declared_player_count: activeTab === 'simulator' ? playerCount : undefined,
+          member_notes: memberNotes.trim() || undefined,
           ...(rescheduleBookingId ? { reschedule_booking_id: rescheduleBookingId } : {})
         })
       });
@@ -937,6 +942,45 @@ const BookGolf: React.FC = () => {
         </section>
 ) : (
         <div className="relative z-10 animate-pop-in space-y-6">
+          {activeTab === 'simulator' && (
+          <section className={`rounded-2xl p-4 border glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-white/80' : 'text-primary/80'}`}>How many players?</span>
+                <button
+                  onClick={() => setShowPlayerTooltip(!showPlayerTooltip)}
+                  className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${isDark ? 'bg-white/10 text-white/60 hover:bg-white/20' : 'bg-black/5 text-primary/60 hover:bg-black/10'}`}
+                >
+                  ?
+                </button>
+              </div>
+            </div>
+            {showPlayerTooltip && (
+              <div className={`mb-3 p-3 rounded-lg text-sm ${isDark ? 'bg-blue-500/10 border border-blue-500/30 text-blue-300' : 'bg-blue-50 border border-blue-200 text-blue-700'}`}>
+                <span className="material-symbols-outlined text-sm mr-1 align-middle">info</span>
+                Guest time counts toward your daily usage. Time is split equally among all players.
+              </div>
+            )}
+            <div className={`flex gap-2 p-1 rounded-xl border ${isDark ? 'bg-black/20 border-white/20' : 'bg-black/5 border-black/5'}`}>
+              {[1, 2, 3, 4].map(count => (
+                <button
+                  key={count}
+                  onClick={() => { haptic.selection(); setPlayerCount(count); }}
+                  aria-pressed={playerCount === count}
+                  className={`flex-1 py-3 rounded-lg transition-all active:scale-95 focus:ring-2 focus:ring-accent focus:outline-none ${
+                    playerCount === count
+                      ? 'bg-accent text-[#293515] shadow-glow'
+                      : (isDark ? 'text-white/80 hover:bg-white/5 hover:text-white' : 'text-primary/80 hover:bg-black/5 hover:text-primary')
+                  }`}
+                >
+                  <div className="text-lg font-bold">{count}</div>
+                  <div className="text-[10px] opacity-70">{count === 1 ? 'Solo' : count === 2 ? 'Duo' : count === 3 ? 'Trio' : 'Four'}</div>
+                </button>
+              ))}
+            </div>
+          </section>
+          )}
+
           <section className={`rounded-2xl p-4 border glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}>
             <div className="flex items-center justify-between mb-3">
               <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-white/80' : 'text-primary/80'}`}>Date & Duration</span>
@@ -954,41 +998,77 @@ const BookGolf: React.FC = () => {
                   />
                 ))}
               </div>
-              <div className={`flex gap-2 p-1 rounded-xl border ${isDark ? 'bg-black/20 border-white/20' : 'bg-black/5 border-black/5'}`}>
+              <div className={`grid ${activeTab === 'simulator' ? 'grid-cols-2' : 'grid-cols-4'} gap-2`}>
                 {(() => {
-                  const availableDurations = [30, 60, 90, 120].filter(mins => {
+                  const baseDurations = activeTab === 'simulator' 
+                    ? [60, 90, 120, 150, 180] 
+                    : [30, 60, 90, 120];
+                  const availableDurations = baseDurations.filter(mins => {
                     const maxMinutes = activeTab === 'simulator' 
                       ? tierPermissions.dailySimulatorMinutes 
                       : tierPermissions.dailyConfRoomMinutes;
-                    // VIP/unlimited gets all options
                     if (maxMinutes >= 999 || tierPermissions.unlimitedAccess) return true;
-                    // Show durations up to remaining minutes for the day (not full daily limit)
-                    // This respects already-booked time
                     return mins <= remainingMinutes;
                   });
                   
                   if (availableDurations.length === 0) {
                     return (
-                      <div className={`flex-1 py-2.5 text-center text-xs ${isDark ? 'text-white/60' : 'text-primary/60'}`}>
+                      <div className={`col-span-2 py-2.5 text-center text-xs ${isDark ? 'text-white/60' : 'text-primary/60'}`}>
                         No time remaining for this date
                       </div>
                     );
                   }
                   
-                  return availableDurations.map(mins => (
-                    <button 
-                      key={mins}
-                      onClick={() => { haptic.selection(); setDuration(mins); setExpandedHour(null); setHasUserSelectedDuration(true); }}
-                      aria-pressed={duration === mins}
-                      className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all active:scale-95 focus:ring-2 focus:ring-accent focus:outline-none ${
-                        duration === mins 
-                        ? 'bg-accent text-[#293515] shadow-glow'
-                        : (isDark ? 'text-white/80 hover:bg-white/5 hover:text-white' : 'text-primary/80 hover:bg-black/5 hover:text-primary')
-                      }`}
-                    >
-                      {mins}m
-                    </button>
-                  ));
+                  const isSocialTier = effectiveUser?.tier?.toLowerCase() === 'social';
+                  const dailyAllowance = tierPermissions.dailySimulatorMinutes || 0;
+                  
+                  return availableDurations.map(mins => {
+                    const perPersonMins = Math.floor(mins / playerCount);
+                    const isLowTime = playerCount >= 3 && mins <= 60;
+                    const recommendedMins = playerCount * 30;
+                    
+                    const myUsageMinutes = perPersonMins;
+                    const overageMinutes = isSocialTier 
+                      ? myUsageMinutes 
+                      : Math.max(0, (usedMinutesForDay + myUsageMinutes) - dailyAllowance);
+                    const overageBlocks = Math.ceil(overageMinutes / 30);
+                    const overageFee = overageBlocks * 25;
+                    const hasOverage = overageMinutes > 0 && activeTab === 'simulator';
+                    
+                    return (
+                      <button
+                        key={mins}
+                        onClick={() => { haptic.selection(); setDuration(mins); setExpandedHour(null); setHasUserSelectedDuration(true); }}
+                        aria-pressed={duration === mins}
+                        className={`relative p-3 rounded-xl border transition-all active:scale-95 focus:ring-2 focus:ring-accent focus:outline-none ${
+                          duration === mins
+                            ? 'bg-accent text-[#293515] border-accent shadow-glow'
+                            : isLowTime
+                              ? (isDark ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-700')
+                              : (isDark ? 'bg-black/20 border-white/20 text-white/80 hover:bg-white/5' : 'bg-white border-black/10 text-primary/80 hover:bg-black/5')
+                        }`}
+                      >
+                        <div className="text-lg font-bold">{mins}m</div>
+                        {activeTab === 'simulator' && (
+                          <div className={`text-[10px] ${duration === mins ? 'opacity-80' : 'opacity-60'}`}>
+                            {perPersonMins} min each
+                          </div>
+                        )}
+                        {isLowTime && duration !== mins && (
+                          <div className="text-[9px] mt-1 opacity-80">
+                            Rec: {recommendedMins}m+
+                          </div>
+                        )}
+                        {hasOverage && duration !== mins && (
+                          <div className={`absolute -top-2 -right-2 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
+                            isDark ? 'bg-amber-500 text-black' : 'bg-amber-500 text-white'
+                          }`}>
+                            ${overageFee}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  });
                 })()}
               </div>
             </div>
@@ -1248,7 +1328,7 @@ const BookGolf: React.FC = () => {
           </section>
 
           {selectedSlot && (
-            <section ref={baySelectionRef} className="animate-pop-in pb-48">
+            <section ref={baySelectionRef} className="animate-pop-in">
               <h3 className={`text-sm font-bold uppercase tracking-wider mb-3 pl-1 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
                 Select {activeTab === 'simulator' ? 'Bay' : 'Room'}
               </h3>
@@ -1263,6 +1343,29 @@ const BookGolf: React.FC = () => {
                     />
                   </div>
                 ))}
+              </div>
+            </section>
+          )}
+
+          {selectedResource && (
+            <section className="animate-pop-in pb-48">
+              <h3 className={`text-sm font-bold uppercase tracking-wider mb-3 pl-1 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
+                Notes for Staff <span className="font-normal opacity-60">(optional)</span>
+              </h3>
+              <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/20 bg-black/20' : 'border-black/10 bg-white'}`}>
+                <textarea
+                  value={memberNotes}
+                  onChange={(e) => setMemberNotes(e.target.value.slice(0, 280))}
+                  placeholder="Any special requests or information for staff..."
+                  maxLength={280}
+                  rows={3}
+                  className={`w-full p-4 resize-none focus:outline-none focus:ring-2 focus:ring-accent focus:ring-inset ${
+                    isDark ? 'bg-transparent text-white placeholder:text-white/40' : 'bg-transparent text-primary placeholder:text-primary/40'
+                  }`}
+                />
+                <div className={`px-4 py-2 text-xs text-right border-t ${isDark ? 'border-white/10 text-white/50' : 'border-black/5 text-primary/50'}`}>
+                  {memberNotes.length}/280
+                </div>
               </div>
             </section>
           )}
