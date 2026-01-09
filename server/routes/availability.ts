@@ -135,15 +135,16 @@ router.post('/api/availability/batch', async (req, res) => {
         [resource_ids]
       ),
       // Fetch all booked slots for all resources in one query
+      // Include both 'approved' and 'confirmed' statuses as active bookings that block availability
       ignoreId
         ? pool.query(
             `SELECT resource_id, start_time, end_time FROM booking_requests 
-             WHERE resource_id = ANY($1) AND request_date = $2 AND status = 'approved' AND id != $3`,
+             WHERE resource_id = ANY($1) AND request_date = $2 AND status IN ('approved', 'confirmed') AND id != $3`,
             [resource_ids, date, ignoreId]
           )
         : pool.query(
             `SELECT resource_id, start_time, end_time FROM booking_requests 
-             WHERE resource_id = ANY($1) AND request_date = $2 AND status = 'approved'`,
+             WHERE resource_id = ANY($1) AND request_date = $2 AND status IN ('approved', 'confirmed')`,
             [resource_ids, date]
           ),
       // Fetch all blocked slots for all resources in one query
@@ -262,15 +263,16 @@ router.get('/api/availability', async (req, res) => {
     // When rescheduling, ignore the original booking so its slot shows as available
     const ignoreId = ignore_booking_id ? parseInt(ignore_booking_id as string) : null;
     
+    // Include both 'approved' and 'confirmed' statuses as active bookings that block availability
     const bookedSlots = ignoreId
       ? await pool.query(
           `SELECT start_time, end_time FROM booking_requests 
-           WHERE resource_id = $1 AND request_date = $2 AND status = 'approved' AND id != $3`,
+           WHERE resource_id = $1 AND request_date = $2 AND status IN ('approved', 'confirmed') AND id != $3`,
           [resource_id, date, ignoreId]
         )
       : await pool.query(
           `SELECT start_time, end_time FROM booking_requests 
-           WHERE resource_id = $1 AND request_date = $2 AND status = 'approved'`,
+           WHERE resource_id = $1 AND request_date = $2 AND status IN ('approved', 'confirmed')`,
           [resource_id, date]
         );
     

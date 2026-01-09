@@ -129,9 +129,10 @@ const RosterManager: React.FC<RosterManagerProps> = ({
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
   const [addingGuest, setAddingGuest] = useState(false);
+  const [apiDeclaredPlayerCount, setApiDeclaredPlayerCount] = useState<number>(declaredPlayerCount);
 
   const canManage = isOwner || isStaff;
-  const remainingSlots = Math.max(0, declaredPlayerCount - participants.length);
+  const remainingSlots = Math.max(0, apiDeclaredPlayerCount - participants.length);
 
   const fetchParticipants = useCallback(async () => {
     try {
@@ -143,6 +144,10 @@ const RosterManager: React.FC<RosterManagerProps> = ({
         setParticipants(data.participants);
         setBooking(data.booking);
         setGuestPassesRemaining(data.guestPassesRemaining);
+        // Use API's declaredPlayerCount (from database) instead of prop
+        if (data.declaredPlayerCount) {
+          setApiDeclaredPlayerCount(data.declaredPlayerCount);
+        }
       } else {
         console.error('[RosterManager] Failed to fetch participants:', error);
       }
@@ -371,7 +376,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
               {canManage ? 'Manage Players' : 'Players'}
             </h3>
             <span className={`text-sm font-medium ${isDark ? 'text-white/60' : 'text-[#293515]/60'}`}>
-              {participants.length}/{declaredPlayerCount}
+              {participants.length}/{apiDeclaredPlayerCount}
             </span>
           </div>
         </div>

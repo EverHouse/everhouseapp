@@ -437,8 +437,8 @@ const Dashboard: React.FC = () => {
       const end = raw.end_time?.split(':').map(Number) || [0, 0];
       const totalMinutes = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
       
-      // Split time among all players (members + guests) if total_player_count is available
-      const playerCount = raw.total_player_count || 1;
+      // Split time among all players based on declared_player_count
+      const playerCount = raw.declared_player_count || 1;
       const memberShare = Math.ceil(totalMinutes / playerCount);
       
       return sum + memberShare;
@@ -451,8 +451,8 @@ const Dashboard: React.FC = () => {
       const end = raw.end_time?.split(':').map(Number) || [0, 0];
       const totalMinutes = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
       
-      // Split time among all players (members + guests) if total_player_count is available
-      const playerCount = raw.total_player_count || 1;
+      // Split time among all players based on declared_player_count
+      const playerCount = raw.declared_player_count || 1;
       const memberShare = Math.ceil(totalMinutes / playerCount);
       
       return sum + memberShare;
