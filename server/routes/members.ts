@@ -322,10 +322,17 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       .where(sql`LOWER(${wellnessEnrollments.userEmail}) = ${normalizedEmail}`)
       .orderBy(desc(wellnessClasses.date), desc(wellnessEnrollments.createdAt));
     
-    const guestPassInfo = await db.select()
+    const guestPassRaw = await db.select()
       .from(guestPasses)
       .where(sql`LOWER(${guestPasses.memberEmail}) = ${normalizedEmail}`)
       .limit(1);
+    
+    // Transform to expected format for frontend
+    const guestPassInfo = guestPassRaw[0] ? {
+      remainingPasses: guestPassRaw[0].passesTotal - guestPassRaw[0].passesUsed,
+      totalUsed: guestPassRaw[0].passesUsed,
+      passesTotal: guestPassRaw[0].passesTotal
+    } : null;
     
     const guestCheckInsHistory = await db.select()
       .from(guestCheckIns)
@@ -401,7 +408,7 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       bookingRequestsHistory: [],
       eventRsvpHistory,
       wellnessHistory,
-      guestPassInfo: guestPassInfo[0] || null,
+      guestPassInfo: guestPassInfo,
       guestCheckInsHistory,
       visitHistory,
       pastBookingsCount,

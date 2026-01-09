@@ -1381,20 +1381,6 @@ const Dashboard: React.FC = () => {
 
                 </div>
 
-                {/* Check In a Guest Button */}
-                {guestPasses && guestPasses.passes_remaining > 0 && (
-                  <button
-                    onClick={() => {
-                      setIsCardOpen(false);
-                      setShowGuestCheckin(true);
-                    }}
-                    className="w-full mt-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
-                    style={{ backgroundColor: `${cardTextColor}20`, color: cardTextColor }}
-                  >
-                    <span className="material-symbols-outlined text-lg">group_add</span>
-                    Check In a Guest ({guestPasses.passes_remaining} passes)
-                  </button>
-                )}
               </div>
             </div>
 
