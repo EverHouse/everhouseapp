@@ -72,6 +72,7 @@ export const bookingRequests = pgTable("booking_requests", {
 }, (table) => [
   uniqueIndex("booking_requests_trackman_id_idx").on(table.trackmanBookingId),
   index("booking_requests_session_idx").on(table.sessionId),
+  index("booking_requests_date_resource_idx").on(table.requestDate, table.resourceId),
 ]);
 
 // Facility closures table - scheduled closures

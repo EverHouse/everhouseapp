@@ -1,14 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useData } from '../../contexts/DataContext';
 import { BottomSentinel } from '../../components/layout/BottomSentinel';
 import BackToTop from '../../components/BackToTop';
 import Toggle from '../../components/Toggle';
-import FaqsAdmin from './FaqsAdmin';
-import InquiriesAdmin from './InquiriesAdmin';
-import GalleryAdmin from './GalleryAdmin';
-import BugReportsAdmin from './BugReportsAdmin';
 import Avatar from '../../components/Avatar';
 import ModalShell from '../../components/ModalShell';
 import StaffCommandCenter from '../../components/StaffCommandCenter';
@@ -17,18 +13,30 @@ import { useStaffWebSocket } from '../../hooks/useStaffWebSocket';
 
 import { TabType, StaffBottomNav, usePendingCounts, useUnreadNotifications } from './layout';
 
-import ChangelogTab from './tabs/ChangelogTab';
-import ToursTab from './tabs/ToursTab';
-import BlocksTab from './tabs/BlocksTab';
-import UpdatesTab from './tabs/UpdatesTab';
-import CafeTab from './tabs/CafeTab';
-import AnnouncementsTab from './tabs/AnnouncementsTab';
-import TeamTab from './tabs/TeamTab';
-import TiersTab from './tabs/TiersTab';
-import TrackmanTab from './tabs/TrackmanTab';
-import DirectoryTab from './tabs/DirectoryTab';
-import EventsTab from './tabs/EventsTab';
-import SimulatorTab from './tabs/SimulatorTab';
+// Lazy load admin tabs - reduces initial bundle size by deferring tab code until needed
+const FaqsAdmin = lazy(() => import('./FaqsAdmin'));
+const InquiriesAdmin = lazy(() => import('./InquiriesAdmin'));
+const GalleryAdmin = lazy(() => import('./GalleryAdmin'));
+const BugReportsAdmin = lazy(() => import('./BugReportsAdmin'));
+const ChangelogTab = lazy(() => import('./tabs/ChangelogTab'));
+const ToursTab = lazy(() => import('./tabs/ToursTab'));
+const BlocksTab = lazy(() => import('./tabs/BlocksTab'));
+const UpdatesTab = lazy(() => import('./tabs/UpdatesTab'));
+const CafeTab = lazy(() => import('./tabs/CafeTab'));
+const AnnouncementsTab = lazy(() => import('./tabs/AnnouncementsTab'));
+const TeamTab = lazy(() => import('./tabs/TeamTab'));
+const TiersTab = lazy(() => import('./tabs/TiersTab'));
+const TrackmanTab = lazy(() => import('./tabs/TrackmanTab'));
+const DirectoryTab = lazy(() => import('./tabs/DirectoryTab'));
+const EventsTab = lazy(() => import('./tabs/EventsTab'));
+const SimulatorTab = lazy(() => import('./tabs/SimulatorTab'));
+
+// Loading fallback for lazy-loaded tabs - matches app aesthetic
+const TabLoadingFallback = () => (
+  <div className="flex items-center justify-center py-20">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#293515] dark:border-[#F2F2EC]" />
+  </div>
+);
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -161,23 +169,25 @@ const AdminDashboard: React.FC = () => {
 
       <main className={`flex-1 px-4 md:px-8 mx-auto pt-[max(112px,calc(env(safe-area-inset-top)+96px))] w-full relative z-0 ${activeTab === 'simulator' || activeTab === 'home' || activeTab === 'directory' ? 'max-w-[1920px]' : 'max-w-4xl'}`}>
         {activeTab === 'home' && <StaffCommandCenter onTabChange={handleTabChange} isAdmin={actualUser?.role === 'admin'} wsConnected={staffWsConnected} />}
-        {activeTab === 'cafe' && <CafeTab />}
-        {activeTab === 'events' && <EventsTab />}
-        {activeTab === 'announcements' && <AnnouncementsTab />}
-        {activeTab === 'directory' && <DirectoryTab />}
-        {activeTab === 'simulator' && <SimulatorTab onTabChange={handleTabChange} />}
-        {activeTab === 'team' && <TeamTab />}
-        {activeTab === 'faqs' && <FaqsAdmin />}
-        {activeTab === 'inquiries' && <InquiriesAdmin />}
-        {activeTab === 'gallery' && <GalleryAdmin />}
-        {activeTab === 'tiers' && actualUser?.role === 'admin' && <TiersTab />}
-        {activeTab === 'blocks' && <BlocksTab />}
-        {activeTab === 'changelog' && <ChangelogTab />}
-        {activeTab === 'bugs' && actualUser?.role === 'admin' && <BugReportsAdmin />}
         {activeTab === 'training' && <StaffTrainingGuide />}
-        {activeTab === 'updates' && <UpdatesTab />}
-        {activeTab === 'tours' && <ToursTab />}
-        {activeTab === 'trackman' && actualUser?.role === 'admin' && <TrackmanTab />}
+        <Suspense fallback={<TabLoadingFallback />}>
+          {activeTab === 'cafe' && <CafeTab />}
+          {activeTab === 'events' && <EventsTab />}
+          {activeTab === 'announcements' && <AnnouncementsTab />}
+          {activeTab === 'directory' && <DirectoryTab />}
+          {activeTab === 'simulator' && <SimulatorTab onTabChange={handleTabChange} />}
+          {activeTab === 'team' && <TeamTab />}
+          {activeTab === 'faqs' && <FaqsAdmin />}
+          {activeTab === 'inquiries' && <InquiriesAdmin />}
+          {activeTab === 'gallery' && <GalleryAdmin />}
+          {activeTab === 'tiers' && actualUser?.role === 'admin' && <TiersTab />}
+          {activeTab === 'blocks' && <BlocksTab />}
+          {activeTab === 'changelog' && <ChangelogTab />}
+          {activeTab === 'bugs' && actualUser?.role === 'admin' && <BugReportsAdmin />}
+          {activeTab === 'updates' && <UpdatesTab />}
+          {activeTab === 'tours' && <ToursTab />}
+          {activeTab === 'trackman' && actualUser?.role === 'admin' && <TrackmanTab />}
+        </Suspense>
         <BottomSentinel />
       </main>
 
