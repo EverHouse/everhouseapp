@@ -235,6 +235,12 @@ router.post('/api/auth/verify-member', async (req, res) => {
       return res.status(400).json({ error: 'Email is required' });
     }
     
+    const normalizedEmail = email.toLowerCase();
+    
+    // Check if this is a staff/admin user first
+    const staffUserData = await getStaffUserByEmail(normalizedEmail);
+    const isStaffOrAdmin = staffUserData !== null;
+    
     const hubspot = await getHubSpotClient();
     
     const searchResponse = await hubspot.crm.contacts.searchApi.doSearch({
@@ -242,7 +248,7 @@ router.post('/api/auth/verify-member', async (req, res) => {
         filters: [{
           propertyName: 'email',
           operator: 'EQ' as any,
-          value: email.toLowerCase()
+          value: normalizedEmail
         }]
       }],
       properties: [
@@ -258,44 +264,46 @@ router.post('/api/auth/verify-member', async (req, res) => {
       limit: 1
     });
     
-    if (searchResponse.results.length === 0) {
+    const contact = searchResponse.results[0];
+    
+    // Staff/admin users can log in even without a HubSpot contact
+    if (!contact && !isStaffOrAdmin) {
       return res.status(404).json({ error: 'No member found with this email address' });
     }
     
-    const contact = searchResponse.results[0];
-    const status = (contact.properties.membership_status || '').toLowerCase();
-    
-    if (status !== 'active') {
-      return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
+    // Only check membership status for non-staff users with a HubSpot contact
+    if (contact && !isStaffOrAdmin) {
+      const status = (contact.properties.membership_status || '').toLowerCase();
+      if (status !== 'active') {
+        return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
+      }
     }
     
-    const role = await getUserRole(email.toLowerCase());
+    const role = isStaffOrAdmin ? staffUserData!.role : 'member';
 
-    let firstName = contact.properties.firstname || '';
-    let lastName = contact.properties.lastname || '';
-    let phone = contact.properties.phone || '';
+    let firstName = contact?.properties.firstname || '';
+    let lastName = contact?.properties.lastname || '';
+    let phone = contact?.properties.phone || '';
     let jobTitle = '';
 
-    if (role === 'staff' || role === 'admin') {
-      const staffUserData = await getStaffUserByEmail(email.toLowerCase());
-      if (staffUserData) {
-        firstName = staffUserData.firstName || firstName;
-        lastName = staffUserData.lastName || lastName;
-        phone = staffUserData.phone || phone;
-        jobTitle = staffUserData.jobTitle || '';
-      }
+    // Use staff user data if available (overrides HubSpot data for staff/admin)
+    if (isStaffOrAdmin && staffUserData) {
+      firstName = staffUserData.firstName || firstName;
+      lastName = staffUserData.lastName || lastName;
+      phone = staffUserData.phone || phone;
+      jobTitle = staffUserData.jobTitle || '';
     }
 
     const member = {
-      id: contact.id,
+      id: contact?.id || crypto.randomUUID(),
       firstName,
       lastName,
-      email: contact.properties.email || email,
+      email: contact?.properties.email || normalizedEmail,
       phone,
       jobTitle,
-      tier: normalizeTierName(contact.properties.membership_tier),
-      tags: extractTierTags(contact.properties.membership_tier, contact.properties.membership_discount_reason),
-      mindbodyClientId: contact.properties.mindbody_client_id || '',
+      tier: isStaffOrAdmin ? null : normalizeTierName(contact?.properties.membership_tier),
+      tags: isStaffOrAdmin ? [] : extractTierTags(contact?.properties.membership_tier, contact?.properties.membership_discount_reason),
+      mindbodyClientId: contact?.properties.mindbody_client_id || '',
       status: 'Active',
       role
     };
