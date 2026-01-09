@@ -1,5 +1,10 @@
 import { sql } from "drizzle-orm";
-import { index, uniqueIndex, jsonb, pgTable, timestamp, varchar, serial, boolean, text, date, time, integer, numeric } from "drizzle-orm/pg-core";
+import { index, uniqueIndex, jsonb, pgTable, timestamp, varchar, serial, boolean, text, date, time, integer, numeric, pgEnum } from "drizzle-orm/pg-core";
+
+export const bookingSourceEnum = pgEnum("booking_source", ["member_request", "staff_manual", "trackman_import"]);
+export const paymentMethodEnum = pgEnum("payment_method", ["guest_pass", "credit_card", "unpaid", "waived"]);
+export const participantTypeEnum = pgEnum("participant_type", ["owner", "member", "guest"]);
+export const participantPaymentStatusEnum = pgEnum("participant_payment_status", ["pending", "paid", "waived"]);
 
 // Resources table - bookable resources
 export const resources = pgTable("resources", {
@@ -57,8 +62,16 @@ export const bookingRequests = pgTable("booking_requests", {
   originalBookedDate: timestamp("original_booked_date"),
   guestCount: integer("guest_count").default(0),
   trackmanPlayerCount: integer("trackman_player_count"),
+  sessionId: integer("session_id"),
+  declaredPlayerCount: integer("declared_player_count"),
+  finalPlayerCount: integer("final_player_count"),
+  originalStartTime: time("original_start_time"),
+  originalEndTime: time("original_end_time"),
+  originalResourceId: integer("original_resource_id"),
+  memberNotes: varchar("member_notes", { length: 280 }),
 }, (table) => [
   uniqueIndex("booking_requests_trackman_id_idx").on(table.trackmanBookingId),
+  index("booking_requests_session_idx").on(table.sessionId),
 ]);
 
 // Facility closures table - scheduled closures
@@ -185,3 +198,85 @@ export type InsertTour = typeof tours.$inferInsert;
 export type TrackmanUnmatchedBooking = typeof trackmanUnmatchedBookings.$inferSelect;
 export type InsertTrackmanUnmatchedBooking = typeof trackmanUnmatchedBookings.$inferInsert;
 export type TrackmanImportRun = typeof trackmanImportRuns.$inferSelect;
+
+// ============================================================================
+// Multi-Member Booking System Tables (Phase 1)
+// ============================================================================
+
+// Booking sessions table - central hub linking bookings to Trackman and participants
+export const bookingSessions = pgTable("booking_sessions", {
+  id: serial("id").primaryKey(),
+  trackmanBookingId: varchar("trackman_booking_id").unique(),
+  resourceId: integer("resource_id").notNull(),
+  sessionDate: date("session_date").notNull(),
+  startTime: time("start_time").notNull(),
+  endTime: time("end_time").notNull(),
+  source: bookingSourceEnum("source").default("member_request"),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("booking_sessions_resource_date_idx").on(table.resourceId, table.sessionDate),
+  index("booking_sessions_trackman_idx").on(table.trackmanBookingId),
+]);
+
+// Guests table - persistent guest tracking across bookings
+export const guests = pgTable("guests", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(),
+  email: varchar("email"),
+  phone: varchar("phone"),
+  createdByMemberId: varchar("created_by_member_id"),
+  lastVisitDate: date("last_visit_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("guests_email_idx").on(table.email),
+  index("guests_created_by_idx").on(table.createdByMemberId),
+]);
+
+// Usage ledger table - tracks per-member time and fees with tier snapshot
+export const usageLedger = pgTable("usage_ledger", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull(),
+  memberId: varchar("member_id"),
+  minutesCharged: integer("minutes_charged").notNull().default(0),
+  overageFee: numeric("overage_fee", { precision: 10, scale: 2 }).default("0.00"),
+  guestFee: numeric("guest_fee", { precision: 10, scale: 2 }).default("0.00"),
+  tierAtBooking: varchar("tier_at_booking"),
+  paymentMethod: paymentMethodEnum("payment_method").default("unpaid"),
+  source: bookingSourceEnum("source").default("member_request"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("usage_ledger_session_idx").on(table.sessionId),
+  index("usage_ledger_member_idx").on(table.memberId),
+]);
+
+// Booking participants table - unified table for all participants (replaces booking_members/booking_guests)
+export const bookingParticipants = pgTable("booking_participants", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull(),
+  userId: varchar("user_id"),
+  guestId: integer("guest_id"),
+  participantType: participantTypeEnum("participant_type").notNull(),
+  displayName: varchar("display_name").notNull(),
+  slotDuration: integer("slot_duration"),
+  paymentStatus: participantPaymentStatusEnum("payment_status").default("pending"),
+  trackmanPlayerRowId: varchar("trackman_player_row_id"),
+  inviteStatus: varchar("invite_status").default("pending"),
+  invitedAt: timestamp("invited_at"),
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("booking_participants_session_idx").on(table.sessionId),
+  index("booking_participants_user_idx").on(table.userId),
+  index("booking_participants_guest_idx").on(table.guestId),
+]);
+
+export type BookingSession = typeof bookingSessions.$inferSelect;
+export type InsertBookingSession = typeof bookingSessions.$inferInsert;
+export type Guest = typeof guests.$inferSelect;
+export type InsertGuest = typeof guests.$inferInsert;
+export type UsageLedger = typeof usageLedger.$inferSelect;
+export type InsertUsageLedger = typeof usageLedger.$inferInsert;
+export type BookingParticipant = typeof bookingParticipants.$inferSelect;
+export type InsertBookingParticipant = typeof bookingParticipants.$inferInsert;

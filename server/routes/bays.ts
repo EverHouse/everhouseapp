@@ -12,7 +12,7 @@ import { isStaffOrAdmin } from '../core/middleware';
 import { formatNotificationDateTime, formatDateDisplayWithDay, formatTime12Hour, createPacificDate } from '../utils/dateUtils';
 import { parseAffectedAreas } from '../core/affectedAreas';
 import { logAndRespond } from '../core/logger';
-import { checkClosureConflict, parseTimeToMinutes } from '../core/bookingValidation';
+import { checkClosureConflict, checkAvailabilityBlockConflict, parseTimeToMinutes } from '../core/bookingValidation';
 import { bookingEvents } from '../core/bookingEvents';
 import { sendNotificationToUser } from '../core/websocket';
 import { getSessionUser } from '../types/session';
@@ -607,6 +607,22 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
             statusCode: 409, 
             error: 'Cannot approve booking during closure',
             message: `This time slot conflicts with "${closureCheck.closureTitle}". Please decline this request or wait until the closure ends.`
+          };
+        }
+        
+        // Also check availability blocks (event blocks)
+        const blockCheck = await checkAvailabilityBlockConflict(
+          assignedBayId,
+          req_data.requestDate,
+          req_data.startTime,
+          req_data.endTime
+        );
+        
+        if (blockCheck.hasConflict) {
+          throw { 
+            statusCode: 409, 
+            error: 'Cannot approve booking during event block',
+            message: `This time slot is blocked: ${blockCheck.blockType || 'Event block'}. Please decline this request or reschedule.`
           };
         }
         

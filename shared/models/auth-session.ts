@@ -36,6 +36,7 @@ export const users = pgTable("users", {
   joinDate: date("join_date"),
   welcomeEmailSent: boolean("welcome_email_sent").default(false),
   welcomeEmailSentAt: timestamp("welcome_email_sent_at"),
+  trackmanEmail: varchar("trackman_email"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

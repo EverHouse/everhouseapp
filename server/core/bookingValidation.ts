@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { facilityClosures, bookingRequests } from '../../shared/schema';
+import { facilityClosures, bookingRequests, availabilityBlocks } from '../../shared/schema';
 import { eq, and, or, sql } from 'drizzle-orm';
 import { parseAffectedAreas } from './affectedAreas';
 import { logger } from './logger';
@@ -131,4 +131,64 @@ export async function checkBookingConflict(
     logger.error('[checkBookingConflict] Error checking booking conflict:', error);
     throw error;
   }
+}
+
+export async function checkAvailabilityBlockConflict(
+  resourceId: number,
+  bookingDate: string,
+  startTime: string,
+  endTime: string
+): Promise<{ hasConflict: boolean; blockType?: string; blockNotes?: string }> {
+  try {
+    const blocks = await db
+      .select()
+      .from(availabilityBlocks)
+      .where(and(
+        eq(availabilityBlocks.resourceId, resourceId),
+        sql`${availabilityBlocks.blockDate} = ${bookingDate}`,
+        and(
+          sql`${availabilityBlocks.startTime} < ${endTime}`,
+          sql`${availabilityBlocks.endTime} > ${startTime}`
+        )
+      ));
+
+    if (blocks.length > 0) {
+      const block = blocks[0];
+      return { 
+        hasConflict: true, 
+        blockType: block.blockType || 'Event Block',
+        blockNotes: block.notes || undefined
+      };
+    }
+
+    return { hasConflict: false };
+  } catch (error) {
+    logger.error('[checkAvailabilityBlockConflict] Error checking availability block conflict:', error);
+    throw error;
+  }
+}
+
+export async function checkAllConflicts(
+  resourceId: number,
+  bookingDate: string,
+  startTime: string,
+  endTime: string,
+  excludeBookingId?: number
+): Promise<{ hasConflict: boolean; conflictType?: 'closure' | 'availability_block' | 'booking'; conflictTitle?: string }> {
+  const closureCheck = await checkClosureConflict(resourceId, bookingDate, startTime, endTime);
+  if (closureCheck.hasConflict) {
+    return { hasConflict: true, conflictType: 'closure', conflictTitle: closureCheck.closureTitle || 'Facility Closure' };
+  }
+
+  const blockCheck = await checkAvailabilityBlockConflict(resourceId, bookingDate, startTime, endTime);
+  if (blockCheck.hasConflict) {
+    return { hasConflict: true, conflictType: 'availability_block', conflictTitle: blockCheck.blockType || 'Event Block' };
+  }
+
+  const bookingCheck = await checkBookingConflict(resourceId, bookingDate, startTime, endTime, excludeBookingId);
+  if (bookingCheck.hasConflict) {
+    return { hasConflict: true, conflictType: 'booking', conflictTitle: 'Existing Booking' };
+  }
+
+  return { hasConflict: false };
 }

@@ -12,7 +12,7 @@ import { withRetry } from '../core/retry';
 import { checkDailyBookingLimit } from '../core/tierService';
 import { bookingEvents } from '../core/bookingEvents';
 import { sendNotificationToUser } from '../core/websocket';
-import { checkClosureConflict, checkBookingConflict, parseTimeToMinutes } from '../core/bookingValidation';
+import { checkAllConflicts, parseTimeToMinutes } from '../core/bookingValidation';
 import { getSessionUser } from '../types/session';
 
 const router = Router();
@@ -262,19 +262,30 @@ router.put('/api/bookings/:id/approve', isStaffOrAdmin, async (req, res) => {
         throw { statusCode: 404, error: 'Booking not found' };
       }
       
-      const closureCheck = await checkClosureConflict(
+      // Check all conflicts: closures, availability blocks, and existing bookings
+      const conflictCheck = await checkAllConflicts(
         booking.resourceId!,
         booking.requestDate,
         booking.startTime,
-        booking.endTime
+        booking.endTime,
+        bookingId  // Exclude this booking from the check
       );
       
-      if (closureCheck.hasConflict) {
-        throw { 
-          statusCode: 409, 
-          error: 'Cannot approve booking during closure',
-          message: `This time slot conflicts with "${closureCheck.closureTitle}". Please decline this request or wait until the closure ends.`
-        };
+      if (conflictCheck.hasConflict) {
+        if (conflictCheck.conflictType === 'closure') {
+          throw { 
+            statusCode: 409, 
+            error: 'Cannot approve booking during closure',
+            message: `This time slot conflicts with "${conflictCheck.conflictTitle}". Please decline this request or wait until the closure ends.`
+          };
+        } else if (conflictCheck.conflictType === 'availability_block') {
+          throw { 
+            statusCode: 409, 
+            error: 'Cannot approve booking during event block',
+            message: `This time slot is blocked: ${conflictCheck.conflictTitle || 'Event block'}. Please decline this request or reschedule.`
+          };
+        }
+        // Note: booking conflicts handled by the existing query below for more detailed messaging
       }
       
       const existingConflicts = await tx.select()
@@ -466,12 +477,25 @@ router.post('/api/bookings', async (req, res) => {
       return res.status(409).json({ error: 'This time slot is already requested or booked' });
     }
     
-    const closureCheck = await checkClosureConflict(resource_id, booking_date, start_time, end_time);
-    if (closureCheck.hasConflict) {
-      return res.status(409).json({ 
-        error: 'Time slot conflicts with a facility closure',
-        message: `This time slot conflicts with "${closureCheck.closureTitle}".`
-      });
+    // Check all conflicts using unified function
+    const conflictCheck = await checkAllConflicts(resource_id, booking_date, start_time, end_time);
+    if (conflictCheck.hasConflict) {
+      if (conflictCheck.conflictType === 'closure') {
+        return res.status(409).json({ 
+          error: 'Time slot conflicts with a facility closure',
+          message: `This time slot conflicts with "${conflictCheck.conflictTitle}".`
+        });
+      } else if (conflictCheck.conflictType === 'availability_block') {
+        return res.status(409).json({ 
+          error: 'Time slot is blocked for an event',
+          message: `This time slot is blocked: ${conflictCheck.conflictTitle || 'Event block'}.`
+        });
+      } else {
+        return res.status(409).json({ 
+          error: 'Time slot already booked',
+          message: 'Another booking already exists for this time slot.'
+        });
+      }
     }
     
     const userName = user?.firstName && user?.lastName 
@@ -793,20 +817,25 @@ router.post('/api/staff/bookings/manual', isStaffOrAdmin, async (req, res) => {
     const endMin = endMinutes % 60;
     const end_time = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
 
-    const closureCheck = await checkClosureConflict(resource_id, booking_date, start_time, end_time);
-    if (closureCheck.hasConflict) {
-      return res.status(409).json({ 
-        error: 'Time slot conflicts with a facility closure',
-        message: `This time slot conflicts with "${closureCheck.closureTitle}".`
-      });
-    }
-
-    const bookingCheck = await checkBookingConflict(resource_id, booking_date, start_time, end_time);
-    if (bookingCheck.hasConflict) {
-      return res.status(409).json({ 
-        error: 'Time slot already booked',
-        message: 'Another booking already exists for this time slot.'
-      });
+    // Check all conflicts: closures, availability blocks, and existing bookings
+    const conflictCheck = await checkAllConflicts(resource_id, booking_date, start_time, end_time);
+    if (conflictCheck.hasConflict) {
+      if (conflictCheck.conflictType === 'closure') {
+        return res.status(409).json({ 
+          error: 'Time slot conflicts with a facility closure',
+          message: `This time slot conflicts with "${conflictCheck.conflictTitle}".`
+        });
+      } else if (conflictCheck.conflictType === 'availability_block') {
+        return res.status(409).json({ 
+          error: 'Time slot is blocked for an event',
+          message: `This time slot is blocked: ${conflictCheck.conflictTitle || 'Event block'}.`
+        });
+      } else {
+        return res.status(409).json({ 
+          error: 'Time slot already booked',
+          message: 'Another booking already exists for this time slot.'
+        });
+      }
     }
 
     let calendarEventId: string | null = null;

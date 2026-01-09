@@ -72,6 +72,17 @@ interface UnmatchedBooking {
     originalEmail: string | null;
 }
 
+interface AvailabilityBlock {
+    id: number;
+    resourceId: number;
+    blockDate: string;
+    startTime: string;
+    endTime: string;
+    blockType: string;
+    notes: string | null;
+    closureTitle?: string | null;
+}
+
 const formatDateShortAdmin = (dateStr: string): string => {
     if (!dateStr) return 'No Date';
     const datePart = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
@@ -344,7 +355,8 @@ const ManualBookingModal: React.FC<{
                 const endTimeCalc = (() => {
                     const [h, m] = startTime.split(':').map(Number);
                     const totalMins = h * 60 + m + durationMinutes;
-                    return `${Math.floor(totalMins / 60).toString().padStart(2, '0')}:${(totalMins % 60).toString().padStart(2, '0')}`;
+                    const endHour = Math.floor(totalMins / 60) % 24;
+                    return `${endHour.toString().padStart(2, '0')}:${(totalMins % 60).toString().padStart(2, '0')}`;
                 })();
                 
                 const bookingResult: ManualBookingResult = {
@@ -655,6 +667,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
     const [resources, setResources] = useState<Resource[]>([]);
     const [approvedBookings, setApprovedBookings] = useState<BookingRequest[]>([]);
     const [closures, setClosures] = useState<CalendarClosure[]>([]);
+    const [availabilityBlocks, setAvailabilityBlocks] = useState<AvailabilityBlock[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedRequest, setSelectedRequest] = useState<BookingRequest | null>(null);
     const [actionModal, setActionModal] = useState<'approve' | 'decline' | null>(null);
@@ -876,10 +889,11 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
         const startDate = addDaysToPacificDate(baseDate, -60);
         const endDate = addDaysToPacificDate(baseDate, 30);
         try {
-            const [bookingsRes, closuresRes, unmatchedRes] = await Promise.all([
+            const [bookingsRes, closuresRes, unmatchedRes, blocksRes] = await Promise.all([
                 fetch(`/api/approved-bookings?start_date=${startDate}&end_date=${endDate}`),
                 fetch('/api/closures'),
-                fetch(`/api/admin/trackman/unmatched-calendar?start_date=${startDate}&end_date=${endDate}`, { credentials: 'include' })
+                fetch(`/api/admin/trackman/unmatched-calendar?start_date=${startDate}&end_date=${endDate}`, { credentials: 'include' }),
+                fetch(`/api/availability-blocks?start_date=${startDate}&end_date=${endDate}`)
             ]);
             
             if (bookingsRes.ok) {
@@ -898,6 +912,21 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
             if (unmatchedRes.ok) {
                 const unmatchedData = await unmatchedRes.json();
                 setUnmatchedBookings(unmatchedData);
+            }
+            
+            if (blocksRes.ok) {
+                const blocksData = await blocksRes.json();
+                const mappedBlocks: AvailabilityBlock[] = blocksData.map((b: any) => ({
+                    id: b.id,
+                    resourceId: b.resource_id,
+                    blockDate: b.block_date,
+                    startTime: b.start_time,
+                    endTime: b.end_time,
+                    blockType: b.block_type,
+                    notes: b.notes,
+                    closureTitle: b.closure_title
+                }));
+                setAvailabilityBlocks(mappedBlocks);
             }
         } catch (err) {
             console.error('Failed to fetch calendar data:', err);
@@ -1440,6 +1469,25 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
         return null;
     };
 
+    const getBlockForSlot = (resourceId: number, date: string, slotStart: number, slotEnd: number): AvailabilityBlock | null => {
+        for (const block of availabilityBlocks) {
+            if (block.blockDate !== date) continue;
+            if (block.resourceId !== resourceId) continue;
+            
+            const blockStartMinutes = block.startTime 
+                ? parseInt(block.startTime.split(':')[0]) * 60 + parseInt(block.startTime.split(':')[1] || '0') 
+                : 0;
+            const blockEndMinutes = block.endTime 
+                ? parseInt(block.endTime.split(':')[0]) * 60 + parseInt(block.endTime.split(':')[1] || '0') 
+                : 24 * 60;
+            
+            if (slotStart < blockEndMinutes && slotEnd > blockStartMinutes) {
+                return block;
+            }
+        }
+        return null;
+    };
+
     return (
             <div className="flex justify-center animate-pop-in h-full">
                 <div className="w-full bg-white dark:bg-surface-dark rounded-2xl shadow-lg border border-gray-200 dark:border-white/25 overflow-hidden flex flex-col lg:h-[calc(100vh-140px)]">
@@ -1845,6 +1893,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                             const slotEnd = slotStart + 15;
                                             
                                             const closure = getClosureForSlot(resource.id, calendarDate, slotStart, slotEnd);
+                                            const eventBlock = !closure ? getBlockForSlot(resource.id, calendarDate, slotStart, slotEnd) : null;
                                             
                                             const booking = approvedBookings.find(b => {
                                                 if (b.resource_id !== resource.id || b.request_date !== calendarDate) return false;
@@ -1889,16 +1938,18 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                 }));
                                             };
                                             
-                                            const isEmptyCell = !closure && !booking && !unmatchedBooking;
+                                            const isEmptyCell = !closure && !eventBlock && !booking && !unmatchedBooking;
                                             
                                             return (
                                                 <div
                                                     key={`${resource.id}-${slot}`}
-                                                    title={closure ? `CLOSED: ${closure.title}` : isUnmatchedPlaceholder ? `UNMATCHED: ${booking?.user_name || 'Unknown'} - Click to resolve` : booking ? `${bookingDisplayName}${isInactiveMember ? ' (Inactive Member)' : ''} - Click for details` : unmatchedBooking ? `UNMATCHED: ${unmatchedBooking.userName || unmatchedBooking.originalEmail || 'Unknown'} - Click to resolve` : `Click to book ${resource.type === 'conference_room' ? 'Conference Room' : resource.name} at ${formatTime12Hour(slot)}`}
-                                                    onClick={closure ? undefined : booking ? () => setSelectedCalendarBooking(booking) : unmatchedBooking ? () => { setResolveSearchQuery(''); setResolveUnmatchedModal({ booking: unmatchedBooking, memberEmail: '' }); } : handleEmptyCellClick}
+                                                    title={closure ? `CLOSED: ${closure.title}` : eventBlock ? `EVENT BLOCK: ${eventBlock.closureTitle || eventBlock.blockType || 'Blocked'}` : isUnmatchedPlaceholder ? `UNMATCHED: ${booking?.user_name || 'Unknown'} - Click to resolve` : booking ? `${bookingDisplayName}${isInactiveMember ? ' (Inactive Member)' : ''} - Click for details` : unmatchedBooking ? `UNMATCHED: ${unmatchedBooking.userName || unmatchedBooking.originalEmail || 'Unknown'} - Click to resolve` : `Click to book ${resource.type === 'conference_room' ? 'Conference Room' : resource.name} at ${formatTime12Hour(slot)}`}
+                                                    onClick={closure || eventBlock ? undefined : booking ? () => setSelectedCalendarBooking(booking) : unmatchedBooking ? () => { setResolveSearchQuery(''); setResolveUnmatchedModal({ booking: unmatchedBooking, memberEmail: '' }); } : handleEmptyCellClick}
                                                     className={`h-7 sm:h-8 rounded border ${
                                                         closure
                                                             ? 'bg-red-100 dark:bg-red-500/20 border-red-300 dark:border-red-500/30'
+                                                            : eventBlock
+                                                                ? 'bg-orange-100 dark:bg-orange-500/20 border-orange-300 dark:border-orange-500/30'
                                                             : isUnmatchedPlaceholder
                                                                 ? 'bg-amber-100 dark:bg-amber-500/20 border-amber-300 dark:border-amber-500/30 cursor-pointer hover:bg-amber-200 dark:hover:bg-amber-500/30'
                                                             : booking 
@@ -1920,6 +1971,13 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                                 CLOSED
                                                             </span>
                                                             <span className="sm:hidden text-[8px] font-bold text-red-600 dark:text-red-400">X</span>
+                                                        </div>
+                                                    ) : eventBlock ? (
+                                                        <div className="px-0.5 sm:px-1 h-full flex items-center justify-center">
+                                                            <span className="hidden sm:block text-[9px] sm:text-[10px] font-medium truncate text-orange-600 dark:text-orange-400">
+                                                                EVENT
+                                                            </span>
+                                                            <span className="sm:hidden text-[8px] font-bold text-orange-600 dark:text-orange-400">E</span>
                                                         </div>
                                                     ) : isUnmatchedPlaceholder && booking ? (
                                                         <div className="px-0.5 sm:px-1 h-full flex items-center justify-center sm:justify-start">
