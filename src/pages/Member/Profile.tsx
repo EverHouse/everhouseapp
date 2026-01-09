@@ -1,0 +1,586 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useData } from '../../contexts/DataContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import { usePageReady } from '../../contexts/PageReadyContext';
+import { isFoundingMember, getBaseTier } from '../../utils/permissions';
+import { getTierColor } from '../../utils/tierUtils';
+import { formatPhoneNumber } from '../../utils/formatting';
+import { formatMemberSince } from '../../utils/dateUtils';
+import { useTierPermissions } from '../../hooks/useTierPermissions';
+import TierBadge from '../../components/TierBadge';
+import TagBadge from '../../components/TagBadge';
+import HubSpotFormModal from '../../components/HubSpotFormModal';
+import { isPushSupported, isSubscribedToPush, subscribeToPush, unsubscribeFromPush } from '../../services/pushNotifications';
+import Toggle from '../../components/Toggle';
+import MemberBottomNav from '../../components/MemberBottomNav';
+import StaffBottomNavSimple from '../../components/StaffBottomNavSimple';
+import { BottomSentinel } from '../../components/layout/BottomSentinel';
+import BugReportModal from '../../components/BugReportModal';
+import ModalShell from '../../components/ModalShell';
+
+
+const GUEST_CHECKIN_FIELDS = [
+  { name: 'guest_firstname', label: 'Guest First Name', type: 'text' as const, required: true, placeholder: 'John' },
+  { name: 'guest_lastname', label: 'Guest Last Name', type: 'text' as const, required: true, placeholder: 'Smith' },
+  { name: 'guest_email', label: 'Guest Email', type: 'email' as const, required: true, placeholder: 'john@example.com' },
+  { name: 'guest_phone', label: 'Guest Phone', type: 'tel' as const, required: false, placeholder: '(555) 123-4567' }
+];
+
+const Profile: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user, logout, actualUser, isViewingAs } = useData();
+  const { effectiveTheme } = useTheme();
+  const { setPageReady } = usePageReady();
+  const isDark = effectiveTheme === 'dark';
+  const [isCardOpen, setIsCardOpen] = useState(false);
+  const [showGuestCheckin, setShowGuestCheckin] = useState(false);
+  const [guestPasses, setGuestPasses] = useState<{ passes_used: number; passes_total: number; passes_remaining: number } | null>(null);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+  
+  const [showPasswordSection, setShowPasswordSection] = useState(false);
+  const [hasPassword, setHasPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [showPasswordSetupBanner, setShowPasswordSetupBanner] = useState(false);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [showBugReport, setShowBugReport] = useState(false);
+  const [staffDetails, setStaffDetails] = useState<{phone?: string; job_title?: string} | null>(null);
+
+  // Check if viewing a staff/admin profile (either directly or via view-as)
+  const isStaffOrAdminProfile = user?.role === 'admin' || user?.role === 'staff';
+  // Check if actual user is admin viewing as someone
+  const isAdminViewingAs = actualUser?.role === 'admin' && isViewingAs;
+
+  const { permissions: tierPermissions } = useTierPermissions(user?.tier);
+
+  useEffect(() => {
+    if (!isProfileLoading) {
+      setPageReady(true);
+    }
+  }, [isProfileLoading, setPageReady]);
+
+  useEffect(() => {
+    if (user?.email) {
+      fetch(`/api/guest-passes/${encodeURIComponent(user.email)}?tier=${encodeURIComponent(user.tier || 'Social')}`, { credentials: 'include' })
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to fetch guest passes');
+          return res.json();
+        })
+        .then(data => setGuestPasses(data))
+        .catch(err => console.error('Error fetching guest passes:', err))
+        .finally(() => setIsProfileLoading(false));
+    } else {
+      setIsProfileLoading(false);
+    }
+  }, [user?.email, user?.tier]);
+
+  useEffect(() => {
+    if (isStaffOrAdminProfile && user?.email) {
+      fetch(`/api/auth/check-staff-admin?email=${encodeURIComponent(user.email)}`, { credentials: 'include' })
+        .then(res => res.json())
+        .then(data => {
+          setHasPassword(data.hasPassword || false);
+        })
+        .catch(() => {});
+    }
+  }, [user?.email, isStaffOrAdminProfile]);
+
+  useEffect(() => {
+    const state = location.state as { showPasswordSetup?: boolean } | null;
+    if (state?.showPasswordSetup && isStaffOrAdminProfile) {
+      setShowPasswordSetupBanner(true);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, isStaffOrAdminProfile]);
+
+  useEffect(() => {
+    if (isStaffOrAdminProfile && user?.email) {
+      fetch(`/api/staff-users/by-email/${encodeURIComponent(user.email)}`, { credentials: 'include' })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => setStaffDetails(data))
+        .catch(() => {});
+    }
+  }, [user?.email, isStaffOrAdminProfile]);
+
+  const handlePasswordSubmit = async () => {
+    setPasswordError('');
+    setPasswordSuccess('');
+    
+    if (newPassword.length < 8) {
+      setPasswordError('Password must be at least 8 characters');
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match');
+      return;
+    }
+    
+    if (hasPassword && !currentPassword) {
+      setPasswordError('Current password is required');
+      return;
+    }
+    
+    setPasswordLoading(true);
+    
+    try {
+      const res = await fetch('/api/auth/set-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          password: newPassword,
+          currentPassword: hasPassword ? currentPassword : undefined
+        }),
+        credentials: 'include'
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to set password');
+      }
+      
+      setPasswordSuccess('Password updated successfully');
+      setHasPassword(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowPasswordSetupBanner(false);
+      
+      setTimeout(() => {
+        setShowPasswordSection(false);
+        setPasswordSuccess('');
+      }, 2000);
+    } catch (err: any) {
+      setPasswordError(err.message || 'Failed to set password');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const checkPush = async () => {
+      const supported = await isPushSupported();
+      setPushSupported(supported);
+      if (supported) {
+        const subscribed = await isSubscribedToPush();
+        setPushEnabled(subscribed);
+      }
+    };
+    checkPush();
+  }, []);
+
+  const handlePushToggle = async (newValue: boolean) => {
+    if (!user?.email || pushLoading) return;
+    
+    setPushLoading(true);
+    try {
+      if (!newValue) {
+        await unsubscribeFromPush();
+        setPushEnabled(false);
+      } else {
+        const success = await subscribeToPush(user.email);
+        setPushEnabled(success);
+      }
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
+  if (!user) return null;
+
+  return (
+    <div 
+      className={`px-6 pb-32 min-h-screen ${isDark ? 'bg-[#0f120a]' : 'bg-[#F2F2EC]'}`}
+      style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'calc(var(--header-offset) + 1.5rem)' }}
+    >
+      <div className="space-y-6">
+         <Section title="Account" isDark={isDark} delay="0.05s">
+            <Row icon="person" label="Name" value={user.name} isDark={isDark} />
+            <Row icon="mail" label="Email" value={user.email} isDark={isDark} />
+            <Row icon="call" label="Phone" value={formatPhoneNumber(staffDetails?.phone || user.phone)} isDark={isDark} />
+         </Section>
+
+         <Section title="Settings" isDark={isDark} delay="0.1s">
+            <div className={`p-4 flex items-center justify-between transition-colors ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
+              <div className="flex items-center gap-4">
+                <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>notifications</span>
+                <div>
+                  <span className={`font-medium text-sm ${isDark ? '' : 'text-primary'}`}>Push Notifications</span>
+                  <p className={`text-xs mt-0.5 ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
+                    {isStaffOrAdminProfile 
+                      ? 'Get notified of new booking requests' 
+                      : 'Get notified when bookings are approved'}
+                  </p>
+                  {!pushSupported && (
+                    <p className={`text-xs mt-1 ${isDark ? 'text-amber-400/70' : 'text-amber-600'}`}>
+                      Not supported in this browser
+                    </p>
+                  )}
+                </div>
+              </div>
+              <Toggle
+                checked={pushEnabled}
+                onChange={handlePushToggle}
+                disabled={pushLoading || !pushSupported}
+                label="Push Notifications"
+              />
+            </div>
+            <Row icon="lock" label="Privacy" arrow isDark={isDark} />
+         </Section>
+
+         {/* Password Setup Banner for Staff/Admin */}
+         {showPasswordSetupBanner && isStaffOrAdminProfile && (
+           <div className={`rounded-2xl p-4 mb-4 ${isDark ? 'bg-accent/20 border border-accent/30' : 'bg-amber-50 border border-amber-200'}`}>
+             <div className="flex items-start gap-3">
+               <span className={`material-symbols-outlined text-xl ${isDark ? 'text-accent' : 'text-amber-600'}`}>key</span>
+               <div className="flex-1">
+                 <p className={`font-semibold text-sm ${isDark ? 'text-accent' : 'text-amber-800'}`}>
+                   Set Up Password Login (Optional)
+                 </p>
+                 <p className={`text-xs mt-1 ${isDark ? 'text-white/80' : 'text-amber-700'}`}>
+                   For faster access, you can set a password to log in without email codes.
+                 </p>
+                 <div className="flex gap-2 mt-3">
+                   <button
+                     onClick={() => { setShowPasswordSection(true); setShowPasswordSetupBanner(false); }}
+                     className={`px-4 py-2 rounded-lg text-xs font-bold ${isDark ? 'bg-accent text-primary' : 'bg-amber-600 text-white'}`}
+                   >
+                     Set Password
+                   </button>
+                   <button
+                     onClick={() => setShowPasswordSetupBanner(false)}
+                     className={`px-4 py-2 rounded-lg text-xs font-medium ${isDark ? 'bg-white/10 text-white/70' : 'bg-amber-100 text-amber-700'}`}
+                   >
+                     Maybe Later
+                   </button>
+                 </div>
+               </div>
+             </div>
+           </div>
+         )}
+
+         {/* Staff Info - only show for staff/admin users */}
+         {isStaffOrAdminProfile && (
+           <Section title="Staff Information" isDark={isDark} delay="0.15s">
+              <Row icon="shield_person" label="Role" value={user?.role === 'admin' ? 'Administrator' : 'Staff'} isDark={isDark} />
+              {staffDetails?.job_title && <Row icon="work" label="Job Title" value={staffDetails.job_title} isDark={isDark} />}
+           </Section>
+         )}
+
+         {/* Password Section - only show for staff/admin users */}
+         {isStaffOrAdminProfile && (
+           <Section title="Security" isDark={isDark} delay="0.2s">
+              <div 
+                className={`p-4 flex items-center justify-between transition-colors cursor-pointer ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}
+                onClick={() => setShowPasswordSection(!showPasswordSection)}
+              >
+                <div className="flex items-center gap-4">
+                  <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>key</span>
+                  <span className={`font-medium text-sm ${isDark ? '' : 'text-primary'}`}>
+                    {hasPassword ? 'Change Password' : 'Set Up Password'}
+                  </span>
+                </div>
+                <span className={`material-symbols-outlined text-sm ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
+                  {showPasswordSection ? 'expand_less' : 'expand_more'}
+                </span>
+              </div>
+              
+              {showPasswordSection && (
+                <div className={`p-4 pt-0 space-y-4 animate-pop-in ${isDark ? 'border-t border-white/20' : 'border-t border-black/5'}`}>
+                  {passwordError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
+                      {passwordError}
+                    </div>
+                  )}
+                  {passwordSuccess && (
+                    <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-lg text-xs">
+                      {passwordSuccess}
+                    </div>
+                  )}
+                  
+                  {hasPassword && (
+                    <input
+                      type="password"
+                      placeholder="Current Password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className={`w-full px-4 py-3 rounded-xl border text-sm ${isDark ? 'bg-white/5 border-white/25 text-white placeholder:text-white/70' : 'bg-white border-black/10 text-primary placeholder:text-gray-600'}`}
+                    />
+                  )}
+                  
+                  <input
+                    type="password"
+                    placeholder="New Password (min 8 characters)"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-xl border text-sm ${isDark ? 'bg-white/5 border-white/25 text-white placeholder:text-white/70' : 'bg-white border-black/10 text-primary placeholder:text-gray-600'}`}
+                  />
+                  
+                  <input
+                    type="password"
+                    placeholder="Confirm New Password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-xl border text-sm ${isDark ? 'bg-white/5 border-white/25 text-white placeholder:text-white/70' : 'bg-white border-black/10 text-primary placeholder:text-gray-600'}`}
+                  />
+                  
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handlePasswordSubmit}
+                      disabled={passwordLoading || !newPassword || !confirmPassword}
+                      className={`flex-1 py-3 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${isDark ? 'bg-accent text-primary' : 'bg-primary text-white'}`}
+                    >
+                      {passwordLoading ? 'Saving...' : (hasPassword ? 'Update Password' : 'Set Password')}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowPasswordSection(false);
+                        setCurrentPassword('');
+                        setNewPassword('');
+                        setConfirmPassword('');
+                        setPasswordError('');
+                      }}
+                      className={`px-4 py-3 rounded-xl text-sm font-medium ${isDark ? 'bg-white/10 text-white/70' : 'bg-black/5 text-primary/70'}`}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+           </Section>
+         )}
+
+         <button onClick={async () => { await logout(); navigate('/login'); }} className={`w-full py-4 rounded-xl text-red-400 font-bold text-sm transition-colors animate-pop-in ${isDark ? 'glass-button hover:bg-red-500/10' : 'bg-white border border-black/5 hover:bg-red-50'}`} style={{animationDelay: '0.2s'}}>
+            Sign Out
+         </button>
+
+         <button 
+           onClick={() => setShowBugReport(true)} 
+           className={`w-full py-4 rounded-xl font-bold text-sm transition-colors animate-pop-in flex items-center justify-center gap-2 ${isDark ? 'glass-button text-white/80 hover:text-white hover:bg-white/5' : 'bg-white border border-black/5 text-primary/80 hover:text-primary hover:bg-black/5'}`} 
+           style={{animationDelay: '0.25s'}}
+         >
+            <span className="material-symbols-outlined text-lg">bug_report</span>
+            Report a Bug
+         </button>
+      </div>
+
+      <BugReportModal
+        isOpen={showBugReport}
+        onClose={() => setShowBugReport(false)}
+      />
+
+      {/* Guest Check-In Modal */}
+      <HubSpotFormModal
+        isOpen={showGuestCheckin}
+        onClose={() => setShowGuestCheckin(false)}
+        formType="guest-checkin"
+        title="Guest Check-In"
+        subtitle="Register your guest for today's visit."
+        fields={GUEST_CHECKIN_FIELDS}
+        submitButtonText="Check In Guest"
+        additionalFields={{
+          member_name: user.name,
+          member_email: user.email
+        }}
+        onSuccess={async () => {
+          try {
+            const res = await fetch(`/api/guest-passes/${encodeURIComponent(user.email)}?tier=${encodeURIComponent(user.tier || 'Social')}`, { credentials: 'include' });
+            if (!res.ok) throw new Error('Failed to refresh guest passes');
+            const data = await res.json();
+            setGuestPasses(data);
+          } catch (err) {
+            console.error('Error refreshing guest passes:', err);
+          }
+        }}
+      />
+
+      <BottomSentinel />
+
+      {/* Bottom Navigation */}
+      {isStaffOrAdminProfile ? (
+        <StaffBottomNavSimple />
+      ) : (
+        <MemberBottomNav currentPath="/profile" isDarkTheme={isDark} />
+      )}
+
+      {/* Full Screen Card Modal */}
+      <ModalShell 
+        isOpen={isCardOpen} 
+        onClose={() => setIsCardOpen(false)}
+        showCloseButton={false}
+        size="sm"
+        className="!bg-transparent !border-0 !shadow-none"
+      >
+        {(() => {
+          const tierColors = getTierColor(user.tier || 'Social');
+          const cardBgColor = isStaffOrAdminProfile ? '#293515' : tierColors.bg;
+          const cardTextColor = isStaffOrAdminProfile ? '#F2F2EC' : tierColors.text;
+          const baseTier = getBaseTier(user.tier || 'Social');
+          const useDarkLogo = !isStaffOrAdminProfile && ['Social', 'Premium', 'VIP'].includes(baseTier);
+          return (
+            <div className="flex flex-col items-center">
+              <div className="w-full rounded-[2rem] relative overflow-hidden shadow-2xl flex flex-col" style={{ backgroundColor: cardBgColor }}>
+               
+               {/* Close Button */}
+               <button onClick={() => setIsCardOpen(false)} className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center z-10" style={{ backgroundColor: `${cardTextColor}33`, color: cardTextColor }}>
+                   <span className="material-symbols-outlined text-sm">close</span>
+               </button>
+
+               {/* Header with Logo */}
+               <div className="pt-6 pb-4 px-6 flex justify-center" style={{ backgroundColor: cardBgColor }}>
+                   <img src={useDarkLogo ? "/assets/logos/monogram-dark.webp" : "/assets/logos/monogram-white.webp"} className="w-12 h-12" alt="" />
+               </div>
+               
+               {/* Member Info */}
+               <div className="px-6 pb-6 text-center" style={{ backgroundColor: cardBgColor }}>
+                   <h2 className="text-2xl font-bold mb-3" style={{ color: cardTextColor }}>{user.name}</h2>
+                   
+                   {isStaffOrAdminProfile ? (
+                     <>
+                       <div className="flex items-center justify-center gap-2 flex-wrap mb-2">
+                          <span className="px-3 py-1 rounded-full bg-white/20 text-sm font-bold" style={{ color: cardTextColor }}>
+                             {user.role === 'admin' ? 'Administrator' : 'Staff'}
+                          </span>
+                       </div>
+                       {user.jobTitle && (
+                         <p className="text-sm opacity-80" style={{ color: cardTextColor }}>{user.jobTitle}</p>
+                       )}
+                     </>
+                   ) : (
+                     <>
+                       <div className="flex items-center justify-center gap-2 flex-wrap mb-2">
+                          <TierBadge tier={user.tier || 'Social'} size="md" />
+                       </div>
+                       {((user.tags || []).length > 0 || isFoundingMember(user.tier || '', user.isFounding)) && (
+                         <div className="flex items-center justify-center gap-2 flex-wrap">
+                            {(user.tags || []).map((tag) => (
+                               <TagBadge key={tag} tag={tag} size="sm" />
+                            ))}
+                            {!user.tags?.length && isFoundingMember(user.tier || '', user.isFounding) && (
+                               <TagBadge tag="Founding Member" size="sm" />
+                            )}
+                         </div>
+                       )}
+                     </>
+                   )}
+               </div>
+
+               {/* Benefits Section - Members Only */}
+               {!isStaffOrAdminProfile && (
+                 <div className="px-6 pb-6" style={{ backgroundColor: cardBgColor }}>
+                   <div className="rounded-xl p-4 space-y-3" style={{ backgroundColor: `${cardTextColor}10` }}>
+                     <h3 className="text-xs font-bold uppercase tracking-wider opacity-60 mb-3" style={{ color: cardTextColor }}>Membership Benefits</h3>
+                     
+                     {user.joinDate && (
+                       <div className="flex items-center justify-between">
+                         <div className="flex items-center gap-3">
+                           <span className="material-symbols-outlined text-base opacity-70" style={{ color: cardTextColor }}>event</span>
+                           <span className="text-sm opacity-80" style={{ color: cardTextColor }}>Member Since</span>
+                         </div>
+                         <span className="text-sm font-semibold" style={{ color: cardTextColor }}>{formatMemberSince(user.joinDate)}</span>
+                       </div>
+                     )}
+                     
+                     <div className="flex items-center justify-between">
+                       <div className="flex items-center gap-3">
+                         <span className="material-symbols-outlined text-base opacity-70" style={{ color: cardTextColor }}>calendar_month</span>
+                         <span className="text-sm opacity-80" style={{ color: cardTextColor }}>Advance Booking</span>
+                       </div>
+                       <span className="text-sm font-semibold" style={{ color: cardTextColor }}>
+                         {tierPermissions.unlimitedAccess ? 'Unlimited' : `${tierPermissions.advanceBookingDays} days`}
+                       </span>
+                     </div>
+                     
+                     {tierPermissions.canBookSimulators && (
+                       <div className="flex items-center justify-between">
+                         <div className="flex items-center gap-3">
+                           <span className="material-symbols-outlined text-base opacity-70" style={{ color: cardTextColor }}>sports_golf</span>
+                           <span className="text-sm opacity-80" style={{ color: cardTextColor }}>Daily Sim Time</span>
+                         </div>
+                         <span className="text-sm font-semibold" style={{ color: cardTextColor }}>
+                           {tierPermissions.unlimitedAccess ? 'Unlimited' : `${tierPermissions.dailySimulatorMinutes} min`}
+                         </span>
+                       </div>
+                     )}
+                     
+                     {guestPasses && (
+                       <div className="flex items-center justify-between">
+                         <div className="flex items-center gap-3">
+                           <span className="material-symbols-outlined text-base opacity-70" style={{ color: cardTextColor }}>group_add</span>
+                           <span className="text-sm opacity-80" style={{ color: cardTextColor }}>Guest Passes</span>
+                         </div>
+                         <span className="text-sm font-semibold" style={{ color: cardTextColor }}>
+                           {guestPasses.passes_remaining} / {guestPasses.passes_total}
+                         </span>
+                       </div>
+                     )}
+
+                     {user.mindbodyClientId && (
+                       <div className="flex items-center justify-between pt-2 mt-2" style={{ borderTop: `1px solid ${cardTextColor}20` }}>
+                         <div className="flex items-center gap-3">
+                           <span className="material-symbols-outlined text-base opacity-70" style={{ color: cardTextColor }}>badge</span>
+                           <span className="text-sm opacity-80" style={{ color: cardTextColor }}>Mindbody ID</span>
+                         </div>
+                         <span className="text-sm font-mono font-semibold" style={{ color: cardTextColor }}>{user.mindbodyClientId}</span>
+                       </div>
+                     )}
+                   </div>
+                 </div>
+               )}
+
+               {/* Staff Portal Access */}
+               {isStaffOrAdminProfile && (
+                 <div className="px-6 pb-6" style={{ backgroundColor: cardBgColor }}>
+                   <div className="rounded-xl p-4 text-center" style={{ backgroundColor: `${cardTextColor}10` }}>
+                     <span className="text-xs font-bold uppercase tracking-wider opacity-60" style={{ color: cardTextColor }}>Portal Access</span>
+                     <p className="text-lg font-bold mt-1" style={{ color: cardTextColor }}>Staff Portal</p>
+                   </div>
+                 </div>
+               )}
+              </div>
+
+            </div>
+          );
+        })()}
+      </ModalShell>
+    </div>
+  );
+};
+
+const Section: React.FC<{title: string; children: React.ReactNode; isDark?: boolean; delay?: string}> = ({ title, children, isDark = true, delay }) => (
+  <div className="animate-pop-in" style={delay ? {animationDelay: delay} : undefined}>
+     <h3 className={`text-xs font-bold uppercase tracking-wider ml-2 mb-3 ${isDark ? 'opacity-70' : 'text-primary/70'}`}>{title}</h3>
+     <div className={`rounded-2xl overflow-hidden glass-card divide-y ${isDark ? 'divide-white/20 border-white/25' : 'divide-black/5 border-black/10'}`}>
+        {children}
+     </div>
+  </div>
+);
+
+const Row: React.FC<{icon: string; label: string; value?: string; toggle?: boolean; arrow?: boolean; isDark?: boolean}> = ({ icon, label, value, toggle, arrow, isDark = true }) => (
+   <div className={`p-4 flex items-center justify-between transition-colors cursor-pointer ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
+      <div className="flex items-center gap-4">
+         <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>{icon}</span>
+         <span className={`font-medium text-sm ${isDark ? '' : 'text-primary'}`}>{label}</span>
+      </div>
+      <div className="flex items-center gap-2">
+         {value && <span className={`text-sm ${isDark ? 'opacity-70' : 'text-primary/70'}`}>{value}</span>}
+         {toggle && (
+            <div className="w-10 h-6 bg-green-500 rounded-full relative">
+               <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
+            </div>
+         )}
+         {arrow && <span className={`material-symbols-outlined text-sm ${isDark ? 'opacity-70' : 'text-primary/70'}`}>arrow_forward_ios</span>}
+      </div>
+   </div>
+);
+
+export default Profile;

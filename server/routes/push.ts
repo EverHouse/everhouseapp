@@ -1,0 +1,520 @@
+import { Router } from 'express';
+import webpush from 'web-push';
+import { pool, isProduction } from '../core/db';
+import { db } from '../db';
+import { pushSubscriptions, users, notifications, events, eventRsvps, bookingRequests, wellnessClasses, wellnessEnrollments, facilityClosures } from '../../shared/schema';
+import { eq, inArray, and, sql, or, isNull } from 'drizzle-orm';
+import { formatTime12Hour, getTodayPacific } from '../utils/dateUtils';
+
+const router = Router();
+
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    'mailto:hello@everhouse.app',
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+}
+
+export async function sendPushNotification(userEmail: string, payload: { title: string; body: string; url?: string; tag?: string }) {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM push_subscriptions WHERE user_email = $1',
+      [userEmail]
+    );
+    
+    const notifications = result.rows.map(async (sub) => {
+      const pushSubscription = {
+        endpoint: sub.endpoint,
+        keys: {
+          p256dh: sub.p256dh,
+          auth: sub.auth
+        }
+      };
+      
+      try {
+        await webpush.sendNotification(pushSubscription, JSON.stringify(payload));
+      } catch (err: any) {
+        if (err.statusCode === 410) {
+          await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [sub.endpoint]);
+        }
+      }
+    });
+    
+    await Promise.all(notifications);
+  } catch (error) {
+    console.error('Failed to send push notification:', error);
+  }
+}
+
+export async function sendPushNotificationToStaff(payload: { title: string; body: string; url?: string; tag?: string }) {
+  try {
+    const staffSubscriptions = await db
+      .selectDistinct({
+        id: pushSubscriptions.id,
+        userEmail: pushSubscriptions.userEmail,
+        endpoint: pushSubscriptions.endpoint,
+        p256dh: pushSubscriptions.p256dh,
+        auth: pushSubscriptions.auth,
+      })
+      .from(pushSubscriptions)
+      .innerJoin(users, eq(pushSubscriptions.userEmail, users.email))
+      .where(inArray(users.role, ['admin', 'staff']));
+    
+    const notifications = staffSubscriptions.map(async (sub) => {
+      const pushSubscription = {
+        endpoint: sub.endpoint,
+        keys: {
+          p256dh: sub.p256dh,
+          auth: sub.auth
+        }
+      };
+      
+      try {
+        await webpush.sendNotification(pushSubscription, JSON.stringify(payload));
+      } catch (err: any) {
+        if (err.statusCode === 410) {
+          await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [sub.endpoint]);
+        }
+      }
+    });
+    
+    await Promise.all(notifications);
+  } catch (error) {
+    console.error('Failed to send push notification to staff:', error);
+  }
+}
+
+export async function sendPushNotificationToAllMembers(payload: { title: string; body: string; url?: string; tag?: string }): Promise<number> {
+  const results = { sent: 0, pushFailed: 0 };
+  
+  try {
+    const allMembers = await db
+      .select({ email: users.email })
+      .from(users)
+      .where(or(eq(users.role, 'member'), isNull(users.role)));
+    
+    if (allMembers.length === 0) {
+      console.log('[Push to Members] No members found');
+      return 0;
+    }
+    
+    const memberSubscriptions = await db
+      .select({
+        userEmail: pushSubscriptions.userEmail,
+        endpoint: pushSubscriptions.endpoint,
+        p256dh: pushSubscriptions.p256dh,
+        auth: pushSubscriptions.auth
+      })
+      .from(pushSubscriptions)
+      .innerJoin(users, eq(pushSubscriptions.userEmail, users.email))
+      .where(or(eq(users.role, 'member'), isNull(users.role)));
+    
+    const notificationValues = allMembers.map(member => ({
+      userEmail: member.email,
+      title: payload.title,
+      message: payload.body,
+      type: 'announcement' as const,
+      relatedType: 'announcement' as const
+    }));
+    
+    try {
+      await db.insert(notifications).values(notificationValues);
+      results.sent = notificationValues.length;
+    } catch (err: any) {
+      console.error('[Push to Members] Failed to insert in-app notifications:', err.message);
+    }
+    
+    for (const sub of memberSubscriptions) {
+      const pushSubscription = {
+        endpoint: sub.endpoint,
+        keys: { p256dh: sub.p256dh, auth: sub.auth }
+      };
+      
+      try {
+        await webpush.sendNotification(pushSubscription, JSON.stringify(payload));
+      } catch (err: any) {
+        if (err.statusCode === 410) {
+          await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, sub.endpoint));
+        }
+        results.pushFailed++;
+      }
+    }
+    
+    console.log(`[Push to Members] Sent ${results.sent} in-app notifications, ${memberSubscriptions.length - results.pushFailed} push notifications. Failures: ${results.pushFailed}`);
+    
+    return results.sent;
+  } catch (error) {
+    console.error('Failed to send push notification to members:', error);
+    return 0;
+  }
+}
+
+router.get('/api/push/vapid-public-key', (req, res) => {
+  res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
+});
+
+router.post('/api/push/subscribe', async (req, res) => {
+  try {
+    const { subscription, user_email } = req.body;
+    
+    if (!subscription || !user_email) {
+      return res.status(400).json({ error: 'subscription and user_email are required' });
+    }
+    
+    const { endpoint, keys } = subscription;
+    
+    await pool.query(
+      `INSERT INTO push_subscriptions (user_email, endpoint, p256dh, auth)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (endpoint) DO UPDATE SET
+         user_email = $1,
+         p256dh = $3,
+         auth = $4`,
+      [user_email, endpoint, keys.p256dh, keys.auth]
+    );
+    
+    res.json({ success: true });
+  } catch (error: any) {
+    if (!isProduction) console.error('Push subscription error:', error);
+    res.status(500).json({ error: 'Failed to save push subscription' });
+  }
+});
+
+router.post('/api/push/unsubscribe', async (req, res) => {
+  try {
+    const { endpoint } = req.body;
+    
+    if (!endpoint) {
+      return res.status(400).json({ error: 'endpoint is required' });
+    }
+    
+    await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [endpoint]);
+    
+    res.json({ success: true });
+  } catch (error: any) {
+    if (!isProduction) console.error('Push unsubscribe error:', error);
+    res.status(500).json({ error: 'Failed to unsubscribe' });
+  }
+});
+
+router.post('/api/push/test', async (req, res) => {
+  try {
+    const { user_email } = req.body;
+    
+    if (!user_email) {
+      return res.status(400).json({ error: 'user_email is required' });
+    }
+    
+    await sendPushNotification(user_email, {
+      title: 'Test Notification',
+      body: 'This is a test push notification from Ever House!',
+      url: '/#/dashboard'
+    });
+    
+    res.json({ success: true });
+  } catch (error: any) {
+    if (!isProduction) console.error('Test push error:', error);
+    res.status(500).json({ error: 'Failed to send test notification' });
+  }
+});
+
+export async function sendDailyReminders() {
+  const results = { events: 0, bookings: 0, wellness: 0, pushFailed: 0, errors: [] as string[] };
+  
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    
+    const eventReminders = await db.select({
+      userEmail: eventRsvps.userEmail,
+      eventId: events.id,
+      title: events.title,
+      eventDate: events.eventDate,
+      startTime: events.startTime,
+      location: events.location
+    })
+    .from(eventRsvps)
+    .innerJoin(events, eq(eventRsvps.eventId, events.id))
+    .where(and(
+      eq(eventRsvps.status, 'confirmed'),
+      sql`DATE(${events.eventDate}) = ${tomorrowStr}`
+    ));
+    
+    if (eventReminders.length > 0) {
+      const eventNotifications = eventReminders.map(evt => ({
+        userEmail: evt.userEmail,
+        title: 'Event Tomorrow',
+        message: `Reminder: ${evt.title} is tomorrow${evt.startTime ? ` at ${formatTime12Hour(evt.startTime)}` : ''}${evt.location ? ` - ${evt.location}` : ''}.`,
+        type: 'event_reminder' as const,
+        relatedId: evt.eventId,
+        relatedType: 'event' as const
+      }));
+      
+      try {
+        await db.insert(notifications).values(eventNotifications);
+        results.events = eventNotifications.length;
+      } catch (err: any) {
+        results.errors.push(`Event batch insert: ${err.message}`);
+      }
+      
+      for (const evt of eventReminders) {
+        const message = `Reminder: ${evt.title} is tomorrow${evt.startTime ? ` at ${formatTime12Hour(evt.startTime)}` : ''}${evt.location ? ` - ${evt.location}` : ''}.`;
+        sendPushNotification(evt.userEmail, { title: 'Event Tomorrow', body: message, url: '/#/member-events' })
+          .catch(() => { results.pushFailed++; });
+      }
+    }
+    
+    const bookingReminders = await db.select({
+      userEmail: bookingRequests.userEmail,
+      id: bookingRequests.id,
+      requestDate: bookingRequests.requestDate,
+      startTime: bookingRequests.startTime,
+      resourceId: bookingRequests.resourceId
+    })
+    .from(bookingRequests)
+    .where(and(
+      eq(bookingRequests.status, 'approved'),
+      sql`DATE(${bookingRequests.requestDate}) = ${tomorrowStr}`
+    ));
+    
+    if (bookingReminders.length > 0) {
+      const bookingNotifications = bookingReminders.map(booking => ({
+        userEmail: booking.userEmail,
+        title: 'Booking Tomorrow',
+        message: `Reminder: Your simulator booking is tomorrow at ${formatTime12Hour(booking.startTime)}${booking.resourceId ? ` on Bay ${booking.resourceId}` : ''}.`,
+        type: 'booking_reminder' as const,
+        relatedId: booking.id,
+        relatedType: 'booking_request' as const
+      }));
+      
+      try {
+        await db.insert(notifications).values(bookingNotifications);
+        results.bookings = bookingNotifications.length;
+      } catch (err: any) {
+        results.errors.push(`Booking batch insert: ${err.message}`);
+      }
+      
+      for (const booking of bookingReminders) {
+        const message = `Reminder: Your simulator booking is tomorrow at ${formatTime12Hour(booking.startTime)}${booking.resourceId ? ` on Bay ${booking.resourceId}` : ''}.`;
+        sendPushNotification(booking.userEmail, { title: 'Booking Tomorrow', body: message, url: '/#/sims' })
+          .catch(() => { results.pushFailed++; });
+      }
+    }
+    
+    const wellnessReminders = await db.select({
+      userEmail: wellnessEnrollments.userEmail,
+      classId: wellnessClasses.id,
+      title: wellnessClasses.title,
+      date: wellnessClasses.date,
+      time: wellnessClasses.time,
+      instructor: wellnessClasses.instructor
+    })
+    .from(wellnessEnrollments)
+    .innerJoin(wellnessClasses, eq(wellnessEnrollments.classId, wellnessClasses.id))
+    .where(and(
+      eq(wellnessEnrollments.status, 'confirmed'),
+      sql`DATE(${wellnessClasses.date}) = ${tomorrowStr}`
+    ));
+    
+    if (wellnessReminders.length > 0) {
+      const wellnessNotifications = wellnessReminders.map(cls => ({
+        userEmail: cls.userEmail,
+        title: 'Wellness Class Tomorrow',
+        message: `Reminder: ${cls.title} with ${cls.instructor} is tomorrow at ${cls.time}.`,
+        type: 'wellness_reminder' as const,
+        relatedId: cls.classId,
+        relatedType: 'wellness_class' as const
+      }));
+      
+      try {
+        await db.insert(notifications).values(wellnessNotifications);
+        results.wellness = wellnessNotifications.length;
+      } catch (err: any) {
+        results.errors.push(`Wellness batch insert: ${err.message}`);
+      }
+      
+      for (const cls of wellnessReminders) {
+        const message = `Reminder: ${cls.title} with ${cls.instructor} is tomorrow at ${cls.time}.`;
+        sendPushNotification(cls.userEmail, { title: 'Class Tomorrow', body: message, url: '/#/member-wellness' })
+          .catch(() => { results.pushFailed++; });
+      }
+    }
+    
+  console.log(`[Daily Reminders] Sent ${results.events} event, ${results.bookings} booking, ${results.wellness} wellness reminders. Push failures: ${results.pushFailed}`);
+  
+  return {
+    success: true,
+    message: `Sent ${results.events} event, ${results.bookings} booking, and ${results.wellness} wellness reminders`,
+    ...results
+  };
+}
+
+router.post('/api/push/send-daily-reminders', async (req, res) => {
+  try {
+    const result = await sendDailyReminders();
+    res.json(result);
+  } catch (error: any) {
+    console.error('Daily reminders error:', error);
+    res.status(500).json({ error: 'Failed to send daily reminders' });
+  }
+});
+
+// Send morning notifications for closures/notices starting today
+export async function sendMorningClosureNotifications() {
+  const results = { closures: 0, skipped: 0, pushFailed: 0, errors: [] as string[] };
+  
+  try {
+    const todayStr = getTodayPacific();
+    
+    // Find closures that:
+    // 1. Start today
+    // 2. Are published (needsReview = false)
+    // 3. Are active
+    // 4. Affect booking availability (affectedAreas != 'none')
+    const todayClosures = await db
+      .select({
+        id: facilityClosures.id,
+        title: facilityClosures.title,
+        reason: facilityClosures.reason,
+        noticeType: facilityClosures.noticeType,
+        startDate: facilityClosures.startDate,
+        startTime: facilityClosures.startTime,
+        endTime: facilityClosures.endTime,
+        affectedAreas: facilityClosures.affectedAreas
+      })
+      .from(facilityClosures)
+      .where(and(
+        sql`DATE(${facilityClosures.startDate}) = ${todayStr}`,
+        eq(facilityClosures.isActive, true),
+        eq(facilityClosures.needsReview, false),
+        sql`${facilityClosures.affectedAreas} IS NOT NULL AND ${facilityClosures.affectedAreas} != 'none'`
+      ));
+    
+    if (todayClosures.length === 0) {
+      console.log('[Morning Notifications] No closures starting today');
+      return { success: true, message: 'No closures starting today', ...results };
+    }
+    
+    // Check which closures have already been notified (idempotency check)
+    // Look for existing closure_today notifications for these closure IDs
+    const closureIds = todayClosures.map(c => c.id);
+    const existingNotifications = await db
+      .select({
+        relatedId: notifications.relatedId
+      })
+      .from(notifications)
+      .where(and(
+        eq(notifications.type, 'closure_today'),
+        eq(notifications.relatedType, 'closure'),
+        inArray(notifications.relatedId, closureIds)
+      ))
+      .groupBy(notifications.relatedId);
+    
+    const alreadyNotifiedIds = new Set(existingNotifications.map(n => n.relatedId));
+    const closuresToNotify = todayClosures.filter(c => !alreadyNotifiedIds.has(c.id));
+    
+    if (closuresToNotify.length === 0) {
+      const skippedCount = todayClosures.length;
+      console.log(`[Morning Notifications] All ${skippedCount} closures already notified today`);
+      return { success: true, message: `All ${skippedCount} closures already notified`, ...results, skipped: skippedCount };
+    }
+    
+    results.skipped = todayClosures.length - closuresToNotify.length;
+    
+    // Get all member emails
+    const allMembers = await db
+      .select({ email: users.email })
+      .from(users)
+      .where(or(eq(users.role, 'member'), isNull(users.role)));
+    
+    if (allMembers.length === 0) {
+      console.log('[Morning Notifications] No members to notify');
+      return { success: true, message: 'No members to notify', ...results };
+    }
+    
+    // Get all member push subscriptions
+    const memberSubscriptions = await db
+      .select({
+        userEmail: pushSubscriptions.userEmail,
+        endpoint: pushSubscriptions.endpoint,
+        p256dh: pushSubscriptions.p256dh,
+        auth: pushSubscriptions.auth
+      })
+      .from(pushSubscriptions)
+      .innerJoin(users, eq(pushSubscriptions.userEmail, users.email))
+      .where(or(eq(users.role, 'member'), isNull(users.role)));
+    
+    for (const closure of closuresToNotify) {
+      const title = closure.noticeType || closure.title || 'Notice';
+      const timeInfo = closure.startTime && closure.endTime 
+        ? ` (${formatTime12Hour(closure.startTime)} - ${formatTime12Hour(closure.endTime)})`
+        : '';
+      const message = closure.reason 
+        ? `${closure.reason}${timeInfo}`
+        : `${title}${timeInfo}`;
+      
+      // Create in-app notifications for all members
+      const notificationValues = allMembers.map(member => ({
+        userEmail: member.email,
+        title: `Today: ${title}`,
+        message: message,
+        type: 'closure_today' as const,
+        relatedId: closure.id,
+        relatedType: 'closure' as const
+      }));
+      
+      try {
+        await db.insert(notifications).values(notificationValues);
+        results.closures++;
+      } catch (err: any) {
+        results.errors.push(`Closure notification insert: ${err.message}`);
+      }
+      
+      // Send push notifications
+      for (const sub of memberSubscriptions) {
+        const pushSubscription = {
+          endpoint: sub.endpoint,
+          keys: { p256dh: sub.p256dh, auth: sub.auth }
+        };
+        
+        try {
+          await webpush.sendNotification(pushSubscription, JSON.stringify({
+            title: `Today: ${title}`,
+            body: message,
+            url: '/updates?tab=notices'
+          }));
+        } catch (err: any) {
+          if (err.statusCode === 410) {
+            await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, sub.endpoint));
+          }
+          results.pushFailed++;
+        }
+      }
+    }
+    
+    console.log(`[Morning Notifications] Sent ${results.closures} closure notifications, skipped ${results.skipped} (already notified). Push failures: ${results.pushFailed}`);
+    
+    return {
+      success: true,
+      message: `Sent notifications for ${results.closures} closures starting today (${results.skipped} already notified)`,
+      ...results
+    };
+  } catch (error: any) {
+    console.error('[Morning Notifications] Error:', error);
+    results.errors.push(error.message);
+    return { success: false, message: 'Failed to send morning notifications', ...results };
+  }
+}
+
+router.post('/api/push/send-morning-closure-notifications', async (req, res) => {
+  try {
+    const result = await sendMorningClosureNotifications();
+    res.json(result);
+  } catch (error: any) {
+    console.error('Morning closure notifications error:', error);
+    res.status(500).json({ error: 'Failed to send morning closure notifications' });
+  }
+});
+
+export default router;

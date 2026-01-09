@@ -1,0 +1,100 @@
+modules = ["nodejs-20", "python-3.11", "postgresql-16"]
+[nix]
+channel = "stable-25_05"
+packages = ["gifsicle", "imagemagick", "libwebp", "unzip"]
+
+[agent]
+expertMode = true
+integrations = ["hubspot:1.0.0", "google-calendar:1.0.0", "javascript_replit_auth:2.0.0", "javascript_openai_ai_integrations:2.0.0", "javascript_object_storage:2.0.0", "resend:1.0.0"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "API Server"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Dev Server"
+
+[[workflows.workflow]]
+name = "API Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run server"
+waitForPort = 3001
+
+[[workflows.workflow]]
+name = "Dev Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
+
+[[ports]]
+localPort = 80
+externalPort = 80
+
+[[ports]]
+localPort = 3001
+externalPort = 3001
+
+[[ports]]
+localPort = 5000
+externalPort = 5000
+
+[[ports]]
+localPort = 5001
+
+[[ports]]
+localPort = 5002
+
+[[ports]]
+localPort = 5003
+
+[[ports]]
+localPort = 5004
+
+[[ports]]
+localPort = 8080
+
+[userenv]
+
+[userenv.shared]
+HUBSPOT_PORTAL_ID = "244200670"
+HUBSPOT_FORM_TOUR_REQUEST = "686db5e2-c17e-4c45-9ab9-21b466fd105c"
+HUBSPOT_FORM_MEMBERSHIP = "6973a2ea-f8a5-4925-9898-2fcc373512f0"
+HUBSPOT_FORM_PRIVATE_HIRE = "7b2eca31-2f78-40bc-9a67-e25ecd140047"
+HUBSPOT_FORM_GUEST_CHECKIN = "ba04af2b-b1d5-435b-9e3e-bfd9086d2fa9"
+HUBSPOT_FORM_CONTACT = "63c397f3-faeb-4582-9176-ae9603188b9a"
+VAPID_PUBLIC_KEY = "BG-oXwIn5dHb93Y6SuyOpkHm7Qu2La9ge5pwQFAx98WRllqI6-zg-n3A5CURITIR_wA6sIo8zEaBVwGhLz3CCFw"
+SUPABASE_URL = "https://vramupyxmnzhgegltppg.supabase.co"
+
+[userenv.development]
+DEV_LOGIN_ENABLED = "true"
+ENABLE_TEST_LOGIN = "true"
+
+
+[deployment]
+deploymentTarget = "cloudrun"
+run = ["npm", "run", "start"]
+build = ["npm", "run", "build"]
+
+[objectStorage]
+defaultBucketID = "replit-objstore-a74e2fa8-3e0a-44cd-bca4-3046e4e3b9c2"

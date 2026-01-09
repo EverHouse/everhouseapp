@@ -1,0 +1,72 @@
+export interface CafeItem {
+  id: string;
+  category: string;
+  name: string;
+  price: number;
+  desc: string;
+  icon: string;
+  image: string;
+}
+
+export type EventSource = 'internal' | 'eventbrite';
+
+export interface EventData {
+  id: string;
+  source: EventSource;
+  externalLink?: string;
+  title: string;
+  category: string;
+  date: string;
+  time: string;
+  location: string;
+  image: string;
+  description: string;
+  attendees: string[];
+  capacity?: number;
+  ticketsSold?: number;
+}
+
+export interface Announcement {
+  id: string;
+  title: string;
+  desc: string;
+  type: 'update' | 'announcement';
+  date: string;
+  createdAt?: string;
+  priority?: 'normal' | 'high' | 'urgent';
+  startDate?: string;
+  endDate?: string;
+  linkType?: 'events' | 'wellness' | 'golf' | 'external';
+  linkTarget?: string;
+  notifyMembers?: boolean;
+  showAsBanner?: boolean;
+}
+
+export interface MemberProfile {
+  id: string;
+  name: string;
+  tier: string;
+  tags?: string[];
+  isFounding?: boolean;
+  status: 'Active' | 'Pending' | 'Expired' | 'Inactive' | 'Terminated' | 'former_member' | string;
+  email: string;
+  phone: string;
+  jobTitle?: string;
+  joinDate?: string;
+  avatar?: string;
+  role?: 'member' | 'staff' | 'admin';
+  mindbodyClientId?: string;
+  lifetimeVisits?: number;
+  lastBookingDate?: string;
+  manuallyLinkedEmails?: string[];
+}
+
+export interface Booking {
+  id: string;
+  type: 'golf' | 'event' | 'wellness' | 'dining';
+  title: string;
+  date: string;
+  time: string;
+  details: string;
+  color?: 'primary' | 'accent';
+}

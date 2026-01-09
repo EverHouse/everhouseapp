@@ -1,0 +1,966 @@
+import { Router } from 'express';
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+import { eq, and, sql, gt, isNotNull } from 'drizzle-orm';
+import { db } from '../db';
+import { users, magicLinks, staffUsers, membershipTiers } from '../../shared/schema';
+import { isProduction } from '../core/db';
+import { getHubSpotClient } from '../core/integrations';
+import { normalizeTierName, extractTierTags, DEFAULT_TIER } from '../../shared/constants/tiers';
+import { getResendClient } from '../utils/resend';
+import { triggerMemberSync } from '../core/memberSync';
+import { withResendRetry } from '../core/retryUtils';
+import { getSessionUser } from '../types/session';
+import { sendWelcomeEmail } from '../emails/welcomeEmail';
+
+interface StaffUserData {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  jobTitle: string;
+  role: 'admin' | 'staff';
+}
+
+function normalizeRole(role: string | null | undefined): 'admin' | 'staff' {
+  if (!role) return 'staff';
+  const normalized = role.toLowerCase().trim();
+  return normalized === 'admin' ? 'admin' : 'staff';
+}
+
+async function getStaffUserByEmail(email: string): Promise<StaffUserData | null> {
+  if (!email) return null;
+  try {
+    const result = await db.select({
+      firstName: staffUsers.firstName,
+      lastName: staffUsers.lastName,
+      phone: staffUsers.phone,
+      jobTitle: staffUsers.jobTitle,
+      role: staffUsers.role
+    })
+      .from(staffUsers)
+      .where(and(
+        sql`LOWER(${staffUsers.email}) = LOWER(${email})`,
+        eq(staffUsers.isActive, true)
+      ))
+      .limit(1);
+    
+    if (result.length > 0) {
+      return {
+        firstName: result[0].firstName || '',
+        lastName: result[0].lastName || '',
+        phone: result[0].phone || '',
+        jobTitle: result[0].jobTitle || '',
+        role: normalizeRole(result[0].role)
+      };
+    }
+    return null;
+  } catch (error) {
+    if (!isProduction) console.error('Error fetching staff user:', error);
+    return null;
+  }
+}
+
+async function getUserRole(email: string): Promise<'admin' | 'staff' | 'member'> {
+  const normalizedEmail = email.toLowerCase();
+  const staffUser = await getStaffUserByEmail(normalizedEmail);
+  if (staffUser) {
+    return staffUser.role;
+  }
+  return 'member';
+}
+
+async function isStaffOrAdminEmail(email: string): Promise<boolean> {
+  const staffUser = await getStaffUserByEmail(email);
+  return staffUser !== null;
+}
+
+interface UpsertUserData {
+  email: string;
+  tierName: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  jobTitle?: string;
+  mindbodyClientId?: string;
+  tags?: string[];
+  membershipStartDate?: string;
+  role?: 'admin' | 'staff' | 'member';
+}
+
+async function upsertUserWithTier(data: UpsertUserData): Promise<void> {
+  try {
+    const normalizedEmail = data.email.toLowerCase();
+    const isStaffOrAdmin = data.role === 'admin' || data.role === 'staff';
+    
+    // Staff/admin users don't have membership tiers
+    const normalizedTier = isStaffOrAdmin ? null : normalizeTierName(data.tierName);
+    let tierId: number | null = null;
+    
+    if (!isStaffOrAdmin && normalizedTier) {
+      const tierResult = await db.select({ id: membershipTiers.id })
+        .from(membershipTiers)
+        .where(sql`LOWER(${membershipTiers.name}) = LOWER(${normalizedTier})`)
+        .limit(1);
+      tierId = tierResult.length > 0 ? tierResult[0].id : null;
+    }
+    
+    await db.insert(users)
+      .values({
+        id: crypto.randomUUID(),
+        email: normalizedEmail,
+        firstName: data.firstName || null,
+        lastName: data.lastName || null,
+        tier: normalizedTier,
+        tierId: tierId,
+        phone: data.phone || null,
+        mindbodyClientId: isStaffOrAdmin ? null : (data.mindbodyClientId || null),
+        tags: isStaffOrAdmin ? [] : (data.tags && data.tags.length > 0 ? data.tags : []),
+        role: data.role || 'member'
+      })
+      .onConflictDoUpdate({
+        target: users.email,
+        set: {
+          tier: normalizedTier,
+          tierId: tierId,
+          firstName: sql`COALESCE(${data.firstName || null}, ${users.firstName})`,
+          lastName: sql`COALESCE(${data.lastName || null}, ${users.lastName})`,
+          phone: sql`COALESCE(${data.phone || null}, ${users.phone})`,
+          mindbodyClientId: isStaffOrAdmin ? null : sql`COALESCE(${data.mindbodyClientId || null}, ${users.mindbodyClientId})`,
+          tags: isStaffOrAdmin ? [] : (data.tags && data.tags.length > 0 ? data.tags : []),
+          role: data.role || 'member',
+          updatedAt: new Date()
+        }
+      });
+    
+    if (!isProduction) console.log(`[Auth] Updated user ${normalizedEmail} with role ${data.role}, tier ${normalizedTier || 'none'}`);
+  } catch (error) {
+    console.error('[Auth] Error upserting user tier:', error);
+  }
+}
+
+const router = Router();
+
+const otpRequestLimiter: Map<string, { count: number; resetAt: number }> = new Map();
+const otpVerifyAttempts: Map<string, { count: number; lockedUntil: number }> = new Map();
+const magicLinkRequestLimiter: Map<string, { count: number; resetAt: number }> = new Map();
+
+const OTP_REQUEST_LIMIT = 3;
+const OTP_REQUEST_WINDOW = 15 * 60 * 1000;
+const MAGIC_LINK_REQUEST_LIMIT = 3;
+const MAGIC_LINK_REQUEST_WINDOW = 15 * 60 * 1000;
+const OTP_VERIFY_MAX_ATTEMPTS = 5;
+const OTP_VERIFY_LOCKOUT = 15 * 60 * 1000;
+
+const checkOtpRequestLimit = (email: string, ip: string): { allowed: boolean; retryAfter?: number } => {
+  const key = `${email}:${ip}`;
+  const now = Date.now();
+  const record = otpRequestLimiter.get(key);
+  
+  if (!record || now > record.resetAt) {
+    otpRequestLimiter.set(key, { count: 1, resetAt: now + OTP_REQUEST_WINDOW });
+    return { allowed: true };
+  }
+  
+  if (record.count >= OTP_REQUEST_LIMIT) {
+    return { allowed: false, retryAfter: Math.ceil((record.resetAt - now) / 1000) };
+  }
+  
+  record.count++;
+  return { allowed: true };
+};
+
+const checkMagicLinkRequestLimit = (email: string, ip: string): { allowed: boolean; retryAfter?: number } => {
+  const key = `${email}:${ip}`;
+  const now = Date.now();
+  const record = magicLinkRequestLimiter.get(key);
+  
+  if (!record || now > record.resetAt) {
+    magicLinkRequestLimiter.set(key, { count: 1, resetAt: now + MAGIC_LINK_REQUEST_WINDOW });
+    return { allowed: true };
+  }
+  
+  if (record.count >= MAGIC_LINK_REQUEST_LIMIT) {
+    return { allowed: false, retryAfter: Math.ceil((record.resetAt - now) / 1000) };
+  }
+  
+  record.count++;
+  return { allowed: true };
+};
+
+const checkOtpVerifyAttempts = (email: string): { allowed: boolean; retryAfter?: number } => {
+  const now = Date.now();
+  const record = otpVerifyAttempts.get(email);
+  
+  if (!record) {
+    return { allowed: true };
+  }
+  
+  if (record.lockedUntil > 0 && now < record.lockedUntil) {
+    return { allowed: false, retryAfter: Math.ceil((record.lockedUntil - now) / 1000) };
+  }
+  
+  if (record.lockedUntil > 0 && now >= record.lockedUntil) {
+    otpVerifyAttempts.delete(email);
+    return { allowed: true };
+  }
+  
+  return { allowed: true };
+};
+
+const recordOtpVerifyFailure = (email: string): void => {
+  const now = Date.now();
+  const record = otpVerifyAttempts.get(email);
+  
+  if (!record) {
+    otpVerifyAttempts.set(email, { count: 1, lockedUntil: 0 });
+    return;
+  }
+  
+  record.count++;
+  if (record.count >= OTP_VERIFY_MAX_ATTEMPTS) {
+    record.lockedUntil = now + OTP_VERIFY_LOCKOUT;
+  }
+};
+
+const clearOtpVerifyAttempts = (email: string): void => {
+  otpVerifyAttempts.delete(email);
+};
+
+
+router.post('/api/auth/verify-member', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+    
+    const hubspot = await getHubSpotClient();
+    
+    const searchResponse = await hubspot.crm.contacts.searchApi.doSearch({
+      filterGroups: [{
+        filters: [{
+          propertyName: 'email',
+          operator: 'EQ' as any,
+          value: email.toLowerCase()
+        }]
+      }],
+      properties: [
+        'firstname',
+        'lastname',
+        'email',
+        'phone',
+        'membership_tier',
+        'membership_status',
+        'membership_discount_reason',
+        'mindbody_client_id'
+      ],
+      limit: 1
+    });
+    
+    if (searchResponse.results.length === 0) {
+      return res.status(404).json({ error: 'No member found with this email address' });
+    }
+    
+    const contact = searchResponse.results[0];
+    const status = (contact.properties.membership_status || '').toLowerCase();
+    
+    if (status !== 'active') {
+      return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
+    }
+    
+    const role = await getUserRole(email.toLowerCase());
+
+    let firstName = contact.properties.firstname || '';
+    let lastName = contact.properties.lastname || '';
+    let phone = contact.properties.phone || '';
+    let jobTitle = '';
+
+    if (role === 'staff' || role === 'admin') {
+      const staffUserData = await getStaffUserByEmail(email.toLowerCase());
+      if (staffUserData) {
+        firstName = staffUserData.firstName || firstName;
+        lastName = staffUserData.lastName || lastName;
+        phone = staffUserData.phone || phone;
+        jobTitle = staffUserData.jobTitle || '';
+      }
+    }
+
+    const member = {
+      id: contact.id,
+      firstName,
+      lastName,
+      email: contact.properties.email || email,
+      phone,
+      jobTitle,
+      tier: normalizeTierName(contact.properties.membership_tier),
+      tags: extractTierTags(contact.properties.membership_tier, contact.properties.membership_discount_reason),
+      mindbodyClientId: contact.properties.mindbody_client_id || '',
+      status: 'Active',
+      role
+    };
+    
+    res.json({ success: true, member });
+  } catch (error: any) {
+    if (!isProduction) console.error('Member verification error:', error);
+    res.status(500).json({ error: 'Failed to verify membership' });
+  }
+});
+
+
+router.post('/api/auth/request-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+    
+    const normalizedEmail = email.toLowerCase();
+    const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+    
+    const rateCheck = checkOtpRequestLimit(normalizedEmail, clientIp);
+    if (!rateCheck.allowed) {
+      return res.status(429).json({ 
+        error: `Too many code requests. Please try again in ${Math.ceil((rateCheck.retryAfter || 0) / 60)} minutes.` 
+      });
+    }
+    
+    const isStaffOrAdmin = await isStaffOrAdminEmail(normalizedEmail);
+    
+    const hubspot = await getHubSpotClient();
+    
+    const searchResponse = await hubspot.crm.contacts.searchApi.doSearch({
+      filterGroups: [{
+        filters: [{
+          propertyName: 'email',
+          operator: 'EQ' as any,
+          value: normalizedEmail
+        }]
+      }],
+      properties: ['firstname', 'lastname', 'email', 'membership_status', 'membership_start_date'],
+      limit: 1
+    });
+    
+    let contact = searchResponse.results[0];
+    let firstName = isStaffOrAdmin ? 'Team Member' : 'Member';
+    
+    if (!contact && !isStaffOrAdmin) {
+      return res.status(404).json({ error: 'No member found with this email address' });
+    }
+    
+    if (contact) {
+      const status = (contact.properties.membership_status || '').toLowerCase();
+      firstName = contact.properties.firstname || firstName;
+      
+      if (status !== 'active' && !isStaffOrAdmin) {
+        return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
+      }
+    }
+    
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    
+    await db.insert(magicLinks).values({
+      email: normalizedEmail,
+      token: code,
+      expiresAt
+    });
+    
+    const { client: resendClient, fromEmail } = await getResendClient();
+    const logoUrl = 'https://everhouse.app/assets/logos/monogram-dark.webp';
+    
+    const emailResult = await withResendRetry(() => resendClient.emails.send({
+      from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
+      to: normalizedEmail,
+      subject: 'Your Ever House Login Code',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #F2F2EC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #F2F2EC;">
+            <tr>
+              <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(41, 53, 21, 0.08);">
+                  <tr>
+                    <td style="padding: 48px 40px 32px 40px; text-align: center;">
+                      <!--[if mso]>
+                      <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" style="height:72px;width:72px;v-text-anchor:middle;" arcsize="50%" fillcolor="#293515">
+                        <w:anchorlock/>
+                        <center style="color:#ffffff;font-size:28px;font-weight:600;font-family:Georgia,serif;">EH</center>
+                      </v:roundrect>
+                      <![endif]-->
+                      <!--[if !mso]><!-->
+                      <img src="${logoUrl}" alt="EH" width="72" height="72" style="display: block; margin: 0 auto 24px auto; border-radius: 50%; border: 0;">
+                      <!--<![endif]-->
+                      <h1 style="margin: 0 0 8px 0; font-size: 28px; font-weight: 600; color: #293515; font-family: 'Georgia', serif;">Hi ${firstName},</h1>
+                      <p style="margin: 0; font-size: 16px; color: #666666; line-height: 1.5;">
+                        Enter this code in the Ever House app to sign in:
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 0 40px 12px 40px; text-align: center;">
+                      <div style="background: linear-gradient(135deg, #293515 0%, #3d4f22 100%); padding: 24px 32px; border-radius: 12px; display: inline-block; cursor: pointer;">
+                        <span style="font-size: 36px; font-weight: 700; letter-spacing: 10px; color: #ffffff; font-family: 'SF Mono', 'Monaco', 'Consolas', monospace; user-select: all;">${code}</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 0 40px 8px 40px; text-align: center;">
+                      <p style="margin: 0; font-size: 13px; color: #888888;">
+                        Tap the code above to select, then copy
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 0 40px 40px 40px; text-align: center;">
+                      <p style="margin: 0 0 24px 0; font-size: 14px; color: #888888;">
+                        This code expires in <strong style="color: #293515;">15 minutes</strong>
+                      </p>
+                      <p style="margin: 0; font-size: 13px; color: #aaaaaa; line-height: 1.5;">
+                        If you didn't request this code, you can safely ignore this email.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 24px 40px; background-color: #f8f8f6; border-radius: 0 0 16px 16px; text-align: center;">
+                      <p style="margin: 0; font-size: 12px; color: #999999;">
+                        Ever House Members Club<br>
+                        <span style="color: #CCB8E4;">Golf & Wellness</span>
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `
+    }));
+    
+    if (!isProduction) console.log('Resend OTP email result:', JSON.stringify(emailResult));
+    
+    if (emailResult.error) {
+      if (!isProduction) console.error('Resend OTP error:', emailResult.error);
+      return res.status(500).json({ error: 'Failed to send code: ' + emailResult.error.message });
+    }
+    
+    res.json({ success: true, message: 'Login code sent to your email' });
+  } catch (error: any) {
+    if (!isProduction) console.error('OTP request error:', error?.message || error);
+    
+    if (error?.message?.includes('HubSpot') || error?.message?.includes('hubspot')) {
+      return res.status(500).json({ error: 'Unable to verify membership. Please try again later.' });
+    }
+    if (error?.message?.includes('Resend') || error?.message?.includes('email')) {
+      return res.status(500).json({ error: 'Unable to send email. Please try again later.' });
+    }
+    
+    res.status(500).json({ error: 'Failed to send login code. Please try again.' });
+  }
+});
+
+router.post('/api/auth/verify-otp', async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    
+    if (!email || !code) {
+      return res.status(400).json({ error: 'Email and code are required' });
+    }
+    
+    const normalizedEmail = email.toLowerCase();
+    const normalizedCode = code.toString().trim();
+    
+    const attemptCheck = checkOtpVerifyAttempts(normalizedEmail);
+    if (!attemptCheck.allowed) {
+      return res.status(429).json({ 
+        error: `Too many failed attempts. Please try again in ${Math.ceil((attemptCheck.retryAfter || 0) / 60)} minutes.` 
+      });
+    }
+    
+    const result = await db.select()
+      .from(magicLinks)
+      .where(and(
+        eq(magicLinks.email, normalizedEmail),
+        eq(magicLinks.token, normalizedCode),
+        eq(magicLinks.used, false),
+        gt(magicLinks.expiresAt, new Date())
+      ))
+      .orderBy(sql`${magicLinks.createdAt} DESC`)
+      .limit(1);
+    
+    if (result.length === 0) {
+      recordOtpVerifyFailure(normalizedEmail);
+      const currentAttempts = otpVerifyAttempts.get(normalizedEmail);
+      const attemptsLeft = OTP_VERIFY_MAX_ATTEMPTS - (currentAttempts?.count || 0);
+      return res.status(400).json({ 
+        error: attemptsLeft > 0 
+          ? `Invalid code. ${attemptsLeft} attempt${attemptsLeft === 1 ? '' : 's'} remaining.`
+          : 'Too many failed attempts. Please request a new code.'
+      });
+    }
+    
+    clearOtpVerifyAttempts(normalizedEmail);
+    
+    const otpRecord = result[0];
+    
+    await db.update(magicLinks)
+      .set({ used: true })
+      .where(eq(magicLinks.id, otpRecord.id));
+    
+    const role = await getUserRole(normalizedEmail);
+    const sessionTtl = 7 * 24 * 60 * 60 * 1000;
+    
+    let member: any;
+    let shouldSetupPassword = false;
+    
+    if (role === 'admin' || role === 'staff') {
+      const staffUserData = await getStaffUserByEmail(normalizedEmail);
+      
+      if (!staffUserData) {
+        return res.status(404).json({ error: 'Staff user not found' });
+      }
+      
+      const pwCheck = await db.select({ passwordHash: staffUsers.passwordHash })
+        .from(staffUsers)
+        .where(and(
+          sql`LOWER(${staffUsers.email}) = LOWER(${normalizedEmail})`,
+          eq(staffUsers.isActive, true)
+        ))
+        .limit(1);
+      
+      shouldSetupPassword = pwCheck.length > 0 && !pwCheck[0].passwordHash;
+      
+      member = {
+        id: crypto.randomUUID(),
+        firstName: staffUserData.firstName,
+        lastName: staffUserData.lastName,
+        email: normalizedEmail,
+        phone: staffUserData.phone,
+        jobTitle: staffUserData.jobTitle,
+        tier: null,
+        tags: [],
+        mindbodyClientId: '',
+        membershipStartDate: '',
+        status: 'Active',
+        role,
+        expires_at: Date.now() + sessionTtl
+      };
+    } else {
+      const hubspot = await getHubSpotClient();
+      
+      const searchResponse = await hubspot.crm.contacts.searchApi.doSearch({
+        filterGroups: [{
+          filters: [{
+            propertyName: 'email',
+            operator: 'EQ' as any,
+            value: normalizedEmail
+          }]
+        }],
+        properties: ['firstname', 'lastname', 'email', 'phone', 'membership_tier', 'membership_status', 'membership_discount_reason', 'mindbody_client_id', 'membership_start_date'],
+        limit: 1
+      });
+      
+      if (searchResponse.results.length === 0) {
+        return res.status(404).json({ error: 'Member not found' });
+      }
+      
+      const contact = searchResponse.results[0];
+      const tags = extractTierTags(contact.properties.membership_tier, contact.properties.membership_discount_reason);
+      
+      member = {
+        id: contact.id,
+        firstName: contact.properties.firstname || '',
+        lastName: contact.properties.lastname || '',
+        email: contact.properties.email || normalizedEmail,
+        phone: contact.properties.phone || '',
+        tier: normalizeTierName(contact.properties.membership_tier),
+        tags,
+        mindbodyClientId: contact.properties.mindbody_client_id || '',
+        membershipStartDate: contact.properties.membership_start_date || '',
+        status: 'Active',
+        role,
+        expires_at: Date.now() + sessionTtl
+      };
+    }
+    
+    req.session.user = member;
+    
+    await upsertUserWithTier({
+      email: member.email,
+      tierName: member.tier || '',
+      firstName: member.firstName,
+      lastName: member.lastName,
+      phone: member.phone,
+      mindbodyClientId: member.mindbodyClientId,
+      tags: member.tags || [],
+      membershipStartDate: member.membershipStartDate,
+      role
+    });
+    
+    // Send welcome email on first login (async, non-blocking)
+    (async () => {
+      try {
+        const [user] = await db.select({ welcomeEmailSent: users.welcomeEmailSent })
+          .from(users)
+          .where(sql`LOWER(${users.email}) = LOWER(${member.email})`)
+          .limit(1);
+        
+        if (user && !user.welcomeEmailSent && member.role === 'member') {
+          const result = await sendWelcomeEmail(member.email, member.firstName);
+          if (result.success) {
+            await db.update(users)
+              .set({ welcomeEmailSent: true, welcomeEmailSentAt: new Date() })
+              .where(sql`LOWER(${users.email}) = LOWER(${member.email})`);
+          }
+        }
+      } catch (e) {
+        console.error('[Welcome Email] Error checking/sending:', e);
+      }
+    })();
+    
+    req.session.save((err) => {
+      if (err) {
+        if (!isProduction) console.error('Session save error:', err);
+        return res.status(500).json({ error: 'Failed to create session' });
+      }
+      res.json({ success: true, member, shouldSetupPassword });
+    });
+  } catch (error: any) {
+    if (!isProduction) console.error('OTP verification error:', error);
+    res.status(500).json({ error: 'Failed to verify code' });
+  }
+});
+
+router.post('/api/auth/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      if (!isProduction) console.error('Session destroy error:', err);
+      return res.status(500).json({ error: 'Failed to logout' });
+    }
+    res.clearCookie('connect.sid');
+    res.json({ success: true, message: 'Logged out successfully' });
+  });
+});
+
+router.get('/api/auth/session', (req, res) => {
+  const sessionUser = getSessionUser(req);
+  
+  if (!sessionUser?.email) {
+    return res.status(401).json({ error: 'No active session', authenticated: false });
+  }
+  
+  if (sessionUser.expires_at && Date.now() > sessionUser.expires_at) {
+    return res.status(401).json({ error: 'Session expired', authenticated: false });
+  }
+  
+  res.json({
+    authenticated: true,
+    member: {
+      id: sessionUser.id,
+      firstName: sessionUser.firstName || '',
+      lastName: sessionUser.lastName || '',
+      email: sessionUser.email,
+      phone: sessionUser.phone || '',
+      tier: sessionUser.tier || 'Social',
+      tags: sessionUser.tags || [],
+      mindbodyClientId: sessionUser.mindbodyClientId || '',
+      status: sessionUser.status || 'Active',
+      role: sessionUser.role || 'member'
+    }
+  });
+});
+
+router.get('/api/auth/check-staff-admin', async (req, res) => {
+  try {
+    const { email } = req.query;
+    
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+    
+    const normalizedEmail = email.toLowerCase();
+    
+    const staffResult = await db.select({
+      id: staffUsers.id,
+      role: staffUsers.role,
+      hasPassword: isNotNull(staffUsers.passwordHash)
+    })
+      .from(staffUsers)
+      .where(and(
+        eq(staffUsers.email, normalizedEmail),
+        eq(staffUsers.isActive, true)
+      ));
+    
+    if (staffResult.length > 0) {
+      const userRole = staffResult[0].role === 'admin' ? 'admin' : 'staff';
+      return res.json({ 
+        isStaffOrAdmin: true, 
+        role: userRole,
+        hasPassword: staffResult[0].hasPassword 
+      });
+    }
+    
+    res.json({ isStaffOrAdmin: false, role: null, hasPassword: false });
+  } catch (error: any) {
+    if (!isProduction) console.error('Check staff/admin error:', error);
+    res.status(500).json({ error: 'Failed to check user status' });
+  }
+});
+
+router.post('/api/auth/password-login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+    
+    const normalizedEmail = email.toLowerCase();
+    
+    let userRecord: { id: number; email: string; name: string | null; passwordHash: string | null; role: string | null } | null = null;
+    let userRole: 'admin' | 'staff' | 'member' = 'member';
+    
+    const staffResult = await db.select({
+      id: staffUsers.id,
+      email: staffUsers.email,
+      name: staffUsers.name,
+      passwordHash: staffUsers.passwordHash,
+      role: staffUsers.role
+    })
+      .from(staffUsers)
+      .where(and(
+        eq(staffUsers.email, normalizedEmail),
+        eq(staffUsers.isActive, true)
+      ));
+    
+    if (staffResult.length > 0) {
+      userRecord = staffResult[0];
+      userRole = staffResult[0].role === 'admin' ? 'admin' : 'staff';
+    }
+    
+    if (!userRecord) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    
+    if (!userRecord.passwordHash) {
+      return res.status(400).json({ error: 'Password not set. Please use magic link or contact an admin.' });
+    }
+    
+    const isValid = await bcrypt.compare(password, userRecord.passwordHash);
+    
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    
+    const hubspot = await getHubSpotClient();
+    let memberData = null;
+    
+    try {
+      const searchResponse = await hubspot.crm.contacts.searchApi.doSearch({
+        filterGroups: [{
+          filters: [{
+            propertyName: 'email',
+            operator: 'EQ' as any,
+            value: normalizedEmail
+          }]
+        }],
+        properties: ['firstname', 'lastname', 'email', 'phone', 'membership_tier', 'membership_status', 'membership_discount_reason', 'mindbody_client_id', 'membership_start_date'],
+        limit: 1
+      });
+      
+      if (searchResponse.results.length > 0) {
+        const contact = searchResponse.results[0];
+        memberData = {
+          id: contact.id,
+          firstName: contact.properties.firstname || userRecord.name?.split(' ')[0] || '',
+          lastName: contact.properties.lastname || userRecord.name?.split(' ').slice(1).join(' ') || '',
+          email: normalizedEmail,
+          phone: contact.properties.phone || '',
+          tier: normalizeTierName(contact.properties.membership_tier),
+          tags: extractTierTags(contact.properties.membership_tier, contact.properties.membership_discount_reason),
+          mindbodyClientId: contact.properties.mindbody_client_id || '',
+          membershipStartDate: contact.properties.membership_start_date || '',
+        };
+      }
+    } catch (hubspotError) {
+      if (!isProduction) console.error('HubSpot lookup failed:', hubspotError);
+    }
+    
+    const sessionTtl = 7 * 24 * 60 * 60 * 1000;
+    const member = {
+      id: memberData?.id || userRecord.id.toString(),
+      firstName: memberData?.firstName || userRecord.name?.split(' ')[0] || '',
+      lastName: memberData?.lastName || userRecord.name?.split(' ').slice(1).join(' ') || '',
+      email: normalizedEmail,
+      phone: memberData?.phone || '',
+      tier: memberData?.tier || DEFAULT_TIER,
+      tags: memberData?.tags || [],
+      mindbodyClientId: memberData?.mindbodyClientId || '',
+      membershipStartDate: memberData?.membershipStartDate || '',
+      status: 'Active',
+      role: userRole,
+      expires_at: Date.now() + sessionTtl
+    };
+    
+    req.session.user = member;
+    
+    await upsertUserWithTier({
+      email: member.email,
+      tierName: member.tier,
+      firstName: member.firstName,
+      lastName: member.lastName,
+      phone: member.phone,
+      mindbodyClientId: member.mindbodyClientId,
+      tags: member.tags,
+      membershipStartDate: member.membershipStartDate,
+      role: userRole
+    });
+    
+    req.session.save((err) => {
+      if (err) {
+        if (!isProduction) console.error('Session save error:', err);
+        return res.status(500).json({ error: 'Failed to create session' });
+      }
+      res.json({ success: true, member });
+    });
+  } catch (error: any) {
+    if (!isProduction) console.error('Password login error:', error);
+    res.status(500).json({ error: 'Login failed. Please try again.' });
+  }
+});
+
+router.post('/api/auth/set-password', async (req, res) => {
+  try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser?.email) {
+      return res.status(401).json({ error: 'You must be logged in to set a password' });
+    }
+    
+    const { password, currentPassword } = req.body;
+    
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required' });
+    }
+    
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    
+    const normalizedEmail = sessionUser.email.toLowerCase();
+    
+    const staffRecord = await db.select({ id: staffUsers.id, passwordHash: staffUsers.passwordHash })
+      .from(staffUsers)
+      .where(and(
+        eq(staffUsers.email, normalizedEmail),
+        eq(staffUsers.isActive, true)
+      ))
+      .limit(1);
+    
+    if (staffRecord.length > 0) {
+      if (staffRecord[0].passwordHash) {
+        if (!currentPassword) {
+          return res.status(400).json({ error: 'Current password is required' });
+        }
+        const isValid = await bcrypt.compare(currentPassword, staffRecord[0].passwordHash);
+        if (!isValid) {
+          return res.status(400).json({ error: 'Current password is incorrect' });
+        }
+      }
+      
+      const passwordHash = await bcrypt.hash(password, 10);
+      await db.update(staffUsers)
+        .set({ passwordHash })
+        .where(eq(staffUsers.id, staffRecord[0].id));
+      
+      return res.json({ success: true, message: 'Password set successfully' });
+    }
+    
+    res.status(403).json({ error: 'Password can only be set for staff or admin accounts' });
+  } catch (error: any) {
+    if (!isProduction) console.error('Set password error:', error);
+    res.status(500).json({ error: 'Failed to set password' });
+  }
+});
+
+router.post('/api/auth/dev-login', async (req, res) => {
+  if (isProduction) {
+    return res.status(403).json({ error: 'Dev login not available in production' });
+  }
+  
+  if (process.env.DEV_LOGIN_ENABLED !== 'true') {
+    return res.status(403).json({ error: 'Dev login not enabled' });
+  }
+  
+  try {
+    const devEmail = 'nick@evenhouse.club';
+    
+    const existingUser = await db.select()
+      .from(users)
+      .where(eq(users.email, devEmail));
+    
+    if (existingUser.length === 0) {
+      return res.status(404).json({ error: 'Dev user not found' });
+    }
+    
+    const user = existingUser[0];
+    
+    const sessionTtl = 7 * 24 * 60 * 60 * 1000;
+    const member = {
+      id: user.id,
+      firstName: user.firstName || 'Nick',
+      lastName: user.lastName || 'Luu',
+      email: devEmail,
+      phone: user.phone || '',
+      tier: user.tier || 'Premium',
+      role: user.role || 'admin',
+      expires_at: Date.now() + sessionTtl
+    };
+    
+    req.session.user = member;
+    
+    req.session.save((err) => {
+      if (err) {
+        if (!isProduction) console.error('Session save error:', err);
+        return res.status(500).json({ error: 'Failed to create session' });
+      }
+      res.json({ success: true, member });
+    });
+  } catch (error: any) {
+    if (!isProduction) console.error('Dev login error:', error);
+    res.status(500).json({ error: 'Dev login failed' });
+  }
+});
+
+// Test endpoint to send welcome email (admin only)
+router.post('/api/auth/test-welcome-email', async (req, res) => {
+  const sessionUser = getSessionUser(req);
+  if (!sessionUser || sessionUser.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  try {
+    const { email, firstName } = req.body;
+    const targetEmail = email || sessionUser.email;
+    const targetFirstName = firstName || sessionUser.firstName;
+    
+    const result = await sendWelcomeEmail(targetEmail, targetFirstName);
+    
+    if (result.success) {
+      res.json({ success: true, message: `Welcome email sent to ${targetEmail}` });
+    } else {
+      res.status(500).json({ error: result.error || 'Failed to send welcome email' });
+    }
+  } catch (error: any) {
+    console.error('Test welcome email error:', error);
+    res.status(500).json({ error: error.message || 'Failed to send test email' });
+  }
+});
+
+export default router;
