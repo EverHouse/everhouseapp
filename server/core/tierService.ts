@@ -171,16 +171,16 @@ export async function checkDailyBookingLimit(
     return { allowed: true, remainingMinutes: 999, overageMinutes: 0, includedMinutes: requestedMinutes };
   }
   
-  // Social tier (0 minutes) cannot book simulators at all
-  if (dailyLimit === 0) {
-    return { allowed: false, reason: 'Your membership tier does not include daily simulator time' };
-  }
+  // If daily limit is 0 but can_book_simulators is true, this is pay-as-you-go (e.g., Social tier)
+  // All time is charged as overage. They can still book, just with 0 included minutes.
+  // Only block if can_book_simulators is explicitly false (already checked above at line 145)
   
   const alreadyBooked = await getDailyBookedMinutes(email, date);
   const remainingMinutes = Math.max(0, dailyLimit - alreadyBooked);
   
-  // Allow bookings that exceed daily limit - calculate overage for billing
+  // Allow bookings - calculate included vs overage for billing
   // Members can book longer sessions and pay overage fees ($25/30 min)
+  // For tiers with 0 daily minutes (pay-as-you-go), all time is overage
   const includedMinutes = Math.min(requestedMinutes, remainingMinutes);
   const overageMinutes = Math.max(0, requestedMinutes - remainingMinutes);
   
