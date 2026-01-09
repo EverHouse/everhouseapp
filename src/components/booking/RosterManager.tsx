@@ -64,6 +64,7 @@ interface FeePreviewResponse {
   timeAllocation: {
     totalMinutes: number;
     declaredPlayerCount: number;
+    totalSlots?: number;
     minutesPerParticipant: number;
     allocations: Array<{
       displayName: string;

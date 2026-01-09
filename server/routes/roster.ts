@@ -642,6 +642,20 @@ router.post('/api/bookings/:bookingId/participants/preview-fees', async (req: Re
     const ownerTier = booking.owner_tier || await getMemberTierByEmail(booking.owner_email);
     const durationMinutes = booking.duration_minutes || 60;
     const declaredPlayerCount = booking.declared_player_count || 1;
+    
+    // Get resource capacity for time allocation calculation
+    let resourceCapacity = declaredPlayerCount;
+    if (booking.resource_id) {
+      const capacityResult = await pool.query(
+        'SELECT capacity FROM resources WHERE id = $1',
+        [booking.resource_id]
+      );
+      if (capacityResult.rows[0]?.capacity) {
+        resourceCapacity = capacityResult.rows[0].capacity;
+      }
+    }
+    // Total slots = resource capacity (used for dividing time evenly)
+    const totalSlots = resourceCapacity;
 
     let dailyAllowance = 60;
     let guestPassesPerMonth = 0;
@@ -678,18 +692,18 @@ router.post('/api/bookings/:bookingId/participants/preview-fees', async (req: Re
       });
     }
 
-    // Use computeUsageAllocation with declared_player_count as the divisor
-    // This ensures time is split by declared players, not just current participants
+    // Use computeUsageAllocation with resource capacity (totalSlots) as the divisor
+    // This ensures time is split by total slots (e.g., 4 for a simulator), not just current participants
     const allocations = computeUsageAllocation(durationMinutes, participantsForAllocation, {
-      declaredSlots: declaredPlayerCount,
+      declaredSlots: totalSlots,
       assignRemainderToOwner: true
     });
 
     const guestCount = allParticipants.filter(p => p.participantType === 'guest').length;
     const memberCount = allParticipants.filter(p => p.participantType === 'member').length;
     
-    // Calculate minutes per player for display purposes
-    const minutesPerPlayer = Math.floor(durationMinutes / declaredPlayerCount);
+    // Calculate minutes per slot for display purposes (using resource capacity)
+    const minutesPerPlayer = Math.floor(durationMinutes / totalSlots);
     
     // Get owner's allocated minutes from the computed allocations
     const ownerAllocation = allocations.find(a => a.participantType === 'owner');
@@ -697,7 +711,7 @@ router.post('/api/bookings/:bookingId/participants/preview-fees', async (req: Re
     
     // Owner is also responsible for any unfilled slots
     const filledSlots = participantsForAllocation.length;
-    const unfilledSlots = Math.max(0, declaredPlayerCount - filledSlots);
+    const unfilledSlots = Math.max(0, totalSlots - filledSlots);
     const unfilledMinutes = unfilledSlots * minutesPerPlayer;
     const ownerMinutes = baseOwnerMinutes + unfilledMinutes;
     
@@ -740,7 +754,8 @@ router.post('/api/bookings/:bookingId/participants/preview-fees', async (req: Re
       },
       timeAllocation: {
         totalMinutes: durationMinutes,
-        declaredPlayerCount,
+        declaredPlayerCount: totalSlots,
+        totalSlots,
         minutesPerParticipant: minutesPerPlayer,
         allocations: allocations.map(a => ({
           displayName: a.displayName,

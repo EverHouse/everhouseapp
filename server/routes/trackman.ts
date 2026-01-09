@@ -476,13 +476,17 @@ router.get('/api/admin/booking/:id/members', isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Get guest_count and trackman_player_count from booking_requests
+    // Get guest_count, trackman_player_count, and resource_id from booking_requests
     const bookingResult = await pool.query(
-      `SELECT guest_count, trackman_player_count FROM booking_requests WHERE id = $1`,
+      `SELECT br.guest_count, br.trackman_player_count, br.resource_id, r.capacity as resource_capacity
+       FROM booking_requests br
+       LEFT JOIN resources r ON br.resource_id = r.id
+       WHERE br.id = $1`,
       [id]
     );
     const legacyGuestCount = bookingResult.rows[0]?.guest_count || 0;
     const trackmanPlayerCount = bookingResult.rows[0]?.trackman_player_count;
+    const resourceCapacity = bookingResult.rows[0]?.resource_capacity || null;
     
     const membersResult = await pool.query(
       `SELECT bm.*, u.first_name, u.last_name, u.email as member_email
@@ -513,6 +517,11 @@ router.get('/api/admin/booking/:id/members', isAdmin, async (req, res) => {
     } else {
       // Legacy booking without booking_members - use legacy formula
       expectedPlayerCount = Math.max(legacyGuestCount + 1, 1);
+    }
+    
+    // Cap expectedPlayerCount at resource capacity (e.g., simulator max 4 players)
+    if (resourceCapacity && resourceCapacity > 0) {
+      expectedPlayerCount = Math.min(expectedPlayerCount, resourceCapacity);
     }
     
     // For display purposes, use appropriate guest count
