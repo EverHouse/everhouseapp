@@ -250,7 +250,8 @@ router.get('/api/booking-requests', async (req, res) => {
       guest_count: bookingRequests.guestCount,
       trackman_player_count: bookingRequests.trackmanPlayerCount,
       declared_player_count: bookingRequests.declaredPlayerCount,
-      member_notes: bookingRequests.memberNotes
+      member_notes: bookingRequests.memberNotes,
+      session_id: bookingRequests.sessionId
     })
     .from(bookingRequests)
     .leftJoin(resources, eq(bookingRequests.resourceId, resources.id))
