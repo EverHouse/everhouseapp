@@ -713,13 +713,22 @@ router.post('/api/bookings/:id/invite/accept', async (req: Request, res: Respons
       return res.status(400).json({ error: 'Booking has no session - cannot accept invite' });
     }
 
-    // Find the participant record
+    // Find the participant record - join with users table since userId is a UUID
+    // This allows finding participants by their email address
     const participantResult = await db
-      .select()
+      .select({
+        id: bookingParticipants.id,
+        sessionId: bookingParticipants.sessionId,
+        userId: bookingParticipants.userId,
+        inviteStatus: bookingParticipants.inviteStatus,
+        displayName: bookingParticipants.displayName,
+        participantType: bookingParticipants.participantType
+      })
       .from(bookingParticipants)
+      .innerJoin(users, eq(bookingParticipants.userId, users.id))
       .where(and(
         eq(bookingParticipants.sessionId, booking.session_id),
-        sql`LOWER(${bookingParticipants.userId}) = ${userEmail}`
+        sql`LOWER(${users.email}) = ${userEmail}`
       ))
       .limit(1);
 
@@ -777,13 +786,21 @@ router.post('/api/bookings/:id/invite/decline', async (req: Request, res: Respon
       return res.status(400).json({ error: 'Booking has no session - cannot decline invite' });
     }
 
-    // Find the participant record
+    // Find the participant record - join with users table since userId is a UUID
     const participantResult = await db
-      .select()
+      .select({
+        id: bookingParticipants.id,
+        sessionId: bookingParticipants.sessionId,
+        userId: bookingParticipants.userId,
+        inviteStatus: bookingParticipants.inviteStatus,
+        displayName: bookingParticipants.displayName,
+        participantType: bookingParticipants.participantType
+      })
       .from(bookingParticipants)
+      .innerJoin(users, eq(bookingParticipants.userId, users.id))
       .where(and(
         eq(bookingParticipants.sessionId, booking.session_id),
-        sql`LOWER(${bookingParticipants.userId}) = ${userEmail}`
+        sql`LOWER(${users.email}) = ${userEmail}`
       ))
       .limit(1);
 
