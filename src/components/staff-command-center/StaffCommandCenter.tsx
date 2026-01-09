@@ -13,6 +13,7 @@ import { TodayScheduleSection } from './sections/TodayScheduleSection';
 import { ResourcesSection, NoticeBoardWidget } from './sections/ResourcesSection';
 import { AlertsCard } from './sections/AlertsCard';
 import { QuickActionsGrid } from './sections/QuickActionsGrid';
+import { CheckinBillingModal } from './modals/CheckinBillingModal';
 import type { StaffCommandCenterProps, BookingRequest, RecentActivity } from './types';
 
 const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, isAdmin, wsConnected = false }) => {
@@ -24,6 +25,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [fabOpen, setFabOpen] = useState(false);
   const [trackmanModal, setTrackmanModal] = useState<BookingRequest | null>(null);
+  const [billingModal, setBillingModal] = useState<{ isOpen: boolean; bookingId: number | null }>({ isOpen: false, bookingId: null });
 
   const today = getTodayPacific();
   const pendingCount = data.pendingRequests.length;
@@ -120,8 +122,25 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include'
       });
+      
       if (res.ok) {
         showToast('Member checked in', 'success');
+      } else if (res.status === 402) {
+        // Payment required - show billing modal
+        updateTodaysBookings(prev => prev.map(b => 
+          b.id === booking.id ? { ...b, status: booking.status } : b
+        ));
+        updateBayStatuses(prev => prev.map(bay => {
+          if (bay.currentBooking?.id === booking.id) {
+            return {
+              ...bay,
+              currentBooking: bay.currentBooking ? { ...bay.currentBooking, status: booking.status } : null
+            };
+          }
+          return bay;
+        }));
+        updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
+        setBillingModal({ isOpen: true, bookingId: id });
       } else {
         // Revert optimistic update on failure
         updateTodaysBookings(prev => prev.map(b => 
@@ -159,6 +178,11 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
       setActionInProgress(null);
     }
   };
+
+  const handleBillingModalComplete = useCallback(() => {
+    showToast('Member checked in', 'success');
+    refresh();
+  }, [showToast, refresh]);
 
   const handleRefresh = useCallback(async () => {
     await refresh();
@@ -414,6 +438,13 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
         </div>,
         document.body
       )}
+      
+      <CheckinBillingModal
+        isOpen={billingModal.isOpen}
+        onClose={() => setBillingModal({ isOpen: false, bookingId: null })}
+        bookingId={billingModal.bookingId || 0}
+        onCheckinComplete={handleBillingModalComplete}
+      />
       
       {trackmanModal && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { resources, availabilityBlocks, bookingRequests, notifications, facilityClosures, users, bookingMembers, bookingGuests, bookingParticipants } from '../../shared/schema';
+import { pool } from '../core/db';
+import { resources, availabilityBlocks, bookingRequests, notifications, facilityClosures, users, bookingMembers, bookingGuests, bookingParticipants, bookingPaymentAudit } from '../../shared/schema';
 import { eq, and, or, gte, lte, gt, lt, desc, asc, ne, sql } from 'drizzle-orm';
 import { isProduction } from '../core/db';
 import { getGoogleCalendarClient } from '../core/integrations';
@@ -1250,25 +1251,29 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
 router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { status: targetStatus } = req.body;
+    const { status: targetStatus, confirmPayment, skipPaymentCheck } = req.body;
+    const bookingId = parseInt(id);
+    const sessionUser = getSessionUser(req);
+    const staffEmail = sessionUser?.email || 'unknown';
+    const staffName = sessionUser?.name || null;
     
     // Validate the target status - must be 'attended' or 'no_show'
     const validStatuses = ['attended', 'no_show'];
     const newStatus = validStatuses.includes(targetStatus) ? targetStatus : 'attended';
     
-    // First check the current booking status
-    const existing = await db.select({
-      status: bookingRequests.status,
-      userEmail: bookingRequests.userEmail
-    })
-      .from(bookingRequests)
-      .where(eq(bookingRequests.id, parseInt(id)));
+    // First check the current booking status and session
+    const existingResult = await pool.query(`
+      SELECT br.status, br.user_email, br.session_id
+      FROM booking_requests br
+      WHERE br.id = $1
+    `, [bookingId]);
     
-    if (existing.length === 0) {
+    if (existingResult.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found' });
     }
     
-    const currentStatus = existing[0].status;
+    const existing = existingResult.rows[0];
+    const currentStatus = existing.status;
     
     // Idempotent - skip if already at target status
     if (currentStatus === newStatus) {
@@ -1280,6 +1285,77 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: `Cannot update booking with status: ${currentStatus}` });
     }
     
+    // PAYMENT GUARD: Check for unpaid balance before marking as attended
+    if (newStatus === 'attended' && existing.session_id && !skipPaymentCheck) {
+      const balanceResult = await pool.query(`
+        SELECT 
+          bp.id as participant_id,
+          bp.display_name,
+          bp.participant_type,
+          bp.payment_status,
+          COALESCE(ul.overage_fee, 0)::numeric as overage_fee,
+          COALESCE(ul.guest_fee, 0)::numeric as guest_fee
+        FROM booking_participants bp
+        LEFT JOIN usage_ledger ul ON ul.session_id = bp.session_id AND ul.member_id = bp.user_id
+        WHERE bp.session_id = $1 AND bp.payment_status = 'pending'
+      `, [existing.session_id]);
+      
+      let totalOutstanding = 0;
+      const unpaidParticipants: Array<{ id: number; name: string; amount: number }> = [];
+      
+      for (const p of balanceResult.rows) {
+        const amount = parseFloat(p.overage_fee) + parseFloat(p.guest_fee);
+        if (amount > 0) {
+          totalOutstanding += amount;
+          unpaidParticipants.push({
+            id: p.participant_id,
+            name: p.display_name,
+            amount
+          });
+        }
+      }
+      
+      if (totalOutstanding > 0 && !confirmPayment) {
+        // Log the guard trigger
+        await pool.query(`
+          INSERT INTO booking_payment_audit 
+            (booking_id, session_id, action, staff_email, staff_name, amount_affected, metadata)
+          VALUES ($1, $2, 'checkin_guard_triggered', $3, $4, $5, $6)
+        `, [
+          bookingId,
+          existing.session_id,
+          staffEmail,
+          staffName,
+          totalOutstanding,
+          JSON.stringify({ unpaidParticipants })
+        ]);
+        
+        return res.status(402).json({ 
+          error: 'Payment required',
+          requiresPayment: true,
+          totalOutstanding,
+          unpaidParticipants,
+          message: `Outstanding balance of $${totalOutstanding.toFixed(2)}. Has the member paid?`
+        });
+      }
+      
+      // If confirmPayment is true, mark all pending participants as paid
+      if (confirmPayment && totalOutstanding > 0) {
+        for (const p of unpaidParticipants) {
+          await pool.query(
+            `UPDATE booking_participants SET payment_status = 'paid' WHERE id = $1`,
+            [p.id]
+          );
+          
+          await pool.query(`
+            INSERT INTO booking_payment_audit 
+              (booking_id, session_id, participant_id, action, staff_email, staff_name, amount_affected, previous_status, new_status)
+            VALUES ($1, $2, $3, 'payment_confirmed', $4, $5, $6, 'pending', 'paid')
+          `, [bookingId, existing.session_id, p.id, staffEmail, staffName, p.amount]);
+        }
+      }
+    }
+    
     // Update booking request status
     const result = await db.update(bookingRequests)
       .set({
@@ -1287,7 +1363,7 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
         updatedAt: new Date()
       })
       .where(and(
-        eq(bookingRequests.id, parseInt(id)),
+        eq(bookingRequests.id, bookingId),
         or(
           eq(bookingRequests.status, 'approved'),
           eq(bookingRequests.status, 'confirmed')

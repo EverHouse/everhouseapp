@@ -10,6 +10,8 @@ export interface BookingRequest {
   status: string;
   source?: string;
   resource_name?: string;
+  member_notes?: string | null;
+  notes?: string | null;
 }
 
 export interface Tour {

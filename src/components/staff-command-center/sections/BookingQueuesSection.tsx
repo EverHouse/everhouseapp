@@ -64,6 +64,14 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
                   </p>
                 </div>
               </div>
+              {(request.member_notes || request.notes) && (
+                <div className="ml-[56px] px-2 py-1.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/30 rounded-lg">
+                  <p className="text-xs text-amber-700 dark:text-amber-300 flex items-start gap-1.5">
+                    <span className="material-symbols-outlined text-sm flex-shrink-0 mt-0.5">edit_note</span>
+                    <span className="italic">"{request.member_notes || request.notes}"</span>
+                  </p>
+                </div>
+              )}
               <div className="flex gap-2 ml-[56px]">
                 <button
                   onClick={(e) => { e.stopPropagation(); onApprove(request); }}
