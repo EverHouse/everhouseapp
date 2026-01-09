@@ -16,6 +16,7 @@ import { checkClosureConflict, checkAvailabilityBlockConflict, parseTimeToMinute
 import { bookingEvents } from '../core/bookingEvents';
 import { sendNotificationToUser } from '../core/websocket';
 import { getSessionUser } from '../types/session';
+import { refundGuestPass } from './guestPasses';
 
 const router = Router();
 
@@ -957,6 +958,30 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
           })
           .where(eq(bookingRequests.id, bookingId))
           .returning();
+        
+        // Refund guest passes for any guests in this booking
+        // Check if booking has a session with guest participants
+        const sessionResult = await tx.select({ sessionId: bookingRequests.sessionId })
+          .from(bookingRequests)
+          .where(eq(bookingRequests.id, bookingId));
+        
+        if (sessionResult[0]?.sessionId) {
+          const guestParticipants = await tx.select({ id: bookingParticipants.id, displayName: bookingParticipants.displayName })
+            .from(bookingParticipants)
+            .where(and(
+              eq(bookingParticipants.sessionId, sessionResult[0].sessionId),
+              eq(bookingParticipants.participantType, 'guest')
+            ));
+          
+          // Refund one guest pass for each guest participant
+          for (const guest of guestParticipants) {
+            await refundGuestPass(existing.userEmail, guest.displayName || undefined, false);
+          }
+          
+          if (guestParticipants.length > 0) {
+            console.log(`[bays] Refunded ${guestParticipants.length} guest pass(es) for cancelled booking ${bookingId}`);
+          }
+        }
         
         let pushInfo: { type: 'staff' | 'member' | 'both'; email?: string; staffMessage?: string; memberMessage?: string; message: string } | null = null;
         
