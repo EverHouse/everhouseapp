@@ -1093,7 +1093,7 @@ const Dashboard: React.FC = () => {
                         <RosterManager
                           bookingId={item.dbId}
                           declaredPlayerCount={rawBookingData.declared_player_count || 1}
-                          isOwner={true}
+                          isOwner={isOwnerOfBooking}
                           isStaff={isStaffOrAdminProfile}
                           onUpdate={() => fetchUserData(false)}
                         />

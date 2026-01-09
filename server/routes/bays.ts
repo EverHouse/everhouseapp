@@ -309,13 +309,15 @@ router.get('/api/booking-requests', async (req, res) => {
       const primaryBookerName = isLinkedMember ? (booking.user_name || booking.user_email) : null;
       
       // For linked members, get invite_status from booking_participants via session
+      // Note: booking_participants.userId contains user UUIDs, so we must join with users table to match by email
       let inviteStatus: string | null = null;
       if (isLinkedMember && booking.session_id) {
         const participantResult = await db.select({ inviteStatus: bookingParticipants.inviteStatus })
           .from(bookingParticipants)
+          .innerJoin(users, eq(bookingParticipants.userId, users.id))
           .where(and(
             eq(bookingParticipants.sessionId, booking.session_id),
-            sql`LOWER(${bookingParticipants.userId}) = ${requestingUserEmail}`
+            sql`LOWER(${users.email}) = ${requestingUserEmail}`
           ))
           .limit(1);
         
