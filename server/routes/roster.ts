@@ -705,4 +705,135 @@ router.post('/api/bookings/:bookingId/participants/preview-fees', async (req: Re
   }
 });
 
+// Accept an invite to a booking
+router.post('/api/bookings/:id/invite/accept', async (req: Request, res: Response) => {
+  try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const bookingId = parseInt(req.params.id);
+    if (isNaN(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
+
+    const userEmail = sessionUser.email?.toLowerCase() || '';
+    
+    // Get booking with session
+    const booking = await getBookingWithSession(bookingId);
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    
+    if (!booking.session_id) {
+      return res.status(400).json({ error: 'Booking has no session - cannot accept invite' });
+    }
+
+    // Find the participant record
+    const participantResult = await db
+      .select()
+      .from(bookingParticipants)
+      .where(and(
+        eq(bookingParticipants.sessionId, booking.session_id),
+        sql`LOWER(${bookingParticipants.userId}) = ${userEmail}`
+      ))
+      .limit(1);
+
+    if (!participantResult[0]) {
+      return res.status(404).json({ error: 'You are not a participant on this booking' });
+    }
+
+    const participant = participantResult[0];
+    
+    if (participant.inviteStatus === 'accepted') {
+      return res.json({ success: true, message: 'Invite already accepted' });
+    }
+
+    // Update invite status to accepted
+    await db
+      .update(bookingParticipants)
+      .set({ 
+        inviteStatus: 'accepted',
+        respondedAt: new Date()
+      })
+      .where(eq(bookingParticipants.id, participant.id));
+
+    logger.info('[Invite Accept] Member accepted invite', {
+      extra: { bookingId, userEmail, sessionId: booking.session_id }
+    });
+
+    res.json({ success: true, message: 'Invite accepted successfully' });
+  } catch (error: any) {
+    logAndRespond(req, res, 500, 'Failed to accept invite', error);
+  }
+});
+
+// Decline an invite to a booking
+router.post('/api/bookings/:id/invite/decline', async (req: Request, res: Response) => {
+  try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const bookingId = parseInt(req.params.id);
+    if (isNaN(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
+
+    const userEmail = sessionUser.email?.toLowerCase() || '';
+    
+    // Get booking with session
+    const booking = await getBookingWithSession(bookingId);
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    
+    if (!booking.session_id) {
+      return res.status(400).json({ error: 'Booking has no session - cannot decline invite' });
+    }
+
+    // Find the participant record
+    const participantResult = await db
+      .select()
+      .from(bookingParticipants)
+      .where(and(
+        eq(bookingParticipants.sessionId, booking.session_id),
+        sql`LOWER(${bookingParticipants.userId}) = ${userEmail}`
+      ))
+      .limit(1);
+
+    if (!participantResult[0]) {
+      return res.status(404).json({ error: 'You are not a participant on this booking' });
+    }
+
+    const participant = participantResult[0];
+    
+    // Import bookingMembers for removal
+    const { bookingMembers } = await import('../../shared/schema');
+    
+    // Remove from booking_members table (so it no longer shows on schedule)
+    await db
+      .delete(bookingMembers)
+      .where(and(
+        eq(bookingMembers.bookingId, bookingId),
+        sql`LOWER(${bookingMembers.userEmail}) = ${userEmail}`
+      ));
+
+    // Delete the participant record (release the slot)
+    await db
+      .delete(bookingParticipants)
+      .where(eq(bookingParticipants.id, participant.id));
+
+    logger.info('[Invite Decline] Member declined invite', {
+      extra: { bookingId, userEmail, sessionId: booking.session_id, participantId: participant.id }
+    });
+
+    res.json({ success: true, message: 'Invite declined successfully' });
+  } catch (error: any) {
+    logAndRespond(req, res, 500, 'Failed to decline invite', error);
+  }
+});
+
 export default router;

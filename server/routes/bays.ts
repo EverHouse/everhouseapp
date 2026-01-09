@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { resources, availabilityBlocks, bookingRequests, notifications, facilityClosures, users, bookingMembers, bookingGuests } from '../../shared/schema';
+import { resources, availabilityBlocks, bookingRequests, notifications, facilityClosures, users, bookingMembers, bookingGuests, bookingParticipants } from '../../shared/schema';
 import { eq, and, or, gte, lte, gt, lt, desc, asc, ne, sql } from 'drizzle-orm';
 import { isProduction } from '../core/db';
 import { getGoogleCalendarClient } from '../core/integrations';
@@ -308,13 +308,30 @@ router.get('/api/booking-requests', async (req, res) => {
       // For linked members, include the primary booker's name
       const primaryBookerName = isLinkedMember ? (booking.user_name || booking.user_email) : null;
       
+      // For linked members, get invite_status from booking_participants via session
+      let inviteStatus: string | null = null;
+      if (isLinkedMember && booking.session_id) {
+        const participantResult = await db.select({ inviteStatus: bookingParticipants.inviteStatus })
+          .from(bookingParticipants)
+          .where(and(
+            eq(bookingParticipants.sessionId, booking.session_id),
+            sql`LOWER(${bookingParticipants.userId}) = ${requestingUserEmail}`
+          ))
+          .limit(1);
+        
+        if (participantResult[0]) {
+          inviteStatus = participantResult[0].inviteStatus;
+        }
+      }
+      
       return {
         ...booking,
         linked_member_count: filledMemberCount,
         guest_count: actualGuestCount,
         total_player_count: totalPlayerCount,
         is_linked_member: isLinkedMember || false,
-        primary_booker_name: primaryBookerName
+        primary_booker_name: primaryBookerName,
+        invite_status: inviteStatus
       };
     }));
     
@@ -1347,7 +1364,8 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
       calendar_event_id: bookingRequests.calendarEventId,
       resource_name: resources.name,
       trackman_booking_id: bookingRequests.trackmanBookingId,
-      declared_player_count: bookingRequests.declaredPlayerCount
+      declared_player_count: bookingRequests.declaredPlayerCount,
+      member_notes: bookingRequests.memberNotes
     })
     .from(bookingRequests)
     .leftJoin(resources, eq(bookingRequests.resourceId, resources.id))

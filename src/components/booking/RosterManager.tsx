@@ -63,6 +63,7 @@ interface FeePreviewResponse {
   };
   timeAllocation: {
     totalMinutes: number;
+    declaredPlayerCount: number;
     minutesPerParticipant: number;
     allocations: Array<{
       displayName: string;
@@ -507,6 +508,25 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                   </span>
                 </div>
               ))}
+              
+              {/* Open Slots - show unfilled slots so math balances */}
+              {(() => {
+                const declaredCount = feePreview.timeAllocation.declaredPlayerCount || apiDeclaredPlayerCount;
+                const filledCount = feePreview.timeAllocation.allocations.length;
+                const unfilledCount = Math.max(0, declaredCount - filledCount);
+                const minutesPerSlot = feePreview.timeAllocation.minutesPerParticipant;
+                
+                return Array.from({ length: unfilledCount }, (_, idx) => (
+                  <div key={`open-${idx}`} className="flex items-center justify-between">
+                    <span className={`text-sm italic ${isDark ? 'text-white/40' : 'text-[#293515]/40'}`}>
+                      Open Slot {filledCount + idx + 1}
+                    </span>
+                    <span className={`text-sm font-medium ${isDark ? 'text-white/40' : 'text-[#293515]/40'}`}>
+                      {minutesPerSlot} min
+                    </span>
+                  </div>
+                ));
+              })()}
               
               <div className={`pt-2 mt-2 border-t ${isDark ? 'border-white/10' : 'border-black/5'}`}>
                 <div className="flex items-center justify-between">

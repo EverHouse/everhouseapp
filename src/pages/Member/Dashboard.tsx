@@ -24,6 +24,7 @@ import ErrorState from '../../components/ErrorState';
 import ModalShell from '../../components/ModalShell';
 import MetricsGrid from '../../components/MetricsGrid';
 import { RosterManager } from '../../components/booking';
+import { apiRequest } from '../../lib/apiRequest';
 
 const GUEST_CHECKIN_FIELDS = [
   { name: 'guest_firstname', label: 'Guest First Name', type: 'text' as const, required: true, placeholder: 'John' },
@@ -104,6 +105,7 @@ interface DBBookingRequest {
   is_linked_member?: boolean;
   primary_booker_name?: string | null;
   declared_player_count?: number;
+  invite_status?: 'pending' | 'accepted' | 'declined' | null;
 }
 
 const formatDate = (dateStr: string): string => {
@@ -141,6 +143,7 @@ const Dashboard: React.FC = () => {
   const [isCardOpen, setIsCardOpen] = useState(false);
   const [bannerAnnouncement, setBannerAnnouncement] = useState<{ id: string; title: string; desc: string; linkType?: string; linkTarget?: string } | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [processingInviteId, setProcessingInviteId] = useState<number | null>(null);
 
   const isStaffOrAdminProfile = user?.role === 'admin' || user?.role === 'staff';
   const { permissions: tierPermissions } = useTierPermissions(user?.tier);
@@ -469,16 +472,35 @@ const Dashboard: React.FC = () => {
     .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
     [0];
 
+  // Filter out pending invites from upcomingItems (show them in separate section)
+  const pendingInvites = dbBookingRequests.filter(r => 
+    r.is_linked_member === true && 
+    r.invite_status === 'pending' &&
+    ['pending', 'pending_approval', 'approved', 'confirmed'].includes(r.status)
+  );
+  
+  const pendingInviteIds = new Set(pendingInvites.map(p => p.id));
+  
+  // Filter upcomingItems to exclude pending invites
+  const upcomingItemsFiltered = upcomingItems.filter(item => {
+    if (item.type === 'booking_request') {
+      const raw = item.raw as DBBookingRequest;
+      // Exclude if it's a pending invite
+      return !pendingInviteIds.has(raw.id);
+    }
+    return true;
+  });
+
   // Separate bookings from events/wellness (include both confirmed bookings, approved requests, and calendar conference room bookings)
-  const upcomingBookings = upcomingItems.filter(item => item.type === 'booking' || item.type === 'booking_request' || item.type === 'conference_room_calendar');
-  const upcomingEventsWellness = upcomingItems.filter(item => item.type === 'rsvp' || item.type === 'wellness');
+  const upcomingBookings = upcomingItemsFiltered.filter(item => item.type === 'booking' || item.type === 'booking_request' || item.type === 'conference_room_calendar');
+  const upcomingEventsWellness = upcomingItemsFiltered.filter(item => item.type === 'rsvp' || item.type === 'wellness');
 
   // Next booking card shows only golf/conference bookings
   const nextBooking = upcomingBookings[0];
   
   // Upcoming section shows events and wellness enrollments
-  const nextItem = upcomingItems[0];
-  const laterItems = upcomingItems.slice(1);
+  const nextItem = upcomingItemsFiltered[0];
+  const laterItems = upcomingItemsFiltered.slice(1);
 
   const getIconForType = (type: string) => {
     switch(type) {
@@ -619,6 +641,57 @@ const Dashboard: React.FC = () => {
           // Revert on error
           setDbWellnessEnrollments(previousWellness);
           showToast('Failed to cancel enrollment', 'error');
+        }
+      }
+    });
+  };
+
+  const handleAcceptInvite = async (bookingId: number) => {
+    setProcessingInviteId(bookingId);
+    try {
+      const result = await apiRequest(`/api/bookings/${bookingId}/invite/accept`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (result.ok) {
+        showToast('Invite accepted!', 'success');
+        await fetchUserData(false);
+      } else {
+        showToast(result.error || 'Failed to accept invite', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to accept invite', 'error');
+    } finally {
+      setProcessingInviteId(null);
+    }
+  };
+
+  const handleDeclineInvite = (bookingId: number, primaryBookerName?: string | null) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Decline Invite",
+      message: `Are you sure you want to decline this booking invite${primaryBookerName ? ` from ${primaryBookerName}` : ''}? This will remove you from the booking.`,
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setProcessingInviteId(bookingId);
+        
+        try {
+          const result = await apiRequest(`/api/bookings/${bookingId}/invite/decline`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          
+          if (result.ok) {
+            showToast('Invite declined', 'success');
+            await fetchUserData(false);
+          } else {
+            showToast(result.error || 'Failed to decline invite', 'error');
+          }
+        } catch (err) {
+          showToast('Failed to decline invite', 'error');
+        } finally {
+          setProcessingInviteId(null);
         }
       }
     });
@@ -833,6 +906,81 @@ const Dashboard: React.FC = () => {
         </div>
       ) : (
         <>
+          {/* Pending Invites Section */}
+          {pendingInvites.length > 0 && (
+            <div className="mb-6 animate-pop-in" style={{animationDelay: '0.13s'}}>
+              <div className="flex justify-between items-center mb-4 px-1">
+                <h3 className={`text-sm font-bold uppercase tracking-wider ${isDark ? 'text-amber-400/90' : 'text-amber-600'}`}>
+                  <span className="material-symbols-outlined text-base mr-1 align-text-bottom">mail</span>
+                  Pending Invites ({pendingInvites.length})
+                </h3>
+              </div>
+              <div className="space-y-3">
+                {pendingInvites.map((invite, idx) => (
+                  <div 
+                    key={`invite-${invite.id}`}
+                    className={`rounded-2xl p-4 border ${isDark ? 'bg-amber-900/20 border-amber-500/30' : 'bg-amber-50 border-amber-200'} animate-pop-in`}
+                    style={{animationDelay: `${0.13 + (idx * 0.05)}s`}}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0 flex-1">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isDark ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
+                          <span className={`material-symbols-outlined text-xl ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>sports_golf</span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className={`font-bold text-sm ${isDark ? 'text-white' : 'text-primary'}`}>
+                            {invite.resource_name || invite.bay_name || 'Simulator'}
+                          </h4>
+                          <p className={`text-xs mt-0.5 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
+                            {formatDate(invite.request_date)} • {formatTime12Hour(invite.start_time)} - {formatTime12Hour(invite.end_time)}
+                          </p>
+                          {invite.primary_booker_name && (
+                            <p className={`text-xs mt-1 ${isDark ? 'text-amber-400/80' : 'text-amber-600/80'}`}>
+                              Invited by {invite.primary_booker_name.split(' ')[0]}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full flex-shrink-0 ${isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-700'}`}>
+                        Invite
+                      </span>
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => handleAcceptInvite(invite.id)}
+                        disabled={processingInviteId === invite.id}
+                        className={`flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 transition-all ${
+                          processingInviteId === invite.id 
+                            ? 'opacity-50 cursor-not-allowed' 
+                            : 'hover:scale-[0.98] active:scale-95'
+                        } ${isDark ? 'bg-brand-green text-white' : 'bg-brand-green text-white'}`}
+                      >
+                        {processingInviteId === invite.id ? (
+                          <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
+                        ) : (
+                          <span className="material-symbols-outlined text-base">check</span>
+                        )}
+                        Accept
+                      </button>
+                      <button
+                        onClick={() => handleDeclineInvite(invite.id, invite.primary_booker_name)}
+                        disabled={processingInviteId === invite.id}
+                        className={`flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 transition-all ${
+                          processingInviteId === invite.id 
+                            ? 'opacity-50 cursor-not-allowed' 
+                            : 'hover:scale-[0.98] active:scale-95'
+                        } ${isDark ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-gray-100 text-primary hover:bg-gray-200'}`}
+                      >
+                        <span className="material-symbols-outlined text-base">close</span>
+                        Decline
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Your Schedule - Combined Bookings, Events & Wellness */}
           <div className="animate-pop-in" style={{animationDelay: '0.15s'}}>
             <div className="flex justify-between items-center mb-4 px-1">
@@ -847,7 +995,7 @@ const Dashboard: React.FC = () => {
               </button>
             </div>
             <div className="space-y-3">
-              {upcomingItems.length > 0 ? upcomingItems.slice(0, 6).map((item, idx) => {
+              {upcomingItemsFiltered.length > 0 ? upcomingItemsFiltered.slice(0, 6).map((item, idx) => {
                 let actions;
                 if (item.type === 'booking' || item.type === 'booking_request') {
                   const bookingStatus = (item as any).status;
