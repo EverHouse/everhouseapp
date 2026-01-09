@@ -87,10 +87,9 @@ interface FeePreviewResponse {
 
 interface Member {
   id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  tier: string;
+  name: string;
+  emailRedacted: string;
+  tier?: string;
 }
 
 export interface RosterManagerProps {
@@ -200,12 +199,12 @@ const RosterManager: React.FC<RosterManagerProps> = ({
     setSearchLoading(true);
     try {
       const { ok, data } = await apiRequest<Member[]>(
-        `/api/members/search?q=${encodeURIComponent(query)}&limit=10`
+        `/api/members/search?query=${encodeURIComponent(query)}&limit=10`
       );
       
       if (ok && data) {
         const existingIds = new Set(participants.map(p => p.userId));
-        const filtered = data.filter(m => !existingIds.has(m.id) && !existingIds.has(m.email));
+        const filtered = data.filter(m => !existingIds.has(m.id));
         setSearchResults(filtered);
       }
     } catch (err) {
@@ -236,14 +235,14 @@ const RosterManager: React.FC<RosterManagerProps> = ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'member',
-            userId: member.email
+            userId: member.id
           })
         }
       );
       
       if (ok) {
         haptic.success();
-        showToast(`${member.firstName || member.email} added to booking`, 'success');
+        showToast(`${member.name} added to booking`, 'success');
         setShowAddMemberModal(false);
         setMemberSearch('');
         setSearchResults([]);
@@ -595,13 +594,13 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                       : 'hover:bg-black/5 active:bg-black/10'
                   } ${addingMember ? 'opacity-50' : ''}`}
                 >
-                  <Avatar name={`${member.firstName} ${member.lastName}`} size="md" />
+                  <Avatar name={member.name} size="md" />
                   <div className="flex-1 text-left min-w-0">
                     <p className={`font-semibold truncate ${isDark ? 'text-white' : 'text-[#293515]'}`}>
-                      {member.firstName} {member.lastName}
+                      {member.name}
                     </p>
                     <p className={`text-sm truncate ${isDark ? 'text-white/60' : 'text-[#293515]/60'}`}>
-                      {member.email}
+                      {member.emailRedacted}
                     </p>
                   </div>
                   <span className="material-symbols-outlined text-[#CCB8E4]">add_circle</span>

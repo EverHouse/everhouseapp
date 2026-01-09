@@ -265,9 +265,30 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
       });
     }
 
+    let memberInfo: { id: string; email: string; firstName: string; lastName: string } | null = null;
+    
     if (type === 'member') {
+      // Look up member first to get both ID and email for duplicate checking
+      const memberResult = await pool.query(
+        `SELECT id, email, first_name, last_name FROM users WHERE id = $1 OR LOWER(email) = LOWER($1) LIMIT 1`,
+        [userId]
+      );
+      
+      if (memberResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Member not found' });
+      }
+      
+      memberInfo = {
+        id: memberResult.rows[0].id,
+        email: memberResult.rows[0].email,
+        firstName: memberResult.rows[0].first_name,
+        lastName: memberResult.rows[0].last_name
+      };
+      
+      // Check for duplicates using both ID and email (handles legacy data stored as email)
       const existingMember = existingParticipants.find(p => 
-        p.userId === userId || p.userId?.toLowerCase() === userId?.toLowerCase()
+        p.userId === memberInfo!.id || 
+        p.userId?.toLowerCase() === memberInfo!.email?.toLowerCase()
       );
       if (existingMember) {
         return res.status(400).json({ error: 'This member is already a participant' });
@@ -297,21 +318,11 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
 
     let participantInput: ParticipantInput;
     
-    if (type === 'member') {
-      const memberResult = await pool.query(
-        `SELECT id, email, first_name, last_name FROM users WHERE id = $1 OR LOWER(email) = LOWER($1) LIMIT 1`,
-        [userId]
-      );
-      
-      if (memberResult.rows.length === 0) {
-        return res.status(404).json({ error: 'Member not found' });
-      }
-      
-      const member = memberResult.rows[0];
-      const displayName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email;
+    if (type === 'member' && memberInfo) {
+      const displayName = [memberInfo.firstName, memberInfo.lastName].filter(Boolean).join(' ') || memberInfo.email;
       
       participantInput = {
-        userId: member.id,
+        userId: memberInfo.id,
         participantType: 'member',
         displayName,
       };

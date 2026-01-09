@@ -8,10 +8,9 @@ import { apiRequest } from '../../lib/apiRequest';
 
 interface MemberSearchResult {
   id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  tier: string;
+  name: string;
+  emailRedacted: string;
+  tier?: string;
 }
 
 interface AddMemberModalProps {
@@ -20,14 +19,7 @@ interface AddMemberModalProps {
   onAdd: (userId: string, memberName: string) => void;
 }
 
-function redactEmail(email: string): string {
-  if (!email || !email.includes('@')) return email;
-  const [localPart, domain] = email.split('@');
-  if (localPart.length <= 2) {
-    return `${localPart[0]}***@${domain}`;
-  }
-  return `${localPart.slice(0, 2)}***@${domain}`;
-}
+// Email is already redacted from API, no need for client-side redaction
 
 const AddMemberModal: React.FC<AddMemberModalProps> = ({
   isOpen,
@@ -104,8 +96,7 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
   }, [searchQuery, searchMembers]);
 
   const handleSelectMember = (member: MemberSearchResult) => {
-    const memberName = [member.firstName, member.lastName].filter(Boolean).join(' ') || member.email;
-    onAdd(member.email, memberName);
+    onAdd(member.id, member.name);
     onClose();
   };
 
@@ -135,7 +126,7 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
           <div className="space-y-2 max-h-72 overflow-y-auto">
             {searchResults.map((member) => (
               <button
-                key={member.id || member.email}
+                key={member.id}
                 onClick={() => handleSelectMember(member)}
                 className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-colors ${
                   isDark 
@@ -144,15 +135,15 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
                 }`}
               >
                 <Avatar 
-                  name={`${member.firstName || ''} ${member.lastName || ''}`.trim() || member.email} 
+                  name={member.name} 
                   size="md" 
                 />
                 <div className="flex-1 text-left min-w-0">
                   <p className={`font-semibold truncate ${isDark ? 'text-white' : 'text-[#293515]'}`}>
-                    {member.firstName} {member.lastName}
+                    {member.name}
                   </p>
                   <p className={`text-sm truncate ${isDark ? 'text-white/60' : 'text-[#293515]/60'}`}>
-                    {redactEmail(member.email)}
+                    {member.emailRedacted}
                   </p>
                 </div>
                 {member.tier && <TierBadge tier={member.tier} size="sm" />}
