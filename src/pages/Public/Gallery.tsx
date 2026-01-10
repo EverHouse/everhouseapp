@@ -431,7 +431,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ images, currentIndex, onClose
 
   return createPortal(
     <div 
-      className="fixed inset-0 bg-black flex items-center justify-center"
+      className="fixed inset-0 bg-black/80 backdrop-blur-xl flex items-center justify-center"
       style={{ zIndex: 99999 }}
       onClick={onClose}
     >
