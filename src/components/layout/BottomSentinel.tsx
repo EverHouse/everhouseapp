@@ -11,17 +11,22 @@ export const BottomSentinel: React.FC = () => {
   const rafRef = useRef<number | null>(null);
   
   const updateNavVisibility = useCallback((scrollDelta: number, currentScrollY: number) => {
-    const scrollHeight = document.documentElement.scrollHeight;
+    const scrollHeight = Math.max(
+      document.body.scrollHeight,
+      document.documentElement.scrollHeight,
+      document.body.offsetHeight,
+      document.documentElement.offsetHeight
+    );
     const clientHeight = window.innerHeight;
-    const isScrollable = scrollHeight > clientHeight + 100;
+    const isScrollable = scrollHeight > clientHeight + 50;
     
     if (isScrollable) {
-      if (scrollDelta > 8 && currentScrollY > SCROLL_THRESHOLD) {
+      if (scrollDelta > 5 && currentScrollY > SCROLL_THRESHOLD) {
         if (!isHiddenRef.current) {
           isHiddenRef.current = true;
           setIsAtBottom(true);
         }
-      } else if (scrollDelta < -8) {
+      } else if (scrollDelta < -5) {
         if (isHiddenRef.current) {
           isHiddenRef.current = false;
           setIsAtBottom(false);
