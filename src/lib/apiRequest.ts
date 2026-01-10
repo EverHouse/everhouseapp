@@ -4,6 +4,8 @@ export interface ApiResult<T = any> {
   ok: boolean;
   data?: T;
   error?: string;
+  errorType?: string;
+  errorData?: Record<string, any>;
 }
 
 interface RetryConfig {
@@ -91,7 +93,12 @@ export async function apiRequest<T = any>(
           continue;
         }
         
-        return { ok: false, error };
+        return { 
+          ok: false, 
+          error,
+          errorType: errorData.errorType,
+          errorData: errorData
+        };
       }
 
       const data = await res.json();

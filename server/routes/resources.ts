@@ -42,7 +42,11 @@ async function handleCancellationCascade(
     errors: []
   };
 
+  const client = await pool.connect();
+  
   try {
+    await client.query('BEGIN');
+    
     const bookingStartTime = createPacificDate(requestDate, startTime);
     const now = new Date();
     const hoursUntilStart = (bookingStartTime.getTime() - now.getTime()) / (1000 * 60 * 60);
@@ -57,110 +61,120 @@ async function handleCancellationCascade(
       }
     });
 
-    if (sessionId) {
-      const participants = await db
-        .select()
-        .from(bookingParticipants)
-        .where(eq(bookingParticipants.sessionId, sessionId));
+    const formattedDate = formatDateDisplayWithDay(requestDate);
+    const formattedTime = formatTime12Hour(startTime);
+    const displayOwner = ownerName || ownerEmail;
+    const displayResource = resourceName || 'simulator';
 
-      const formattedDate = formatDateDisplayWithDay(requestDate);
-      const formattedTime = formatTime12Hour(startTime);
-      const displayOwner = ownerName || ownerEmail;
-      const displayResource = resourceName || 'simulator';
+    const membersToNotify: { email: string; participantId: number }[] = [];
+    const guestsToRefund: { displayName: string; participantId: number }[] = [];
+
+    if (sessionId) {
+      const participantsResult = await client.query(
+        `SELECT id, user_id, guest_id, participant_type, display_name 
+         FROM booking_participants WHERE session_id = $1`,
+        [sessionId]
+      );
+      const participants = participantsResult.rows;
 
       for (const participant of participants) {
-        if (participant.participantType === 'member' && participant.userId) {
-          try {
-            const userResult = await pool.query(
-              `SELECT email FROM users WHERE id = $1 OR LOWER(email) = LOWER($1) LIMIT 1`,
-              [participant.userId]
-            );
-            
-            if (userResult.rows.length > 0) {
-              const memberEmail = userResult.rows[0].email;
-              
-              await notifyMember({
-                userEmail: memberEmail,
-                title: 'Booking Cancelled',
-                message: `${displayOwner}'s ${displayResource} booking on ${formattedDate} at ${formattedTime} has been cancelled.`,
-                type: 'booking_cancelled',
-                relatedId: bookingId,
-                relatedType: 'booking_request'
-              });
-              
-              result.participantsNotified++;
-              
-              logger.info('[cancellation-cascade] Notified member participant', {
-                extra: { bookingId, memberEmail, participantId: participant.id }
-              });
-            }
-          } catch (notifyError) {
-            const errorMsg = `Failed to notify participant ${participant.userId}: ${(notifyError as Error).message}`;
-            result.errors.push(errorMsg);
-            logger.warn('[cancellation-cascade] ' + errorMsg, { error: notifyError as Error });
+        if (participant.participant_type === 'member' && participant.user_id) {
+          const userResult = await client.query(
+            `SELECT email FROM users WHERE id = $1 OR LOWER(email) = LOWER($1) LIMIT 1`,
+            [participant.user_id]
+          );
+          if (userResult.rows.length > 0) {
+            membersToNotify.push({
+              email: userResult.rows[0].email,
+              participantId: participant.id
+            });
           }
         }
 
-        if (participant.participantType === 'guest' && shouldRefundGuestPasses) {
-          try {
-            const refundResult = await refundGuestPass(
-              ownerEmail,
-              participant.displayName || undefined,
-              false
-            );
-            
-            if (refundResult.success) {
-              result.guestPassesRefunded++;
-              logger.info('[cancellation-cascade] Guest pass refunded', {
-                extra: {
-                  bookingId,
-                  ownerEmail,
-                  guestName: participant.displayName,
-                  remainingPasses: refundResult.remaining
-                }
-              });
-            } else {
-              result.errors.push(`Failed to refund guest pass for ${participant.displayName}: ${refundResult.error}`);
-            }
-          } catch (refundError) {
-            const errorMsg = `Failed to refund guest pass for ${participant.displayName}: ${(refundError as Error).message}`;
-            result.errors.push(errorMsg);
-            logger.warn('[cancellation-cascade] ' + errorMsg, { error: refundError as Error });
-          }
+        if (participant.participant_type === 'guest' && shouldRefundGuestPasses) {
+          guestsToRefund.push({
+            displayName: participant.display_name || 'Guest',
+            participantId: participant.id
+          });
         }
       }
 
+      await client.query(
+        `UPDATE booking_participants SET invite_status = 'cancelled' WHERE session_id = $1`,
+        [sessionId]
+      );
+      
+      logger.info('[cancellation-cascade] Updated participant invite statuses', {
+        extra: { bookingId, sessionId, count: participants.length }
+      });
+    }
+
+    const deleteResult = await client.query(
+      `DELETE FROM booking_members WHERE booking_id = $1 RETURNING id`,
+      [bookingId]
+    );
+    result.bookingMembersRemoved = deleteResult.rows.length;
+    
+    if (deleteResult.rows.length > 0) {
+      logger.info('[cancellation-cascade] Removed booking members', {
+        extra: { bookingId, count: deleteResult.rows.length }
+      });
+    }
+
+    await client.query('COMMIT');
+
+    for (const member of membersToNotify) {
       try {
-        await db
-          .update(bookingParticipants)
-          .set({ inviteStatus: 'cancelled' })
-          .where(eq(bookingParticipants.sessionId, sessionId));
-        
-        logger.info('[cancellation-cascade] Updated participant invite statuses', {
-          extra: { bookingId, sessionId, count: participants.length }
+        await notifyMember({
+          userEmail: member.email,
+          title: 'Booking Cancelled',
+          message: `${displayOwner}'s ${displayResource} booking on ${formattedDate} at ${formattedTime} has been cancelled.`,
+          type: 'booking_cancelled',
+          relatedId: bookingId,
+          relatedType: 'booking_request'
         });
-      } catch (updateError) {
-        result.errors.push(`Failed to update participant statuses: ${(updateError as Error).message}`);
-        logger.warn('[cancellation-cascade] Failed to update participant statuses', { error: updateError as Error });
+        result.participantsNotified++;
+        logger.info('[cancellation-cascade] Notified member participant', {
+          extra: { bookingId, memberEmail: member.email, participantId: member.participantId }
+        });
+      } catch (notifyError) {
+        const errorMsg = `Failed to notify participant ${member.email}: ${(notifyError as Error).message}`;
+        result.errors.push(errorMsg);
+        logger.warn('[cancellation-cascade] ' + errorMsg, { error: notifyError as Error });
       }
     }
 
-    try {
-      const deleteResult = await db
-        .delete(bookingMembers)
-        .where(eq(bookingMembers.bookingId, bookingId))
-        .returning();
-      
-      result.bookingMembersRemoved = deleteResult.length;
-      
-      if (deleteResult.length > 0) {
-        logger.info('[cancellation-cascade] Removed booking members', {
-          extra: { bookingId, count: deleteResult.length }
-        });
+    const refundedGuests = new Set<number>();
+    for (const guest of guestsToRefund) {
+      if (refundedGuests.has(guest.participantId)) {
+        continue;
       }
-    } catch (deleteError) {
-      result.errors.push(`Failed to remove booking members: ${(deleteError as Error).message}`);
-      logger.warn('[cancellation-cascade] Failed to remove booking members', { error: deleteError as Error });
+      try {
+        const refundResult = await refundGuestPass(
+          ownerEmail,
+          guest.displayName,
+          false
+        );
+        
+        if (refundResult.success) {
+          result.guestPassesRefunded++;
+          refundedGuests.add(guest.participantId);
+          logger.info('[cancellation-cascade] Guest pass refunded', {
+            extra: {
+              bookingId,
+              ownerEmail,
+              guestName: guest.displayName,
+              remainingPasses: refundResult.remaining
+            }
+          });
+        } else {
+          result.errors.push(`Failed to refund guest pass for ${guest.displayName}: ${refundResult.error}`);
+        }
+      } catch (refundError) {
+        const errorMsg = `Failed to refund guest pass for ${guest.displayName}: ${(refundError as Error).message}`;
+        result.errors.push(errorMsg);
+        logger.warn('[cancellation-cascade] ' + errorMsg, { error: refundError as Error });
+      }
     }
 
     if (result.guestPassesRefunded > 0) {
@@ -187,9 +201,12 @@ async function handleCancellationCascade(
     });
 
   } catch (error) {
+    await client.query('ROLLBACK');
     const errorMsg = `Cascade error: ${(error as Error).message}`;
     result.errors.push(errorMsg);
     logger.error('[cancellation-cascade] Fatal error during cascade', { error: error as Error });
+  } finally {
+    client.release();
   }
 
   return result;

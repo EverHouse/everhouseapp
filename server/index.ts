@@ -603,6 +603,7 @@ async function startServer() {
     try {
       const { notifyMember } = await import('./core/notificationService');
       const { logger } = await import('./core/logger');
+      const { formatDateDisplayWithDay, formatTime12Hour } = await import('./utils/dateUtils');
       
       const expiredInvites = await pool.query(`
         SELECT 
@@ -631,18 +632,21 @@ async function startServer() {
       console.log(`[Invite Expiry] Processing ${expiredInvites.rows.length} expired invites`);
       
       for (const invite of expiredInvites.rows) {
+        const client = await pool.connect();
         try {
-          await pool.query(`
+          await client.query('BEGIN');
+          
+          await client.query(`
             UPDATE booking_participants 
             SET invite_status = 'expired', 
                 expired_reason = 'auto_expired',
-                responded_at = NOW()
+                responded_at = $2
             WHERE id = $1
-          `, [invite.participant_id]);
+          `, [invite.participant_id, new Date().toISOString()]);
           
           let memberEmail: string | null = null;
           if (invite.user_id) {
-            const userResult = await pool.query(
+            const userResult = await client.query(
               `SELECT email FROM users WHERE id = $1 OR LOWER(email) = LOWER($1) LIMIT 1`,
               [invite.user_id]
             );
@@ -650,14 +654,15 @@ async function startServer() {
           }
           
           if (memberEmail) {
-            await pool.query(
+            await client.query(
               `DELETE FROM booking_members WHERE booking_id = $1 AND LOWER(user_email) = LOWER($2)`,
               [invite.booking_id, memberEmail]
             );
           }
           
+          await client.query('COMMIT');
+          
           if (invite.owner_email) {
-            const { formatDateDisplayWithDay, formatTime12Hour } = await import('./utils/dateUtils');
             const dateDisplay = invite.session_date ? formatDateDisplayWithDay(invite.session_date) : 'your booking';
             const timeDisplay = invite.start_time ? ` at ${formatTime12Hour(invite.start_time)}` : '';
             
@@ -679,10 +684,13 @@ async function startServer() {
             }
           });
         } catch (inviteError) {
+          await client.query('ROLLBACK');
           logger.error('[Invite Expiry] Error processing individual invite', {
             error: inviteError as Error,
             extra: { participantId: invite.participant_id }
           });
+        } finally {
+          client.release();
         }
       }
       

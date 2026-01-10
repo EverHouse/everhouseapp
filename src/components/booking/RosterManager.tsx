@@ -154,9 +154,10 @@ const RosterManager: React.FC<RosterManagerProps> = ({
   const canManage = isOwner || isStaff;
 
   const getExpiryCountdown = useCallback((expiresAt: string): string | null => {
-    const now = new Date();
-    const expiry = new Date(expiresAt);
-    const diffMs = expiry.getTime() - now.getTime();
+    const now = Date.now();
+    const expiryStr = expiresAt.endsWith('Z') ? expiresAt : expiresAt + 'Z';
+    const expiry = new Date(expiryStr).getTime();
+    const diffMs = expiry - now;
     
     if (diffMs <= 0) return 'Expired';
     
@@ -263,17 +264,20 @@ const RosterManager: React.FC<RosterManagerProps> = ({
     haptic.light();
     
     try {
-      const res = await fetch(`/api/bookings/${bookingId}/participants`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          type: 'member',
-          userId: member.id
-        })
-      });
+      const { ok, data, error, errorType, errorData } = await apiRequest<{ success: boolean; participant: any; conflict?: any; errorType?: string }>(
+        `/api/bookings/${bookingId}/participants`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'member',
+            userId: member.id
+          })
+        },
+        { retryNonIdempotent: false }
+      );
       
-      if (res.ok) {
+      if (ok && data) {
         haptic.success();
         showToast(`${member.name} added to booking`, 'success');
         setShowAddMemberModal(false);
@@ -283,23 +287,29 @@ const RosterManager: React.FC<RosterManagerProps> = ({
         onUpdate?.();
       } else {
         haptic.error();
-        const errorData = await res.json().catch(() => ({}));
         
-        if (res.status === 409 && errorData.errorType === 'booking_conflict') {
+        if (errorType === 'booking_conflict' || (error && error.includes('scheduling conflict'))) {
+          const conflict = errorData?.conflict;
           setConflictDetails({
             memberName: member.name,
-            conflictingBooking: errorData.conflictingBooking || {
+            conflictingBooking: conflict ? {
+              id: conflict.id || 0,
+              date: conflict.date || booking?.requestDate || 'Unknown',
+              startTime: conflict.startTime || booking?.startTime || 'Unknown',
+              endTime: conflict.endTime || booking?.endTime || 'Unknown',
+              resourceName: conflict.resourceName || booking?.resourceName || undefined
+            } : {
               id: 0,
-              date: errorData.conflictDate || 'Unknown',
-              startTime: errorData.conflictStartTime || 'Unknown',
-              endTime: errorData.conflictEndTime || 'Unknown',
-              resourceName: errorData.conflictResource
+              date: booking?.requestDate || 'Unknown',
+              startTime: booking?.startTime || 'Unknown',
+              endTime: booking?.endTime || 'Unknown',
+              resourceName: booking?.resourceName || undefined
             }
           });
           setShowConflictModal(true);
           showToast(`${member.name} has a conflicting booking at this time`, 'warning');
         } else {
-          showToast(errorData.error || errorData.message || 'Failed to add member', 'error');
+          showToast(error || 'Failed to add member', 'error');
         }
       }
     } catch (err) {

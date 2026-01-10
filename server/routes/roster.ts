@@ -384,7 +384,9 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
           error: `This member has a scheduling conflict with another booking on ${booking.request_date}`,
           errorType: 'booking_conflict',
           conflict: {
+            id: conflict.bookingId,
             bookingId: conflict.bookingId,
+            date: booking.request_date,
             resourceName: conflict.resourceName,
             startTime: conflict.startTime,
             endTime: conflict.endTime,
@@ -978,7 +980,9 @@ router.post('/api/bookings/:id/invite/accept', async (req: Request, res: Respons
         error: `Cannot accept invite: you have a scheduling conflict with another booking on ${booking.request_date}`,
         errorType: 'booking_conflict',
         conflict: {
+          id: conflict.bookingId,
           bookingId: conflict.bookingId,
+          date: booking.request_date,
           resourceName: conflict.resourceName,
           startTime: conflict.startTime,
           endTime: conflict.endTime,

@@ -17,13 +17,24 @@ export interface ConflictCheckResult {
   conflicts: ConflictingBooking[];
 }
 
+function timeToMinutes(timeStr: string): number {
+  const parts = timeStr.split(':');
+  const hours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1] || '0', 10);
+  return hours * 60 + minutes;
+}
+
 function timePeriodsOverlap(
   start1: string,
   end1: string,
   start2: string,
   end2: string
 ): boolean {
-  return start1 < end2 && start2 < end1;
+  const s1 = timeToMinutes(start1);
+  const e1 = timeToMinutes(end1);
+  const s2 = timeToMinutes(start2);
+  const e2 = timeToMinutes(end2);
+  return s1 < e2 && s2 < e1;
 }
 
 export async function findConflictingBookings(
