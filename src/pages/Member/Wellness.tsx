@@ -247,9 +247,28 @@ const ClassesView: React.FC<{onBook: (cls: WellnessClass) => void; isDark?: bool
     
     setLoadingCancel(classData.id);
     
-    // Optimistic UI: remove enrollment immediately
+    // Optimistic UI: remove enrollment and update counts immediately
     const previousEnrollments = [...enrollments];
+    const previousClasses = [...classes];
+    
+    const enrollmentToCancel = enrollments.find(e => e.class_id === classData.id);
+    const isWaitlistCancel = enrollmentToCancel?.is_waitlisted;
+
     setEnrollments(prev => prev.filter(e => e.class_id !== classData.id));
+    setClasses(prev => prev.map(c => {
+      if (c.id === classData.id) {
+        if (isWaitlistCancel) {
+          return { ...c, waitlistCount: Math.max(0, (c.waitlistCount || 1) - 1) };
+        } else {
+          return { 
+            ...c, 
+            enrolledCount: Math.max(0, c.enrolledCount - 1),
+            spotsRemaining: c.spotsRemaining !== null ? c.spotsRemaining + 1 : null
+          };
+        }
+      }
+      return c;
+    }));
     
     const { ok, error } = await apiRequest(`/api/wellness-enrollments/${classData.id}/${encodeURIComponent(userEmail)}`, {
       method: 'DELETE'
@@ -261,20 +280,38 @@ const ClassesView: React.FC<{onBook: (cls: WellnessClass) => void; isDark?: bool
     } else {
       // Revert on failure
       setEnrollments(previousEnrollments);
+      setClasses(previousClasses);
       showToast(error || 'Unable to cancel. Please try again.', 'error');
+      console.error('Wellness cancellation error:', error);
     }
     setLoadingCancel(null);
-  }, [userEmail, showToast, fetchClasses, enrollments]);
+  }, [userEmail, showToast, fetchClasses, enrollments, classes]);
 
   const handleRsvp = useCallback(async (classData: WellnessClass) => {
     if (!userEmail) return;
     
     setLoadingRsvp(classData.id);
     
-    // Optimistic UI: add enrollment immediately
+    // Optimistic UI: add enrollment and update counts immediately
     const previousEnrollments = [...enrollments];
+    const previousClasses = [...classes];
     const isWaitlistJoin = classData.spotsRemaining !== null && classData.spotsRemaining <= 0 && classData.waitlistEnabled;
+    
     setEnrollments(prev => [...prev, { class_id: classData.id, user_email: userEmail, is_waitlisted: isWaitlistJoin }]);
+    setClasses(prev => prev.map(c => {
+      if (c.id === classData.id) {
+        if (isWaitlistJoin) {
+          return { ...c, waitlistCount: (c.waitlistCount || 0) + 1 };
+        } else {
+          return { 
+            ...c, 
+            enrolledCount: c.enrolledCount + 1,
+            spotsRemaining: c.spotsRemaining !== null ? Math.max(0, c.spotsRemaining - 1) : null
+          };
+        }
+      }
+      return c;
+    }));
     
     const { ok, data, error } = await apiRequest<{isWaitlisted?: boolean; message?: string}>('/api/wellness-enrollments', {
       method: 'POST',
@@ -293,10 +330,12 @@ const ClassesView: React.FC<{onBook: (cls: WellnessClass) => void; isDark?: bool
       fetchEnrollments();
     } else {
       setEnrollments(previousEnrollments);
+      setClasses(previousClasses);
       showToast(error || 'Unable to RSVP. Please try again.', 'error');
+      console.error('Wellness RSVP error:', error);
     }
     setLoadingRsvp(null);
-  }, [userEmail, showToast, fetchClasses, fetchEnrollments, enrollments]);
+  }, [userEmail, showToast, fetchClasses, fetchEnrollments, enrollments, classes]);
 
   const isEnrolled = useCallback((classId: number) => {
     return enrollments.some(e => e.class_id === classId);

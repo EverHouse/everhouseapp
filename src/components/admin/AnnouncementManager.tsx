@@ -36,10 +36,10 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
         setIsEditing(true);
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if(!newItem.title) return;
-        const ann: Announcement = {
-            id: editId || Date.now().toString(),
+        const ann: any = {
+            id: editId || undefined,
             title: newItem.title,
             desc: newItem.desc || '',
             type: newItem.type || 'update',
@@ -52,12 +52,16 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
             showAsBanner: newItem.showAsBanner
         };
 
-        if (editId) {
-            updateAnnouncement(ann);
-        } else {
-            addAnnouncement(ann);
+        try {
+            if (editId) {
+                await updateAnnouncement(ann);
+            } else {
+                await addAnnouncement(ann);
+            }
+            setIsEditing(false);
+        } catch (err) {
+            console.error('Failed to save announcement:', err);
         }
-        setIsEditing(false);
     };
 
     return (

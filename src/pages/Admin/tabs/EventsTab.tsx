@@ -688,9 +688,18 @@ const EventsAdminContent: React.FC = () => {
             if (!res.ok) {
                 throw new Error('Failed to save');
             }
+
+            const savedItem = await res.json();
             
-            await fetchEvents();
+            // Optimistically update local state
+            if (editId) {
+                setEvents(prev => prev.map(e => e.id === editId ? savedItem : e));
+            } else {
+                setEvents(prev => [savedItem, ...prev]);
+            }
+            
             setIsEditing(false);
+            showToast(editId ? 'Event updated successfully' : 'Event created successfully', 'success');
         } catch (err) {
             console.error('Failed to save event:', err);
             setError('Failed to save event. Please try again.');
@@ -718,16 +727,19 @@ const EventsAdminContent: React.FC = () => {
             const res = await fetch(`/api/events/${deletedId}`, { method: 'DELETE', credentials: 'include' });
             if (res.ok) {
                 setSuccess('Event deleted');
+                showToast('Event deleted successfully', 'success');
                 setTimeout(() => setSuccess(null), 3000);
             } else {
                 setEvents(snapshot);
                 setError('Failed to delete event');
+                showToast('Failed to delete event', 'error');
                 setTimeout(() => setError(null), 3000);
             }
         } catch (err) {
             console.error('Failed to delete event:', err);
             setEvents(snapshot);
             setError('Failed to delete event');
+            showToast('Failed to delete event', 'error');
             setTimeout(() => setError(null), 3000);
         }
     };
@@ -1307,10 +1319,19 @@ const WellnessAdminContent: React.FC = () => {
             });
 
             if (res.ok) {
-                await fetchClasses();
+                const savedItem = await res.json();
+                
+                // Optimistically update local state
+                if (editId) {
+                    setClasses(prev => prev.map(c => c.id === editId ? savedItem : c));
+                } else {
+                    setClasses(prev => [savedItem, ...prev]);
+                }
+                
                 setIsEditing(false);
                 setFormData({ category: 'Classes', status: 'available', duration: '60 min' });
                 setSuccess(editId ? 'Class updated successfully' : 'Class created successfully');
+                showToast(editId ? 'Class updated successfully' : 'Class created successfully', 'success');
                 setTimeout(() => setSuccess(null), 3000);
             } else {
                 const data = await res.json();
@@ -1993,9 +2014,17 @@ const AvailabilityBlocksContent: React.FC = () => {
             });
 
             if (res.ok) {
+                const savedItem = await res.json();
+                
+                // Optimistically update local state
+                if (editId) {
+                    setBlocks(prev => prev.map(b => b.id === editId ? savedItem : b));
+                } else {
+                    setBlocks(prev => [savedItem, ...prev]);
+                }
+                
                 showToast(editId ? 'Block updated' : 'Block created', 'success');
                 setIsEditing(false);
-                fetchBlocks();
             } else {
                 const data = await res.json();
                 setFormError(data.error || 'Failed to save block');
@@ -2015,22 +2044,28 @@ const AvailabilityBlocksContent: React.FC = () => {
     const confirmDelete = async () => {
         if (!blockToDelete) return;
         
+        const snapshot = [...blocks];
+        const deletedId = blockToDelete.id;
+        
+        setBlocks(prev => prev.filter(b => b.id !== deletedId));
+        setShowDeleteConfirm(false);
+        setBlockToDelete(null);
+
         try {
             setIsDeleting(true);
-            const res = await fetch(`/api/availability-blocks/${blockToDelete.id}`, {
+            const res = await fetch(`/api/availability-blocks/${deletedId}`, {
                 method: 'DELETE',
                 credentials: 'include',
             });
 
             if (res.ok) {
                 showToast('Block deleted', 'success');
-                setShowDeleteConfirm(false);
-                setBlockToDelete(null);
-                fetchBlocks();
             } else {
+                setBlocks(snapshot);
                 showToast('Failed to delete block', 'error');
             }
         } catch (err) {
+            setBlocks(snapshot);
             showToast('Failed to delete block', 'error');
         } finally {
             setIsDeleting(false);

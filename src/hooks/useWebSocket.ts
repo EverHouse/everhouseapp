@@ -108,6 +108,16 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           if (message.type === 'closure_update') {
             window.dispatchEvent(new CustomEvent('closure-update', { detail: message }));
           }
+
+          // Handle member data updates (from HubSpot sync)
+          if (message.type === 'member_data_updated') {
+            window.dispatchEvent(new CustomEvent('member-data-updated', { detail: message }));
+          }
+
+          // Handle member stats updates (guest passes, visit counts)
+          if (message.type === 'member_stats_updated') {
+            window.dispatchEvent(new CustomEvent('member-stats-updated', { detail: message }));
+          }
         } catch (e) {
           console.error('[WebSocket] Error parsing message:', e);
         }

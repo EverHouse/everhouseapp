@@ -15,7 +15,7 @@ import { parseAffectedAreas } from '../core/affectedAreas';
 import { logAndRespond } from '../core/logger';
 import { checkClosureConflict, checkAvailabilityBlockConflict, parseTimeToMinutes } from '../core/bookingValidation';
 import { bookingEvents } from '../core/bookingEvents';
-import { sendNotificationToUser, broadcastAvailabilityUpdate } from '../core/websocket';
+import { sendNotificationToUser, broadcastAvailabilityUpdate, broadcastMemberStatsUpdated } from '../core/websocket';
 import { getSessionUser } from '../types/session';
 import { refundGuestPass } from './guestPasses';
 import { updateHubSpotContactVisitCount } from '../core/memberSync';
@@ -1454,6 +1454,13 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
       if (updatedUser?.hubspot_id && updatedUser.lifetime_visits) {
         updateHubSpotContactVisitCount(updatedUser.hubspot_id, updatedUser.lifetime_visits)
           .catch(err => console.error('[Bays] Failed to sync visit count to HubSpot:', err));
+      }
+      
+      // Broadcast stats update to all connected clients
+      if (updatedUser?.lifetime_visits) {
+        broadcastMemberStatsUpdated(booking.userEmail, {
+          lifetimeVisits: updatedUser.lifetime_visits
+        });
       }
     }
     

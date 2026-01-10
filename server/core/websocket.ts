@@ -702,6 +702,61 @@ export function broadcastClosureUpdate(action: 'created' | 'updated' | 'deleted'
   return sent;
 }
 
+export function broadcastMemberDataUpdated(changedEmails: string[] = []) {
+  const payload = JSON.stringify({
+    type: 'member_data_updated',
+    changedEmails
+  });
+
+  let sent = 0;
+  clients.forEach((connections) => {
+    connections.forEach(conn => {
+      if (conn.isStaff && conn.ws.readyState === WebSocket.OPEN) {
+        conn.ws.send(payload);
+        sent++;
+      }
+    });
+  });
+
+  if (sent > 0 && changedEmails.length > 0) {
+    console.log(`[WebSocket] Broadcast member data updated (${changedEmails.length} members) to ${sent} staff connections`);
+  }
+  return sent;
+}
+
+export function broadcastMemberStatsUpdated(memberEmail: string, data: { guestPasses?: number; lifetimeVisits?: number }) {
+  const payload = JSON.stringify({
+    type: 'member_stats_updated',
+    memberEmail,
+    ...data
+  });
+
+  // Send to the specific member
+  const memberConnections = clients.get(memberEmail.toLowerCase()) || [];
+  let sent = 0;
+  memberConnections.forEach(conn => {
+    if (conn.ws.readyState === WebSocket.OPEN) {
+      conn.ws.send(payload);
+      sent++;
+    }
+  });
+
+  // Also broadcast to staff
+  clients.forEach((connections) => {
+    connections.forEach(conn => {
+      if (conn.isStaff && conn.ws.readyState === WebSocket.OPEN) {
+        conn.ws.send(payload);
+        sent++;
+      }
+    });
+  });
+
+  if (sent > 0) {
+    console.log(`[WebSocket] Broadcast member stats updated for ${memberEmail} to ${sent} connections`);
+  }
+  return sent;
+}
+
 export function getConnectedUsers(): string[] {
   return Array.from(clients.keys());
 }

@@ -47,9 +47,9 @@ interface DataContextType {
   deleteCafeItem: (id: string) => Promise<void>;
   refreshCafeMenu: () => Promise<void>;
   
-  addEvent: (event: EventData) => void;
-  updateEvent: (event: EventData) => void;
-  deleteEvent: (id: string) => void;
+  addEvent: (event: Partial<EventData>) => Promise<void>;
+  updateEvent: (event: EventData) => Promise<void>;
+  deleteEvent: (id: string) => Promise<void>;
   syncEventbrite: () => Promise<void>;
 
   addAnnouncement: (ann: Announcement) => Promise<void>;
@@ -550,10 +550,28 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     };
     
     window.addEventListener('directory-update', handleDirectoryUpdate);
+    window.addEventListener('member-data-updated', handleDirectoryUpdate);
     return () => {
       window.removeEventListener('directory-update', handleDirectoryUpdate);
+      window.removeEventListener('member-data-updated', handleDirectoryUpdate);
     };
   }, [refreshMembers]);
+
+  // Listen for member stats updates (visit counts, guest passes) - refresh current user if it's their data
+  useEffect(() => {
+    const handleMemberStatsUpdate = (event: CustomEvent) => {
+      const memberEmail = event.detail?.memberEmail;
+      if (memberEmail && actualUser?.email?.toLowerCase() === memberEmail.toLowerCase()) {
+        // Refresh user data when their stats are updated
+        refreshUser();
+      }
+    };
+    
+    window.addEventListener('member-stats-updated', handleMemberStatsUpdate as EventListener);
+    return () => {
+      window.removeEventListener('member-stats-updated', handleMemberStatsUpdate as EventListener);
+    };
+  }, [actualUser?.email, refreshUser]);
 
   // Fetch events with background sync
   useEffect(() => {
@@ -801,9 +819,101 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   };
 
   // Event Actions
-  const addEvent = (item: EventData) => setEvents(prev => [...prev, item]);
-  const updateEvent = (item: EventData) => setEvents(prev => prev.map(i => i.id === item.id ? item : i));
-  const deleteEvent = (id: string) => setEvents(prev => prev.filter(i => i.id !== id));
+  const addEvent = async (item: Partial<EventData>) => {
+    try {
+      const res = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          title: item.title,
+          description: item.description,
+          event_date: item.date,
+          start_time: item.time,
+          location: item.location,
+          category: item.category,
+          image_url: item.image,
+          max_attendees: item.capacity
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const formatted = {
+          id: data.id.toString(),
+          source: data.source === 'eventbrite' ? 'eventbrite' : 'internal',
+          externalLink: data.eventbrite_url || undefined,
+          title: data.title,
+          category: data.category || 'Social',
+          date: formatDateShort(data.event_date),
+          time: data.start_time || 'TBD',
+          location: data.location || 'Ever House',
+          image: data.image_url || 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=1000&auto=format&fit=crop',
+          description: data.description || '',
+          attendees: [],
+          capacity: data.max_attendees || undefined,
+          ticketsSold: undefined
+        } as EventData;
+        setEvents(prev => [...prev, formatted]);
+      }
+    } catch (err) {
+      console.error('Failed to add event:', err);
+    }
+  };
+
+  const updateEvent = async (item: EventData) => {
+    try {
+      const res = await fetch(`/api/events/${item.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          title: item.title,
+          description: item.description,
+          event_date: item.date,
+          start_time: item.time,
+          location: item.location,
+          category: item.category,
+          image_url: item.image,
+          max_attendees: item.capacity
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const formatted = {
+          id: data.id.toString(),
+          source: data.source === 'eventbrite' ? 'eventbrite' : 'internal',
+          externalLink: data.eventbrite_url || undefined,
+          title: data.title,
+          category: data.category || 'Social',
+          date: formatDateShort(data.event_date),
+          time: data.start_time || 'TBD',
+          location: data.location || 'Ever House',
+          image: data.image_url || 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=1000&auto=format&fit=crop',
+          description: data.description || '',
+          attendees: [],
+          capacity: data.max_attendees || undefined,
+          ticketsSold: undefined
+        } as EventData;
+        setEvents(prev => prev.map(i => i.id === formatted.id ? formatted : i));
+      }
+    } catch (err) {
+      console.error('Failed to update event:', err);
+    }
+  };
+
+  const deleteEvent = async (id: string) => {
+    try {
+      const res = await fetch(`/api/events/${id}`, { 
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (res.ok) {
+        setEvents(prev => prev.filter(i => i.id !== id));
+      }
+    } catch (err) {
+      console.error('Failed to delete event:', err);
+    }
+  };
   
   const syncEventbrite = async () => {
     try {
@@ -866,6 +976,11 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   };
   
   const updateAnnouncement = async (item: Announcement) => {
+    const snapshot = [...announcements];
+    
+    // Optimistically update
+    setAnnouncements(prev => prev.map(a => a.id === item.id ? item : a));
+    
     try {
       const res = await fetch(`/api/announcements/${item.id}`, {
         method: 'PUT',
@@ -885,24 +1000,32 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       });
       if (res.ok) {
         const updated = await res.json();
-        setAnnouncements(prev => prev.map(i => i.id === updated.id ? updated : i));
+        // Update with server data to ensure consistency (e.g. server-side timestamps)
+        setAnnouncements(prev => prev.map(a => a.id === updated.id ? updated : a));
+      } else {
+        setAnnouncements(snapshot);
       }
     } catch (err) {
       console.error('Failed to update announcement:', err);
+      setAnnouncements(snapshot);
     }
   };
   
   const deleteAnnouncement = async (id: string) => {
+    const snapshot = [...announcements];
+    setAnnouncements(prev => prev.filter(a => a.id !== id));
+    
     try {
       const res = await fetch(`/api/announcements/${id}`, {
         method: 'DELETE',
         credentials: 'include'
       });
-      if (res.ok) {
-        setAnnouncements(prev => prev.filter(i => i.id !== id));
+      if (!res.ok) {
+        setAnnouncements(snapshot);
       }
     } catch (err) {
       console.error('Failed to delete announcement:', err);
+      setAnnouncements(snapshot);
     }
   };
 

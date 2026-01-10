@@ -2,8 +2,9 @@ import { db } from '../db';
 import { users, membershipTiers } from '../../shared/schema';
 import { getHubSpotClient } from './integrations';
 import { normalizeTierName, extractTierTags } from '../../shared/constants/tiers';
-import { sql } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
 import { isProduction } from './db';
+import { broadcastMemberDataUpdated } from './websocket';
 
 interface HubSpotContact {
   id: string;
@@ -167,6 +168,12 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
     }
     
     if (!isProduction) console.log(`[MemberSync] Complete - Synced: ${synced}, Errors: ${errors}`);
+    
+    // Broadcast to staff that member data has been updated
+    if (synced > 0) {
+      broadcastMemberDataUpdated([]);
+    }
+    
     return { synced, errors };
   } catch (error) {
     console.error('[MemberSync] Fatal error:', error);
