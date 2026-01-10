@@ -1131,43 +1131,42 @@ router.post('/api/staff/bookings/manual', isStaffOrAdmin, async (req, res) => {
       }
     }
 
+    // Only create calendar events for conference rooms - golf/simulators no longer sync to calendar
     let calendarEventId: string | null = null;
-    try {
-      const calendarName = resource.type === 'simulator' 
-        ? CALENDAR_CONFIG.golf.name 
-        : CALENDAR_CONFIG.conference.name;
-      
-      const calendarId = await getCalendarIdByName(calendarName);
-      
-      if (calendarId) {
-        const memberName = member.firstName && member.lastName 
-          ? `${member.firstName} ${member.lastName}` 
-          : member_email;
+    if (resource.type === 'conference_room') {
+      try {
+        const calendarId = await getCalendarIdByName(CALENDAR_CONFIG.conference.name);
         
-        const summary = `Booking: ${memberName}`;
-        const descriptionLines = [
-          `Area: ${resource.name}`,
-          `Member: ${member_email}`,
-          `Guests: ${guest_count}`,
-          `Source: ${booking_source}`,
-          `Created by: ${staffEmail}`
-        ];
-        if (notes) {
-          descriptionLines.push(`Notes: ${notes}`);
+        if (calendarId) {
+          const memberName = member.firstName && member.lastName 
+            ? `${member.firstName} ${member.lastName}` 
+            : member_email;
+          
+          const summary = `Booking: ${memberName}`;
+          const descriptionLines = [
+            `Area: ${resource.name}`,
+            `Member: ${member_email}`,
+            `Guests: ${guest_count}`,
+            `Source: ${booking_source}`,
+            `Created by: ${staffEmail}`
+          ];
+          if (notes) {
+            descriptionLines.push(`Notes: ${notes}`);
+          }
+          const description = descriptionLines.join('\n');
+          
+          calendarEventId = await createCalendarEventOnCalendar(
+            calendarId,
+            summary,
+            description,
+            booking_date,
+            start_time,
+            end_time
+          );
         }
-        const description = descriptionLines.join('\n');
-        
-        calendarEventId = await createCalendarEventOnCalendar(
-          calendarId,
-          summary,
-          description,
-          booking_date,
-          start_time,
-          end_time
-        );
+      } catch (calErr) {
+        logger.error('Calendar event creation error', { error: calErr as Error, requestId: req.requestId });
       }
-    } catch (calErr) {
-      logger.error('Calendar event creation error', { error: calErr as Error, requestId: req.requestId });
     }
 
     const memberName = member.firstName && member.lastName 
@@ -1203,12 +1202,18 @@ router.post('/api/staff/bookings/manual', isStaffOrAdmin, async (req, res) => {
         .set({ status: 'cancelled', updatedAt: new Date() })
         .where(eq(bookingRequests.id, reschedule_from_id as number));
       
-      if (oldBookingRequest.calendarEventId) {
+      // Only delete calendar events for conference room bookings
+      if (oldBookingRequest.calendarEventId && oldBookingRequest.resourceId) {
         try {
-          const calendarName = CALENDAR_CONFIG.golf.name;
-          const oldCalendarId = await getCalendarIdByName(calendarName);
-          if (oldCalendarId) {
-            await deleteCalendarEvent(oldBookingRequest.calendarEventId, oldCalendarId);
+          const [oldResource] = await db.select({ type: resources.type })
+            .from(resources)
+            .where(eq(resources.id, oldBookingRequest.resourceId));
+          
+          if (oldResource?.type === 'conference_room') {
+            const oldCalendarId = await getCalendarIdByName(CALENDAR_CONFIG.conference.name);
+            if (oldCalendarId) {
+              await deleteCalendarEvent(oldBookingRequest.calendarEventId, oldCalendarId);
+            }
           }
         } catch (calErr) {
           logger.warn('Failed to delete old calendar event during reschedule', { error: calErr as Error, requestId: req.requestId });
