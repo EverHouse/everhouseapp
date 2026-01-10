@@ -214,19 +214,19 @@ const History: React.FC = () => {
   return (
     <PullToRefresh onRefresh={handleRefresh}>
       <SwipeablePage className="px-6 relative overflow-hidden">
-        <section className="mb-4 pt-4 md:pt-2">
+        <section className="mb-4 pt-4 md:pt-2 animate-pop-in">
           <h1 className={`text-3xl font-bold leading-tight drop-shadow-md ${isDark ? 'text-white' : 'text-primary'}`}>History</h1>
           <p className={`text-sm font-medium mt-1 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>Your past bookings and experiences.</p>
         </section>
 
-        <section className={`mb-6 border-b -mx-6 px-6 ${isDark ? 'border-white/25' : 'border-black/10'}`}>
+        <section className={`mb-6 border-b -mx-6 px-6 animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`} style={{animationDelay: '0.05s'}}>
           <div className="flex gap-6 overflow-x-auto pb-0 scrollbar-hide scroll-fade-right">
             <TabButton label="Bookings" active={activeTab === 'bookings'} onClick={() => setActiveTab('bookings')} isDark={isDark} />
             <TabButton label="Experiences" active={activeTab === 'experiences'} onClick={() => setActiveTab('experiences')} isDark={isDark} />
           </div>
         </section>
 
-        <div className="relative z-10">
+        <div className="relative z-10 animate-pop-in" style={{animationDelay: '0.1s'}}>
           {isLoading ? (
             <div className="animate-pulse space-y-4">
               {[1, 2, 3].map(i => (
@@ -239,13 +239,13 @@ const History: React.FC = () => {
                 {bookings.length} past booking{bookings.length !== 1 ? 's' : ''}
               </div>
               {bookings.length === 0 ? (
-                <div className={`text-center py-12 rounded-2xl border glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}>
+                <div className={`text-center py-12 rounded-2xl border glass-card animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`}>
                   <span className={`material-symbols-outlined text-5xl mb-4 ${isDark ? 'text-white/30' : 'text-primary/30'}`}>history</span>
                   <p className={`${isDark ? 'text-white/80' : 'text-primary/80'}`}>No past bookings yet</p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {bookings.map(booking => {
+                  {bookings.map((booking, index) => {
                     const isConferenceRoom = booking.resource_id === 11 || 
                       (booking.resource_name?.toLowerCase()?.includes('conference') ?? false) ||
                       (booking.bay_name?.toLowerCase()?.includes('conference') ?? false) ||
@@ -257,7 +257,8 @@ const History: React.FC = () => {
                     return (
                     <div 
                       key={booking.id} 
-                      className={`rounded-xl p-4 border glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}
+                      className={`rounded-xl p-4 border glass-card animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`}
+                      style={{animationDelay: `${0.05 * index}s`}}
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div>
@@ -299,16 +300,17 @@ const History: React.FC = () => {
                 {experiencesCount} past experience{experiencesCount !== 1 ? 's' : ''}
               </div>
               {combinedExperiences.length === 0 ? (
-                <div className={`text-center py-12 rounded-2xl border glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}>
+                <div className={`text-center py-12 rounded-2xl border glass-card animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`}>
                   <span className={`material-symbols-outlined text-5xl mb-4 ${isDark ? 'text-white/30' : 'text-primary/30'}`}>celebration</span>
                   <p className={`${isDark ? 'text-white/80' : 'text-primary/80'}`}>No past experiences yet</p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {combinedExperiences.map(exp => (
+                  {combinedExperiences.map((exp, index) => (
                     <div 
                       key={exp.id} 
-                      className={`rounded-xl p-4 border glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}
+                      className={`rounded-xl p-4 border glass-card animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`}
+                      style={{animationDelay: `${0.05 * index}s`}}
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1">

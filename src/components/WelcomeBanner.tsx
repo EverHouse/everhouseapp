@@ -74,7 +74,7 @@ const WelcomeBanner: React.FC = () => {
     <>
       <div 
         onClick={() => handleInstallClick()}
-        className={`mb-6 py-2 px-4 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition-transform active:scale-[0.98] ${
+        className={`mb-6 py-2 px-4 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition-transform active:scale-[0.98] animate-pop-in ${
           isDark ? 'bg-accent text-brand-green' : 'bg-brand-green text-white'
         }`}
       >

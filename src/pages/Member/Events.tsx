@@ -229,11 +229,11 @@ const MemberEvents: React.FC = () => {
   return (
     <PullToRefresh onRefresh={handleRefresh}>
     <SwipeablePage className="px-6 relative overflow-hidden">
-      <section className="mb-4 pt-4 md:pt-2">
+      <section className="mb-4 pt-4 md:pt-2 animate-pop-in">
         <p className={`text-sm font-medium ${isDark ? 'text-white/70' : 'text-primary/70'}`}>Discover what's happening at the House.</p>
       </section>
 
-      <section className={`mb-6 border-b -mx-6 px-6 ${isDark ? 'border-white/25' : 'border-black/10'}`}>
+      <section className={`mb-6 border-b -mx-6 px-6 animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`} style={{animationDelay: '0.05s'}}>
         <div className="flex gap-6 overflow-x-auto pb-0 scrollbar-hide scroll-fade-right">
           {['All', 'Social', 'Golf', 'Tournaments', 'Dining', 'Networking', 'Workshops', 'Family', 'Entertainment', 'Charity'].map(cat => (
             <TabButton 
@@ -247,7 +247,7 @@ const MemberEvents: React.FC = () => {
         </div>
       </section>
 
-      <section className="mb-6">
+      <section className="mb-6 animate-pop-in" style={{animationDelay: '0.1s'}}>
         <div className={`transition-opacity duration-300 ${isLoading ? 'opacity-100' : 'opacity-0 hidden'}`}>
           <SkeletonList count={4} Component={EventCardSkeleton} isDark={isDark} className="space-y-4" />
         </div>
