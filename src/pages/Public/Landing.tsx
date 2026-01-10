@@ -525,7 +525,7 @@ const Landing: React.FC = () => {
       </div>
       </div>
 
-      <Footer />
+      <Footer hideCta />
 
       <HubSpotMeetingModal isOpen={showTourModal} onClose={() => setShowTourModal(false)} />
 
