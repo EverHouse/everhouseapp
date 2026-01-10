@@ -96,6 +96,7 @@ The application features a React 19 frontend with Vite, styled using Tailwind CS
     - **Background Sync**: Member data pulls from HubSpot every 5 minutes, including interest flags (golf, cafe, events, workspace).
     - **Visit Count Push**: When a member checks in at a simulator, their lifetime visit count updates in HubSpot (`total_visit_count` property).
     - **Profile Preferences**: Members can toggle email/SMS updates in their Profile settings; changes push to HubSpot in real-time.
+    - **Tour Scheduling Sync**: Tours scheduled via HubSpot scheduler sync directly to the app database using HubSpot Meetings API. Matches by guest email + date/time window (±15 min). Supports backfilling legacy Google-synced tours. Google Calendar fallback available via `?source=calendar` query parameter.
 -   **HubSpot Forms**: Application forms submit to HubSpot Forms API.
 -   **Eventbrite**: Syncs members-only events and attendee information.
 -   **Google Calendar**: Three-calendar integration for sync (MBO_Conference_Room, Public/Member Events, Wellness & Classes). Note: Golf/simulator bookings are handled in-app only and no longer sync to Google Calendar.
