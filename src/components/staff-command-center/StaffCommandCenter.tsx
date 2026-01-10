@@ -193,9 +193,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
   };
 
   const handleBillingModalComplete = useCallback(() => {
-    showToast('Member checked in', 'success');
     refresh();
-  }, [showToast, refresh]);
+  }, [refresh]);
 
   const handleRefresh = useCallback(async () => {
     await refresh();

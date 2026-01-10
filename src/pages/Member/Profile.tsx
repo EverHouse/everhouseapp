@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useData } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePageReady } from '../../contexts/PageReadyContext';
+import { useToast } from '../../components/Toast';
 import { isFoundingMember, getBaseTier } from '../../utils/permissions';
 import { getTierColor } from '../../utils/tierUtils';
 import { formatPhoneNumber } from '../../utils/formatting';
@@ -33,6 +34,7 @@ const Profile: React.FC = () => {
   const { user, logout, actualUser, isViewingAs } = useData();
   const { effectiveTheme } = useTheme();
   const { setPageReady } = usePageReady();
+  const { showToast } = useToast();
   const isDark = effectiveTheme === 'dark';
   const [isCardOpen, setIsCardOpen] = useState(false);
   const [showGuestCheckin, setShowGuestCheckin] = useState(false);
@@ -118,17 +120,17 @@ const Profile: React.FC = () => {
     setPasswordSuccess('');
     
     if (newPassword.length < 8) {
-      setPasswordError('Password must be at least 8 characters');
+      showToast('Password must be at least 8 characters', 'error');
       return;
     }
     
     if (newPassword !== confirmPassword) {
-      setPasswordError('Passwords do not match');
+      showToast('Passwords do not match', 'error');
       return;
     }
     
     if (hasPassword && !currentPassword) {
-      setPasswordError('Current password is required');
+      showToast('Current password is required', 'error');
       return;
     }
     
@@ -151,7 +153,7 @@ const Profile: React.FC = () => {
         throw new Error(data.error || 'Failed to set password');
       }
       
-      setPasswordSuccess('Password updated successfully');
+      showToast('Password updated', 'success');
       setHasPassword(true);
       setCurrentPassword('');
       setNewPassword('');
@@ -160,10 +162,9 @@ const Profile: React.FC = () => {
       
       setTimeout(() => {
         setShowPasswordSection(false);
-        setPasswordSuccess('');
-      }, 2000);
+      }, 1500);
     } catch (err: any) {
-      setPasswordError(err.message || 'Failed to set password');
+      showToast(err.message || 'Failed to set password', 'error');
     } finally {
       setPasswordLoading(false);
     }
@@ -197,7 +198,6 @@ const Profile: React.FC = () => {
   const handlePreferenceToggle = async (type: 'email' | 'sms', newValue: boolean) => {
     if (!user?.email || prefsLoading) return;
     
-    // Optimistically update UI
     const previousEmail = emailOptIn;
     const previousSms = smsOptIn;
     if (type === 'email') setEmailOptIn(newValue);
@@ -213,17 +213,17 @@ const Profile: React.FC = () => {
         credentials: 'include'
       });
       
-      if (!res.ok) {
-        // Revert on failure
+      if (res.ok) {
+        showToast('Preferences updated', 'success');
+      } else {
         if (type === 'email') setEmailOptIn(previousEmail);
         else setSmsOptIn(previousSms);
-        console.error('Failed to update preference');
+        showToast('Failed to update preferences', 'error');
       }
     } catch {
-      // Revert on network error
       if (type === 'email') setEmailOptIn(previousEmail);
       else setSmsOptIn(previousSms);
-      console.error('Failed to update preference');
+      showToast('Failed to update preferences', 'error');
     } finally {
       setPrefsLoading(false);
     }
@@ -237,10 +237,18 @@ const Profile: React.FC = () => {
       if (!newValue) {
         await unsubscribeFromPush();
         setPushEnabled(false);
+        showToast('Push notifications disabled', 'info');
       } else {
         const success = await subscribeToPush(user.email);
         setPushEnabled(success);
+        if (success) {
+          showToast('Push notifications enabled', 'success');
+        } else {
+          showToast('Failed to enable push notifications', 'error');
+        }
       }
+    } catch {
+      showToast('Failed to update push notifications', 'error');
     } finally {
       setPushLoading(false);
     }

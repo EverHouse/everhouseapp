@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useData, Announcement } from '../../contexts/DataContext';
 import { usePageReady } from '../../contexts/PageReadyContext';
+import { useToast } from '../Toast';
 import ModalShell from '../ModalShell';
 
 interface AnnouncementManagerProps {
@@ -9,6 +10,7 @@ interface AnnouncementManagerProps {
 
 const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate }) => {
     const { setPageReady } = usePageReady();
+    const { showToast } = useToast();
     const { announcements, addAnnouncement, updateAnnouncement, deleteAnnouncement } = useData();
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<string | null>(null);
@@ -55,12 +57,25 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
         try {
             if (editId) {
                 await updateAnnouncement(ann);
+                showToast('Announcement updated', 'success');
             } else {
                 await addAnnouncement(ann);
+                showToast('Announcement created', 'success');
             }
             setIsEditing(false);
         } catch (err) {
             console.error('Failed to save announcement:', err);
+            showToast('Failed to save announcement', 'error');
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        try {
+            await deleteAnnouncement(id);
+            showToast('Announcement deleted', 'success');
+        } catch (err) {
+            console.error('Failed to delete announcement:', err);
+            showToast('Failed to delete announcement', 'error');
         }
     };
 
@@ -174,7 +189,7 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
                                 </div>
                             )}
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); deleteAnnouncement(item.id); }} className="text-gray-500 hover:text-red-500 p-2 min-w-[44px] min-h-[44px]">
+                        <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }} className="text-gray-500 hover:text-red-500 p-2 min-w-[44px] min-h-[44px]">
                             <span aria-hidden="true" className="material-symbols-outlined">delete</span>
                         </button>
                     </div>
