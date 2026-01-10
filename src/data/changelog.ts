@@ -8,6 +8,42 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.7",
+    date: "2026-01-10",
+    title: "Reliability & Token Refresh",
+    changes: [
+      "Fixed HubSpot and Google Calendar token expiration issues",
+      "Tokens now refresh proactively before they expire",
+      "Improved connection reliability for external integrations"
+    ]
+  },
+  {
+    version: "8.6",
+    date: "2026-01-09",
+    title: "Smoother Animations & Notifications",
+    changes: [
+      "New animations for page transitions and modal popups",
+      "Toast notifications confirm your actions throughout the app",
+      "Improved loading states with fade effects",
+      "Better visual feedback when buttons are tapped"
+    ]
+  },
+  {
+    version: "8.5",
+    date: "2026-01-08",
+    title: "Multi-Member Bookings",
+    isMajor: true,
+    changes: [
+      "Invite other members to join your golf booking",
+      "Add guests directly to your reservation using guest passes",
+      "See who's accepted, pending, or declined at a glance",
+      "Time is automatically split between all participants",
+      "Invites expire automatically if not accepted in time",
+      "Conflict detection prevents double-booking the same member",
+      "Staff can reconcile declared vs actual player counts from Trackman"
+    ]
+  },
+  {
     version: "8.4",
     date: "2026-01-06",
     title: "Availability Blocks & Calendar Status",

@@ -50,11 +50,31 @@ export const TRAINING_SEED_DATA = [
     ]
   },
   {
+    guideId: 'multi-member-bookings',
+    icon: 'group_add',
+    title: 'Multi-Member Bookings',
+    description: 'Invite members and add guests to golf bookings',
+    sortOrder: 3,
+    isAdminOnly: false,
+    steps: [
+      { title: 'What are Multi-Member Bookings?', content: 'Members can invite other members or add guests to share their golf simulator booking. Time is automatically split between all participants.', pageIcon: 'group_add' },
+      { title: 'Viewing the Roster', content: 'When viewing a booking (approved or pending), the Roster section shows who is currently on the booking: the owner, any invited members, and any guests.' },
+      { title: 'Invite Status', content: 'Member invites show their status: Pending (waiting for response), Accepted (confirmed), Declined (rejected), or Expired (timed out). Expired invites can be re-sent.' },
+      { title: 'Adding Members', content: 'The booking owner can tap "Add Member" to search for and invite other club members. The invited member receives a notification and must accept within the time limit.' },
+      { title: 'Adding Guests', content: 'Tap "Add Guest" to add a non-member. This uses one of the owner\'s monthly guest passes. Enter the guest\'s name and optional email.' },
+      { title: 'Automatic Time Split', content: 'Time is divided equally among all participants. For example, a 60-minute booking with 3 players gives each person 20 minutes of allocated time.' },
+      { title: 'Conflict Detection', content: 'The system prevents inviting members who already have a booking during the same time slot. A warning appears if a conflict is detected.' },
+      { title: 'Invite Expiration', content: 'Pending invites expire automatically (typically after 24 hours for future bookings, or 2 hours for same-day bookings). Staff can see expired invites and the owner can re-invite.' },
+      { title: 'Staff View', content: 'Staff can view and manage the roster for any booking. Staff can add or remove participants on behalf of members when needed.' },
+      { title: 'Player Count Reconciliation', content: 'After a session, staff can compare the declared player count with actual Trackman data to ensure accurate tracking.' },
+    ]
+  },
+  {
     guideId: 'tours',
     icon: 'directions_walk',
     title: 'Tours',
     description: 'View and manage scheduled facility tours',
-    sortOrder: 3,
+    sortOrder: 4,
     isAdminOnly: false,
     steps: [
       { title: 'Access Tours', content: 'Go to the Tours tab from the bottom nav or dashboard to view scheduled tours.', pageIcon: 'directions_walk' },
@@ -69,7 +89,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'notifications',
     title: 'Notices',
     description: 'Schedule notices and facility closures',
-    sortOrder: 4,
+    sortOrder: 5,
     isAdminOnly: false,
     steps: [
       { title: 'Access Notices', content: 'Go to Notices from the bottom navigation bar to manage facility notices and closures.', pageIcon: 'notifications' },
@@ -88,7 +108,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'calendar_month',
     title: 'Events, Wellness & Blocks',
     description: 'Manage events, wellness classes, and availability blocks',
-    sortOrder: 5,
+    sortOrder: 6,
     isAdminOnly: false,
     steps: [
       { title: 'Access the Calendar', content: 'Go to the Calendar tab to view and manage events, wellness classes, and availability blocks.', pageIcon: 'calendar_month' },
@@ -107,7 +127,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'campaign',
     title: 'Updates & Announcements',
     description: 'Create announcements and view activity',
-    sortOrder: 6,
+    sortOrder: 7,
     isAdminOnly: false,
     steps: [
       { title: 'Access Updates', content: 'Click the campaign icon in the header or go to Updates from the dashboard.', pageIcon: 'campaign' },
@@ -123,7 +143,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'groups',
     title: 'Member Directory',
     description: 'Search and view member profiles',
-    sortOrder: 7,
+    sortOrder: 8,
     isAdminOnly: false,
     steps: [
       { title: 'Access Directory', content: 'Go to the Home tab and tap "Member Directory" in the Employee Resources section.', pageIcon: 'groups' },
@@ -139,7 +159,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'mail',
     title: 'Inquiries',
     description: 'Manage form submissions (Admin only)',
-    sortOrder: 8,
+    sortOrder: 9,
     isAdminOnly: true,
     steps: [
       { title: 'Access Inquiries', content: 'Go to the Home tab and tap "Inquiries" in the Admin Settings section.', pageIcon: 'mail' },
@@ -155,7 +175,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'local_cafe',
     title: 'Cafe Menu',
     description: 'Update menu items and prices',
-    sortOrder: 9,
+    sortOrder: 10,
     isAdminOnly: false,
     steps: [
       { title: 'Access Cafe Menu', content: 'Go to the Home tab and tap "Cafe Menu" in the Employee Resources section.', pageIcon: 'local_cafe' },
@@ -170,7 +190,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'photo_library',
     title: 'Gallery',
     description: 'Manage venue photos (Admin only)',
-    sortOrder: 10,
+    sortOrder: 11,
     isAdminOnly: true,
     steps: [
       { title: 'Access Gallery', content: 'Go to the Home tab and tap "Gallery" in the Admin Settings section.', pageIcon: 'photo_library' },
@@ -185,7 +205,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'help_outline',
     title: 'FAQs',
     description: 'Edit frequently asked questions (Admin only)',
-    sortOrder: 11,
+    sortOrder: 12,
     isAdminOnly: true,
     steps: [
       { title: 'Access FAQs', content: 'Go to the Home tab and tap "FAQs" in the Admin Settings section.', pageIcon: 'help_outline' },
@@ -200,7 +220,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'shield_person',
     title: 'Team Access',
     description: 'Manage staff and admin accounts',
-    sortOrder: 12,
+    sortOrder: 13,
     isAdminOnly: true,
     steps: [
       { title: 'Access Team Settings', content: 'Go to Team Access from the Admin Settings section of the dashboard. This is admin-only.', pageIcon: 'shield_person' },
@@ -215,7 +235,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'loyalty',
     title: 'Membership Tiers',
     description: 'Configure tier settings and permissions',
-    sortOrder: 13,
+    sortOrder: 14,
     isAdminOnly: true,
     steps: [
       { title: 'Access Tiers', content: 'Go to Manage Tiers from the Admin Settings section. This controls what each membership level can do.', pageIcon: 'loyalty' },
@@ -232,7 +252,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'badge',
     title: 'Team Directory',
     description: 'View staff and admin contact info',
-    sortOrder: 14,
+    sortOrder: 15,
     isAdminOnly: false,
     steps: [
       { title: 'Access Team Directory', content: 'Go to the Home tab and tap "Team" in the Employee Resources section.', pageIcon: 'badge' },
@@ -246,7 +266,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'upload_file',
     title: 'Trackman Import',
     description: 'Import historical booking data (Admin only)',
-    sortOrder: 15,
+    sortOrder: 16,
     isAdminOnly: true,
     steps: [
       { title: 'Access Trackman Import', content: 'Go to the Home tab and tap "Trackman Import" in the Admin Settings section. This is admin-only.', pageIcon: 'upload_file' },
@@ -262,7 +282,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'bug_report',
     title: 'Bug Reports',
     description: 'View and manage reported issues (Admin only)',
-    sortOrder: 16,
+    sortOrder: 17,
     isAdminOnly: true,
     steps: [
       { title: 'Access Bug Reports', content: 'Go to the Home tab and tap "Bug Reports" in the Admin Settings section.', pageIcon: 'bug_report' },
@@ -277,7 +297,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'history',
     title: 'Version History',
     description: 'View app updates and changes (Admin only)',
-    sortOrder: 17,
+    sortOrder: 18,
     isAdminOnly: true,
     steps: [
       { title: 'Access Version History', content: 'Go to the Home tab and tap "Version History" in the Admin Settings section.', pageIcon: 'history' },
