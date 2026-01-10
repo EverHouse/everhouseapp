@@ -545,7 +545,11 @@ router.post('/api/wellness-enrollments', async (req, res) => {
     }
     
     const cls = classDataResult.rows[0];
-    const formattedDate = formatDateDisplayWithDay(cls.date);
+    // cls.date is a Date object from Postgres, convert to YYYY-MM-DD string
+    const dateStr = cls.date instanceof Date 
+      ? cls.date.toISOString().split('T')[0] 
+      : (typeof cls.date === 'string' ? cls.date.split('T')[0] : String(cls.date));
+    const formattedDate = formatDateDisplayWithDay(dateStr);
     const memberName = user_email.split('@')[0];
     
     // Check capacity and determine if this should be a waitlist enrollment
@@ -678,7 +682,11 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res
     }
     
     const cls = classDataResult.rows[0];
-    const formattedDate = formatDateDisplayWithDay(cls.date);
+    // cls.date is a Date object from Postgres, convert to YYYY-MM-DD string
+    const dateStr = cls.date instanceof Date 
+      ? cls.date.toISOString().split('T')[0] 
+      : (typeof cls.date === 'string' ? cls.date.split('T')[0] : String(cls.date));
+    const formattedDate = formatDateDisplayWithDay(dateStr);
     const memberName = user_email.split('@')[0];
     const staffMessage = `${memberName} cancelled their enrollment for ${cls.title} on ${formattedDate}`;
     
