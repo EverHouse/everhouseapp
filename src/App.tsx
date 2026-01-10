@@ -109,6 +109,7 @@ const FAQ = lazy(() => import('./pages/Public/FAQ'));
 const Login = lazy(() => import('./pages/Public/Login'));
 const AuthCallback = lazy(() => import('./pages/Public/AuthCallback'));
 const AdminDashboard = lazy(() => import('./pages/Admin/AdminDashboard'));
+const DataIntegrity = lazy(() => import('./pages/Admin/DataIntegrity'));
 
 import { prefetchRoute, prefetchAdjacentRoutes, prefetchOnIdle } from './lib/prefetch';
 
@@ -332,6 +333,11 @@ const AnimatedRoutes: React.FC = () => {
             <Route path="/admin" element={
               <AdminProtectedRoute>
                 <DirectionalPageTransition><PageErrorBoundary pageName="AdminDashboard"><AdminDashboard /></PageErrorBoundary></DirectionalPageTransition>
+              </AdminProtectedRoute>
+            } />
+            <Route path="/admin/data-integrity" element={
+              <AdminProtectedRoute>
+                <DirectionalPageTransition><PageErrorBoundary pageName="DataIntegrity"><DataIntegrity /></PageErrorBoundary></DirectionalPageTransition>
               </AdminProtectedRoute>
             } />
 

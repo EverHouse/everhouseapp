@@ -119,6 +119,55 @@ router.post('/api/calendars/sync-all', isStaffOrAdmin, async (req, res) => {
   }
 });
 
+router.get('/api/events/needs-review', isStaffOrAdmin, async (req, res) => {
+  try {
+    const result = await db.select({
+      id: events.id,
+      title: events.title,
+      description: events.description,
+      event_date: events.eventDate,
+      start_time: events.startTime,
+      end_time: events.endTime,
+      location: events.location,
+      category: events.category,
+      source: events.source,
+      visibility: events.visibility,
+      needs_review: events.needsReview,
+    }).from(events)
+      .where(eq(events.needsReview, true))
+      .orderBy(events.eventDate, events.startTime);
+    
+    res.json(result);
+  } catch (error: any) {
+    if (!isProduction) console.error('API error:', error);
+    res.status(500).json({ error: 'Failed to fetch events needing review' });
+  }
+});
+
+router.post('/api/events/:id/mark-reviewed', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sessionUser = getSessionUser(req);
+    const reviewedBy = sessionUser?.email || 'unknown';
+    
+    const result = await db.update(events).set({
+      needsReview: false,
+      reviewedBy,
+      reviewedAt: new Date(),
+      reviewDismissed: true,
+    }).where(eq(events.id, parseInt(id))).returning();
+    
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    
+    res.json({ success: true, event: result[0] });
+  } catch (error: any) {
+    if (!isProduction) console.error('API error:', error);
+    res.status(500).json({ error: 'Failed to mark event as reviewed' });
+  }
+});
+
 router.get('/api/events', async (req, res) => {
   try {
     const { date, include_past, visibility } = req.query;

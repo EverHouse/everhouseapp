@@ -76,10 +76,15 @@ export async function syncGoogleCalendarEvents(): Promise<{ synced: number; crea
       
       const location = event.location || appMetadata.location || null;
       
+      const hasBracketPrefix = /^\[.+\]/.test(title);
+      const hasSufficientMetadata = !!(location || appMetadata.imageUrl || appMetadata.externalUrl || description);
+      const needsReview = !hasBracketPrefix || !hasSufficientMetadata;
+      
       const existing = await pool.query(
         `SELECT id, locally_edited, app_last_modified_at, google_event_updated_at,
                 title, description, event_date, start_time, end_time, location, category,
-                image_url, external_url, max_attendees, visibility, requires_rsvp
+                image_url, external_url, max_attendees, visibility, requires_rsvp,
+                reviewed_at, last_synced_at, review_dismissed
          FROM events WHERE google_calendar_id = $1`,
         [googleEventId]
       );
@@ -158,6 +163,9 @@ export async function syncGoogleCalendarEvents(): Promise<{ synced: number; crea
             }
           }
         } else {
+          const reviewDismissed = dbRow.review_dismissed === true;
+          const shouldSetNeedsReview = reviewDismissed ? false : needsReview;
+          
           await pool.query(
             `UPDATE events SET title = $1, description = $2, event_date = $3, start_time = $4, 
              end_time = $5, location = $6, source = 'google_calendar',
@@ -166,12 +174,13 @@ export async function syncGoogleCalendarEvents(): Promise<{ synced: number; crea
              max_attendees = COALESCE($9, max_attendees),
              visibility = COALESCE($10, visibility),
              requires_rsvp = COALESCE($11, requires_rsvp),
-             google_event_etag = $12, google_event_updated_at = $13, last_synced_at = NOW()
+             google_event_etag = $12, google_event_updated_at = $13, last_synced_at = NOW(),
+             needs_review = CASE WHEN $15 THEN needs_review ELSE $16 END
              WHERE google_calendar_id = $14`,
             [title, description, eventDate, startTime, endTime, location,
              appMetadata.imageUrl, appMetadata.externalUrl, appMetadata.maxAttendees,
              appMetadata.visibility, appMetadata.requiresRsvp,
-             googleEtag, googleUpdatedAt, googleEventId]
+             googleEtag, googleUpdatedAt, googleEventId, reviewDismissed, shouldSetNeedsReview]
           );
           updated++;
         }
@@ -179,12 +188,12 @@ export async function syncGoogleCalendarEvents(): Promise<{ synced: number; crea
         await pool.query(
           `INSERT INTO events (title, description, event_date, start_time, end_time, location, category, 
            source, visibility, requires_rsvp, google_calendar_id, image_url, external_url, max_attendees,
-           google_event_etag, google_event_updated_at, last_synced_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())`,
+           google_event_etag, google_event_updated_at, last_synced_at, needs_review)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), $17)`,
           [title, description, eventDate, startTime, endTime, location, 'Social', 'google_calendar', 
            appMetadata.visibility || 'public', appMetadata.requiresRsvp || false, googleEventId,
            appMetadata.imageUrl, appMetadata.externalUrl, appMetadata.maxAttendees,
-           googleEtag, googleUpdatedAt]
+           googleEtag, googleUpdatedAt, needsReview]
         );
         created++;
       }

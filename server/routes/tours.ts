@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { isProduction } from '../core/db';
 import { db } from '../db';
-import { tours } from '../../shared/schema';
-import { eq, gte, asc, desc, and, sql, or, ilike } from 'drizzle-orm';
+import { tours, dismissedHubspotMeetings } from '../../shared/schema';
+import { eq, gte, asc, desc, and, sql, or, ilike, inArray } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../core/middleware';
 import { getGoogleCalendarClient, getHubSpotClient } from '../core/integrations';
 import { CALENDAR_CONFIG, getCalendarIdByName, discoverCalendarIds } from '../core/calendar/index';
@@ -184,6 +184,311 @@ router.patch('/api/tours/:id/confirm', async (req, res) => {
     res.status(500).json({ error: 'Failed to confirm tour' });
   }
 });
+
+router.get('/api/tours/needs-review', isStaffOrAdmin, async (req, res) => {
+  try {
+    const forceRefresh = req.query.refresh === 'true';
+    let meetings: HubSpotMeetingDetails[];
+    
+    if (!forceRefresh && hubspotMeetingsCache && (Date.now() - hubspotMeetingsCache.timestamp) < HUBSPOT_CACHE_TTL_MS) {
+      meetings = hubspotMeetingsCache.data;
+    } else {
+      meetings = await fetchHubSpotTourMeetings();
+      hubspotMeetingsCache = { data: meetings, timestamp: Date.now() };
+    }
+    
+    const existingToursByHubspotId = await db.select().from(tours)
+      .where(sql`${tours.hubspotMeetingId} IS NOT NULL`);
+    const linkedHubspotIds = new Set(existingToursByHubspotId.map(t => t.hubspotMeetingId));
+    
+    const dismissedMeetings = await db.select().from(dismissedHubspotMeetings);
+    const dismissedIds = new Set(dismissedMeetings.map(d => d.hubspotMeetingId));
+    
+    const unmatchedMeetings: any[] = [];
+    
+    for (const meeting of meetings) {
+      if (linkedHubspotIds.has(meeting.hubspotMeetingId)) continue;
+      if (dismissedIds.has(meeting.hubspotMeetingId)) continue;
+      
+      let potentialMatches: any[] = [];
+      if (meeting.guestEmail) {
+        const meetingTimeMinutes = parseTimeToMinutes(meeting.startTime);
+        const candidateTours = await db.select().from(tours).where(
+          and(
+            ilike(tours.guestEmail, meeting.guestEmail),
+            eq(tours.tourDate, meeting.tourDate),
+            sql`${tours.hubspotMeetingId} IS NULL`
+          )
+        );
+        
+        potentialMatches = candidateTours.filter(t => {
+          if (t.startTime === '00:00:00') return true;
+          const tourTimeMinutes = parseTimeToMinutes(t.startTime);
+          return Math.abs(meetingTimeMinutes - tourTimeMinutes) <= 15;
+        }).map(t => ({
+          id: t.id,
+          guestName: t.guestName,
+          guestEmail: t.guestEmail,
+          tourDate: t.tourDate,
+          startTime: t.startTime,
+          status: t.status,
+        }));
+      }
+      
+      unmatchedMeetings.push({
+        ...meeting,
+        potentialMatches,
+        wouldBackfill: potentialMatches.length > 0,
+      });
+    }
+    
+    res.json({ unmatchedMeetings });
+  } catch (error: any) {
+    if (!isProduction) console.error('Tours needs-review error:', error);
+    res.status(500).json({ error: 'Failed to fetch HubSpot meetings needing review' });
+  }
+});
+
+router.post('/api/tours/link-hubspot', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { hubspotMeetingId, tourId } = req.body;
+    
+    if (!hubspotMeetingId || !tourId) {
+      return res.status(400).json({ error: 'hubspotMeetingId and tourId are required' });
+    }
+    
+    const existingLink = await db.select().from(tours)
+      .where(eq(tours.hubspotMeetingId, hubspotMeetingId));
+    if (existingLink.length > 0) {
+      return res.status(400).json({ error: 'This HubSpot meeting is already linked to a tour' });
+    }
+    
+    const meetings = await fetchHubSpotTourMeetings();
+    const meeting = meetings.find(m => m.hubspotMeetingId === hubspotMeetingId);
+    if (!meeting) {
+      return res.status(404).json({ error: 'HubSpot meeting not found' });
+    }
+    
+    const [updated] = await db.update(tours)
+      .set({
+        hubspotMeetingId,
+        title: meeting.title,
+        guestName: meeting.guestName,
+        guestEmail: meeting.guestEmail,
+        guestPhone: meeting.guestPhone,
+        tourDate: meeting.tourDate,
+        startTime: meeting.startTime,
+        endTime: meeting.endTime,
+        notes: meeting.notes,
+        updatedAt: new Date(),
+      })
+      .where(eq(tours.id, tourId))
+      .returning();
+    
+    if (!updated) {
+      return res.status(404).json({ error: 'Tour not found' });
+    }
+    
+    res.json({ success: true, tour: updated });
+  } catch (error: any) {
+    if (!isProduction) console.error('Link HubSpot error:', error);
+    res.status(500).json({ error: 'Failed to link HubSpot meeting to tour' });
+  }
+});
+
+router.post('/api/tours/create-from-hubspot', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { hubspotMeetingId } = req.body;
+    
+    if (!hubspotMeetingId) {
+      return res.status(400).json({ error: 'hubspotMeetingId is required' });
+    }
+    
+    const existingLink = await db.select().from(tours)
+      .where(eq(tours.hubspotMeetingId, hubspotMeetingId));
+    if (existingLink.length > 0) {
+      return res.status(400).json({ error: 'This HubSpot meeting is already linked to a tour' });
+    }
+    
+    const meetings = await fetchHubSpotTourMeetings();
+    const meeting = meetings.find(m => m.hubspotMeetingId === hubspotMeetingId);
+    if (!meeting) {
+      return res.status(404).json({ error: 'HubSpot meeting not found' });
+    }
+    
+    const [newTour] = await db.insert(tours).values({
+      hubspotMeetingId,
+      title: meeting.title,
+      guestName: meeting.guestName,
+      guestEmail: meeting.guestEmail,
+      guestPhone: meeting.guestPhone,
+      tourDate: meeting.tourDate,
+      startTime: meeting.startTime,
+      endTime: meeting.endTime,
+      notes: meeting.notes,
+      status: meeting.isCancelled ? 'cancelled' : 'scheduled',
+    }).returning();
+    
+    res.json({ success: true, tour: newTour });
+  } catch (error: any) {
+    if (!isProduction) console.error('Create from HubSpot error:', error);
+    res.status(500).json({ error: 'Failed to create tour from HubSpot meeting' });
+  }
+});
+
+router.post('/api/tours/dismiss-hubspot', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { hubspotMeetingId, notes } = req.body;
+    const staffEmail = getSessionUser(req)?.email || null;
+    
+    if (!hubspotMeetingId) {
+      return res.status(400).json({ error: 'hubspotMeetingId is required' });
+    }
+    
+    const existing = await db.select().from(dismissedHubspotMeetings)
+      .where(eq(dismissedHubspotMeetings.hubspotMeetingId, hubspotMeetingId));
+    if (existing.length > 0) {
+      return res.status(400).json({ error: 'This HubSpot meeting is already dismissed' });
+    }
+    
+    const [dismissed] = await db.insert(dismissedHubspotMeetings).values({
+      hubspotMeetingId,
+      dismissedBy: staffEmail,
+      notes: notes || null,
+    }).returning();
+    
+    res.json({ success: true, dismissed });
+  } catch (error: any) {
+    if (!isProduction) console.error('Dismiss HubSpot error:', error);
+    res.status(500).json({ error: 'Failed to dismiss HubSpot meeting' });
+  }
+});
+
+interface HubSpotMeetingDetails {
+  hubspotMeetingId: string;
+  title: string;
+  guestName: string | null;
+  guestEmail: string | null;
+  guestPhone: string | null;
+  tourDate: string;
+  startTime: string;
+  endTime: string | null;
+  notes: string | null;
+  isCancelled: boolean;
+}
+
+const HUBSPOT_CACHE_TTL_MS = 5 * 60 * 1000;
+let hubspotMeetingsCache: { data: HubSpotMeetingDetails[]; timestamp: number } | null = null;
+
+async function fetchHubSpotTourMeetings(): Promise<HubSpotMeetingDetails[]> {
+  const hubspot = await getHubSpotClient();
+  
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  
+  const allMeetings: any[] = [];
+  let after: string | undefined = undefined;
+  
+  do {
+    const response = await hubspot.crm.objects.meetings.basicApi.getPage(
+      100,
+      after,
+      [
+        'hs_meeting_title',
+        'hs_meeting_start_time',
+        'hs_meeting_end_time',
+        'hs_meeting_outcome',
+        'hs_meeting_body',
+        'hs_internal_meeting_notes',
+        'hs_meeting_external_url',
+        'hs_timestamp',
+        'hs_meeting_location'
+      ],
+      undefined,
+      ['contacts']
+    );
+    
+    if (response.results) {
+      const filteredMeetings = response.results.filter((meeting: any) => {
+        const startTime = meeting.properties.hs_meeting_start_time;
+        if (!startTime) return false;
+        const meetingDate = new Date(startTime);
+        if (meetingDate < oneYearAgo) return false;
+        const title = (meeting.properties.hs_meeting_title || '').toLowerCase();
+        const location = (meeting.properties.hs_meeting_location || '').toLowerCase();
+        const externalUrl = (meeting.properties.hs_meeting_external_url || '').toLowerCase();
+        return title.includes('tour') || 
+               location.includes('tourbooking') || 
+               externalUrl.includes('tourbooking');
+      });
+      allMeetings.push(...filteredMeetings);
+    }
+    after = response.paging?.next?.after;
+  } while (after);
+  
+  const result: HubSpotMeetingDetails[] = [];
+  
+  for (const meeting of allMeetings) {
+    const props = meeting.properties;
+    const startTimeRaw = props.hs_meeting_start_time;
+    if (!startTimeRaw) continue;
+    
+    const hubspotMeetingId = meeting.id;
+    const title = props.hs_meeting_title || 'Tour';
+    const endTimeRaw = props.hs_meeting_end_time;
+    const outcome = (props.hs_meeting_outcome || '').toLowerCase();
+    const notes = props.hs_meeting_body || props.hs_internal_meeting_notes || '';
+    
+    const startDt = new Date(startTimeRaw);
+    const tourDate = startDt.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+    const startTime = startDt.toLocaleTimeString('en-GB', { timeZone: 'America/Los_Angeles', hour12: false });
+    
+    let endTime: string | null = null;
+    if (endTimeRaw) {
+      const endDt = new Date(endTimeRaw);
+      endTime = endDt.toLocaleTimeString('en-GB', { timeZone: 'America/Los_Angeles', hour12: false });
+    }
+    
+    let guestName: string | null = null;
+    let guestEmail: string | null = null;
+    let guestPhone: string | null = null;
+    
+    const associations = meeting.associations;
+    if (associations?.contacts?.results?.length > 0) {
+      const contactId = associations.contacts.results[0].id;
+      try {
+        const contact = await hubspot.crm.contacts.basicApi.getById(contactId, [
+          'firstname', 'lastname', 'email', 'phone'
+        ]);
+        const firstName = contact.properties.firstname || '';
+        const lastName = contact.properties.lastname || '';
+        guestName = `${firstName} ${lastName}`.trim() || null;
+        guestEmail = contact.properties.email || null;
+        guestPhone = contact.properties.phone || null;
+      } catch (e) {
+        if (!isProduction) console.warn(`[HubSpot] Failed to fetch contact ${contactId}:`, e);
+      }
+    }
+    
+    const cancelledOutcomes = ['canceled', 'cancelled', 'no show', 'no_show', 'noshow', 'rescheduled'];
+    const isCancelled = cancelledOutcomes.includes(outcome);
+    
+    result.push({
+      hubspotMeetingId,
+      title,
+      guestName,
+      guestEmail,
+      guestPhone,
+      tourDate,
+      startTime,
+      endTime,
+      notes: notes || null,
+      isCancelled,
+    });
+  }
+  
+  return result;
+}
 
 export async function syncToursFromCalendar(): Promise<{ synced: number; created: number; updated: number; cancelled: number; error?: string }> {
   try {

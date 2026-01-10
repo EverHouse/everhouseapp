@@ -135,3 +135,7 @@ export const ADMIN_LINKS = [
   { id: 'inquiries' as const, icon: 'mail', label: 'Inquiries' },
   { id: 'changelog' as const, icon: 'history', label: 'Version History' },
 ];
+
+export const ADMIN_ROUTE_LINKS = [
+  { route: '/admin/data-integrity', icon: 'fact_check', label: 'Data Integrity' },
+];

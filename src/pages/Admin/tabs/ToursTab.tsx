@@ -8,6 +8,7 @@ import ModalShell from '../../../components/ModalShell';
 interface Tour {
   id: number;
   googleCalendarId: string | null;
+  hubspotMeetingId: string | null;
   title: string;
   guestName: string | null;
   guestEmail: string | null;
@@ -21,6 +22,30 @@ interface Tour {
   checkedInBy: string | null;
 }
 
+interface PotentialMatch {
+  id: number;
+  guestName: string | null;
+  guestEmail: string | null;
+  tourDate: string;
+  startTime: string;
+  status: string;
+}
+
+interface UnmatchedMeeting {
+  hubspotMeetingId: string;
+  title: string;
+  guestName: string | null;
+  guestEmail: string | null;
+  guestPhone: string | null;
+  tourDate: string;
+  startTime: string;
+  endTime: string | null;
+  notes: string | null;
+  isCancelled: boolean;
+  potentialMatches: PotentialMatch[];
+  wouldBackfill: boolean;
+}
+
 const ToursTab: React.FC = () => {
   const { setPageReady } = usePageReady();
   const [tours, setTours] = useState<Tour[]>([]);
@@ -32,9 +57,32 @@ const ToursTab: React.FC = () => {
   const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
   const typeformContainerRef = useRef<HTMLDivElement>(null);
 
+  const [unmatchedMeetings, setUnmatchedMeetings] = useState<UnmatchedMeeting[]>([]);
+  const [needsReviewExpanded, setNeedsReviewExpanded] = useState(true);
+  const [needsReviewLoading, setNeedsReviewLoading] = useState(true);
+  const [dismissModalOpen, setDismissModalOpen] = useState(false);
+  const [dismissingMeeting, setDismissingMeeting] = useState<UnmatchedMeeting | null>(null);
+  const [dismissNotes, setDismissNotes] = useState('');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
   useEffect(() => {
     setPageReady(true);
   }, [setPageReady]);
+
+  const fetchNeedsReview = useCallback(async () => {
+    try {
+      const res = await fetch('/api/tours/needs-review', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setUnmatchedMeetings(data.unmatchedMeetings || []);
+        setNeedsReviewExpanded((data.unmatchedMeetings || []).length > 0);
+      }
+    } catch (err) {
+      console.error('Failed to fetch needs review:', err);
+    } finally {
+      setNeedsReviewLoading(false);
+    }
+  }, []);
 
   const fetchTours = useCallback(async () => {
     try {
@@ -58,7 +106,6 @@ const ToursTab: React.FC = () => {
         data.forEach((t: Tour) => {
           if (t.tourDate === todayStr) return;
           if (t.tourDate > todayStr) {
-            // Filter out cancelled tours from upcoming list
             if (t.status !== 'cancelled') {
               upcoming.push(t);
             }
@@ -82,7 +129,8 @@ const ToursTab: React.FC = () => {
 
   useEffect(() => {
     fetchTours();
-  }, [fetchTours]);
+    fetchNeedsReview();
+  }, [fetchTours, fetchNeedsReview]);
 
   const handlePullRefresh = useCallback(async () => {
     setSyncMessage(null);
@@ -112,8 +160,8 @@ const ToursTab: React.FC = () => {
     } catch (err) {
       setSyncMessage('Network error - please try again');
     }
-    await fetchTours();
-  }, [fetchTours]);
+    await Promise.all([fetchTours(), fetchNeedsReview()]);
+  }, [fetchTours, fetchNeedsReview]);
 
   const openCheckIn = (tour: Tour) => {
     setSelectedTour(tour);
@@ -123,7 +171,6 @@ const ToursTab: React.FC = () => {
   const handleCheckIn = async () => {
     if (!selectedTour) return;
     
-    // Optimistic UI: mark tour as checked in immediately across all lists
     const previousTodayTours = [...todayTours];
     const previousTours = [...tours];
     const previousPastTours = [...pastTours];
@@ -143,19 +190,96 @@ const ToursTab: React.FC = () => {
         credentials: 'include'
       });
       if (res.ok) {
-        fetchTours(); // Sync with server
+        fetchTours();
       } else {
-        // Revert on failure
         setTodayTours(previousTodayTours);
         setTours(previousTours);
         setPastTours(previousPastTours);
       }
     } catch (err) {
-      // Revert on error
       setTodayTours(previousTodayTours);
       setTours(previousTours);
       setPastTours(previousPastTours);
       console.error('Check-in failed:', err);
+    }
+  };
+
+  const handleLinkHubspot = async (hubspotMeetingId: string, tourId: number) => {
+    setActionLoading(hubspotMeetingId);
+    try {
+      const res = await fetch('/api/tours/link-hubspot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ hubspotMeetingId, tourId })
+      });
+      if (res.ok) {
+        await Promise.all([fetchTours(), fetchNeedsReview()]);
+      } else {
+        const data = await res.json();
+        console.error('Link failed:', data.error);
+      }
+    } catch (err) {
+      console.error('Link HubSpot failed:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCreateFromHubspot = async (hubspotMeetingId: string) => {
+    setActionLoading(hubspotMeetingId);
+    try {
+      const res = await fetch('/api/tours/create-from-hubspot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ hubspotMeetingId })
+      });
+      if (res.ok) {
+        await Promise.all([fetchTours(), fetchNeedsReview()]);
+      } else {
+        const data = await res.json();
+        console.error('Create failed:', data.error);
+      }
+    } catch (err) {
+      console.error('Create from HubSpot failed:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const openDismissModal = (meeting: UnmatchedMeeting) => {
+    setDismissingMeeting(meeting);
+    setDismissNotes('');
+    setDismissModalOpen(true);
+  };
+
+  const handleDismissHubspot = async () => {
+    if (!dismissingMeeting) return;
+    setActionLoading(dismissingMeeting.hubspotMeetingId);
+    try {
+      const res = await fetch('/api/tours/dismiss-hubspot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          hubspotMeetingId: dismissingMeeting.hubspotMeetingId,
+          notes: dismissNotes || null
+        })
+      });
+      if (res.ok) {
+        setDismissModalOpen(false);
+        setDismissingMeeting(null);
+        setDismissNotes('');
+        await fetchNeedsReview();
+      } else {
+        const data = await res.json();
+        console.error('Dismiss failed:', data.error);
+      }
+    } catch (err) {
+      console.error('Dismiss HubSpot failed:', err);
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -251,12 +375,168 @@ const ToursTab: React.FC = () => {
     </div>
   );
 
+  const NeedsReviewSection = () => {
+    const count = unmatchedMeetings.length;
+    
+    return (
+      <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10 backdrop-blur-sm overflow-hidden">
+        <button
+          onClick={() => setNeedsReviewExpanded(!needsReviewExpanded)}
+          className="w-full flex items-center justify-between p-4 hover:bg-amber-500/5 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-amber-600 dark:text-amber-400">
+              rate_review
+            </span>
+            <span className="text-sm font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+              Needs Review
+            </span>
+            {count > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-amber-500 text-white text-xs font-bold">
+                {count}
+              </span>
+            )}
+          </div>
+          <span className={`material-symbols-outlined text-amber-600 dark:text-amber-400 transition-transform duration-200 ${needsReviewExpanded ? 'rotate-180' : ''}`}>
+            expand_more
+          </span>
+        </button>
+        
+        {needsReviewExpanded && (
+          <div className="border-t border-amber-500/20 p-4 space-y-4">
+            {needsReviewLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-6 h-6 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin"></div>
+              </div>
+            ) : count === 0 ? (
+              <div className="text-center py-6">
+                <span className="material-symbols-outlined text-3xl text-amber-500/50 mb-2">check_circle</span>
+                <p className="text-sm text-amber-700/70 dark:text-amber-300/70">
+                  All HubSpot meetings are matched
+                </p>
+              </div>
+            ) : (
+              unmatchedMeetings.map((meeting) => (
+                <div 
+                  key={meeting.hubspotMeetingId}
+                  className="p-4 rounded-xl border border-amber-500/20 bg-white/60 dark:bg-white/5 space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-bold text-primary dark:text-white">
+                          {formatTime12Hour(meeting.startTime)}
+                        </span>
+                        {meeting.endTime && (
+                          <span className="text-xs text-primary/70 dark:text-white/70">
+                            - {formatTime12Hour(meeting.endTime)}
+                          </span>
+                        )}
+                        <span className="text-xs text-primary/60 dark:text-white/60">
+                          {formatDate(meeting.tourDate)}
+                        </span>
+                      </div>
+                      <h4 className="font-semibold text-primary dark:text-white">
+                        {meeting.guestName || meeting.title}
+                      </h4>
+                      {meeting.guestEmail && (
+                        <p className="text-xs text-primary/80 dark:text-white/80 truncate">
+                          {meeting.guestEmail}
+                        </p>
+                      )}
+                      {meeting.guestPhone && (
+                        <p className="text-xs text-primary/80 dark:text-white/80">
+                          {formatPhoneNumber(meeting.guestPhone)}
+                        </p>
+                      )}
+                      {meeting.notes && (
+                        <p className="text-xs text-primary/60 dark:text-white/60 mt-1 line-clamp-2">
+                          {meeting.notes}
+                        </p>
+                      )}
+                      {meeting.isCancelled && (
+                        <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-xs">
+                          <span className="material-symbols-outlined text-xs">cancel</span>
+                          Cancelled
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {meeting.potentialMatches.length > 0 && (
+                    <div className="border-t border-primary/10 dark:border-white/10 pt-3">
+                      <p className="text-xs font-medium text-primary/70 dark:text-white/70 mb-2">
+                        Potential matches:
+                      </p>
+                      <div className="space-y-2">
+                        {meeting.potentialMatches.map((match) => (
+                          <div 
+                            key={match.id}
+                            className="flex items-center justify-between gap-2 p-2 rounded-lg bg-primary/5 dark:bg-white/5"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-primary dark:text-white truncate">
+                                {match.guestName || match.guestEmail}
+                              </p>
+                              <p className="text-xs text-primary/60 dark:text-white/60">
+                                {formatTime12Hour(match.startTime)} • {match.status}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => handleLinkHubspot(meeting.hubspotMeetingId, match.id)}
+                              disabled={actionLoading === meeting.hubspotMeetingId}
+                              className="px-3 py-1.5 rounded-full bg-blue-500 text-white text-xs font-bold hover:bg-blue-600 transition-colors flex items-center gap-1 disabled:opacity-50"
+                            >
+                              <span className="material-symbols-outlined text-sm">link</span>
+                              Link
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center gap-2 pt-2">
+                    <button
+                      onClick={() => handleCreateFromHubspot(meeting.hubspotMeetingId)}
+                      disabled={actionLoading === meeting.hubspotMeetingId}
+                      className="flex-1 px-3 py-2 rounded-full bg-accent text-primary text-xs font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-1 disabled:opacity-50"
+                    >
+                      {actionLoading === meeting.hubspotMeetingId ? (
+                        <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-sm">add_circle</span>
+                          Create Tour
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => openDismissModal(meeting)}
+                      disabled={actionLoading === meeting.hubspotMeetingId}
+                      className="px-3 py-2 rounded-full border border-primary/20 dark:border-white/20 text-primary/70 dark:text-white/70 text-xs font-medium hover:bg-primary/5 dark:hover:bg-white/5 transition-colors flex items-center gap-1 disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined text-sm">visibility_off</span>
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <PullToRefresh onRefresh={handlePullRefresh}>
       <div className="space-y-6 animate-pop-in pb-32">
         <p className="text-sm text-primary/80 dark:text-white/80">
           Synced from Google Calendar: <span className="font-medium">Tours Scheduled</span>
         </p>
+
+        <NeedsReviewSection />
 
       {syncMessage && (
         <div className="p-3 rounded-xl bg-accent/20 text-primary dark:text-accent text-sm text-center">
@@ -340,6 +620,62 @@ const ToursTab: React.FC = () => {
             >
               <span aria-hidden="true" className="material-symbols-outlined text-sm">check_circle</span>
               Mark as Checked In
+            </button>
+          </div>
+        </div>
+      </ModalShell>
+
+      <ModalShell 
+        isOpen={dismissModalOpen && !!dismissingMeeting} 
+        onClose={() => {
+          setDismissModalOpen(false);
+          setDismissingMeeting(null);
+          setDismissNotes('');
+        }} 
+        title="Dismiss HubSpot Meeting" 
+        showCloseButton={true} 
+        size="sm"
+      >
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-primary/80 dark:text-white/80">
+            This will hide <span className="font-semibold">{dismissingMeeting?.guestName || dismissingMeeting?.title}</span> from the needs review list.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-2">
+              Notes (optional)
+            </label>
+            <textarea
+              value={dismissNotes}
+              onChange={(e) => setDismissNotes(e.target.value)}
+              placeholder="Add a reason for dismissing..."
+              className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/60 dark:bg-white/5 text-primary dark:text-white placeholder-primary/40 dark:placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none"
+              rows={3}
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              onClick={() => {
+                setDismissModalOpen(false);
+                setDismissingMeeting(null);
+                setDismissNotes('');
+              }}
+              className="px-4 py-2 rounded-full text-sm font-medium text-primary/70 dark:text-white/70 hover:bg-primary/10 dark:hover:bg-white/10 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDismissHubspot}
+              disabled={actionLoading === dismissingMeeting?.hubspotMeetingId}
+              className="px-6 py-2 rounded-full bg-amber-500 text-white text-sm font-bold hover:bg-amber-600 transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              {actionLoading === dismissingMeeting?.hubspotMeetingId ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-sm">visibility_off</span>
+                  Dismiss
+                </>
+              )}
             </button>
           </div>
         </div>

@@ -103,9 +103,21 @@ export async function syncWellnessCalendarEvents(): Promise<{ synced: number; cr
       const spots = appMetadata.spots || '10 spots';
       const status = appMetadata.status || 'Open';
       
+      let needsReview = false;
+      if (!rawTitle.includes(' - ') && !rawTitle.toLowerCase().includes(' with ')) {
+        needsReview = true;
+      }
+      if (instructor === 'TBD') {
+        needsReview = true;
+      }
+      if (category === 'Wellness') {
+        needsReview = true;
+      }
+      
       const existing = await pool.query(
         `SELECT id, locally_edited, app_last_modified_at, google_event_updated_at, 
-                image_url, external_url, spots, status, title, time, instructor, duration, category, date
+                image_url, external_url, spots, status, title, time, instructor, duration, category, date,
+                reviewed_at, last_synced_at, review_dismissed
          FROM wellness_classes WHERE google_calendar_id = $1`,
         [googleEventId]
       );
@@ -126,10 +138,10 @@ export async function syncWellnessCalendarEvents(): Promise<{ synced: number; cr
                 image_url = COALESCE($10, image_url),
                 external_url = COALESCE($11, external_url),
                 google_event_etag = $12, google_event_updated_at = $13, last_synced_at = NOW(),
-                locally_edited = false, app_last_modified_at = NULL
+                locally_edited = false, app_last_modified_at = NULL, needs_review = $15
                WHERE google_calendar_id = $14`,
               [title, startTime, instructor, duration, category, spots, status, description, eventDate,
-               appMetadata.imageUrl, appMetadata.externalUrl, googleEtag, googleUpdatedAt, googleEventId]
+               appMetadata.imageUrl, appMetadata.externalUrl, googleEtag, googleUpdatedAt, googleEventId, needsReview]
             );
             updated++;
           } else {
@@ -220,6 +232,9 @@ export async function syncWellnessCalendarEvents(): Promise<{ synced: number; cr
             }
           }
         } else {
+          const reviewDismissed = dbRow.review_dismissed === true;
+          const shouldSetNeedsReview = reviewDismissed ? false : needsReview;
+          
           await pool.query(
             `UPDATE wellness_classes SET 
               title = $1, time = $2, instructor = $3, duration = $4, 
@@ -227,10 +242,11 @@ export async function syncWellnessCalendarEvents(): Promise<{ synced: number; cr
               date = $9, is_active = true, updated_at = NOW(),
               image_url = COALESCE($10, image_url),
               external_url = COALESCE($11, external_url),
-              google_event_etag = $12, google_event_updated_at = $13, last_synced_at = NOW()
+              google_event_etag = $12, google_event_updated_at = $13, last_synced_at = NOW(),
+              needs_review = CASE WHEN $15 THEN needs_review ELSE $16 END
              WHERE google_calendar_id = $14`,
             [title, startTime, instructor, duration, category, spots, status, description, eventDate,
-             appMetadata.imageUrl, appMetadata.externalUrl, googleEtag, googleUpdatedAt, googleEventId]
+             appMetadata.imageUrl, appMetadata.externalUrl, googleEtag, googleUpdatedAt, googleEventId, reviewDismissed, shouldSetNeedsReview]
           );
           updated++;
         }
@@ -238,10 +254,10 @@ export async function syncWellnessCalendarEvents(): Promise<{ synced: number; cr
         await pool.query(
           `INSERT INTO wellness_classes 
             (title, time, instructor, duration, category, spots, status, description, date, is_active, 
-             google_calendar_id, image_url, external_url, google_event_etag, google_event_updated_at, last_synced_at, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11, $12, $13, $14, NOW(), NOW())`,
+             google_calendar_id, image_url, external_url, google_event_etag, google_event_updated_at, last_synced_at, created_at, needs_review)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11, $12, $13, $14, NOW(), NOW(), $15)`,
           [title, startTime, instructor, duration, category, spots, status, description, eventDate, googleEventId,
-           appMetadata.imageUrl, appMetadata.externalUrl, googleEtag, googleUpdatedAt]
+           appMetadata.imageUrl, appMetadata.externalUrl, googleEtag, googleUpdatedAt, needsReview]
         );
         created++;
       }

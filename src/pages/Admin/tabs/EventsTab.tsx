@@ -64,6 +64,9 @@ interface WellnessClass {
   waitlist_enabled?: boolean;
   enrolled_count?: number;
   waitlist_count?: number;
+  needs_review?: boolean;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
 }
 
 interface WellnessFormData extends Partial<WellnessClass> {
@@ -551,8 +554,23 @@ const ParticipantDetailsModal: React.FC<ParticipantDetailsModalProps> = ({
     );
 };
 
+interface NeedsReviewEvent {
+    id: number;
+    title: string;
+    description: string | null;
+    event_date: string;
+    start_time: string;
+    end_time: string | null;
+    location: string | null;
+    category: string | null;
+    source: string | null;
+    visibility: string | null;
+    needs_review: boolean;
+}
+
 const EventsAdminContent: React.FC = () => {
     const { setPageReady } = usePageReady();
+    const { showToast } = useToast();
     const [events, setEvents] = useState<DBEvent[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeCategory, setActiveCategory] = useState('all');
@@ -569,6 +587,11 @@ const EventsAdminContent: React.FC = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [eventToDelete, setEventToDelete] = useState<DBEvent | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
+    
+    const [needsReviewEvents, setNeedsReviewEvents] = useState<NeedsReviewEvent[]>([]);
+    const [needsReviewExpanded, setNeedsReviewExpanded] = useState(true);
+    const [needsReviewLoading, setNeedsReviewLoading] = useState(true);
+    const [markingReviewedId, setMarkingReviewedId] = useState<number | null>(null);
 
     useEffect(() => {
         if (!isLoading) {
@@ -588,8 +611,46 @@ const EventsAdminContent: React.FC = () => {
         }
     };
 
+    const fetchNeedsReview = async () => {
+        try {
+            const res = await fetch('/api/events/needs-review', { credentials: 'include' });
+            if (res.ok) {
+                const data = await res.json();
+                setNeedsReviewEvents(data || []);
+                setNeedsReviewExpanded((data || []).length > 0);
+            }
+        } catch (err) {
+            console.error('Failed to fetch needs review:', err);
+        } finally {
+            setNeedsReviewLoading(false);
+        }
+    };
+
+    const handleMarkReviewed = async (eventId: number) => {
+        setMarkingReviewedId(eventId);
+        try {
+            const res = await fetch(`/api/events/${eventId}/mark-reviewed`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+            if (res.ok) {
+                showToast('Event marked as reviewed', 'success');
+                await fetchNeedsReview();
+            } else {
+                const data = await res.json();
+                showToast(data.error || 'Failed to mark as reviewed', 'error');
+            }
+        } catch (err) {
+            console.error('Failed to mark reviewed:', err);
+            showToast('Failed to mark as reviewed', 'error');
+        } finally {
+            setMarkingReviewedId(null);
+        }
+    };
+
     useEffect(() => {
         fetchEvents();
+        fetchNeedsReview();
     }, []);
 
     useEffect(() => {
@@ -775,11 +836,132 @@ const EventsAdminContent: React.FC = () => {
         return `${h12}:${mins.toString().padStart(2, '0')} ${period}`;
     };
 
+    const formatTime12Hour = (time: string | null | undefined) => {
+        if (!time) return '';
+        const [h, m] = time.split(':').map(Number);
+        const period = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 || 12;
+        return `${h12}:${m.toString().padStart(2, '0')} ${period}`;
+    };
+
+    const NeedsReviewSection = () => {
+        const count = needsReviewEvents.length;
+        
+        return (
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10 backdrop-blur-sm overflow-hidden mb-4">
+                <button
+                    onClick={() => setNeedsReviewExpanded(!needsReviewExpanded)}
+                    className="w-full flex items-center justify-between p-4 hover:bg-amber-500/5 transition-colors"
+                >
+                    <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-amber-600 dark:text-amber-400">
+                            rate_review
+                        </span>
+                        <span className="text-sm font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                            Needs Review
+                        </span>
+                        {count > 0 && (
+                            <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-amber-500 text-white text-xs font-bold">
+                                {count}
+                            </span>
+                        )}
+                    </div>
+                    <span className={`material-symbols-outlined text-amber-600 dark:text-amber-400 transition-transform duration-200 ${needsReviewExpanded ? 'rotate-180' : ''}`}>
+                        expand_more
+                    </span>
+                </button>
+                
+                {needsReviewExpanded && (
+                    <div className="border-t border-amber-500/20 p-4 space-y-4">
+                        {needsReviewLoading ? (
+                            <div className="flex items-center justify-center py-8">
+                                <div className="w-6 h-6 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin"></div>
+                            </div>
+                        ) : count === 0 ? (
+                            <div className="text-center py-6">
+                                <span className="material-symbols-outlined text-3xl text-amber-500/50 mb-2">check_circle</span>
+                                <p className="text-sm text-amber-700/70 dark:text-amber-300/70">
+                                    All events have been reviewed
+                                </p>
+                            </div>
+                        ) : (
+                            needsReviewEvents.map((event) => (
+                                <div 
+                                    key={event.id}
+                                    className="p-4 rounded-xl border border-amber-500/20 bg-white/60 dark:bg-white/5 space-y-3"
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="text-sm font-bold text-primary dark:text-white">
+                                                    {formatTime12Hour(event.start_time)}
+                                                </span>
+                                                {event.end_time && (
+                                                    <span className="text-xs text-primary/70 dark:text-white/70">
+                                                        - {formatTime12Hour(event.end_time)}
+                                                    </span>
+                                                )}
+                                                <span className="text-xs text-primary/60 dark:text-white/60">
+                                                    {formatDateDisplayWithDay(event.event_date)}
+                                                </span>
+                                            </div>
+                                            <h4 className="font-semibold text-primary dark:text-white">
+                                                {event.title}
+                                            </h4>
+                                            {event.location && (
+                                                <p className="text-xs text-primary/80 dark:text-white/80 truncate">
+                                                    {event.location}
+                                                </p>
+                                            )}
+                                            <div className="flex items-center gap-2 mt-1">
+                                                {event.source && (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 dark:bg-white/10 text-primary/70 dark:text-white/70 text-xs">
+                                                        <span className="material-symbols-outlined text-xs">sync</span>
+                                                        {event.source}
+                                                    </span>
+                                                )}
+                                                {event.category && (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 dark:bg-white/10 text-primary/70 dark:text-white/70 text-xs">
+                                                        {event.category}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-2 pt-2">
+                                        <button
+                                            onClick={() => handleMarkReviewed(event.id)}
+                                            disabled={markingReviewedId === event.id}
+                                            className="flex-1 px-3 py-2 rounded-full bg-accent text-primary text-xs font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-1 disabled:opacity-50"
+                                        >
+                                            {markingReviewedId === event.id ? (
+                                                <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                                            ) : (
+                                                <>
+                                                    <span className="material-symbols-outlined text-sm">check_circle</span>
+                                                    Mark Reviewed
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     return (
         <div className="animate-pop-in">
             <p className="text-sm text-primary/80 dark:text-white/80 mb-4">
                 Synced from Google Calendar: <span className="font-medium">Events</span>
             </p>
+            
+            <NeedsReviewSection />
+            
             <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide -mx-4 px-4 animate-pop-in scroll-fade-right" style={{animationDelay: '0.05s'}}>
                 {CATEGORY_TABS.map(tab => (
                     <button
@@ -1134,11 +1316,15 @@ const WellnessAdminContent: React.FC = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [classToDelete, setClassToDelete] = useState<WellnessClass | null>(null);
     const [deletingClassId, setDeletingClassId] = useState<number | null>(null);
+    const [needsReviewClasses, setNeedsReviewClasses] = useState<WellnessClass[]>([]);
+    const [markingReviewedId, setMarkingReviewedId] = useState<number | null>(null);
+    const { showToast } = useToast();
 
     const categories = ['Classes', 'MedSpa', 'Recovery', 'Therapy', 'Nutrition', 'Personal Training', 'Mindfulness', 'Outdoors', 'General'];
 
     useEffect(() => {
         fetchClasses();
+        fetchNeedsReviewClasses();
     }, []);
 
     useEffect(() => {
@@ -1181,6 +1367,40 @@ const WellnessAdminContent: React.FC = () => {
             console.error('Error fetching wellness classes:', err);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const fetchNeedsReviewClasses = async () => {
+        try {
+            const res = await fetch('/api/wellness-classes/needs-review', { credentials: 'include' });
+            if (res.ok) {
+                const data = await res.json();
+                setNeedsReviewClasses(data);
+            }
+        } catch (err) {
+            console.error('Error fetching needs review classes:', err);
+        }
+    };
+
+    const handleMarkReviewed = async (classId: number) => {
+        setMarkingReviewedId(classId);
+        try {
+            const res = await fetch(`/api/wellness-classes/${classId}/mark-reviewed`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+            if (res.ok) {
+                showToast('Class marked as reviewed', 'success');
+                setNeedsReviewClasses(prev => prev.filter(c => c.id !== classId));
+                fetchClasses();
+            } else {
+                showToast('Failed to mark as reviewed', 'error');
+            }
+        } catch (err) {
+            console.error('Error marking class as reviewed:', err);
+            showToast('Failed to mark as reviewed', 'error');
+        } finally {
+            setMarkingReviewedId(null);
         }
     };
 
@@ -1445,6 +1665,62 @@ const WellnessAdminContent: React.FC = () => {
             {error && !isEditing && (
                 <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-red-700 dark:text-red-400 text-sm">
                     {error}
+                </div>
+            )}
+
+            {needsReviewClasses.length > 0 && (
+                <div className="mb-6 animate-pop-in">
+                    <div className="bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-sm border border-amber-200 dark:border-amber-700/50 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <span aria-hidden="true" className="material-symbols-outlined text-amber-500">rate_review</span>
+                            <h3 className="font-bold text-amber-700 dark:text-amber-400">Needs Review</h3>
+                            <span className="ml-auto bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{needsReviewClasses.length}</span>
+                        </div>
+                        <p className="text-xs text-amber-600 dark:text-amber-400/80 mb-3">
+                            These classes were imported from calendar with incomplete or ambiguous data.
+                        </p>
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {needsReviewClasses.map(cls => (
+                                <div key={cls.id} className="bg-white/80 dark:bg-black/30 rounded-lg p-3 flex items-center justify-between gap-3">
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="font-medium text-primary dark:text-white truncate">{cls.title}</h4>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                                            <span>{formatDateDisplayWithDay(cls.date.split('T')[0])}</span>
+                                            <span>•</span>
+                                            <span>{cls.time}</span>
+                                            {cls.instructor && cls.instructor !== 'TBD' && (
+                                                <>
+                                                    <span>•</span>
+                                                    <span className="flex items-center gap-1">
+                                                        <span aria-hidden="true" className="material-symbols-outlined text-[12px]">person</span>
+                                                        {cls.instructor}
+                                                    </span>
+                                                </>
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                        <button
+                                            onClick={() => openEdit(cls)}
+                                            className="text-primary dark:text-white/80 text-xs font-bold uppercase tracking-wider hover:bg-primary/10 px-2 py-1 rounded transition-colors"
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            onClick={() => handleMarkReviewed(cls.id)}
+                                            disabled={markingReviewedId === cls.id}
+                                            className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold uppercase tracking-wider px-2 py-1 rounded transition-colors disabled:opacity-50 flex items-center gap-1"
+                                        >
+                                            {markingReviewedId === cls.id && (
+                                                <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>
+                                            )}
+                                            Mark Reviewed
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             )}
 

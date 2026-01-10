@@ -28,6 +28,10 @@ export const events = pgTable("events", {
   appLastModifiedAt: timestamp("app_last_modified_at"),
   lastSyncedAt: timestamp("last_synced_at"),
   blockBookings: boolean("block_bookings").default(false),
+  needsReview: boolean("needs_review").default(false),
+  reviewedBy: varchar("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewDismissed: boolean("review_dismissed").default(false),
 });
 
 // Event RSVPs table - event registrations
@@ -74,6 +78,10 @@ export const wellnessClasses = pgTable("wellness_classes", {
   blockBookings: boolean("block_bookings").default(false),
   capacity: integer("capacity"),
   waitlistEnabled: boolean("waitlist_enabled").default(false),
+  needsReview: boolean("needs_review").default(false),
+  reviewedBy: varchar("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewDismissed: boolean("review_dismissed").default(false),
 });
 
 // Wellness enrollments table - class registrations

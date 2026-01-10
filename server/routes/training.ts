@@ -80,7 +80,8 @@ export const TRAINING_SEED_DATA = [
       { title: 'Access Tours', content: 'Go to the Tours tab from the bottom nav or dashboard to view scheduled tours.', pageIcon: 'directions_walk' },
       { title: 'Today\'s Tours', content: 'The top section shows tours scheduled for today with guest name, time, and status.' },
       { title: 'Upcoming Tours', content: 'Below today\'s tours, you can see all upcoming scheduled tours.' },
-      { title: 'Tour Sources', content: 'Tours come from: the booking widget on the website, or directly synced from the Google Calendar.' },
+      { title: 'Tour Sources', content: 'Tours come from: the booking widget on the website, or directly synced from the HubSpot scheduler.' },
+      { title: 'Needs Review', content: 'HubSpot meetings that didn\'t auto-match appear in the "Needs Review" section at the top. You can link them to existing tours, create new ones, or dismiss.' },
       { title: 'Tour Notifications', content: 'Staff receive notifications when new tours are scheduled. Daily reminders are sent at 6pm for the next day\'s tours.' },
     ]
   },

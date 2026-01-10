@@ -320,3 +320,15 @@ export type BookingParticipant = typeof bookingParticipants.$inferSelect;
 export type InsertBookingParticipant = typeof bookingParticipants.$inferInsert;
 export type BookingPaymentAudit = typeof bookingPaymentAudit.$inferSelect;
 export type InsertBookingPaymentAudit = typeof bookingPaymentAudit.$inferInsert;
+
+// Dismissed HubSpot meetings table - tracks HubSpot meetings that were dismissed/ignored
+export const dismissedHubspotMeetings = pgTable("dismissed_hubspot_meetings", {
+  id: serial("id").primaryKey(),
+  hubspotMeetingId: varchar("hubspot_meeting_id").notNull().unique(),
+  dismissedBy: varchar("dismissed_by"),
+  dismissedAt: timestamp("dismissed_at").notNull().defaultNow(),
+  notes: text("notes"),
+});
+
+export type DismissedHubspotMeeting = typeof dismissedHubspotMeetings.$inferSelect;
+export type InsertDismissedHubspotMeeting = typeof dismissedHubspotMeetings.$inferInsert;

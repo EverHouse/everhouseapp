@@ -151,6 +151,44 @@ router.post('/api/wellness-classes/backfill-calendar', isStaffOrAdmin, async (re
   }
 });
 
+router.get('/api/wellness-classes/needs-review', isStaffOrAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM wellness_classes 
+       WHERE needs_review = true AND is_active = true
+       ORDER BY date ASC, time ASC`
+    );
+    res.json(result.rows);
+  } catch (error: any) {
+    if (!isProduction) console.error('Fetch needs review error:', error);
+    res.status(500).json({ error: 'Failed to fetch wellness classes needing review' });
+  }
+});
+
+router.post('/api/wellness-classes/:id/mark-reviewed', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sessionUser = getSessionUser(req);
+    const reviewedBy = sessionUser?.email || 'staff';
+    
+    const result = await pool.query(
+      `UPDATE wellness_classes 
+       SET needs_review = false, reviewed_by = $1, reviewed_at = NOW(), updated_at = NOW(), review_dismissed = true
+       WHERE id = $2 RETURNING *`,
+      [reviewedBy, id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Wellness class not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    if (!isProduction) console.error('Mark reviewed error:', error);
+    res.status(500).json({ error: 'Failed to mark wellness class as reviewed' });
+  }
+});
+
 router.get('/api/wellness-classes', async (req, res) => {
   try {
     const { active_only } = req.query;
