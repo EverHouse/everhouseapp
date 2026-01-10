@@ -79,7 +79,11 @@ The application features a React 19 frontend with Vite, styled using Tailwind CS
 - **Unified Conflict Validation**: All booking routes check closures, availability blocks, AND existing bookings via `checkAllConflicts` function
 - **Fair Usage Tracking**: Time is split equally among all players for accurate usage calculations. Guest history is tracked and displayed in member profiles.
 - **Modal Pattern**: Standardized, accessible, viewport-centered modal implementation.
-- **Calendar Import "Needs Review" Feature**: Calendar sync auto-imports events, flagging those without bracket prefixes as `needsReview` for staff configuration.
+- **Needs Review & Reconciliation Features**:
+  - **Tours Needs Review**: HubSpot meetings without matching app records appear in Tours tab for staff to link, create tours from, or dismiss. Uses 5-minute cache to avoid API throttling.
+  - **Events Needs Review**: Calendar events without bracket prefixes are flagged for staff to configure category/access. Uses `reviewDismissed` flag to persist staff decisions across syncs.
+  - **Wellness Needs Review**: Wellness classes missing proper metadata flagged for staff configuration with same dismissal persistence.
+- **Data Integrity Dashboard**: Admin-only page at /admin/data-integrity with comprehensive checks for orphan records, missing relationships, sync mismatches between app and external systems (HubSpot, Google Calendar), and data quality issues. Accessible from Employee Resources in admin settings.
 - **Code Architecture**: Database schema and calendar modules have been refactored into domain-focused files for improved organization and maintainability.
 - **Admin-Configurable Features**: Includes push notifications for announcements, 15-minute booking intervals for staff, RSVP management, promotional banner options, wellness class capacity and waitlists, and configurable closure reasons and notice types.
 
