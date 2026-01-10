@@ -10,6 +10,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import pRetry, { AbortError } from 'p-retry';
 import { broadcastDirectoryUpdate } from '../core/websocket';
+import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts';
 
 const router = Router();
 
@@ -121,7 +122,7 @@ async function fetchRecentlyModifiedContacts(sinceTimestamp: number): Promise<an
       filterGroups: [{
         filters: [{
           propertyName: 'lastmodifieddate',
-          operator: 'GTE' as const,
+          operator: FilterOperatorEnum.Gte,
           value: sinceTimestamp.toString()
         }]
       }],
