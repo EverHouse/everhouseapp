@@ -9,6 +9,7 @@ import Avatar from '../../components/Avatar';
 import ModalShell from '../../components/ModalShell';
 import StaffCommandCenter from '../../components/StaffCommandCenter';
 import MenuOverlay from '../../components/MenuOverlay';
+import PageErrorBoundary from '../../components/PageErrorBoundary';
 import { useStaffWebSocket } from '../../hooks/useStaffWebSocket';
 
 import { TabType, StaffBottomNav, usePendingCounts, useUnreadNotifications } from './layout';
@@ -170,24 +171,26 @@ const AdminDashboard: React.FC = () => {
       <main className={`flex-1 px-4 md:px-8 mx-auto pt-[max(112px,calc(env(safe-area-inset-top)+96px))] w-full relative z-0 ${activeTab === 'simulator' || activeTab === 'home' || activeTab === 'directory' ? 'max-w-[1920px]' : 'max-w-4xl'}`}>
         {activeTab === 'home' && <StaffCommandCenter onTabChange={handleTabChange} isAdmin={actualUser?.role === 'admin'} wsConnected={staffWsConnected} />}
         {activeTab === 'training' && <StaffTrainingGuide />}
-        <Suspense fallback={<TabLoadingFallback />}>
-          {activeTab === 'cafe' && <CafeTab />}
-          {activeTab === 'events' && <EventsTab />}
-          {activeTab === 'announcements' && <AnnouncementsTab />}
-          {activeTab === 'directory' && <DirectoryTab />}
-          {activeTab === 'simulator' && <SimulatorTab onTabChange={handleTabChange} />}
-          {activeTab === 'team' && <TeamTab />}
-          {activeTab === 'faqs' && <FaqsAdmin />}
-          {activeTab === 'inquiries' && <InquiriesAdmin />}
-          {activeTab === 'gallery' && <GalleryAdmin />}
-          {activeTab === 'tiers' && actualUser?.role === 'admin' && <TiersTab />}
-          {activeTab === 'blocks' && <BlocksTab />}
-          {activeTab === 'changelog' && <ChangelogTab />}
-          {activeTab === 'bugs' && actualUser?.role === 'admin' && <BugReportsAdmin />}
-          {activeTab === 'updates' && <UpdatesTab />}
-          {activeTab === 'tours' && <ToursTab />}
-          {activeTab === 'trackman' && actualUser?.role === 'admin' && <TrackmanTab />}
-        </Suspense>
+        <PageErrorBoundary pageName={`Admin Tab: ${activeTab}`}>
+          <Suspense fallback={<TabLoadingFallback />}>
+            {activeTab === 'cafe' && <CafeTab />}
+            {activeTab === 'events' && <EventsTab />}
+            {activeTab === 'announcements' && <AnnouncementsTab />}
+            {activeTab === 'directory' && <DirectoryTab />}
+            {activeTab === 'simulator' && <SimulatorTab onTabChange={handleTabChange} />}
+            {activeTab === 'team' && <TeamTab />}
+            {activeTab === 'faqs' && <FaqsAdmin />}
+            {activeTab === 'inquiries' && <InquiriesAdmin />}
+            {activeTab === 'gallery' && <GalleryAdmin />}
+            {activeTab === 'tiers' && actualUser?.role === 'admin' && <TiersTab />}
+            {activeTab === 'blocks' && <BlocksTab />}
+            {activeTab === 'changelog' && <ChangelogTab />}
+            {activeTab === 'bugs' && actualUser?.role === 'admin' && <BugReportsAdmin />}
+            {activeTab === 'updates' && <UpdatesTab />}
+            {activeTab === 'tours' && <ToursTab />}
+            {activeTab === 'trackman' && actualUser?.role === 'admin' && <TrackmanTab />}
+          </Suspense>
+        </PageErrorBoundary>
         <BottomSentinel />
       </main>
 

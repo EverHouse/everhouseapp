@@ -14,8 +14,9 @@ import { broadcastDirectoryUpdate } from '../core/websocket';
 const router = Router();
 
 // Shared cache for all HubSpot contacts (used by both active and former member views)
-let allContactsCache: { data: any[] | null; timestamp: number } = { data: null, timestamp: 0 };
-const ALL_CONTACTS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+let allContactsCache: { data: any[] | null; timestamp: number; lastModifiedCheck: number } = { data: null, timestamp: 0, lastModifiedCheck: 0 };
+const ALL_CONTACTS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes for full refresh
+const INCREMENTAL_SYNC_INTERVAL = 5 * 60 * 1000; // Check for updates every 5 minutes
 
 /**
  * Check if an error is a HubSpot rate limit error (429)
@@ -59,168 +60,254 @@ async function retryableHubSpotRequest<T>(fn: () => Promise<T>): Promise<T> {
   );
 }
 
+const HUBSPOT_CONTACT_PROPERTIES = [
+  'firstname',
+  'lastname',
+  'email',
+  'phone',
+  'company',
+  'hs_lead_status',
+  'lifecyclestage',
+  'createdate',
+  'membership_tier',
+  'membership_status',
+  'membership_discount_reason',
+  'lastmodifieddate'
+];
+
 /**
- * Fetch and cache all HubSpot contacts (shared between active/former)
+ * Transform a raw HubSpot contact into our normalized format
+ */
+function transformHubSpotContact(contact: any): any {
+  const lifecycleStage = (contact.properties.lifecyclestage || '').toLowerCase();
+  const membershipStatus = (contact.properties.membership_status || '').toLowerCase();
+  
+  const activeStatuses = ['active'];
+  const formerStatuses = ['expired', 'terminated', 'former_member', 'cancelled', 'canceled', 'inactive', 'churned', 'declined'];
+  
+  const isActiveMember = activeStatuses.includes(membershipStatus);
+  const isFormerMember = formerStatuses.includes(membershipStatus);
+  
+  return {
+    id: contact.id,
+    firstName: contact.properties.firstname || '',
+    lastName: contact.properties.lastname || '',
+    email: contact.properties.email || '',
+    phone: contact.properties.phone || '',
+    company: contact.properties.company || '',
+    lifecycleStage,
+    status: membershipStatus || (isActiveMember ? 'active' : ''),
+    tier: normalizeTierName(contact.properties.membership_tier),
+    tags: extractTierTags(contact.properties.membership_tier, contact.properties.membership_discount_reason),
+    createdAt: contact.properties.createdate,
+    lastModified: contact.properties.lastmodifieddate,
+    isActiveMember,
+    isFormerMember
+  };
+}
+
+/**
+ * Fetch only contacts modified since the given timestamp using HubSpot Search API
+ * This is much more efficient than fetching all contacts when we only need updates
+ */
+async function fetchRecentlyModifiedContacts(sinceTimestamp: number): Promise<any[]> {
+  const hubspot = await getHubSpotClient();
+  
+  let modifiedContacts: any[] = [];
+  let after: string | undefined = undefined;
+  
+  do {
+    const searchRequest = {
+      filterGroups: [{
+        filters: [{
+          propertyName: 'lastmodifieddate',
+          operator: 'GTE' as const,
+          value: sinceTimestamp.toString()
+        }]
+      }],
+      properties: HUBSPOT_CONTACT_PROPERTIES,
+      limit: 100,
+      after: after || '0'
+    };
+    
+    const response = await retryableHubSpotRequest(() => 
+      hubspot.crm.contacts.searchApi.doSearch(searchRequest)
+    );
+    
+    modifiedContacts = modifiedContacts.concat(response.results);
+    after = response.paging?.next?.after;
+  } while (after);
+  
+  return modifiedContacts.map(transformHubSpotContact);
+}
+
+/**
+ * Fetch and cache all HubSpot contacts with incremental sync support
+ * - Full refresh: Every 30 minutes or on force refresh
+ * - Incremental sync: Every 5 minutes, only fetches recently modified contacts
  */
 async function fetchAllHubSpotContacts(forceRefresh: boolean = false): Promise<any[]> {
   const now = Date.now();
   
-  // Return cached data if still valid
+  // If we have cache and it's within TTL, check if we need incremental sync
   if (!forceRefresh && allContactsCache.data && (now - allContactsCache.timestamp) < ALL_CONTACTS_CACHE_TTL) {
+    // Check if we should do an incremental sync
+    if ((now - allContactsCache.lastModifiedCheck) > INCREMENTAL_SYNC_INTERVAL) {
+      try {
+        const modifiedContacts = await fetchRecentlyModifiedContacts(allContactsCache.lastModifiedCheck);
+        
+        if (modifiedContacts.length > 0) {
+          // Enrich the modified contacts with DB data FIRST (before updating cache)
+          const enrichedModified = await enrichContactsWithDbData(modifiedContacts);
+          
+          // Now merge enriched contacts into cache, preserving existing enriched data for unchanged contacts
+          const contactMap = new Map(allContactsCache.data.map((c: any) => [c.id, c]));
+          for (const contact of enrichedModified) {
+            contactMap.set(contact.id, contact);
+          }
+          
+          allContactsCache.data = Array.from(contactMap.values());
+          if (!isProduction) console.log(`[HubSpot] Incremental sync: updated ${modifiedContacts.length} contacts`);
+        }
+        
+        allContactsCache.lastModifiedCheck = now;
+      } catch (err) {
+        // Incremental sync failed, continue with cached data
+        if (!isProduction) console.warn('[HubSpot] Incremental sync failed, using cached data:', err);
+      }
+    }
+    
     return allContactsCache.data;
   }
   
-  const hubspot = await getHubSpotClient();
+  // Full refresh needed
+  if (!isProduction) console.log('[HubSpot] Performing full contact sync...');
   
-  const properties = [
-    'firstname',
-    'lastname',
-    'email',
-    'phone',
-    'company',
-    'hs_lead_status',
-    'lifecyclestage',
-    'createdate',
-    'membership_tier',
-    'membership_status',
-    'membership_discount_reason'
-  ];
+  const hubspot = await getHubSpotClient();
   
   let allContacts: any[] = [];
   let after: string | undefined = undefined;
   
   do {
     const response = await retryableHubSpotRequest(() => 
-      hubspot.crm.contacts.basicApi.getPage(100, after, properties)
+      hubspot.crm.contacts.basicApi.getPage(100, after, HUBSPOT_CONTACT_PROPERTIES)
     );
     allContacts = allContacts.concat(response.results);
     after = response.paging?.next?.after;
   } while (after);
+  
+  if (!isProduction) console.log(`[HubSpot] Full sync: fetched ${allContacts.length} contacts`);
 
   // Transform raw HubSpot data
-  const hubspotContacts = allContacts.map((contact: any) => {
-    const lifecycleStage = (contact.properties.lifecyclestage || '').toLowerCase();
-    const membershipStatus = (contact.properties.membership_status || '').toLowerCase();
-    
-    const activeStatuses = ['active'];
-    const formerStatuses = ['expired', 'terminated', 'former_member', 'cancelled', 'canceled', 'inactive', 'churned', 'declined'];
-    
-    // Only count as active if membership_status is explicitly 'active' (no lifecycle fallback)
-    const isActiveMember = activeStatuses.includes(membershipStatus);
-    const isFormerMember = formerStatuses.includes(membershipStatus);
-    
-    return {
-      id: contact.id,
-      firstName: contact.properties.firstname || '',
-      lastName: contact.properties.lastname || '',
-      email: contact.properties.email || '',
-      phone: contact.properties.phone || '',
-      company: contact.properties.company || '',
-      lifecycleStage,
-      status: membershipStatus || (isActiveMember ? 'active' : ''),
-      tier: normalizeTierName(contact.properties.membership_tier),
-      tags: extractTierTags(contact.properties.membership_tier, contact.properties.membership_discount_reason),
-      createdAt: contact.properties.createdate,
-      isActiveMember,
-      isFormerMember
-    };
-  });
+  const hubspotContacts = allContacts.map(transformHubSpotContact);
   
-  // Fetch additional user data from database for ALL contacts at once
-  const emails = hubspotContacts.map((c: any) => c.email.toLowerCase()).filter(Boolean);
+  // Enrich with database data
+  const enrichedContacts = await enrichContactsWithDbData(hubspotContacts);
+  
+  // Update cache with full refresh data
+  allContactsCache = { data: enrichedContacts, timestamp: now, lastModifiedCheck: now };
+  
+  return enrichedContacts;
+}
+
+/**
+ * Enrich contacts with additional data from the database (visits, join dates, etc.)
+ */
+async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
+  const emails = contacts.map((c: any) => c.email.toLowerCase()).filter(Boolean);
+  
+  if (emails.length === 0) return contacts;
+  
   let dbUserMap: Record<string, any> = {};
   let lastActivityMap: Record<string, string> = {};
   let pastBookingsMap: Record<string, number> = {};
   let eventVisitsMap: Record<string, number> = {};
   let wellnessVisitsMap: Record<string, number> = {};
   
-  if (emails.length > 0) {
-    // Get user data including id for matched_user_id joins
-    const dbResult = await pool.query(
-      `SELECT id, email, joined_on, mindbody_client_id, manually_linked_emails 
-       FROM users WHERE LOWER(email) = ANY($1)`,
-      [emails]
-    );
-    for (const row of dbResult.rows) {
-      dbUserMap[row.email.toLowerCase()] = row;
-    }
-    
-    // Get last visit date - most recent PAST date from bookings or experiences
-    const lastActivityResult = await pool.query(
-      `SELECT email, MAX(activity_date) as last_activity FROM (
-        SELECT LOWER(user_email) as email, request_date as activity_date
-        FROM booking_requests 
-        WHERE LOWER(user_email) = ANY($1) AND request_date < CURRENT_DATE AND status NOT IN ('cancelled', 'declined')
-        UNION ALL
-        SELECT LOWER(er.user_email) as email, e.event_date as activity_date
-        FROM event_rsvps er
-        JOIN events e ON er.event_id = e.id
-        WHERE LOWER(er.user_email) = ANY($1) AND e.event_date < CURRENT_DATE AND er.status != 'cancelled'
-        UNION ALL
-        SELECT LOWER(we.user_email) as email, wc.date as activity_date
-        FROM wellness_enrollments we
-        JOIN wellness_classes wc ON we.class_id = wc.id
-        WHERE LOWER(we.user_email) = ANY($1) AND wc.date < CURRENT_DATE AND we.status != 'cancelled'
-      ) combined
-      GROUP BY email`,
-      [emails]
-    );
-    for (const row of lastActivityResult.rows) {
-      if (row.last_activity) {
-        const date = row.last_activity instanceof Date ? row.last_activity : new Date(row.last_activity);
-        lastActivityMap[row.email] = date.toISOString().split('T')[0];
-      }
-    }
-    
-    // Count past bookings (excluding cancelled/declined)
-    const pastBookingsResult = await pool.query(
-      `SELECT LOWER(user_email) as email, COUNT(*)::int as count
-       FROM booking_requests
-       WHERE LOWER(user_email) = ANY($1)
-         AND request_date < CURRENT_DATE
-         AND status NOT IN ('cancelled', 'declined')
-       GROUP BY LOWER(user_email)`,
-      [emails]
-    );
-    for (const row of pastBookingsResult.rows) {
-      pastBookingsMap[row.email] = row.count;
-    }
-    
-    // Count past event RSVPs (excluding cancelled) - include both email and matched_user_id
-    const eventVisitsResult = await pool.query(
-      `SELECT u.email, COUNT(DISTINCT er.id)::int as count
-       FROM users u
-       JOIN event_rsvps er ON (LOWER(er.user_email) = LOWER(u.email) OR er.matched_user_id = u.id)
-       JOIN events e ON er.event_id = e.id
-       WHERE LOWER(u.email) = ANY($1)
-         AND er.status != 'cancelled'
-         AND e.event_date < CURRENT_DATE
-       GROUP BY u.email`,
-      [emails]
-    );
-    for (const row of eventVisitsResult.rows) {
-      eventVisitsMap[row.email.toLowerCase()] = row.count;
-    }
-    
-    // Count past wellness enrollments (excluding cancelled)
-    const wellnessVisitsResult = await pool.query(
-      `SELECT LOWER(we.user_email) as email, COUNT(*)::int as count
-       FROM wellness_enrollments we
-       JOIN wellness_classes wc ON we.class_id = wc.id
-       WHERE LOWER(we.user_email) = ANY($1)
-         AND we.status != 'cancelled'
-         AND wc.date < CURRENT_DATE
-       GROUP BY LOWER(we.user_email)`,
-      [emails]
-    );
-    for (const row of wellnessVisitsResult.rows) {
-      wellnessVisitsMap[row.email] = row.count;
+  // Get user data including id for matched_user_id joins
+  const dbResult = await pool.query(
+    `SELECT id, email, joined_on, mindbody_client_id, manually_linked_emails 
+     FROM users WHERE LOWER(email) = ANY($1)`,
+    [emails]
+  );
+  for (const row of dbResult.rows) {
+    dbUserMap[row.email.toLowerCase()] = row;
+  }
+  
+  // Get last visit date - most recent PAST date from bookings or experiences
+  const lastActivityResult = await pool.query(
+    `SELECT email, MAX(activity_date) as last_activity FROM (
+      SELECT LOWER(user_email) as email, request_date as activity_date
+      FROM booking_requests 
+      WHERE LOWER(user_email) = ANY($1) AND request_date < CURRENT_DATE AND status NOT IN ('cancelled', 'declined')
+      UNION ALL
+      SELECT LOWER(er.user_email) as email, e.event_date as activity_date
+      FROM event_rsvps er
+      JOIN events e ON er.event_id = e.id
+      WHERE LOWER(er.user_email) = ANY($1) AND e.event_date < CURRENT_DATE AND er.status != 'cancelled'
+      UNION ALL
+      SELECT LOWER(we.user_email) as email, wc.date as activity_date
+      FROM wellness_enrollments we
+      JOIN wellness_classes wc ON we.class_id = wc.id
+      WHERE LOWER(we.user_email) = ANY($1) AND wc.date < CURRENT_DATE AND we.status != 'cancelled'
+    ) combined
+    GROUP BY email`,
+    [emails]
+  );
+  for (const row of lastActivityResult.rows) {
+    if (row.last_activity) {
+      const date = row.last_activity instanceof Date ? row.last_activity : new Date(row.last_activity);
+      lastActivityMap[row.email] = date.toISOString().split('T')[0];
     }
   }
   
-  // Merge HubSpot data with database data
-  // Total visits = past bookings + past event RSVPs + past wellness enrollments
-  const enrichedContacts = hubspotContacts.map((contact: any) => {
+  // Count past bookings (excluding cancelled/declined)
+  const pastBookingsResult = await pool.query(
+    `SELECT LOWER(user_email) as email, COUNT(*)::int as count
+     FROM booking_requests
+     WHERE LOWER(user_email) = ANY($1)
+       AND request_date < CURRENT_DATE
+       AND status NOT IN ('cancelled', 'declined')
+     GROUP BY LOWER(user_email)`,
+    [emails]
+  );
+  for (const row of pastBookingsResult.rows) {
+    pastBookingsMap[row.email] = row.count;
+  }
+  
+  // Count past event RSVPs (excluding cancelled) - include both email and matched_user_id
+  const eventVisitsResult = await pool.query(
+    `SELECT u.email, COUNT(DISTINCT er.id)::int as count
+     FROM users u
+     JOIN event_rsvps er ON (LOWER(er.user_email) = LOWER(u.email) OR er.matched_user_id = u.id)
+     JOIN events e ON er.event_id = e.id
+     WHERE LOWER(u.email) = ANY($1)
+       AND er.status != 'cancelled'
+       AND e.event_date < CURRENT_DATE
+     GROUP BY u.email`,
+    [emails]
+  );
+  for (const row of eventVisitsResult.rows) {
+    eventVisitsMap[row.email.toLowerCase()] = row.count;
+  }
+  
+  // Count past wellness enrollments (excluding cancelled)
+  const wellnessVisitsResult = await pool.query(
+    `SELECT LOWER(we.user_email) as email, COUNT(*)::int as count
+     FROM wellness_enrollments we
+     JOIN wellness_classes wc ON we.class_id = wc.id
+     WHERE LOWER(we.user_email) = ANY($1)
+       AND we.status != 'cancelled'
+       AND wc.date < CURRENT_DATE
+     GROUP BY LOWER(we.user_email)`,
+    [emails]
+  );
+  for (const row of wellnessVisitsResult.rows) {
+    wellnessVisitsMap[row.email] = row.count;
+  }
+  
+  // Merge contact data with database data
+  return contacts.map((contact: any) => {
     const emailLower = contact.email.toLowerCase();
     const dbUser = dbUserMap[emailLower];
     const pastBookings = pastBookingsMap[emailLower] || 0;
@@ -235,11 +322,6 @@ async function fetchAllHubSpotContacts(forceRefresh: boolean = false): Promise<a
       lastBookingDate: lastActivityMap[emailLower] || null
     };
   });
-  
-  // Update the shared cache
-  allContactsCache = { data: enrichedContacts, timestamp: now };
-  
-  return enrichedContacts;
 }
 
 router.get('/api/hubspot/contacts', isStaffOrAdmin, async (req, res) => {
