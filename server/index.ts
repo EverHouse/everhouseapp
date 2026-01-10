@@ -13,6 +13,7 @@ import { db } from './db';
 import { systemSettings } from '../shared/schema';
 import { eq, sql } from 'drizzle-orm';
 import { syncGoogleCalendarEvents, syncWellnessCalendarEvents, syncInternalCalendarToClosures, syncConferenceRoomCalendarToBookings } from './core/calendar/index';
+import { syncAllMembersFromHubSpot } from './core/memberSync';
 
 import resourcesRouter from './routes/resources';
 import calendarRouter from './routes/calendar';
@@ -422,12 +423,14 @@ async function startServer() {
       const toursResult = await syncToursFromCalendar().catch(() => ({ synced: 0, created: 0, updated: 0, cancelled: 0, error: 'Tours sync failed' }));
       const closuresResult = await syncInternalCalendarToClosures().catch(() => ({ synced: 0, created: 0, updated: 0, deleted: 0, error: 'Closures sync failed' }));
       const confRoomResult = await syncConferenceRoomCalendarToBookings().catch(() => ({ synced: 0, linked: 0, created: 0, skipped: 0, error: 'Conference room sync failed' })) as { synced: number; linked: number; created: number; skipped: number; error?: string; warning?: string };
+      const memberResult = await syncAllMembersFromHubSpot().catch(() => ({ synced: 0, errors: 0, error: 'Member sync failed' })) as { synced: number; errors: number; error?: string };
       const eventsMsg = eventsResult.error ? eventsResult.error : `${eventsResult.synced} synced`;
       const wellnessMsg = wellnessResult.error ? wellnessResult.error : `${wellnessResult.synced} synced`;
       const toursMsg = toursResult.error ? toursResult.error : `${toursResult.synced} synced`;
       const closuresMsg = closuresResult.error ? closuresResult.error : `${closuresResult.synced} synced`;
       const confRoomMsg = confRoomResult.error ? confRoomResult.error : (confRoomResult.warning ? 'not configured' : `${confRoomResult.synced} synced`);
-      console.log(`[Auto-sync] Events: ${eventsMsg}, Wellness: ${wellnessMsg}, Tours: ${toursMsg}, Closures: ${closuresMsg}, ConfRoom: ${confRoomMsg}`);
+      const memberMsg = memberResult.error ? memberResult.error : `${memberResult.synced} synced`;
+      console.log(`[Auto-sync] Events: ${eventsMsg}, Wellness: ${wellnessMsg}, Tours: ${toursMsg}, Closures: ${closuresMsg}, ConfRoom: ${confRoomMsg}, Members: ${memberMsg}`);
     } catch (err) {
       console.error('[Auto-sync] Calendar sync failed:', err);
     } finally {

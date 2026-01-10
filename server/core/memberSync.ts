@@ -19,6 +19,13 @@ interface HubSpotContact {
     mindbody_client_id?: string;
     membership_start_date?: string;
     createdate?: string;
+    eh_email_updates_opt_in?: string;
+    eh_sms_updates_opt_in?: string;
+    interest_golf?: string;
+    interest_in_cafe?: string;
+    interest_in_events?: string;
+    interest_in_workspace?: string;
+    total_visit_count?: string;
   };
 }
 
@@ -55,7 +62,14 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
       'membership_discount_reason',
       'mindbody_client_id',
       'membership_start_date',
-      'createdate'
+      'createdate',
+      'eh_email_updates_opt_in',
+      'eh_sms_updates_opt_in',
+      'interest_golf',
+      'interest_in_cafe',
+      'interest_in_events',
+      'interest_in_workspace',
+      'total_visit_count'
     ];
     
     let allContacts: HubSpotContact[] = [];
@@ -96,6 +110,16 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           }
         }
         
+        // Parse opt-in values from HubSpot (they come as strings like "true"/"false" or "Yes"/"No")
+        const parseOptIn = (val?: string): boolean | null => {
+          if (!val) return null;
+          const lower = val.toLowerCase();
+          return lower === 'true' || lower === 'yes' || lower === '1';
+        };
+        
+        const emailOptIn = parseOptIn(contact.properties.eh_email_updates_opt_in);
+        const smsOptIn = parseOptIn(contact.properties.eh_sms_updates_opt_in);
+        
         await db.insert(users)
           .values({
             id: sql`gen_random_uuid()`,
@@ -110,6 +134,8 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
             membershipStatus: status,
             mindbodyClientId: contact.properties.mindbody_client_id || null,
             joinDate,
+            emailOptIn,
+            smsOptIn,
             lastSyncedAt: new Date(),
             role: 'member'
           })
@@ -126,6 +152,8 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
               membershipStatus: status,
               mindbodyClientId: sql`COALESCE(${contact.properties.mindbody_client_id || null}, ${users.mindbodyClientId})`,
               joinDate: joinDate ? joinDate : sql`${users.joinDate}`,
+              emailOptIn: emailOptIn !== null ? emailOptIn : sql`${users.emailOptIn}`,
+              smsOptIn: smsOptIn !== null ? smsOptIn : sql`${users.smsOptIn}`,
               lastSyncedAt: new Date(),
               updatedAt: new Date()
             }
@@ -152,4 +180,50 @@ export function triggerMemberSync(): void {
   syncAllMembersFromHubSpot().catch(err => {
     console.error('[MemberSync] Background sync failed:', err);
   });
+}
+
+// Push lifetimeVisits to HubSpot when visit count changes
+export async function updateHubSpotContactVisitCount(hubspotId: string, visitCount: number): Promise<boolean> {
+  try {
+    const hubspot = await getHubSpotClient();
+    await hubspot.crm.contacts.basicApi.update(hubspotId, {
+      properties: {
+        total_visit_count: String(visitCount)
+      }
+    });
+    if (!isProduction) console.log(`[MemberSync] Updated HubSpot contact ${hubspotId} visit count to ${visitCount}`);
+    return true;
+  } catch (error) {
+    console.error(`[MemberSync] Failed to update HubSpot visit count for ${hubspotId}:`, error);
+    return false;
+  }
+}
+
+// Push communication preferences to HubSpot
+export async function updateHubSpotContactPreferences(
+  hubspotId: string, 
+  preferences: { emailOptIn?: boolean; smsOptIn?: boolean }
+): Promise<boolean> {
+  try {
+    const hubspot = await getHubSpotClient();
+    const properties: Record<string, string> = {};
+    
+    if (preferences.emailOptIn !== undefined) {
+      properties.eh_email_updates_opt_in = preferences.emailOptIn ? 'true' : 'false';
+    }
+    if (preferences.smsOptIn !== undefined) {
+      properties.eh_sms_updates_opt_in = preferences.smsOptIn ? 'true' : 'false';
+    }
+    
+    if (Object.keys(properties).length === 0) {
+      return true; // Nothing to update
+    }
+    
+    await hubspot.crm.contacts.basicApi.update(hubspotId, { properties });
+    if (!isProduction) console.log(`[MemberSync] Updated HubSpot contact ${hubspotId} preferences:`, properties);
+    return true;
+  } catch (error) {
+    console.error(`[MemberSync] Failed to update HubSpot preferences for ${hubspotId}:`, error);
+    return false;
+  }
 }

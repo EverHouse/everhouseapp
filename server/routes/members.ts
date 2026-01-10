@@ -19,6 +19,7 @@ import {
 import { isProduction } from '../core/db';
 import { isStaffOrAdmin, isAuthenticated } from '../core/middleware';
 import { getSessionUser } from '../types/session';
+import { updateHubSpotContactPreferences } from '../core/memberSync';
 
 const router = Router();
 
@@ -671,6 +672,79 @@ router.put('/api/members/:id/role', async (req, res) => {
   } catch (error: any) {
     if (!isProduction) console.error('API error:', error);
     res.status(500).json({ error: 'Failed to update member' });
+  }
+});
+
+// Update member communication preferences (email/sms opt-in) - for the logged-in user
+router.patch('/api/members/me/preferences', isAuthenticated, async (req, res) => {
+  try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser?.email) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    const { emailOptIn, smsOptIn } = req.body;
+    
+    if (emailOptIn === undefined && smsOptIn === undefined) {
+      return res.status(400).json({ error: 'No preferences provided' });
+    }
+    
+    const updateData: Record<string, any> = { updatedAt: new Date() };
+    if (emailOptIn !== undefined) updateData.emailOptIn = emailOptIn;
+    if (smsOptIn !== undefined) updateData.smsOptIn = smsOptIn;
+    
+    const result = await db.update(users)
+      .set(updateData)
+      .where(eq(users.email, sessionUser.email.toLowerCase()))
+      .returning({ 
+        emailOptIn: users.emailOptIn, 
+        smsOptIn: users.smsOptIn,
+        hubspotId: users.hubspotId 
+      });
+    
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    // Push preferences to HubSpot if contact has hubspot_id
+    const updated = result[0];
+    if (updated.hubspotId) {
+      updateHubSpotContactPreferences(updated.hubspotId, { 
+        emailOptIn: emailOptIn !== undefined ? emailOptIn : undefined,
+        smsOptIn: smsOptIn !== undefined ? smsOptIn : undefined
+      }).catch(err => console.error('[Members] Failed to sync preferences to HubSpot:', err));
+    }
+    
+    res.json({ emailOptIn: updated.emailOptIn, smsOptIn: updated.smsOptIn });
+  } catch (error: any) {
+    if (!isProduction) console.error('API error:', error);
+    res.status(500).json({ error: 'Failed to update preferences' });
+  }
+});
+
+// Get member communication preferences
+router.get('/api/members/me/preferences', isAuthenticated, async (req, res) => {
+  try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser?.email) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    const result = await db.select({ 
+      emailOptIn: users.emailOptIn, 
+      smsOptIn: users.smsOptIn 
+    })
+      .from(users)
+      .where(eq(users.email, sessionUser.email.toLowerCase()));
+    
+    if (result.length === 0) {
+      return res.json({ emailOptIn: null, smsOptIn: null });
+    }
+    
+    res.json(result[0]);
+  } catch (error: any) {
+    if (!isProduction) console.error('API error:', error);
+    res.status(500).json({ error: 'Failed to fetch preferences' });
   }
 });
 

@@ -40,6 +40,9 @@ const Profile: React.FC = () => {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
+  const [emailOptIn, setEmailOptIn] = useState<boolean | null>(null);
+  const [smsOptIn, setSmsOptIn] = useState<boolean | null>(null);
+  const [prefsLoading, setPrefsLoading] = useState(false);
   
   const [showPasswordSection, setShowPasswordSection] = useState(false);
   const [hasPassword, setHasPassword] = useState(false);
@@ -178,6 +181,54 @@ const Profile: React.FC = () => {
     checkPush();
   }, []);
 
+  // Fetch communication preferences (only for members, not staff)
+  useEffect(() => {
+    if (user?.email && !isStaffOrAdminProfile) {
+      fetch('/api/members/me/preferences', { credentials: 'include' })
+        .then(res => res.ok ? res.json() : { emailOptIn: null, smsOptIn: null })
+        .then(data => {
+          setEmailOptIn(data.emailOptIn);
+          setSmsOptIn(data.smsOptIn);
+        })
+        .catch(() => {});
+    }
+  }, [user?.email, isStaffOrAdminProfile]);
+
+  const handlePreferenceToggle = async (type: 'email' | 'sms', newValue: boolean) => {
+    if (!user?.email || prefsLoading) return;
+    
+    // Optimistically update UI
+    const previousEmail = emailOptIn;
+    const previousSms = smsOptIn;
+    if (type === 'email') setEmailOptIn(newValue);
+    else setSmsOptIn(newValue);
+    
+    setPrefsLoading(true);
+    try {
+      const body = type === 'email' ? { emailOptIn: newValue } : { smsOptIn: newValue };
+      const res = await fetch('/api/members/me/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        credentials: 'include'
+      });
+      
+      if (!res.ok) {
+        // Revert on failure
+        if (type === 'email') setEmailOptIn(previousEmail);
+        else setSmsOptIn(previousSms);
+        console.error('Failed to update preference');
+      }
+    } catch {
+      // Revert on network error
+      if (type === 'email') setEmailOptIn(previousEmail);
+      else setSmsOptIn(previousSms);
+      console.error('Failed to update preference');
+    } finally {
+      setPrefsLoading(false);
+    }
+  };
+
   const handlePushToggle = async (newValue: boolean) => {
     if (!user?.email || pushLoading) return;
     
@@ -234,6 +285,47 @@ const Profile: React.FC = () => {
                 label="Push Notifications"
               />
             </div>
+            
+            {/* Email/SMS opt-in toggles - only for members */}
+            {!isStaffOrAdminProfile && (
+              <>
+                <div className={`p-4 flex items-center justify-between transition-colors ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
+                  <div className="flex items-center gap-4">
+                    <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>mail</span>
+                    <div>
+                      <span className={`font-medium text-sm ${isDark ? '' : 'text-primary'}`}>Email Updates</span>
+                      <p className={`text-xs mt-0.5 ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
+                        Receive club news and updates via email
+                      </p>
+                    </div>
+                  </div>
+                  <Toggle
+                    checked={emailOptIn ?? false}
+                    onChange={(val) => handlePreferenceToggle('email', val)}
+                    disabled={prefsLoading}
+                    label="Email Updates"
+                  />
+                </div>
+                <div className={`p-4 flex items-center justify-between transition-colors ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
+                  <div className="flex items-center gap-4">
+                    <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>sms</span>
+                    <div>
+                      <span className={`font-medium text-sm ${isDark ? '' : 'text-primary'}`}>SMS Updates</span>
+                      <p className={`text-xs mt-0.5 ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
+                        Receive reminders and alerts via text message
+                      </p>
+                    </div>
+                  </div>
+                  <Toggle
+                    checked={smsOptIn ?? false}
+                    onChange={(val) => handlePreferenceToggle('sms', val)}
+                    disabled={prefsLoading}
+                    label="SMS Updates"
+                  />
+                </div>
+              </>
+            )}
+            
             <Row icon="lock" label="Privacy" arrow isDark={isDark} />
          </Section>
 

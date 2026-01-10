@@ -18,6 +18,7 @@ import { bookingEvents } from '../core/bookingEvents';
 import { sendNotificationToUser, broadcastAvailabilityUpdate } from '../core/websocket';
 import { getSessionUser } from '../types/session';
 import { refundGuestPass } from './guestPasses';
+import { updateHubSpotContactVisitCount } from '../core/memberSync';
 
 const router = Router();
 
@@ -1439,11 +1440,21 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
     // Increment lifetime visits for the member only if marked as attended
     const booking = result[0];
     if (newStatus === 'attended' && booking.userEmail) {
-      await db.execute(sql`
-        UPDATE users 
-        SET lifetime_visits = COALESCE(lifetime_visits, 0) + 1 
-        WHERE email = ${booking.userEmail}
-      `);
+      // Update local database
+      const updateResult = await pool.query<{ lifetime_visits: number; hubspot_id: string | null }>(
+        `UPDATE users 
+         SET lifetime_visits = COALESCE(lifetime_visits, 0) + 1 
+         WHERE email = $1
+         RETURNING lifetime_visits, hubspot_id`,
+        [booking.userEmail]
+      );
+      
+      // Push updated visit count to HubSpot if contact has hubspot_id
+      const updatedUser = updateResult.rows[0];
+      if (updatedUser?.hubspot_id && updatedUser.lifetime_visits) {
+        updateHubSpotContactVisitCount(updatedUser.hubspot_id, updatedUser.lifetime_visits)
+          .catch(err => console.error('[Bays] Failed to sync visit count to HubSpot:', err));
+      }
     }
     
     res.json({ success: true, booking: result[0] });
