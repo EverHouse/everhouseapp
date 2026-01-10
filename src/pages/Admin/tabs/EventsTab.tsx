@@ -103,15 +103,6 @@ interface BlockFormData {
   notes: string;
 }
 
-interface CalendarStatus {
-  name: string;
-  status: 'connected' | 'not_found';
-}
-
-interface CalendarStatusResponse {
-  timestamp: string;
-  configured_calendars: CalendarStatus[];
-}
 
 const CATEGORY_TABS = [
     { id: 'all', label: 'All', icon: 'calendar_month' },
@@ -2699,14 +2690,6 @@ const EventsTab: React.FC = () => {
     );
     const [syncMessage, setSyncMessage] = useState<string | null>(null);
     
-    const [calendarStatus, setCalendarStatus] = useState<CalendarStatusResponse | null>(null);
-    const [isLoadingCalendars, setIsLoadingCalendars] = useState(true);
-    const [showCalendars, setShowCalendars] = useState(false);
-    const [isBackfilling, setIsBackfilling] = useState(false);
-    
-    useEffect(() => {
-        fetchCalendarStatus();
-    }, []);
     
     useEffect(() => {
         if (subtabParam === 'wellness') {
@@ -2717,43 +2700,6 @@ const EventsTab: React.FC = () => {
             setActiveSubTab('events');
         }
     }, [subtabParam]);
-    
-    const fetchCalendarStatus = async () => {
-        try {
-            setIsLoadingCalendars(true);
-            const res = await fetch('/api/admin/calendars', { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setCalendarStatus(data);
-            }
-        } catch (err) {
-            console.error('Failed to fetch calendar status:', err);
-        } finally {
-            setIsLoadingCalendars(false);
-        }
-    };
-
-    const handleBackfillCalendar = async () => {
-        try {
-            setIsBackfilling(true);
-            const res = await fetch('/api/wellness-classes/backfill-calendar', {
-                method: 'POST',
-                credentials: 'include',
-            });
-            
-            if (res.ok) {
-                const data = await res.json();
-                showToast(`Created ${data.created} calendar events`, 'success');
-            } else {
-                const data = await res.json();
-                showToast(data.error || 'Failed to backfill calendar', 'error');
-            }
-        } catch (err) {
-            showToast('Failed to backfill calendar', 'error');
-        } finally {
-            setIsBackfilling(false);
-        }
-    };
     
     const handlePullRefresh = async () => {
         setSyncMessage(null);
@@ -2813,70 +2759,6 @@ const EventsTab: React.FC = () => {
                         {syncMessage}
                     </div>
                 )}
-
-                <div className="mb-4 p-4 bg-white dark:bg-surface-dark rounded-xl border border-gray-200 dark:border-white/20">
-                    <button
-                        onClick={() => setShowCalendars(!showCalendars)}
-                        className="flex items-center justify-between w-full text-left"
-                    >
-                        <div className="flex items-center gap-2">
-                            <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">calendar_month</span>
-                            <span className="font-bold text-primary dark:text-white">Calendar Status</span>
-                        </div>
-                        <span aria-hidden="true" className={`material-symbols-outlined text-gray-500 dark:text-gray-400 transition-transform ${showCalendars ? 'rotate-180' : ''}`}>
-                            expand_more
-                        </span>
-                    </button>
-                    
-                    {showCalendars && (
-                        <div className="mt-4 space-y-3">
-                            {isLoadingCalendars ? (
-                                <div className="flex items-center justify-center py-4">
-                                    <span aria-hidden="true" className="material-symbols-outlined animate-spin text-gray-500">progress_activity</span>
-                                </div>
-                            ) : calendarStatus ? (
-                                <>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                        {calendarStatus.configured_calendars.map((cal, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
-                                                <span className="text-sm font-medium text-primary dark:text-white truncate mr-2">{cal.name}</span>
-                                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded shrink-0 ${
-                                                    cal.status === 'connected' 
-                                                        ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' 
-                                                        : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
-                                                }`}>
-                                                    {cal.status === 'connected' ? 'Connected' : 'Not Found'}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                        Last checked: {new Date(calendarStatus.timestamp).toLocaleString()}
-                                    </p>
-                                    <button
-                                        onClick={handleBackfillCalendar}
-                                        disabled={isBackfilling}
-                                        className="w-full py-2.5 px-4 rounded-lg border-2 border-dashed border-gray-200 dark:border-white/25 text-gray-600 dark:text-gray-400 text-sm font-medium flex items-center justify-center gap-2 hover:border-primary/30 hover:text-primary dark:hover:border-white/30 dark:hover:text-white transition-colors disabled:opacity-50"
-                                    >
-                                        {isBackfilling ? (
-                                            <>
-                                                <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
-                                                Filling gaps...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">sync</span>
-                                                Fill Calendar Gaps
-                                            </>
-                                        )}
-                                    </button>
-                                </>
-                            ) : (
-                                <p className="text-sm text-gray-500 dark:text-gray-400">Failed to load calendar status</p>
-                            )}
-                        </div>
-                    )}
-                </div>
 
                 <div className="flex gap-2 mb-4 animate-pop-in" style={{animationDelay: '0.05s'}}>
                     <button
