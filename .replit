@@ -71,7 +71,7 @@ ENABLE_TEST_LOGIN = "true"
 [deployment]
 deploymentTarget = "autoscale"
 run = ["npm", "run", "start"]
-build = ["bash", "-c", "npm install && npm run build"]
+build = ["sh", "-c", "npm install && npm run build"]
 
 [objectStorage]
 defaultBucketID = "replit-objstore-a74e2fa8-3e0a-44cd-bca4-3046e4e3b9c2"
