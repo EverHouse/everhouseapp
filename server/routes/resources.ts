@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { eq, and, or, sql, desc, asc, ne } from 'drizzle-orm';
 import { db } from '../db';
-import { resources, users, facilityClosures, notifications, bookingRequests } from '../../shared/schema';
+import { pool } from '../core/db';
+import { resources, users, facilityClosures, notifications, bookingRequests, bookingParticipants, bookingMembers } from '../../shared/schema';
 import { isAuthorizedForMemberBooking } from '../core/bookingAuth';
 import { isStaffOrAdmin } from '../core/middleware';
 import { createCalendarEventOnCalendar, getCalendarIdByName, deleteCalendarEvent, CALENDAR_CONFIG } from '../core/calendar/index';
@@ -14,6 +15,185 @@ import { bookingEvents } from '../core/bookingEvents';
 import { sendNotificationToUser, broadcastAvailabilityUpdate } from '../core/websocket';
 import { checkAllConflicts, parseTimeToMinutes } from '../core/bookingValidation';
 import { getSessionUser } from '../types/session';
+import { notifyMember } from '../core/notificationService';
+import { refundGuestPass } from './guestPasses';
+import { createPacificDate, formatDateDisplayWithDay, formatTime12Hour } from '../utils/dateUtils';
+
+interface CancellationCascadeResult {
+  participantsNotified: number;
+  guestPassesRefunded: number;
+  bookingMembersRemoved: number;
+  errors: string[];
+}
+
+async function handleCancellationCascade(
+  bookingId: number,
+  sessionId: number | null,
+  ownerEmail: string,
+  ownerName: string | null,
+  requestDate: string,
+  startTime: string,
+  resourceName?: string
+): Promise<CancellationCascadeResult> {
+  const result: CancellationCascadeResult = {
+    participantsNotified: 0,
+    guestPassesRefunded: 0,
+    bookingMembersRemoved: 0,
+    errors: []
+  };
+
+  try {
+    const bookingStartTime = createPacificDate(requestDate, startTime);
+    const now = new Date();
+    const hoursUntilStart = (bookingStartTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const shouldRefundGuestPasses = hoursUntilStart > 24;
+
+    logger.info('[cancellation-cascade] Starting cascade', {
+      extra: {
+        bookingId,
+        sessionId,
+        hoursUntilStart: hoursUntilStart.toFixed(1),
+        shouldRefundGuestPasses
+      }
+    });
+
+    if (sessionId) {
+      const participants = await db
+        .select()
+        .from(bookingParticipants)
+        .where(eq(bookingParticipants.sessionId, sessionId));
+
+      const formattedDate = formatDateDisplayWithDay(requestDate);
+      const formattedTime = formatTime12Hour(startTime);
+      const displayOwner = ownerName || ownerEmail;
+      const displayResource = resourceName || 'simulator';
+
+      for (const participant of participants) {
+        if (participant.participantType === 'member' && participant.userId) {
+          try {
+            const userResult = await pool.query(
+              `SELECT email FROM users WHERE id = $1 OR LOWER(email) = LOWER($1) LIMIT 1`,
+              [participant.userId]
+            );
+            
+            if (userResult.rows.length > 0) {
+              const memberEmail = userResult.rows[0].email;
+              
+              await notifyMember({
+                userEmail: memberEmail,
+                title: 'Booking Cancelled',
+                message: `${displayOwner}'s ${displayResource} booking on ${formattedDate} at ${formattedTime} has been cancelled.`,
+                type: 'booking_cancelled',
+                relatedId: bookingId,
+                relatedType: 'booking_request'
+              });
+              
+              result.participantsNotified++;
+              
+              logger.info('[cancellation-cascade] Notified member participant', {
+                extra: { bookingId, memberEmail, participantId: participant.id }
+              });
+            }
+          } catch (notifyError) {
+            const errorMsg = `Failed to notify participant ${participant.userId}: ${(notifyError as Error).message}`;
+            result.errors.push(errorMsg);
+            logger.warn('[cancellation-cascade] ' + errorMsg, { error: notifyError as Error });
+          }
+        }
+
+        if (participant.participantType === 'guest' && shouldRefundGuestPasses) {
+          try {
+            const refundResult = await refundGuestPass(
+              ownerEmail,
+              participant.displayName || undefined,
+              false
+            );
+            
+            if (refundResult.success) {
+              result.guestPassesRefunded++;
+              logger.info('[cancellation-cascade] Guest pass refunded', {
+                extra: {
+                  bookingId,
+                  ownerEmail,
+                  guestName: participant.displayName,
+                  remainingPasses: refundResult.remaining
+                }
+              });
+            } else {
+              result.errors.push(`Failed to refund guest pass for ${participant.displayName}: ${refundResult.error}`);
+            }
+          } catch (refundError) {
+            const errorMsg = `Failed to refund guest pass for ${participant.displayName}: ${(refundError as Error).message}`;
+            result.errors.push(errorMsg);
+            logger.warn('[cancellation-cascade] ' + errorMsg, { error: refundError as Error });
+          }
+        }
+      }
+
+      try {
+        await db
+          .update(bookingParticipants)
+          .set({ inviteStatus: 'cancelled' })
+          .where(eq(bookingParticipants.sessionId, sessionId));
+        
+        logger.info('[cancellation-cascade] Updated participant invite statuses', {
+          extra: { bookingId, sessionId, count: participants.length }
+        });
+      } catch (updateError) {
+        result.errors.push(`Failed to update participant statuses: ${(updateError as Error).message}`);
+        logger.warn('[cancellation-cascade] Failed to update participant statuses', { error: updateError as Error });
+      }
+    }
+
+    try {
+      const deleteResult = await db
+        .delete(bookingMembers)
+        .where(eq(bookingMembers.bookingId, bookingId))
+        .returning();
+      
+      result.bookingMembersRemoved = deleteResult.length;
+      
+      if (deleteResult.length > 0) {
+        logger.info('[cancellation-cascade] Removed booking members', {
+          extra: { bookingId, count: deleteResult.length }
+        });
+      }
+    } catch (deleteError) {
+      result.errors.push(`Failed to remove booking members: ${(deleteError as Error).message}`);
+      logger.warn('[cancellation-cascade] Failed to remove booking members', { error: deleteError as Error });
+    }
+
+    if (result.guestPassesRefunded > 0) {
+      try {
+        await notifyMember({
+          userEmail: ownerEmail,
+          title: 'Guest Passes Refunded',
+          message: `${result.guestPassesRefunded} guest pass${result.guestPassesRefunded > 1 ? 'es have' : ' has'} been refunded due to your booking cancellation (cancelled more than 24 hours in advance).`,
+          type: 'guest_pass',
+          relatedId: bookingId,
+          relatedType: 'booking_request'
+        });
+      } catch (notifyError) {
+        logger.warn('[cancellation-cascade] Failed to notify owner about guest pass refund', { error: notifyError as Error });
+      }
+    }
+
+    logger.info('[cancellation-cascade] Cascade complete', {
+      extra: {
+        bookingId,
+        ...result,
+        errorCount: result.errors.length
+      }
+    });
+
+  } catch (error) {
+    const errorMsg = `Cascade error: ${(error as Error).message}`;
+    result.errors.push(errorMsg);
+    logger.error('[cancellation-cascade] Fatal error during cascade', { error: error as Error });
+  }
+
+  return result;
+}
 
 const router = Router();
 
@@ -536,34 +716,69 @@ router.post('/api/bookings', async (req, res) => {
 router.delete('/api/bookings/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const bookingId = parseInt(id);
     
     const [booking] = await db.select({
       calendarEventId: bookingRequests.calendarEventId,
-      resourceId: bookingRequests.resourceId
+      resourceId: bookingRequests.resourceId,
+      userEmail: bookingRequests.userEmail,
+      userName: bookingRequests.userName,
+      requestDate: bookingRequests.requestDate,
+      startTime: bookingRequests.startTime,
+      sessionId: bookingRequests.sessionId
     })
     .from(bookingRequests)
-    .where(eq(bookingRequests.id, parseInt(id)));
+    .where(eq(bookingRequests.id, bookingId));
+    
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    
+    let resourceName: string | undefined;
+    if (booking.resourceId) {
+      const [resource] = await db.select({ name: resources.name, type: resources.type })
+        .from(resources)
+        .where(eq(resources.id, booking.resourceId));
+      resourceName = resource?.name;
+    }
     
     await db.update(bookingRequests)
       .set({ status: 'cancelled' })
-      .where(eq(bookingRequests.id, parseInt(id)));
+      .where(eq(bookingRequests.id, bookingId));
     
-    // Broadcast availability update for real-time availability refresh
+    const cascadeResult = await handleCancellationCascade(
+      bookingId,
+      booking.sessionId,
+      booking.userEmail || '',
+      booking.userName || null,
+      booking.requestDate,
+      booking.startTime || '',
+      resourceName
+    );
+    
+    logger.info('[DELETE /api/bookings] Cancellation cascade complete', {
+      extra: {
+        bookingId,
+        participantsNotified: cascadeResult.participantsNotified,
+        guestPassesRefunded: cascadeResult.guestPassesRefunded,
+        bookingMembersRemoved: cascadeResult.bookingMembersRemoved,
+        cascadeErrors: cascadeResult.errors.length
+      }
+    });
+    
     broadcastAvailabilityUpdate({
       resourceId: booking?.resourceId || undefined,
-      date: undefined,
+      date: booking.requestDate,
       action: 'cancelled'
     });
     
-    // Only delete calendar event for conference rooms - golf/simulators no longer sync to calendar
-    if (booking?.calendarEventId) {
+    if (booking?.calendarEventId && booking.resourceId) {
       try {
-        const resource = await db.select({ type: resources.type })
+        const [resource] = await db.select({ type: resources.type })
           .from(resources)
-          .where(eq(resources.id, booking.resourceId!));
+          .where(eq(resources.id, booking.resourceId));
         
-        // Only conference rooms sync to calendar
-        if (resource[0]?.type === 'conference_room') {
+        if (resource?.type === 'conference_room') {
           const calendarId = await getCalendarIdByName(CALENDAR_CONFIG.conference.name);
           if (calendarId) {
             await deleteCalendarEvent(booking.calendarEventId, calendarId);
@@ -574,7 +789,13 @@ router.delete('/api/bookings/:id', isStaffOrAdmin, async (req, res) => {
       }
     }
     
-    res.json({ success: true });
+    res.json({ 
+      success: true,
+      cascade: {
+        participantsNotified: cascadeResult.participantsNotified,
+        guestPassesRefunded: cascadeResult.guestPassesRefunded
+      }
+    });
   } catch (error: any) {
     logAndRespond(req, res, 500, 'Failed to cancel booking', error, 'BOOKING_CANCEL_ERROR');
   }
@@ -599,11 +820,13 @@ router.put('/api/bookings/:id/member-cancel', async (req, res) => {
     const [existing] = await db.select({
       id: bookingRequests.id,
       userEmail: bookingRequests.userEmail,
+      userName: bookingRequests.userName,
       status: bookingRequests.status,
       calendarEventId: bookingRequests.calendarEventId,
       resourceId: bookingRequests.resourceId,
       requestDate: bookingRequests.requestDate,
-      startTime: bookingRequests.startTime
+      startTime: bookingRequests.startTime,
+      sessionId: bookingRequests.sessionId
     })
       .from(bookingRequests)
       .where(eq(bookingRequests.id, bookingId));
@@ -634,11 +857,38 @@ router.put('/api/bookings/:id/member-cancel', async (req, res) => {
       return res.status(400).json({ error: 'Booking is already cancelled' });
     }
     
+    let resourceName: string | undefined;
+    if (existing.resourceId) {
+      const [resource] = await db.select({ name: resources.name, type: resources.type })
+        .from(resources)
+        .where(eq(resources.id, existing.resourceId));
+      resourceName = resource?.name;
+    }
+    
     await db.update(bookingRequests)
       .set({ status: 'cancelled' })
       .where(eq(bookingRequests.id, bookingId));
     
-    // Broadcast availability update for real-time availability refresh
+    const cascadeResult = await handleCancellationCascade(
+      bookingId,
+      existing.sessionId,
+      existing.userEmail || '',
+      existing.userName || null,
+      existing.requestDate,
+      existing.startTime || '',
+      resourceName
+    );
+    
+    logger.info('[PUT /api/bookings/member-cancel] Cancellation cascade complete', {
+      extra: {
+        bookingId,
+        participantsNotified: cascadeResult.participantsNotified,
+        guestPassesRefunded: cascadeResult.guestPassesRefunded,
+        bookingMembersRemoved: cascadeResult.bookingMembersRemoved,
+        cascadeErrors: cascadeResult.errors.length
+      }
+    });
+    
     broadcastAvailabilityUpdate({
       resourceId: existing.resourceId || undefined,
       date: existing.requestDate,
@@ -662,15 +912,13 @@ router.put('/api/bookings/:id/member-cancel', async (req, res) => {
       console.error('Staff notification failed:', staffNotifyErr);
     }
     
-    // Only delete calendar event for conference rooms - golf/simulators no longer sync to calendar
-    if (existing.calendarEventId) {
+    if (existing.calendarEventId && existing.resourceId) {
       try {
-        const resource = await db.select({ type: resources.type })
+        const [resource] = await db.select({ type: resources.type })
           .from(resources)
-          .where(eq(resources.id, existing.resourceId!));
+          .where(eq(resources.id, existing.resourceId));
         
-        // Only conference rooms sync to calendar
-        if (resource[0]?.type === 'conference_room') {
+        if (resource?.type === 'conference_room') {
           const calendarId = await getCalendarIdByName(CALENDAR_CONFIG.conference.name);
           if (calendarId) {
             await deleteCalendarEvent(existing.calendarEventId, calendarId);
@@ -681,9 +929,15 @@ router.put('/api/bookings/:id/member-cancel', async (req, res) => {
       }
     }
     
-    res.json({ success: true, message: 'Booking cancelled successfully' });
+    res.json({ 
+      success: true, 
+      message: 'Booking cancelled successfully',
+      cascade: {
+        participantsNotified: cascadeResult.participantsNotified,
+        guestPassesRefunded: cascadeResult.guestPassesRefunded
+      }
+    });
 
-    // Publish booking event for real-time updates
     bookingEvents.publish('booking_cancelled', {
       bookingId,
       memberEmail: existing.userEmail || '',
