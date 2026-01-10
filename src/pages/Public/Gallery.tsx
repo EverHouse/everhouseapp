@@ -442,12 +442,19 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ images, currentIndex, onClose
         className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center"
         onClick={onClose}
       >
-        <button
-          className="absolute top-6 right-4 z-10 w-12 h-12 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors backdrop-blur-sm safe-area-top"
-          onClick={(e) => { e.stopPropagation(); onClose(); }}
-        >
-          <span className="material-symbols-outlined text-white text-2xl">close</span>
-        </button>
+        <div className="absolute top-4 left-0 right-0 z-10 flex items-center justify-between px-4 pt-[env(safe-area-inset-top)]">
+          <div className="px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full">
+            <span className="text-white/80 text-sm font-medium">
+              {currentIndex + 1} / {images.length}
+            </span>
+          </div>
+          <button
+            className="w-12 h-12 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors backdrop-blur-sm"
+            onClick={(e) => { e.stopPropagation(); onClose(); }}
+          >
+            <span className="material-symbols-outlined text-white text-2xl">close</span>
+          </button>
+        </div>
 
         {currentIndex > 0 && (
           <button
@@ -479,12 +486,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ images, currentIndex, onClose
             alt="Gallery full view"
             className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
           />
-        </div>
-
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full">
-          <span className="text-white/80 text-sm font-medium">
-            {currentIndex + 1} / {images.length}
-          </span>
         </div>
       </div>
     </ModalShell>
