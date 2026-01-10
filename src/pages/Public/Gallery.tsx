@@ -475,7 +475,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ images, currentIndex, onClose
         )}
 
         <div 
-          className="max-w-[90vw] max-h-[85vh] flex items-center justify-center rounded-2xl overflow-hidden bg-white/5 backdrop-blur-sm border border-white/10 shadow-lg"
+          className="max-w-[90vw] max-h-[85vh] rounded-2xl overflow-hidden"
           onClick={(e) => e.stopPropagation()}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -484,7 +484,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ images, currentIndex, onClose
           <img
             src={images[currentIndex]}
             alt="Gallery full view"
-            className="max-w-full max-h-[85vh] object-contain rounded-2xl animate-in zoom-in-95 duration-200"
+            className="w-full h-full object-contain animate-in zoom-in-95 duration-200"
           />
         </div>
       </div>
