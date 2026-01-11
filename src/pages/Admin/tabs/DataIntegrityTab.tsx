@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../../../components/Toast';
+import { getCheckMetadata, sortBySeverity, CheckSeverity } from '../../../data/integrityCheckMetadata';
 
 interface IntegrityIssue {
   category: 'orphan_record' | 'missing_relationship' | 'sync_mismatch' | 'data_quality';
@@ -74,7 +75,7 @@ const DataIntegrityTab: React.FC = () => {
       const res = await fetch('/api/data-integrity/run', { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
-        setResults(data.results);
+        setResults(sortBySeverity(data.results));
         setMeta(data.meta);
         showToast('Integrity checks completed', 'success');
       } else {
@@ -106,6 +107,15 @@ const DataIntegrityTab: React.FC = () => {
       case 'pass': return 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400';
       case 'warning': return 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400';
       case 'fail': return 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400';
+    }
+  };
+
+  const getCheckSeverityColor = (severity: CheckSeverity) => {
+    switch (severity) {
+      case 'critical': return 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400';
+      case 'high': return 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400';
+      case 'medium': return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400';
+      case 'low': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400';
     }
   };
 
@@ -147,13 +157,61 @@ const DataIntegrityTab: React.FC = () => {
   const warningCount = results.reduce((sum, r) => sum + r.issues.filter(i => i.severity === 'warning').length, 0);
   const infoCount = results.reduce((sum, r) => sum + r.issues.filter(i => i.severity === 'info').length, 0);
 
+  const escapeCSVField = (field: string | number): string => {
+    const str = String(field);
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+
+  const downloadCSV = () => {
+    const headers = ['Check Name', 'Severity', 'Category', 'Table', 'Record ID', 'Description', 'Suggestion'];
+    const rows: string[][] = [];
+
+    results.forEach(result => {
+      const metadata = getCheckMetadata(result.checkName);
+      const displayTitle = metadata?.title || result.checkName;
+      
+      result.issues.forEach(issue => {
+        rows.push([
+          displayTitle,
+          issue.severity,
+          issue.category,
+          issue.table,
+          String(issue.recordId),
+          issue.description,
+          issue.suggestion || ''
+        ]);
+      });
+    });
+
+    const csvContent = [
+      headers.map(escapeCSVField).join(','),
+      ...rows.map(row => row.map(escapeCSVField).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const date = new Date().toISOString().split('T')[0];
+    link.href = url;
+    link.download = `data-integrity-export-${date}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const hasIssues = results.some(r => r.issues.length > 0);
+
   return (
     <div className="space-y-6 animate-pop-in pb-32">
-      <div className="mb-6">
+      <div className="mb-6 flex gap-3">
         <button
           onClick={runIntegrityChecks}
           disabled={isRunning}
-          className="w-full py-3 px-4 bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515] rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
+          className="flex-1 py-3 px-4 bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515] rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
         >
           {isRunning ? (
             <>
@@ -167,6 +225,16 @@ const DataIntegrityTab: React.FC = () => {
             </>
           )}
         </button>
+        {results.length > 0 && (
+          <button
+            onClick={downloadCSV}
+            disabled={!hasIssues}
+            className="py-3 px-4 border-2 border-primary dark:border-white/40 text-primary dark:text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-primary/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span aria-hidden="true" className="material-symbols-outlined text-[20px]">download</span>
+            Download CSV
+          </button>
+        )}
       </div>
 
       {meta && (
@@ -240,81 +308,111 @@ const DataIntegrityTab: React.FC = () => {
       {results.length > 0 && (
         <div className="space-y-3">
           <h2 className="font-bold text-primary dark:text-white text-lg">Check Results</h2>
-          {results.map((result) => (
-            <div 
-              key={result.checkName}
-              className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl overflow-hidden"
-            >
-              <button
-                onClick={() => toggleCheck(result.checkName)}
-                className="w-full flex items-center justify-between p-4 text-left hover:bg-primary/5 dark:hover:bg-white/5 transition-colors"
+          {results.map((result) => {
+            const metadata = getCheckMetadata(result.checkName);
+            const displayTitle = metadata?.title || result.checkName;
+            const description = metadata?.description;
+            const impact = metadata?.impact;
+            const severity = metadata?.severity;
+            
+            return (
+              <div 
+                key={result.checkName}
+                className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl overflow-hidden"
               >
-                <div className="flex items-center gap-3">
-                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${getStatusColor(result.status)}`}>
-                    {result.status}
-                  </span>
-                  <span className="font-medium text-primary dark:text-white">{result.checkName}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {result.issueCount > 0 && (
-                    <span className="text-sm text-primary/60 dark:text-white/60">{result.issueCount} issues</span>
-                  )}
-                  <span aria-hidden="true" className={`material-symbols-outlined text-gray-500 dark:text-gray-400 transition-transform ${expandedChecks.has(result.checkName) ? 'rotate-180' : ''}`}>
-                    expand_more
-                  </span>
-                </div>
-              </button>
-              
-              {expandedChecks.has(result.checkName) && result.issues.length > 0 && (
-                <div className="border-t border-primary/10 dark:border-white/10 p-4 space-y-3">
-                  {Object.entries(groupByCategory(result.issues)).map(([category, issues]) => (
-                    <div key={category}>
-                      <p className="text-xs text-primary/60 dark:text-white/60 uppercase tracking-wide mb-2">
-                        {getCategoryLabel(category)} ({issues.length})
-                      </p>
-                      <div className="space-y-2">
-                        {issues.map((issue, idx) => (
-                          <div 
-                            key={idx} 
-                            className={`p-3 rounded-lg border ${getSeverityColor(issue.severity)}`}
-                          >
-                            <div className="flex items-start gap-2">
-                              <span aria-hidden="true" className="material-symbols-outlined text-[18px] mt-0.5">{getSeverityIcon(issue.severity)}</span>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex flex-wrap items-center gap-2 mb-1">
-                                  <span className="text-xs font-mono bg-black/10 dark:bg-white/10 px-1.5 py-0.5 rounded">
-                                    {issue.table}
-                                  </span>
-                                  <span className="text-xs font-mono bg-black/10 dark:bg-white/10 px-1.5 py-0.5 rounded">
-                                    ID: {issue.recordId}
-                                  </span>
+                <button
+                  onClick={() => toggleCheck(result.checkName)}
+                  className="w-full flex items-center justify-between p-4 text-left hover:bg-primary/5 dark:hover:bg-white/5 transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${getStatusColor(result.status)}`}>
+                        {result.status}
+                      </span>
+                      {severity && (
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${getCheckSeverityColor(severity)}`}>
+                          {severity}
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-medium text-primary dark:text-white block">{displayTitle}</span>
+                    {description && (
+                      <p className="text-xs text-primary/60 dark:text-white/60 mt-1">{description}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    {result.issueCount > 0 && (
+                      <span className="text-sm text-primary/60 dark:text-white/60">{result.issueCount} issues</span>
+                    )}
+                    <span aria-hidden="true" className={`material-symbols-outlined text-gray-500 dark:text-gray-400 transition-transform ${expandedChecks.has(result.checkName) ? 'rotate-180' : ''}`}>
+                      expand_more
+                    </span>
+                  </div>
+                </button>
+                
+                {expandedChecks.has(result.checkName) && result.issues.length > 0 && (
+                  <div className="border-t border-primary/10 dark:border-white/10 p-4 space-y-3">
+                    {impact && (
+                      <div className="bg-primary/5 dark:bg-white/5 rounded-lg p-3 mb-3">
+                        <p className="text-xs font-medium text-primary/80 dark:text-white/80 uppercase tracking-wide mb-1">Business Impact</p>
+                        <p className="text-sm text-primary/70 dark:text-white/70">{impact}</p>
+                      </div>
+                    )}
+                    {Object.entries(groupByCategory(result.issues)).map(([category, issues]) => (
+                      <div key={category}>
+                        <p className="text-xs text-primary/60 dark:text-white/60 uppercase tracking-wide mb-2">
+                          {getCategoryLabel(category)} ({issues.length})
+                        </p>
+                        <div className="space-y-2">
+                          {issues.map((issue, idx) => (
+                            <div 
+                              key={idx} 
+                              className={`p-3 rounded-lg border ${getSeverityColor(issue.severity)}`}
+                            >
+                              <div className="flex items-start gap-2">
+                                <span aria-hidden="true" className="material-symbols-outlined text-[18px] mt-0.5">{getSeverityIcon(issue.severity)}</span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                                    <span className="text-xs font-mono bg-black/10 dark:bg-white/10 px-1.5 py-0.5 rounded">
+                                      {issue.table}
+                                    </span>
+                                    <span className="text-xs font-mono bg-black/10 dark:bg-white/10 px-1.5 py-0.5 rounded">
+                                      ID: {issue.recordId}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm">{issue.description}</p>
+                                  {issue.suggestion && (
+                                    <p className="text-xs mt-1 opacity-80">
+                                      <span className="font-medium">Suggestion:</span> {issue.suggestion}
+                                    </p>
+                                  )}
                                 </div>
-                                <p className="text-sm">{issue.description}</p>
-                                {issue.suggestion && (
-                                  <p className="text-xs mt-1 opacity-80">
-                                    <span className="font-medium">Suggestion:</span> {issue.suggestion}
-                                  </p>
-                                )}
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {expandedChecks.has(result.checkName) && result.issues.length === 0 && (
-                <div className="border-t border-primary/10 dark:border-white/10 p-4">
-                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                    <span aria-hidden="true" className="material-symbols-outlined">check_circle</span>
-                    <span className="text-sm">No issues found</span>
+                    ))}
                   </div>
-                </div>
-              )}
-            </div>
-          ))}
+                )}
+                
+                {expandedChecks.has(result.checkName) && result.issues.length === 0 && (
+                  <div className="border-t border-primary/10 dark:border-white/10 p-4">
+                    {impact && (
+                      <div className="bg-primary/5 dark:bg-white/5 rounded-lg p-3 mb-3">
+                        <p className="text-xs font-medium text-primary/80 dark:text-white/80 uppercase tracking-wide mb-1">Business Impact</p>
+                        <p className="text-sm text-primary/70 dark:text-white/70">{impact}</p>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                      <span aria-hidden="true" className="material-symbols-outlined">check_circle</span>
+                      <span className="text-sm">No issues found</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

@@ -363,13 +363,23 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
     
     const existing = await db.select({ 
       googleCalendarId: events.googleCalendarId,
-      blockBookings: events.blockBookings 
+      blockBookings: events.blockBookings,
+      needsReview: events.needsReview
     }).from(events).where(eq(events.id, parseInt(id)));
     
     const previousBlockBookings = existing[0]?.blockBookings || false;
     const newBlockBookings = block_bookings === true || block_bookings === 'true';
     
-    const result = await db.update(events).set({
+    // Auto-exit needs review when required fields are filled:
+    // - Category is set and not generic
+    // - Description is not empty
+    // - Location is not empty
+    const hasValidCategory = category && category.trim() !== '' && category !== 'General';
+    const hasDescription = description && description.trim() !== '';
+    const hasLocation = location && location.trim() !== '';
+    const shouldClearReview = existing[0]?.needsReview && hasValidCategory && hasDescription && hasLocation;
+    
+    const updateData: any = {
       title: trimmedTitle,
       description,
       eventDate: trimmedEventDate,
@@ -383,7 +393,16 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
       blockBookings: newBlockBookings,
       locallyEdited: true,
       appLastModifiedAt: new Date(),
-    }).where(eq(events.id, parseInt(id))).returning();
+    };
+    
+    // If all required fields are filled, auto-clear the needs review flag
+    if (shouldClearReview) {
+      updateData.needsReview = false;
+      updateData.reviewedAt = new Date();
+      updateData.reviewedBy = getSessionUser(req)?.email || 'system';
+    }
+    
+    const result = await db.update(events).set(updateData).where(eq(events.id, parseInt(id))).returning();
     
     if (result.length === 0) {
       return res.status(404).json({ error: 'Event not found' });

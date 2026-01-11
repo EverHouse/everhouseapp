@@ -466,6 +466,30 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
       if (!isProduction) console.error('Failed to update availability blocks for wellness class:', blockError);
     }
     
+    // Auto-clear needs_review if all required fields are filled
+    if (updated.needs_review) {
+      const hasValidInstructor = updated.instructor && updated.instructor.toLowerCase() !== 'tbd' && updated.instructor.trim() !== '';
+      const hasValidCategory = updated.category && updated.category.toLowerCase() !== 'wellness' && updated.category.trim() !== '';
+      const spotsMatch = updated.spots?.match(/(\d+)/);
+      const spotsValue = spotsMatch ? parseInt(spotsMatch[1]) : 0;
+      const capacityValue = updated.capacity || 0;
+      const hasValidSpots = spotsValue > 0 || capacityValue > 0;
+      
+      if (hasValidInstructor && hasValidCategory && hasValidSpots) {
+        try {
+          const reviewedResult = await pool.query(
+            `UPDATE wellness_classes SET needs_review = false, reviewed_by = $1, reviewed_at = NOW(), updated_at = NOW() WHERE id = $2 RETURNING *`,
+            [userEmail, id]
+          );
+          if (reviewedResult.rows.length > 0) {
+            Object.assign(updated, reviewedResult.rows[0]);
+          }
+        } catch (reviewError) {
+          if (!isProduction) console.error('Failed to auto-clear needs_review:', reviewError);
+        }
+      }
+    }
+    
     res.json(updated);
   } catch (error: any) {
     if (!isProduction) console.error('API error:', error);
