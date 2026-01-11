@@ -67,6 +67,7 @@ interface WellnessClass {
   needs_review?: boolean;
   reviewed_by?: string | null;
   reviewed_at?: string | null;
+  conflict_detected?: boolean;
 }
 
 interface WellnessFormData extends Partial<WellnessClass> {
@@ -557,6 +558,7 @@ interface NeedsReviewEvent {
     source: string | null;
     visibility: string | null;
     needs_review: boolean;
+    conflict_detected?: boolean;
 }
 
 const EventsAdminContent: React.FC = () => {
@@ -879,11 +881,17 @@ const EventsAdminContent: React.FC = () => {
                                 return (
                                     <div 
                                         key={event.id}
-                                        className="p-4 rounded-xl border border-amber-500/20 bg-white/60 dark:bg-white/5 space-y-3"
+                                        className={`p-4 rounded-xl border ${event.conflict_detected ? 'border-orange-500/40 bg-orange-50/60 dark:bg-orange-900/20' : 'border-amber-500/20 bg-white/60 dark:bg-white/5'} space-y-3`}
                                     >
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-1">
+                                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                    {event.conflict_detected && (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500 text-white text-[10px] font-bold uppercase tracking-wider">
+                                                            <span className="material-symbols-outlined text-[12px]">sync_problem</span>
+                                                            Conflict Detected
+                                                        </span>
+                                                    )}
                                                     <span className="text-sm font-bold text-primary dark:text-white">
                                                         {formatTime12Hour(event.start_time)}
                                                     </span>
@@ -920,6 +928,11 @@ const EventsAdminContent: React.FC = () => {
                                                 {missingFields.length > 0 && (
                                                     <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
                                                         Missing: {missingFields.join(', ')}
+                                                    </p>
+                                                )}
+                                                {event.conflict_detected && (
+                                                    <p className="text-xs text-orange-600 dark:text-orange-400 mt-2">
+                                                        This event was modified in Google Calendar after being reviewed. Please verify the changes.
                                                     </p>
                                                 )}
                                             </div>
@@ -1651,9 +1664,17 @@ const WellnessAdminContent: React.FC = () => {
                         </p>
                         <div className="space-y-2 max-h-64 overflow-y-auto">
                             {needsReviewClasses.map(cls => (
-                                <div key={cls.id} className="bg-white/80 dark:bg-black/30 rounded-lg p-3 flex items-center justify-between gap-3">
+                                <div key={cls.id} className={`${cls.conflict_detected ? 'bg-orange-50 dark:bg-orange-900/30 border border-orange-300/50 dark:border-orange-700/50' : 'bg-white/80 dark:bg-black/30'} rounded-lg p-3 flex items-center justify-between gap-3`}>
                                     <div className="min-w-0 flex-1">
-                                        <h4 className="font-medium text-primary dark:text-white truncate">{cls.title}</h4>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            {cls.conflict_detected && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500 text-white text-[10px] font-bold uppercase tracking-wider">
+                                                    <span aria-hidden="true" className="material-symbols-outlined text-[12px]">sync_problem</span>
+                                                    Conflict
+                                                </span>
+                                            )}
+                                            <h4 className="font-medium text-primary dark:text-white truncate">{cls.title}</h4>
+                                        </div>
                                         <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
                                             <span>{formatDateDisplayWithDay(cls.date.split('T')[0])}</span>
                                             <span>•</span>
@@ -1668,6 +1689,11 @@ const WellnessAdminContent: React.FC = () => {
                                                 </>
                                             )}
                                         </p>
+                                        {cls.conflict_detected && (
+                                            <p className="text-[10px] text-orange-600 dark:text-orange-400 mt-1">
+                                                Changed in Google Calendar after review
+                                            </p>
+                                        )}
                                     </div>
                                     <button
                                         onClick={() => openEdit(cls)}

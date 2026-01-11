@@ -117,7 +117,7 @@ export async function syncWellnessCalendarEvents(): Promise<{ synced: number; cr
       const existing = await pool.query(
         `SELECT id, locally_edited, app_last_modified_at, google_event_updated_at, 
                 image_url, external_url, spots, status, title, time, instructor, duration, category, date,
-                reviewed_at, last_synced_at, review_dismissed
+                reviewed_at, last_synced_at, review_dismissed, needs_review
          FROM wellness_classes WHERE google_calendar_id = $1`,
         [googleEventId]
       );
@@ -235,6 +235,17 @@ export async function syncWellnessCalendarEvents(): Promise<{ synced: number; cr
           const reviewDismissed = dbRow.review_dismissed === true;
           const shouldSetNeedsReview = reviewDismissed ? false : needsReview;
           
+          const wasReviewed = dbRow.needs_review === false && dbRow.reviewed_at !== null;
+          const hasChanges = (
+            dbRow.title !== title ||
+            dbRow.date !== eventDate ||
+            dbRow.time !== startTime ||
+            dbRow.instructor !== instructor ||
+            dbRow.duration !== duration ||
+            dbRow.category !== category
+          );
+          const isConflict = wasReviewed && hasChanges;
+          
           await pool.query(
             `UPDATE wellness_classes SET 
               title = $1, time = $2, instructor = $3, duration = $4, 
@@ -243,10 +254,11 @@ export async function syncWellnessCalendarEvents(): Promise<{ synced: number; cr
               image_url = COALESCE($10, image_url),
               external_url = COALESCE($11, external_url),
               google_event_etag = $12, google_event_updated_at = $13, last_synced_at = NOW(),
-              needs_review = CASE WHEN $15 THEN needs_review ELSE $16 END
+              needs_review = CASE WHEN $17 THEN true ELSE CASE WHEN $15 THEN needs_review ELSE $16 END END,
+              conflict_detected = CASE WHEN $17 THEN true ELSE conflict_detected END
              WHERE google_calendar_id = $14`,
             [title, startTime, instructor, duration, category, spots, status, description, eventDate,
-             appMetadata.imageUrl, appMetadata.externalUrl, googleEtag, googleUpdatedAt, googleEventId, reviewDismissed, shouldSetNeedsReview]
+             appMetadata.imageUrl, appMetadata.externalUrl, googleEtag, googleUpdatedAt, googleEventId, reviewDismissed, shouldSetNeedsReview, isConflict]
           );
           updated++;
         }

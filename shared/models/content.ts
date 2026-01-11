@@ -32,6 +32,7 @@ export const events = pgTable("events", {
   reviewedBy: varchar("reviewed_by"),
   reviewedAt: timestamp("reviewed_at"),
   reviewDismissed: boolean("review_dismissed").default(false),
+  conflictDetected: boolean("conflict_detected").default(false),
 });
 
 // Event RSVPs table - event registrations
@@ -82,6 +83,7 @@ export const wellnessClasses = pgTable("wellness_classes", {
   reviewedBy: varchar("reviewed_by"),
   reviewedAt: timestamp("reviewed_at"),
   reviewDismissed: boolean("review_dismissed").default(false),
+  conflictDetected: boolean("conflict_detected").default(false),
 });
 
 // Wellness enrollments table - class registrations

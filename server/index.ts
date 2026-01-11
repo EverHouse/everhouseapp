@@ -48,6 +48,7 @@ import dataIntegrityRouter from './routes/dataIntegrity';
 import { registerObjectStorageRoutes } from './replit_integrations/object_storage';
 import { ensureDatabaseConstraints, seedDefaultNoticeTypes } from './db-init';
 import { initWebSocketServer } from './core/websocket';
+import { startIntegrityScheduler } from './schedulers/integrityScheduler';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -704,6 +705,9 @@ async function startServer() {
   
   setInterval(expireUnacceptedInvites, INVITE_EXPIRY_INTERVAL_MS);
   console.log('[Startup] Invite auto-expiry scheduler enabled (runs every 5 minutes)');
+
+  // Daily integrity check scheduler - runs at midnight Pacific
+  startIntegrityScheduler();
 }
 
 startServer().catch((err) => {

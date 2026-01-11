@@ -16,6 +16,7 @@ interface BlocksClosure {
     endDate: string;
     endTime: string | null;
     affectedAreas: string | null;
+    visibility: string | null;
     notifyMembers: boolean | null;
     isActive: boolean;
     needsReview: boolean | null;
@@ -29,6 +30,7 @@ interface BlocksClosureForm {
     end_date: string;
     end_time: string;
     affected_areas: string;
+    visibility: string;
     reason: string;
     title: string;
     notice_type: string;
@@ -83,6 +85,7 @@ const BlocksTab: React.FC = () => {
         end_date: '',
         end_time: '',
         affected_areas: 'entire_facility',
+        visibility: '',
         reason: '',
         title: '',
         notice_type: '',
@@ -327,6 +330,7 @@ const BlocksTab: React.FC = () => {
             end_date: '',
             end_time: '',
             affected_areas: 'entire_facility',
+            visibility: '',
             reason: '',
             title: '',
             notice_type: '',
@@ -391,6 +395,7 @@ const BlocksTab: React.FC = () => {
             end_date: closure.endDate,
             end_time: closure.endTime || '',
             affected_areas: closure.affectedAreas || 'entire_facility',
+            visibility: closure.visibility || '',
             reason: closure.reason || '',
             title: closure.title || '',
             notice_type: closure.noticeType || '',
@@ -575,6 +580,9 @@ const BlocksTab: React.FC = () => {
         }
         if (!closure.affectedAreas || closure.affectedAreas === 'none' || closure.affectedAreas === '') {
             missing.push('Affected areas');
+        }
+        if (!closure.visibility || closure.visibility.trim() === '') {
+            missing.push('Visibility');
         }
         return missing;
     };

@@ -84,7 +84,7 @@ export async function syncGoogleCalendarEvents(): Promise<{ synced: number; crea
         `SELECT id, locally_edited, app_last_modified_at, google_event_updated_at,
                 title, description, event_date, start_time, end_time, location, category,
                 image_url, external_url, max_attendees, visibility, requires_rsvp,
-                reviewed_at, last_synced_at, review_dismissed
+                reviewed_at, last_synced_at, review_dismissed, needs_review
          FROM events WHERE google_calendar_id = $1`,
         [googleEventId]
       );
@@ -166,6 +166,17 @@ export async function syncGoogleCalendarEvents(): Promise<{ synced: number; crea
           const reviewDismissed = dbRow.review_dismissed === true;
           const shouldSetNeedsReview = reviewDismissed ? false : needsReview;
           
+          const wasReviewed = dbRow.needs_review === false && dbRow.reviewed_at !== null;
+          const hasChanges = (
+            dbRow.title !== title ||
+            dbRow.event_date !== eventDate ||
+            dbRow.start_time !== startTime ||
+            dbRow.end_time !== endTime ||
+            dbRow.description !== description ||
+            dbRow.location !== location
+          );
+          const isConflict = wasReviewed && hasChanges;
+          
           await pool.query(
             `UPDATE events SET title = $1, description = $2, event_date = $3, start_time = $4, 
              end_time = $5, location = $6, source = 'google_calendar',
@@ -175,12 +186,13 @@ export async function syncGoogleCalendarEvents(): Promise<{ synced: number; crea
              visibility = COALESCE($10, visibility),
              requires_rsvp = COALESCE($11, requires_rsvp),
              google_event_etag = $12, google_event_updated_at = $13, last_synced_at = NOW(),
-             needs_review = CASE WHEN $15 THEN needs_review ELSE $16 END
+             needs_review = CASE WHEN $17 THEN true ELSE CASE WHEN $15 THEN needs_review ELSE $16 END END,
+             conflict_detected = CASE WHEN $17 THEN true ELSE conflict_detected END
              WHERE google_calendar_id = $14`,
             [title, description, eventDate, startTime, endTime, location,
              appMetadata.imageUrl, appMetadata.externalUrl, appMetadata.maxAttendees,
              appMetadata.visibility, appMetadata.requiresRsvp,
-             googleEtag, googleUpdatedAt, googleEventId, reviewDismissed, shouldSetNeedsReview]
+             googleEtag, googleUpdatedAt, googleEventId, reviewDismissed, shouldSetNeedsReview, isConflict]
           );
           updated++;
         }

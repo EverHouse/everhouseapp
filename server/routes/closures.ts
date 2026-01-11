@@ -549,6 +549,9 @@ router.get('/api/closures/needs-review', isStaffOrAdmin, async (req, res) => {
       if (!closure.affectedAreas || closure.affectedAreas === 'none') {
         missingFields.push('Affected areas');
       }
+      if (!closure.visibility || closure.visibility.trim() === '') {
+        missingFields.push('Visibility');
+      }
       return {
         ...closure,
         missingFields

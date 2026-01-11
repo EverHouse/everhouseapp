@@ -133,6 +133,7 @@ router.get('/api/events/needs-review', isStaffOrAdmin, async (req, res) => {
       source: events.source,
       visibility: events.visibility,
       needs_review: events.needsReview,
+      conflict_detected: events.conflictDetected,
     }).from(events)
       .where(eq(events.needsReview, true))
       .orderBy(events.eventDate, events.startTime);
@@ -155,6 +156,7 @@ router.post('/api/events/:id/mark-reviewed', isStaffOrAdmin, async (req, res) =>
       reviewedBy,
       reviewedAt: new Date(),
       reviewDismissed: true,
+      conflictDetected: false,
     }).where(eq(events.id, parseInt(id))).returning();
     
     if (result.length === 0) {
@@ -400,7 +402,11 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
       updateData.needsReview = false;
       updateData.reviewedAt = new Date();
       updateData.reviewedBy = getSessionUser(req)?.email || 'system';
+      updateData.conflictDetected = false;
     }
+    
+    // Always clear conflict_detected when saving an event (user is acknowledging changes)
+    updateData.conflictDetected = false;
     
     const result = await db.update(events).set(updateData).where(eq(events.id, parseInt(id))).returning();
     

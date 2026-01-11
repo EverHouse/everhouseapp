@@ -154,7 +154,9 @@ router.post('/api/wellness-classes/backfill-calendar', isStaffOrAdmin, async (re
 router.get('/api/wellness-classes/needs-review', isStaffOrAdmin, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT * FROM wellness_classes 
+      `SELECT id, title, time, instructor, duration, category, spots, status, description, date, 
+              is_active, image_url, external_url, visibility, needs_review, conflict_detected 
+       FROM wellness_classes 
        WHERE needs_review = true AND is_active = true
        ORDER BY date ASC, time ASC`
     );
@@ -173,7 +175,7 @@ router.post('/api/wellness-classes/:id/mark-reviewed', isStaffOrAdmin, async (re
     
     const result = await pool.query(
       `UPDATE wellness_classes 
-       SET needs_review = false, reviewed_by = $1, reviewed_at = NOW(), updated_at = NOW(), review_dismissed = true
+       SET needs_review = false, reviewed_by = $1, reviewed_at = NOW(), updated_at = NOW(), review_dismissed = true, conflict_detected = false
        WHERE id = $2 RETURNING *`,
       [reviewedBy, id]
     );
@@ -352,7 +354,8 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
         waitlist_enabled = $15,
         locally_edited = true,
         app_last_modified_at = NOW(),
-        updated_at = NOW()
+        updated_at = NOW(),
+        conflict_detected = false
        WHERE id = $16 RETURNING *`,
       [title, time, instructor, duration, category, spots, status, description, date, is_active, image_url, external_url, newBlockBookings, capacity || null, newWaitlistEnabled, id]
     );

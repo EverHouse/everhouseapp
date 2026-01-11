@@ -84,6 +84,7 @@ The application features a React 19 frontend with Vite, styled using Tailwind CS
   - **Events Needs Review**: Calendar events without bracket prefixes are flagged for staff to configure category/access. Uses `reviewDismissed` flag to persist staff decisions across syncs.
   - **Wellness Needs Review**: Wellness classes missing proper metadata flagged for staff configuration with same dismissal persistence.
 - **Data Integrity Dashboard**: Admin-only page at /admin/data-integrity with comprehensive checks for orphan records, missing relationships, sync mismatches between app and external systems (HubSpot, Google Calendar), and data quality issues. Accessible from Employee Resources in admin settings.
+- **Automated Integrity Checks**: Daily scheduler runs integrity checks at midnight Pacific time. If critical (error/warning) issues are detected, sends an email alert to the configured `ADMIN_ALERT_EMAIL` address with a summary breakdown and issue details. Uses Resend for email delivery.
 - **Code Architecture**: Database schema and calendar modules have been refactored into domain-focused files for improved organization and maintainability.
 - **Admin-Configurable Features**: Includes push notifications for announcements, 15-minute booking intervals for staff, RSVP management, promotional banner options, wellness class capacity and waitlists, and configurable closure reasons and notice types.
 

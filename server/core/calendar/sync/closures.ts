@@ -321,7 +321,8 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
         updated++;
       } else {
         const affectedAreas = metadata.affectedAreas || 'none';
-        const needsReview = !noticeType || affectedAreas === 'none';
+        const visibility = metadata.visibility || null;
+        const needsReview = !noticeType || affectedAreas === 'none' || !visibility;
         
         const result = await pool.query(
           `INSERT INTO facility_closures 
