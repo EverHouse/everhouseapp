@@ -92,6 +92,19 @@ const BlocksTab: React.FC = () => {
         notify_members: false
     });
     const [closureSaving, setClosureSaving] = useState(false);
+    const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+
+    const markTouched = (field: string) => {
+        setTouchedFields(prev => new Set(prev).add(field));
+    };
+
+    const closureValidation = {
+        notice_type: !closureForm.notice_type?.trim(),
+        affected_areas: !closureForm.affected_areas?.trim(),
+        visibility: !closureForm.visibility?.trim()
+    };
+
+    const isClosureFormValid = !closureValidation.notice_type && !closureValidation.affected_areas && !closureValidation.visibility;
 
     useEffect(() => {
         if (isClosureModalOpen) {
@@ -337,10 +350,11 @@ const BlocksTab: React.FC = () => {
             notify_members: false
         });
         setEditingClosureId(null);
+        setTouchedFields(new Set());
     };
 
     const handleSaveClosure = async () => {
-        if (!closureForm.start_date || !closureForm.affected_areas) return;
+        if (!closureForm.start_date || !closureForm.affected_areas || !closureForm.visibility?.trim()) return;
         setClosureSaving(true);
         try {
             const url = editingClosureId 
@@ -1171,17 +1185,25 @@ const BlocksTab: React.FC = () => {
                 <div className="p-6 space-y-4 overflow-hidden">
                     <div className="space-y-3 mb-5">
                         <div>
-                            <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Reason Category</label>
+                            <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Reason Category *</label>
                             <select
                                 value={closureForm.notice_type}
                                 onChange={e => setClosureForm({...closureForm, notice_type: e.target.value})}
-                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                                onBlur={() => markTouched('notice_type')}
+                                className={`w-full border bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                    touchedFields.has('notice_type') && closureValidation.notice_type 
+                                        ? 'border-red-500 dark:border-red-500' 
+                                        : 'border-gray-200 dark:border-white/20'
+                                }`}
                             >
                                 <option value="">Select category...</option>
                                 {noticeTypes.map(type => (
                                     <option key={type.id} value={type.name}>{type.name}</option>
                                 ))}
                             </select>
+                            {touchedFields.has('notice_type') && closureValidation.notice_type && (
+                                <p className="text-xs text-red-500 mt-1">Reason category is required</p>
+                            )}
                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                 Syncs with Google Calendar bracket prefix
                             </p>
@@ -1213,7 +1235,7 @@ const BlocksTab: React.FC = () => {
                             </p>
                         </div>
                         <div>
-                            <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">Affected Resources</label>
+                            <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">Affected Resources *</label>
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                                 <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span> Selecting resources will block bookings (red card)</span>
                                 <br />
@@ -1293,6 +1315,31 @@ const BlocksTab: React.FC = () => {
                             )}
                         </div>
                         <div>
+                            <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Visibility *</label>
+                            <select
+                                value={closureForm.visibility}
+                                onChange={e => setClosureForm({...closureForm, visibility: e.target.value})}
+                                onBlur={() => markTouched('visibility')}
+                                className={`w-full border bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                    touchedFields.has('visibility') && closureValidation.visibility 
+                                        ? 'border-red-500 dark:border-red-500' 
+                                        : 'border-gray-200 dark:border-white/20'
+                                }`}
+                            >
+                                <option value="">Select visibility...</option>
+                                <option value="Public">Public</option>
+                                <option value="Staff Only">Staff Only</option>
+                                <option value="Private">Private</option>
+                                <option value="Draft">Draft</option>
+                            </select>
+                            {touchedFields.has('visibility') && closureValidation.visibility && (
+                                <p className="text-xs text-red-500 mt-1">Visibility is required</p>
+                            )}
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Controls who can see this notice
+                            </p>
+                        </div>
+                        <div>
                             <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">Member Visibility</label>
                             <div className="p-3 bg-gray-50 dark:bg-black/20 rounded-xl border border-gray-200 dark:border-white/25">
                                 <label className={`flex items-center gap-3 ${closureForm.affected_areas !== 'none' ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}>
@@ -1365,7 +1412,7 @@ const BlocksTab: React.FC = () => {
                         </button>
                         <button 
                             onClick={handleSaveClosure}
-                            disabled={!closureForm.start_date || closureSaving}
+                            disabled={!closureForm.start_date || closureSaving || !isClosureFormValid}
                             className={`flex-1 py-3 rounded-xl font-medium text-white transition-colors ${
                                 isBlocking(closureForm.affected_areas)
                                     ? 'bg-red-500 hover:bg-red-600 disabled:bg-red-300'

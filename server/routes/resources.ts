@@ -360,9 +360,15 @@ router.get('/api/bookings', async (req, res) => {
       }
     }
     
-    const { include_all } = req.query;
+    const { include_all, include_archived } = req.query;
     
     let conditions: any[] = [];
+    
+    // Filter archived records by default unless include_archived=true
+    if (include_archived !== 'true') {
+      conditions.push(sql`${bookingRequests.archivedAt} IS NULL`);
+    }
+    
     if (status) {
       conditions.push(eq(bookingRequests.status, status as string));
     } else if (include_all === 'true') {
@@ -730,10 +736,56 @@ router.post('/api/bookings', async (req, res) => {
   }
 });
 
+router.get('/api/bookings/:id/cascade-preview', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const bookingId = parseInt(id);
+    
+    const [booking] = await db.select({
+      id: bookingRequests.id,
+      sessionId: bookingRequests.sessionId
+    })
+    .from(bookingRequests)
+    .where(eq(bookingRequests.id, bookingId));
+    
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    
+    let participantsCount = 0;
+    let membersCount = 0;
+    
+    if (booking.sessionId) {
+      const participantsResult = await db.select({ count: sql<number>`count(*)::int` })
+        .from(bookingParticipants)
+        .where(eq(bookingParticipants.sessionId, booking.sessionId));
+      participantsCount = participantsResult[0]?.count || 0;
+    }
+    
+    const membersResult = await db.select({ count: sql<number>`count(*)::int` })
+      .from(bookingMembers)
+      .where(eq(bookingMembers.bookingId, bookingId));
+    membersCount = membersResult[0]?.count || 0;
+    
+    res.json({
+      bookingId,
+      relatedData: {
+        participants: participantsCount,
+        linkedMembers: membersCount
+      },
+      hasRelatedData: participantsCount > 0 || membersCount > 0
+    });
+  } catch (error: any) {
+    logAndRespond(req, res, 500, 'Failed to fetch cascade preview', error, 'CASCADE_PREVIEW_ERROR');
+  }
+});
+
 router.delete('/api/bookings/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const bookingId = parseInt(id);
+    const sessionUser = getSessionUser(req);
+    const archivedBy = sessionUser?.email || 'unknown';
     
     const [booking] = await db.select({
       calendarEventId: bookingRequests.calendarEventId,
@@ -742,13 +794,18 @@ router.delete('/api/bookings/:id', isStaffOrAdmin, async (req, res) => {
       userName: bookingRequests.userName,
       requestDate: bookingRequests.requestDate,
       startTime: bookingRequests.startTime,
-      sessionId: bookingRequests.sessionId
+      sessionId: bookingRequests.sessionId,
+      archivedAt: bookingRequests.archivedAt
     })
     .from(bookingRequests)
     .where(eq(bookingRequests.id, bookingId));
     
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
+    }
+    
+    if (booking.archivedAt) {
+      return res.status(400).json({ error: 'Booking is already archived' });
     }
     
     let resourceName: string | undefined;
@@ -760,7 +817,11 @@ router.delete('/api/bookings/:id', isStaffOrAdmin, async (req, res) => {
     }
     
     await db.update(bookingRequests)
-      .set({ status: 'cancelled' })
+      .set({ 
+        status: 'cancelled',
+        archivedAt: new Date(),
+        archivedBy: archivedBy
+      })
       .where(eq(bookingRequests.id, bookingId));
     
     const cascadeResult = await handleCancellationCascade(
@@ -773,9 +834,10 @@ router.delete('/api/bookings/:id', isStaffOrAdmin, async (req, res) => {
       resourceName
     );
     
-    logger.info('[DELETE /api/bookings] Cancellation cascade complete', {
+    logger.info('[DELETE /api/bookings] Soft delete complete', {
       extra: {
         bookingId,
+        archivedBy,
         participantsNotified: cascadeResult.participantsNotified,
         guestPassesRefunded: cascadeResult.guestPassesRefunded,
         bookingMembersRemoved: cascadeResult.bookingMembersRemoved,
@@ -808,13 +870,15 @@ router.delete('/api/bookings/:id', isStaffOrAdmin, async (req, res) => {
     
     res.json({ 
       success: true,
+      archived: true,
+      archivedBy,
       cascade: {
         participantsNotified: cascadeResult.participantsNotified,
         guestPassesRefunded: cascadeResult.guestPassesRefunded
       }
     });
   } catch (error: any) {
-    logAndRespond(req, res, 500, 'Failed to cancel booking', error, 'BOOKING_CANCEL_ERROR');
+    logAndRespond(req, res, 500, 'Failed to archive booking', error, 'BOOKING_ARCHIVE_ERROR');
   }
 });
 

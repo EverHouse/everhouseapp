@@ -172,9 +172,14 @@ router.post('/api/events/:id/mark-reviewed', isStaffOrAdmin, async (req, res) =>
 
 router.get('/api/events', async (req, res) => {
   try {
-    const { date, include_past, visibility } = req.query;
+    const { date, include_past, visibility, include_archived } = req.query;
     const conditions: any[] = [];
     const todayPacific = getTodayPacific();
+    
+    // Filter archived records by default unless include_archived=true
+    if (include_archived !== 'true') {
+      conditions.push(sql`${events.archivedAt} IS NULL`);
+    }
     
     if (date) {
       conditions.push(eq(events.eventDate, date as string));
@@ -457,13 +462,55 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
   }
 });
 
-router.delete('/api/events/:id', isStaffOrAdmin, async (req, res) => {
+router.get('/api/events/:id/cascade-preview', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const eventId = parseInt(id);
     
-    const existing = await db.select({ googleCalendarId: events.googleCalendarId }).from(events).where(eq(events.id, eventId));
-    if (existing.length > 0 && existing[0].googleCalendarId) {
+    const [event] = await db.select({ id: events.id }).from(events).where(eq(events.id, eventId));
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    
+    const rsvpsResult = await db.select({ count: sql<number>`count(*)::int` })
+      .from(eventRsvps)
+      .where(eq(eventRsvps.eventId, eventId));
+    const rsvpsCount = rsvpsResult[0]?.count || 0;
+    
+    res.json({
+      eventId,
+      relatedData: {
+        rsvps: rsvpsCount
+      },
+      hasRelatedData: rsvpsCount > 0
+    });
+  } catch (error: any) {
+    if (!isProduction) console.error('Event cascade preview error:', error);
+    res.status(500).json({ error: 'Failed to fetch cascade preview' });
+  }
+});
+
+router.delete('/api/events/:id', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const eventId = parseInt(id);
+    const sessionUser = getSessionUser(req);
+    const archivedBy = sessionUser?.email || 'unknown';
+    
+    const existing = await db.select({ 
+      googleCalendarId: events.googleCalendarId,
+      archivedAt: events.archivedAt 
+    }).from(events).where(eq(events.id, eventId));
+    
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    
+    if (existing[0].archivedAt) {
+      return res.status(400).json({ error: 'Event is already archived' });
+    }
+    
+    if (existing[0].googleCalendarId) {
       try {
         const calendarId = await getCalendarIdByName(CALENDAR_CONFIG.events.name);
         if (calendarId) {
@@ -482,11 +529,17 @@ router.delete('/api/events/:id', isStaffOrAdmin, async (req, res) => {
       if (!isProduction) console.error('Failed to remove availability blocks for event:', blockError);
     }
     
-    await db.delete(events).where(eq(events.id, eventId));
-    res.json({ success: true });
+    await db.update(events)
+      .set({
+        archivedAt: new Date(),
+        archivedBy: archivedBy
+      })
+      .where(eq(events.id, eventId));
+    
+    res.json({ success: true, archived: true, archivedBy });
   } catch (error: any) {
-    console.error('Event delete error:', error?.message || error);
-    res.status(500).json({ error: 'Failed to delete event', details: error?.message });
+    console.error('Event archive error:', error?.message || error);
+    res.status(500).json({ error: 'Failed to archive event', details: error?.message });
   }
 });
 

@@ -41,6 +41,8 @@ export const users = pgTable("users", {
   smsOptIn: boolean("sms_opt_in"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  archivedAt: timestamp("archived_at"),
+  archivedBy: varchar("archived_by"),
 });
 
 // Staff users table - emails that get staff or admin access

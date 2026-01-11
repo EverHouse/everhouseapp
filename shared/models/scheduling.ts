@@ -73,6 +73,8 @@ export const bookingRequests = pgTable("booking_requests", {
   reconciliationNotes: text("reconciliation_notes"),
   reconciledBy: varchar("reconciled_by"),
   reconciledAt: timestamp("reconciled_at"),
+  archivedAt: timestamp("archived_at"),
+  archivedBy: varchar("archived_by"),
 }, (table) => [
   uniqueIndex("booking_requests_trackman_id_idx").on(table.trackmanBookingId),
   index("booking_requests_session_idx").on(table.sessionId),

@@ -193,7 +193,7 @@ router.post('/api/wellness-classes/:id/mark-reviewed', isStaffOrAdmin, async (re
 
 router.get('/api/wellness-classes', async (req, res) => {
   try {
-    const { active_only } = req.query;
+    const { active_only, include_archived } = req.query;
     // Join with enrollments to get remaining spots and waitlist count
     let query = `
       SELECT wc.*, 
@@ -219,12 +219,29 @@ router.get('/api/wellness-classes', async (req, res) => {
         GROUP BY class_id
       ) w ON wc.id = w.class_id
     `;
-    if (active_only === 'true') {
-      query += ' WHERE wc.is_active = true AND wc.date >= $1';
+    
+    // Build WHERE conditions
+    const conditions: string[] = [];
+    const params: any[] = [];
+    
+    // Filter archived records by default unless include_archived=true
+    if (include_archived !== 'true') {
+      conditions.push('wc.archived_at IS NULL');
     }
+    
+    if (active_only === 'true') {
+      conditions.push('wc.is_active = true');
+      params.push(getTodayPacific());
+      conditions.push(`wc.date >= $${params.length}`);
+    }
+    
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+    
     query += ' ORDER BY wc.date ASC, wc.time ASC';
-    const result = active_only === 'true' 
-      ? await pool.query(query, [getTodayPacific()])
+    const result = params.length > 0 
+      ? await pool.query(query, params)
       : await pool.query(query);
     res.json(result.rows);
   } catch (error: any) {

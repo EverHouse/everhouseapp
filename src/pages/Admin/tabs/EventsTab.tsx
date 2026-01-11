@@ -572,6 +572,15 @@ const EventsAdminContent: React.FC = () => {
     const [newItem, setNewItem] = useState<Partial<DBEvent>>({ category: 'Social' });
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+
+    const eventValidation = {
+        category: !newItem.category || newItem.category === '' || newItem.category === 'Event',
+        description: !newItem.description || newItem.description.trim() === '',
+        location: !newItem.location || newItem.location.trim() === ''
+    };
+    const isEventFormValid = !eventValidation.category && !eventValidation.description && !eventValidation.location;
+    const markTouched = (field: string) => setTouchedFields(prev => new Set(prev).add(field));
     const [isViewingRsvps, setIsViewingRsvps] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<DBEvent | null>(null);
     const [rsvps, setRsvps] = useState<Participant[]>([]);
@@ -579,6 +588,7 @@ const EventsAdminContent: React.FC = () => {
     const [deletingEventId, setDeletingEventId] = useState<number | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [eventToDelete, setEventToDelete] = useState<DBEvent | null>(null);
+    const [eventCascadePreview, setEventCascadePreview] = useState<{ rsvps: number } | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     
     const [needsReviewEvents, setNeedsReviewEvents] = useState<NeedsReviewEvent[]>([]);
@@ -678,12 +688,14 @@ const EventsAdminContent: React.FC = () => {
     const openEdit = (event: DBEvent) => {
         setNewItem(event);
         setEditId(event.id);
+        setTouchedFields(new Set());
         setIsEditing(true);
     };
 
     const openCreate = () => {
         setNewItem({ category: activeCategory === 'all' ? 'Social' : activeCategory });
         setEditId(null);
+        setTouchedFields(new Set());
         setIsEditing(true);
     };
 
@@ -758,8 +770,18 @@ const EventsAdminContent: React.FC = () => {
         }
     };
 
-    const handleDelete = (event: DBEvent) => {
+    const handleDelete = async (event: DBEvent) => {
         setEventToDelete(event);
+        setEventCascadePreview(null);
+        try {
+            const res = await fetch(`/api/events/${event.id}/cascade-preview`, { credentials: 'include' });
+            if (res.ok) {
+                const data = await res.json();
+                setEventCascadePreview(data.relatedData || null);
+            }
+        } catch (err) {
+            console.error('Failed to fetch cascade preview:', err);
+        }
         setShowDeleteConfirm(true);
     };
 
@@ -776,20 +798,20 @@ const EventsAdminContent: React.FC = () => {
         try {
             const res = await fetch(`/api/events/${deletedId}`, { method: 'DELETE', credentials: 'include' });
             if (res.ok) {
-                setSuccess('Event deleted');
-                showToast('Event deleted successfully', 'success');
+                setSuccess('Event archived');
+                showToast('Event archived successfully', 'success');
                 setTimeout(() => setSuccess(null), 3000);
             } else {
                 setEvents(snapshot);
-                setError('Failed to delete event');
-                showToast('Failed to delete event', 'error');
+                setError('Failed to archive event');
+                showToast('Failed to archive event', 'error');
                 setTimeout(() => setError(null), 3000);
             }
         } catch (err) {
-            console.error('Failed to delete event:', err);
+            console.error('Failed to archive event:', err);
             setEvents(snapshot);
-            setError('Failed to delete event');
-            showToast('Failed to delete event', 'error');
+            setError('Failed to archive event');
+            showToast('Failed to archive event', 'error');
             setTimeout(() => setError(null), 3000);
         }
     };
@@ -989,14 +1011,22 @@ const EventsAdminContent: React.FC = () => {
                 </div>
             )}
 
-            <ModalShell isOpen={showDeleteConfirm} onClose={() => { setShowDeleteConfirm(false); setEventToDelete(null); }} title="Delete Event" showCloseButton={false}>
+            <ModalShell isOpen={showDeleteConfirm} onClose={() => { setShowDeleteConfirm(false); setEventToDelete(null); setEventCascadePreview(null); }} title="Archive Event" showCloseButton={false}>
                 <div className="p-6">
-                    <p className="text-gray-600 dark:text-gray-300 mb-6">
-                        Are you sure you want to delete <span className="font-bold text-primary dark:text-white">"{eventToDelete?.title}"</span>? This action cannot be undone.
+                    <p className="text-gray-600 dark:text-gray-300 mb-4">
+                        Are you sure you want to archive <span className="font-bold text-primary dark:text-white">"{eventToDelete?.title}"</span>?
                     </p>
+                    {eventCascadePreview && eventCascadePreview.rsvps > 0 && (
+                        <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+                            <p className="text-amber-700 dark:text-amber-400 text-sm font-medium flex items-center gap-2">
+                                <span className="material-symbols-outlined text-[18px]">warning</span>
+                                This event has {eventCascadePreview.rsvps} RSVP{eventCascadePreview.rsvps !== 1 ? 's' : ''}
+                            </p>
+                        </div>
+                    )}
                     <div className="flex gap-3 justify-end">
                         <button 
-                            onClick={() => { setShowDeleteConfirm(false); setEventToDelete(null); }} 
+                            onClick={() => { setShowDeleteConfirm(false); setEventToDelete(null); setEventCascadePreview(null); }} 
                             className="px-4 py-2 text-gray-500 dark:text-gray-400 font-bold hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
                             disabled={deletingEventId !== null}
                         >
@@ -1008,7 +1038,7 @@ const EventsAdminContent: React.FC = () => {
                             className="px-6 py-2 bg-red-500 text-white rounded-lg font-bold shadow-md hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center gap-2"
                         >
                             {deletingEventId !== null && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
-                            {deletingEventId !== null ? 'Deleting...' : 'Delete'}
+                            {deletingEventId !== null ? 'Archiving...' : 'Archive'}
                         </button>
                     </div>
                 </div>
@@ -1026,8 +1056,18 @@ const EventsAdminContent: React.FC = () => {
                         <input className="w-full border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/20 p-3 rounded-lg text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60" placeholder="Event title" value={newItem.title || ''} onChange={e => setNewItem({...newItem, title: e.target.value})} />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Category</label>
-                        <select className="w-full border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/20 p-3 rounded-lg text-primary dark:text-white" value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})}>
+                        <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Category *</label>
+                        <select 
+                            className={`w-full border bg-gray-50 dark:bg-black/20 p-3 rounded-lg text-primary dark:text-white ${
+                                touchedFields.has('category') && eventValidation.category 
+                                    ? 'border-red-500 dark:border-red-500' 
+                                    : 'border-gray-200 dark:border-white/25'
+                            }`} 
+                            value={newItem.category || ''} 
+                            onChange={e => setNewItem({...newItem, category: e.target.value})}
+                            onBlur={() => markTouched('category')}
+                        >
+                            <option value="">Select category...</option>
                             <option value="Social">Social</option>
                             <option value="Golf">Golf</option>
                             <option value="Tournaments">Tournaments</option>
@@ -1038,6 +1078,9 @@ const EventsAdminContent: React.FC = () => {
                             <option value="Entertainment">Entertainment</option>
                             <option value="Charity">Charity</option>
                         </select>
+                        {touchedFields.has('category') && eventValidation.category && (
+                            <p className="text-xs text-red-500 mt-1">Category is required</p>
+                        )}
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Date *</label>
@@ -1052,8 +1095,21 @@ const EventsAdminContent: React.FC = () => {
                         <input type="time" className="w-full border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/20 p-3 rounded-lg text-primary dark:text-white" value={newItem.end_time || ''} onChange={e => setNewItem({...newItem, end_time: e.target.value})} />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Location</label>
-                        <input className="w-full border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/20 p-3 rounded-lg text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60" placeholder="Event location" value={newItem.location || ''} onChange={e => setNewItem({...newItem, location: e.target.value})} />
+                        <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Location *</label>
+                        <input 
+                            className={`w-full border bg-gray-50 dark:bg-black/20 p-3 rounded-lg text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 ${
+                                touchedFields.has('location') && eventValidation.location 
+                                    ? 'border-red-500 dark:border-red-500' 
+                                    : 'border-gray-200 dark:border-white/25'
+                            }`} 
+                            placeholder="Event location" 
+                            value={newItem.location || ''} 
+                            onChange={e => setNewItem({...newItem, location: e.target.value})}
+                            onBlur={() => markTouched('location')}
+                        />
+                        {touchedFields.has('location') && eventValidation.location && (
+                            <p className="text-xs text-red-500 mt-1">Location is required</p>
+                        )}
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Image URL (optional)</label>
@@ -1068,8 +1124,22 @@ const EventsAdminContent: React.FC = () => {
                         <input className="w-full border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/20 p-3 rounded-lg text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60" placeholder="https://..." value={newItem.external_url || ''} onChange={e => setNewItem({...newItem, external_url: e.target.value})} />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Description</label>
-                        <textarea className="w-full border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/20 p-3 rounded-lg text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 resize-none" placeholder="Event description" rows={3} value={newItem.description || ''} onChange={e => setNewItem({...newItem, description: e.target.value})} />
+                        <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Description *</label>
+                        <textarea 
+                            className={`w-full border bg-gray-50 dark:bg-black/20 p-3 rounded-lg text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 resize-none ${
+                                touchedFields.has('description') && eventValidation.description 
+                                    ? 'border-red-500 dark:border-red-500' 
+                                    : 'border-gray-200 dark:border-white/25'
+                            }`} 
+                            placeholder="Event description" 
+                            rows={3} 
+                            value={newItem.description || ''} 
+                            onChange={e => setNewItem({...newItem, description: e.target.value})}
+                            onBlur={() => markTouched('description')}
+                        />
+                        {touchedFields.has('description') && eventValidation.description && (
+                            <p className="text-xs text-red-500 mt-1">Description is required</p>
+                        )}
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-2">Visibility</label>
@@ -1128,8 +1198,8 @@ const EventsAdminContent: React.FC = () => {
                         </button>
                     </div>
                     <div className="flex gap-3 justify-end pt-2">
-                        <button onClick={() => { setIsEditing(false); setError(null); }} className="px-4 py-2 text-gray-500 dark:text-gray-400 font-bold" disabled={isSaving}>Cancel</button>
-                        <button onClick={handleSave} disabled={isSaving} className="px-6 py-2 bg-primary text-white rounded-lg font-bold shadow-md disabled:opacity-50 flex items-center gap-2">
+                        <button onClick={() => { setIsEditing(false); setError(null); setTouchedFields(new Set()); }} className="px-4 py-2 text-gray-500 dark:text-gray-400 font-bold" disabled={isSaving}>Cancel</button>
+                        <button onClick={handleSave} disabled={isSaving || !isEventFormValid} className="px-6 py-2 bg-primary text-white rounded-lg font-bold shadow-md disabled:opacity-50 flex items-center gap-2">
                             {isSaving && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
                             {isSaving ? 'Saving...' : 'Save'}
                         </button>
@@ -1320,9 +1390,22 @@ const WellnessAdminContent: React.FC = () => {
     const [classToDelete, setClassToDelete] = useState<WellnessClass | null>(null);
     const [deletingClassId, setDeletingClassId] = useState<number | null>(null);
     const [needsReviewClasses, setNeedsReviewClasses] = useState<WellnessClass[]>([]);
+    const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
     const { showToast } = useToast();
 
     const categories = ['Classes', 'MedSpa', 'Recovery', 'Therapy', 'Nutrition', 'Personal Training', 'Mindfulness', 'Outdoors', 'General'];
+
+    const markTouched = (field: string) => {
+        setTouchedFields(prev => new Set(prev).add(field));
+    };
+
+    const wellnessValidation = {
+        instructor: !formData.instructor?.trim() || formData.instructor === 'TBD',
+        category: !formData.category || formData.category === 'Wellness',
+        spots: formData.spots === 0 || formData.spots === undefined
+    };
+
+    const isWellnessFormValid = !wellnessValidation.instructor && !wellnessValidation.category && !wellnessValidation.spots;
 
     useEffect(() => {
         fetchClasses();
@@ -1424,6 +1507,7 @@ const WellnessAdminContent: React.FC = () => {
             endTime
         });
         setEditId(cls.id);
+        setTouchedFields(new Set());
         setIsEditing(true);
         setError(null);
     };
@@ -1439,6 +1523,7 @@ const WellnessAdminContent: React.FC = () => {
             date: tomorrow.toISOString().split('T')[0]
         });
         setEditId(null);
+        setTouchedFields(new Set());
         setIsEditing(true);
         setError(null);
     };
@@ -1869,22 +1954,39 @@ const WellnessAdminContent: React.FC = () => {
                             type="text"
                             value={formData.instructor || ''}
                             onChange={(e) => setFormData({ ...formData, instructor: e.target.value })}
+                            onBlur={() => markTouched('instructor')}
                             placeholder="Jane Smith"
-                            className="w-full p-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white"
+                            className={`w-full p-3 rounded-lg border bg-gray-50 dark:bg-black/30 text-primary dark:text-white ${
+                                touchedFields.has('instructor') && wellnessValidation.instructor 
+                                    ? 'border-red-500 dark:border-red-500' 
+                                    : 'border-gray-200 dark:border-white/25'
+                            }`}
                         />
+                        {touchedFields.has('instructor') && wellnessValidation.instructor && (
+                            <p className="text-xs text-red-500 mt-1">Please enter a valid instructor name</p>
+                        )}
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category *</label>
                         <select
-                            value={formData.category || 'Yoga'}
+                            value={formData.category || ''}
                             onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                            className="w-full p-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white"
+                            onBlur={() => markTouched('category')}
+                            className={`w-full p-3 rounded-lg border bg-gray-50 dark:bg-black/30 text-primary dark:text-white ${
+                                touchedFields.has('category') && wellnessValidation.category 
+                                    ? 'border-red-500 dark:border-red-500' 
+                                    : 'border-gray-200 dark:border-white/25'
+                            }`}
                         >
+                            <option value="">Select category...</option>
                             {categories.map(cat => (
                                 <option key={cat} value={cat}>{cat}</option>
                             ))}
                         </select>
+                        {touchedFields.has('category') && wellnessValidation.category && (
+                            <p className="text-xs text-red-500 mt-1">Category is required</p>
+                        )}
                     </div>
 
                     <div>
@@ -1893,9 +1995,17 @@ const WellnessAdminContent: React.FC = () => {
                             type="text"
                             value={formData.spots || ''}
                             onChange={(e) => setFormData({ ...formData, spots: e.target.value })}
+                            onBlur={() => markTouched('spots')}
                             placeholder="12 spots"
-                            className="w-full p-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white"
+                            className={`w-full p-3 rounded-lg border bg-gray-50 dark:bg-black/30 text-primary dark:text-white ${
+                                touchedFields.has('spots') && wellnessValidation.spots 
+                                    ? 'border-red-500 dark:border-red-500' 
+                                    : 'border-gray-200 dark:border-white/25'
+                            }`}
                         />
+                        {touchedFields.has('spots') && wellnessValidation.spots && (
+                            <p className="text-xs text-red-500 mt-1">Number of spots is required</p>
+                        )}
                     </div>
 
                     <div>
@@ -2057,14 +2167,14 @@ const WellnessAdminContent: React.FC = () => {
 
                     <div className="flex gap-3 pt-2">
                         <button
-                            onClick={() => { setIsEditing(false); setError(null); }}
+                            onClick={() => { setIsEditing(false); setError(null); setTouchedFields(new Set()); }}
                             className="flex-1 py-3 px-4 rounded-lg border border-gray-200 dark:border-white/25 text-gray-600 dark:text-gray-300 font-medium"
                         >
                             Cancel
                         </button>
                         <button
                             onClick={handleSave}
-                            disabled={isUploading}
+                            disabled={isUploading || !isWellnessFormValid}
                             className="flex-1 py-3 px-4 rounded-lg bg-brand-green text-white font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                             {isUploading && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}

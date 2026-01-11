@@ -43,6 +43,7 @@ router.get('/api/members/search', isAuthenticated, async (req, res) => {
     
     let whereConditions = and(
       sql`${users.membershipStatus} = 'active'`,
+      sql`${users.archivedAt} IS NULL`,
       sql`(
         LOWER(COALESCE(${users.firstName}, '') || ' ' || COALESCE(${users.lastName}, '')) LIKE ${searchTerm}
         OR LOWER(COALESCE(${users.firstName}, '')) LIKE ${searchTerm}
@@ -719,6 +720,115 @@ router.patch('/api/members/me/preferences', isAuthenticated, async (req, res) =>
   } catch (error: any) {
     if (!isProduction) console.error('API error:', error);
     res.status(500).json({ error: 'Failed to update preferences' });
+  }
+});
+
+// Get cascade preview for member archive - shows what will be affected
+router.get('/api/members/:email/cascade-preview', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { email } = req.params;
+    const normalizedEmail = decodeURIComponent(email).toLowerCase();
+    
+    const userResult = await db.select({ id: users.id })
+      .from(users)
+      .where(sql`LOWER(${users.email}) = ${normalizedEmail}`);
+    
+    if (userResult.length === 0) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    const userId = userResult[0].id;
+    
+    // Count bookings where user is primary booker or linked
+    const bookingsResult = await db.execute(sql`
+      SELECT COUNT(DISTINCT br.id)::int as count FROM booking_requests br
+      LEFT JOIN booking_members bm ON br.id = bm.booking_id
+      WHERE (
+        LOWER(br.user_email) = ${normalizedEmail}
+        OR LOWER(bm.user_email) = ${normalizedEmail}
+      )
+      AND br.archived_at IS NULL
+    `);
+    const bookingsCount = Number((bookingsResult as any).rows?.[0]?.count || 0);
+    
+    // Count event RSVPs
+    const rsvpsResult = await db.select({ count: sql<number>`count(*)::int` })
+      .from(eventRsvps)
+      .where(or(
+        sql`LOWER(${eventRsvps.userEmail}) = ${normalizedEmail}`,
+        eq(eventRsvps.matchedUserId, userId)
+      ));
+    const rsvpsCount = rsvpsResult[0]?.count || 0;
+    
+    // Count wellness enrollments
+    const enrollmentsResult = await db.select({ count: sql<number>`count(*)::int` })
+      .from(wellnessEnrollments)
+      .where(sql`LOWER(${wellnessEnrollments.userEmail}) = ${normalizedEmail}`);
+    const enrollmentsCount = enrollmentsResult[0]?.count || 0;
+    
+    // Count guest check-ins
+    const guestCheckInsResult = await db.select({ count: sql<number>`count(*)::int` })
+      .from(guestCheckIns)
+      .where(sql`LOWER(${guestCheckIns.memberEmail}) = ${normalizedEmail}`);
+    const guestCheckInsCount = guestCheckInsResult[0]?.count || 0;
+    
+    res.json({
+      memberEmail: normalizedEmail,
+      relatedData: {
+        bookings: bookingsCount,
+        rsvps: rsvpsCount,
+        enrollments: enrollmentsCount,
+        guestCheckIns: guestCheckInsCount
+      },
+      hasRelatedData: bookingsCount > 0 || rsvpsCount > 0 || enrollmentsCount > 0 || guestCheckInsCount > 0
+    });
+  } catch (error: any) {
+    if (!isProduction) console.error('Member cascade preview error:', error);
+    res.status(500).json({ error: 'Failed to fetch cascade preview' });
+  }
+});
+
+// Archive a member (soft delete)
+router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { email } = req.params;
+    const normalizedEmail = decodeURIComponent(email).toLowerCase();
+    const sessionUser = getSessionUser(req);
+    const archivedBy = sessionUser?.email || 'unknown';
+    
+    const userResult = await db.select({ 
+      id: users.id, 
+      archivedAt: users.archivedAt 
+    })
+      .from(users)
+      .where(sql`LOWER(${users.email}) = ${normalizedEmail}`);
+    
+    if (userResult.length === 0) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    if (userResult[0].archivedAt) {
+      return res.status(400).json({ error: 'Member is already archived' });
+    }
+    
+    await db.update(users)
+      .set({
+        archivedAt: new Date(),
+        archivedBy: archivedBy,
+        membershipStatus: 'archived',
+        updatedAt: new Date()
+      })
+      .where(sql`LOWER(${users.email}) = ${normalizedEmail}`);
+    
+    res.json({ 
+      success: true, 
+      archived: true,
+      archivedBy,
+      message: 'Member archived successfully'
+    });
+  } catch (error: any) {
+    if (!isProduction) console.error('Member archive error:', error);
+    res.status(500).json({ error: 'Failed to archive member' });
   }
 });
 

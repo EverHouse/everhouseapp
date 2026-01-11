@@ -1065,7 +1065,7 @@ const DataIntegrityTab: React.FC = () => {
                                     
                                     {!issue.ignored && (
                                       <div className="mt-3 flex flex-wrap gap-2">
-                                        {issue.context?.syncComparison && issue.context.syncComparison.length > 0 && (
+                                        {issue.context?.syncComparison && issue.context.syncComparison.length > 0 && issue.context.syncType === 'hubspot' && (
                                           <>
                                             <button
                                               onClick={(e) => {
@@ -1080,7 +1080,7 @@ const DataIntegrityTab: React.FC = () => {
                                               ) : (
                                                 <span aria-hidden="true" className="material-symbols-outlined text-[14px]">cloud_upload</span>
                                               )}
-                                              Push to {issue.context.syncType === 'hubspot' ? 'HubSpot' : 'Calendar'}
+                                              Push to HubSpot
                                             </button>
                                             <button
                                               onClick={(e) => {
@@ -1095,7 +1095,7 @@ const DataIntegrityTab: React.FC = () => {
                                               ) : (
                                                 <span aria-hidden="true" className="material-symbols-outlined text-[14px]">cloud_download</span>
                                               )}
-                                              Pull from {issue.context.syncType === 'hubspot' ? 'HubSpot' : 'Calendar'}
+                                              Pull from HubSpot
                                             </button>
                                           </>
                                         )}
