@@ -123,12 +123,6 @@ interface AuditLogEntry {
   notes: string | null;
 }
 
-interface ResolveModalState {
-  isOpen: boolean;
-  issue: IntegrityIssue | null;
-  checkName: string;
-}
-
 interface IgnoreModalState {
   isOpen: boolean;
   issue: IntegrityIssue | null;
@@ -155,10 +149,6 @@ const DataIntegrityTab: React.FC = () => {
   const [isLoadingAuditLog, setIsLoadingAuditLog] = useState(true);
   const [showActivityLog, setShowActivityLog] = useState(true);
 
-  const [resolveModal, setResolveModal] = useState<ResolveModalState>({ isOpen: false, issue: null, checkName: '' });
-  const [resolutionMethod, setResolutionMethod] = useState<string>('');
-  const [resolutionNotes, setResolutionNotes] = useState<string>('');
-  const [isResolving, setIsResolving] = useState(false);
   const [syncingIssues, setSyncingIssues] = useState<Set<string>>(new Set());
 
   const [ignoreModal, setIgnoreModal] = useState<IgnoreModalState>({ isOpen: false, issue: null, checkName: '' });
@@ -301,55 +291,6 @@ const DataIntegrityTab: React.FC = () => {
     } catch (err) {
       console.error('Failed to un-ignore issue:', err);
       showToast('Failed to un-ignore issue', 'error');
-    }
-  };
-
-  const openResolveModal = (issue: IntegrityIssue, checkName: string) => {
-    setResolveModal({ isOpen: true, issue, checkName });
-    setResolutionMethod('');
-    setResolutionNotes('');
-  };
-
-  const closeResolveModal = () => {
-    setResolveModal({ isOpen: false, issue: null, checkName: '' });
-    setResolutionMethod('');
-    setResolutionNotes('');
-  };
-
-  const handleResolveIssue = async () => {
-    if (!resolveModal.issue || !resolutionMethod) return;
-    
-    const issueKey = `${resolveModal.issue.table}_${resolveModal.issue.recordId}`;
-    
-    setIsResolving(true);
-    try {
-      const res = await fetch('/api/data-integrity/resolve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          issue_key: issueKey,
-          resolution_method: resolutionMethod,
-          notes: resolutionNotes || undefined,
-          action: 'resolved'
-        })
-      });
-      
-      if (res.ok) {
-        showToast('Issue marked as resolved', 'success');
-        closeResolveModal();
-        fetchHistory();
-        fetchAuditLog();
-        runIntegrityChecks();
-      } else {
-        const err = await res.json();
-        showToast(err.error || 'Failed to resolve issue', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to resolve issue:', err);
-      showToast('Failed to resolve issue', 'error');
-    } finally {
-      setIsResolving(false);
     }
   };
 
@@ -1045,8 +986,8 @@ const DataIntegrityTab: React.FC = () => {
                                     {issue.ignored && issue.ignoreInfo && (
                                       <div className="mt-3 p-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-xs">
                                         <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 font-medium">
-                                          <span aria-hidden="true" className="material-symbols-outlined text-[14px]">visibility_off</span>
-                                          Ignored until {new Date(issue.ignoreInfo.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                          <span aria-hidden="true" className="material-symbols-outlined text-[14px]">block</span>
+                                          Excluded until {new Date(issue.ignoreInfo.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                         </div>
                                         <p className="text-gray-500 dark:text-gray-400 mt-1">
                                           Reason: {issue.ignoreInfo.reason}
@@ -1058,7 +999,7 @@ const DataIntegrityTab: React.FC = () => {
                                           }}
                                           className="mt-2 text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                                         >
-                                          Un-ignore
+                                          Remove Exclusion
                                         </button>
                                       </div>
                                     )}
@@ -1102,25 +1043,13 @@ const DataIntegrityTab: React.FC = () => {
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            openResolveModal(issue, result.checkName);
+                                            openIgnoreModal(issue, result.checkName);
                                           }}
-                                          className="text-xs px-3 py-1.5 bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515] rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center gap-1"
+                                          className="text-xs px-3 py-1.5 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded-lg font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center gap-1"
                                         >
-                                          <span aria-hidden="true" className="material-symbols-outlined text-[14px]">check_circle</span>
-                                          Mark Resolved
+                                          <span aria-hidden="true" className="material-symbols-outlined text-[14px]">block</span>
+                                          Exclude
                                         </button>
-                                        {severity !== 'critical' && (
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              openIgnoreModal(issue, result.checkName);
-                                            }}
-                                            className="text-xs px-3 py-1.5 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded-lg font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center gap-1"
-                                          >
-                                            <span aria-hidden="true" className="material-symbols-outlined text-[14px]">visibility_off</span>
-                                            Ignore
-                                          </button>
-                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -1170,8 +1099,8 @@ const DataIntegrityTab: React.FC = () => {
             className="flex items-center justify-between w-full text-left"
           >
             <div className="flex items-center gap-2">
-              <span aria-hidden="true" className="material-symbols-outlined text-gray-500 dark:text-gray-400">visibility_off</span>
-              <span className="font-bold text-primary dark:text-white">Ignored Issues</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-gray-500 dark:text-gray-400">block</span>
+              <span className="font-bold text-primary dark:text-white">Excluded Issues</span>
               <span className="text-xs px-2 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full">
                 {ignoredIssues.filter(i => !i.isExpired).length} active
               </span>
@@ -1215,7 +1144,7 @@ const DataIntegrityTab: React.FC = () => {
                         </div>
                         <p className="text-sm text-gray-700 dark:text-gray-300">{ignore.reason}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Ignored by {ignore.ignoredBy} on {new Date(ignore.ignoredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          Excluded by {ignore.ignoredBy} on {new Date(ignore.ignoredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </p>
                       </div>
                       <button
@@ -1229,92 +1158,11 @@ const DataIntegrityTab: React.FC = () => {
                 ))
               ) : (
                 <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                  No ignored issues.
+                  No excluded issues.
                 </p>
               )}
             </div>
           )}
-        </div>
-      )}
-
-      {resolveModal.isOpen && resolveModal.issue && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-[#1a1a2e] rounded-2xl w-full max-w-md shadow-2xl animate-pop-in">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-primary dark:text-white">Mark Issue Resolved</h3>
-                <button
-                  onClick={closeResolveModal}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
-                >
-                  <span aria-hidden="true" className="material-symbols-outlined text-gray-500">close</span>
-                </button>
-              </div>
-              
-              <div className="mb-4 p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
-                <p className="text-sm text-primary/80 dark:text-white/80">{resolveModal.issue.description}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {resolveModal.issue.table} • ID: {resolveModal.issue.recordId}
-                </p>
-              </div>
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-primary dark:text-white mb-2">
-                  Resolution Method *
-                </label>
-                <select
-                  value={resolutionMethod}
-                  onChange={(e) => setResolutionMethod(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4]"
-                >
-                  <option value="">Select method...</option>
-                  <option value="manual_fix">Manual Fix</option>
-                  <option value="sync">Sync</option>
-                  <option value="deleted_record">Deleted Record</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-primary dark:text-white mb-2">
-                  Notes (Optional)
-                </label>
-                <textarea
-                  value={resolutionNotes}
-                  onChange={(e) => setResolutionNotes(e.target.value)}
-                  placeholder="Add any notes about how this was resolved..."
-                  rows={3}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-primary dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] resize-none"
-                />
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={closeResolveModal}
-                  className="flex-1 py-3 px-4 border-2 border-gray-200 dark:border-white/20 text-primary dark:text-white rounded-xl font-bold hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleResolveIssue}
-                  disabled={!resolutionMethod || isResolving}
-                  className="flex-1 py-3 px-4 bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515] rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isResolving ? (
-                    <>
-                      <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <span aria-hidden="true" className="material-symbols-outlined text-[18px]">check</span>
-                      Mark Resolved
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
@@ -1323,7 +1171,7 @@ const DataIntegrityTab: React.FC = () => {
           <div className="bg-white dark:bg-[#1a1a2e] rounded-2xl w-full max-w-md shadow-2xl animate-pop-in">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-primary dark:text-white">Temporarily Ignore Issue</h3>
+                <h3 className="text-lg font-bold text-primary dark:text-white">Exclude from Checks</h3>
                 <button
                   onClick={closeIgnoreModal}
                   className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
@@ -1341,7 +1189,7 @@ const DataIntegrityTab: React.FC = () => {
               
               <div className="mb-4">
                 <label className="block text-sm font-medium text-primary dark:text-white mb-2">
-                  Ignore Duration *
+                  Exclusion Duration *
                 </label>
                 <div className="flex gap-2">
                   <button
@@ -1384,7 +1232,7 @@ const DataIntegrityTab: React.FC = () => {
                 <textarea
                   value={ignoreReason}
                   onChange={(e) => setIgnoreReason(e.target.value)}
-                  placeholder="Explain why this issue is being ignored (e.g., Known edge case, pending external fix, etc.)"
+                  placeholder="Explain why this issue is being excluded (e.g., Test account, intentional edge case, pending external fix)"
                   rows={3}
                   className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-primary dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] resize-none"
                 />
@@ -1405,12 +1253,12 @@ const DataIntegrityTab: React.FC = () => {
                   {isIgnoring ? (
                     <>
                       <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
-                      Ignoring...
+                      Excluding...
                     </>
                   ) : (
                     <>
-                      <span aria-hidden="true" className="material-symbols-outlined text-[18px]">visibility_off</span>
-                      Ignore Issue
+                      <span aria-hidden="true" className="material-symbols-outlined text-[18px]">block</span>
+                      Exclude Issue
                     </>
                   )}
                 </button>
