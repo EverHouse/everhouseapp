@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { isAdmin } from '../core/middleware';
 import { runAllIntegrityChecks, getIntegritySummary, getIntegrityHistory, resolveIssue, getAuditLog, syncPush, syncPull, createIgnoreRule, removeIgnoreRule, getIgnoredIssues } from '../core/dataIntegrity';
 import { isProduction } from '../core/db';
+import { broadcastDataIntegrityUpdate } from '../core/websocket';
 import type { Request } from 'express';
 
 const router = Router();
@@ -112,6 +113,9 @@ router.post('/api/data-integrity/sync-push', isAdmin, async (req: Request, res) 
       hubspotContactId: hubspot_contact_id
     });
     
+    // Broadcast update so other staff dashboards refresh
+    broadcastDataIntegrityUpdate('data_changed', { source: `sync_push_${target}` });
+    
     res.json(result);
   } catch (error: any) {
     if (!isProduction) console.error('[DataIntegrity] Sync push error:', error);
@@ -137,6 +141,9 @@ router.post('/api/data-integrity/sync-pull', isAdmin, async (req: Request, res) 
       userId: user_id,
       hubspotContactId: hubspot_contact_id
     });
+    
+    // Broadcast update so other staff dashboards refresh
+    broadcastDataIntegrityUpdate('data_changed', { source: `sync_pull_${target}` });
     
     res.json(result);
   } catch (error: any) {

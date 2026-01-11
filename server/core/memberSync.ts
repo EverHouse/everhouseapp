@@ -4,7 +4,7 @@ import { getHubSpotClient } from './integrations';
 import { normalizeTierName, extractTierTags } from '../../shared/constants/tiers';
 import { sql, eq } from 'drizzle-orm';
 import { isProduction } from './db';
-import { broadcastMemberDataUpdated } from './websocket';
+import { broadcastMemberDataUpdated, broadcastDataIntegrityUpdate } from './websocket';
 
 interface HubSpotContact {
   id: string;
@@ -172,6 +172,8 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
     // Broadcast to staff that member data has been updated
     if (synced > 0) {
       broadcastMemberDataUpdated([]);
+      // Also notify Data Integrity dashboard to refresh (HubSpot sync affects integrity checks)
+      broadcastDataIntegrityUpdate('data_changed', { source: 'hubspot_sync' });
     }
     
     return { synced, errors };

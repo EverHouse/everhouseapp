@@ -118,6 +118,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           if (message.type === 'member_stats_updated') {
             window.dispatchEvent(new CustomEvent('member-stats-updated', { detail: message }));
           }
+
+          // Handle data integrity updates (for admin dashboard)
+          if (message.type === 'data_integrity_update') {
+            window.dispatchEvent(new CustomEvent('data-integrity-update', { detail: message }));
+          }
         } catch (e) {
           console.error('[WebSocket] Error parsing message:', e);
         }

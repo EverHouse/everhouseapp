@@ -166,6 +166,27 @@ const DataIntegrityTab: React.FC = () => {
     fetchIgnoredIssues();
   }, []);
 
+  // Real-time updates via WebSocket
+  useEffect(() => {
+    const handleDataIntegrityUpdate = (event: CustomEvent) => {
+      const { action, source } = event.detail || {};
+      console.log('[DataIntegrity] Real-time update received:', action, source);
+      
+      // Refresh the integrity checks when data changes elsewhere
+      if (action === 'data_changed' || action === 'issue_resolved') {
+        runIntegrityChecks();
+        fetchHistory();
+        fetchAuditLog();
+      }
+    };
+
+    window.addEventListener('data-integrity-update', handleDataIntegrityUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('data-integrity-update', handleDataIntegrityUpdate as EventListener);
+    };
+  }, []);
+
   const fetchCalendarStatus = async () => {
     try {
       setIsLoadingCalendars(true);

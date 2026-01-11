@@ -757,6 +757,29 @@ export function broadcastMemberStatsUpdated(memberEmail: string, data: { guestPa
   return sent;
 }
 
+export function broadcastDataIntegrityUpdate(action: 'check_complete' | 'issue_resolved' | 'data_changed', details?: { source?: string; affectedChecks?: string[] }) {
+  const payload = JSON.stringify({
+    type: 'data_integrity_update',
+    action,
+    ...details
+  });
+
+  let sent = 0;
+  clients.forEach((connections) => {
+    connections.forEach(conn => {
+      if (conn.isStaff && conn.ws.readyState === WebSocket.OPEN) {
+        conn.ws.send(payload);
+        sent++;
+      }
+    });
+  });
+
+  if (sent > 0) {
+    console.log(`[WebSocket] Broadcast data integrity ${action} to ${sent} staff connections`);
+  }
+  return sent;
+}
+
 export function getConnectedUsers(): string[] {
   return Array.from(clients.keys());
 }
