@@ -70,11 +70,30 @@ export const TRAINING_SEED_DATA = [
     ]
   },
   {
+    guideId: 'checkin-billing',
+    icon: 'point_of_sale',
+    title: 'Check-In & Billing',
+    description: 'Check in bookings and handle payments',
+    sortOrder: 4,
+    isAdminOnly: false,
+    steps: [
+      { title: 'Starting Check-In', content: 'When a member arrives for their booking, tap the check-in button on the booking card. This opens the billing screen.', pageIcon: 'point_of_sale' },
+      { title: 'Understanding the Fee Breakdown', content: 'The billing screen shows each person on the booking with their individual fees. Color-coded badges help you quickly see what type of fee applies.' },
+      { title: 'Orange Badge = Time Overage', content: 'An orange badge means the person exceeded their daily time allowance and owes an overage fee ($25 per extra 30-minute block).' },
+      { title: 'Blue Badge = Guest Fee', content: 'A blue badge indicates a flat $25 guest fee for bringing a non-member.' },
+      { title: 'Green Badge = Guest Pass Used', content: 'A green badge means the member used one of their monthly guest passes, so no guest fee is charged.' },
+      { title: 'Tier & Allowance Info', content: 'Each person\'s row shows their membership tier and how much daily time they have left. This helps explain why overage fees apply.' },
+      { title: 'Confirming Payments', content: 'You can mark individual payments as paid, or confirm all at once. Use "Waive" if a fee should be forgiven (you must enter a reason).' },
+      { title: 'Payment Audit Trail', content: 'All payment actions are logged with your name and timestamp for accountability.' },
+      { title: 'Overdue Payments', content: 'The Overdue Payments section on the Home tab shows past bookings from the last 30 days with unpaid balances. Use this to follow up with members.' },
+    ]
+  },
+  {
     guideId: 'tours',
     icon: 'directions_walk',
     title: 'Tours',
     description: 'View and manage scheduled facility tours',
-    sortOrder: 4,
+    sortOrder: 5,
     isAdminOnly: false,
     steps: [
       { title: 'Access Tours', content: 'Go to the Tours tab from the bottom nav or dashboard to view scheduled tours.', pageIcon: 'directions_walk' },
@@ -90,7 +109,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'notifications',
     title: 'Notices',
     description: 'Schedule notices and facility closures',
-    sortOrder: 5,
+    sortOrder: 6,
     isAdminOnly: false,
     steps: [
       { title: 'Access Notices', content: 'Go to Notices from the bottom navigation bar to manage facility notices and closures.', pageIcon: 'notifications' },
@@ -109,7 +128,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'calendar_month',
     title: 'Events, Wellness & Blocks',
     description: 'Manage events, wellness classes, and availability blocks',
-    sortOrder: 6,
+    sortOrder: 7,
     isAdminOnly: false,
     steps: [
       { title: 'Access the Calendar', content: 'Go to the Calendar tab to view and manage events, wellness classes, and availability blocks.', pageIcon: 'calendar_month' },
@@ -128,7 +147,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'campaign',
     title: 'Updates & Announcements',
     description: 'Create announcements and view activity',
-    sortOrder: 7,
+    sortOrder: 8,
     isAdminOnly: false,
     steps: [
       { title: 'Access Updates', content: 'Click the campaign icon in the header or go to Updates from the dashboard.', pageIcon: 'campaign' },
@@ -144,7 +163,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'groups',
     title: 'Member Directory',
     description: 'Search and view member profiles',
-    sortOrder: 8,
+    sortOrder: 9,
     isAdminOnly: false,
     steps: [
       { title: 'Access Directory', content: 'Go to the Home tab and tap "Member Directory" in the Employee Resources section.', pageIcon: 'groups' },
@@ -160,7 +179,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'mail',
     title: 'Inquiries',
     description: 'Manage form submissions (Admin only)',
-    sortOrder: 9,
+    sortOrder: 10,
     isAdminOnly: true,
     steps: [
       { title: 'Access Inquiries', content: 'Go to the Home tab and tap "Inquiries" in the Admin Settings section.', pageIcon: 'mail' },
@@ -176,7 +195,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'local_cafe',
     title: 'Cafe Menu',
     description: 'Update menu items and prices',
-    sortOrder: 10,
+    sortOrder: 11,
     isAdminOnly: false,
     steps: [
       { title: 'Access Cafe Menu', content: 'Go to the Home tab and tap "Cafe Menu" in the Employee Resources section.', pageIcon: 'local_cafe' },
@@ -191,7 +210,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'photo_library',
     title: 'Gallery',
     description: 'Manage venue photos (Admin only)',
-    sortOrder: 11,
+    sortOrder: 12,
     isAdminOnly: true,
     steps: [
       { title: 'Access Gallery', content: 'Go to the Home tab and tap "Gallery" in the Admin Settings section.', pageIcon: 'photo_library' },
@@ -206,7 +225,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'help_outline',
     title: 'FAQs',
     description: 'Edit frequently asked questions (Admin only)',
-    sortOrder: 12,
+    sortOrder: 13,
     isAdminOnly: true,
     steps: [
       { title: 'Access FAQs', content: 'Go to the Home tab and tap "FAQs" in the Admin Settings section.', pageIcon: 'help_outline' },
@@ -221,7 +240,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'shield_person',
     title: 'Team Access',
     description: 'Manage staff and admin accounts',
-    sortOrder: 13,
+    sortOrder: 14,
     isAdminOnly: true,
     steps: [
       { title: 'Access Team Settings', content: 'Go to Team Access from the Admin Settings section of the dashboard. This is admin-only.', pageIcon: 'shield_person' },
@@ -236,7 +255,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'loyalty',
     title: 'Membership Tiers',
     description: 'Configure tier settings and permissions',
-    sortOrder: 14,
+    sortOrder: 15,
     isAdminOnly: true,
     steps: [
       { title: 'Access Tiers', content: 'Go to Manage Tiers from the Admin Settings section. This controls what each membership level can do.', pageIcon: 'loyalty' },
@@ -253,7 +272,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'badge',
     title: 'Team Directory',
     description: 'View staff and admin contact info',
-    sortOrder: 15,
+    sortOrder: 16,
     isAdminOnly: false,
     steps: [
       { title: 'Access Team Directory', content: 'Go to the Home tab and tap "Team" in the Employee Resources section.', pageIcon: 'badge' },
@@ -267,7 +286,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'upload_file',
     title: 'Trackman Import',
     description: 'Import historical booking data (Admin only)',
-    sortOrder: 16,
+    sortOrder: 17,
     isAdminOnly: true,
     steps: [
       { title: 'Access Trackman Import', content: 'Go to the Home tab and tap "Trackman Import" in the Admin Settings section. This is admin-only.', pageIcon: 'upload_file' },
@@ -283,7 +302,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'bug_report',
     title: 'Bug Reports',
     description: 'View and manage reported issues (Admin only)',
-    sortOrder: 17,
+    sortOrder: 18,
     isAdminOnly: true,
     steps: [
       { title: 'Access Bug Reports', content: 'Go to the Home tab and tap "Bug Reports" in the Admin Settings section.', pageIcon: 'bug_report' },
@@ -298,7 +317,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'history',
     title: 'Version History',
     description: 'View app updates and changes (Admin only)',
-    sortOrder: 18,
+    sortOrder: 19,
     isAdminOnly: true,
     steps: [
       { title: 'Access Version History', content: 'Go to the Home tab and tap "Version History" in the Admin Settings section.', pageIcon: 'history' },

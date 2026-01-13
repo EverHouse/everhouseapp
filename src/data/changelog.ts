@@ -8,6 +8,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.8",
+    date: "2026-01-13",
+    title: "Billing & Payment Tracking",
+    changes: [
+      "Check-in screen now shows a clear fee breakdown with color-coded badges",
+      "Orange badge for time overage fees, blue for guest fees, green when a guest pass is used",
+      "See each person's tier and daily allowance right on the billing screen",
+      "New Overdue Payments section helps staff follow up on unpaid past bookings",
+      "Fixed an issue where guest fees were incorrectly counting toward the host's usage"
+    ]
+  },
+  {
     version: "8.7",
     date: "2026-01-10",
     title: "Reliability & Token Refresh",
