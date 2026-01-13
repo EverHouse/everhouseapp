@@ -1404,6 +1404,38 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: `Cannot update booking with status: ${currentStatus}` });
     }
     
+    // ROSTER GUARD: Check for empty player slots before allowing check-in
+    const { skipRosterCheck } = req.body;
+    if (newStatus === 'attended' && !skipRosterCheck) {
+      const rosterResult = await pool.query(`
+        SELECT 
+          br.trackman_player_count,
+          br.declared_player_count,
+          (SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id) as total_slots,
+          (SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id AND bm.user_email IS NULL) as empty_slots
+        FROM booking_requests br
+        WHERE br.id = $1
+      `, [bookingId]);
+      
+      if (rosterResult.rows.length > 0) {
+        const roster = rosterResult.rows[0];
+        const declaredCount = roster.trackman_player_count || roster.declared_player_count || 1;
+        const emptySlots = parseInt(roster.empty_slots) || 0;
+        const totalSlots = parseInt(roster.total_slots) || 0;
+        
+        if (emptySlots > 0 && declaredCount > 1) {
+          return res.status(402).json({
+            error: 'Roster incomplete',
+            requiresRoster: true,
+            emptySlots,
+            totalSlots,
+            declaredPlayerCount: declaredCount,
+            message: `${emptySlots} player slot${emptySlots > 1 ? 's' : ''} not assigned. Staff must link members or add guests before check-in to ensure proper billing.`
+          });
+        }
+      }
+    }
+    
     // PAYMENT GUARD: Check for unpaid balance before marking as attended
     if (newStatus === 'attended' && existing.session_id && !skipPaymentCheck) {
       const balanceResult = await pool.query(`

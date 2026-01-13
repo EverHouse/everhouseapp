@@ -178,8 +178,18 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
         optimisticUpdateRef.current = null;
         showToast('Member checked in', 'success');
       } else if (res.status === 402) {
+        const errorData = await res.json();
         safeRevertOptimisticUpdate(booking.id, optimisticStatus, newActivity.id);
-        setBillingModal({ isOpen: true, bookingId: id });
+        
+        if (errorData.requiresRoster) {
+          showToast(`${errorData.emptySlots} player slot${errorData.emptySlots > 1 ? 's' : ''} need to be filled before check-in`, 'error');
+          onTabChange('simulator');
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('open-booking-details', { detail: { bookingId: id } }));
+          }, 100);
+        } else {
+          setBillingModal({ isOpen: true, bookingId: id });
+        }
       } else {
         safeRevertOptimisticUpdate(booking.id, optimisticStatus, newActivity.id);
         showToast('Failed to check in', 'error');

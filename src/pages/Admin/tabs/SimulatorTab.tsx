@@ -815,6 +815,27 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
     }, []);
 
     useEffect(() => {
+        const handleOpenBookingDetails = async (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            if (detail?.bookingId) {
+                try {
+                    const res = await fetch(`/api/booking-requests?id=${detail.bookingId}`, { credentials: 'include' });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.length > 0) {
+                            setSelectedCalendarBooking(data[0]);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to open booking details:', err);
+                }
+            }
+        };
+        window.addEventListener('open-booking-details', handleOpenBookingDetails);
+        return () => window.removeEventListener('open-booking-details', handleOpenBookingDetails);
+    }, []);
+
+    useEffect(() => {
         if (actionModal || showTrackmanConfirm || selectedCalendarBooking || markStatusModal.booking || resolveUnmatchedModal) {
             document.body.style.overflow = 'hidden';
         } else {
