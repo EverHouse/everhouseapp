@@ -13,7 +13,7 @@ import {
   getReconciliationSummary 
 } from '../core/bookingService/trackmanReconciliation';
 import { getGuestPassesRemaining } from './guestPasses';
-import { getMemberTierByEmail, getTierLimits } from '../core/tierService';
+import { getMemberTierByEmail, getTierLimits, getDailyBookedMinutes } from '../core/tierService';
 
 const router = Router();
 
@@ -510,9 +510,10 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
   try {
     const { id } = req.params;
     
-    // Get guest_count, trackman_player_count, resource_id, and owner email from booking_requests
+    // Get booking details including duration for fee calculation
     const bookingResult = await pool.query(
       `SELECT br.guest_count, br.trackman_player_count, br.resource_id, br.user_email as owner_email,
+              br.duration_minutes, br.request_date,
               r.capacity as resource_capacity
        FROM booking_requests br
        LEFT JOIN resources r ON br.resource_id = r.id
@@ -528,6 +529,8 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     const trackmanPlayerCount = bookingResult.rows[0]?.trackman_player_count;
     const resourceCapacity = bookingResult.rows[0]?.resource_capacity || null;
     const ownerEmail = bookingResult.rows[0]?.owner_email;
+    const durationMinutes = bookingResult.rows[0]?.duration_minutes || 60;
+    const requestDate = bookingResult.rows[0]?.request_date;
     
     // Get owner's tier and guest passes remaining
     let ownerTier: string | null = null;
@@ -585,7 +588,10 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     // Check for player count mismatch (unfilled member slots)
     const playerCountMismatch = actualPlayerCount !== expectedPlayerCount;
     
-    // Calculate fee for each member
+    // Calculate per-person minutes based on player count (same formula as BookGolf.tsx)
+    const perPersonMins = Math.floor(durationMinutes / expectedPlayerCount);
+    
+    // Calculate fee for each member using SAME logic as booking flow
     const membersWithFees = await Promise.all(membersResult.rows.map(async (row) => {
       let tier: string | null = null;
       let fee = 0;
@@ -596,19 +602,32 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
         
         if (tier) {
           const tierLimits = await getTierLimits(tier);
+          const isSocialTier = tier.toLowerCase() === 'social';
+          const dailyAllowance = tierLimits.daily_sim_minutes || 0;
           
-          if (tierLimits.unlimited_access || tierLimits.daily_sim_minutes >= 999) {
+          // Unlimited tiers (999+ minutes) pay nothing
+          if (dailyAllowance >= 999 || tierLimits.unlimited_access) {
             fee = 0;
             feeNote = 'Included in membership';
-          } else if (tierLimits.can_book_simulators && tierLimits.daily_sim_minutes > 0) {
-            fee = 0;
-            feeNote = 'Included in membership';
-          } else if (tierLimits.can_book_simulators) {
-            fee = 25;
-            feeNote = `${tier} tier - $25/30min`;
+          } else if (isSocialTier) {
+            // Social tier pays for ALL their minutes (no included time)
+            const overageBlocks = Math.ceil(perPersonMins / 30);
+            fee = overageBlocks * 25;
+            feeNote = fee > 0 ? `Social tier - $${fee} (${perPersonMins} min)` : 'Included';
+          } else if (dailyAllowance > 0) {
+            // Other tiers: check what they've used today + this booking
+            const usedToday = await getDailyBookedMinutes(row.user_email, requestDate);
+            // Note: usedToday includes THIS booking if already saved, so we need to be careful
+            // For already-saved bookings, just use perPersonMins for overage calc
+            const overageMinutes = Math.max(0, (usedToday + perPersonMins) - dailyAllowance);
+            const overageBlocks = Math.ceil(overageMinutes / 30);
+            fee = overageBlocks * 25;
+            feeNote = fee > 0 ? `${tier} - $${fee} (overage)` : 'Included in membership';
           } else {
-            fee = 25;
-            feeNote = 'Pay-as-you-go - $25/30min';
+            // No daily allowance = pay as you go
+            const overageBlocks = Math.ceil(perPersonMins / 30);
+            fee = overageBlocks * 25;
+            feeNote = `Pay-as-you-go - $${fee}`;
           }
         }
       }
@@ -658,6 +677,11 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     
     res.json({
       ownerGuestPassesRemaining,
+      bookingInfo: {
+        durationMinutes,
+        perPersonMins,
+        expectedPlayerCount
+      },
       members: membersWithFees,
       guests: guestsWithFees,
       validation: {
