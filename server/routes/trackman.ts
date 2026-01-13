@@ -278,7 +278,20 @@ router.get('/api/admin/trackman/matched', isStaffOrAdmin, async (req, res) => {
         u.last_name as member_last_name,
         u.email as member_email,
         COALESCE(br.trackman_player_count, 1) as total_slots,
-        COALESCE((SELECT COUNT(*) FROM booking_participants bp WHERE bp.session_id = br.session_id), 0) as filled_slots
+        -- Count filled slots: use booking_participants if session exists, otherwise count owner + non-primary members
+        CASE 
+          WHEN br.session_id IS NOT NULL THEN
+            COALESCE((SELECT COUNT(*) FROM booking_participants bp WHERE bp.session_id = br.session_id), 0)
+          ELSE
+            -- No session: count owner as 1 if real email, plus non-primary booking_members
+            CASE 
+              WHEN br.user_email IS NOT NULL 
+                   AND br.user_email NOT LIKE 'unmatched-%@%' 
+                   AND br.user_email NOT LIKE '%unmatched@%'
+              THEN 1
+              ELSE 0
+            END + COALESCE((SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id AND bm.user_email IS NOT NULL AND bm.is_primary = false), 0)
+        END as filled_slots
        FROM booking_requests br
        LEFT JOIN users u ON LOWER(br.user_email) = LOWER(u.email)
        WHERE ${whereClause}
@@ -770,7 +783,20 @@ router.get('/api/admin/trackman/needs-players', isStaffOrAdmin, async (req, res)
         u.last_name as member_last_name,
         u.email as member_email,
         COALESCE(br.trackman_player_count, 1) as total_slots,
-        COALESCE((SELECT COUNT(*) FROM booking_participants bp WHERE bp.session_id = br.session_id), 0) as filled_slots,
+        -- Count filled slots: use booking_participants if session exists, otherwise count owner + non-primary members
+        CASE 
+          WHEN br.session_id IS NOT NULL THEN
+            COALESCE((SELECT COUNT(*) FROM booking_participants bp WHERE bp.session_id = br.session_id), 0)
+          ELSE
+            -- No session: count owner as 1 if real email, plus non-primary booking_members
+            CASE 
+              WHEN br.user_email IS NOT NULL 
+                   AND br.user_email NOT LIKE 'unmatched-%@%' 
+                   AND br.user_email NOT LIKE '%unmatched@%'
+              THEN 1
+              ELSE 0
+            END + COALESCE((SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id AND bm.user_email IS NOT NULL AND bm.is_primary = false), 0)
+        END as filled_slots,
         (SELECT COUNT(*) FROM booking_guests bg WHERE bg.booking_id = br.id) as guest_count_actual
        FROM booking_requests br
        LEFT JOIN users u ON LOWER(br.user_email) = LOWER(u.email)

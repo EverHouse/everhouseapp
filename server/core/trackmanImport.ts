@@ -399,6 +399,129 @@ async function getUserIdByEmail(email: string): Promise<string | null> {
   return result.rows[0]?.id || null;
 }
 
+// Check if an email belongs to a user (via primary email, trackman_email, or manually_linked_emails)
+async function isEmailLinkedToUser(email: string, userEmail: string): Promise<boolean> {
+  const emailLower = email.toLowerCase().trim();
+  const userEmailLower = userEmail.toLowerCase().trim();
+  
+  // Direct match
+  if (emailLower === userEmailLower) return true;
+  
+  // Check if email matches user's trackman_email or is in manually_linked_emails
+  const result = await pool.query(
+    `SELECT 1 FROM users 
+     WHERE LOWER(email) = LOWER($1) 
+     AND (
+       LOWER(trackman_email) = LOWER($2)
+       OR COALESCE(manually_linked_emails, '[]'::jsonb) ? $2
+     )
+     LIMIT 1`,
+    [userEmail, emailLower]
+  );
+  return result.rowCount > 0;
+}
+
+// Normalize a name for comparison (lowercase, remove extra spaces, handle common variations)
+function normalizeName(name: string): string {
+  return name.toLowerCase()
+    .replace(/[^a-z\s]/g, '') // Remove non-letters
+    .replace(/\s+/g, ' ')     // Normalize whitespace
+    .trim();
+}
+
+// Check if two names are similar enough to be the same person
+function areNamesSimilar(name1: string, name2: string): boolean {
+  const n1 = normalizeName(name1);
+  const n2 = normalizeName(name2);
+  
+  // Exact match
+  if (n1 === n2) return true;
+  
+  // Split into parts
+  const parts1 = n1.split(' ').filter(p => p.length > 1);
+  const parts2 = n2.split(' ').filter(p => p.length > 1);
+  
+  if (parts1.length === 0 || parts2.length === 0) return false;
+  
+  // Check if first names match (handles Joshua/Josh, Michael/Mike, etc.)
+  const firstName1 = parts1[0];
+  const firstName2 = parts2[0];
+  
+  // One is prefix of the other (Josh/Joshua, Alex/Alexander)
+  const firstNameMatch = firstName1.startsWith(firstName2) || firstName2.startsWith(firstName1) ||
+    firstName1.slice(0, 4) === firstName2.slice(0, 4); // First 4 chars match
+  
+  // Check last names if available
+  const lastName1 = parts1[parts1.length - 1];
+  const lastName2 = parts2[parts2.length - 1];
+  
+  // Last name should match closely (allow for typos like Mcgeeney/Mcgeeny)
+  const lastNameMatch = lastName1 === lastName2 || 
+    lastName1.replace(/e+y$/i, 'y') === lastName2.replace(/e+y$/i, 'y') || // Normalize -eey/-ey endings
+    levenshteinDistance(lastName1, lastName2) <= 2; // Allow 2 char typos
+  
+  return firstNameMatch && lastNameMatch;
+}
+
+// Simple Levenshtein distance for typo detection
+function levenshteinDistance(a: string, b: string): number {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  
+  const matrix: number[][] = [];
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+  
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+// Auto-link an M: email to the owner's manually_linked_emails
+async function autoLinkEmailToOwner(aliasEmail: string, ownerEmail: string, reason: string): Promise<boolean> {
+  try {
+    const aliasLower = aliasEmail.toLowerCase().trim();
+    
+    // Add to manually_linked_emails if not already present
+    const result = await pool.query(
+      `UPDATE users 
+       SET manually_linked_emails = 
+         CASE 
+           WHEN COALESCE(manually_linked_emails, '[]'::jsonb) ? $2
+           THEN manually_linked_emails
+           ELSE COALESCE(manually_linked_emails, '[]'::jsonb) || to_jsonb($2::text)
+         END
+       WHERE LOWER(email) = LOWER($1)
+       RETURNING email`,
+      [ownerEmail, aliasLower]
+    );
+    
+    if (result.rowCount && result.rowCount > 0) {
+      process.stderr.write(`[Trackman Import] Auto-linked ${aliasLower} to ${ownerEmail}: ${reason}\n`);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    process.stderr.write(`[Trackman Import] Failed to auto-link ${aliasEmail} to ${ownerEmail}: ${error}\n`);
+    return false;
+  }
+}
+
 async function createTrackmanSessionAndParticipants(input: SessionCreationInput): Promise<void> {
   try {
     // Gather all participants with resolved user IDs
@@ -414,6 +537,7 @@ async function createTrackmanSessionAndParticipants(input: SessionCreationInput)
     
     // Calculate per-participant duration (split equally among all participants)
     // Count unique members by resolving emails first to avoid counting owner twice
+    // Note: This is a sync count, actual duplicates are filtered later with async DB checks
     const uniqueMemberCount = input.parsedPlayers.filter(p => {
       if (p.type !== 'member' || !p.email) return false;
       const resolvedEmail = resolveEmail(p.email, input.membersByEmail, input.trackmanEmailMapping);
@@ -454,6 +578,12 @@ async function createTrackmanSessionAndParticipants(input: SessionCreationInput)
         
         // Skip if same user_id as owner (catches alias mismatches like max.lee vs maxwell.lee)
         if (memberUserId && ownerUserId && memberUserId === ownerUserId) {
+          continue;
+        }
+        
+        // Also check if this email is linked to the owner in the database
+        const isLinkedToOwner = await isEmailLinkedToUser(member.email, input.ownerEmail);
+        if (isLinkedToOwner) {
           continue;
         }
         
@@ -1209,18 +1339,49 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
             // Resolve owner email using trackman mapping for comparison
             const ownerResolvedEmail = resolveEmail(matchedEmail, membersByEmail, trackmanEmailMapping);
             
-            for (const memberEmail of memberEmails) {
+            // Get parsed player objects (with name and email) for name matching
+            const memberPlayers = parsedPlayers.filter(p => p.type === 'member' && p.email);
+            
+            for (const memberPlayer of memberPlayers) {
+              const memberEmail = memberPlayer.email!.toLowerCase();
+              const memberName = memberPlayer.name || '';
+              
               // Resolve member email to check if it's the same person as owner
               const memberResolvedEmail = resolveEmail(memberEmail, membersByEmail, trackmanEmailMapping);
               
               // Skip if this member is the same person as the owner
+              // Check both resolved emails AND database-linked emails
               if (memberResolvedEmail === ownerResolvedEmail) {
                 continue;
               }
               
+              // Also check if this email is linked to the owner in the database
+              // (handles cases where trackman_email or manually_linked_emails aren't in the CSV mapping)
+              let isLinkedToOwner = await isEmailLinkedToUser(memberEmail, matchedEmail);
+              if (isLinkedToOwner) {
+                process.stderr.write(`[Trackman Import] Skipping M: ${memberEmail} - linked to owner ${matchedEmail}\n`);
+                continue;
+              }
+              
+              // Check if this email exists in our members database
+              const memberExists = membersByEmail.get(memberEmail) || trackmanEmailMapping.get(memberEmail);
+              
+              // For solo bookings: if M: email is unresolved but M: name matches owner name,
+              // auto-link the email to the owner's manually_linked_emails for future imports
+              if (!memberExists && row.playerCount === 1 && memberName) {
+                // Check if the M: name matches the owner's name
+                if (areNamesSimilar(memberName, row.userName)) {
+                  // Auto-link this email to the owner
+                  const linked = await autoLinkEmailToOwner(memberEmail, matchedEmail, 
+                    `Solo booking name match: "${memberName}" ~ "${row.userName}"`);
+                  if (linked) {
+                    // Skip creating a member entry since this is the owner
+                    continue;
+                  }
+                }
+              }
+              
               if (memberSlot <= row.playerCount) {
-                // Check if this email exists in our members database
-                const memberExists = membersByEmail.get(memberEmail) || trackmanEmailMapping.get(memberEmail);
                 await db.insert(bookingMembers).values({
                   bookingId: bookingId,
                   userEmail: memberExists || memberEmail, // Use real email if mapped, otherwise placeholder
