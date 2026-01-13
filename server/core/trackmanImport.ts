@@ -1206,10 +1206,21 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
             let guestSlot = 1;
             
             // Create slots for additional members from notes (skip if same as primary)
+            // Resolve owner email using trackman mapping for comparison
+            const ownerResolvedEmail = resolveEmail(matchedEmail, membersByEmail, trackmanEmailMapping);
+            
             for (const memberEmail of memberEmails) {
-              if (memberEmail !== matchedEmail.toLowerCase() && memberSlot <= row.playerCount) {
+              // Resolve member email to check if it's the same person as owner
+              const memberResolvedEmail = resolveEmail(memberEmail, membersByEmail, trackmanEmailMapping);
+              
+              // Skip if this member is the same person as the owner
+              if (memberResolvedEmail === ownerResolvedEmail) {
+                continue;
+              }
+              
+              if (memberSlot <= row.playerCount) {
                 // Check if this email exists in our members database
-                const memberExists = membersByEmail.get(memberEmail);
+                const memberExists = membersByEmail.get(memberEmail) || trackmanEmailMapping.get(memberEmail);
                 await db.insert(bookingMembers).values({
                   bookingId: bookingId,
                   userEmail: memberExists || memberEmail, // Use real email if mapped, otherwise placeholder
