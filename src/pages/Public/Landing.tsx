@@ -305,7 +305,7 @@ const Landing: React.FC = () => {
           <div 
             className="absolute inset-0 transition-opacity duration-300"
             style={{
-              background: `linear-gradient(to top, rgba(0,0,0,${0.95 + gradientShift * 0.005}) 0%, rgba(0,0,0,${0.7 + gradientShift * 0.01}) 30%, rgba(0,0,0,${0.5 + gradientShift * 0.02}) ${50 + gradientShift}%, rgba(0,0,0,0.2) 75%, transparent 100%)`
+              background: `linear-gradient(to top, rgba(0,0,0,${0.95 + gradientShift * 0.005}) 0%, rgba(0,0,0,${0.85 + gradientShift * 0.01}) 25%, rgba(0,0,0,${0.65 + gradientShift * 0.015}) 45%, rgba(0,0,0,0.4) 65%, rgba(0,0,0,0.15) 85%, transparent 100%)`
             }}
           />
         </div>

@@ -894,6 +894,74 @@ export async function getIntegritySummary(): Promise<IntegritySummary> {
   return summary;
 }
 
+export interface CachedIntegrityResults {
+  results: IntegrityCheckResult[];
+  meta: {
+    totalChecks: number;
+    passed: number;
+    warnings: number;
+    failed: number;
+    totalIssues: number;
+    lastRun: Date;
+    isCached: boolean;
+  };
+}
+
+export async function getCachedIntegrityResults(): Promise<CachedIntegrityResults | null> {
+  const [latestRun] = await db.select()
+    .from(integrityCheckHistory)
+    .orderBy(desc(integrityCheckHistory.runAt))
+    .limit(1);
+  
+  if (!latestRun || !latestRun.resultsJson) {
+    return null;
+  }
+  
+  const results: IntegrityCheckResult[] = JSON.parse(JSON.stringify(latestRun.resultsJson));
+  
+  const activeIgnores = await db.select()
+    .from(integrityIgnores)
+    .where(and(
+      eq(integrityIgnores.isActive, true),
+      gt(integrityIgnores.expiresAt, new Date())
+    ));
+  
+  const ignoreMap = new Map(activeIgnores.map(i => [i.issueKey, i]));
+  
+  for (const check of results) {
+    for (const issue of check.issues) {
+      issue.recordId = String(issue.recordId);
+      const issueKey = generateIssueKey(issue);
+      const ignoreRule = ignoreMap.get(issueKey);
+      if (ignoreRule) {
+        issue.ignored = true;
+        issue.ignoreInfo = {
+          ignoredBy: ignoreRule.ignoredBy,
+          ignoredAt: new Date(ignoreRule.ignoredAt),
+          expiresAt: new Date(ignoreRule.expiresAt),
+          reason: ignoreRule.reason
+        };
+      } else {
+        issue.ignored = false;
+        delete issue.ignoreInfo;
+      }
+    }
+  }
+  
+  return {
+    results,
+    meta: {
+      totalChecks: results.length,
+      passed: results.filter(r => r.status === 'pass').length,
+      warnings: results.filter(r => r.status === 'warning').length,
+      failed: results.filter(r => r.status === 'fail').length,
+      totalIssues: results.reduce((sum, r) => sum + r.issueCount, 0),
+      lastRun: latestRun.runAt,
+      isCached: true
+    }
+  };
+}
+
 export interface ResolveIssueParams {
   issueKey: string;
   action: 'resolved' | 'ignored' | 'reopened';

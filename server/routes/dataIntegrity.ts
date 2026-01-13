@@ -1,11 +1,33 @@
 import { Router } from 'express';
 import { isAdmin } from '../core/middleware';
-import { runAllIntegrityChecks, getIntegritySummary, getIntegrityHistory, resolveIssue, getAuditLog, syncPush, syncPull, createIgnoreRule, removeIgnoreRule, getIgnoredIssues } from '../core/dataIntegrity';
+import { runAllIntegrityChecks, getIntegritySummary, getIntegrityHistory, resolveIssue, getAuditLog, syncPush, syncPull, createIgnoreRule, removeIgnoreRule, getIgnoredIssues, getCachedIntegrityResults } from '../core/dataIntegrity';
 import { isProduction } from '../core/db';
 import { broadcastDataIntegrityUpdate } from '../core/websocket';
 import type { Request } from 'express';
 
 const router = Router();
+
+router.get('/api/data-integrity/cached', isAdmin, async (req, res) => {
+  try {
+    const cached = await getCachedIntegrityResults();
+    if (!cached) {
+      return res.json({ 
+        success: false, 
+        hasCached: false,
+        message: 'No cached results available. Run checks to generate initial results.' 
+      });
+    }
+    res.json({
+      success: true,
+      hasCached: true,
+      results: cached.results,
+      meta: cached.meta
+    });
+  } catch (error: any) {
+    if (!isProduction) console.error('[DataIntegrity] Cached results error:', error);
+    res.status(500).json({ error: 'Failed to get cached results', details: error.message });
+  }
+});
 
 router.get('/api/data-integrity/run', isAdmin, async (req, res) => {
   try {

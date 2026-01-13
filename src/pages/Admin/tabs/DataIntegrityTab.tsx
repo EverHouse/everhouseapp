@@ -133,8 +133,10 @@ const DataIntegrityTab: React.FC = () => {
   const { showToast } = useToast();
   
   const [isRunning, setIsRunning] = useState(false);
+  const [isLoadingCached, setIsLoadingCached] = useState(true);
   const [results, setResults] = useState<IntegrityCheckResult[]>([]);
   const [meta, setMeta] = useState<IntegrityMeta | null>(null);
+  const [isCached, setIsCached] = useState(false);
   const [expandedChecks, setExpandedChecks] = useState<Set<string>>(new Set());
   
   const [calendarStatus, setCalendarStatus] = useState<CalendarStatusResponse | null>(null);
@@ -160,11 +162,39 @@ const DataIntegrityTab: React.FC = () => {
   const [isLoadingIgnored, setIsLoadingIgnored] = useState(false);
 
   useEffect(() => {
+    fetchCachedResults();
     fetchCalendarStatus();
     fetchHistory();
     fetchAuditLog();
     fetchIgnoredIssues();
   }, []);
+
+  const fetchCachedResults = async () => {
+    try {
+      setIsLoadingCached(true);
+      const res = await fetch('/api/data-integrity/cached', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.hasCached) {
+          setResults(sortBySeverity(data.results));
+          setMeta(data.meta);
+          setIsCached(true);
+          setIsLoadingCached(false);
+        } else {
+          setIsLoadingCached(false);
+          runIntegrityChecks();
+        }
+      } else {
+        console.error('Cached results endpoint returned error, falling back to fresh run');
+        setIsLoadingCached(false);
+        runIntegrityChecks();
+      }
+    } catch (err) {
+      console.error('Failed to fetch cached results:', err);
+      setIsLoadingCached(false);
+      runIntegrityChecks();
+    }
+  };
 
   // Real-time updates via WebSocket
   useEffect(() => {
@@ -401,6 +431,7 @@ const DataIntegrityTab: React.FC = () => {
         const data = await res.json();
         setResults(sortBySeverity(data.results));
         setMeta(data.meta);
+        setIsCached(false);
         showToast('Integrity checks completed', 'success');
         fetchHistory();
       } else {
@@ -413,6 +444,20 @@ const DataIntegrityTab: React.FC = () => {
     } finally {
       setIsRunning(false);
     }
+  };
+
+  const formatTimeAgo = (date: Date | string) => {
+    const now = new Date();
+    const then = new Date(date);
+    const diffMs = now.getTime() - then.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
   };
 
   const getIssueTracking = (issue: IntegrityIssue): ActiveIssue | undefined => {
@@ -593,35 +638,50 @@ const DataIntegrityTab: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-pop-in pb-32">
-      <div className="mb-6 flex gap-3">
-        <button
-          onClick={runIntegrityChecks}
-          disabled={isRunning}
-          className="flex-1 py-3 px-4 bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515] rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {isRunning ? (
-            <>
-              <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
-              Running Checks...
-            </>
-          ) : (
-            <>
-              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">fact_check</span>
-              Run Integrity Checks
-            </>
-          )}
-        </button>
-        {results.length > 0 && (
+      <div className="mb-6 flex flex-col gap-3">
+        <div className="flex gap-3">
           <button
-            onClick={downloadCSV}
-            disabled={!hasIssues}
-            className="py-3 px-4 border-2 border-primary dark:border-white/40 text-primary dark:text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-primary/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={runIntegrityChecks}
+            disabled={isRunning || isLoadingCached}
+            className="flex-1 py-3 px-4 bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515] rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
           >
-            <span aria-hidden="true" className="material-symbols-outlined text-[20px]">download</span>
-            Download CSV
+            {isRunning ? (
+              <>
+                <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
+                Running Checks...
+              </>
+            ) : (
+              <>
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">{isCached ? 'refresh' : 'fact_check'}</span>
+                {isCached ? 'Refresh Checks' : 'Run Integrity Checks'}
+              </>
+            )}
           </button>
+          {results.length > 0 && (
+            <button
+              onClick={downloadCSV}
+              disabled={!hasIssues}
+              className="py-3 px-4 border-2 border-primary dark:border-white/40 text-primary dark:text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-primary/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">download</span>
+              Download CSV
+            </button>
+          )}
+        </div>
+        {meta?.lastRun && isCached && (
+          <p className="text-sm text-primary/60 dark:text-white/60 text-center">
+            <span aria-hidden="true" className="material-symbols-outlined text-[14px] align-middle mr-1">schedule</span>
+            Last checked {formatTimeAgo(meta.lastRun)}
+          </p>
         )}
       </div>
+
+      {isLoadingCached && !meta && (
+        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-8 text-center">
+          <span aria-hidden="true" className="material-symbols-outlined animate-spin text-3xl text-primary/40 dark:text-white/40 mb-2">progress_activity</span>
+          <p className="text-sm text-primary/60 dark:text-white/60">Loading cached results...</p>
+        </div>
+      )}
 
       {meta && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
