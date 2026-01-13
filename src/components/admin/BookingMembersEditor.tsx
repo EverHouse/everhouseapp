@@ -10,6 +10,9 @@ interface BookingMember {
   linkedAt: string | null;
   linkedBy: string | null;
   memberName: string;
+  tier: string | null;
+  fee: number;
+  feeNote: string;
 }
 
 interface BookingGuest {
@@ -18,6 +21,8 @@ interface BookingGuest {
   guestName: string | null;
   guestEmail: string | null;
   slotNumber: number;
+  fee: number;
+  feeNote: string;
 }
 
 interface MemberSearchResult {
@@ -290,11 +295,11 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ bookingId, 
               key={member.id} 
               className="flex items-center justify-between p-2 bg-white dark:bg-black/20 rounded-lg border border-gray-100 dark:border-white/10"
             >
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
                 <div className="w-6 h-6 rounded-full bg-primary/10 dark:bg-white/10 flex items-center justify-center flex-shrink-0">
                   <span className="text-xs font-bold text-primary dark:text-white">{member.slotNumber}</span>
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <p className="text-sm font-medium text-primary dark:text-white truncate">
                       {member.memberName}
@@ -304,17 +309,41 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ bookingId, 
                         PRIMARY
                       </span>
                     )}
+                    {member.tier && (
+                      <TierBadge tier={member.tier} size="sm" />
+                    )}
                   </div>
-                  {member.userEmail && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{member.userEmail}</p>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {member.userEmail && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{member.userEmail}</p>
+                    )}
+                  </div>
                 </div>
+                {member.userEmail && (
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    <span 
+                      className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${
+                        member.fee === 0 
+                          ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' 
+                          : 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400'
+                      }`}
+                      title={member.feeNote}
+                    >
+                      ${member.fee.toFixed(2)}
+                    </span>
+                    {member.feeNote && (
+                      <span className="text-[9px] text-gray-500 dark:text-gray-400 max-w-[100px] truncate hidden sm:inline" title={member.feeNote}>
+                        {member.feeNote}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               {!member.isPrimary && member.userEmail && (
                 <button
                   onClick={() => handleUnlinkMember(member.id)}
                   disabled={unlinkingSlotId === member.id}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50 ml-1"
                   title="Remove from booking"
                 >
                   {unlinkingSlotId === member.id ? (
@@ -462,23 +491,40 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ bookingId, 
               {guests.map((guest) => (
                 <div 
                   key={guest.id} 
-                  className="flex items-center gap-2 p-2 bg-amber-50/50 dark:bg-amber-500/5 rounded-lg border border-amber-100 dark:border-amber-500/20"
+                  className="flex items-center justify-between p-2 bg-amber-50/50 dark:bg-amber-500/5 rounded-lg border border-amber-100 dark:border-amber-500/20"
                 >
-                  <div className="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400">{guest.slotNumber}</span>
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-medium text-primary dark:text-white truncate">
-                        {guest.guestName || 'Guest'}
-                      </p>
-                      <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 shrink-0">
-                        GUEST
-                      </span>
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-bold text-amber-600 dark:text-amber-400">{guest.slotNumber}</span>
                     </div>
-                    {guest.guestEmail && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{guest.guestEmail}</p>
-                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium text-primary dark:text-white truncate">
+                          {guest.guestName || 'Guest'}
+                        </p>
+                        <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 shrink-0">
+                          GUEST
+                        </span>
+                      </div>
+                      {guest.guestEmail && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{guest.guestEmail}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    <span 
+                      className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${
+                        guest.fee === 0 
+                          ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' 
+                          : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'
+                      }`}
+                      title={guest.feeNote}
+                    >
+                      ${guest.fee.toFixed(2)}
+                    </span>
+                    <span className="text-[9px] text-gray-500 dark:text-gray-400 max-w-[80px] truncate" title={guest.feeNote}>
+                      {guest.feeNote}
+                    </span>
                   </div>
                 </div>
               ))}

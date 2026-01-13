@@ -12,6 +12,8 @@ import {
   adjustLedgerForReconciliation, 
   getReconciliationSummary 
 } from '../core/bookingService/trackmanReconciliation';
+import { getGuestPassesRemaining } from './guestPasses';
+import { getMemberTierByEmail, getTierLimits } from '../core/tierService';
 
 const router = Router();
 
@@ -508,20 +510,36 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
   try {
     const { id } = req.params;
     
-    // Get guest_count, trackman_player_count, and resource_id from booking_requests
+    // Get guest_count, trackman_player_count, resource_id, and owner email from booking_requests
     const bookingResult = await pool.query(
-      `SELECT br.guest_count, br.trackman_player_count, br.resource_id, r.capacity as resource_capacity
+      `SELECT br.guest_count, br.trackman_player_count, br.resource_id, br.user_email as owner_email,
+              r.capacity as resource_capacity
        FROM booking_requests br
        LEFT JOIN resources r ON br.resource_id = r.id
        WHERE br.id = $1`,
       [id]
     );
+    
+    if (bookingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    
     const legacyGuestCount = bookingResult.rows[0]?.guest_count || 0;
     const trackmanPlayerCount = bookingResult.rows[0]?.trackman_player_count;
     const resourceCapacity = bookingResult.rows[0]?.resource_capacity || null;
+    const ownerEmail = bookingResult.rows[0]?.owner_email;
+    
+    // Get owner's tier and guest passes remaining
+    let ownerTier: string | null = null;
+    let ownerGuestPassesRemaining = 0;
+    
+    if (ownerEmail && !ownerEmail.includes('unmatched')) {
+      ownerTier = await getMemberTierByEmail(ownerEmail);
+      ownerGuestPassesRemaining = await getGuestPassesRemaining(ownerEmail, ownerTier || undefined);
+    }
     
     const membersResult = await pool.query(
-      `SELECT bm.*, u.first_name, u.last_name, u.email as member_email
+      `SELECT bm.*, u.first_name, u.last_name, u.email as member_email, u.tier as user_tier
        FROM booking_members bm
        LEFT JOIN users u ON LOWER(bm.user_email) = LOWER(u.email)
        WHERE bm.booking_id = $1
@@ -567,8 +585,35 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     // Check for player count mismatch (unfilled member slots)
     const playerCountMismatch = actualPlayerCount !== expectedPlayerCount;
     
-    res.json({
-      members: membersResult.rows.map(row => ({
+    // Calculate fee for each member
+    const membersWithFees = await Promise.all(membersResult.rows.map(async (row) => {
+      let tier: string | null = null;
+      let fee = 0;
+      let feeNote = '';
+      
+      if (row.user_email) {
+        tier = row.user_tier || await getMemberTierByEmail(row.user_email);
+        
+        if (tier) {
+          const tierLimits = await getTierLimits(tier);
+          
+          if (tierLimits.unlimited_access || tierLimits.daily_sim_minutes >= 999) {
+            fee = 0;
+            feeNote = 'Included in membership';
+          } else if (tierLimits.can_book_simulators && tierLimits.daily_sim_minutes > 0) {
+            fee = 0;
+            feeNote = 'Included in membership';
+          } else if (tierLimits.can_book_simulators) {
+            fee = 25;
+            feeNote = `${tier} tier - $25/30min`;
+          } else {
+            fee = 25;
+            feeNote = 'Pay-as-you-go - $25/30min';
+          }
+        }
+      }
+      
+      return {
         id: row.id,
         bookingId: row.booking_id,
         userEmail: row.user_email,
@@ -578,15 +623,43 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
         linkedBy: row.linked_by,
         memberName: row.first_name && row.last_name 
           ? `${row.first_name} ${row.last_name}`
-          : row.user_email || 'Empty Slot'
-      })),
-      guests: guestsResult.rows.map(row => ({
+          : row.user_email || 'Empty Slot',
+        tier,
+        fee,
+        feeNote
+      };
+    }));
+    
+    // Calculate fee for each guest, tracking guest passes used
+    let guestPassesAvailable = ownerGuestPassesRemaining;
+    const guestsWithFees = guestsResult.rows.map(row => {
+      let fee: number;
+      let feeNote: string;
+      
+      if (guestPassesAvailable > 0) {
+        fee = 0;
+        feeNote = 'Guest Pass Used';
+        guestPassesAvailable--;
+      } else {
+        fee = 25;
+        feeNote = 'No passes - $25 due';
+      }
+      
+      return {
         id: row.id,
         bookingId: row.booking_id,
         guestName: row.guest_name,
         guestEmail: row.guest_email,
-        slotNumber: row.slot_number
-      })),
+        slotNumber: row.slot_number,
+        fee,
+        feeNote
+      };
+    });
+    
+    res.json({
+      ownerGuestPassesRemaining,
+      members: membersWithFees,
+      guests: guestsWithFees,
       validation: {
         expectedPlayerCount,
         actualPlayerCount,

@@ -216,6 +216,24 @@ export async function refundGuestPass(
   }
 }
 
+export async function getGuestPassesRemaining(memberEmail: string, tier?: string): Promise<number> {
+  try {
+    const result = await db.select()
+      .from(guestPasses)
+      .where(eq(guestPasses.memberEmail, memberEmail));
+    
+    if (result.length === 0) {
+      const tierLimits = tier ? await getTierLimits(tier) : null;
+      return tierLimits?.guest_passes_per_month ?? 0;
+    }
+    
+    return Math.max(0, result[0].passesTotal - result[0].passesUsed);
+  } catch (error) {
+    console.error('[getGuestPassesRemaining] Error:', error);
+    return 0;
+  }
+}
+
 export async function ensureGuestPassRecord(memberEmail: string, tier?: string): Promise<void> {
   try {
     const tierLimits = tier ? await getTierLimits(tier) : null;
