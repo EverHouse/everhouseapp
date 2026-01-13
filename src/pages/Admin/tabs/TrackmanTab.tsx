@@ -586,7 +586,7 @@ const TrackmanTab: React.FC = () => {
           Unmatched Bookings ({unmatchedTotalCount})
         </h2>
         <p className="text-sm text-primary/70 dark:text-white/70 mb-4">
-          These bookings couldn't be matched to a member. Click "Resolve" to manually assign them.
+          These bookings have no owner assigned. The email or name from Trackman didn't match any member in our system. Click "Resolve" to link each booking to the correct member so their visit history and usage are tracked properly.
         </p>
         
         <div className="mb-4">
@@ -685,7 +685,7 @@ const TrackmanTab: React.FC = () => {
             Requires Review ({requiresReviewTotalCount})
           </h2>
           <p className="text-sm text-primary/70 dark:text-white/70 mb-4">
-            These bookings have partial names without emails and need manual matching to a member.
+            These bookings have incomplete info (like "Bobby S." or just a first name) so the system couldn't auto-match them. Click "Find Matches" to search for the member and assign them as the owner. This ensures their visit counts toward their account.
           </p>
           
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
@@ -723,7 +723,7 @@ const TrackmanTab: React.FC = () => {
             Potential Matches ({potentialMatchesTotalCount})
           </h2>
           <p className="text-sm text-primary/70 dark:text-white/70 mb-4">
-            These unmatched bookings have potential matches in the app. Click "Link" to connect them.
+            These Trackman bookings weren't auto-matched, but the system found app bookings from the same time that might be the same session. Click "Link" to connect them - this matches the Trackman data to the member's existing booking in our system.
           </p>
           
           <div className="space-y-4 max-h-[500px] overflow-y-auto">
@@ -789,7 +789,7 @@ const TrackmanTab: React.FC = () => {
             Needs Players ({needsPlayersTotalCount})
           </h2>
           <p className="text-sm text-primary/70 dark:text-white/70 mb-4">
-            These bookings have unfilled player slots. Click to manage players.
+            These bookings have an owner, but Trackman recorded more players than are currently assigned. For example, "1/3 Assigned" means 1 of 3 players is identified. Click "Manage" to add the other players so each person's usage is tracked correctly for billing and fair usage limits.
           </p>
           
           <div className="mb-4">
@@ -907,7 +907,7 @@ const TrackmanTab: React.FC = () => {
         {showMatchedBookings && (
           <div className="mt-4">
             <p className="text-sm text-primary/70 dark:text-white/70 mb-4">
-              These bookings were matched to members during import. Click "Edit" to reassign if incorrect.
+              These bookings are complete - the owner is assigned and all player slots are filled. The "1/1 assigned" badge means all players are accounted for. Click "Edit" if a match was wrong and needs to be reassigned to a different member.
             </p>
             
             <div className="mb-4">
