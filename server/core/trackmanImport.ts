@@ -10,6 +10,7 @@ import { getHubSpotClient } from './integrations';
 import { bookingEvents } from './bookingEvents';
 import { getMemberTierByEmail } from './tierService';
 import { createSession, recordUsage, ParticipantInput } from './bookingService/sessionManager';
+import { calculateFullSessionBilling, FLAT_GUEST_FEE, Participant } from './bookingService/usageCalculator';
 import { useGuestPass } from '../routes/guestPasses';
 
 interface ParsedPlayer {
@@ -588,18 +589,46 @@ async function createTrackmanSessionAndParticipants(input: SessionCreationInput)
           continue;
         }
         
+        // If member has no userId (unmatched), treat them as a guest
+        if (!memberUserId) {
+          let guestId: number | undefined;
+          const guestName = member.name || normalizedMemberEmail;
+          const existingGuest = await db.select()
+            .from(guestsTable)
+            .where(sql`LOWER(name) = LOWER(${guestName})`)
+            .limit(1);
+          
+          if (existingGuest.length > 0) {
+            guestId = existingGuest[0].id;
+          } else {
+            const [newGuest] = await db.insert(guestsTable).values({
+              name: guestName,
+              email: member.email,
+              createdByMemberId: input.ownerEmail
+            }).returning();
+            guestId = newGuest?.id;
+          }
+          
+          participantInputs.push({
+            guestId,
+            participantType: 'guest',
+            displayName: guestName,
+            slotDuration: perParticipantMinutes
+          });
+          process.stderr.write(`[Trackman Import] Unmatched member "${guestName}" (${member.email}) treated as guest\n`);
+          continue;
+        }
+        
         const memberTier = await getMemberTierByEmail(normalizedMemberEmail) || 'social';
         
         participantInputs.push({
-          userId: memberUserId || undefined,
+          userId: memberUserId,
           participantType: 'member',
           displayName: member.name || normalizedMemberEmail,
           slotDuration: perParticipantMinutes
         });
         
-        if (memberUserId) {
-          memberData.push({ userId: memberUserId, tier: memberTier });
-        }
+        memberData.push({ userId: memberUserId, tier: memberTier, email: normalizedMemberEmail });
       }
     }
     
@@ -652,30 +681,103 @@ async function createTrackmanSessionAndParticipants(input: SessionCreationInput)
       .set({ sessionId: session.id })
       .where(eq(bookingRequests.id, input.bookingId));
 
-    // Update payment_status for past bookings (sessionManager defaults to 'pending')
-    if (input.isPast && participants.length > 0) {
+    // Update payment_status and payment_method based on past/future sessions
+    if (participants.length > 0) {
       const participantIds = participants.map(p => p.id);
-      await db.execute(sql`
-        UPDATE booking_participants 
-        SET payment_status = 'paid' 
-        WHERE id = ANY(${participantIds})
-      `);
+      if (input.isPast) {
+        await db.execute(sql`
+          UPDATE booking_participants 
+          SET payment_status = 'paid', payment_method = 'credit_card'
+          WHERE id = ANY(${participantIds})
+        `);
+      } else {
+        await db.execute(sql`
+          UPDATE booking_participants 
+          SET payment_status = 'pending', payment_method = 'unpaid'
+          WHERE id = ANY(${participantIds})
+        `);
+      }
     }
 
-    // Create usage_ledger entries for members using recordUsage
+    // Build Participant array for billing calculation
+    const billingParticipants: Participant[] = [];
+    
+    // Add owner
+    billingParticipants.push({
+      userId: ownerUserId || undefined,
+      email: input.ownerEmail,
+      participantType: 'owner',
+      displayName: input.ownerName || input.ownerEmail
+    });
+    
+    // Add members from memberData
     for (const md of memberData) {
+      billingParticipants.push({
+        userId: md.userId,
+        email: md.email,
+        participantType: 'member',
+        displayName: md.email
+      });
+    }
+    
+    // Add guests from participantInputs (those with participantType === 'guest')
+    const guestInputs = participantInputs.filter(p => p.participantType === 'guest');
+    for (const g of guestInputs) {
+      billingParticipants.push({
+        guestId: g.guestId,
+        participantType: 'guest',
+        displayName: g.displayName
+      });
+    }
+    
+    // Calculate billing using calculateFullSessionBilling
+    const billingResult = await calculateFullSessionBilling(
+      input.sessionDate,
+      input.durationMinutes,
+      billingParticipants,
+      input.ownerEmail
+    );
+
+    // Create usage_ledger entries for members with calculated fees
+    for (const md of memberData) {
+      // Find the billing breakdown for this member
+      const memberBilling = billingResult.billingBreakdown.find(
+        b => b.userId === md.userId || b.email?.toLowerCase() === md.email.toLowerCase()
+      );
+      
       await recordUsage(
         session.id,
         {
           memberId: md.userId,
-          minutesCharged: perParticipantMinutes,
-          overageFee: 0,
+          minutesCharged: memberBilling?.minutesAllocated || perParticipantMinutes,
+          overageFee: memberBilling?.overageFee || 0,
           guestFee: 0,
           tierAtBooking: md.tier,
           paymentMethod: input.isPast ? 'credit_card' : 'unpaid'
         },
         'trackman_import'
       );
+    }
+    
+    // Record owner usage with calculated overage
+    if (ownerUserId) {
+      const ownerBilling = billingResult.billingBreakdown.find(b => b.participantType === 'owner');
+      await recordUsage(
+        session.id,
+        {
+          memberId: ownerUserId,
+          minutesCharged: ownerBilling?.minutesAllocated || input.durationMinutes,
+          overageFee: ownerBilling?.overageFee || 0,
+          guestFee: billingResult.totalGuestFees,
+          tierAtBooking: ownerTier,
+          paymentMethod: input.isPast ? 'credit_card' : 'unpaid'
+        },
+        'trackman_import'
+      );
+    }
+    
+    if (billingResult.totalFees > 0) {
+      process.stderr.write(`[Trackman Import] Session #${session.id} billing: overage=$${billingResult.totalOverageFees}, guest=$${billingResult.totalGuestFees}\n`);
     }
 
     process.stderr.write(`[Trackman Import] Created session #${session.id} with ${participants.length} participants for Trackman ID ${input.trackmanBookingId}\n`);

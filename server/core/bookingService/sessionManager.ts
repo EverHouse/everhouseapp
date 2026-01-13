@@ -273,6 +273,7 @@ import { enforceSocialTierRules, getMemberTier, type ParticipantForValidation } 
 import { 
   computeUsageAllocation, 
   assignGuestTimeToHost, 
+  calculateFullSessionBilling,
   type Participant as UsageParticipant 
 } from './usageCalculator';
 import { users } from '../../../shared/schema';
@@ -387,8 +388,8 @@ export async function createSessionWithUsageTracking(
       source
     );
     
-    // Step 4: Compute usage allocation using usageCalculator types
-    const usageParticipants: UsageParticipant[] = request.participants.map(p => ({
+    // Step 4: Build participants for billing calculation
+    const billingParticipants: UsageParticipant[] = request.participants.map(p => ({
       userId: p.userId,
       email: p.userId ? userIdToEmail.get(p.userId) : undefined,
       guestId: p.guestId,
@@ -396,70 +397,55 @@ export async function createSessionWithUsageTracking(
       displayName: p.displayName
     }));
     
-    const usageAllocations = computeUsageAllocation(request.durationMinutes, usageParticipants);
+    // Step 5: Calculate billing using the new centralized billing calculator
+    const billingResult = await calculateFullSessionBilling(
+      request.sessionDate,
+      request.durationMinutes,
+      billingParticipants,
+      request.ownerEmail
+    );
     
-    // Step 5: Record usage ledger entries
+    // Step 6: Record usage ledger entries based on billing breakdown
     let ledgerEntriesCreated = 0;
-    let ownerOwnMinutes = 0;
-    let totalGuestMinutes = 0;
     
-    // First pass: record member usage, accumulate guest minutes
-    for (const allocation of usageAllocations) {
-      if (allocation.participantType === 'guest') {
-        // Accumulate guest minutes for host reassignment
-        totalGuestMinutes += allocation.minutesAllocated;
-      } else if (allocation.userId) {
-        // Track owner's own minutes for overage calculation
-        if (allocation.participantType === 'owner') {
-          ownerOwnMinutes = allocation.minutesAllocated;
+    for (const billing of billingResult.billingBreakdown) {
+      if (billing.participantType === 'guest') {
+        // Guest fees are assigned to the host, but with minutesCharged=0 
+        // to avoid double-counting in host's daily usage
+        if (billing.guestFee > 0) {
+          await recordUsage(session.id, {
+            memberId: request.ownerEmail,
+            minutesCharged: 0,  // Don't add to host's usage minutes
+            overageFee: 0,
+            guestFee: billing.guestFee,
+            tierAtBooking: ownerTier || undefined,
+            paymentMethod: 'unpaid'
+          }, source);
+          ledgerEntriesCreated++;
         }
-        
-        // Resolve userId to email for tier lookup
-        const memberEmail = userIdToEmail.get(allocation.userId) || allocation.userId;
-        
-        // Get tier for member using their email
-        const tier = allocation.participantType === 'owner' 
-          ? ownerTier 
-          : await getMemberTier(memberEmail);
-        
-        // Record usage with email as memberId (consistent with existing ledger data)
+      } else {
+        // Record member/owner usage with their calculated overage fee
+        const memberEmail = billing.email || billing.userId || '';
         await recordUsage(session.id, {
           memberId: memberEmail,
-          minutesCharged: allocation.minutesAllocated,
-          tierAtBooking: tier || undefined,
+          minutesCharged: billing.minutesAllocated,
+          overageFee: billing.overageFee,
+          guestFee: 0,
+          tierAtBooking: billing.tierName || undefined,
           paymentMethod: 'unpaid'
         }, source);
-        
         ledgerEntriesCreated++;
       }
     }
     
-    // Step 6: Use assignGuestTimeToHost for guest minute reassignment with proper overage calculation
-    if (totalGuestMinutes > 0) {
-      const guestAssignment = await assignGuestTimeToHost(
-        request.ownerEmail,
-        totalGuestMinutes,
-        ownerOwnMinutes
-      );
-      
-      await recordUsage(session.id, {
-        memberId: request.ownerEmail,
-        minutesCharged: totalGuestMinutes,
-        tierAtBooking: ownerTier || undefined,
-        guestFee: guestAssignment.overageFee,
-        paymentMethod: 'unpaid'
-      }, source);
-      
-      ledgerEntriesCreated++;
-      
-      logger.info('[createSessionWithUsageTracking] Guest time assigned to host', {
-        extra: {
-          sessionId: session.id,
-          guestMinutes: totalGuestMinutes,
-          overageFee: guestAssignment.overageFee
-        }
-      });
-    }
+    logger.info('[createSessionWithUsageTracking] Session created with new billing', {
+      extra: {
+        sessionId: session.id,
+        totalOverageFees: billingResult.totalOverageFees,
+        totalGuestFees: billingResult.totalGuestFees,
+        guestPassesUsed: billingResult.guestPassesUsed
+      }
+    });
     
     logger.info('[createSessionWithUsageTracking] Session created with usage tracking', {
       extra: {

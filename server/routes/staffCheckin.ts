@@ -284,6 +284,73 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
   }
 });
 
+interface OverduePayment {
+  bookingId: number;
+  sessionId: number;
+  ownerEmail: string;
+  ownerName: string;
+  bookingDate: string;
+  startTime: string;
+  endTime: string;
+  resourceName: string;
+  totalOutstanding: number;
+}
+
+router.get('/api/bookings/overdue-payments', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query(`
+      WITH overdue_bookings AS (
+        SELECT 
+          br.id as booking_id,
+          br.session_id,
+          br.user_email as owner_email,
+          br.user_name as owner_name,
+          br.request_date as booking_date,
+          br.start_time,
+          br.end_time,
+          r.name as resource_name,
+          COALESCE(SUM(
+            CASE WHEN bp.payment_status = 'pending' 
+            THEN COALESCE(ul.overage_fee, 0) + COALESCE(ul.guest_fee, 0)
+            ELSE 0 END
+          ), 0)::numeric as total_outstanding
+        FROM booking_requests br
+        LEFT JOIN resources r ON br.resource_id = r.id
+        LEFT JOIN booking_participants bp ON bp.session_id = br.session_id
+        LEFT JOIN usage_ledger ul ON ul.session_id = bp.session_id AND ul.member_id = bp.user_id
+        WHERE br.request_date < CURRENT_DATE
+          AND br.request_date >= CURRENT_DATE - INTERVAL '30 days'
+          AND br.session_id IS NOT NULL
+        GROUP BY br.id, br.session_id, br.user_email, br.user_name, 
+                 br.request_date, br.start_time, br.end_time, r.name
+        HAVING SUM(
+          CASE WHEN bp.payment_status = 'pending' 
+               AND (COALESCE(ul.overage_fee, 0) + COALESCE(ul.guest_fee, 0)) > 0
+          THEN 1 ELSE 0 END
+        ) > 0
+      )
+      SELECT * FROM overdue_bookings
+      ORDER BY booking_date DESC
+    `);
+
+    const overduePayments: OverduePayment[] = result.rows.map(row => ({
+      bookingId: row.booking_id,
+      sessionId: row.session_id,
+      ownerEmail: row.owner_email,
+      ownerName: row.owner_name || row.owner_email,
+      bookingDate: row.booking_date,
+      startTime: row.start_time,
+      endTime: row.end_time,
+      resourceName: row.resource_name || 'Unknown',
+      totalOutstanding: parseFloat(row.total_outstanding) || 0
+    }));
+
+    res.json(overduePayments);
+  } catch (error: any) {
+    logAndRespond(req, res, 500, 'Failed to get overdue payments', error);
+  }
+});
+
 router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
     const bookingId = parseInt(req.params.id);

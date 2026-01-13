@@ -1,5 +1,6 @@
 import { logger } from '../logger';
 import { getTierLimits, getMemberTierByEmail } from '../tierService';
+import { pool } from '../db';
 
 export interface Participant {
   userId?: string;
@@ -25,6 +26,7 @@ export interface OverageFeeResult {
 
 const OVERAGE_RATE_PER_30_MIN = 25;
 const OVERAGE_RATE_PER_HOUR = 50;
+const FLAT_GUEST_FEE = 25;
 
 export interface AllocationOptions {
   declaredSlots?: number;
@@ -40,7 +42,6 @@ export function computeUsageAllocation(
     return [];
   }
   
-  // Use declaredSlots if provided, otherwise use participant count
   const divisor = options?.declaredSlots && options.declaredSlots > 0 
     ? options.declaredSlots 
     : participants.length;
@@ -48,12 +49,9 @@ export function computeUsageAllocation(
   const minutesPerParticipant = Math.floor(sessionDuration / divisor);
   const remainder = sessionDuration % divisor;
   
-  // If assigning remainder to owner, find owner and give them the extra minutes
-  // Otherwise distribute remainder 1 minute at a time to first N participants
   const assignToOwner = options?.assignRemainderToOwner ?? false;
   
   if (assignToOwner) {
-    // Remainder goes entirely to the owner
     return participants.map((participant) => ({
       userId: participant.userId,
       guestId: participant.guestId,
@@ -63,7 +61,6 @@ export function computeUsageAllocation(
     }));
   }
   
-  // Default: distribute remainder to first N participants
   return participants.map((participant, index) => ({
     userId: participant.userId,
     guestId: participant.guestId,
@@ -97,41 +94,424 @@ export function calculateOverageFee(
   };
 }
 
+export interface ParticipantBilling {
+  participantId?: number;
+  userId?: string;
+  guestId?: number;
+  email?: string;
+  displayName: string;
+  participantType: 'owner' | 'member' | 'guest';
+  tierName: string | null;
+  minutesAllocated: number;
+  dailyAllowance: number;
+  usedMinutesToday: number;
+  remainingMinutesBefore: number;
+  overageMinutes: number;
+  overageFee: number;
+  guestFee: number;
+  guestPassUsed: boolean;
+  totalFee: number;
+}
+
+export interface SessionBillingResult {
+  sessionDuration: number;
+  participantCount: number;
+  guestCount: number;
+  billingBreakdown: ParticipantBilling[];
+  totalOverageFees: number;
+  totalGuestFees: number;
+  totalFees: number;
+  guestPassesUsed: number;
+  guestPassesAvailable: number;
+}
+
+export async function getDailyUsageFromLedger(
+  memberEmail: string,
+  date: string,
+  excludeSessionId?: number
+): Promise<number> {
+  try {
+    const result = await pool.query(
+      `SELECT COALESCE(SUM(minutes_charged), 0) as total_minutes
+       FROM usage_ledger ul
+       JOIN booking_sessions bs ON ul.session_id = bs.id
+       WHERE LOWER(ul.member_id) = LOWER($1)
+         AND bs.session_date = $2
+         ${excludeSessionId ? 'AND ul.session_id != $3' : ''}`,
+      excludeSessionId ? [memberEmail, date, excludeSessionId] : [memberEmail, date]
+    );
+    
+    return parseInt(result.rows[0].total_minutes) || 0;
+  } catch (error) {
+    logger.error('[getDailyUsageFromLedger] Error:', { error: error as Error });
+    return 0;
+  }
+}
+
+export async function getGuestPassInfo(
+  memberEmail: string,
+  tierName?: string
+): Promise<{ remaining: number; hasGuestPassBenefit: boolean }> {
+  try {
+    const tierLimits = tierName ? await getTierLimits(tierName) : null;
+    const hasGuestPassBenefit = tierLimits?.has_simulator_guest_passes ?? false;
+    
+    if (!hasGuestPassBenefit) {
+      return { remaining: 0, hasGuestPassBenefit: false };
+    }
+    
+    const result = await pool.query(
+      `SELECT passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = LOWER($1)`,
+      [memberEmail]
+    );
+    
+    if (result.rows.length === 0) {
+      const monthlyAllocation = tierLimits?.guest_passes_per_month ?? 0;
+      return { remaining: monthlyAllocation, hasGuestPassBenefit: true };
+    }
+    
+    const remaining = Math.max(0, result.rows[0].passes_total - result.rows[0].passes_used);
+    return { remaining, hasGuestPassBenefit: true };
+  } catch (error) {
+    logger.error('[getGuestPassInfo] Error:', { error: error as Error });
+    return { remaining: 0, hasGuestPassBenefit: false };
+  }
+}
+
+export async function calculateSessionBilling(
+  sessionDate: string,
+  sessionDuration: number,
+  participants: Participant[],
+  hostEmail: string,
+  options?: {
+    excludeSessionId?: number;
+    consumeGuestPasses?: boolean;
+  }
+): Promise<SessionBillingResult> {
+  const billingBreakdown: ParticipantBilling[] = [];
+  let totalOverageFees = 0;
+  let totalGuestFees = 0;
+  let guestPassesUsed = 0;
+  
+  const guestCount = participants.filter(p => p.participantType === 'guest').length;
+  const hostTier = await getMemberTierByEmail(hostEmail);
+  const guestPassInfo = await getGuestPassInfo(hostEmail, hostTier || undefined);
+  let guestPassesRemaining = guestPassInfo.remaining;
+  
+  for (const participant of participants) {
+    let billing: ParticipantBilling;
+    
+    if (participant.participantType === 'guest') {
+      let guestFee = FLAT_GUEST_FEE;
+      let guestPassUsed = false;
+      
+      if (guestPassInfo.hasGuestPassBenefit && guestPassesRemaining > 0) {
+        guestPassUsed = true;
+        guestPassesRemaining--;
+        guestPassesUsed++;
+        guestFee = 0;
+      }
+      
+      billing = {
+        guestId: participant.guestId,
+        displayName: participant.displayName,
+        participantType: 'guest',
+        tierName: null,
+        minutesAllocated: Math.floor(sessionDuration / participants.length),
+        dailyAllowance: 0,
+        usedMinutesToday: 0,
+        remainingMinutesBefore: 0,
+        overageMinutes: 0,
+        overageFee: 0,
+        guestFee,
+        guestPassUsed,
+        totalFee: guestFee
+      };
+      
+      totalGuestFees += guestFee;
+    } else {
+      const memberEmail = participant.email || participant.userId || '';
+      const tierName = await getMemberTierByEmail(memberEmail);
+      const tierLimits = tierName ? await getTierLimits(tierName) : null;
+      const dailyAllowance = tierLimits?.daily_sim_minutes ?? 0;
+      const unlimitedAccess = tierLimits?.unlimited_access ?? false;
+      
+      const usedMinutesToday = await getDailyUsageFromLedger(
+        memberEmail,
+        sessionDate,
+        options?.excludeSessionId
+      );
+      
+      const remainingMinutesBefore = unlimitedAccess || dailyAllowance >= 999
+        ? 999
+        : Math.max(0, dailyAllowance - usedMinutesToday);
+      
+      const minutesAllocated = Math.floor(sessionDuration / participants.length);
+      
+      let overageMinutes = 0;
+      let overageFee = 0;
+      
+      if (!unlimitedAccess && dailyAllowance < 999) {
+        const totalMinutesAfterSession = usedMinutesToday + minutesAllocated;
+        const overageResult = calculateOverageFee(totalMinutesAfterSession, dailyAllowance);
+        
+        const priorOverage = calculateOverageFee(usedMinutesToday, dailyAllowance);
+        overageMinutes = overageResult.overageMinutes - priorOverage.overageMinutes;
+        overageFee = overageResult.overageFee - priorOverage.overageFee;
+        
+        if (overageMinutes < 0) overageMinutes = 0;
+        if (overageFee < 0) overageFee = 0;
+      }
+      
+      billing = {
+        userId: participant.userId,
+        email: memberEmail,
+        displayName: participant.displayName,
+        participantType: participant.participantType,
+        tierName,
+        minutesAllocated,
+        dailyAllowance,
+        usedMinutesToday,
+        remainingMinutesBefore,
+        overageMinutes,
+        overageFee,
+        guestFee: 0,
+        guestPassUsed: false,
+        totalFee: overageFee
+      };
+      
+      totalOverageFees += overageFee;
+    }
+    
+    billingBreakdown.push(billing);
+  }
+  
+  return {
+    sessionDuration,
+    participantCount: participants.length,
+    guestCount,
+    billingBreakdown,
+    totalOverageFees,
+    totalGuestFees,
+    totalFees: totalOverageFees + totalGuestFees,
+    guestPassesUsed,
+    guestPassesAvailable: guestPassInfo.remaining
+  };
+}
+
+export async function calculateFullSessionBilling(
+  sessionDate: string,
+  sessionDuration: number,
+  participants: Participant[],
+  hostEmail: string,
+  options?: {
+    excludeSessionId?: number;
+  }
+): Promise<SessionBillingResult> {
+  const billingBreakdown: ParticipantBilling[] = [];
+  let totalOverageFees = 0;
+  let totalGuestFees = 0;
+  let guestPassesUsed = 0;
+  
+  const guestCount = participants.filter(p => p.participantType === 'guest').length;
+  const memberCount = participants.filter(p => p.participantType !== 'guest').length;
+  
+  const hostTier = await getMemberTierByEmail(hostEmail);
+  const guestPassInfo = await getGuestPassInfo(hostEmail, hostTier || undefined);
+  let guestPassesRemaining = guestPassInfo.remaining;
+  
+  const hostTierLimits = hostTier ? await getTierLimits(hostTier) : null;
+  const hostDailyAllowance = hostTierLimits?.daily_sim_minutes ?? 0;
+  const hostUnlimitedAccess = hostTierLimits?.unlimited_access ?? false;
+  
+  const hostUsedMinutesToday = await getDailyUsageFromLedger(
+    hostEmail,
+    sessionDate,
+    options?.excludeSessionId
+  );
+  
+  let hostOverageFee = 0;
+  let hostOverageMinutes = 0;
+  
+  if (!hostUnlimitedAccess && hostDailyAllowance < 999) {
+    const hostTotalMinutesAfterSession = hostUsedMinutesToday + sessionDuration;
+    const hostOverageResult = calculateOverageFee(hostTotalMinutesAfterSession, hostDailyAllowance);
+    const hostPriorOverage = calculateOverageFee(hostUsedMinutesToday, hostDailyAllowance);
+    
+    hostOverageMinutes = Math.max(0, hostOverageResult.overageMinutes - hostPriorOverage.overageMinutes);
+    hostOverageFee = Math.max(0, hostOverageResult.overageFee - hostPriorOverage.overageFee);
+  }
+  
+  for (const participant of participants) {
+    let billing: ParticipantBilling;
+    const minutesAllocated = Math.floor(sessionDuration / participants.length);
+    
+    if (participant.participantType === 'guest') {
+      let guestFee = FLAT_GUEST_FEE;
+      let guestPassUsed = false;
+      
+      if (guestPassInfo.hasGuestPassBenefit && guestPassesRemaining > 0) {
+        guestPassUsed = true;
+        guestPassesRemaining--;
+        guestPassesUsed++;
+        guestFee = 0;
+      }
+      
+      billing = {
+        guestId: participant.guestId,
+        displayName: participant.displayName,
+        participantType: 'guest',
+        tierName: null,
+        minutesAllocated,
+        dailyAllowance: 0,
+        usedMinutesToday: 0,
+        remainingMinutesBefore: 0,
+        overageMinutes: 0,
+        overageFee: 0,
+        guestFee,
+        guestPassUsed,
+        totalFee: guestFee
+      };
+      
+      totalGuestFees += guestFee;
+    } else if (participant.participantType === 'owner') {
+      const hostRemainingBefore = hostUnlimitedAccess || hostDailyAllowance >= 999
+        ? 999
+        : Math.max(0, hostDailyAllowance - hostUsedMinutesToday);
+      
+      billing = {
+        userId: participant.userId,
+        email: hostEmail,
+        displayName: participant.displayName,
+        participantType: 'owner',
+        tierName: hostTier,
+        minutesAllocated: sessionDuration,
+        dailyAllowance: hostDailyAllowance,
+        usedMinutesToday: hostUsedMinutesToday,
+        remainingMinutesBefore: hostRemainingBefore,
+        overageMinutes: hostOverageMinutes,
+        overageFee: hostOverageFee,
+        guestFee: 0,
+        guestPassUsed: false,
+        totalFee: hostOverageFee
+      };
+      
+      totalOverageFees += hostOverageFee;
+    } else {
+      const memberEmail = participant.email || participant.userId || '';
+      const tierName = await getMemberTierByEmail(memberEmail);
+      const tierLimits = tierName ? await getTierLimits(tierName) : null;
+      const dailyAllowance = tierLimits?.daily_sim_minutes ?? 0;
+      const unlimitedAccess = tierLimits?.unlimited_access ?? false;
+      
+      const usedMinutesToday = await getDailyUsageFromLedger(
+        memberEmail,
+        sessionDate,
+        options?.excludeSessionId
+      );
+      
+      const remainingMinutesBefore = unlimitedAccess || dailyAllowance >= 999
+        ? 999
+        : Math.max(0, dailyAllowance - usedMinutesToday);
+      
+      let overageMinutes = 0;
+      let overageFee = 0;
+      
+      if (!unlimitedAccess && dailyAllowance < 999) {
+        const totalMinutesAfterSession = usedMinutesToday + minutesAllocated;
+        const overageResult = calculateOverageFee(totalMinutesAfterSession, dailyAllowance);
+        const priorOverage = calculateOverageFee(usedMinutesToday, dailyAllowance);
+        
+        overageMinutes = Math.max(0, overageResult.overageMinutes - priorOverage.overageMinutes);
+        overageFee = Math.max(0, overageResult.overageFee - priorOverage.overageFee);
+      }
+      
+      billing = {
+        userId: participant.userId,
+        email: memberEmail,
+        displayName: participant.displayName,
+        participantType: 'member',
+        tierName,
+        minutesAllocated,
+        dailyAllowance,
+        usedMinutesToday,
+        remainingMinutesBefore,
+        overageMinutes,
+        overageFee,
+        guestFee: 0,
+        guestPassUsed: false,
+        totalFee: overageFee
+      };
+      
+      totalOverageFees += overageFee;
+    }
+    
+    billingBreakdown.push(billing);
+  }
+  
+  return {
+    sessionDuration,
+    participantCount: participants.length,
+    guestCount,
+    billingBreakdown,
+    totalOverageFees,
+    totalGuestFees,
+    totalFees: totalOverageFees + totalGuestFees,
+    guestPassesUsed,
+    guestPassesAvailable: guestPassInfo.remaining
+  };
+}
+
 export interface GuestTimeAssignment {
   hostEmail: string;
   guestMinutes: number;
   totalHostMinutes: number;
   overageFee: number;
+  guestFee: number;
+  guestPassUsed: boolean;
 }
 
 export async function assignGuestTimeToHost(
   hostEmail: string,
-  guestMinutes: number,
+  guestCount: number,
+  sessionDuration: number,
   existingHostMinutes: number = 0
 ): Promise<GuestTimeAssignment> {
   try {
     const tier = await getMemberTierByEmail(hostEmail);
+    const tierLimits = tier ? await getTierLimits(tier) : null;
+    const dailyAllowance = tierLimits?.daily_sim_minutes ?? 0;
+    const unlimitedAccess = tierLimits?.unlimited_access ?? false;
     
-    if (!tier) {
-      const overageResult = calculateOverageFee(guestMinutes, 0);
-      return {
-        hostEmail,
-        guestMinutes,
-        totalHostMinutes: existingHostMinutes + guestMinutes,
-        overageFee: overageResult.overageFee
-      };
+    const guestPassInfo = await getGuestPassInfo(hostEmail, tier || undefined);
+    
+    let guestFee = 0;
+    let guestPassUsed = false;
+    
+    for (let i = 0; i < guestCount; i++) {
+      if (guestPassInfo.hasGuestPassBenefit && guestPassInfo.remaining > i) {
+        guestPassUsed = true;
+      } else {
+        guestFee += FLAT_GUEST_FEE;
+      }
     }
     
-    const limits = await getTierLimits(tier);
-    const totalMinutes = existingHostMinutes + guestMinutes;
+    const totalMinutes = existingHostMinutes + sessionDuration;
     
-    const overageResult = calculateOverageFee(totalMinutes, limits.daily_sim_minutes);
+    let overageFee = 0;
+    if (!unlimitedAccess && dailyAllowance < 999) {
+      const overageResult = calculateOverageFee(totalMinutes, dailyAllowance);
+      const priorOverage = calculateOverageFee(existingHostMinutes, dailyAllowance);
+      overageFee = Math.max(0, overageResult.overageFee - priorOverage.overageFee);
+    }
     
     return {
       hostEmail,
-      guestMinutes,
+      guestMinutes: sessionDuration,
       totalHostMinutes: totalMinutes,
-      overageFee: overageResult.overageFee
+      overageFee,
+      guestFee,
+      guestPassUsed
     };
   } catch (error) {
     logger.error('[assignGuestTimeToHost] Error:', { error: error as Error });
@@ -168,4 +548,126 @@ export function formatOverageFeeFromDollars(dollars: number): string {
   return `$${dollars.toFixed(2)}`;
 }
 
-export { OVERAGE_RATE_PER_30_MIN, OVERAGE_RATE_PER_HOUR };
+export interface RecalculationResult {
+  sessionId: number;
+  billingResult: SessionBillingResult;
+  ledgerUpdated: boolean;
+  participantsUpdated: number;
+}
+
+export async function recalculateSessionFees(
+  sessionId: number
+): Promise<RecalculationResult> {
+  try {
+    const sessionResult = await pool.query(
+      `SELECT bs.id, bs.session_date, bs.start_time, bs.end_time,
+              EXTRACT(EPOCH FROM (bs.end_time::time - bs.start_time::time)) / 60 as duration_minutes,
+              br.user_email as host_email
+       FROM booking_sessions bs
+       LEFT JOIN booking_requests br ON br.session_id = bs.id
+       WHERE bs.id = $1`,
+      [sessionId]
+    );
+    
+    if (sessionResult.rows.length === 0) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+    
+    const session = sessionResult.rows[0];
+    const sessionDate = session.session_date;
+    const sessionDuration = Math.round(parseFloat(session.duration_minutes) || 60);
+    const hostEmail = session.host_email;
+    
+    const participantsResult = await pool.query(
+      `SELECT bp.id, bp.user_id, bp.guest_id, bp.display_name, bp.participant_type,
+              u.email as member_email
+       FROM booking_participants bp
+       LEFT JOIN users u ON bp.user_id = u.id
+       WHERE bp.session_id = $1
+       ORDER BY 
+         CASE bp.participant_type 
+           WHEN 'owner' THEN 1 
+           WHEN 'member' THEN 2 
+           WHEN 'guest' THEN 3 
+         END`,
+      [sessionId]
+    );
+    
+    const participants: Participant[] = participantsResult.rows.map(p => ({
+      userId: p.user_id,
+      email: p.member_email || p.user_id,
+      guestId: p.guest_id,
+      participantType: p.participant_type as 'owner' | 'member' | 'guest',
+      displayName: p.display_name
+    }));
+    
+    const billingResult = await calculateFullSessionBilling(
+      sessionDate,
+      sessionDuration,
+      participants,
+      hostEmail || participants.find(p => p.participantType === 'owner')?.email || '',
+      { excludeSessionId: sessionId }
+    );
+    
+    await pool.query(`DELETE FROM usage_ledger WHERE session_id = $1`, [sessionId]);
+    
+    let participantsUpdated = 0;
+    
+    for (const billing of billingResult.billingBreakdown) {
+      if (billing.participantType === 'guest') {
+        if (billing.guestFee > 0) {
+          await pool.query(
+            `INSERT INTO usage_ledger (session_id, member_id, minutes_charged, overage_fee, guest_fee, tier_at_booking, payment_method, source)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [
+              sessionId,
+              hostEmail || 'guest',
+              billing.minutesAllocated,
+              0,
+              billing.guestFee,
+              null,
+              'unpaid',
+              'recalculation'
+            ]
+          );
+        }
+      } else {
+        await pool.query(
+          `INSERT INTO usage_ledger (session_id, member_id, minutes_charged, overage_fee, guest_fee, tier_at_booking, payment_method, source)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            sessionId,
+            billing.email || billing.userId,
+            billing.minutesAllocated,
+            billing.overageFee,
+            0,
+            billing.tierName,
+            'unpaid',
+            'recalculation'
+          ]
+        );
+      }
+      participantsUpdated++;
+    }
+    
+    logger.info('[recalculateSessionFees] Session fees recalculated', {
+      extra: {
+        sessionId,
+        participantsUpdated,
+        totalFees: billingResult.totalFees
+      }
+    });
+    
+    return {
+      sessionId,
+      billingResult,
+      ledgerUpdated: true,
+      participantsUpdated
+    };
+  } catch (error) {
+    logger.error('[recalculateSessionFees] Error:', { error: error as Error });
+    throw error;
+  }
+}
+
+export { OVERAGE_RATE_PER_30_MIN, OVERAGE_RATE_PER_HOUR, FLAT_GUEST_FEE };

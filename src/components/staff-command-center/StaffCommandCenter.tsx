@@ -13,6 +13,7 @@ import { TodayScheduleSection } from './sections/TodayScheduleSection';
 import { ResourcesSection, NoticeBoardWidget } from './sections/ResourcesSection';
 import { AlertsCard } from './sections/AlertsCard';
 import { QuickActionsGrid } from './sections/QuickActionsGrid';
+import { OverduePaymentsSection } from './sections/OverduePaymentsSection';
 import { CheckinBillingModal } from './modals/CheckinBillingModal';
 import type { StaffCommandCenterProps, BookingRequest, RecentActivity } from './types';
 
@@ -357,6 +358,11 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
               )}
             </div>
           </div>
+
+          {/* Row 3: Overdue Payments */}
+          <div className="grid grid-cols-3 gap-6">
+            <OverduePaymentsSection variant="desktop" />
+          </div>
         </div>
 
         {/* Mobile Layout - Order: Next Tour/Event → Notice Board → Alerts → Facility Status → Booking Requests → Upcoming Bookings → Upcoming Events → Upcoming Wellness */}
@@ -414,6 +420,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
             onCheckIn={handleCheckIn}
             variant="mobile"
           />
+          {/* Overdue Payments */}
+          <OverduePaymentsSection variant="mobile" />
           {/* Upcoming Events & Wellness */}
           <TodayScheduleSection
             upcomingTours={data.upcomingTours}

@@ -11,6 +11,9 @@ interface ParticipantFee {
   guestFee: number;
   totalFee: number;
   tierAtBooking: string | null;
+  dailyAllowance?: number;
+  minutesUsed?: number;
+  guestPassUsed?: boolean;
 }
 
 interface CheckinContext {
@@ -279,14 +282,43 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
                           </span>
                         </div>
                         
-                        {p.totalFee > 0 && (
-                          <div className="text-xs text-primary/60 dark:text-white/60 mb-2">
-                            {p.overageFee > 0 && <span>Overage: ${p.overageFee.toFixed(2)}</span>}
-                            {p.overageFee > 0 && p.guestFee > 0 && <span> • </span>}
-                            {p.guestFee > 0 && <span>Guest fee: ${p.guestFee.toFixed(2)}</span>}
-                            {p.tierAtBooking && <span className="ml-2 opacity-60">({p.tierAtBooking})</span>}
-                          </div>
-                        )}
+                        <div className="text-xs text-primary/60 dark:text-white/60 mb-2 space-y-0.5">
+                          {p.tierAtBooking && (
+                            <div className="flex items-center gap-1">
+                              <span className="material-symbols-outlined text-xs">workspace_premium</span>
+                              <span>{p.tierAtBooking}</span>
+                              {p.dailyAllowance !== undefined && p.dailyAllowance < 999 && (
+                                <span className="opacity-60">({p.dailyAllowance} min/day)</span>
+                              )}
+                              {p.dailyAllowance !== undefined && p.dailyAllowance >= 999 && (
+                                <span className="opacity-60">(Unlimited)</span>
+                              )}
+                            </div>
+                          )}
+                          {(p.overageFee > 0 || p.guestFee > 0) && (
+                            <div className="flex flex-wrap gap-2">
+                              {p.overageFee > 0 && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded">
+                                  Time Overage: ${p.overageFee.toFixed(2)}
+                                </span>
+                              )}
+                              {p.guestFee > 0 && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                                  Guest Fee: ${p.guestFee.toFixed(2)}
+                                </span>
+                              )}
+                              {p.guestPassUsed && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
+                                  <span className="material-symbols-outlined text-xs mr-0.5">confirmation_number</span>
+                                  Pass Used
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {p.totalFee === 0 && p.participantType !== 'guest' && !p.guestPassUsed && (
+                            <span className="text-green-600 dark:text-green-400">Within daily allowance</span>
+                          )}
+                        </div>
 
                         {p.paymentStatus === 'pending' && p.totalFee > 0 ? (
                           showWaiverInput === p.participantId ? (

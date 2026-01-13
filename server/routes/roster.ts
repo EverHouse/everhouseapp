@@ -31,6 +31,7 @@ import {
 import { 
   computeUsageAllocation,
   calculateOverageFee,
+  recalculateSessionFees,
   type Participant as UsageParticipant
 } from '../core/bookingService/usageCalculator';
 import { getTierLimits, getMemberTierByEmail } from '../core/tierService';
@@ -549,6 +550,25 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
       }
     });
 
+    // Recalculate session fees after adding participant
+    try {
+      const recalcResult = await recalculateSessionFees(sessionId);
+      logger.info('[roster] Session fees recalculated after adding participant', {
+        extra: {
+          sessionId,
+          bookingId,
+          participantsUpdated: recalcResult.participantsUpdated,
+          totalFees: recalcResult.billingResult.totalFees,
+          ledgerUpdated: recalcResult.ledgerUpdated
+        }
+      });
+    } catch (recalcError) {
+      logger.warn('[roster] Failed to recalculate session fees (non-blocking)', {
+        error: recalcError as Error,
+        extra: { sessionId, bookingId }
+      });
+    }
+
     res.status(201).json({
       success: true,
       participant: newParticipant,
@@ -688,6 +708,25 @@ router.delete('/api/bookings/:bookingId/participants/:participantId', async (req
         removedBy: userEmail
       }
     });
+
+    // Recalculate session fees after removing participant
+    try {
+      const recalcResult = await recalculateSessionFees(booking.session_id);
+      logger.info('[roster] Session fees recalculated after removing participant', {
+        extra: {
+          sessionId: booking.session_id,
+          bookingId,
+          participantsUpdated: recalcResult.participantsUpdated,
+          totalFees: recalcResult.billingResult.totalFees,
+          ledgerUpdated: recalcResult.ledgerUpdated
+        }
+      });
+    } catch (recalcError) {
+      logger.warn('[roster] Failed to recalculate session fees (non-blocking)', {
+        error: recalcError as Error,
+        extra: { sessionId: booking.session_id, bookingId }
+      });
+    }
 
     res.json({
       success: true,
