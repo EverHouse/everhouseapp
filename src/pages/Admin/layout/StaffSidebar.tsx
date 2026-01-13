@@ -1,5 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { TabType } from './types';
 
 interface NavItem {
@@ -45,6 +46,8 @@ export const StaffSidebar: React.FC<StaffSidebarProps> = ({
   onTabChange,
   isAdmin = false 
 }) => {
+  const navigate = useNavigate();
+  
   const NavButton: React.FC<{ item: NavItem }> = ({ item }) => {
     const isActive = activeTab === item.id;
     return (
@@ -68,7 +71,11 @@ export const StaffSidebar: React.FC<StaffSidebarProps> = ({
 
   const sidebarContent = (
     <aside className="hidden lg:flex flex-col w-64 h-screen fixed left-0 top-0 bg-[#293515]" style={{ zIndex: 'var(--z-sidebar, 40)' }}>
-      <div className="flex items-center gap-3 px-4 py-5 flex-shrink-0">
+      <button 
+        onClick={() => navigate('/')}
+        className="flex items-center gap-3 px-4 py-5 flex-shrink-0 hover:opacity-80 transition-opacity w-full text-left"
+        aria-label="Go to home"
+      >
         <img 
           src="/assets/logos/mascot-white.webp" 
           alt="Ever House" 
@@ -78,7 +85,7 @@ export const StaffSidebar: React.FC<StaffSidebarProps> = ({
           <h1 className="text-white font-bold text-lg leading-tight">Staff Portal</h1>
           <p className="text-white/50 text-xs">Ever House</p>
         </div>
-      </div>
+      </button>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <div className="space-y-1">
