@@ -12,7 +12,7 @@ import MenuOverlay from '../../components/MenuOverlay';
 import PageErrorBoundary from '../../components/PageErrorBoundary';
 import { useStaffWebSocket } from '../../hooks/useStaffWebSocket';
 
-import { TabType, StaffBottomNav, usePendingCounts, useUnreadNotifications } from './layout';
+import { TabType, StaffBottomNav, StaffSidebar, usePendingCounts, useUnreadNotifications } from './layout';
 
 // Lazy load admin tabs - reduces initial bundle size by deferring tab code until needed
 const FaqsAdmin = lazy(() => import('./FaqsAdmin'));
@@ -122,7 +122,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   const headerContent = (
-    <header className="fixed top-0 left-0 right-0 flex items-center justify-between px-4 md:px-6 pt-[max(16px,env(safe-area-inset-top))] pb-4 bg-[#293515] shadow-md transition-all duration-200 text-[#F2F2EC] pointer-events-auto" style={{ zIndex: 'var(--z-header)' }}>
+    <header className="fixed top-0 left-0 right-0 lg:left-64 flex items-center justify-between px-4 md:px-6 pt-[max(16px,env(safe-area-inset-top))] pb-4 bg-[#293515] shadow-md transition-all duration-200 text-[#F2F2EC] pointer-events-auto" style={{ zIndex: 'var(--z-header)' }}>
       <button 
         onClick={() => navigate('/')}
         className="flex items-center justify-center min-h-[44px] hover:opacity-70 transition-opacity py-1 flex-shrink-0 z-10"
@@ -168,9 +168,15 @@ const AdminDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-bone font-display dark:bg-transparent transition-colors duration-300 flex flex-col relative">
       
+      <StaffSidebar 
+        activeTab={activeTab} 
+        onTabChange={handleTabChange} 
+        isAdmin={actualUser?.role === 'admin'} 
+      />
+      
       {createPortal(headerContent, document.body)}
 
-      <main className={`flex-1 px-4 md:px-8 mx-auto pt-[max(112px,calc(env(safe-area-inset-top)+96px))] w-full relative z-0 ${activeTab === 'simulator' || activeTab === 'home' || activeTab === 'directory' ? 'max-w-[1920px]' : 'max-w-4xl'}`}>
+      <main className={`flex-1 px-4 md:px-8 mx-auto pt-[max(112px,calc(env(safe-area-inset-top)+96px))] w-full relative z-0 lg:ml-64 ${activeTab === 'simulator' || activeTab === 'home' || activeTab === 'directory' ? 'max-w-[1920px]' : 'max-w-4xl'}`}>
         {activeTab === 'home' && <StaffCommandCenter onTabChange={handleTabChange} isAdmin={actualUser?.role === 'admin'} wsConnected={staffWsConnected} />}
         {activeTab === 'training' && <StaffTrainingGuide />}
         <PageErrorBoundary pageName={`Admin Tab: ${activeTab}`}>
@@ -197,12 +203,14 @@ const AdminDashboard: React.FC = () => {
         <BottomSentinel />
       </main>
 
-      <StaffBottomNav 
-        activeTab={activeTab} 
-        onTabChange={handleTabChange} 
-        isAdmin={actualUser?.role === 'admin'}
-        pendingRequestsCount={pendingRequestsCount}
-      />
+      <div className="lg:hidden">
+        <StaffBottomNav 
+          activeTab={activeTab} 
+          onTabChange={handleTabChange} 
+          isAdmin={actualUser?.role === 'admin'}
+          pendingRequestsCount={pendingRequestsCount}
+        />
+      </div>
 
       <BackToTop threshold={200} />
 
