@@ -15,7 +15,6 @@ import HubSpotFormModal from '../../components/HubSpotFormModal';
 import { isPushSupported, isSubscribedToPush, subscribeToPush, unsubscribeFromPush } from '../../services/pushNotifications';
 import Toggle from '../../components/Toggle';
 import MemberBottomNav from '../../components/MemberBottomNav';
-import StaffBottomNavSimple from '../../components/StaffBottomNavSimple';
 import { BottomSentinel } from '../../components/layout/BottomSentinel';
 import BugReportModal from '../../components/BugReportModal';
 import ModalShell from '../../components/ModalShell';
@@ -262,6 +261,23 @@ const Profile: React.FC = () => {
       style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'calc(var(--header-offset) + 1.5rem)' }}
     >
       <div className="space-y-6">
+         {/* Staff Portal Quick Return - mobile only */}
+         {isStaffOrAdminProfile && (
+           <div className="lg:hidden">
+             <button
+               onClick={() => navigate('/admin')}
+               className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl transition-colors ${
+                 isDark 
+                   ? 'bg-white/10 hover:bg-white/15 text-white' 
+                   : 'bg-primary/10 hover:bg-primary/15 text-primary'
+               }`}
+             >
+               <span className="material-symbols-outlined text-lg">arrow_back</span>
+               <span className="font-medium text-sm">Return to Staff Portal</span>
+             </button>
+           </div>
+         )}
+
          <Section title="Account" isDark={isDark} delay="0.05s">
             <Row icon="person" label="Name" value={user.name} isDark={isDark} />
             <Row icon="mail" label="Email" value={user.email} isDark={isDark} />
@@ -506,11 +522,7 @@ const Profile: React.FC = () => {
       <BottomSentinel />
 
       {/* Bottom Navigation */}
-      {isStaffOrAdminProfile ? (
-        <StaffBottomNavSimple />
-      ) : (
-        <MemberBottomNav currentPath="/profile" isDarkTheme={isDark} />
-      )}
+      <MemberBottomNav currentPath="/profile" isDarkTheme={isDark} />
 
       {/* Full Screen Card Modal */}
       <ModalShell 
