@@ -125,7 +125,7 @@ const AdminDashboard: React.FC = () => {
     <header className="fixed top-0 left-0 right-0 lg:left-64 flex items-center justify-between px-4 md:px-6 pt-[max(16px,env(safe-area-inset-top))] pb-4 bg-[#293515] shadow-md transition-all duration-200 text-[#F2F2EC] pointer-events-auto" style={{ zIndex: 'var(--z-header)' }}>
       <button 
         onClick={() => navigate('/')}
-        className="flex items-center justify-center min-h-[44px] hover:opacity-70 transition-opacity py-1 flex-shrink-0 z-10"
+        className="flex items-center justify-center min-h-[44px] hover:opacity-70 transition-opacity py-1 flex-shrink-0 z-10 lg:hidden"
         aria-label="Go to home"
       >
         <img 
@@ -135,9 +135,9 @@ const AdminDashboard: React.FC = () => {
         />
       </button>
       
-      <div className="absolute inset-0 flex items-center justify-center pt-[max(16px,env(safe-area-inset-top))] pb-4 pointer-events-none">
+      <div className="absolute inset-0 flex items-center justify-center lg:justify-start lg:pl-6 pt-[max(16px,env(safe-area-inset-top))] pb-4 pointer-events-none">
         <h1 className="text-lg font-bold text-[#F2F2EC] tracking-wide">
-          {activeTab === 'home' ? 'Staff Portal' : getTabTitle()}
+          {getTabTitle()}
         </h1>
       </div>
 
@@ -166,7 +166,7 @@ const AdminDashboard: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-bone font-display dark:bg-transparent transition-colors duration-300 flex flex-col relative">
+    <div className="min-h-screen bg-bone font-display dark:bg-transparent transition-colors duration-300 flex flex-col relative overflow-x-hidden">
       
       <StaffSidebar 
         activeTab={activeTab} 

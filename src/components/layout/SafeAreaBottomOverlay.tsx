@@ -14,7 +14,7 @@ export const SafeAreaBottomOverlay: React.FC<SafeAreaBottomOverlayProps> = ({ ch
   
   const overlayContent = (
     <div 
-      className={`fixed inset-x-0 bottom-0 pointer-events-none transition-transform duration-300 ease-out ${isAtBottom ? 'translate-y-[calc(100%+env(safe-area-inset-bottom,0px))]' : 'translate-y-0'}`}
+      className={`fixed inset-x-0 bottom-0 pointer-events-none transition-transform duration-300 ease-out lg:hidden ${isAtBottom ? 'translate-y-[calc(100%+env(safe-area-inset-bottom,0px))]' : 'translate-y-0'}`}
       style={{ zIndex: 'var(--z-nav)' }}
     >
       {children}
