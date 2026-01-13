@@ -325,8 +325,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
                   <p className="text-sm text-primary/50 dark:text-white/50">No recent activity</p>
                 </div>
               ) : (
-                <div className="flex-1 space-y-2 overflow-y-auto max-h-[200px]">
-                  {data.recentActivity.slice(0, 6).map(activity => (
+                <div className="flex-1 space-y-2 overflow-y-auto min-h-0">
+                  {data.recentActivity.slice(0, 8).map(activity => (
                     <div key={activity.id} className="flex items-start gap-3 p-2 rounded-lg bg-white/50 dark:bg-white/5">
                       <span className={`material-symbols-outlined text-lg ${
                         activity.type === 'check_in' ? 'text-green-600 dark:text-green-400' :
