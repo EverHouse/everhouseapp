@@ -122,10 +122,10 @@ const AdminDashboard: React.FC = () => {
   };
 
   const headerContent = (
-    <header className="fixed top-0 left-0 right-0 lg:left-64 flex items-center justify-between px-4 md:px-6 pt-[max(16px,env(safe-area-inset-top))] pb-4 bg-[#293515] shadow-md transition-all duration-200 text-[#F2F2EC] pointer-events-auto" style={{ zIndex: 'var(--z-header)' }}>
+    <header className="fixed top-0 left-0 right-0 lg:left-64 grid grid-cols-[auto_1fr_auto] items-center gap-2 px-4 md:px-6 pt-[max(16px,env(safe-area-inset-top))] pb-4 bg-[#293515] shadow-md transition-all duration-200 text-[#F2F2EC] pointer-events-auto" style={{ zIndex: 'var(--z-header)' }}>
       <button 
         onClick={() => navigate('/')}
-        className="flex items-center justify-center min-h-[44px] hover:opacity-70 transition-opacity py-1 flex-shrink-0 z-10 lg:hidden"
+        className="flex items-center justify-center min-h-[44px] hover:opacity-70 transition-opacity py-1 flex-shrink-0 lg:hidden"
         aria-label="Go to home"
       >
         <img 
@@ -134,14 +134,13 @@ const AdminDashboard: React.FC = () => {
           className="h-10 w-auto object-contain"
         />
       </button>
+      <div className="hidden lg:block" />
       
-      <div className="absolute inset-0 flex items-center justify-center lg:justify-start lg:pl-6 pt-[max(16px,env(safe-area-inset-top))] pb-4 pointer-events-none">
-        <h1 className="text-lg font-bold text-[#F2F2EC] tracking-wide">
-          {getTabTitle()}
-        </h1>
-      </div>
+      <h1 className="text-lg font-bold text-[#F2F2EC] tracking-wide text-center truncate">
+        {getTabTitle()}
+      </h1>
 
-      <div className="flex items-center gap-2 md:gap-3 flex-shrink-0 z-10">
+      <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
         <button 
           onClick={() => handleTabChange('updates')}
           className="flex items-center justify-center min-w-[44px] min-h-[44px] hover:opacity-70 transition-opacity relative"
@@ -166,7 +165,7 @@ const AdminDashboard: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-bone font-display dark:bg-transparent transition-colors duration-300 flex flex-col relative overflow-x-hidden">
+    <div className="min-h-screen bg-bone font-display dark:bg-transparent transition-colors duration-300 flex flex-col relative">
       
       <StaffSidebar 
         activeTab={activeTab} 
@@ -176,7 +175,7 @@ const AdminDashboard: React.FC = () => {
       
       {createPortal(headerContent, document.body)}
 
-      <main className={`flex-1 px-4 md:px-8 mx-auto pt-[max(112px,calc(env(safe-area-inset-top)+96px))] w-full relative z-0 lg:ml-64 ${activeTab === 'simulator' || activeTab === 'home' || activeTab === 'directory' ? 'max-w-[1920px]' : 'max-w-4xl'}`}>
+      <main className={`flex-1 px-4 md:px-8 pt-[max(112px,calc(env(safe-area-inset-top)+96px))] relative z-0 lg:ml-64 lg:w-[calc(100vw-256px)] ${activeTab === 'simulator' || activeTab === 'home' || activeTab === 'directory' ? 'max-w-[1920px] mx-auto' : 'max-w-4xl mx-auto'}`}>
         {activeTab === 'home' && <StaffCommandCenter onTabChange={handleTabChange} isAdmin={actualUser?.role === 'admin'} wsConnected={staffWsConnected} />}
         {activeTab === 'training' && <StaffTrainingGuide />}
         <PageErrorBoundary pageName={`Admin Tab: ${activeTab}`}>
