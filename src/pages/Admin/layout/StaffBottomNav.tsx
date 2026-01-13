@@ -48,9 +48,9 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({
             aria-label={item.label}
             aria-current={activeTab === item.id ? 'page' : undefined}
             className={`
-              flex-1 flex flex-col items-center gap-0.5 py-2 px-1 min-h-[44px] relative z-10 cursor-pointer
+              flex-1 flex flex-col items-center gap-1 py-2 px-1 min-h-[48px] relative z-10 cursor-pointer
               transition-colors duration-300 ease-out active:scale-95
-              ${activeTab === item.id ? 'text-white' : 'text-white/70 hover:text-white/80'}
+              ${activeTab === item.id ? 'text-white' : 'text-white/60 hover:text-white'}
             `}
           >
             <div className="relative">
@@ -63,7 +63,7 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({
                 </span>
               )}
             </div>
-            <span className={`text-[9px] tracking-wide transition-colors duration-300 ${activeTab === item.id ? 'font-bold' : 'font-medium'}`}>
+            <span className={`text-[11px] tracking-wide transition-colors duration-300 ${activeTab === item.id ? 'font-semibold' : 'font-medium'}`}>
               {item.label}
             </span>
           </button>

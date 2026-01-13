@@ -401,8 +401,15 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
             transition: 'bottom 0.3s ease-out'
           }}
         >
-          <div className={`absolute bottom-16 right-0 flex flex-col gap-3 transition-all duration-300 ${fabOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+          <div 
+            role="menu" 
+            aria-label="Quick actions"
+            aria-hidden={!fabOpen}
+            className={`absolute bottom-16 right-0 flex flex-col gap-3 transition-all duration-300 ${fabOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+          >
             <button
+              role="menuitem"
+              tabIndex={fabOpen ? 0 : -1}
               onClick={() => { 
                 setFabOpen(false); 
                 onTabChange('simulator');
@@ -410,10 +417,12 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
               }}
               className="flex items-center gap-2 px-4 py-2 bg-[#293515]/90 text-white rounded-full shadow-lg whitespace-nowrap backdrop-blur-sm"
             >
-              <span className="material-symbols-outlined text-lg">sports_golf</span>
+              <span className="material-symbols-outlined text-lg" aria-hidden="true">sports_golf</span>
               <span className="text-sm font-medium">New Booking</span>
             </button>
             <button
+              role="menuitem"
+              tabIndex={fabOpen ? 0 : -1}
               onClick={() => { 
                 setFabOpen(false); 
                 onTabChange('updates');
@@ -421,10 +430,12 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
               }}
               className="flex items-center gap-2 px-4 py-2 bg-[#CCB8E4]/90 text-[#293515] rounded-full shadow-lg whitespace-nowrap backdrop-blur-sm"
             >
-              <span className="material-symbols-outlined text-lg">campaign</span>
+              <span className="material-symbols-outlined text-lg" aria-hidden="true">campaign</span>
               <span className="text-sm font-medium">New Announcement</span>
             </button>
             <button
+              role="menuitem"
+              tabIndex={fabOpen ? 0 : -1}
               onClick={() => { 
                 setFabOpen(false); 
                 onTabChange('blocks');
@@ -432,20 +443,24 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
               }}
               className="flex items-center gap-2 px-4 py-2 bg-amber-500/90 text-white rounded-full shadow-lg whitespace-nowrap backdrop-blur-sm"
             >
-              <span className="material-symbols-outlined text-lg">notifications</span>
+              <span className="material-symbols-outlined text-lg" aria-hidden="true">notifications</span>
               <span className="text-sm font-medium">New Notice</span>
             </button>
           </div>
 
           <button
             onClick={() => setFabOpen(!fabOpen)}
+            aria-label={fabOpen ? 'Close quick actions menu' : 'Open quick actions menu'}
+            aria-expanded={fabOpen}
+            aria-haspopup="menu"
             className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${
               fabOpen 
                 ? 'bg-red-500/80 text-white backdrop-blur-xl rotate-45' 
                 : 'bg-primary/50 dark:bg-white/50 text-white dark:text-primary backdrop-blur-xl'
             } border border-white/30`}
+            title="Quick Actions: New Booking, Announcement, or Notice"
           >
-            <span className="material-symbols-outlined text-2xl">add</span>
+            <span className="material-symbols-outlined text-2xl" aria-hidden="true">add</span>
           </button>
         </div>,
         document.body

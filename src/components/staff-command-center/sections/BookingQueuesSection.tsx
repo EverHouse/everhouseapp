@@ -41,9 +41,20 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
   const isDesktopGrid = variant === 'desktop-top' || variant === 'desktop-bottom';
   
   const PendingRequestsCard = () => (
-    <div className={`${isDesktopGrid ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4`}>
+    <div 
+      className={`${isDesktopGrid ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4 ${pendingRequests.length > 0 ? 'border-l-4 border-l-amber-500' : ''}`}
+      role="region"
+      aria-label={pendingRequests.length > 0 ? `Booking Requests - ${pendingRequests.length} pending, action required` : 'Booking Requests'}
+    >
       <div className="flex items-center justify-between mb-3 lg:mb-4 flex-shrink-0">
-        <h3 className={`font-bold text-primary dark:text-white ${variant === 'desktop' ? 'text-sm' : ''}`}>Booking Requests</h3>
+        <div className="flex items-center gap-2">
+          <h3 className={`font-bold text-primary dark:text-white ${variant === 'desktop' ? 'text-sm' : ''}`}>Booking Requests</h3>
+          {pendingRequests.length > 0 && (
+            <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full">
+              Action Required
+            </span>
+          )}
+        </div>
         <button onClick={() => onTabChange('simulator')} className="text-xs text-primary/60 dark:text-white/60 hover:underline">View all</button>
       </div>
       {pendingRequests.length === 0 ? (
