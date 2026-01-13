@@ -255,9 +255,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
             />
           </div>
 
-          {/* Main content: 3 columns with 2 rows - equal height cards */}
-          <div className="grid grid-cols-3 grid-rows-2 gap-6" style={{ gridTemplateRows: '1fr 1fr' }}>
-            {/* Row 1: Booking Requests, Upcoming Wellness, Facility Status */}
+          {/* Row 1: Booking Requests, Upcoming Wellness, Facility Status */}
+          <div className="grid grid-cols-3 gap-6">
             <BookingQueuesSection
               pendingRequests={data.pendingRequests}
               todaysBookings={data.todaysBookings}
@@ -291,7 +290,10 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
               recentActivity={data.recentActivity}
               notifications={data.notifications}
             />
-            {/* Row 2: Upcoming Bookings, Upcoming Events, Employee Resources */}
+          </div>
+
+          {/* Row 2: Upcoming Bookings, Upcoming Events */}
+          <div className="grid grid-cols-2 gap-6">
             <BookingQueuesSection
               pendingRequests={data.pendingRequests}
               todaysBookings={data.todaysBookings}
@@ -315,7 +317,6 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
               onTabChange={onTabChange}
               variant="desktop-events"
             />
-            <QuickActionsGrid onTabChange={onTabChange} isAdmin={isAdmin} variant="desktop" />
           </div>
         </div>
 
