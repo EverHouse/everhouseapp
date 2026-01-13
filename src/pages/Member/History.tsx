@@ -11,6 +11,11 @@ import { BottomSentinel } from '../../components/layout/BottomSentinel';
 import { formatDateShort, getTodayString, formatTime12Hour, getNowTimePacific, getRelativeDateLabel } from '../../utils/dateUtils';
 import { getStatusColor, formatStatusLabel } from '../../utils/statusColors';
 
+interface Participant {
+  name: string;
+  type: 'member' | 'guest';
+}
+
 interface BookingRecord {
   id: number;
   resource_id: number;
@@ -24,6 +29,7 @@ interface BookingRecord {
   duration_minutes?: number;
   status: string;
   notes: string;
+  participants?: Participant[];
 }
 
 interface RSVPRecord {
@@ -288,6 +294,35 @@ const History: React.FC = () => {
                           <span className="material-symbols-outlined text-sm">golf_course</span>
                           {resourceDetail}
                         </p>
+                      )}
+                      {booking.participants && booking.participants.length > 0 && (
+                        <div className={`mt-2 pt-2 border-t ${isDark ? 'border-white/10' : 'border-black/5'}`}>
+                          <p className={`text-xs font-medium mb-1 flex items-center gap-1 ${isDark ? 'text-white/60' : 'text-primary/60'}`}>
+                            <span className="material-symbols-outlined text-xs">group</span>
+                            Played with
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {booking.participants.map((p, idx) => (
+                              <span 
+                                key={idx} 
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
+                                  p.type === 'member'
+                                    ? (isDark ? 'bg-accent/15 text-accent' : 'bg-accent/15 text-brand-green')
+                                    : (isDark ? 'bg-orange-500/15 text-orange-300' : 'bg-orange-100 text-orange-700')
+                                }`}
+                              >
+                                {p.name}
+                                <span className={`text-[10px] font-medium ${
+                                  p.type === 'member' 
+                                    ? (isDark ? 'text-accent/70' : 'text-brand-green/70')
+                                    : (isDark ? 'text-orange-300/70' : 'text-orange-600/70')
+                                }`}>
+                                  {p.type === 'member' ? 'Member' : 'Guest'}
+                                </span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
                       )}
                     </div>
                   );})}

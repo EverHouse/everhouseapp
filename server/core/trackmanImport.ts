@@ -10,6 +10,7 @@ import { getHubSpotClient } from './integrations';
 import { bookingEvents } from './bookingEvents';
 import { getMemberTierByEmail } from './tierService';
 import { createSession, recordUsage, ParticipantInput } from './bookingService/sessionManager';
+import { useGuestPass } from '../routes/guestPasses';
 
 interface ParsedPlayer {
   type: 'member' | 'guest';
@@ -1433,6 +1434,15 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 trackmanBookingId: row.bookingId
               });
               guestSlot++;
+              
+              // Deduct guest pass from booking owner
+              // For upcoming bookings: send notification; for past bookings: deduct silently
+              const guestPassResult = await useGuestPass(matchedEmail, guest.name || undefined, isUpcoming);
+              if (!guestPassResult.success) {
+                process.stderr.write(`[Trackman Import] Guest pass deduction failed for ${matchedEmail} (guest: ${guest.name}): ${guestPassResult.error}\n`);
+              } else {
+                process.stderr.write(`[Trackman Import] Deducted guest pass for ${matchedEmail} (guest: ${guest.name}), ${guestPassResult.remaining} remaining\n`);
+              }
             }
             
             // Create empty member slots for remaining player count (if any)
@@ -1865,6 +1875,15 @@ async function insertBookingIfNotExists(
         slotNumber: i + 1,
         trackmanBookingId: booking.trackmanBookingId
       });
+      
+      // Deduct guest pass from booking owner
+      // For upcoming bookings: send notification; for past bookings: deduct silently
+      const guestPassResult = await useGuestPass(memberEmail, guests[i].name || undefined, isUpcoming);
+      if (!guestPassResult.success) {
+        process.stderr.write(`[Trackman Import] Guest pass deduction failed for ${memberEmail} (guest: ${guests[i].name}): ${guestPassResult.error}\n`);
+      } else {
+        process.stderr.write(`[Trackman Import] Deducted guest pass for ${memberEmail} (guest: ${guests[i].name}), ${guestPassResult.remaining} remaining\n`);
+      }
     }
   }
 

@@ -306,6 +306,25 @@ router.get('/api/booking-requests', async (req, res) => {
     .where(sql`${bookingGuests.bookingId} IN (${sql.join(bookingIds.map(id => sql`${id}`), sql`, `)})`)
     .groupBy(bookingGuests.bookingId);
     
+    // Batch query: Fetch member details (names) for participant display
+    const memberDetails = await db.select({
+      bookingId: bookingMembers.bookingId,
+      userEmail: bookingMembers.userEmail,
+      isPrimary: bookingMembers.isPrimary,
+      userName: users.name
+    })
+    .from(bookingMembers)
+    .leftJoin(users, sql`LOWER(${bookingMembers.userEmail}) = LOWER(${users.email})`)
+    .where(sql`${bookingMembers.bookingId} IN (${sql.join(bookingIds.map(id => sql`${id}`), sql`, `)})`);
+    
+    // Batch query: Fetch guest details for participant display
+    const guestDetails = await db.select({
+      bookingId: bookingGuests.bookingId,
+      guestName: bookingGuests.guestName
+    })
+    .from(bookingGuests)
+    .where(sql`${bookingGuests.bookingId} IN (${sql.join(bookingIds.map(id => sql`${id}`), sql`, `)})`);
+    
     // Batch query: Get invite statuses for linked members (only for non-staff member requests)
     let inviteStatusMap = new Map<string, string>();
     if (requestingUserEmail && !isStaffRequest) {
@@ -334,6 +353,32 @@ router.get('/api/booking-requests', async (req, res) => {
     const memberCountsMap = new Map(memberSlotsCounts.map(m => [m.bookingId, { total: m.totalSlots, filled: m.filledSlots }]));
     const guestCountsMap = new Map(guestCounts.map(g => [g.bookingId, g.count]));
     
+    // Build participant lookup maps
+    const memberDetailsMap = new Map<number, Array<{ name: string; type: 'member'; isPrimary: boolean }>>();
+    for (const m of memberDetails) {
+      if (!memberDetailsMap.has(m.bookingId)) {
+        memberDetailsMap.set(m.bookingId, []);
+      }
+      if (m.userEmail) {
+        memberDetailsMap.get(m.bookingId)!.push({
+          name: m.userName || m.userEmail,
+          type: 'member',
+          isPrimary: m.isPrimary || false
+        });
+      }
+    }
+    
+    const guestDetailsMap = new Map<number, Array<{ name: string; type: 'guest' }>>();
+    for (const g of guestDetails) {
+      if (!guestDetailsMap.has(g.bookingId)) {
+        guestDetailsMap.set(g.bookingId, []);
+      }
+      guestDetailsMap.get(g.bookingId)!.push({
+        name: g.guestName || 'Guest',
+        type: 'guest'
+      });
+    }
+    
     // Enrich results using pre-fetched data
     const enrichedResult = result.map((booking) => {
       const memberCounts = memberCountsMap.get(booking.id) || { total: 0, filled: 0 };
@@ -359,6 +404,15 @@ router.get('/api/booking-requests', async (req, res) => {
         ? (inviteStatusMap.get(booking.session_id) || null)
         : null;
       
+      // Build participants array (non-primary members and guests)
+      const members = memberDetailsMap.get(booking.id) || [];
+      const guests = guestDetailsMap.get(booking.id) || [];
+      const nonPrimaryMembers = members.filter(m => !m.isPrimary);
+      const participants: Array<{ name: string; type: 'member' | 'guest' }> = [
+        ...nonPrimaryMembers.map(m => ({ name: m.name, type: 'member' as const })),
+        ...guests.map(g => ({ name: g.name, type: 'guest' as const }))
+      ];
+      
       return {
         ...booking,
         linked_member_count: memberCounts.filled,
@@ -366,7 +420,8 @@ router.get('/api/booking-requests', async (req, res) => {
         total_player_count: totalPlayerCount,
         is_linked_member: isLinkedMember || false,
         primary_booker_name: primaryBookerName,
-        invite_status: inviteStatus
+        invite_status: inviteStatus,
+        participants
       };
     });
     
