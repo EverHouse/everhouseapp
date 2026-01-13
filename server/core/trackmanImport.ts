@@ -371,7 +371,24 @@ interface SessionCreationInput {
   ownerName: string;
   parsedPlayers: ParsedPlayer[];
   membersByEmail: Map<string, string>;
+  trackmanEmailMapping: Map<string, string>;
   isPast: boolean;
+}
+
+// Helper function to resolve an email to the primary member email
+function resolveEmail(email: string, membersByEmail: Map<string, string>, trackmanEmailMapping: Map<string, string>): string {
+  const emailLower = email.toLowerCase();
+  // First check if it's a trackman_email alias
+  const trackmanResolved = trackmanEmailMapping.get(emailLower);
+  if (trackmanResolved) {
+    return trackmanResolved.toLowerCase();
+  }
+  // Then check membersByEmail
+  const memberResolved = membersByEmail.get(emailLower);
+  if (memberResolved) {
+    return memberResolved.toLowerCase();
+  }
+  return emailLower;
 }
 
 async function getUserIdByEmail(email: string): Promise<string | null> {
@@ -392,14 +409,14 @@ async function createTrackmanSessionAndParticipants(input: SessionCreationInput)
     const ownerUserId = await getUserIdByEmail(input.ownerEmail);
     const ownerTier = await getMemberTierByEmail(input.ownerEmail) || 'social';
     
-    // Normalize owner email for duplicate detection (resolve any aliases)
-    const ownerEmailNormalized = (input.membersByEmail.get(input.ownerEmail.toLowerCase()) || input.ownerEmail).toLowerCase();
+    // Normalize owner email for duplicate detection (resolve any aliases including trackman_email)
+    const ownerEmailNormalized = resolveEmail(input.ownerEmail, input.membersByEmail, input.trackmanEmailMapping);
     
     // Calculate per-participant duration (split equally among all participants)
     // Count unique members by resolving emails first to avoid counting owner twice
     const uniqueMemberCount = input.parsedPlayers.filter(p => {
       if (p.type !== 'member' || !p.email) return false;
-      const resolvedEmail = (input.membersByEmail.get(p.email.toLowerCase()) || p.email).toLowerCase();
+      const resolvedEmail = resolveEmail(p.email, input.membersByEmail, input.trackmanEmailMapping);
       return resolvedEmail !== ownerEmailNormalized;
     }).length;
     const guestCount = input.parsedPlayers.filter(p => p.type === 'guest').length;
@@ -423,22 +440,29 @@ async function createTrackmanSessionAndParticipants(input: SessionCreationInput)
     const memberPlayers = input.parsedPlayers.filter(p => p.type === 'member' && p.email);
     for (const member of memberPlayers) {
       if (member.email) {
-        // Resolve member email to real email BEFORE comparing to owner
-        const realEmail = input.membersByEmail.get(member.email.toLowerCase()) || member.email;
-        const normalizedMemberEmail = realEmail.toLowerCase();
+        // Resolve member email to real email BEFORE comparing to owner (check trackman_email mappings too)
+        const normalizedMemberEmail = resolveEmail(member.email, input.membersByEmail, input.trackmanEmailMapping);
         
         // Skip if this member is the same person as the owner (prevents duplicates)
+        // Check by email first
         if (normalizedMemberEmail === ownerEmailNormalized) {
           continue;
         }
         
-        const memberUserId = await getUserIdByEmail(realEmail);
-        const memberTier = await getMemberTierByEmail(realEmail) || 'social';
+        // Also get member's user ID to compare - catches cases where emails differ but it's the same person
+        const memberUserId = await getUserIdByEmail(normalizedMemberEmail);
+        
+        // Skip if same user_id as owner (catches alias mismatches like max.lee vs maxwell.lee)
+        if (memberUserId && ownerUserId && memberUserId === ownerUserId) {
+          continue;
+        }
+        
+        const memberTier = await getMemberTierByEmail(normalizedMemberEmail) || 'social';
         
         participantInputs.push({
           userId: memberUserId || undefined,
           participantType: 'member',
-          displayName: member.name || realEmail,
+          displayName: member.name || normalizedMemberEmail,
           slotDuration: perParticipantMinutes
         });
         
@@ -1001,6 +1025,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                   ownerName: row.userName,
                   parsedPlayers: linkedParsedPlayers,
                   membersByEmail: membersByEmail,
+                  trackmanEmailMapping: trackmanEmailMapping,
                   isPast: !isUpcoming
                 });
                 
@@ -1023,6 +1048,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                     ownerName: row.userName,
                     parsedPlayers: backfillParsedPlayers,
                     membersByEmail: membersByEmail,
+                    trackmanEmailMapping: trackmanEmailMapping,
                     isPast: !isUpcoming
                   });
                   
@@ -1116,6 +1142,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 ownerName: row.userName,
                 parsedPlayers: toleranceParsedPlayers,
                 membersByEmail: membersByEmail,
+                trackmanEmailMapping: trackmanEmailMapping,
                 isPast: !isUpcoming
               });
               
@@ -1270,6 +1297,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
               ownerName: row.userName,
               parsedPlayers: parsedPlayers,
               membersByEmail: membersByEmail,
+              trackmanEmailMapping: trackmanEmailMapping,
               isPast: !isUpcoming
             });
           }
