@@ -18,7 +18,7 @@ async function getHubSpotAccessToken() {
     }
   }
   
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
+  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME || 'connectors.replit.com';
   const xReplitToken = process.env.REPL_IDENTITY 
     ? 'repl ' + process.env.REPL_IDENTITY 
     : process.env.WEB_REPL_RENEWAL 
@@ -26,7 +26,8 @@ async function getHubSpotAccessToken() {
     : null;
 
   if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+    console.error('[HubSpot] Connector auth failed - missing token. REPL_IDENTITY:', !!process.env.REPL_IDENTITY, 'WEB_REPL_RENEWAL:', !!process.env.WEB_REPL_RENEWAL);
+    throw new Error('HubSpot connector not available - deployment token missing. Please ensure the HubSpot integration is enabled for this deployment.');
   }
 
   const response = await fetch(
@@ -91,7 +92,7 @@ async function getGoogleCalendarAccessToken() {
     }
   }
   
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
+  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME || 'connectors.replit.com';
   const xReplitToken = process.env.REPL_IDENTITY 
     ? 'repl ' + process.env.REPL_IDENTITY 
     : process.env.WEB_REPL_RENEWAL 
@@ -99,7 +100,8 @@ async function getGoogleCalendarAccessToken() {
     : null;
 
   if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+    console.error('[Google Calendar] Connector auth failed - missing token. REPL_IDENTITY:', !!process.env.REPL_IDENTITY, 'WEB_REPL_RENEWAL:', !!process.env.WEB_REPL_RENEWAL);
+    throw new Error('Google Calendar connector not available - deployment token missing. Please ensure the Google Calendar integration is enabled for this deployment.');
   }
 
   googleCalendarConnectionSettings = await fetch(
