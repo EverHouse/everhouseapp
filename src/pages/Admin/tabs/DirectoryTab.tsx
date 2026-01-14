@@ -96,16 +96,6 @@ const DirectoryTab: React.FC = () => {
         setPageReady(true);
     }, [setPageReady]);
 
-    useEffect(() => {
-        if (isViewingDetails && selectedMember) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = '';
-        }
-        return () => {
-            document.body.style.overflow = '';
-        };
-    }, [isViewingDetails, selectedMember]);
 
     // Fetch former members when switching to that tab
     const handleTabChange = useCallback(async (tab: MemberTab) => {
