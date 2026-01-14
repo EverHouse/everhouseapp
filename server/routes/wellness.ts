@@ -498,7 +498,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
       if (hasValidInstructor && hasValidCategory && hasValidSpots) {
         try {
           const reviewedResult = await pool.query(
-            `UPDATE wellness_classes SET needs_review = false, reviewed_by = $1, reviewed_at = NOW(), updated_at = NOW() WHERE id = $2 RETURNING *`,
+            `UPDATE wellness_classes SET needs_review = false, reviewed_by = $1, reviewed_at = NOW(), updated_at = NOW(), review_dismissed = true WHERE id = $2 RETURNING *`,
             [userEmail, id]
           );
           if (reviewedResult.rows.length > 0) {

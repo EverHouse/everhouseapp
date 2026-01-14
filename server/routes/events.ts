@@ -407,6 +407,7 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
       updateData.needsReview = false;
       updateData.reviewedAt = new Date();
       updateData.reviewedBy = getSessionUser(req)?.email || 'system';
+      updateData.reviewDismissed = true;
       updateData.conflictDetected = false;
     }
     
