@@ -340,13 +340,15 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   const fetchFormerMembers = useCallback(async (forceRefresh = false) => {
     if (!actualUser || (actualUser.role !== 'admin' && actualUser.role !== 'staff')) return;
     
-    const now = Date.now();
-    const cacheValid = formerMembersFetched.current && 
-                       (now - formerMembersLastFetch.current) < FORMER_MEMBERS_CACHE_MS;
-    
-    // Return cached data if still valid and not forcing refresh
-    if (cacheValid && !forceRefresh && formerMembers.length > 0) {
-      return;
+    // Skip fetch if cache is valid AND we're not forcing a refresh
+    if (!forceRefresh) {
+      const now = Date.now();
+      const cacheAge = now - formerMembersLastFetch.current;
+      const cacheValid = formerMembersFetched.current && cacheAge < FORMER_MEMBERS_CACHE_MS;
+      
+      if (cacheValid) {
+        return;
+      }
     }
     
     try {
@@ -381,7 +383,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     } catch (err) {
       console.error('Failed to fetch former members:', err);
     }
-  }, [actualUser, formerMembers.length]);
+  }, [actualUser]);
 
   const refreshMembers = useCallback(async (): Promise<{ success: boolean; count: number }> => {
     if (!actualUser || (actualUser.role !== 'admin' && actualUser.role !== 'staff')) {

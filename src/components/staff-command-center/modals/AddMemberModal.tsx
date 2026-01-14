@@ -19,6 +19,17 @@ interface AddMemberModalProps {
   onSuccess?: () => void;
 }
 
+interface FieldErrors {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  tier?: string;
+}
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^[\d\s\-\+\(\)\.]+$/;
+
 export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   isOpen,
   onClose,
@@ -39,6 +50,54 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
+  const validateFirstName = (value: string): string | undefined => {
+    if (!value.trim()) return 'First name is required';
+    if (value.trim().length > 50) return 'First name must be 50 characters or less';
+    return undefined;
+  };
+
+  const validateLastName = (value: string): string | undefined => {
+    if (!value.trim()) return 'Last name is required';
+    if (value.trim().length > 50) return 'Last name must be 50 characters or less';
+    return undefined;
+  };
+
+  const validateEmail = (value: string): string | undefined => {
+    if (!value.trim()) return 'Email is required';
+    if (!EMAIL_REGEX.test(value)) return 'Please enter a valid email address';
+    if (value.length > 255) return 'Email must be 255 characters or less';
+    return undefined;
+  };
+
+  const validatePhone = (value: string): string | undefined => {
+    if (!value.trim()) return undefined;
+    if (!PHONE_REGEX.test(value)) return 'Please enter a valid phone number';
+    const digitsOnly = value.replace(/\D/g, '');
+    if (digitsOnly.length < 10) return 'Phone number must have at least 10 digits';
+    if (digitsOnly.length > 15) return 'Phone number is too long';
+    return undefined;
+  };
+
+  const validateTier = (value: string): string | undefined => {
+    if (!value) return 'Please select a tier';
+    return undefined;
+  };
+
+  const validateAllFields = (): FieldErrors => {
+    return {
+      firstName: validateFirstName(firstName),
+      lastName: validateLastName(lastName),
+      email: validateEmail(email),
+      phone: validatePhone(phone),
+      tier: validateTier(tier)
+    };
+  };
+
+  const hasErrors = (errors: FieldErrors): boolean => {
+    return Object.values(errors).some(e => e !== undefined);
+  };
 
   const fetchOptions = useCallback(async () => {
     setOptionsLoading(true);
@@ -78,6 +137,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
     setDiscountReason('');
     setStartDate('');
     setError(null);
+    setFieldErrors({});
   }, []);
 
   useEffect(() => {
@@ -86,23 +146,53 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
     }
   }, [isOpen, resetForm]);
 
+  const handleFirstNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFirstName(value);
+    if (fieldErrors.firstName) {
+      setFieldErrors(prev => ({ ...prev, firstName: validateFirstName(value) }));
+    }
+  };
+
+  const handleLastNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setLastName(value);
+    if (fieldErrors.lastName) {
+      setFieldErrors(prev => ({ ...prev, lastName: validateLastName(value) }));
+    }
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setEmail(value);
+    if (fieldErrors.email) {
+      setFieldErrors(prev => ({ ...prev, email: validateEmail(value) }));
+    }
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setPhone(value);
+    if (fieldErrors.phone) {
+      setFieldErrors(prev => ({ ...prev, phone: validatePhone(value) }));
+    }
+  };
+
+  const handleTierChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setTier(value);
+    if (fieldErrors.tier) {
+      setFieldErrors(prev => ({ ...prev, tier: validateTier(value) }));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!firstName.trim()) {
-      setError('First name is required');
-      return;
-    }
-    if (!lastName.trim()) {
-      setError('Last name is required');
-      return;
-    }
-    if (!email.trim() || !email.includes('@')) {
-      setError('Valid email is required');
-      return;
-    }
-    if (!tier) {
-      setError('Please select a tier');
+    const errors = validateAllFields();
+    setFieldErrors(errors);
+    
+    if (hasErrors(errors)) {
       return;
     }
 
@@ -183,10 +273,15 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                     <input
                       type="text"
                       value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
+                      onChange={handleFirstNameChange}
                       placeholder="John"
-                      className="w-full px-4 py-2 border border-primary/20 dark:border-white/20 rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40"
+                      className={`w-full px-4 py-2 border rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 ${
+                        fieldErrors.firstName ? 'border-red-500' : 'border-primary/20 dark:border-white/20'
+                      }`}
                     />
+                    {fieldErrors.firstName && (
+                      <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.firstName}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-primary dark:text-white mb-2">
@@ -195,10 +290,15 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                     <input
                       type="text"
                       value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
+                      onChange={handleLastNameChange}
                       placeholder="Smith"
-                      className="w-full px-4 py-2 border border-primary/20 dark:border-white/20 rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40"
+                      className={`w-full px-4 py-2 border rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 ${
+                        fieldErrors.lastName ? 'border-red-500' : 'border-primary/20 dark:border-white/20'
+                      }`}
                     />
+                    {fieldErrors.lastName && (
+                      <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.lastName}</p>
+                    )}
                   </div>
                 </div>
 
@@ -209,10 +309,15 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                   <input
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={handleEmailChange}
                     placeholder="john@example.com"
-                    className="w-full px-4 py-2 border border-primary/20 dark:border-white/20 rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40"
+                    className={`w-full px-4 py-2 border rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 ${
+                      fieldErrors.email ? 'border-red-500' : 'border-primary/20 dark:border-white/20'
+                    }`}
                   />
+                  {fieldErrors.email && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.email}</p>
+                  )}
                 </div>
 
                 <div>
@@ -222,10 +327,15 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                   <input
                     type="tel"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={handlePhoneChange}
                     placeholder="+1 (555) 123-4567"
-                    className="w-full px-4 py-2 border border-primary/20 dark:border-white/20 rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40"
+                    className={`w-full px-4 py-2 border rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 ${
+                      fieldErrors.phone ? 'border-red-500' : 'border-primary/20 dark:border-white/20'
+                    }`}
                   />
+                  {fieldErrors.phone && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.phone}</p>
+                  )}
                 </div>
 
                 <div>
@@ -234,14 +344,19 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                   </label>
                   <select
                     value={tier}
-                    onChange={(e) => setTier(e.target.value)}
-                    className="w-full px-4 py-2 border border-primary/20 dark:border-white/20 rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white"
+                    onChange={handleTierChange}
+                    className={`w-full px-4 py-2 border rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white ${
+                      fieldErrors.tier ? 'border-red-500' : 'border-primary/20 dark:border-white/20'
+                    }`}
                   >
                     <option value="">Select a tier...</option>
                     {options?.tiers.map(t => (
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
+                  {fieldErrors.tier && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.tier}</p>
+                  )}
                 </div>
 
                 <div>

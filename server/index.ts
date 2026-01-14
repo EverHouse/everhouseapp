@@ -46,7 +46,10 @@ import testAuthRouter from './routes/testAuth';
 import rosterRouter from './routes/roster';
 import staffCheckinRouter from './routes/staffCheckin';
 import dataIntegrityRouter from './routes/dataIntegrity';
+import dataToolsRouter from './routes/dataTools';
 import legacyPurchasesRouter from './routes/legacyPurchases';
+import mindbodyRouter from './routes/mindbody';
+import settingsRouter from './routes/settings';
 import { registerObjectStorageRoutes } from './replit_integrations/object_storage';
 import { ensureDatabaseConstraints, seedDefaultNoticeTypes } from './db-init';
 import { initWebSocketServer } from './core/websocket';
@@ -260,7 +263,10 @@ app.use(noticesRouter);
 app.use(rosterRouter);
 app.use(staffCheckinRouter);
 app.use(dataIntegrityRouter);
+app.use(dataToolsRouter);
 app.use(legacyPurchasesRouter);
+app.use(mindbodyRouter);
+app.use(settingsRouter);
 registerObjectStorageRoutes(app);
 
 // SPA catch-all using middleware (avoids Express 5 path-to-regexp issues)

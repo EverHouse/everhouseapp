@@ -161,6 +161,32 @@ const DataIntegrityTab: React.FC = () => {
   const [showIgnoredIssues, setShowIgnoredIssues] = useState(false);
   const [isLoadingIgnored, setIsLoadingIgnored] = useState(false);
 
+  const [showDataTools, setShowDataTools] = useState(true);
+  const [resyncEmail, setResyncEmail] = useState('');
+  const [isResyncing, setIsResyncing] = useState(false);
+  const [resyncResult, setResyncResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const [guestFeeStartDate, setGuestFeeStartDate] = useState('');
+  const [guestFeeEndDate, setGuestFeeEndDate] = useState('');
+  const [unlinkedGuestFees, setUnlinkedGuestFees] = useState<any[]>([]);
+  const [isLoadingGuestFees, setIsLoadingGuestFees] = useState(false);
+  const [availableSessions, setAvailableSessions] = useState<any[]>([]);
+  const [selectedFeeId, setSelectedFeeId] = useState<number | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+  const [isLinkingFee, setIsLinkingFee] = useState(false);
+
+  const [attendanceSearchDate, setAttendanceSearchDate] = useState('');
+  const [attendanceSearchEmail, setAttendanceSearchEmail] = useState('');
+  const [attendanceBookings, setAttendanceBookings] = useState<any[]>([]);
+  const [isSearchingAttendance, setIsSearchingAttendance] = useState(false);
+  const [updatingAttendanceId, setUpdatingAttendanceId] = useState<number | null>(null);
+  const [attendanceNote, setAttendanceNote] = useState('');
+
+  const [mindbodyStartDate, setMindbodyStartDate] = useState('');
+  const [mindbodyEndDate, setMindbodyEndDate] = useState('');
+  const [isRunningMindbodyImport, setIsRunningMindbodyImport] = useState(false);
+  const [mindbodyResult, setMindbodyResult] = useState<{ success: boolean; message: string } | null>(null);
+
   useEffect(() => {
     fetchCachedResults();
     fetchCalendarStatus();
@@ -636,6 +662,195 @@ const DataIntegrityTab: React.FC = () => {
 
   const hasIssues = results.some(r => r.issues.length > 0);
 
+  const handleResyncMember = async () => {
+    if (!resyncEmail.trim()) return;
+    
+    setIsResyncing(true);
+    setResyncResult(null);
+    try {
+      const res = await fetch('/api/data-tools/resync-member', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: resyncEmail.trim() })
+      });
+      
+      const data = await res.json();
+      if (res.ok) {
+        setResyncResult({ success: true, message: data.message });
+        showToast(data.message, 'success');
+        setResyncEmail('');
+      } else {
+        setResyncResult({ success: false, message: data.error || 'Failed to resync member' });
+        showToast(data.error || 'Failed to resync member', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to resync member:', err);
+      setResyncResult({ success: false, message: 'Network error occurred' });
+      showToast('Failed to resync member', 'error');
+    } finally {
+      setIsResyncing(false);
+    }
+  };
+
+  const handleSearchUnlinkedGuestFees = async () => {
+    if (!guestFeeStartDate || !guestFeeEndDate) return;
+    
+    setIsLoadingGuestFees(true);
+    try {
+      const res = await fetch(`/api/data-tools/unlinked-guest-fees?startDate=${guestFeeStartDate}&endDate=${guestFeeEndDate}`, {
+        credentials: 'include'
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setUnlinkedGuestFees(data);
+      } else {
+        showToast('Failed to search guest fees', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to search guest fees:', err);
+      showToast('Failed to search guest fees', 'error');
+    } finally {
+      setIsLoadingGuestFees(false);
+    }
+  };
+
+  const handleLoadSessionsForFee = async (fee: any) => {
+    setSelectedFeeId(fee.id);
+    setSelectedSessionId(null);
+    try {
+      const res = await fetch(`/api/data-tools/available-sessions?date=${fee.saleDate}&memberEmail=${fee.memberEmail || ''}`, {
+        credentials: 'include'
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setAvailableSessions(data);
+      }
+    } catch (err) {
+      console.error('Failed to load sessions:', err);
+    }
+  };
+
+  const handleLinkGuestFee = async () => {
+    if (!selectedFeeId || !selectedSessionId) return;
+    
+    setIsLinkingFee(true);
+    try {
+      const res = await fetch('/api/data-tools/link-guest-fee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ guestFeeId: selectedFeeId, bookingId: selectedSessionId })
+      });
+      
+      if (res.ok) {
+        showToast('Guest fee linked successfully', 'success');
+        setUnlinkedGuestFees(prev => prev.filter(f => f.id !== selectedFeeId));
+        setSelectedFeeId(null);
+        setSelectedSessionId(null);
+        setAvailableSessions([]);
+      } else {
+        const data = await res.json();
+        showToast(data.error || 'Failed to link guest fee', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to link guest fee:', err);
+      showToast('Failed to link guest fee', 'error');
+    } finally {
+      setIsLinkingFee(false);
+    }
+  };
+
+  const handleSearchAttendance = async () => {
+    if (!attendanceSearchDate && !attendanceSearchEmail) {
+      showToast('Please enter a date or member email', 'error');
+      return;
+    }
+    
+    setIsSearchingAttendance(true);
+    try {
+      const params = new URLSearchParams();
+      if (attendanceSearchDate) params.append('date', attendanceSearchDate);
+      if (attendanceSearchEmail) params.append('memberEmail', attendanceSearchEmail);
+      
+      const res = await fetch(`/api/data-tools/bookings-search?${params.toString()}`, {
+        credentials: 'include'
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setAttendanceBookings(data);
+      } else {
+        showToast('Failed to search bookings', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to search bookings:', err);
+      showToast('Failed to search bookings', 'error');
+    } finally {
+      setIsSearchingAttendance(false);
+    }
+  };
+
+  const handleUpdateAttendance = async (bookingId: number, status: string) => {
+    setUpdatingAttendanceId(bookingId);
+    try {
+      const res = await fetch('/api/data-tools/update-attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ bookingId, attendanceStatus: status, notes: attendanceNote })
+      });
+      
+      if (res.ok) {
+        showToast(`Attendance updated to ${status}`, 'success');
+        setAttendanceBookings(prev => prev.map(b => 
+          b.id === bookingId ? { ...b, reconciliationStatus: status, reconciliationNotes: attendanceNote } : b
+        ));
+        setAttendanceNote('');
+      } else {
+        const data = await res.json();
+        showToast(data.error || 'Failed to update attendance', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to update attendance:', err);
+      showToast('Failed to update attendance', 'error');
+    } finally {
+      setUpdatingAttendanceId(null);
+    }
+  };
+
+  const handleMindbodyReimport = async () => {
+    if (!mindbodyStartDate || !mindbodyEndDate) return;
+    
+    setIsRunningMindbodyImport(true);
+    setMindbodyResult(null);
+    try {
+      const res = await fetch('/api/data-tools/mindbody-reimport', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ startDate: mindbodyStartDate, endDate: mindbodyEndDate })
+      });
+      
+      const data = await res.json();
+      if (res.ok) {
+        setMindbodyResult({ success: true, message: data.message });
+        showToast(data.message, 'success');
+      } else {
+        setMindbodyResult({ success: false, message: data.error || 'Failed to queue reimport' });
+        showToast(data.error || 'Failed to queue reimport', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to queue reimport:', err);
+      setMindbodyResult({ success: false, message: 'Network error occurred' });
+      showToast('Failed to queue reimport', 'error');
+    } finally {
+      setIsRunningMindbodyImport(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-pop-in pb-32">
       <div className="mb-6 flex flex-col gap-3">
@@ -848,6 +1063,255 @@ const DataIntegrityTab: React.FC = () => {
             ) : (
               <p className="text-sm text-gray-500 dark:text-gray-400">Failed to load history</p>
             )}
+          </div>
+        )}
+      </div>
+
+      <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+        <button
+          onClick={() => setShowDataTools(!showDataTools)}
+          className="flex items-center justify-between w-full text-left"
+        >
+          <div className="flex items-center gap-2">
+            <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">build</span>
+            <span className="font-bold text-primary dark:text-white">Data Tools</span>
+            <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded-full">Admin</span>
+          </div>
+          <span aria-hidden="true" className={`material-symbols-outlined text-gray-500 dark:text-gray-400 transition-transform ${showDataTools ? 'rotate-180' : ''}`}>
+            expand_more
+          </span>
+        </button>
+        
+        {showDataTools && (
+          <div className="mt-4 space-y-6">
+            <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
+              <h4 className="font-semibold text-primary dark:text-white mb-3 flex items-center gap-2">
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">sync</span>
+                Re-sync Member from HubSpot
+              </h4>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={resyncEmail}
+                  onChange={(e) => setResyncEmail(e.target.value)}
+                  placeholder="Enter member email"
+                  className="flex-1 px-3 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg text-sm text-primary dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4]"
+                />
+                <button
+                  onClick={handleResyncMember}
+                  disabled={!resyncEmail.trim() || isResyncing}
+                  className="px-4 py-2 bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515] rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isResyncing && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                  Resync
+                </button>
+              </div>
+              {resyncResult && (
+                <p className={`text-sm mt-2 ${resyncResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {resyncResult.message}
+                </p>
+              )}
+            </div>
+
+            <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
+              <h4 className="font-semibold text-primary dark:text-white mb-3 flex items-center gap-2">
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">link</span>
+                Guest Fee Relinking
+              </h4>
+              <div className="flex flex-wrap gap-2 mb-3">
+                <input
+                  type="date"
+                  value={guestFeeStartDate}
+                  onChange={(e) => setGuestFeeStartDate(e.target.value)}
+                  className="px-3 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg text-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4]"
+                />
+                <span className="flex items-center text-gray-500">to</span>
+                <input
+                  type="date"
+                  value={guestFeeEndDate}
+                  onChange={(e) => setGuestFeeEndDate(e.target.value)}
+                  className="px-3 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg text-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4]"
+                />
+                <button
+                  onClick={handleSearchUnlinkedGuestFees}
+                  disabled={!guestFeeStartDate || !guestFeeEndDate || isLoadingGuestFees}
+                  className="px-4 py-2 bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515] rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isLoadingGuestFees && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                  Search
+                </button>
+              </div>
+              {unlinkedGuestFees.length > 0 && (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {unlinkedGuestFees.map((fee) => (
+                    <div key={fee.id} className={`p-3 rounded-lg border ${selectedFeeId === fee.id ? 'border-primary dark:border-[#CCB8E4] bg-primary/5 dark:bg-[#CCB8E4]/10' : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/5'}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <span className="text-sm font-medium text-primary dark:text-white">{fee.itemName}</span>
+                          <span className="text-xs text-gray-500 ml-2">${fee.itemTotal}</span>
+                        </div>
+                        <button
+                          onClick={() => handleLoadSessionsForFee(fee)}
+                          className="text-xs px-2 py-1 bg-primary/10 dark:bg-[#CCB8E4]/20 text-primary dark:text-[#CCB8E4] rounded"
+                        >
+                          {selectedFeeId === fee.id ? 'Selected' : 'Select'}
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500">{fee.saleDate} • {fee.memberEmail || 'Unknown member'}</p>
+                      
+                      {selectedFeeId === fee.id && availableSessions.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Link to session:</p>
+                          {availableSessions.map((session) => (
+                            <button
+                              key={session.id}
+                              onClick={() => setSelectedSessionId(session.id)}
+                              className={`w-full text-left p-2 rounded text-sm ${selectedSessionId === session.id ? 'bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515]' : 'bg-gray-100 dark:bg-white/10 text-primary dark:text-white hover:bg-gray-200 dark:hover:bg-white/20'}`}
+                            >
+                              {session.startTime} - {session.endTime} • {session.resourceName || 'Unknown'} • {session.userName}
+                            </button>
+                          ))}
+                          <button
+                            onClick={handleLinkGuestFee}
+                            disabled={!selectedSessionId || isLinkingFee}
+                            className="w-full px-3 py-2 bg-green-600 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+                          >
+                            {isLinkingFee && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                            Link Fee to Session
+                          </button>
+                        </div>
+                      )}
+                      
+                      {selectedFeeId === fee.id && availableSessions.length === 0 && (
+                        <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">No sessions found for this date/member</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {unlinkedGuestFees.length === 0 && guestFeeStartDate && guestFeeEndDate && !isLoadingGuestFees && (
+                <p className="text-sm text-gray-500 text-center py-4">No unlinked guest fees found in this date range</p>
+              )}
+            </div>
+
+            <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
+              <h4 className="font-semibold text-primary dark:text-white mb-3 flex items-center gap-2">
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">how_to_reg</span>
+                Manual Attendance Correction
+              </h4>
+              <div className="flex flex-wrap gap-2 mb-3">
+                <input
+                  type="date"
+                  value={attendanceSearchDate}
+                  onChange={(e) => setAttendanceSearchDate(e.target.value)}
+                  placeholder="Date"
+                  className="px-3 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg text-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4]"
+                />
+                <input
+                  type="email"
+                  value={attendanceSearchEmail}
+                  onChange={(e) => setAttendanceSearchEmail(e.target.value)}
+                  placeholder="Member email (optional)"
+                  className="flex-1 min-w-[200px] px-3 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg text-sm text-primary dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4]"
+                />
+                <button
+                  onClick={handleSearchAttendance}
+                  disabled={(!attendanceSearchDate && !attendanceSearchEmail) || isSearchingAttendance}
+                  className="px-4 py-2 bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515] rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isSearchingAttendance && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                  Search
+                </button>
+              </div>
+              {attendanceBookings.length > 0 && (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {attendanceBookings.map((booking) => (
+                    <div key={booking.id} className="p-3 bg-white dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <span className="text-sm font-medium text-primary dark:text-white">{booking.userName}</span>
+                          <span className="text-xs text-gray-500 ml-2">{booking.startTime} - {booking.endTime}</span>
+                        </div>
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
+                          booking.reconciliationStatus === 'attended' ? 'bg-green-100 dark:bg-green-900/30 text-green-600' :
+                          booking.reconciliationStatus === 'no_show' ? 'bg-red-100 dark:bg-red-900/30 text-red-600' :
+                          'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                        }`}>
+                          {booking.reconciliationStatus || 'Pending'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-2">{booking.requestDate} • {booking.resourceName || 'Unknown resource'}</p>
+                      <div className="flex flex-wrap gap-2">
+                        <input
+                          type="text"
+                          placeholder="Add note (optional)"
+                          value={updatingAttendanceId === booking.id ? attendanceNote : ''}
+                          onChange={(e) => { setUpdatingAttendanceId(booking.id); setAttendanceNote(e.target.value); }}
+                          className="flex-1 min-w-[150px] px-2 py-1 bg-gray-50 dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded text-xs text-primary dark:text-white placeholder:text-gray-400"
+                        />
+                        <button
+                          onClick={() => handleUpdateAttendance(booking.id, 'attended')}
+                          disabled={updatingAttendanceId === booking.id && !attendanceNote}
+                          className="px-3 py-1 bg-green-600 text-white rounded text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                        >
+                          {updatingAttendanceId === booking.id && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[12px]">progress_activity</span>}
+                          Attended
+                        </button>
+                        <button
+                          onClick={() => handleUpdateAttendance(booking.id, 'no_show')}
+                          disabled={updatingAttendanceId === booking.id && !attendanceNote}
+                          className="px-3 py-1 bg-red-600 text-white rounded text-xs font-medium hover:opacity-90 disabled:opacity-50"
+                        >
+                          No-Show
+                        </button>
+                      </div>
+                      {booking.reconciliationNotes && (
+                        <p className="text-xs text-gray-500 mt-2 italic">Note: {booking.reconciliationNotes}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {attendanceBookings.length === 0 && (attendanceSearchDate || attendanceSearchEmail) && !isSearchingAttendance && (
+                <p className="text-sm text-gray-500 text-center py-4">No bookings found</p>
+              )}
+            </div>
+
+            <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
+              <h4 className="font-semibold text-primary dark:text-white mb-3 flex items-center gap-2">
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">cloud_sync</span>
+                Mindbody Data Re-import
+              </h4>
+              <p className="text-xs text-gray-500 mb-3">Re-import data for a specific date range. This will queue a background job to refresh data from Mindbody CSV exports.</p>
+              <div className="flex flex-wrap gap-2 mb-3">
+                <input
+                  type="date"
+                  value={mindbodyStartDate}
+                  onChange={(e) => setMindbodyStartDate(e.target.value)}
+                  className="px-3 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg text-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4]"
+                />
+                <span className="flex items-center text-gray-500">to</span>
+                <input
+                  type="date"
+                  value={mindbodyEndDate}
+                  onChange={(e) => setMindbodyEndDate(e.target.value)}
+                  className="px-3 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg text-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4]"
+                />
+                <button
+                  onClick={handleMindbodyReimport}
+                  disabled={!mindbodyStartDate || !mindbodyEndDate || isRunningMindbodyImport}
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isRunningMindbodyImport && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                  Queue Re-import
+                </button>
+              </div>
+              {mindbodyResult && (
+                <p className={`text-sm ${mindbodyResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {mindbodyResult.message}
+                </p>
+              )}
+            </div>
           </div>
         )}
       </div>

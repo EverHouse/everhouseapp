@@ -34,6 +34,30 @@ const RoleBadge: React.FC<{ role: 'staff' | 'admin' | null }> = ({ role }) => {
   );
 };
 
+interface TeamFieldErrors {
+  email?: string;
+  phone?: string;
+}
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^[\d\s\-\+\(\)\.]+$/;
+
+const validateEmail = (value: string): string | undefined => {
+  if (!value.trim()) return 'Email is required';
+  if (!EMAIL_REGEX.test(value)) return 'Please enter a valid email address';
+  if (value.length > 255) return 'Email must be 255 characters or less';
+  return undefined;
+};
+
+const validatePhone = (value: string): string | undefined => {
+  if (!value.trim()) return undefined;
+  if (!PHONE_REGEX.test(value)) return 'Please enter a valid phone number';
+  const digitsOnly = value.replace(/\D/g, '');
+  if (digitsOnly.length > 0 && digitsOnly.length < 10) return 'Phone number must have at least 10 digits';
+  if (digitsOnly.length > 15) return 'Phone number is too long';
+  return undefined;
+};
+
 const TeamTab: React.FC = () => {
   const { actualUser } = useData();
   const isAdmin = actualUser?.role === 'admin';
@@ -48,6 +72,8 @@ const TeamTab: React.FC = () => {
   const [isAddingPerson, setIsAddingPerson] = useState(false);
   const [newPerson, setNewPerson] = useState({ firstName: '', lastName: '', email: '', phone: '', jobTitle: '', role: 'staff' as 'staff' | 'admin' });
   const [addError, setAddError] = useState<string | null>(null);
+  const [editFieldErrors, setEditFieldErrors] = useState<TeamFieldErrors>({});
+  const [addFieldErrors, setAddFieldErrors] = useState<TeamFieldErrors>({});
 
   useEffect(() => {
     fetchTeamMembers();
@@ -140,10 +166,41 @@ const TeamTab: React.FC = () => {
     setSelectedMember({...member});
     setIsEditing(true);
     setError(null);
+    setEditFieldErrors({});
+  };
+
+  const handleEditEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (selectedMember) {
+      setSelectedMember({ ...selectedMember, email: value });
+    }
+    if (editFieldErrors.email) {
+      setEditFieldErrors(prev => ({ ...prev, email: validateEmail(value) }));
+    }
+  };
+
+  const handleEditPhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (selectedMember) {
+      setSelectedMember({ ...selectedMember, phone: value || null });
+    }
+    if (editFieldErrors.phone) {
+      setEditFieldErrors(prev => ({ ...prev, phone: validatePhone(value) }));
+    }
   };
 
   const handleEditSave = async () => {
     if (!selectedMember) return;
+
+    const errors: TeamFieldErrors = {
+      email: validateEmail(selectedMember.email),
+      phone: validatePhone(selectedMember.phone || '')
+    };
+    setEditFieldErrors(errors);
+    
+    if (Object.values(errors).some(e => e !== undefined)) {
+      return;
+    }
 
     try {
       setError(null);
@@ -178,9 +235,30 @@ const TeamTab: React.FC = () => {
     }
   };
 
+  const handleAddEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setNewPerson({ ...newPerson, email: value });
+    if (addFieldErrors.email) {
+      setAddFieldErrors(prev => ({ ...prev, email: validateEmail(value) }));
+    }
+  };
+
+  const handleAddPhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setNewPerson({ ...newPerson, phone: value });
+    if (addFieldErrors.phone) {
+      setAddFieldErrors(prev => ({ ...prev, phone: validatePhone(value) }));
+    }
+  };
+
   const handleAddPerson = async () => {
-    if (!newPerson.email.trim()) {
-      setAddError('Email is required');
+    const errors: TeamFieldErrors = {
+      email: validateEmail(newPerson.email),
+      phone: validatePhone(newPerson.phone)
+    };
+    setAddFieldErrors(errors);
+    
+    if (Object.values(errors).some(e => e !== undefined)) {
       return;
     }
 
@@ -382,15 +460,20 @@ const TeamTab: React.FC = () => {
           
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Email
+              Email *
             </label>
             <input
               type="email"
               value={selectedMember?.email || ''}
-              onChange={(e) => selectedMember && setSelectedMember({...selectedMember, email: e.target.value})}
+              onChange={handleEditEmailChange}
               placeholder="email@example.com"
-              className="w-full p-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white"
+              className={`w-full p-3 rounded-lg border bg-gray-50 dark:bg-black/30 text-primary dark:text-white ${
+                editFieldErrors.email ? 'border-red-500' : 'border-gray-200 dark:border-white/25'
+              }`}
             />
+            {editFieldErrors.email && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{editFieldErrors.email}</p>
+            )}
           </div>
 
           <div>
@@ -400,10 +483,15 @@ const TeamTab: React.FC = () => {
             <input
               type="tel"
               value={selectedMember?.phone || ''}
-              onChange={(e) => selectedMember && setSelectedMember({...selectedMember, phone: e.target.value || null})}
+              onChange={handleEditPhoneChange}
               placeholder="+1 (555) 123-4567"
-              className="w-full p-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white"
+              className={`w-full p-3 rounded-lg border bg-gray-50 dark:bg-black/30 text-primary dark:text-white ${
+                editFieldErrors.phone ? 'border-red-500' : 'border-gray-200 dark:border-white/25'
+              }`}
             />
+            {editFieldErrors.phone && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{editFieldErrors.phone}</p>
+            )}
           </div>
 
           <div>
@@ -454,7 +542,7 @@ const TeamTab: React.FC = () => {
         </div>
       </ModalShell>}
 
-      <ModalShell isOpen={isAddingPerson} onClose={() => { setIsAddingPerson(false); setAddError(null); setNewPerson({ firstName: '', lastName: '', email: '', phone: '', jobTitle: '', role: 'staff' }); }} title="Add Team Member" showCloseButton={false}>
+      <ModalShell isOpen={isAddingPerson} onClose={() => { setIsAddingPerson(false); setAddError(null); setAddFieldErrors({}); setNewPerson({ firstName: '', lastName: '', email: '', phone: '', jobTitle: '', role: 'staff' }); }} title="Add Team Member" showCloseButton={false}>
         <div className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -490,10 +578,15 @@ const TeamTab: React.FC = () => {
             <input
               type="email"
               value={newPerson.email}
-              onChange={(e) => setNewPerson({...newPerson, email: e.target.value})}
+              onChange={handleAddEmailChange}
               placeholder="email@example.com"
-              className="w-full p-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white"
+              className={`w-full p-3 rounded-lg border bg-gray-50 dark:bg-black/30 text-primary dark:text-white ${
+                addFieldErrors.email ? 'border-red-500' : 'border-gray-200 dark:border-white/25'
+              }`}
             />
+            {addFieldErrors.email && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{addFieldErrors.email}</p>
+            )}
           </div>
 
           <div>
@@ -503,10 +596,15 @@ const TeamTab: React.FC = () => {
             <input
               type="tel"
               value={newPerson.phone}
-              onChange={(e) => setNewPerson({...newPerson, phone: e.target.value})}
+              onChange={handleAddPhoneChange}
               placeholder="+1 (555) 123-4567"
-              className="w-full p-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white"
+              className={`w-full p-3 rounded-lg border bg-gray-50 dark:bg-black/30 text-primary dark:text-white ${
+                addFieldErrors.phone ? 'border-red-500' : 'border-gray-200 dark:border-white/25'
+              }`}
             />
+            {addFieldErrors.phone && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{addFieldErrors.phone}</p>
+            )}
           </div>
 
           <div>
@@ -542,7 +640,7 @@ const TeamTab: React.FC = () => {
 
           <div className="flex gap-3 pt-2">
             <button
-              onClick={() => { setIsAddingPerson(false); setAddError(null); setNewPerson({ firstName: '', lastName: '', email: '', phone: '', jobTitle: '', role: 'staff' }); }}
+              onClick={() => { setIsAddingPerson(false); setAddError(null); setAddFieldErrors({}); setNewPerson({ firstName: '', lastName: '', email: '', phone: '', jobTitle: '', role: 'staff' }); }}
               className="flex-1 py-3 px-4 rounded-lg border border-gray-200 dark:border-white/25 text-gray-600 dark:text-gray-300 font-medium"
             >
               Cancel

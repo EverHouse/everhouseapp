@@ -6,6 +6,7 @@ import { sql, eq } from 'drizzle-orm';
 import { isProduction } from './db';
 import { broadcastMemberDataUpdated, broadcastDataIntegrityUpdate } from './websocket';
 import { syncDealStageFromMindbodyStatus } from './hubspotDeals';
+import { alertOnHubSpotSyncComplete, alertOnSyncFailure } from './dataAlerts';
 import pLimit from 'p-limit';
 
 // Helper to add delay between operations
@@ -262,9 +263,17 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
       broadcastDataIntegrityUpdate('data_changed', { source: 'hubspot_sync' });
     }
     
+    // Alert if there were sync errors
+    await alertOnHubSpotSyncComplete(synced, errors, allContacts.length);
+    
     return { synced, errors };
   } catch (error) {
     console.error('[MemberSync] Fatal error:', error);
+    await alertOnSyncFailure(
+      'hubspot',
+      'Member sync from HubSpot',
+      error instanceof Error ? error : new Error(String(error))
+    );
     return { synced: 0, errors: 1 };
   } finally {
     syncInProgress = false;

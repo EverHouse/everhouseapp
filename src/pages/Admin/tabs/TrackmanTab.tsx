@@ -104,6 +104,79 @@ const TrackmanTab: React.FC = () => {
   const unmatchedSectionRef = useRef<HTMLDivElement>(null);
   const matchedSectionRef = useRef<HTMLDivElement>(null);
   const needsPlayersSectionRef = useRef<HTMLDivElement>(null);
+  const mindbodySectionRef = useRef<HTMLDivElement>(null);
+
+  const [showMindbodySection, setShowMindbodySection] = useState(false);
+  const [mindbodyUnmatched, setMindbodyUnmatched] = useState<any[]>([]);
+  const [mindbodyUnmatchedTotal, setMindbodyUnmatchedTotal] = useState(0);
+  const [mindbodyPage, setMindbodyPage] = useState(1);
+  const [mindbodySearchQuery, setMindbodySearchQuery] = useState('');
+  const [mindbodyLinkModal, setMindbodyLinkModal] = useState<{ record: any; selectedEmail: string } | null>(null);
+  const [mindbodyMemberSearch, setMindbodyMemberSearch] = useState('');
+  const [mindbodyLinkHistory, setMindbodyLinkHistory] = useState<any[]>([]);
+  const [showMindbodyHistory, setShowMindbodyHistory] = useState(false);
+  const [isLinkingMindbody, setIsLinkingMindbody] = useState(false);
+
+  const fetchMindbodyUnmatched = async (page: number, search?: string) => {
+    try {
+      const offset = (page - 1) * ITEMS_PER_PAGE;
+      const cacheBuster = `_t=${Date.now()}`;
+      const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
+      const res = await fetch(`/api/admin/mindbody/unmatched?limit=${ITEMS_PER_PAGE}&offset=${offset}${searchParam}&${cacheBuster}`, { credentials: 'include' });
+      if (res.ok) {
+        const result = await res.json();
+        setMindbodyUnmatched(result.data || []);
+        setMindbodyUnmatchedTotal(result.totalCount || 0);
+      }
+    } catch (err) {
+      console.error('Failed to fetch Mindbody unmatched:', err);
+    }
+  };
+
+  const fetchMindbodyLinkHistory = async () => {
+    try {
+      const cacheBuster = `_t=${Date.now()}`;
+      const res = await fetch(`/api/admin/mindbody/link-history?limit=20&${cacheBuster}`, { credentials: 'include' });
+      if (res.ok) {
+        const history = await res.json();
+        setMindbodyLinkHistory(history);
+      }
+    } catch (err) {
+      console.error('Failed to fetch link history:', err);
+    }
+  };
+
+  const handleMindbodyLink = async () => {
+    if (!mindbodyLinkModal || !mindbodyLinkModal.selectedEmail) return;
+    setIsLinkingMindbody(true);
+    try {
+      const res = await fetch('/api/admin/mindbody/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          mindbodyClientId: mindbodyLinkModal.record.mindbodyClientId,
+          memberEmail: mindbodyLinkModal.selectedEmail,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMindbodyLinkModal(null);
+        setMindbodyMemberSearch('');
+        showToast(`Linked ${data.linkedCount} purchase(s) to ${data.memberName || data.memberEmail}`, 'success');
+        await fetchMindbodyUnmatched(mindbodyPage, mindbodySearchQuery);
+        await fetchMindbodyLinkHistory();
+      } else {
+        const data = await res.json();
+        showToast(data.error || 'Failed to link member', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to link Mindbody member:', err);
+      showToast('Failed to link member', 'error');
+    } finally {
+      setIsLinkingMindbody(false);
+    }
+  };
 
   const fetchUnmatched = async (page: number, search?: string) => {
     try {
@@ -289,9 +362,12 @@ const TrackmanTab: React.FC = () => {
   const unmatchedTotalPages = Math.ceil(unmatchedTotalCount / ITEMS_PER_PAGE);
   const matchedTotalPages = Math.ceil(matchedTotalCount / ITEMS_PER_PAGE);
   const needsPlayersTotalPages = Math.ceil(needsPlayersTotalCount / ITEMS_PER_PAGE);
+  const mindbodyTotalPages = Math.ceil(mindbodyUnmatchedTotal / ITEMS_PER_PAGE);
 
   useEffect(() => {
     fetchData();
+    fetchMindbodyUnmatched(1);
+    fetchMindbodyLinkHistory();
   }, []);
 
   // Debounced search for unmatched bookings
@@ -320,6 +396,23 @@ const TrackmanTab: React.FC = () => {
     }, 300);
     return () => clearTimeout(debounceTimer);
   }, [needsPlayersSearchQuery]);
+
+  // Debounced search for Mindbody unmatched
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      setMindbodyPage(1);
+      fetchMindbodyUnmatched(1, mindbodySearchQuery);
+    }, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [mindbodySearchQuery]);
+
+  const mindbodyFilteredMembers = members.filter(m => {
+    if (!mindbodyMemberSearch.trim()) return false;
+    const query = mindbodyMemberSearch.toLowerCase();
+    const name = `${m.firstName || m.firstname || ''} ${m.lastName || m.lastname || ''}`.toLowerCase();
+    const email = (m.email || '').toLowerCase();
+    return name.includes(query) || email.includes(query);
+  });
 
   const handleFileUpload = async (file: File) => {
     if (!file.name.endsWith('.csv')) {
@@ -1083,6 +1176,218 @@ const TrackmanTab: React.FC = () => {
           </div>
         )}
       </div>
+
+      <div ref={mindbodySectionRef} className="glass-card p-6 rounded-2xl border border-primary/10 dark:border-white/25">
+        <button
+          onClick={() => setShowMindbodySection(!showMindbodySection)}
+          className="w-full flex items-center justify-between"
+        >
+          <h2 className="text-lg font-bold text-primary dark:text-white flex items-center gap-2">
+            <span aria-hidden="true" className="material-symbols-outlined">link</span>
+            Mindbody Member Linking ({mindbodyUnmatchedTotal})
+          </h2>
+          <span aria-hidden="true" className={`material-symbols-outlined text-primary/60 dark:text-white/60 transition-transform ${showMindbodySection ? 'rotate-180' : ''}`}>
+            expand_more
+          </span>
+        </button>
+
+        {showMindbodySection && (
+          <div className="mt-4 space-y-4">
+            <p className="text-sm text-primary/70 dark:text-white/70">
+              Legacy Mindbody purchases that couldn't be automatically matched to a member. Use this tool to manually link purchases to the correct member account.
+            </p>
+
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-primary/40 dark:text-white/40 text-lg">search</span>
+              <input
+                type="text"
+                placeholder="Search by Mindbody Client ID..."
+                value={mindbodySearchQuery}
+                onChange={(e) => setMindbodySearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-xl bg-white/50 dark:bg-white/5 border border-primary/10 dark:border-white/10 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-accent text-sm"
+              />
+              {mindbodySearchQuery && (
+                <button
+                  onClick={() => setMindbodySearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-primary/40 dark:text-white/40 hover:text-primary dark:hover:text-white"
+                >
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
+              )}
+            </div>
+
+            {mindbodyUnmatched.length === 0 ? (
+              <div className="py-8 text-center border-2 border-dashed border-green-200 dark:border-green-500/30 rounded-xl bg-green-50/50 dark:bg-green-500/5">
+                <span aria-hidden="true" className="material-symbols-outlined text-4xl text-green-500 dark:text-green-400 mb-2">check_circle</span>
+                <p className="text-green-700 dark:text-green-400 font-medium">All Mindbody records are linked!</p>
+                <p className="text-sm text-primary/60 dark:text-white/60 mt-1">No unmatched purchases to link.</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {mindbodyUnmatched.map((record: any) => (
+                  <div key={record.mindbodyClientId} className="p-4 bg-white/50 dark:bg-white/5 rounded-xl flex justify-between items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-primary dark:text-white truncate">
+                        Client ID: {record.mindbodyClientId}
+                      </p>
+                      <p className="text-xs text-primary/80 dark:text-white/80 mt-1">
+                        {record.purchaseCount} purchase(s) • ${record.totalSpent} total
+                      </p>
+                      <p className="text-xs text-primary/60 dark:text-white/60 mt-0.5">
+                        Last: {record.lastItemName || 'Unknown item'}
+                      </p>
+                      {record.lastPurchaseDate && (
+                        <p className="text-xs text-primary/60 dark:text-white/60">
+                          Last purchase: {formatDateDisplayWithDay(record.lastPurchaseDate)}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => { setMindbodyMemberSearch(''); setMindbodyLinkModal({ record, selectedEmail: '' }); }}
+                      className="px-3 py-1.5 bg-accent text-primary rounded-lg text-xs font-bold hover:opacity-90 transition-opacity shrink-0 flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-sm">link</span>
+                      Link
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {mindbodyTotalPages > 1 && (
+              <div className="flex items-center justify-between pt-3 border-t border-primary/10 dark:border-white/10">
+                <p className="text-xs text-primary/60 dark:text-white/60">
+                  Page {mindbodyPage} of {mindbodyTotalPages} ({mindbodyUnmatchedTotal} total)
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setMindbodyPage(p => Math.max(1, p - 1)); fetchMindbodyUnmatched(mindbodyPage - 1, mindbodySearchQuery); mindbodySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+                    disabled={mindbodyPage <= 1}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 dark:bg-white/10 text-primary dark:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/20 dark:hover:bg-white/20 transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => { setMindbodyPage(p => Math.min(mindbodyTotalPages, p + 1)); fetchMindbodyUnmatched(mindbodyPage + 1, mindbodySearchQuery); mindbodySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+                    disabled={mindbodyPage >= mindbodyTotalPages}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 dark:bg-white/10 text-primary dark:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/20 dark:hover:bg-white/20 transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="pt-4 border-t border-primary/10 dark:border-white/10">
+              <button
+                onClick={() => setShowMindbodyHistory(!showMindbodyHistory)}
+                className="flex items-center gap-2 text-sm font-medium text-primary/70 dark:text-white/70 hover:text-primary dark:hover:text-white transition-colors"
+              >
+                <span className="material-symbols-outlined text-lg">history</span>
+                Recent Link History ({mindbodyLinkHistory.length})
+                <span className={`material-symbols-outlined text-sm transition-transform ${showMindbodyHistory ? 'rotate-180' : ''}`}>expand_more</span>
+              </button>
+
+              {showMindbodyHistory && mindbodyLinkHistory.length > 0 && (
+                <div className="mt-3 space-y-2 max-h-[200px] overflow-y-auto">
+                  {mindbodyLinkHistory.map((entry: any) => (
+                    <div key={entry.id} className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg text-xs">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium text-primary dark:text-white">
+                            {(entry.actionDetails as any)?.mindbodyClientId} → {entry.memberEmail}
+                          </p>
+                          <p className="text-primary/60 dark:text-white/60 mt-0.5">
+                            {(entry.actionDetails as any)?.purchasesLinked} purchase(s) linked
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-primary/70 dark:text-white/70">{entry.performedByName || entry.performedBy}</p>
+                          <p className="text-primary/50 dark:text-white/50">
+                            {entry.createdAt ? formatDateTimePacific(new Date(entry.createdAt)) : ''}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <ModalShell isOpen={!!mindbodyLinkModal} onClose={() => { setMindbodyLinkModal(null); setMindbodyMemberSearch(''); }} title="Link Mindbody Member" showCloseButton={false}>
+        <div className="space-y-4">
+          <div className="p-4 border-b border-primary/10 dark:border-white/25 bg-primary/5 dark:bg-white/5">
+            <div className="p-3 rounded-xl bg-white/80 dark:bg-white/10">
+              <p className="font-semibold text-primary dark:text-white">
+                Mindbody Client ID: {mindbodyLinkModal?.record?.mindbodyClientId}
+              </p>
+              <p className="text-xs text-primary/70 dark:text-white/70 mt-1">
+                {mindbodyLinkModal?.record?.purchaseCount} purchase(s) • ${mindbodyLinkModal?.record?.totalSpent} total
+              </p>
+              <p className="text-xs text-primary/60 dark:text-white/60 mt-0.5">
+                Last item: {mindbodyLinkModal?.record?.lastItemName || 'Unknown'}
+              </p>
+            </div>
+          </div>
+          <div className="p-6 pt-0 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-primary dark:text-white mb-2">
+                Search for member to link:
+              </label>
+              <input
+                type="text"
+                placeholder="Search by name or email..."
+                value={mindbodyMemberSearch}
+                onChange={(e) => setMindbodyMemberSearch(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white placeholder:text-primary/70 dark:placeholder:text-white/60 text-base"
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-2 -mx-2 px-2">
+              {mindbodyFilteredMembers.slice(0, 20).map((member: any) => (
+                <button
+                  key={member.email}
+                  onClick={() => mindbodyLinkModal && setMindbodyLinkModal({ ...mindbodyLinkModal, selectedEmail: member.email })}
+                  className={`w-full p-4 text-left rounded-xl transition-all ${
+                    mindbodyLinkModal?.selectedEmail === member.email
+                      ? 'bg-accent/30 border-2 border-accent shadow-md'
+                      : 'bg-white/70 dark:bg-white/5 border border-primary/10 dark:border-white/25 hover:bg-white dark:hover:bg-white/10 hover:border-primary/20 dark:hover:border-white/20'
+                  }`}
+                >
+                  <p className="font-semibold text-primary dark:text-white text-base">
+                    {member.firstName || member.firstname || ''} {member.lastName || member.lastname || ''}
+                  </p>
+                  <p className="text-sm text-primary/80 dark:text-white/80 mt-0.5">{member.email}</p>
+                </button>
+              ))}
+              {mindbodyFilteredMembers.length === 0 && mindbodyMemberSearch && (
+                <p className="text-center py-4 text-primary/70 dark:text-white/70">No members found</p>
+              )}
+              {!mindbodyMemberSearch && (
+                <p className="text-center py-4 text-primary/50 dark:text-white/50">Type to search for a member...</p>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t border-primary/10 dark:border-white/25">
+              <button
+                onClick={() => { setMindbodyLinkModal(null); setMindbodyMemberSearch(''); }}
+                className="px-5 py-2.5 rounded-full text-sm font-medium text-primary/70 dark:text-white/70 hover:bg-primary/10 dark:hover:bg-white/10 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMindbodyLink}
+                disabled={!mindbodyLinkModal?.selectedEmail || isLinkingMindbody}
+                className="px-6 py-2.5 rounded-full bg-accent text-primary text-sm font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity flex items-center gap-2"
+              >
+                {isLinkingMindbody && <WalkingGolferSpinner size="sm" variant="dark" />}
+                Link Member
+              </button>
+            </div>
+          </div>
+        </div>
+      </ModalShell>
 
       <ModalShell isOpen={!!resolveModal} onClose={() => setResolveModal(null)} title="Resolve Booking" showCloseButton={false}>
         <div className="space-y-4">

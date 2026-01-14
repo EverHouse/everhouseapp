@@ -143,6 +143,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
 
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
+  const [guestEmailError, setGuestEmailError] = useState<string | undefined>(undefined);
   const [addingGuest, setAddingGuest] = useState(false);
   const [apiDeclaredPlayerCount, setApiDeclaredPlayerCount] = useState<number>(declaredPlayerCount);
   const [apiRemainingSlots, setApiRemainingSlots] = useState<number>(Math.max(0, declaredPlayerCount - 1));
@@ -320,9 +321,30 @@ const RosterManager: React.FC<RosterManagerProps> = ({
     }
   };
 
+  const validateGuestEmail = (value: string): string | undefined => {
+    if (!value.trim()) return undefined;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(value)) return 'Please enter a valid email address';
+    return undefined;
+  };
+
+  const handleGuestEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setGuestEmail(value);
+    if (guestEmailError) {
+      setGuestEmailError(validateGuestEmail(value));
+    }
+  };
+
   const handleAddGuest = async () => {
     if (!guestName.trim()) {
       showToast('Please enter the guest name', 'error');
+      return;
+    }
+    
+    const emailError = validateGuestEmail(guestEmail);
+    if (emailError) {
+      setGuestEmailError(emailError);
       return;
     }
     
@@ -351,6 +373,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
         setShowGuestModal(false);
         setGuestName('');
         setGuestEmail('');
+        setGuestEmailError(undefined);
         await fetchParticipants();
         onUpdate?.();
       } else {
@@ -725,6 +748,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
           setShowGuestModal(false);
           setGuestName('');
           setGuestEmail('');
+          setGuestEmailError(undefined);
         }}
         title="Add Guest"
         size="md"
@@ -743,8 +767,9 @@ const RosterManager: React.FC<RosterManagerProps> = ({
             placeholder="Enter guest's email"
             type="email"
             value={guestEmail}
-            onChange={(e) => setGuestEmail(e.target.value)}
+            onChange={handleGuestEmailChange}
             icon="mail"
+            error={guestEmailError}
           />
           
           <div className={`p-3 rounded-xl ${isDark ? 'bg-[#CCB8E4]/10' : 'bg-[#CCB8E4]/20'}`}>

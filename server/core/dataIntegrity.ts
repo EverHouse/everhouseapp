@@ -19,6 +19,7 @@ import { sql, eq, isNull, lt, and, or, gte, desc, isNotNull, gt } from 'drizzle-
 import { getHubSpotClient } from './integrations';
 import { isProduction } from './db';
 import { getTodayPacific } from '../utils/dateUtils';
+import { alertOnCriticalIntegrityIssues, alertOnHighIntegrityIssues } from './dataAlerts';
 
 const severityMap: Record<string, 'critical' | 'high' | 'medium' | 'low'> = {
   'HubSpot Sync Status': 'critical',
@@ -914,6 +915,14 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
   try {
     await storeCheckHistory(checks, triggeredBy);
     await updateIssueTracking(checks);
+    
+    const checkSummaries = checks.map(c => ({
+      checkName: c.checkName,
+      status: c.status,
+      issueCount: c.issueCount
+    }));
+    await alertOnCriticalIntegrityIssues(checkSummaries, severityMap);
+    await alertOnHighIntegrityIssues(checkSummaries, severityMap);
   } catch (err) {
     if (!isProduction) console.error('[DataIntegrity] Failed to store history:', err);
   }

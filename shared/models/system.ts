@@ -81,3 +81,17 @@ export const integrityIgnores = pgTable("integrity_ignores", {
 
 export type IntegrityIgnore = typeof integrityIgnores.$inferSelect;
 export type InsertIntegrityIgnore = typeof integrityIgnores.$inferInsert;
+
+export const appSettings = pgTable("app_settings", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 255 }).notNull().unique(),
+  value: text("value"),
+  category: varchar("category", { length: 100 }).notNull().default('general'),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedBy: text("updated_by"),
+}, (table) => ({
+  keyIdx: uniqueIndex("app_settings_key_idx").on(table.key),
+}));
+
+export type AppSetting = typeof appSettings.$inferSelect;
+export type InsertAppSetting = typeof appSettings.$inferInsert;

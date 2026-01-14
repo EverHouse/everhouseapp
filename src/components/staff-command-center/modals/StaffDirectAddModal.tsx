@@ -16,6 +16,14 @@ interface StaffDirectAddModalProps {
   onSuccess: () => void;
 }
 
+interface GuestFieldErrors {
+  guestName?: string;
+  guestEmail?: string;
+  waiveReason?: string;
+}
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
   isOpen,
   onClose,
@@ -35,6 +43,61 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
   const [tierOverride, setTierOverride] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<GuestFieldErrors>({});
+
+  const validateGuestName = (value: string): string | undefined => {
+    if (!value.trim()) return 'Guest name is required';
+    if (value.trim().length > 100) return 'Name must be 100 characters or less';
+    return undefined;
+  };
+
+  const validateGuestEmail = (value: string): string | undefined => {
+    if (!value.trim()) return undefined;
+    if (!EMAIL_REGEX.test(value)) return 'Please enter a valid email address';
+    if (value.length > 255) return 'Email must be 255 characters or less';
+    return undefined;
+  };
+
+  const validateWaiveReason = (value: string, isWaiving: boolean): string | undefined => {
+    if (isWaiving && !value.trim()) return 'Please provide a reason for waiving the fee';
+    return undefined;
+  };
+
+  const validateGuestFields = (): GuestFieldErrors => {
+    return {
+      guestName: validateGuestName(guestName),
+      guestEmail: validateGuestEmail(guestEmail),
+      waiveReason: validateWaiveReason(waiveReason, waiveGuestFee)
+    };
+  };
+
+  const hasErrors = (errors: GuestFieldErrors): boolean => {
+    return Object.values(errors).some(e => e !== undefined);
+  };
+
+  const handleGuestNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setGuestName(value);
+    if (fieldErrors.guestName) {
+      setFieldErrors(prev => ({ ...prev, guestName: validateGuestName(value) }));
+    }
+  };
+
+  const handleGuestEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setGuestEmail(value);
+    if (fieldErrors.guestEmail) {
+      setFieldErrors(prev => ({ ...prev, guestEmail: validateGuestEmail(value) }));
+    }
+  };
+
+  const handleWaiveReasonChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setWaiveReason(value);
+    if (fieldErrors.waiveReason) {
+      setFieldErrors(prev => ({ ...prev, waiveReason: validateWaiveReason(value, waiveGuestFee) }));
+    }
+  };
 
   const isSocialHost = ownerTier?.toLowerCase() === 'social';
 
@@ -66,8 +129,10 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
           tierOverride: tierOverride || undefined
         };
       } else {
-        if (!guestName.trim()) {
-          setError('Please enter guest name');
+        const errors = validateGuestFields();
+        setFieldErrors(errors);
+        
+        if (hasErrors(errors)) {
           setLoading(false);
           return;
         }
@@ -113,6 +178,7 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
     setWaiveReason('');
     setTierOverride('');
     setError(null);
+    setFieldErrors({});
   }, []);
 
   useEffect(() => {
@@ -256,10 +322,15 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
                 <input
                   type="text"
                   value={guestName}
-                  onChange={(e) => setGuestName(e.target.value)}
+                  onChange={handleGuestNameChange}
                   placeholder="Enter guest name"
-                  className="w-full px-4 py-2 border border-primary/20 dark:border-white/20 rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white"
+                  className={`w-full px-4 py-2 border rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white ${
+                    fieldErrors.guestName ? 'border-red-500' : 'border-primary/20 dark:border-white/20'
+                  }`}
                 />
+                {fieldErrors.guestName && (
+                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.guestName}</p>
+                )}
               </div>
 
               <div>
@@ -269,10 +340,15 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
                 <input
                   type="email"
                   value={guestEmail}
-                  onChange={(e) => setGuestEmail(e.target.value)}
+                  onChange={handleGuestEmailChange}
                   placeholder="guest@email.com"
-                  className="w-full px-4 py-2 border border-primary/20 dark:border-white/20 rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white"
+                  className={`w-full px-4 py-2 border rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white ${
+                    fieldErrors.guestEmail ? 'border-red-500' : 'border-primary/20 dark:border-white/20'
+                  }`}
                 />
+                {fieldErrors.guestEmail && (
+                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.guestEmail}</p>
+                )}
               </div>
 
               <div className="space-y-3">
@@ -290,20 +366,32 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
                   <input
                     type="checkbox"
                     checked={waiveGuestFee}
-                    onChange={(e) => setWaiveGuestFee(e.target.checked)}
+                    onChange={(e) => {
+                      setWaiveGuestFee(e.target.checked);
+                      if (!e.target.checked) {
+                        setFieldErrors(prev => ({ ...prev, waiveReason: undefined }));
+                      }
+                    }}
                     className="w-5 h-5 rounded border-primary/30 dark:border-white/30 text-primary"
                   />
                   <span className="text-sm text-primary dark:text-white">Waive guest fee</span>
                 </label>
 
                 {waiveGuestFee && (
-                  <input
-                    type="text"
-                    value={waiveReason}
-                    onChange={(e) => setWaiveReason(e.target.value)}
-                    placeholder="Reason for waiving fee (required)..."
-                    className="w-full px-4 py-2 border border-primary/20 dark:border-white/20 rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white"
-                  />
+                  <div>
+                    <input
+                      type="text"
+                      value={waiveReason}
+                      onChange={handleWaiveReasonChange}
+                      placeholder="Reason for waiving fee (required)..."
+                      className={`w-full px-4 py-2 border rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white ${
+                        fieldErrors.waiveReason ? 'border-red-500' : 'border-primary/20 dark:border-white/20'
+                      }`}
+                    />
+                    {fieldErrors.waiveReason && (
+                      <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.waiveReason}</p>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

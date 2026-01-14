@@ -3,6 +3,7 @@ import { users, legacyPurchases, legacyImportJobs } from "@shared/schema";
 import { eq, sql, and } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
+import { alertOnImportFailure, alertOnLowMatchRate } from "../dataAlerts";
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -451,6 +452,13 @@ export async function runFullMindbodyImport(
   console.log(`[MindbodyImport] Attendance: ${attendanceResult.updated} updated, ${attendanceResult.skipped} skipped`);
   
   console.log('[MindbodyImport] Import complete!');
+  
+  await alertOnImportFailure('members', membersResult);
+  await alertOnImportFailure('sales', salesResult);
+  await alertOnImportFailure('attendance', attendanceResult);
+  
+  await alertOnLowMatchRate('members', membersResult);
+  await alertOnLowMatchRate('sales', salesResult);
   
   return {
     members: membersResult,
