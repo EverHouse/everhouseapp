@@ -16,6 +16,7 @@ interface HubSpotContact {
   properties: {
     firstname?: string;
     lastname?: string;
+    hs_calculated_full_name?: string;
     email?: string;
     phone?: string;
     company?: string;
@@ -60,6 +61,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
     const properties = [
       'firstname',
       'lastname',
+      'hs_calculated_full_name',
       'email',
       'phone',
       'company',
@@ -105,6 +107,26 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
       return lower === 'true' || lower === 'yes' || lower === '1';
     };
     
+    // Extract first/last name from hs_calculated_full_name when individual fields are empty
+    const getNameFromContact = (contact: HubSpotContact): { firstName: string | null; lastName: string | null } => {
+      let firstName = contact.properties.firstname || null;
+      let lastName = contact.properties.lastname || null;
+      
+      // If firstname or lastname is missing, try to extract from hs_calculated_full_name
+      if ((!firstName || !lastName) && contact.properties.hs_calculated_full_name) {
+        const fullName = contact.properties.hs_calculated_full_name.trim();
+        const parts = fullName.split(' ');
+        if (parts.length >= 2) {
+          firstName = firstName || parts[0];
+          lastName = lastName || parts.slice(1).join(' ');
+        } else if (parts.length === 1 && parts[0]) {
+          firstName = firstName || parts[0];
+        }
+      }
+      
+      return { firstName, lastName };
+    };
+    
     // Process contacts in parallel batches for better performance
     const SYNC_BATCH_SIZE = 25;
     const syncLimit = pLimit(10); // 10 concurrent DB operations
@@ -132,13 +154,14 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           
           const emailOptIn = parseOptIn(contact.properties.eh_email_updates_opt_in);
           const smsOptIn = parseOptIn(contact.properties.eh_sms_updates_opt_in);
+          const { firstName, lastName } = getNameFromContact(contact);
           
           await db.insert(users)
             .values({
               id: sql`gen_random_uuid()`,
               email,
-              firstName: contact.properties.firstname || null,
-              lastName: contact.properties.lastname || null,
+              firstName,
+              lastName,
               phone: contact.properties.phone || null,
               tier: normalizedTier,
               tierId,
@@ -155,8 +178,8 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
             .onConflictDoUpdate({
               target: users.email,
               set: {
-                firstName: sql`COALESCE(${contact.properties.firstname || null}, ${users.firstName})`,
-                lastName: sql`COALESCE(${contact.properties.lastname || null}, ${users.lastName})`,
+                firstName: sql`COALESCE(${firstName}, ${users.firstName})`,
+                lastName: sql`COALESCE(${lastName}, ${users.lastName})`,
                 phone: sql`COALESCE(${contact.properties.phone || null}, ${users.phone})`,
                 tier: normalizedTier,
                 tierId,
