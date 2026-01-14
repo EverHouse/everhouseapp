@@ -65,7 +65,8 @@ export function useCommandCenterData(userEmail?: string) {
       // Build a map of email -> properly formatted member name from HubSpot contacts
       const memberNameByEmail = new Map<string, string>();
       if (hubspotContactsRes.ok) {
-        const contacts = await hubspotContactsRes.json();
+        const data = await hubspotContactsRes.json();
+        const contacts = Array.isArray(data) ? data : (data.contacts || []);
         contacts.forEach((contact: any) => {
           const name = [contact.firstName, contact.lastName].filter(Boolean).join(' ');
           if (contact.email && name) {

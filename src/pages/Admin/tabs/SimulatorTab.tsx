@@ -170,7 +170,8 @@ const ManualBookingModal: React.FC<{
             try {
                 const res = await fetch('/api/hubspot/contacts', { credentials: 'include' });
                 if (res.ok) {
-                    const data = await res.json();
+                    const rawData = await res.json();
+                    const data = Array.isArray(rawData) ? rawData : (rawData.contacts || []);
                     const members: MemberSearchResult[] = data.map((m: { email: string; firstName?: string; lastName?: string; tier?: string }) => ({
                         email: m.email,
                         firstName: m.firstName || null,
@@ -758,7 +759,8 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
             try {
                 const res = await fetch('/api/hubspot/contacts?status=all', { credentials: 'include' });
                 if (res.ok) {
-                    const data = await res.json();
+                    const rawData = await res.json();
+                    const data = Array.isArray(rawData) ? rawData : (rawData.contacts || []);
                     const members: MemberSearchResult[] = data.map((m: { email: string; firstName?: string; lastName?: string; tier?: string; status?: string }) => ({
                         email: m.email,
                         firstName: m.firstName || null,
@@ -778,7 +780,8 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                 // Fetch all members (including inactive) for status and name maps
                 const res = await fetch('/api/hubspot/contacts?status=all', { credentials: 'include' });
                 if (res.ok) {
-                    const data = await res.json();
+                    const rawData = await res.json();
+                    const data = Array.isArray(rawData) ? rawData : (rawData.contacts || []);
                     const statusMap: Record<string, string> = {};
                     const nameMap: Record<string, string> = {};
                     data.forEach((m: { email: string; status?: string; firstName?: string; lastName?: string; manuallyLinkedEmails?: string[] }) => {

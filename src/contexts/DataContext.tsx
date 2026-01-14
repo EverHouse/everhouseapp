@@ -307,7 +307,8 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       try {
         const res = await fetch('/api/hubspot/contacts', { credentials: 'include' });
         if (res.ok) {
-          const contacts = await res.json();
+          const data = await res.json();
+          const contacts = Array.isArray(data) ? data : (data.contacts || []);
           const formatted: MemberProfile[] = contacts.map((contact: any) => ({
             id: contact.id,
             name: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email || 'Unknown',
@@ -343,8 +344,9 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     try {
       const res = await fetch('/api/hubspot/contacts?status=former', { credentials: 'include' });
       if (res.ok) {
-        const contacts = await res.json();
-        if (Array.isArray(contacts)) {
+        const data = await res.json();
+        const contacts = Array.isArray(data) ? data : (data.contacts || []);
+        if (contacts.length >= 0) {
           const formatted: MemberProfile[] = contacts.map((contact: any) => ({
             id: contact.id,
             name: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email || 'Unknown',
@@ -381,7 +383,8 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     try {
       const res = await fetch('/api/hubspot/contacts?refresh=true', { credentials: 'include' });
       if (res.ok) {
-        const contacts = await res.json();
+        const data = await res.json();
+        const contacts = Array.isArray(data) ? data : (data.contacts || []);
         const formatted: MemberProfile[] = contacts.map((contact: any) => ({
           id: contact.id,
           name: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email || 'Unknown',

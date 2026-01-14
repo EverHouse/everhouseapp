@@ -103,7 +103,8 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ bookingId, 
       try {
         const res = await fetch('/api/hubspot/contacts?status=all', { credentials: 'include' });
         if (res.ok) {
-          const data = await res.json();
+          const rawData = await res.json();
+          const data = Array.isArray(rawData) ? rawData : (rawData.contacts || []);
           const membersList: MemberSearchResult[] = data.map((m: { email: string; firstName?: string; lastName?: string; tier?: string; status?: string }) => ({
             email: m.email,
             firstName: m.firstName || null,
