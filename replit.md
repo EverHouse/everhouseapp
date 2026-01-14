@@ -62,6 +62,10 @@ The application is built with a React 19 frontend utilizing Vite, styled with Ta
 - **Admin-Configurable Features**: Push notifications, booking intervals, RSVP management, promotional banners, wellness class capacity, waitlists, closure reasons, and notice types.
 - **Mindbody Data Migration**: Import of historical sales data into `legacy_purchases`, member matching, item categorization, and linking guest fees to Trackman sessions. Member purchase history is viewable by staff and members.
 - **HubSpot Name Fallback**: Extracts names from `hs_calculated_full_name` when firstname/lastname are NULL.
+- **Admin Settings Dashboard**: Staff can configure app options (club name, support email, purchase category labels, notification toggles) via `app_settings` table without code changes.
+- **Data Tools Panel**: Self-service recovery tools for re-syncing members, relinking guest fees, correcting attendance, and re-importing data with audit logging.
+- **Automatic Monitoring Alerts**: `dataAlerts.ts` sends staff notifications for import failures, low match rates, sync issues, and data integrity problems.
+- **Former Members Caching**: 10-minute cache in DataContext reduces repeated API calls when viewing former/inactive members, with force-refresh option.
 
 ## External Dependencies
 - **Resend**: Used for email-based OTP verification and email alerts from automated integrity checks.
