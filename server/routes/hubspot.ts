@@ -3,7 +3,8 @@ import * as crypto from 'crypto';
 import { pool, isProduction } from '../core/db';
 import { getHubSpotClient } from '../core/integrations';
 import { db } from '../db';
-import { formSubmissions } from '../../shared/schema';
+import { formSubmissions, users } from '../../shared/schema';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { notifyAllStaff } from '../core/staffNotifications';
 import { isStaffOrAdmin } from '../core/middleware';
 import { normalizeTierName, extractTierTags, TIER_NAMES } from '../../shared/constants/tiers';
@@ -940,6 +941,106 @@ router.post('/webhooks', async (req, res) => {
     }
   } catch (error) {
     console.error('[HubSpot Webhook] Error processing event:', error);
+  }
+});
+
+// Sync member tiers from database to HubSpot (push current tiers to HubSpot)
+router.post('/api/hubspot/push-db-tiers', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { dryRun = true } = req.body;
+    const hubspot = await getHubSpotClient();
+    
+    // Get all active members with hubspot_id
+    const members = await db.select({
+      email: users.email,
+      tier: users.tier,
+      hubspotId: users.hubspotId,
+      firstName: users.firstName,
+      lastName: users.lastName
+    })
+      .from(users)
+      .where(and(
+        isNotNull(users.hubspotId),
+        eq(users.membershipStatus, 'active'),
+        sql`${users.archivedAt} IS NULL`
+      ));
+    
+    console.log(`[DB Tier Push] Found ${members.length} members with HubSpot IDs`);
+    
+    const results = {
+      total: members.length,
+      toUpdate: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [] as string[],
+      updates: [] as { email: string; name: string; tier: string; hubspotId: string }[]
+    };
+    
+    // Prepare batch updates
+    const updateBatch: { id: string; properties: { membership_tier: string } }[] = [];
+    
+    for (const member of members) {
+      if (!member.hubspotId || !member.tier) {
+        results.skipped++;
+        continue;
+      }
+      
+      const name = [member.firstName, member.lastName].filter(Boolean).join(' ');
+      
+      results.updates.push({
+        email: member.email || '',
+        name,
+        tier: member.tier,
+        hubspotId: member.hubspotId
+      });
+      
+      updateBatch.push({
+        id: member.hubspotId,
+        properties: { membership_tier: member.tier }
+      });
+    }
+    
+    results.toUpdate = updateBatch.length;
+    
+    if (!dryRun && updateBatch.length > 0) {
+      const batchSize = 100;
+      for (let i = 0; i < updateBatch.length; i += batchSize) {
+        const batch = updateBatch.slice(i, i + batchSize);
+        try {
+          await retryableHubSpotRequest(() => 
+            hubspot.crm.contacts.batchApi.update({ inputs: batch })
+          );
+          results.updated += batch.length;
+          console.log(`[DB Tier Push] Updated batch ${Math.floor(i / batchSize) + 1}: ${batch.length} contacts`);
+        } catch (err: any) {
+          results.errors.push(`Batch ${Math.floor(i / batchSize) + 1} failed: ${err.message}`);
+          console.error(`[DB Tier Push] Batch update error:`, err);
+        }
+        
+        // Rate limiting delay
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+    
+    if (!dryRun && results.updated > 0) {
+      broadcastDirectoryUpdate('synced');
+    }
+    
+    console.log(`[DB Tier Push] Complete - Total: ${results.total}, Updated: ${results.updated}, Errors: ${results.errors.length}`);
+    
+    res.json({
+      success: true,
+      dryRun,
+      total: results.total,
+      toUpdate: results.toUpdate,
+      updated: results.updated,
+      skipped: results.skipped,
+      errors: results.errors,
+      sampleUpdates: results.updates.slice(0, 20)
+    });
+  } catch (error: any) {
+    console.error('[DB Tier Push] Error:', error);
+    res.status(500).json({ error: 'DB tier push failed: ' + error.message });
   }
 });
 
