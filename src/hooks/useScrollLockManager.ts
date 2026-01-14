@@ -40,10 +40,17 @@ function removeScrollLock() {
 
 export function acquireScrollLock(ownerId?: string): string {
   const id = ownerId || generateLockId();
+  
+  // Skip if body is already fixed (nested modal scenario)
+  const isAlreadyLocked = document.body.style.position === 'fixed';
+  
   if (!lockOwners.has(id)) {
     lockOwners.add(id);
     lockCount++;
-    applyScrollLock();
+    // Only apply scroll lock if not already locked
+    if (!isAlreadyLocked) {
+      applyScrollLock();
+    }
   }
   return id;
 }

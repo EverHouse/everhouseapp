@@ -108,6 +108,7 @@
 html {
   min-height: 100%;
   overflow-x: hidden;
+  overflow-y: auto;
 }
 
 body {
@@ -117,7 +118,6 @@ body {
 
 #root {
   min-height: 100%;
-  isolation: isolate;
 }
 
 /* Modal scroll lock - override when modal is open */

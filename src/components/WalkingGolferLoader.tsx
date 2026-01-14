@@ -65,6 +65,7 @@ const WalkingGolferLoader: React.FC<WalkingGolferLoaderProps> = ({ isVisible = t
   const loaderContent = (
     <div 
       className={`loader-overlay ${isExiting ? 'loader-exit' : ''}`}
+      style={{ pointerEvents: isExiting ? 'none' : 'auto' }}
     >
       <div className={`loader-content ${isExiting ? 'content-exit' : ''}`}>
         <div className="walking-mascot">
