@@ -1,16 +1,72 @@
 import { Router } from 'express';
+import * as crypto from 'crypto';
 import { pool, isProduction } from '../core/db';
 import { getHubSpotClient } from '../core/integrations';
 import { db } from '../db';
 import { formSubmissions } from '../../shared/schema';
 import { notifyAllStaff } from '../core/staffNotifications';
 import { isStaffOrAdmin } from '../core/middleware';
-import { normalizeTierName, extractTierTags } from '../../shared/constants/tiers';
+import { normalizeTierName, extractTierTags, TIER_NAMES } from '../../shared/constants/tiers';
 import * as fs from 'fs';
 import * as path from 'path';
 import pRetry, { AbortError } from 'p-retry';
 import { broadcastDirectoryUpdate } from '../core/websocket';
 import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts';
+
+/**
+ * Validate HubSpot webhook signature (v3 method)
+ * See: https://developers.hubspot.com/docs/api/webhooks/validating-requests
+ */
+function validateHubSpotWebhookSignature(req: any): boolean {
+  const webhookSecret = process.env.HUBSPOT_WEBHOOK_SECRET;
+  
+  // If no secret configured, allow in development but block in production
+  if (!webhookSecret) {
+    if (isProduction) {
+      console.warn('[HubSpot Webhook] No HUBSPOT_WEBHOOK_SECRET configured - rejecting in production');
+      return false;
+    }
+    console.warn('[HubSpot Webhook] No HUBSPOT_WEBHOOK_SECRET configured - allowing in development');
+    return true;
+  }
+  
+  const signature = req.headers['x-hubspot-signature-v3'];
+  const timestamp = req.headers['x-hubspot-request-timestamp'];
+  
+  if (!signature || !timestamp) {
+    console.warn('[HubSpot Webhook] Missing signature headers');
+    return false;
+  }
+  
+  // Check timestamp is within 5 minutes (300000ms)
+  const currentTime = Date.now();
+  const requestTime = parseInt(timestamp, 10);
+  if (Math.abs(currentTime - requestTime) > 300000) {
+    console.warn('[HubSpot Webhook] Request timestamp too old');
+    return false;
+  }
+  
+  // Build the source string: method + URL + body + timestamp
+  const requestUrl = `https://${req.headers.host}${req.originalUrl}`;
+  const sourceString = `POST${requestUrl}${JSON.stringify(req.body)}${timestamp}`;
+  
+  // Calculate HMAC-SHA256
+  const expectedSignature = crypto
+    .createHmac('sha256', webhookSecret)
+    .update(sourceString)
+    .digest('base64');
+  
+  const isValid = crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expectedSignature)
+  );
+  
+  if (!isValid) {
+    console.warn('[HubSpot Webhook] Invalid signature');
+  }
+  
+  return isValid;
+}
 
 const router = Router();
 
@@ -89,6 +145,8 @@ function transformHubSpotContact(contact: any): any {
   const isActiveMember = activeStatuses.includes(membershipStatus);
   const isFormerMember = formerStatuses.includes(membershipStatus);
   
+  const rawTierValue = contact.properties.membership_tier;
+  
   return {
     id: contact.id,
     firstName: contact.properties.firstname || '',
@@ -98,7 +156,8 @@ function transformHubSpotContact(contact: any): any {
     company: contact.properties.company || '',
     lifecycleStage,
     status: membershipStatus || (isActiveMember ? 'active' : ''),
-    tier: normalizeTierName(contact.properties.membership_tier),
+    tier: normalizeTierName(rawTierValue),
+    rawTier: rawTierValue && rawTierValue.trim() ? rawTierValue.trim() : null,
     tags: extractTierTags(contact.properties.membership_tier, contact.properties.membership_discount_reason),
     createdAt: contact.properties.createdate,
     lastModified: contact.properties.lastmodifieddate,
@@ -732,6 +791,115 @@ router.post('/api/hubspot/sync-tiers', isStaffOrAdmin, async (req, res) => {
   } catch (error: any) {
     console.error('[Tier Sync] Error:', error);
     res.status(500).json({ error: 'Tier sync failed: ' + error.message });
+  }
+});
+
+/**
+ * Update a contact's membership tier in HubSpot
+ * Staff/admin only with audit logging
+ */
+router.put('/contacts/:id/tier', isStaffOrAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { tier } = req.body;
+  const staffUser = (req as any).staffUser;
+  
+  if (!tier || typeof tier !== 'string') {
+    return res.status(400).json({ error: 'Tier is required' });
+  }
+  
+  const validTiers = [...TIER_NAMES, 'Founding', 'Unlimited'] as string[];
+  if (!validTiers.includes(tier)) {
+    return res.status(400).json({ error: `Invalid tier. Must be one of: ${validTiers.join(', ')}` });
+  }
+  
+  try {
+    const hubspot = await getHubSpotClient();
+    
+    // Get current contact to log the change
+    const contact = await retryableHubSpotRequest(() =>
+      hubspot.crm.contacts.basicApi.getById(id, ['membership_tier', 'firstname', 'lastname', 'email'])
+    );
+    
+    const oldTier = contact.properties.membership_tier || '(empty)';
+    const contactName = [contact.properties.firstname, contact.properties.lastname].filter(Boolean).join(' ');
+    const contactEmail = contact.properties.email || '';
+    
+    // Update the tier in HubSpot
+    await retryableHubSpotRequest(() =>
+      hubspot.crm.contacts.basicApi.update(id, {
+        properties: { membership_tier: tier }
+      })
+    );
+    
+    // Log the change for audit purposes
+    console.log(`[Tier Update] Contact ${id} (${contactName}, ${contactEmail}): ${oldTier} -> ${tier} by staff ${staffUser?.name || 'Unknown'}`);
+    
+    // Invalidate cache to reflect the change
+    allContactsCache.timestamp = 0;
+    
+    // Broadcast update to all connected clients
+    broadcastDirectoryUpdate('synced');
+    
+    res.json({
+      success: true,
+      contactId: id,
+      contactName,
+      contactEmail,
+      oldTier,
+      newTier: tier,
+      updatedBy: staffUser?.name || 'Unknown'
+    });
+  } catch (error: any) {
+    console.error(`[Tier Update] Error updating contact ${id}:`, error);
+    res.status(500).json({ error: 'Failed to update tier: ' + error.message });
+  }
+});
+
+/**
+ * HubSpot webhook receiver endpoint
+ * Handles contact and deal property change events
+ */
+router.post('/webhooks', async (req, res) => {
+  // Validate signature before processing
+  if (!validateHubSpotWebhookSignature(req)) {
+    console.warn('[HubSpot Webhook] Signature validation failed');
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  
+  // Always respond quickly to HubSpot (they expect 200 within 5 seconds)
+  res.status(200).send('OK');
+  
+  try {
+    const events = Array.isArray(req.body) ? req.body : [req.body];
+    
+    for (const event of events) {
+      const { subscriptionType, objectId, propertyName, propertyValue } = event;
+      
+      console.log(`[HubSpot Webhook] Received: ${subscriptionType} for object ${objectId}, ${propertyName}=${propertyValue}`);
+      
+      if (subscriptionType === 'contact.propertyChange') {
+        // Handle contact property changes (tier, status)
+        if (propertyName === 'membership_tier' || propertyName === 'membership_status') {
+          // Invalidate cache to pick up the change on next fetch
+          allContactsCache.timestamp = 0;
+          
+          // Broadcast to all connected clients
+          broadcastDirectoryUpdate('synced');
+          
+          console.log(`[HubSpot Webhook] Contact ${objectId} ${propertyName} changed to: ${propertyValue}`);
+        }
+      } else if (subscriptionType === 'deal.propertyChange') {
+        // Handle deal property changes (stage, amount)
+        console.log(`[HubSpot Webhook] Deal ${objectId} ${propertyName} changed to: ${propertyValue}`);
+        // Future: Update payment status, trigger notifications
+      } else if (subscriptionType === 'deal.creation') {
+        // Handle new deal creation
+        console.log(`[HubSpot Webhook] New deal created: ${objectId}`);
+        // Future: Link deal to member, set up billing
+      }
+    }
+  } catch (error) {
+    console.error('[HubSpot Webhook] Error processing event:', error);
   }
 });
 

@@ -7,6 +7,7 @@ import { formatPhoneNumber } from '../utils/formatting';
 import { getMemberStatusColor, getMemberStatusLabel } from '../utils/statusColors';
 import { useScrollLock } from '../hooks/useScrollLock';
 import type { MemberProfile } from '../types/data';
+import { TIER_NAMES } from '../../shared/constants/tiers';
 
 interface MemberProfileDrawerProps {
   isOpen: boolean;
@@ -129,6 +130,41 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
   const [newCommBody, setNewCommBody] = useState('');
   const [isAddingComm, setIsAddingComm] = useState(false);
   const [updatingBookingId, setUpdatingBookingId] = useState<number | string | null>(null);
+  const [isEditingTier, setIsEditingTier] = useState(false);
+  const [selectedTier, setSelectedTier] = useState<string>('');
+  const [isSavingTier, setIsSavingTier] = useState(false);
+
+  const VALID_TIERS = [...TIER_NAMES, 'Founding', 'Unlimited'] as string[];
+
+  const handleSaveTier = async () => {
+    if (!member?.id || !selectedTier || selectedTier === member.tier) {
+      setIsEditingTier(false);
+      return;
+    }
+    
+    setIsSavingTier(true);
+    try {
+      const res = await fetch(`/api/hubspot/contacts/${member.id}/tier`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ tier: selectedTier })
+      });
+      
+      if (res.ok) {
+        setIsEditingTier(false);
+      } else {
+        const error = await res.json();
+        console.error('Failed to update tier:', error);
+        alert('Failed to update tier: ' + (error.error || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error('Error updating tier:', err);
+      alert('Failed to update tier. Please try again.');
+    } finally {
+      setIsSavingTier(false);
+    }
+  };
 
   const fetchMemberData = useCallback(async () => {
     if (!member?.email) return;
@@ -867,7 +903,65 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
             <div className="flex-1 min-w-0">
               <h2 className={`text-xl sm:text-2xl font-bold truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>{member.name}</h2>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <TierBadge tier={member.tier} size="md" />
+                {isEditingTier ? (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selectedTier}
+                      onChange={(e) => setSelectedTier(e.target.value)}
+                      className={`px-2 py-1 text-sm rounded-lg border ${
+                        isDark 
+                          ? 'bg-white/10 border-white/20 text-white' 
+                          : 'bg-white border-gray-300 text-gray-900'
+                      }`}
+                      disabled={isSavingTier}
+                    >
+                      <option value="">Select tier...</option>
+                      {VALID_TIERS.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleSaveTier}
+                      disabled={isSavingTier || !selectedTier}
+                      className={`p-1 rounded-full transition-colors ${
+                        isSavingTier || !selectedTier
+                          ? 'opacity-50 cursor-not-allowed'
+                          : isDark 
+                            ? 'hover:bg-white/10 text-green-400' 
+                            : 'hover:bg-gray-100 text-green-600'
+                      }`}
+                      title="Save tier"
+                    >
+                      <span className="material-symbols-outlined text-lg">
+                        {isSavingTier ? 'hourglass_empty' : 'check'}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setIsEditingTier(false)}
+                      disabled={isSavingTier}
+                      className={`p-1 rounded-full transition-colors ${isDark ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
+                      title="Cancel"
+                    >
+                      <span className="material-symbols-outlined text-lg">close</span>
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <TierBadge tier={member.rawTier || member.tier} size="md" showNoTier={true} />
+                    {isAdmin && (
+                      <button
+                        onClick={() => {
+                          setSelectedTier(member.tier || '');
+                          setIsEditingTier(true);
+                        }}
+                        className={`p-0.5 rounded transition-colors ${isDark ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
+                        title="Edit tier"
+                      >
+                        <span className="material-symbols-outlined text-sm">edit</span>
+                      </button>
+                    )}
+                  </>
+                )}
                 {member.status && typeof member.status === 'string' && member.status.toLowerCase() !== 'active' && (
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                     getMemberStatusColor(member.status, isDark)

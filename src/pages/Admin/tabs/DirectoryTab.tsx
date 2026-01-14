@@ -464,7 +464,7 @@ const DirectoryTab: React.FC = () => {
                         </div>
                         <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-gray-50 dark:border-white/20">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                                <TierBadge tier={m.tier} size="sm" />
+                                <TierBadge tier={m.rawTier} size="sm" showNoTier={true} />
                                 {m.tags?.map(tag => (
                                     <TagBadge key={tag} tag={tag} size="sm" />
                                 ))}
@@ -521,7 +521,7 @@ const DirectoryTab: React.FC = () => {
                                 <td className="p-4 font-medium text-primary dark:text-white truncate">{m.name}</td>
                                 <td className="p-4">
                                     <div className="flex items-center gap-1 flex-wrap">
-                                        <TierBadge tier={m.tier} size="sm" />
+                                        <TierBadge tier={m.rawTier} size="sm" showNoTier={true} />
                                         {m.tags?.map(tag => (
                                             <TagBadge key={tag} tag={tag} size="sm" />
                                         ))}
