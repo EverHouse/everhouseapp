@@ -409,7 +409,8 @@ export async function addLineItemToDeal(
     const lineItemId = lineItemResponse.id;
     
     await retryableHubSpotRequest(() =>
-      hubspot.crm.lineItems.associationsApi.create(
+      hubspot.crm.associations.v4.basicApi.create(
+        'line_items',
         lineItemId,
         'deals',
         hubspotDealId,
@@ -694,7 +695,7 @@ async function findOrCreateHubSpotContact(
           firstname: firstName,
           lastname: lastName,
           phone: phone || '',
-          membership_tier: tier || '',
+          membership_tier: tier?.toLowerCase() || '',
           membership_status: 'active',
           lifecyclestage: 'customer'
         }
@@ -739,16 +740,17 @@ async function createMembershipDeal(
         pipeline: MEMBERSHIP_PIPELINE_ID,
         dealstage: stage || HUBSPOT_STAGE_IDS.CLOSED_WON_ACTIVE,
         closedate: startDate || new Date().toISOString().split('T')[0],
-        membership_tier: tier
+        membership_tier: tier?.toLowerCase() || ''
       }
     })
   );
   
   const dealId = dealResponse.id;
   
-  // Associate deal with contact
+  // Associate deal with contact using v3 associations API
   await retryableHubSpotRequest(() =>
-    hubspot.crm.deals.associationsApi.create(
+    hubspot.crm.associations.v4.basicApi.create(
+      'deals',
       dealId,
       'contacts',
       contactId,

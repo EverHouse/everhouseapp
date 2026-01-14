@@ -12,6 +12,7 @@ import {
   calculateTotalDiscount,
   syncDealStageFromMindbodyStatus
 } from '../core/hubspotDeals';
+import { syncAllMembersFromHubSpot } from '../core/memberSync';
 import { db } from '../db';
 import { hubspotProductMappings, discountRules } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
@@ -200,6 +201,19 @@ router.post('/api/hubspot/sync-deal-stage', isStaffOrAdmin, async (req, res) => 
   } catch (error: any) {
     if (!isProduction) console.error('Error syncing deal stage:', error);
     res.status(500).json({ error: 'Failed to sync deal stage' });
+  }
+});
+
+// Manual trigger for full member sync (creates deals for all active members)
+router.post('/api/hubspot/sync-all-members', isStaffOrAdmin, async (req, res) => {
+  try {
+    console.log('[HubSpotDeals] Manual member sync triggered');
+    const result = await syncAllMembersFromHubSpot();
+    console.log(`[HubSpotDeals] Manual sync complete - Synced: ${result.synced}, Errors: ${result.errors}`);
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error('Error during manual member sync:', error);
+    res.status(500).json({ error: 'Failed to sync members' });
   }
 });
 

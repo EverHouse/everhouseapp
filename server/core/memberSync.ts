@@ -6,6 +6,10 @@ import { sql, eq } from 'drizzle-orm';
 import { isProduction } from './db';
 import { broadcastMemberDataUpdated, broadcastDataIntegrityUpdate } from './websocket';
 import { syncDealStageFromMindbodyStatus } from './hubspotDeals';
+import pLimit from 'p-limit';
+
+// Helper to add delay between operations
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 interface HubSpotContact {
   id: string;
@@ -162,15 +166,6 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           });
         
         synced++;
-        
-        // Sync deal stage based on Mindbody status (non-blocking)
-        // Include active members so deals get created for all members
-        const dealSyncStatuses = ['active', 'declined', 'suspended', 'expired', 'terminated', 'cancelled', 'froze', 'non-member', 'frozen'];
-        if (status && dealSyncStatuses.includes(status)) {
-          syncDealStageFromMindbodyStatus(email, status, 'system', 'Mindbody Sync').catch(err => {
-            if (!isProduction) console.error(`[MemberSync] Failed to sync deal stage for ${email}:`, err);
-          });
-        }
       } catch (err) {
         errors++;
         if (!isProduction) console.error(`[MemberSync] Error syncing ${email}:`, err);
@@ -178,6 +173,50 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
     }
     
     if (!isProduction) console.log(`[MemberSync] Complete - Synced: ${synced}, Errors: ${errors}`);
+    
+    // Sync deal stages in batches with throttling to avoid HubSpot rate limits
+    // Run this AFTER the main sync completes to avoid blocking member data updates
+    const dealSyncStatuses = ['active', 'declined', 'suspended', 'expired', 'terminated', 'cancelled', 'froze', 'non-member', 'frozen'];
+    const contactsNeedingDealSync = allContacts.filter(c => {
+      const email = c.properties.email?.toLowerCase();
+      const status = (c.properties.membership_status || 'active').toLowerCase();
+      return email && dealSyncStatuses.includes(status);
+    });
+    
+    if (contactsNeedingDealSync.length > 0) {
+      if (!isProduction) console.log(`[MemberSync] Starting deal sync for ${contactsNeedingDealSync.length} members (throttled)`);
+      
+      // Process deals in batches of 5 with 2 second delay between batches
+      // HubSpot has 110 requests per 10 seconds limit, so we stay well under
+      const BATCH_SIZE = 5;
+      const BATCH_DELAY_MS = 2000;
+      const limit = pLimit(BATCH_SIZE);
+      
+      for (let i = 0; i < contactsNeedingDealSync.length; i += BATCH_SIZE) {
+        const batch = contactsNeedingDealSync.slice(i, i + BATCH_SIZE);
+        
+        await Promise.all(
+          batch.map(contact => 
+            limit(async () => {
+              const email = contact.properties.email!.toLowerCase();
+              const status = (contact.properties.membership_status || 'active').toLowerCase();
+              try {
+                await syncDealStageFromMindbodyStatus(email, status, 'system', 'Mindbody Sync');
+              } catch (err) {
+                if (!isProduction) console.error(`[MemberSync] Failed to sync deal stage for ${email}:`, err);
+              }
+            })
+          )
+        );
+        
+        // Add delay between batches to avoid rate limits
+        if (i + BATCH_SIZE < contactsNeedingDealSync.length) {
+          await delay(BATCH_DELAY_MS);
+        }
+      }
+      
+      if (!isProduction) console.log(`[MemberSync] Deal sync complete for ${contactsNeedingDealSync.length} members`);
+    }
     
     // Broadcast to staff that member data has been updated
     if (synced > 0) {
