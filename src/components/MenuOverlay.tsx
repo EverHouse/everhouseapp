@@ -17,24 +17,47 @@ const MenuOverlay: React.FC<MenuOverlayProps> = ({ isOpen, onClose }) => {
   const { stop, start } = useSmoothScroll();
   const [isVisible, setIsVisible] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const wasOpenRef = useRef(false);
 
+  // Handle menu open/close state changes
   useEffect(() => {
     if (isOpen) {
+      // Clear any pending close timer
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      wasOpenRef.current = true;
       setIsVisible(true);
       setIsClosing(false);
       document.documentElement.classList.add('overflow-hidden');
       stop();
     } else if (isVisible) {
       setIsClosing(true);
-      const timer = setTimeout(() => {
+      timerRef.current = setTimeout(() => {
         setIsVisible(false);
         setIsClosing(false);
         document.documentElement.classList.remove('overflow-hidden');
         start();
+        wasOpenRef.current = false;
+        timerRef.current = null;
       }, 250);
-      return () => clearTimeout(timer);
     }
   }, [isOpen]);
+
+  // Cleanup on unmount - only restore scrolling if menu was open
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+      if (wasOpenRef.current) {
+        document.documentElement.classList.remove('overflow-hidden');
+        start();
+      }
+    };
+  }, [start]);
 
   const handleClose = () => {
     haptic.selection();
