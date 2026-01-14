@@ -686,21 +686,39 @@ async function findOrCreateHubSpotContact(
   }
   
   // Create new contact
-  const createResponse = await retryableHubSpotRequest(() =>
-    hubspot.crm.contacts.basicApi.create({
-      properties: {
-        email: email.toLowerCase(),
-        firstname: firstName,
-        lastname: lastName,
-        phone: phone || '',
-        membership_tier: tier || '',
-        membership_status: 'active',
-        lifecyclestage: 'customer'
+  try {
+    const createResponse = await retryableHubSpotRequest(() =>
+      hubspot.crm.contacts.basicApi.create({
+        properties: {
+          email: email.toLowerCase(),
+          firstname: firstName,
+          lastname: lastName,
+          phone: phone || '',
+          membership_tier: tier || '',
+          membership_status: 'active',
+          lifecyclestage: 'customer'
+        }
+      })
+    );
+    
+    return { contactId: createResponse.id, isNew: true };
+  } catch (createError: any) {
+    // Handle 409 Conflict - contact already exists
+    // HubSpot error message format: "Contact already exists. Existing ID: 355532534519"
+    const statusCode = createError?.code || createError?.response?.statusCode || createError?.status;
+    const errorBody = createError?.body || createError?.response?.body;
+    
+    if (statusCode === 409 && errorBody?.message) {
+      const match = errorBody.message.match(/Existing ID:\s*(\d+)/);
+      if (match && match[1]) {
+        console.log(`[HubSpotDeals] Contact ${email} already exists (ID: ${match[1]}), using existing`);
+        return { contactId: match[1], isNew: false };
       }
-    })
-  );
-  
-  return { contactId: createResponse.id, isNew: true };
+    }
+    
+    // Re-throw if we couldn't extract the contact ID
+    throw createError;
+  }
 }
 
 // Create a deal in the Membership Sales pipeline
