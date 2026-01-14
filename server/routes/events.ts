@@ -682,7 +682,9 @@ router.get('/api/rsvps', async (req, res) => {
               [sessionEmail]
             );
             isStaff = result.rows.length > 0;
-          } catch (e) {}
+          } catch (e) {
+            console.warn('[events] Staff check query failed:', e);
+          }
         }
         if (!isStaff) {
           return res.status(403).json({ error: 'You can only view your own RSVPs' });
