@@ -1762,6 +1762,11 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                                     <div className="flex items-center gap-2">
                                                                         <p className="font-medium text-primary dark:text-white text-sm">{displayName}</p>
                                                                         {(booking as any).tier && <TierBadge tier={(booking as any).tier} size="sm" />}
+                                                                        {isConferenceRoom && (
+                                                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400">
+                                                                                Conf
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                     <p className="text-xs text-primary/80 dark:text-white/80">
                                                                         {formatTime12Hour(booking.start_time)} - {formatTime12Hour(booking.end_time)}
