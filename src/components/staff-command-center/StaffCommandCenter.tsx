@@ -361,10 +361,9 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
             </div>
           </div>
 
-          {/* Row 3: Overdue Payments + Quick Actions */}
+          {/* Row 3: Overdue Payments */}
           <div className="grid grid-cols-3 gap-6">
             <OverduePaymentsSection variant="desktop" />
-            <QuickActionsGrid onTabChange={onTabChange} isAdmin={isAdmin} variant="desktop" onNewMember={() => setAddMemberModalOpen(true)} />
           </div>
         </div>
 
@@ -470,6 +469,18 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
             >
               <span className="material-symbols-outlined text-lg" aria-hidden="true">sports_golf</span>
               <span className="text-sm font-medium">New Booking</span>
+            </button>
+            <button
+              role="menuitem"
+              tabIndex={fabOpen ? 0 : -1}
+              onClick={() => { 
+                setFabOpen(false); 
+                setAddMemberModalOpen(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600/90 text-white rounded-full shadow-lg whitespace-nowrap backdrop-blur-sm"
+            >
+              <span className="material-symbols-outlined text-lg" aria-hidden="true">person_add</span>
+              <span className="text-sm font-medium">New Member</span>
             </button>
             <button
               role="menuitem"

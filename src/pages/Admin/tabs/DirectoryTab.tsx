@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useData, MemberProfile } from '../../../contexts/DataContext';
 import { usePageReady } from '../../../contexts/PageReadyContext';
 import TierBadge from '../../../components/TierBadge';
 import TagBadge from '../../../components/TagBadge';
 import MemberProfileDrawer from '../../../components/MemberProfileDrawer';
+import { AddMemberModal } from '../../../components/staff-command-center/modals/AddMemberModal';
 import { formatPhoneNumber } from '../../../utils/formatting';
 import { getTierColor, getTagColor } from '../../../utils/tierUtils';
 
@@ -53,6 +55,7 @@ const DirectoryTab: React.FC = () => {
     const [formerLoading, setFormerLoading] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncMessage, setSyncMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [addMemberModalOpen, setAddMemberModalOpen] = useState(false);
     
     const isAdmin = actualUser?.role === 'admin';
 
@@ -549,6 +552,28 @@ const DirectoryTab: React.FC = () => {
                 isAdmin={isAdmin}
                 onClose={() => { setIsViewingDetails(false); setSelectedMember(null); }}
                 onViewAs={(member) => { setIsViewingDetails(false); setSelectedMember(null); handleViewAs(member); }}
+            />
+
+            {/* Add Member FAB */}
+            {createPortal(
+                <button
+                    onClick={() => setAddMemberModalOpen(true)}
+                    className="fixed right-5 bottom-24 lg:bottom-8 z-[9998] w-14 h-14 rounded-full shadow-lg flex items-center justify-center bg-green-600 hover:bg-green-700 text-white transition-all duration-300 hover:scale-110 active:scale-95"
+                    title="Add New Member"
+                    aria-label="Add New Member"
+                >
+                    <span className="material-symbols-outlined text-2xl">person_add</span>
+                </button>,
+                document.body
+            )}
+
+            <AddMemberModal
+                isOpen={addMemberModalOpen}
+                onClose={() => setAddMemberModalOpen(false)}
+                onSuccess={() => {
+                    setAddMemberModalOpen(false);
+                    refreshMembers();
+                }}
             />
         </div>
     );
