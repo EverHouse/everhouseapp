@@ -66,7 +66,7 @@ interface CommunicationLog {
   createdAt: string;
 }
 
-type TabType = 'overview' | 'bookings' | 'events' | 'wellness' | 'visits' | 'guest-passes' | 'communications' | 'notes';
+type TabType = 'overview' | 'bookings' | 'events' | 'wellness' | 'visits' | 'guest-passes' | 'purchases' | 'communications' | 'notes';
 
 const TABS: { id: TabType; label: string; icon: string }[] = [
   { id: 'overview', label: 'Overview', icon: 'dashboard' },
@@ -75,6 +75,7 @@ const TABS: { id: TabType; label: string; icon: string }[] = [
   { id: 'wellness', label: 'Wellness', icon: 'spa' },
   { id: 'visits', label: 'Visits', icon: 'check_circle' },
   { id: 'guest-passes', label: 'Guests', icon: 'group_add' },
+  { id: 'purchases', label: 'Purchases', icon: 'receipt_long' },
   { id: 'communications', label: 'Comms', icon: 'chat' },
   { id: 'notes', label: 'Notes', icon: 'sticky_note_2' },
 ];
@@ -116,6 +117,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
   const [notes, setNotes] = useState<MemberNote[]>([]);
   const [communications, setCommunications] = useState<CommunicationLog[]>([]);
   const [guestHistory, setGuestHistory] = useState<GuestVisit[]>([]);
+  const [purchases, setPurchases] = useState<any[]>([]);
   const [linkedEmails, setLinkedEmails] = useState<string[]>([]);
   const [removingEmail, setRemovingEmail] = useState<string | null>(null);
   const [newNoteContent, setNewNoteContent] = useState('');
@@ -170,11 +172,12 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
     if (!member?.email) return;
     setIsLoading(true);
     try {
-      const [historyRes, notesRes, commsRes, guestsRes] = await Promise.all([
+      const [historyRes, notesRes, commsRes, guestsRes, purchasesRes] = await Promise.all([
         fetch(`/api/members/${encodeURIComponent(member.email)}/history`, { credentials: 'include' }),
         fetch(`/api/members/${encodeURIComponent(member.email)}/notes`, { credentials: 'include' }),
         fetch(`/api/members/${encodeURIComponent(member.email)}/communications`, { credentials: 'include' }),
         fetch(`/api/members/${encodeURIComponent(member.email)}/guests`, { credentials: 'include' }),
+        fetch(`/api/legacy-purchases/member/${encodeURIComponent(member.email)}`, { credentials: 'include' }),
       ]);
 
       if (historyRes.ok) {
@@ -192,6 +195,10 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
       if (guestsRes.ok) {
         const guestsData = await guestsRes.json();
         setGuestHistory(guestsData);
+      }
+      if (purchasesRes.ok) {
+        const purchasesData = await purchasesRes.json();
+        setPurchases(purchasesData);
       }
     } catch (err) {
       console.error('Failed to fetch member data:', err);
@@ -664,6 +671,93 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
             {!history?.guestPassInfo && guestHistory.length === 0 && !history?.guestCheckInsHistory?.length && (
               <EmptyState icon="group_add" message="No guests recorded yet" />
             )}
+          </div>
+        );
+
+      case 'purchases':
+        if (purchases.length === 0) {
+          return <EmptyState icon="receipt_long" message="No purchase history found" />;
+        }
+        
+        const categoryLabels: Record<string, string> = {
+          sim_walk_in: 'Sim Walk-In',
+          guest_pass: 'Guest Pass',
+          membership: 'Membership',
+          cafe: 'Cafe',
+          retail: 'Retail',
+          other: 'Other',
+        };
+        
+        const categoryColors: Record<string, string> = {
+          sim_walk_in: 'bg-blue-100 text-blue-700',
+          guest_pass: 'bg-purple-100 text-purple-700',
+          membership: 'bg-green-100 text-green-700',
+          cafe: 'bg-orange-100 text-orange-700',
+          retail: 'bg-pink-100 text-pink-700',
+          other: 'bg-gray-100 text-gray-700',
+        };
+        
+        const categoryOrder = ['membership', 'sim_walk_in', 'guest_pass', 'cafe', 'retail', 'other'];
+        const groupedPurchases = purchases.reduce((acc: Record<string, any[]>, purchase: any) => {
+          const category = purchase.itemCategory || 'other';
+          if (!acc[category]) {
+            acc[category] = [];
+          }
+          acc[category].push(purchase);
+          return acc;
+        }, {});
+        
+        return (
+          <div className="space-y-6">
+            {categoryOrder.map(category => {
+              const categoryPurchases = groupedPurchases[category];
+              if (!categoryPurchases || categoryPurchases.length === 0) return null;
+              
+              return (
+                <div key={category}>
+                  <h4 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${categoryColors[category] || categoryColors.other}`}>
+                      {categoryLabels[category] || category}
+                    </span>
+                    <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                      ({categoryPurchases.length})
+                    </span>
+                  </h4>
+                  <div className="space-y-3">
+                    {categoryPurchases.map((purchase: any) => (
+                      <div key={purchase.id} className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                {purchase.itemName}
+                              </span>
+                              {purchase.quantity > 1 && (
+                                <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                                  x{purchase.quantity}
+                                </span>
+                              )}
+                            </div>
+                            <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                              {formatDatePacific(purchase.saleDate)}
+                              {purchase.staffName && ` · ${purchase.staffName}`}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                              ${purchase.itemTotal}
+                            </span>
+                            {purchase.isComp && (
+                              <span className="block text-[10px] text-green-500 font-medium">COMP</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         );
 
