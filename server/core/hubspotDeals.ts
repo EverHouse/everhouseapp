@@ -25,22 +25,39 @@ export const HUBSPOT_STAGE_IDS = {
   CLOSED_LOST: 'closedlost',
 };
 
-// Map Mindbody statuses to HubSpot stage IDs
+// Map Mindbody statuses to HubSpot deal stage IDs
 const MINDBODY_TO_STAGE_MAP: Record<string, string> = {
-  'active': HUBSPOT_STAGE_IDS.CLOSED_WON_ACTIVE,
+  'active': HUBSPOT_STAGE_IDS.CLOSED_WON_ACTIVE,      // Active Member stage
   'pending': HUBSPOT_STAGE_IDS.BILLING_SETUP,
-  'declined': HUBSPOT_STAGE_IDS.PAYMENT_DECLINED,
-  'suspended': HUBSPOT_STAGE_IDS.PAYMENT_DECLINED,
-  'expired': HUBSPOT_STAGE_IDS.CLOSED_LOST,
-  'terminated': HUBSPOT_STAGE_IDS.CLOSED_LOST,
-  'cancelled': HUBSPOT_STAGE_IDS.CLOSED_LOST,
-  'froze': HUBSPOT_STAGE_IDS.PAYMENT_DECLINED,
+  'declined': HUBSPOT_STAGE_IDS.PAYMENT_DECLINED,    // Payment Declined stage
+  'suspended': HUBSPOT_STAGE_IDS.PAYMENT_DECLINED,   // Payment Declined stage
+  'expired': HUBSPOT_STAGE_IDS.CLOSED_LOST,          // Cancelled/Churned stage
+  'terminated': HUBSPOT_STAGE_IDS.CLOSED_LOST,       // Cancelled/Churned stage
+  'cancelled': HUBSPOT_STAGE_IDS.CLOSED_LOST,        // Cancelled/Churned stage
+  'froze': HUBSPOT_STAGE_IDS.PAYMENT_DECLINED,       // Keep in Payment Declined (frozen but not churned)
   'non-member': HUBSPOT_STAGE_IDS.CLOSED_LOST,
 };
 
+// Map Mindbody statuses to HubSpot contact membership_status property
+// 'active' = full app access, 'inactive' = access kill-switch, 'former_member' = churned
+type ContactMembershipStatus = 'active' | 'inactive' | 'former_member';
+
+const MINDBODY_TO_CONTACT_STATUS_MAP: Record<string, ContactMembershipStatus> = {
+  'active': 'active',
+  'pending': 'active',
+  'declined': 'inactive',          // Payment issue - kill switch
+  'suspended': 'inactive',         // Payment issue - kill switch
+  'froze': 'inactive',             // Frozen - kill switch
+  'expired': 'former_member',      // Churned
+  'terminated': 'former_member',   // Churned
+  'cancelled': 'former_member',    // Churned
+  'non-member': 'former_member',
+};
+
 // Statuses that should mark contact as inactive (kill switch for app features)
-const INACTIVE_STATUSES = ['declined', 'suspended', 'expired', 'terminated', 'cancelled', 'froze', 'non-member'];
-const ACTIVE_STATUSES = ['active'];
+const INACTIVE_STATUSES = ['declined', 'suspended', 'froze'];
+const CHURNED_STATUSES = ['expired', 'terminated', 'cancelled', 'non-member'];
+const ACTIVE_STATUSES = ['active', 'pending'];
 
 function isRateLimitError(error: any): boolean {
   const errorMsg = error instanceof Error ? error.message : String(error);
@@ -51,6 +68,98 @@ function isRateLimitError(error: any): boolean {
     errorMsg.includes("RATELIMIT_EXCEEDED") ||
     errorMsg.toLowerCase().includes("rate limit")
   );
+}
+
+// Cache for pipeline validation to avoid repeated API calls
+let pipelineValidationCache: { 
+  validated: boolean; 
+  pipelineExists: boolean;
+  validStages: string[];
+  lastChecked: Date | null;
+} = { validated: false, pipelineExists: false, validStages: [], lastChecked: null };
+
+// Validate that the Membership Pipeline and required stages exist in HubSpot
+export async function validateMembershipPipeline(): Promise<{ 
+  valid: boolean; 
+  pipelineExists: boolean; 
+  missingStages: string[];
+  error?: string;
+}> {
+  try {
+    // Check cache (valid for 1 hour)
+    const cacheAge = pipelineValidationCache.lastChecked 
+      ? Date.now() - pipelineValidationCache.lastChecked.getTime() 
+      : Infinity;
+    
+    if (pipelineValidationCache.validated && cacheAge < 3600000) {
+      const requiredStages = Object.values(HUBSPOT_STAGE_IDS);
+      const missingStages = requiredStages.filter(s => !pipelineValidationCache.validStages.includes(s));
+      return {
+        valid: pipelineValidationCache.pipelineExists && missingStages.length === 0,
+        pipelineExists: pipelineValidationCache.pipelineExists,
+        missingStages
+      };
+    }
+    
+    const hubspot = await getHubSpotClient();
+    
+    // Get all deal pipelines
+    const pipelinesResponse = await retryableHubSpotRequest(() =>
+      hubspot.crm.pipelines.pipelinesApi.getAll('deals')
+    );
+    
+    const membershipPipeline = pipelinesResponse.results.find(
+      (p: any) => p.id === MEMBERSHIP_PIPELINE_ID || p.label?.toLowerCase().includes('membership')
+    );
+    
+    if (!membershipPipeline) {
+      pipelineValidationCache = { validated: true, pipelineExists: false, validStages: [], lastChecked: new Date() };
+      return {
+        valid: false,
+        pipelineExists: false,
+        missingStages: Object.values(HUBSPOT_STAGE_IDS),
+        error: `Membership Pipeline (${MEMBERSHIP_PIPELINE_ID}) not found in HubSpot`
+      };
+    }
+    
+    // Extract valid stage IDs from the pipeline
+    const validStages = membershipPipeline.stages?.map((s: any) => s.id) || [];
+    
+    // Check which required stages are missing
+    const requiredStages = Object.values(HUBSPOT_STAGE_IDS);
+    const missingStages = requiredStages.filter(s => !validStages.includes(s));
+    
+    pipelineValidationCache = { 
+      validated: true, 
+      pipelineExists: true, 
+      validStages,
+      lastChecked: new Date()
+    };
+    
+    if (missingStages.length > 0) {
+      console.warn(`[HubSpotDeals] Missing stages in Membership Pipeline: ${missingStages.join(', ')}`);
+    }
+    
+    return {
+      valid: missingStages.length === 0,
+      pipelineExists: true,
+      missingStages
+    };
+  } catch (error: any) {
+    console.error('[HubSpotDeals] Error validating membership pipeline:', error);
+    return {
+      valid: false,
+      pipelineExists: false,
+      missingStages: [],
+      error: error.message || 'Failed to validate pipeline'
+    };
+  }
+}
+
+// Check if a specific stage is valid before attempting to move a deal
+export function isValidStage(stageId: string): boolean {
+  if (!pipelineValidationCache.validated) return true; // Allow if not yet validated
+  return pipelineValidationCache.validStages.includes(stageId);
 }
 
 async function retryableHubSpotRequest<T>(fn: () => Promise<T>): Promise<T> {
@@ -173,7 +282,7 @@ export async function updateDealStage(
 // Update HubSpot contact's membership_status property (the app kill switch)
 async function updateContactMembershipStatus(
   hubspotContactId: string,
-  newStatus: 'active' | 'inactive',
+  newStatus: ContactMembershipStatus,
   performedBy: string
 ): Promise<boolean> {
   try {
@@ -200,14 +309,26 @@ export async function syncDealStageFromMindbodyStatus(
   mindbodyStatus: string,
   performedBy: string = 'system',
   performedByName?: string
-): Promise<{ success: boolean; dealId?: string; newStage?: string; contactUpdated?: boolean }> {
+): Promise<{ success: boolean; dealId?: string; newStage?: string; contactUpdated?: boolean; error?: string }> {
   try {
+    // Validate pipeline exists before attempting sync
+    const pipelineValidation = await validateMembershipPipeline();
+    if (!pipelineValidation.pipelineExists) {
+      console.error(`[HubSpotDeals] Cannot sync: ${pipelineValidation.error}`);
+      return { success: false, error: pipelineValidation.error };
+    }
+    
     const normalizedStatus = mindbodyStatus.toLowerCase().replace(/[^a-z-]/g, '');
     const targetStage = MINDBODY_TO_STAGE_MAP[normalizedStatus];
     
     if (!targetStage) {
       if (!isProduction) console.log(`[HubSpotDeals] No stage mapping for status: ${mindbodyStatus}`);
-      return { success: false };
+      return { success: false, error: `No stage mapping for status: ${mindbodyStatus}` };
+    }
+    
+    // Validate target stage exists in pipeline
+    if (!isValidStage(targetStage)) {
+      console.warn(`[HubSpotDeals] Target stage ${targetStage} not found in pipeline, check HubSpot configuration`);
     }
     
     // Find primary deal for this member
@@ -258,9 +379,10 @@ export async function syncDealStageFromMindbodyStatus(
       return { success: true, dealId: deal.hubspotDealId, newStage: targetStage };
     }
     
-    // Determine contact status based on Mindbody status
+    // Determine contact status based on Mindbody status using the new mapping
+    const targetContactStatus: ContactMembershipStatus = MINDBODY_TO_CONTACT_STATUS_MAP[normalizedStatus] || 'inactive';
     const isRecovery = ACTIVE_STATUSES.includes(normalizedStatus);
-    const targetContactStatus: 'active' | 'inactive' = isRecovery ? 'active' : 'inactive';
+    const isChurned = CHURNED_STATUSES.includes(normalizedStatus);
     
     // Update local deal record
     await db.update(hubspotDeals)
@@ -283,16 +405,24 @@ export async function syncDealStageFromMindbodyStatus(
         memberEmail: deal.memberEmail,
         hubspotDealId: deal.hubspotDealId,
         actionType: 'contact_status_changed',
-        previousValue: isRecovery ? 'inactive' : 'active',
         newValue: targetContactStatus,
-        actionDetails: { trigger: 'mindbody_status_sync', mindbodyStatus: normalizedStatus },
+        actionDetails: { 
+          trigger: 'mindbody_status_sync', 
+          mindbodyStatus: normalizedStatus,
+          statusCategory: isRecovery ? 'recovery' : isChurned ? 'churned' : 'payment_issue'
+        },
         performedBy,
         performedByName
       });
     }
     
+    // Log status transitions
     if (isRecovery) {
       if (!isProduction) console.log(`[HubSpotDeals] Recovery: Member ${memberEmail} status changed to Active, deal moved to ${targetStage}`);
+    } else if (isChurned) {
+      if (!isProduction) console.log(`[HubSpotDeals] Churned: Member ${memberEmail} marked as former_member, deal moved to ${targetStage}`);
+    } else {
+      if (!isProduction) console.log(`[HubSpotDeals] Payment Issue: Member ${memberEmail} marked as inactive, deal moved to ${targetStage}`);
     }
     
     return { success: dealUpdated, dealId: deal.hubspotDealId, newStage: targetStage, contactUpdated };
