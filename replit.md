@@ -48,7 +48,8 @@ The application is built with a React 19 frontend utilizing Vite, styled with Ta
 - **Real-Time Sync**: Instant updates across clients via WebSocket for various data points (e.g., simulator availability, waitlists, announcements).
 - **PWA Features**: Service Worker caching, offline support, and iOS-style interactions (haptic feedback, pull-to-refresh).
 - **Motion Architecture**: Pure CSS keyframe animations, staggered content, parallax scrolling.
-- **Trackman Historical Import**: Admin tool for importing CSV data, auto-matching to bookings, handling cancellations, and managing player counts. Enhanced with email matching, notes parsing, fuzzy matching, and creation of `booking_sessions` and `usage_ledger` entries.
+- **Trackman Historical Import**: Staff and admin tool for importing CSV data, auto-matching to bookings, handling cancellations, and managing player counts. Enhanced with email matching, notes parsing, fuzzy matching, and creation of `booking_sessions` and `usage_ledger` entries.
+- **Conference Room Auto Check-In**: Conference room bookings automatically mark as checked-in upon approval (no manual check-in required). Check-in buttons are hidden for conference room bookings in the staff interface.
 - **Multi-Member Booking System**: Central `booking_sessions` table, `booking_participants`, `usage_ledger`, and `guests` tables for tracking participants, usage, and payments. Includes auto-generated `trackman_email` for matching.
 - **Staff Check-In Tools**: Payment guard, check-in billing modal with fee breakdown, individual payment marking, fee waiving, and staff direct-add with tier override. All actions are audited in `booking_payment_audit`.
 - **Conflict Detection**: Prevents double-booking members; API checks for overlapping times in `booking_requests`, `booking_participants`, and `booking_members`, returning 409 status with details.

@@ -790,8 +790,9 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
           };
         }
         
-        const bayResult = await tx.select({ name: resources.name }).from(resources).where(eq(resources.id, assignedBayId));
+        const bayResult = await tx.select({ name: resources.name, type: resources.type }).from(resources).where(eq(resources.id, assignedBayId));
         const bayName = bayResult[0]?.name || 'Simulator';
+        const isConferenceRoom = bayResult[0]?.type === 'conference_room';
         
         // Skip calendar event creation if already linked (e.g., from MindBody sync)
         // Only create calendar events for conference rooms - golf/simulators no longer sync to calendar
@@ -820,9 +821,12 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
           }
         }
         
+        // Conference room bookings auto check-in (no manual check-in required)
+        const finalStatus = isConferenceRoom ? 'attended' : status;
+        
         const [updatedRow] = await tx.update(bookingRequests)
           .set({
-            status: status,
+            status: finalStatus,
             staffNotes: staff_notes,
             suggestedTime: suggested_time,
             reviewedBy: reviewed_by,

@@ -197,7 +197,7 @@ const AdminDashboard: React.FC = () => {
             {activeTab === 'bugs' && actualUser?.role === 'admin' && <BugReportsAdmin />}
             {activeTab === 'updates' && <UpdatesTab />}
             {activeTab === 'tours' && <ToursTab />}
-            {activeTab === 'trackman' && actualUser?.role === 'admin' && <TrackmanTab />}
+            {activeTab === 'trackman' && <TrackmanTab />}
             {activeTab === 'data-integrity' && actualUser?.role === 'admin' && <DataIntegrityTab />}
             {activeTab === 'settings' && actualUser?.role === 'admin' && <SettingsTab />}
           </Suspense>

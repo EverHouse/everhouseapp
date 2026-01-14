@@ -1572,32 +1572,30 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                             )}
                         </button>
                     </div>
-                    {actualUser?.role === 'admin' && (
-                        <div className="flex items-center">
-                            {activeView === 'requests' ? (
-                                <button
-                                    onClick={() => onTabChange('trackman')}
-                                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary dark:text-white bg-primary/10 dark:bg-white/10 hover:bg-primary/20 dark:hover:bg-white/20 rounded-lg transition-colors shadow-sm"
-                                    title="Import bookings from Trackman CSV"
-                                >
-                                    <span className="material-symbols-outlined text-sm">upload_file</span>
-                                    <span>Import</span>
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={handleSyncHistory}
-                                    disabled={isSyncingHistory}
-                                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-primary dark:bg-lavender hover:bg-primary/90 dark:hover:bg-lavender/90 rounded-lg transition-colors disabled:opacity-50 shadow-sm"
-                                    title="Sync conference room bookings from MindBody (last 12 months)"
-                                >
-                                    <span className={`material-symbols-outlined text-sm ${isSyncingHistory ? 'animate-spin' : ''}`}>
-                                        {isSyncingHistory ? 'sync' : 'cloud_sync'}
-                                    </span>
-                                    <span>{isSyncingHistory ? 'Syncing...' : 'Sync'}</span>
-                                </button>
-                            )}
-                        </div>
-                    )}
+                    <div className="flex items-center">
+                        {activeView === 'requests' ? (
+                            <button
+                                onClick={() => onTabChange('trackman')}
+                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary dark:text-white bg-primary/10 dark:bg-white/10 hover:bg-primary/20 dark:hover:bg-white/20 rounded-lg transition-colors shadow-sm"
+                                title="Import bookings from Trackman CSV"
+                            >
+                                <span className="material-symbols-outlined text-sm">upload_file</span>
+                                <span>Import</span>
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleSyncHistory}
+                                disabled={isSyncingHistory}
+                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-primary dark:bg-lavender hover:bg-primary/90 dark:hover:bg-lavender/90 rounded-lg transition-colors disabled:opacity-50 shadow-sm"
+                                title="Sync conference room bookings from MindBody (last 12 months)"
+                            >
+                                <span className={`material-symbols-outlined text-sm ${isSyncingHistory ? 'animate-spin' : ''}`}>
+                                    {isSyncingHistory ? 'sync' : 'cloud_sync'}
+                                </span>
+                                <span>{isSyncingHistory ? 'Syncing...' : 'Sync'}</span>
+                            </button>
+                        )}
+                    </div>
                 </div>
 
             {isLoading ? (
@@ -1614,16 +1612,14 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                 <span aria-hidden="true" className="material-symbols-outlined text-yellow-500">pending</span>
                                 Pending Requests ({pendingRequests.length})
                             </h3>
-                            {actualUser?.role === 'admin' && (
-                                <button
-                                    onClick={() => onTabChange('trackman')}
-                                    className="hidden lg:flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary dark:text-white bg-primary/10 dark:bg-white/10 hover:bg-primary/20 dark:hover:bg-white/20 rounded-lg transition-colors shadow-sm"
-                                    title="Import bookings from Trackman CSV"
-                                >
-                                    <span className="material-symbols-outlined text-sm">upload_file</span>
-                                    <span>Import</span>
-                                </button>
-                            )}
+                            <button
+                                onClick={() => onTabChange('trackman')}
+                                className="hidden lg:flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary dark:text-white bg-primary/10 dark:bg-white/10 hover:bg-primary/20 dark:hover:bg-white/20 rounded-lg transition-colors shadow-sm"
+                                title="Import bookings from Trackman CSV"
+                            >
+                                <span className="material-symbols-outlined text-sm">upload_file</span>
+                                <span>Import</span>
+                            </button>
                         </div>
                         {pendingRequests.length === 0 ? (
                             <div className="py-8 text-center border-2 border-dashed border-gray-200 dark:border-white/25 rounded-xl">
@@ -1732,6 +1728,8 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                 const displayName = bookingEmail && memberNameMap[bookingEmail] 
                                                     ? memberNameMap[bookingEmail] 
                                                     : booking.user_name || booking.user_email;
+                                                const bookingResource = resources.find(r => r.id === booking.resource_id);
+                                                const isConferenceRoom = bookingResource?.type === 'conference_room';
                                                 return (
                                                     <SwipeableListItem
                                                         key={`upcoming-${booking.id}`}
@@ -1774,12 +1772,12 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                                 </div>
                                                             </div>
                                                             <div className="flex items-center gap-2">
-                                                                {isToday && booking.status === 'attended' ? (
+                                                                {!isConferenceRoom && isToday && booking.status === 'attended' ? (
                                                                     <span className="py-1.5 px-3 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 rounded-lg text-xs font-medium flex items-center gap-1">
                                                                         <span aria-hidden="true" className="material-symbols-outlined text-xs">check_circle</span>
                                                                         Checked In
                                                                     </span>
-                                                                ) : isToday && (
+                                                                ) : !isConferenceRoom && isToday && (
                                                                     <button
                                                                         onClick={() => updateBookingStatusOptimistic(booking, 'attended')}
                                                                         className="py-1.5 px-3 bg-accent text-primary rounded-lg text-xs font-medium flex items-center gap-1 hover:opacity-90 transition-colors"
