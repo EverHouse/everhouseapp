@@ -98,6 +98,8 @@ const TrackmanTab: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [isLinkingMatch, setIsLinkingMatch] = useState<number | null>(null);
   const [viewDetailBooking, setViewDetailBooking] = useState<any>(null);
+  const [isRescanning, setIsRescanning] = useState(false);
+  const [rescanResult, setRescanResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const unmatchedSectionRef = useRef<HTMLDivElement>(null);
   const matchedSectionRef = useRef<HTMLDivElement>(null);
@@ -368,6 +370,35 @@ const TrackmanTab: React.FC = () => {
     if (file) handleFileUpload(file);
   };
 
+  const handleRescan = async () => {
+    setIsRescanning(true);
+    setRescanResult(null);
+    
+    try {
+      const res = await fetch('/api/admin/trackman/rescan', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      setRescanResult(data);
+      
+      if (data.success && data.matched > 0) {
+        showToast(`Found ${data.matched} new matches!`, 'success');
+        fetchData();
+      } else if (data.success) {
+        showToast('No new matches found', 'info');
+      } else {
+        showToast(data.error || 'Rescan failed', 'error');
+      }
+    } catch (err: any) {
+      setRescanResult({ success: false, error: err.message });
+      showToast('Rescan failed', 'error');
+    } finally {
+      setIsRescanning(false);
+    }
+  };
+
   const handleResolve = async () => {
     if (!resolveModal) return;
     try {
@@ -581,13 +612,52 @@ const TrackmanTab: React.FC = () => {
       )}
 
       <div ref={unmatchedSectionRef} className="glass-card p-6 rounded-2xl border border-primary/10 dark:border-white/25">
-        <h2 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-          <span aria-hidden="true" className="material-symbols-outlined">warning</span>
-          Unmatched Bookings ({unmatchedTotalCount})
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-primary dark:text-white flex items-center gap-2">
+            <span aria-hidden="true" className="material-symbols-outlined">warning</span>
+            Unmatched Bookings ({unmatchedTotalCount})
+          </h2>
+          {unmatchedTotalCount > 0 && (
+            <button
+              onClick={handleRescan}
+              disabled={isRescanning}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isRescanning ? (
+                <>
+                  <span className="material-symbols-outlined text-sm animate-spin">refresh</span>
+                  Scanning...
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-sm">sync</span>
+                  Re-scan for Matches
+                </>
+              )}
+            </button>
+          )}
+        </div>
         <p className="text-sm text-primary/70 dark:text-white/70 mb-4">
-          These bookings have no owner assigned. The email or name from Trackman didn't match any member in our system. Click "Resolve" to link each booking to the correct member so their visit history and usage are tracked properly.
+          These bookings have no owner assigned. The email or name from Trackman didn't match any member in our system. Click "Resolve" to link each booking to the correct member, or use "Re-scan for Matches" to check against newly synced members.
         </p>
+        
+        {rescanResult && (
+          <div className={`mb-4 p-3 rounded-xl ${rescanResult.success && rescanResult.matched > 0 ? 'bg-green-100 dark:bg-green-500/20' : 'bg-blue-100 dark:bg-blue-500/20'}`}>
+            <p className={`text-sm font-medium ${rescanResult.success && rescanResult.matched > 0 ? 'text-green-700 dark:text-green-300' : 'text-blue-700 dark:text-blue-300'}`}>
+              {rescanResult.message}
+            </p>
+            {rescanResult.resolved && rescanResult.resolved.length > 0 && (
+              <div className="mt-2 text-xs text-green-600 dark:text-green-400">
+                {rescanResult.resolved.slice(0, 5).map((r: any, i: number) => (
+                  <p key={i}>{r.memberEmail} ({r.matchReason})</p>
+                ))}
+                {rescanResult.resolved.length > 5 && (
+                  <p>... and {rescanResult.resolved.length - 5} more</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         
         <div className="mb-4">
           <div className="relative">

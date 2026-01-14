@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { importTrackmanBookings, getUnmatchedBookings, resolveUnmatchedBooking, getImportRuns } from '../core/trackmanImport';
+import { importTrackmanBookings, getUnmatchedBookings, resolveUnmatchedBooking, getImportRuns, rescanUnmatchedBookings } from '../core/trackmanImport';
 import path from 'path';
 import multer from 'multer';
 import fs from 'fs';
@@ -154,6 +154,29 @@ router.post('/api/admin/trackman/upload', isStaffOrAdmin, upload.single('file'),
         console.error('Failed to cleanup uploaded file:', cleanupErr);
       }
     }
+  }
+});
+
+// Re-scan unmatched bookings against current member list (including newly synced former members)
+router.post('/api/admin/trackman/rescan', isStaffOrAdmin, async (req, res) => {
+  try {
+    const performedBy = (req as any).session?.user?.email || 'admin';
+    
+    const result = await rescanUnmatchedBookings(performedBy);
+    
+    res.json({
+      success: true,
+      scanned: result.scanned,
+      matched: result.matched,
+      resolved: result.resolved,
+      errors: result.errors,
+      message: result.matched > 0 
+        ? `Found ${result.matched} new matches out of ${result.scanned} unmatched bookings`
+        : `No new matches found (scanned ${result.scanned} unmatched bookings)`
+    });
+  } catch (error: any) {
+    console.error('Rescan error:', error);
+    res.status(500).json({ error: error.message || 'Failed to rescan unmatched bookings' });
   }
 });
 

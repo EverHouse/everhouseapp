@@ -2166,3 +2166,231 @@ export async function getImportRuns() {
     .from(trackmanImportRuns)
     .orderBy(sql`created_at DESC`);
 }
+
+/**
+ * Re-scan unmatched Trackman bookings against current member list
+ * This finds bookings that couldn't be matched during import but may now match
+ * after new members have been synced from HubSpot (including former members)
+ */
+export async function rescanUnmatchedBookings(performedBy: string = 'system'): Promise<{
+  scanned: number;
+  matched: number;
+  resolved: { trackmanId: string; memberEmail: string; matchReason: string }[];
+  errors: string[];
+}> {
+  const resolved: { trackmanId: string; memberEmail: string; matchReason: string }[] = [];
+  const errors: string[] = [];
+  
+  // Fetch all unresolved unmatched bookings
+  const unmatchedBookings = await db.select()
+    .from(trackmanUnmatchedBookings)
+    .where(sql`resolved_at IS NULL`);
+  
+  if (unmatchedBookings.length === 0) {
+    return { scanned: 0, matched: 0, resolved: [], errors: [] };
+  }
+  
+  process.stderr.write(`[Trackman Rescan] Starting rescan of ${unmatchedBookings.length} unmatched bookings\n`);
+  
+  // Fetch all members (active + former) from HubSpot for matching
+  const hubSpotMembers = await getAllHubSpotMembers();
+  
+  if (hubSpotMembers.length === 0) {
+    return { 
+      scanned: unmatchedBookings.length, 
+      matched: 0, 
+      resolved: [], 
+      errors: ['HubSpot unavailable - cannot fetch members for matching'] 
+    };
+  }
+  
+  // Build member lookup maps
+  const membersByName = new Map<string, string[]>();
+  const membersByEmail = new Map<string, string>();
+  
+  for (const member of hubSpotMembers) {
+    if (member.email) {
+      membersByEmail.set(member.email.toLowerCase(), member.email);
+      const fullName = `${member.firstName || ''} ${member.lastName || ''}`.toLowerCase().trim();
+      if (fullName) {
+        const existing = membersByName.get(fullName) || [];
+        existing.push(member.email);
+        membersByName.set(fullName, existing);
+      }
+    }
+  }
+  
+  process.stderr.write(`[Trackman Rescan] Loaded ${membersByEmail.size} members for matching\n`);
+  
+  // Load email mappings (from CSV and database)
+  const emailMapping = await loadEmailMapping();
+  
+  // Load trackman_email mappings from database
+  const trackmanEmailMapping = new Map<string, string>();
+  try {
+    const usersWithTrackmanEmail = await db.select({
+      email: users.email,
+      trackmanEmail: users.trackmanEmail
+    })
+    .from(users)
+    .where(sql`trackman_email IS NOT NULL AND trackman_email != ''`);
+    
+    for (const user of usersWithTrackmanEmail) {
+      if (user.email && user.trackmanEmail) {
+        trackmanEmailMapping.set(user.trackmanEmail.toLowerCase().trim(), user.email.toLowerCase());
+      }
+    }
+  } catch (err: any) {
+    process.stderr.write(`[Trackman Rescan] Error loading trackman_email mappings: ${err.message}\n`);
+  }
+  
+  let matchedCount = 0;
+  
+  for (const booking of unmatchedBookings) {
+    try {
+      let matchedEmail: string | null = null;
+      let matchReason = '';
+      const originalEmail = booking.originalEmail || '';
+      const userName = booking.userName || '';
+      
+      // Try email mapping first
+      if (originalEmail) {
+        const mappedEmail = emailMapping.get(originalEmail.toLowerCase().trim());
+        if (mappedEmail) {
+          const existingMember = membersByEmail.get(mappedEmail.toLowerCase());
+          if (existingMember) {
+            matchedEmail = existingMember;
+            matchReason = 'Matched via email mapping';
+          }
+        }
+      }
+      
+      // Try direct email match
+      if (!matchedEmail && originalEmail && originalEmail.includes('@')) {
+        const existingMember = membersByEmail.get(originalEmail.toLowerCase());
+        if (existingMember) {
+          matchedEmail = existingMember;
+          matchReason = 'Matched by email';
+        }
+      }
+      
+      // Try trackman_email match
+      if (!matchedEmail && originalEmail && originalEmail.includes('@')) {
+        const trackmanMatch = trackmanEmailMapping.get(originalEmail.toLowerCase().trim());
+        if (trackmanMatch) {
+          const existingMember = membersByEmail.get(trackmanMatch.toLowerCase());
+          if (existingMember) {
+            matchedEmail = existingMember;
+            matchReason = 'Matched by trackman_email';
+          }
+        }
+      }
+      
+      // Try name matching
+      if (!matchedEmail && userName) {
+        const normalizedName = userName.toLowerCase().trim();
+        const byNameEmails = membersByName.get(normalizedName);
+        if (byNameEmails && byNameEmails.length === 1) {
+          matchedEmail = byNameEmails[0];
+          matchReason = 'Matched by name';
+        } else if (!byNameEmails || byNameEmails.length === 0) {
+          // Try partial name matching
+          const nameParts = normalizedName.split(' ');
+          if (nameParts.length >= 2) {
+            const firstName = nameParts[0];
+            const lastName = nameParts[nameParts.length - 1];
+            
+            let partialMatches: string[] = [];
+            let matchedName = '';
+            for (const [name, emails] of membersByName.entries()) {
+              if (name.includes(firstName) && name.includes(lastName)) {
+                partialMatches = partialMatches.concat(emails);
+                matchedName = name;
+              }
+            }
+            
+            if (partialMatches.length === 1) {
+              matchedEmail = partialMatches[0];
+              matchReason = `Matched by partial name: ${matchedName}`;
+            }
+          }
+        }
+      }
+      
+      // If we found a match, resolve it
+      if (matchedEmail) {
+        await db.update(trackmanUnmatchedBookings)
+          .set({
+            resolvedEmail: matchedEmail,
+            resolvedAt: new Date(),
+            resolvedBy: performedBy,
+            matchAttemptReason: matchReason
+          })
+          .where(eq(trackmanUnmatchedBookings.id, booking.id));
+        
+        resolved.push({
+          trackmanId: booking.trackmanBookingId || '',
+          memberEmail: matchedEmail,
+          matchReason
+        });
+        
+        matchedCount++;
+        process.stderr.write(`[Trackman Rescan] Resolved: ${booking.userName} (${originalEmail}) -> ${matchedEmail} (${matchReason})\n`);
+        
+        // Create the booking request for this resolved entry
+        try {
+          const bookingDate = booking.bookingDate ? new Date(booking.bookingDate).toISOString().split('T')[0] : '';
+          const startTime = booking.startTime?.toString() || '';
+          const endTime = booking.endTime?.toString() || '';
+          const bayId = parseInt(booking.bayNumber || '') || null;
+          
+          if (bookingDate && startTime) {
+            // Check if booking already exists
+            const existingBooking = await db.select({ id: bookingRequests.id })
+              .from(bookingRequests)
+              .where(sql`trackman_booking_id = ${booking.trackmanBookingId}`)
+              .limit(1);
+            
+            if (existingBooking.length === 0) {
+              // Create the booking
+              await pool.query(
+                `INSERT INTO booking_requests (
+                  user_email, user_name, booking_date, start_time, end_time,
+                  duration_minutes, resource_id, status, trackman_booking_id,
+                  notes, trackman_player_count, created_at, updated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())`,
+                [
+                  matchedEmail,
+                  booking.userName || '',
+                  bookingDate,
+                  startTime,
+                  endTime,
+                  booking.durationMinutes || 60,
+                  bayId,
+                  'approved',
+                  booking.trackmanBookingId,
+                  `[Trackman Import ID:${booking.trackmanBookingId}] ${booking.notes || ''}`.trim(),
+                  booking.playerCount || 1
+                ]
+              );
+              process.stderr.write(`[Trackman Rescan] Created booking for ${matchedEmail} (Trackman ID: ${booking.trackmanBookingId})\n`);
+            }
+          }
+        } catch (bookingError: any) {
+          process.stderr.write(`[Trackman Rescan] Error creating booking: ${bookingError.message}\n`);
+        }
+      }
+    } catch (err: any) {
+      errors.push(`Error processing booking ${booking.trackmanBookingId}: ${err.message}`);
+    }
+  }
+  
+  process.stderr.write(`[Trackman Rescan] Completed: scanned ${unmatchedBookings.length}, matched ${matchedCount}\n`);
+  
+  return {
+    scanned: unmatchedBookings.length,
+    matched: matchedCount,
+    resolved,
+    errors
+  };
+}
