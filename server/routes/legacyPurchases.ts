@@ -26,6 +26,7 @@ router.get("/api/legacy-purchases/member/:email", isStaffOrAdmin, async (req: Re
       discountAmount: ((p.discountAmountCents || 0) / 100).toFixed(2),
       tax: ((p.taxCents || 0) / 100).toFixed(2),
       itemTotal: (p.itemTotalCents / 100).toFixed(2),
+      salePriceCents: p.itemTotalCents,
     }));
     
     res.json(formattedPurchases);
@@ -54,6 +55,7 @@ router.get("/api/legacy-purchases/my-purchases", async (req: Request, res: Respo
       itemName: p.itemName,
       itemCategory: p.itemCategory,
       itemTotal: (p.itemTotalCents / 100).toFixed(2),
+      salePriceCents: p.itemTotalCents,
       saleDate: p.saleDate,
       isComp: p.isComp,
     }));
