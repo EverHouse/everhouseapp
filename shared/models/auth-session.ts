@@ -32,6 +32,7 @@ export const users = pgTable("users", {
   dataSource: varchar("data_source"),
   hubspotId: varchar("hubspot_id"),
   membershipStatus: varchar("membership_status").default("active"),
+  billingProvider: varchar("billing_provider").default("mindbody"), // 'mindbody' | 'hubspot'
   lastSyncedAt: timestamp("last_synced_at"),
   joinDate: date("join_date"),
   welcomeEmailSent: boolean("welcome_email_sent").default(false),

@@ -7,9 +7,10 @@ interface QuickActionsGridProps {
   onTabChange: (tab: TabType) => void;
   isAdmin?: boolean;
   variant: 'desktop' | 'mobile';
+  onNewMember?: () => void;
 }
 
-export const QuickActionsGrid: React.FC<QuickActionsGridProps> = ({ onTabChange, isAdmin, variant }) => {
+export const QuickActionsGrid: React.FC<QuickActionsGridProps> = ({ onTabChange, isAdmin, variant, onNewMember }) => {
   const navigate = useNavigate();
 
   if (variant === 'desktop') {
@@ -19,6 +20,18 @@ export const QuickActionsGrid: React.FC<QuickActionsGridProps> = ({ onTabChange,
         
         <div className="flex-1 flex flex-col justify-between">
           <div>
+            <p className="text-xs text-primary/60 dark:text-white/60 uppercase tracking-wide mb-2">Quick Actions</p>
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {onNewMember && (
+                <button
+                  onClick={onNewMember}
+                  className="flex flex-col items-center p-3 bg-green-100 dark:bg-green-900/30 rounded-xl hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-2xl text-green-700 dark:text-green-400 mb-1">person_add</span>
+                  <span className="text-xs text-green-700 dark:text-green-400 font-medium text-center">New Member</span>
+                </button>
+              )}
+            </div>
             <p className="text-xs text-primary/60 dark:text-white/60 uppercase tracking-wide mb-2">Quick Links</p>
             <div className="grid grid-cols-2 gap-2">
               {EMPLOYEE_RESOURCES_LINKS.map(link => (
@@ -71,6 +84,18 @@ export const QuickActionsGrid: React.FC<QuickActionsGridProps> = ({ onTabChange,
       <h3 className="font-bold text-primary dark:text-white mb-4">Employee Resources</h3>
       
       <div className="mb-4">
+        <p className="text-xs text-primary/60 dark:text-white/60 uppercase tracking-wide mb-2">Quick Actions</p>
+        <div className="grid grid-cols-4 gap-2 mb-4">
+          {onNewMember && (
+            <button
+              onClick={onNewMember}
+              className="flex flex-col items-center p-3 bg-green-100 dark:bg-green-900/30 rounded-xl hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
+            >
+              <span className="material-symbols-outlined text-xl text-green-700 dark:text-green-400 mb-1">person_add</span>
+              <span className="text-[10px] text-green-700 dark:text-green-400 font-medium text-center leading-tight">New Member</span>
+            </button>
+          )}
+        </div>
         <p className="text-xs text-primary/60 dark:text-white/60 uppercase tracking-wide mb-2">Quick Links</p>
         <div className="grid grid-cols-4 gap-2">
           {EMPLOYEE_RESOURCES_LINKS.map(link => (

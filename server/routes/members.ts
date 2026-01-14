@@ -20,6 +20,8 @@ import { isProduction } from '../core/db';
 import { isStaffOrAdmin, isAuthenticated } from '../core/middleware';
 import { getSessionUser } from '../types/session';
 import { updateHubSpotContactPreferences } from '../core/memberSync';
+import { createMemberWithDeal, getAllDiscountRules } from '../core/hubspotDeals';
+import { TIER_NAMES } from '../../shared/constants/tiers';
 
 const router = Router();
 
@@ -855,6 +857,122 @@ router.get('/api/members/me/preferences', isAuthenticated, async (req, res) => {
   } catch (error: any) {
     if (!isProduction) console.error('API error:', error);
     res.status(500).json({ error: 'Failed to fetch preferences' });
+  }
+});
+
+// ============================================================
+// ADD MEMBER - Staff can manually create new members
+// Creates user in DB + HubSpot contact + Deal + Line Item
+// ============================================================
+
+// Get options for Add Member form (tiers and discount reasons)
+router.get('/api/members/add-options', isStaffOrAdmin, async (req, res) => {
+  try {
+    const discountRules = await getAllDiscountRules();
+    
+    res.json({
+      tiers: TIER_NAMES,
+      discountReasons: discountRules
+        .filter(r => r.isActive)
+        .map(r => ({
+          tag: r.discountTag,
+          percent: r.discountPercent,
+          description: r.description
+        }))
+    });
+  } catch (error: any) {
+    if (!isProduction) console.error('Add options error:', error);
+    res.status(500).json({ error: 'Failed to fetch add member options' });
+  }
+});
+
+// Create new member (Staff only)
+router.post('/api/members', isStaffOrAdmin, async (req, res) => {
+  try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    const { firstName, lastName, email, phone, tier, startDate, discountReason } = req.body;
+    
+    // Validation
+    if (!firstName || typeof firstName !== 'string' || firstName.trim().length === 0) {
+      return res.status(400).json({ error: 'First name is required' });
+    }
+    if (!lastName || typeof lastName !== 'string' || lastName.trim().length === 0) {
+      return res.status(400).json({ error: 'Last name is required' });
+    }
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({ error: 'Valid email is required' });
+    }
+    if (!tier || !TIER_NAMES.includes(tier as any)) {
+      return res.status(400).json({ error: `Invalid tier. Must be one of: ${TIER_NAMES.join(', ')}` });
+    }
+    
+    // Validate startDate if provided
+    if (startDate) {
+      if (typeof startDate !== 'string') {
+        return res.status(400).json({ error: 'Start date must be a string in YYYY-MM-DD format' });
+      }
+      
+      // Check YYYY-MM-DD format
+      const dateFormatRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateFormatRegex.test(startDate)) {
+        return res.status(400).json({ error: 'Start date must be in YYYY-MM-DD format' });
+      }
+      
+      // Validate it's a real date
+      const dateObj = new Date(`${startDate}T00:00:00Z`);
+      if (isNaN(dateObj.getTime())) {
+        return res.status(400).json({ error: 'Start date is not a valid date' });
+      }
+      
+      // Check if date is in the future and warn (but still allow)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const providedDate = new Date(`${startDate}T00:00:00Z`);
+      
+      if (providedDate > today) {
+        if (!isProduction) {
+          console.warn(`[Members] Start date is in the future: ${startDate}. Member ${email} will have a future join date.`);
+        }
+      }
+    }
+    
+    // Create member with HubSpot integration
+    const result = await createMemberWithDeal({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: email.trim(),
+      phone: phone?.trim() || undefined,
+      tier,
+      startDate: startDate || undefined,
+      discountReason: discountReason || undefined,
+      createdBy: sessionUser.email,
+      createdByName: sessionUser.name || `${sessionUser.firstName || ''} ${sessionUser.lastName || ''}`.trim()
+    });
+    
+    if (!result.success) {
+      return res.status(400).json({ error: result.error || 'Failed to create member' });
+    }
+    
+    res.status(201).json({
+      success: true,
+      message: `Successfully created member ${firstName} ${lastName}`,
+      member: {
+        id: result.userId,
+        email: email.toLowerCase(),
+        firstName,
+        lastName,
+        tier,
+        hubspotContactId: result.hubspotContactId,
+        hubspotDealId: result.hubspotDealId
+      }
+    });
+  } catch (error: any) {
+    console.error('Create member error:', error);
+    res.status(500).json({ error: 'Failed to create member' });
   }
 });
 

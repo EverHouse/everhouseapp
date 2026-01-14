@@ -15,6 +15,7 @@ import { AlertsCard } from './sections/AlertsCard';
 import { QuickActionsGrid } from './sections/QuickActionsGrid';
 import { OverduePaymentsSection } from './sections/OverduePaymentsSection';
 import { CheckinBillingModal } from './modals/CheckinBillingModal';
+import { AddMemberModal } from './modals/AddMemberModal';
 import type { StaffCommandCenterProps, BookingRequest, RecentActivity } from './types';
 
 interface OptimisticUpdateRef {
@@ -35,6 +36,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
   const [trackmanModal, setTrackmanModal] = useState<BookingRequest | null>(null);
   const [trackmanBookingIdInput, setTrackmanBookingIdInput] = useState('');
   const [billingModal, setBillingModal] = useState<{ isOpen: boolean; bookingId: number | null }>({ isOpen: false, bookingId: null });
+  const [addMemberModalOpen, setAddMemberModalOpen] = useState(false);
   
   const optimisticUpdateRef = useRef<OptimisticUpdateRef | null>(null);
   
@@ -435,7 +437,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
             onTabChange={onTabChange}
             variant="mobile-cards"
           />
-          <QuickActionsGrid onTabChange={onTabChange} isAdmin={isAdmin} variant="mobile" />
+          <QuickActionsGrid onTabChange={onTabChange} isAdmin={isAdmin} variant="mobile" onNewMember={() => setAddMemberModalOpen(true)} />
         </div>
       </div>
 
@@ -519,6 +521,12 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
         onClose={() => setBillingModal({ isOpen: false, bookingId: null })}
         bookingId={billingModal.bookingId || 0}
         onCheckinComplete={handleBillingModalComplete}
+      />
+      
+      <AddMemberModal
+        isOpen={addMemberModalOpen}
+        onClose={() => setAddMemberModalOpen(false)}
+        onSuccess={() => refresh()}
       />
       
       {trackmanModal && createPortal(

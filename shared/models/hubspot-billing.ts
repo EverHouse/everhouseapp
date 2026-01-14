@@ -32,8 +32,11 @@ export const hubspotDeals = pgTable("hubspot_deals", {
   hubspotDealId: varchar("hubspot_deal_id").notNull().unique(),
   dealName: varchar("deal_name"),
   pipelineId: varchar("pipeline_id"),
-  pipelineStage: varchar("pipeline_stage"), // 'active_member', 'payment_declined', 'churned'
+  pipelineStage: varchar("pipeline_stage"), // HubSpot stage IDs: 'closedwon', '2825519820', 'closedlost'
+  isPrimary: boolean("is_primary").default(true), // for members with multiple deals
   lastKnownMindbodyStatus: varchar("last_known_mindbody_status"),
+  lastPaymentStatus: varchar("last_payment_status"), // 'current', 'overdue', 'failed', 'unknown'
+  lastPaymentCheck: timestamp("last_payment_check"),
   lastStageSyncAt: timestamp("last_stage_sync_at"),
   lastSyncError: text("last_sync_error"),
   createdAt: timestamp("created_at").defaultNow(),

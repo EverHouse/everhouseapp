@@ -13,17 +13,34 @@ import pRetry, { AbortError } from 'p-retry';
 
 const MEMBERSHIP_PIPELINE_ID = process.env.HUBSPOT_MEMBERSHIP_PIPELINE_ID || 'default';
 
-const MINDBODY_TO_STAGE_MAP: Record<string, string> = {
-  'active': 'active_member',
-  'pending': 'pending',
-  'declined': 'payment_declined',
-  'suspended': 'payment_declined',
-  'expired': 'churned',
-  'terminated': 'churned',
-  'cancelled': 'churned',
-  'froze': 'payment_declined',
-  'non-member': 'churned',
+// HubSpot Stage IDs from the Membership Sales pipeline
+export const HUBSPOT_STAGE_IDS = {
+  DAY_PASS_TOUR_REQUEST: '2414796536',
+  TOUR_BOOKED: '2413968103',
+  VISITED_DAY_PASS: '2414796537',
+  APPLICATION_SUBMITTED: '2414797498',
+  BILLING_SETUP: '2825519819',
+  CLOSED_WON_ACTIVE: 'closedwon',
+  PAYMENT_DECLINED: '2825519820',
+  CLOSED_LOST: 'closedlost',
 };
+
+// Map Mindbody statuses to HubSpot stage IDs
+const MINDBODY_TO_STAGE_MAP: Record<string, string> = {
+  'active': HUBSPOT_STAGE_IDS.CLOSED_WON_ACTIVE,
+  'pending': HUBSPOT_STAGE_IDS.BILLING_SETUP,
+  'declined': HUBSPOT_STAGE_IDS.PAYMENT_DECLINED,
+  'suspended': HUBSPOT_STAGE_IDS.PAYMENT_DECLINED,
+  'expired': HUBSPOT_STAGE_IDS.CLOSED_LOST,
+  'terminated': HUBSPOT_STAGE_IDS.CLOSED_LOST,
+  'cancelled': HUBSPOT_STAGE_IDS.CLOSED_LOST,
+  'froze': HUBSPOT_STAGE_IDS.PAYMENT_DECLINED,
+  'non-member': HUBSPOT_STAGE_IDS.CLOSED_LOST,
+};
+
+// Statuses that should mark contact as inactive (kill switch for app features)
+const INACTIVE_STATUSES = ['declined', 'suspended', 'expired', 'terminated', 'cancelled', 'froze', 'non-member'];
+const ACTIVE_STATUSES = ['active'];
 
 function isRateLimitError(error: any): boolean {
   const errorMsg = error instanceof Error ? error.message : String(error);
@@ -153,12 +170,37 @@ export async function updateDealStage(
   }
 }
 
+// Update HubSpot contact's membership_status property (the app kill switch)
+async function updateContactMembershipStatus(
+  hubspotContactId: string,
+  newStatus: 'active' | 'inactive',
+  performedBy: string
+): Promise<boolean> {
+  try {
+    const hubspot = await getHubSpotClient();
+    
+    await retryableHubSpotRequest(() =>
+      hubspot.crm.contacts.basicApi.update(hubspotContactId, {
+        properties: {
+          membership_status: newStatus
+        }
+      })
+    );
+    
+    if (!isProduction) console.log(`[HubSpotDeals] Updated contact ${hubspotContactId} membership_status to ${newStatus}`);
+    return true;
+  } catch (error) {
+    console.error('[HubSpotDeals] Error updating contact membership_status:', error);
+    return false;
+  }
+}
+
 export async function syncDealStageFromMindbodyStatus(
   memberEmail: string,
   mindbodyStatus: string,
   performedBy: string = 'system',
   performedByName?: string
-): Promise<{ success: boolean; dealId?: string; newStage?: string }> {
+): Promise<{ success: boolean; dealId?: string; newStage?: string; contactUpdated?: boolean }> {
   try {
     const normalizedStatus = mindbodyStatus.toLowerCase().replace(/[^a-z-]/g, '');
     const targetStage = MINDBODY_TO_STAGE_MAP[normalizedStatus];
@@ -168,22 +210,40 @@ export async function syncDealStageFromMindbodyStatus(
       return { success: false };
     }
     
+    // Find primary deal for this member
     const existingDeal = await db.select()
       .from(hubspotDeals)
-      .where(eq(hubspotDeals.memberEmail, memberEmail.toLowerCase()))
+      .where(and(
+        eq(hubspotDeals.memberEmail, memberEmail.toLowerCase()),
+        eq(hubspotDeals.isPrimary, true)
+      ))
       .limit(1);
     
-    if (existingDeal.length === 0) {
+    // Fallback to any deal if no primary found
+    const fallbackDeal = existingDeal.length === 0 
+      ? await db.select()
+          .from(hubspotDeals)
+          .where(eq(hubspotDeals.memberEmail, memberEmail.toLowerCase()))
+          .limit(1)
+      : existingDeal;
+    
+    if (fallbackDeal.length === 0) {
       if (!isProduction) console.log(`[HubSpotDeals] No deal found for member: ${memberEmail}`);
       return { success: false };
     }
     
-    const deal = existingDeal[0];
+    const deal = fallbackDeal[0];
     
+    // Check if already in the correct state
     if (deal.pipelineStage === targetStage && deal.lastKnownMindbodyStatus === normalizedStatus) {
       return { success: true, dealId: deal.hubspotDealId, newStage: targetStage };
     }
     
+    // Determine contact status based on Mindbody status
+    const isRecovery = ACTIVE_STATUSES.includes(normalizedStatus);
+    const targetContactStatus: 'active' | 'inactive' = isRecovery ? 'active' : 'inactive';
+    
+    // Update local deal record
     await db.update(hubspotDeals)
       .set({
         lastKnownMindbodyStatus: normalizedStatus,
@@ -191,9 +251,32 @@ export async function syncDealStageFromMindbodyStatus(
       })
       .where(eq(hubspotDeals.id, deal.id));
     
-    const updated = await updateDealStage(deal.hubspotDealId, targetStage, performedBy, performedByName);
+    // Update deal stage in HubSpot
+    const dealUpdated = await updateDealStage(deal.hubspotDealId, targetStage, performedBy, performedByName);
     
-    return { success: updated, dealId: deal.hubspotDealId, newStage: targetStage };
+    // Update contact membership_status in HubSpot (the kill switch)
+    let contactUpdated = false;
+    if (deal.hubspotContactId) {
+      contactUpdated = await updateContactMembershipStatus(deal.hubspotContactId, targetContactStatus, performedBy);
+      
+      // Log the contact status change
+      await db.insert(billingAuditLog).values({
+        memberEmail: deal.memberEmail,
+        hubspotDealId: deal.hubspotDealId,
+        actionType: 'contact_status_changed',
+        previousValue: isRecovery ? 'inactive' : 'active',
+        newValue: targetContactStatus,
+        actionDetails: { trigger: 'mindbody_status_sync', mindbodyStatus: normalizedStatus },
+        performedBy,
+        performedByName
+      });
+    }
+    
+    if (isRecovery) {
+      if (!isProduction) console.log(`[HubSpotDeals] Recovery: Member ${memberEmail} status changed to Active, deal moved to ${targetStage}`);
+    }
+    
+    return { success: dealUpdated, dealId: deal.hubspotDealId, newStage: targetStage, contactUpdated };
   } catch (error) {
     console.error('[HubSpotDeals] Error syncing deal stage from Mindbody:', error);
     return { success: false };
@@ -493,5 +576,374 @@ export async function getBillingAuditLog(memberEmail: string, limit: number = 50
   } catch (error) {
     console.error('[HubSpotDeals] Error fetching billing audit log:', error);
     return [];
+  }
+}
+
+// ============================================================
+// ADD MEMBER FEATURE - Silent Mode (Deal + Line Item, no invoice)
+// ============================================================
+
+export interface AddMemberInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  tier: string;
+  startDate?: string;
+  discountReason?: string;
+  createdBy: string;
+  createdByName?: string;
+}
+
+export interface AddMemberResult {
+  success: boolean;
+  userId?: string;
+  hubspotContactId?: string;
+  hubspotDealId?: string;
+  lineItemId?: string;
+  error?: string;
+}
+
+// Find or create HubSpot contact
+async function findOrCreateHubSpotContact(
+  email: string,
+  firstName: string,
+  lastName: string,
+  phone?: string,
+  tier?: string
+): Promise<{ contactId: string; isNew: boolean }> {
+  const hubspot = await getHubSpotClient();
+  
+  // Try to find existing contact by email
+  try {
+    const searchResponse = await retryableHubSpotRequest(() =>
+      hubspot.crm.contacts.searchApi.doSearch({
+        filterGroups: [{
+          filters: [{
+            propertyName: 'email',
+            operator: 'EQ',
+            value: email.toLowerCase()
+          }]
+        }],
+        properties: ['email', 'firstname', 'lastname'],
+        limit: 1
+      })
+    );
+    
+    if (searchResponse.results && searchResponse.results.length > 0) {
+      return { contactId: searchResponse.results[0].id, isNew: false };
+    }
+  } catch (error: any) {
+    // Only proceed to create new contact if it's a "not found" type error
+    // Re-throw network/auth errors so they bubble up
+    const statusCode = error?.response?.statusCode || error?.status || error?.statusCode;
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    
+    // Check if this is a 404 Not Found error (contact doesn't exist)
+    const isNotFoundError = statusCode === 404 || errorMsg.includes('not found');
+    
+    // Re-throw network/auth errors (5xx, 401, 403, connection errors, etc.)
+    const isNetworkOrAuthError = 
+      !isNotFoundError && (
+        statusCode === 401 || 
+        statusCode === 403 || 
+        (statusCode && statusCode >= 500) ||
+        errorMsg.includes('ECONNREFUSED') ||
+        errorMsg.includes('ETIMEDOUT') ||
+        errorMsg.includes('unauthorized') ||
+        errorMsg.includes('forbidden')
+      );
+    
+    if (isNetworkOrAuthError) {
+      console.error('[HubSpotDeals] Network/Auth error during contact search:', error);
+      throw error;
+    }
+    
+    // For any other error, log it but proceed to create new contact
+    if (!isProduction) console.warn('[HubSpotDeals] Error searching for contact, will create new one:', error);
+  }
+  
+  // Create new contact
+  const createResponse = await retryableHubSpotRequest(() =>
+    hubspot.crm.contacts.basicApi.create({
+      properties: {
+        email: email.toLowerCase(),
+        firstname: firstName,
+        lastname: lastName,
+        phone: phone || '',
+        membership_tier: tier || '',
+        membership_status: 'active',
+        lifecyclestage: 'customer'
+      }
+    })
+  );
+  
+  return { contactId: createResponse.id, isNew: true };
+}
+
+// Create a deal in the Membership Sales pipeline
+async function createMembershipDeal(
+  contactId: string,
+  memberEmail: string,
+  dealName: string,
+  tier: string,
+  startDate?: string
+): Promise<string> {
+  const hubspot = await getHubSpotClient();
+  
+  const dealResponse = await retryableHubSpotRequest(() =>
+    hubspot.crm.deals.basicApi.create({
+      properties: {
+        dealname: dealName,
+        pipeline: MEMBERSHIP_PIPELINE_ID,
+        dealstage: HUBSPOT_STAGE_IDS.CLOSED_WON_ACTIVE,
+        closedate: startDate || new Date().toISOString().split('T')[0],
+        membership_tier: tier
+      }
+    })
+  );
+  
+  const dealId = dealResponse.id;
+  
+  // Associate deal with contact
+  await retryableHubSpotRequest(() =>
+    hubspot.crm.deals.associationsApi.create(
+      dealId,
+      'contacts',
+      contactId,
+      [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 3 }]
+    )
+  );
+  
+  return dealId;
+}
+
+// Main Add Member function - Silent Mode
+export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMemberResult> {
+  const {
+    firstName,
+    lastName,
+    email,
+    phone,
+    tier,
+    startDate,
+    discountReason,
+    createdBy,
+    createdByName
+  } = input;
+  
+  const normalizedEmail = email.toLowerCase().trim();
+  
+  try {
+    // Step 1: Check if user already exists in our database
+    const existingUser = await pool.query(
+      'SELECT id, email FROM users WHERE LOWER(email) = $1',
+      [normalizedEmail]
+    );
+    
+    if (existingUser.rows.length > 0) {
+      return { success: false, error: 'A member with this email already exists' };
+    }
+    
+    // Step 2: Get product mapping for the selected tier
+    const product = await getProductMapping(tier);
+    if (!product) {
+      return { success: false, error: `No HubSpot product found for tier: ${tier}` };
+    }
+    
+    // Step 3: Calculate discount if discount reason provided
+    let discountPercent = 0;
+    if (discountReason) {
+      const discountResult = await pool.query(
+        'SELECT discount_percent FROM discount_rules WHERE discount_tag = $1 AND is_active = true',
+        [discountReason]
+      );
+      if (discountResult.rows.length > 0) {
+        discountPercent = discountResult.rows[0].discount_percent;
+      }
+    }
+    
+    // Step 4: Find or create HubSpot contact
+    const { contactId, isNew: isNewContact } = await findOrCreateHubSpotContact(
+      normalizedEmail,
+      firstName,
+      lastName,
+      phone,
+      tier
+    );
+    
+    // Step 5: Create deal in HubSpot
+    const dealName = `${firstName} ${lastName} - ${tier} Membership`;
+    const dealId = await createMembershipDeal(
+      contactId,
+      normalizedEmail,
+      dealName,
+      tier,
+      startDate
+    );
+    
+    // Step 6: Add line item to deal
+    const lineItemResult = await addLineItemToDeal(
+      dealId,
+      product.hubspotProductId,
+      1,
+      discountPercent,
+      discountReason,
+      createdBy,
+      createdByName
+    );
+    
+    if (!lineItemResult.success) {
+      // Rollback: delete the deal we just created
+      try {
+        const hubspot = await getHubSpotClient();
+        await hubspot.crm.deals.basicApi.archive(dealId);
+      } catch (rollbackError) {
+        console.error('[AddMember] Failed to rollback deal creation:', rollbackError);
+      }
+      return { success: false, error: 'Failed to add line item to deal' };
+    }
+    
+    // Step 7 & 8: Create user and deal record in database
+    // Wrapped in try/catch to handle partial failures gracefully
+    let userId: any;
+    
+    try {
+      const tags = discountReason ? [discountReason] : [];
+      userId = await pool.query(
+        `INSERT INTO users (
+          email, first_name, last_name, phone, role, tier, 
+          membership_status, billing_provider, hubspot_id, 
+          tags, data_source, join_date, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, 'member', $5, 'active', 'hubspot', $6, $7, 'staff_manual', $8, NOW(), NOW())
+        RETURNING id`,
+        [
+          normalizedEmail,
+          firstName,
+          lastName,
+          phone || null,
+          tier,
+          contactId,
+          JSON.stringify(tags),
+          startDate || new Date().toISOString().split('T')[0]
+        ]
+      );
+    } catch (userError: any) {
+      console.error('[AddMember] Failed to create user in database:', userError);
+      return { success: false, error: 'Failed to create user record in database' };
+    }
+    
+    // Step 8: Store deal record locally (non-critical - HubSpot already has the deal)
+    try {
+      await db.insert(hubspotDeals).values({
+        memberEmail: normalizedEmail,
+        hubspotContactId: contactId,
+        hubspotDealId: dealId,
+        dealName,
+        pipelineId: MEMBERSHIP_PIPELINE_ID,
+        pipelineStage: HUBSPOT_STAGE_IDS.CLOSED_WON_ACTIVE,
+        isPrimary: true,
+        lastKnownMindbodyStatus: 'active'
+      });
+    } catch (dealError: any) {
+      console.warn('[AddMember] Failed to store deal record locally (HubSpot has the deal though):', dealError);
+      // Don't return error - the deal exists in HubSpot, just missing from local cache
+      // This is non-critical since HubSpot is the source of truth
+    }
+    
+    // Step 9: Log the action
+    await db.insert(billingAuditLog).values({
+      memberEmail: normalizedEmail,
+      hubspotDealId: dealId,
+      actionType: 'member_created',
+      actionDetails: {
+        firstName,
+        lastName,
+        tier,
+        discountReason,
+        discountPercent,
+        isNewContact,
+        billingProvider: 'hubspot'
+      },
+      newValue: `Created member with ${tier} membership`,
+      performedBy: createdBy,
+      performedByName
+    });
+    
+    if (!isProduction) {
+      console.log(`[AddMember] Successfully created member ${normalizedEmail} with deal ${dealId}`);
+    }
+    
+    return {
+      success: true,
+      userId: userId.rows[0].id,
+      hubspotContactId: contactId,
+      hubspotDealId: dealId,
+      lineItemId: lineItemResult.lineItemId
+    };
+    
+  } catch (error: any) {
+    console.error('[AddMember] Error creating member:', error);
+    return { success: false, error: error.message || 'Failed to create member' };
+  }
+}
+
+// Get member payment status from HubSpot Commerce API (read-only)
+export async function getMemberPaymentStatus(email: string): Promise<{
+  status: 'current' | 'overdue' | 'failed' | 'unknown';
+  lastPaymentDate?: string;
+  overdueAmount?: number;
+  invoiceCount?: number;
+}> {
+  try {
+    const deal = await db.select()
+      .from(hubspotDeals)
+      .where(and(
+        eq(hubspotDeals.memberEmail, email.toLowerCase()),
+        eq(hubspotDeals.isPrimary, true)
+      ))
+      .limit(1);
+    
+    // If no deal found, member is likely legacy Mindbody - return unknown
+    if (deal.length === 0) {
+      return { status: 'unknown' };
+    }
+    
+    // Check if we have a cached status that's recent (within 1 hour)
+    const cachedDeal = deal[0];
+    if (cachedDeal.lastPaymentCheck) {
+      const lastCheck = new Date(cachedDeal.lastPaymentCheck);
+      const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      if (lastCheck > hourAgo && cachedDeal.lastPaymentStatus) {
+        return { status: cachedDeal.lastPaymentStatus as any };
+      }
+    }
+    
+    // For now, infer status from deal stage
+    // In the future, this can query the Commerce API for invoice/payment data
+    const stage = cachedDeal.pipelineStage;
+    let status: 'current' | 'overdue' | 'failed' | 'unknown' = 'unknown';
+    
+    if (stage === HUBSPOT_STAGE_IDS.CLOSED_WON_ACTIVE) {
+      status = 'current';
+    } else if (stage === HUBSPOT_STAGE_IDS.PAYMENT_DECLINED) {
+      status = 'failed';
+    } else if (stage === HUBSPOT_STAGE_IDS.CLOSED_LOST) {
+      status = 'failed';
+    }
+    
+    // Update cache
+    await db.update(hubspotDeals)
+      .set({
+        lastPaymentStatus: status,
+        lastPaymentCheck: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(hubspotDeals.id, cachedDeal.id));
+    
+    return { status };
+  } catch (error) {
+    console.error('[HubSpotDeals] Error getting payment status:', error);
+    return { status: 'unknown' };
   }
 }
