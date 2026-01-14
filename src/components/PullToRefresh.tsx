@@ -35,6 +35,11 @@ const MAX_PULL = 160;
 const HEADER_HEIGHT = 72;
 const DESKTOP_SETTLE_DELAY = 300;
 
+const isTouchDevice = () => {
+  if (typeof window === 'undefined') return false;
+  return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+};
+
 const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disabled = false, className = '' }) => {
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -43,6 +48,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
   const [isSpringBack, setIsSpringBack] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [tagline] = useState(() => taglines[Math.floor(Math.random() * taglines.length)]);
+  const [isTouchCapable] = useState(() => isTouchDevice());
   const containerRef = useRef<HTMLDivElement>(null);
   const startYRef = useRef<number | null>(null);
   const isPullingRef = useRef(false);
@@ -347,7 +353,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       className={`min-h-full ${className}`}
-      style={{ touchAction: pullDistance > 0 ? 'none' : 'pan-y' }}
+      style={isTouchCapable ? { touchAction: pullDistance > 0 ? 'none' : 'pan-y' } : undefined}
     >
       {showPullBar && createPortal(
         <div 
