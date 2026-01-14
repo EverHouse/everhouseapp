@@ -302,18 +302,10 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
     } else {
       document.body.style.overflow = '';
     }
-  }, [isRefreshing, isFillingScreen]);
-
-  // Clear any stuck overflow on mount and unmount
-  useEffect(() => {
-    // Clear any stuck overflow from previous navigation
-    if (!isRefreshing && !isFillingScreen) {
-      document.body.style.overflow = '';
-    }
     return () => {
       document.body.style.overflow = '';
     };
-  }, []);
+  }, [isRefreshing, isFillingScreen]);
 
   // Set body attribute for header fade effect
   useEffect(() => {
