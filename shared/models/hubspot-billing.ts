@@ -109,3 +109,80 @@ export type BillingAuditLog = typeof billingAuditLog.$inferSelect;
 export type InsertBillingAuditLog = typeof billingAuditLog.$inferInsert;
 export type HubspotFormConfig = typeof hubspotFormConfigs.$inferSelect;
 export type InsertHubspotFormConfig = typeof hubspotFormConfigs.$inferInsert;
+
+// Legacy purchases table - historical transactions from Mindbody import
+export const legacyPurchases = pgTable("legacy_purchases", {
+  id: serial("id").primaryKey(),
+  
+  // Member linkage
+  userId: varchar("user_id"), // Links to users.id
+  mindbodyClientId: varchar("mindbody_client_id").notNull(),
+  memberEmail: varchar("member_email"),
+  
+  // Sale identification (unique constraint on sale_id + line_number for deduplication)
+  mindbodySaleId: varchar("mindbody_sale_id").notNull(),
+  lineNumber: integer("line_number").notNull().default(1),
+  
+  // Item details
+  itemName: varchar("item_name").notNull(),
+  itemCategory: varchar("item_category"), // 'membership', 'guest_pass', 'sim_walk_in', 'sim_add_on', 'guest_sim_fee', 'day_pass', 'lesson', 'merch', 'other'
+  
+  // Pricing (stored in cents for accuracy)
+  itemPriceCents: integer("item_price_cents").notNull().default(0),
+  quantity: integer("quantity").notNull().default(1),
+  subtotalCents: integer("subtotal_cents").notNull().default(0),
+  discountPercent: numeric("discount_percent", { precision: 5, scale: 2 }).default("0"),
+  discountAmountCents: integer("discount_amount_cents").default(0),
+  taxCents: integer("tax_cents").default(0),
+  itemTotalCents: integer("item_total_cents").notNull().default(0),
+  
+  // Payment info
+  paymentMethod: varchar("payment_method"), // 'credit_card', 'amex', 'cash', 'comp', 'misc'
+  
+  // Timestamps
+  saleDate: timestamp("sale_date").notNull(),
+  
+  // Trackman session linkage (for guest fee reconciliation)
+  linkedBookingSessionId: integer("linked_booking_session_id"),
+  linkedAt: timestamp("linked_at"),
+  
+  // Flags
+  isComp: boolean("is_comp").default(false), // $0 comped items
+  isSynced: boolean("is_synced").default(false), // Has been synced to HubSpot
+  hubspotDealId: varchar("hubspot_deal_id"),
+  
+  // Audit
+  importedAt: timestamp("imported_at").defaultNow(),
+  importBatchId: varchar("import_batch_id"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("legacy_purchases_mindbody_client_id_idx").on(table.mindbodyClientId),
+  index("legacy_purchases_sale_date_idx").on(table.saleDate),
+  index("legacy_purchases_item_category_idx").on(table.itemCategory),
+  index("legacy_purchases_member_email_idx").on(table.memberEmail),
+]);
+
+// Import jobs tracking table - audit trail for imports
+export const legacyImportJobs = pgTable("legacy_import_jobs", {
+  id: serial("id").primaryKey(),
+  jobType: varchar("job_type").notNull(), // 'members', 'sales', 'attendance'
+  fileName: varchar("file_name"),
+  status: varchar("status").notNull().default("pending"), // 'pending', 'running', 'completed', 'failed'
+  totalRows: integer("total_rows").default(0),
+  processedRows: integer("processed_rows").default(0),
+  matchedRows: integer("matched_rows").default(0),
+  skippedRows: integer("skipped_rows").default(0),
+  errorRows: integer("error_rows").default(0),
+  errorDetails: jsonb("error_details").default(sql`'[]'::jsonb`),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type LegacyPurchase = typeof legacyPurchases.$inferSelect;
+export type InsertLegacyPurchase = typeof legacyPurchases.$inferInsert;
+export type LegacyImportJob = typeof legacyImportJobs.$inferSelect;
+export type InsertLegacyImportJob = typeof legacyImportJobs.$inferInsert;

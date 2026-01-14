@@ -35,6 +35,8 @@ export const users = pgTable("users", {
   billingProvider: varchar("billing_provider").default("mindbody"), // 'mindbody' | 'hubspot'
   lastSyncedAt: timestamp("last_synced_at"),
   joinDate: date("join_date"),
+  memberSince: timestamp("member_since"), // Original Mindbody "Joined On" date
+  legacySource: varchar("legacy_source"), // 'mindbody_import' if migrated from Mindbody
   welcomeEmailSent: boolean("welcome_email_sent").default(false),
   welcomeEmailSentAt: timestamp("welcome_email_sent_at"),
   trackmanEmail: varchar("trackman_email"),
