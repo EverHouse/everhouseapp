@@ -29,6 +29,7 @@ const severityMap: Record<string, 'critical' | 'high' | 'medium' | 'low'> = {
   'Booking Resource Relationships': 'high',
   'Booking Time Validity': 'high',
   'Members Without Email': 'high',
+  'Deals Without Line Items': 'high',
   'Orphan Booking Participants': 'medium',
   'Orphan Wellness Enrollments': 'medium',
   'Orphan Event RSVPs': 'medium',
@@ -674,6 +675,39 @@ async function checkMembersWithoutEmail(): Promise<IntegrityCheckResult> {
   };
 }
 
+async function checkDealsWithoutLineItems(): Promise<IntegrityCheckResult> {
+  const issues: IntegrityIssue[] = [];
+  
+  const dealsWithoutLineItems = await db.execute(sql`
+    SELECT hd.id, hd.member_email, hd.hubspot_deal_id, hd.deal_name, hd.pipeline_stage
+    FROM hubspot_deals hd
+    LEFT JOIN hubspot_line_items hli ON hd.hubspot_deal_id = hli.hubspot_deal_id
+    WHERE hli.id IS NULL
+  `);
+  
+  for (const row of dealsWithoutLineItems.rows as any[]) {
+    issues.push({
+      category: 'data_quality',
+      severity: 'error',
+      table: 'hubspot_deals',
+      recordId: row.id,
+      description: `Deal "${row.deal_name || 'Unnamed'}" for ${row.member_email} has no product line items`,
+      suggestion: 'Add product line items to this deal in the billing section or HubSpot',
+      context: {
+        memberEmail: row.member_email || undefined
+      }
+    });
+  }
+  
+  return {
+    checkName: 'Deals Without Line Items',
+    status: issues.length === 0 ? 'pass' : 'fail',
+    issueCount: issues.length,
+    issues,
+    lastRun: new Date()
+  };
+}
+
 async function storeCheckHistory(results: IntegrityCheckResult[], triggeredBy: 'manual' | 'scheduled' = 'manual'): Promise<void> {
   const totalIssues = results.reduce((sum, r) => sum + r.issueCount, 0);
   
@@ -765,7 +799,8 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
     checkNeedsReviewItems(),
     checkBookingTimeValidity(),
     checkStalePastTours(),
-    checkMembersWithoutEmail()
+    checkMembersWithoutEmail(),
+    checkDealsWithoutLineItems()
   ]);
   
   const now = new Date();

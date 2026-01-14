@@ -20,7 +20,7 @@ import { isProduction } from '../core/db';
 import { isStaffOrAdmin, isAuthenticated } from '../core/middleware';
 import { getSessionUser } from '../types/session';
 import { updateHubSpotContactPreferences } from '../core/memberSync';
-import { createMemberWithDeal, getAllDiscountRules } from '../core/hubspotDeals';
+import { createMemberWithDeal, getAllDiscountRules, handleTierChange } from '../core/hubspotDeals';
 import { TIER_NAMES } from '../../shared/constants/tiers';
 
 const router = Router();
@@ -675,6 +675,89 @@ router.put('/api/members/:id/role', async (req, res) => {
   } catch (error: any) {
     if (!isProduction) console.error('API error:', error);
     res.status(500).json({ error: 'Failed to update member' });
+  }
+});
+
+router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { email } = req.params;
+    const { tier } = req.body;
+    const sessionUser = getSessionUser(req);
+    
+    if (!tier || typeof tier !== 'string') {
+      return res.status(400).json({ error: 'Tier is required' });
+    }
+    
+    if (!TIER_NAMES.includes(tier as any)) {
+      return res.status(400).json({ error: `Invalid tier. Must be one of: ${TIER_NAMES.join(', ')}` });
+    }
+    
+    const normalizedEmail = decodeURIComponent(email).toLowerCase();
+    
+    const userResult = await db.select({
+      id: users.id,
+      email: users.email,
+      tier: users.tier,
+      firstName: users.firstName,
+      lastName: users.lastName
+    })
+      .from(users)
+      .where(sql`LOWER(${users.email}) = ${normalizedEmail}`);
+    
+    if (userResult.length === 0) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    const member = userResult[0];
+    const oldTier = member.tier || 'Social';
+    
+    if (oldTier === tier) {
+      return res.json({ 
+        success: true, 
+        message: 'Member is already on this tier',
+        member: { id: member.id, email: member.email, tier }
+      });
+    }
+    
+    await db.update(users)
+      .set({ tier, updatedAt: new Date() })
+      .where(sql`LOWER(${users.email}) = ${normalizedEmail}`);
+    
+    const performedBy = sessionUser?.email || 'unknown';
+    const performedByName = sessionUser?.firstName 
+      ? `${sessionUser.firstName} ${sessionUser.lastName || ''}`.trim() 
+      : sessionUser?.email?.split('@')[0] || 'Staff';
+    
+    const hubspotResult = await handleTierChange(
+      normalizedEmail,
+      oldTier,
+      tier,
+      performedBy,
+      performedByName
+    );
+    
+    if (!hubspotResult.success && hubspotResult.error) {
+      console.warn(`[Members] HubSpot tier change failed for ${normalizedEmail}: ${hubspotResult.error}`);
+    }
+    
+    res.json({
+      success: true,
+      message: `Member tier updated from ${oldTier} to ${tier}`,
+      member: {
+        id: member.id,
+        email: member.email,
+        tier,
+        previousTier: oldTier
+      },
+      hubspotSync: {
+        success: hubspotResult.success,
+        oldLineItemRemoved: hubspotResult.oldLineItemRemoved,
+        newLineItemAdded: hubspotResult.newLineItemAdded
+      }
+    });
+  } catch (error: any) {
+    if (!isProduction) console.error('Member tier update error:', error);
+    res.status(500).json({ error: 'Failed to update member tier' });
   }
 });
 

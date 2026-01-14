@@ -57,6 +57,13 @@ export const integrityCheckMetadata: IntegrityCheckMetadata[] = [
     description: 'Locates booking sessions that have no participants assigned.',
     impact: 'These empty records clutter the system but have minimal operational impact.',
     severity: 'low'
+  },
+  {
+    checkName: 'Deals Without Line Items',
+    title: 'Member Deals Missing Products',
+    description: 'Identifies HubSpot deals that don\'t have proper product line items attached.',
+    impact: 'Billing won\'t work correctly for these members as they have no products on their membership deal.',
+    severity: 'high'
   }
 ];
 

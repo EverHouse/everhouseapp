@@ -228,8 +228,27 @@ export async function syncDealStageFromMindbodyStatus(
       : existingDeal;
     
     if (fallbackDeal.length === 0) {
-      if (!isProduction) console.log(`[HubSpotDeals] No deal found for member: ${memberEmail}`);
-      return { success: false };
+      if (!isProduction) console.log(`[HubSpotDeals] No deal found for member: ${memberEmail}, creating deal for legacy member`);
+      
+      // Create deal for legacy Mindbody member
+      const legacyDealResult = await createDealForLegacyMember(
+        memberEmail,
+        mindbodyStatus,
+        performedBy,
+        performedByName
+      );
+      
+      if (!legacyDealResult.success) {
+        console.error(`[HubSpotDeals] Failed to create deal for legacy member ${memberEmail}: ${legacyDealResult.error}`);
+        return { success: false };
+      }
+      
+      return {
+        success: true,
+        dealId: legacyDealResult.dealId,
+        newStage: targetStage,
+        contactUpdated: true
+      };
     }
     
     const deal = fallbackDeal[0];
@@ -687,7 +706,8 @@ async function createMembershipDeal(
   memberEmail: string,
   dealName: string,
   tier: string,
-  startDate?: string
+  startDate?: string,
+  stage?: string
 ): Promise<string> {
   const hubspot = await getHubSpotClient();
   
@@ -696,7 +716,7 @@ async function createMembershipDeal(
       properties: {
         dealname: dealName,
         pipeline: MEMBERSHIP_PIPELINE_ID,
-        dealstage: HUBSPOT_STAGE_IDS.CLOSED_WON_ACTIVE,
+        dealstage: stage || HUBSPOT_STAGE_IDS.CLOSED_WON_ACTIVE,
         closedate: startDate || new Date().toISOString().split('T')[0],
         membership_tier: tier
       }
@@ -716,6 +736,134 @@ async function createMembershipDeal(
   );
   
   return dealId;
+}
+
+// Create deal for legacy Mindbody members during sync
+async function createDealForLegacyMember(
+  memberEmail: string,
+  mindbodyStatus: string,
+  performedBy: string,
+  performedByName?: string
+): Promise<{ success: boolean; dealId?: string; contactId?: string; lineItemId?: string; error?: string }> {
+  const normalizedEmail = memberEmail.toLowerCase().trim();
+  
+  try {
+    // Step 1: Fetch the member from users table to get their tier and name
+    const memberResult = await pool.query(
+      'SELECT id, first_name, last_name, email, phone, tier, tags FROM users WHERE LOWER(email) = $1',
+      [normalizedEmail]
+    );
+    
+    if (memberResult.rows.length === 0) {
+      if (!isProduction) console.log(`[HubSpotDeals] Member not found in users table: ${memberEmail}`);
+      return { success: false, error: 'Member not found in users table' };
+    }
+    
+    const member = memberResult.rows[0];
+    const tier = member.tier || 'Resident';
+    const firstName = member.first_name || '';
+    const lastName = member.last_name || '';
+    const phone = member.phone || '';
+    
+    // Step 2: Get product mapping for the member's tier
+    const product = await getProductMapping(tier);
+    if (!product) {
+      if (!isProduction) console.log(`[HubSpotDeals] No product mapping for tier: ${tier}`);
+      return { success: false, error: `No HubSpot product found for tier: ${tier}` };
+    }
+    
+    // Step 3: Determine the appropriate stage based on Mindbody status
+    const normalizedStatus = mindbodyStatus.toLowerCase().replace(/[^a-z-]/g, '');
+    const targetStage = MINDBODY_TO_STAGE_MAP[normalizedStatus] || HUBSPOT_STAGE_IDS.CLOSED_WON_ACTIVE;
+    
+    // Step 4: Find or create HubSpot contact
+    const { contactId, isNew: isNewContact } = await findOrCreateHubSpotContact(
+      normalizedEmail,
+      firstName,
+      lastName,
+      phone,
+      tier
+    );
+    
+    // Step 5: Create deal in HubSpot with appropriate stage
+    const dealName = `${firstName} ${lastName} - ${tier} Membership (Legacy)`;
+    const dealId = await createMembershipDeal(
+      contactId,
+      normalizedEmail,
+      dealName,
+      tier,
+      undefined,
+      targetStage
+    );
+    
+    // Step 6: Add line item to deal (Silent Mode - no invoice)
+    const lineItemResult = await addLineItemToDeal(
+      dealId,
+      product.hubspotProductId,
+      1,
+      0,
+      undefined,
+      performedBy,
+      performedByName
+    );
+    
+    if (!lineItemResult.success) {
+      console.error('[HubSpotDeals] Failed to add line item for legacy member deal');
+    }
+    
+    // Step 7: Store deal record locally with billingProvider = 'mindbody' and isPrimary = true
+    await db.insert(hubspotDeals).values({
+      memberEmail: normalizedEmail,
+      hubspotContactId: contactId,
+      hubspotDealId: dealId,
+      dealName,
+      pipelineId: MEMBERSHIP_PIPELINE_ID,
+      pipelineStage: targetStage,
+      isPrimary: true,
+      lastKnownMindbodyStatus: normalizedStatus,
+      billingProvider: 'mindbody'
+    });
+    
+    // Step 8: Update user's hubspot_id if not already set
+    await pool.query(
+      'UPDATE users SET hubspot_id = $1, updated_at = NOW() WHERE LOWER(email) = $2 AND (hubspot_id IS NULL OR hubspot_id = \'\')',
+      [contactId, normalizedEmail]
+    );
+    
+    // Step 9: Log the action to billingAuditLog
+    await db.insert(billingAuditLog).values({
+      memberEmail: normalizedEmail,
+      hubspotDealId: dealId,
+      actionType: 'deal_created_for_legacy_member',
+      actionDetails: {
+        firstName,
+        lastName,
+        tier,
+        mindbodyStatus: normalizedStatus,
+        targetStage,
+        isNewContact,
+        billingProvider: 'mindbody'
+      },
+      newValue: `Created deal for legacy member with ${tier} membership at stage ${targetStage}`,
+      performedBy,
+      performedByName
+    });
+    
+    if (!isProduction) {
+      console.log(`[HubSpotDeals] Created deal ${dealId} for legacy member ${normalizedEmail} (stage: ${targetStage})`);
+    }
+    
+    return {
+      success: true,
+      dealId,
+      contactId,
+      lineItemId: lineItemResult.lineItemId
+    };
+    
+  } catch (error: any) {
+    console.error('[HubSpotDeals] Error creating deal for legacy member:', error);
+    return { success: false, error: error.message || 'Failed to create deal for legacy member' };
+  }
 }
 
 // Main Add Member function - Silent Mode
@@ -945,5 +1093,174 @@ export async function getMemberPaymentStatus(email: string): Promise<{
   } catch (error) {
     console.error('[HubSpotDeals] Error getting payment status:', error);
     return { status: 'unknown' };
+  }
+}
+
+export interface TierChangeResult {
+  success: boolean;
+  oldLineItemRemoved?: boolean;
+  newLineItemAdded?: boolean;
+  newLineItemId?: string;
+  error?: string;
+}
+
+export async function handleTierChange(
+  memberEmail: string,
+  oldTier: string,
+  newTier: string,
+  performedBy: string,
+  performedByName?: string
+): Promise<TierChangeResult> {
+  const normalizedEmail = memberEmail.toLowerCase().trim();
+  
+  try {
+    const existingDeal = await db.select()
+      .from(hubspotDeals)
+      .where(and(
+        eq(hubspotDeals.memberEmail, normalizedEmail),
+        eq(hubspotDeals.isPrimary, true)
+      ))
+      .limit(1);
+    
+    if (existingDeal.length === 0) {
+      const fallbackDeal = await db.select()
+        .from(hubspotDeals)
+        .where(eq(hubspotDeals.memberEmail, normalizedEmail))
+        .limit(1);
+      
+      if (fallbackDeal.length === 0) {
+        console.warn(`[HubSpotDeals] No deal found for member ${normalizedEmail} during tier change - skipping HubSpot sync`);
+        return { success: true, oldLineItemRemoved: false, newLineItemAdded: false };
+      }
+      
+      existingDeal.push(fallbackDeal[0]);
+    }
+    
+    const deal = existingDeal[0];
+    const hubspotDealId = deal.hubspotDealId;
+    
+    const oldProduct = await getProductMapping(oldTier);
+    const newProduct = await getProductMapping(newTier);
+    
+    if (!newProduct) {
+      console.error(`[HubSpotDeals] No product mapping found for new tier: ${newTier}`);
+      return { success: false, error: `No HubSpot product found for tier: ${newTier}` };
+    }
+    
+    const existingLineItems = await db.select()
+      .from(hubspotLineItems)
+      .where(eq(hubspotLineItems.hubspotDealId, hubspotDealId));
+    
+    let discountPercent = 0;
+    let discountReason: string | undefined;
+    let oldLineItemRemoved = false;
+    
+    const oldTierLineItem = existingLineItems.find(li => 
+      oldProduct && li.hubspotProductId === oldProduct.hubspotProductId
+    );
+    
+    if (oldTierLineItem && oldTierLineItem.hubspotLineItemId) {
+      discountPercent = oldTierLineItem.discountPercent || 0;
+      discountReason = oldTierLineItem.discountReason || undefined;
+      
+      try {
+        const hubspot = await getHubSpotClient();
+        await retryableHubSpotRequest(() =>
+          hubspot.crm.lineItems.basicApi.archive(oldTierLineItem.hubspotLineItemId!)
+        );
+        
+        await db.delete(hubspotLineItems)
+          .where(eq(hubspotLineItems.hubspotLineItemId, oldTierLineItem.hubspotLineItemId!));
+        
+        oldLineItemRemoved = true;
+        
+        if (!isProduction) {
+          console.log(`[HubSpotDeals] Removed old tier line item ${oldTierLineItem.hubspotLineItemId} for tier ${oldTier}`);
+        }
+      } catch (removeError: any) {
+        console.error(`[HubSpotDeals] Failed to remove old line item:`, removeError);
+      }
+    }
+    
+    const lineItemResult = await addLineItemToDeal(
+      hubspotDealId,
+      newProduct.hubspotProductId,
+      1,
+      discountPercent,
+      discountReason,
+      performedBy,
+      performedByName
+    );
+    
+    if (!lineItemResult.success) {
+      return { 
+        success: false, 
+        oldLineItemRemoved,
+        newLineItemAdded: false,
+        error: 'Failed to add new tier line item' 
+      };
+    }
+    
+    try {
+      const hubspot = await getHubSpotClient();
+      await retryableHubSpotRequest(() =>
+        hubspot.crm.deals.basicApi.update(hubspotDealId, {
+          properties: {
+            membership_tier: newTier
+          }
+        })
+      );
+    } catch (dealUpdateError) {
+      console.warn('[HubSpotDeals] Failed to update deal membership_tier property:', dealUpdateError);
+    }
+    
+    if (deal.hubspotContactId) {
+      try {
+        const hubspot = await getHubSpotClient();
+        await retryableHubSpotRequest(() =>
+          hubspot.crm.contacts.basicApi.update(deal.hubspotContactId!, {
+            properties: {
+              membership_tier: newTier
+            }
+          })
+        );
+      } catch (contactUpdateError) {
+        console.warn('[HubSpotDeals] Failed to update contact membership_tier property:', contactUpdateError);
+      }
+    }
+    
+    await db.insert(billingAuditLog).values({
+      memberEmail: normalizedEmail,
+      hubspotDealId,
+      actionType: 'tier_changed',
+      previousValue: oldTier,
+      newValue: newTier,
+      actionDetails: {
+        oldProductId: oldProduct?.hubspotProductId || null,
+        newProductId: newProduct.hubspotProductId,
+        oldLineItemRemoved,
+        newLineItemId: lineItemResult.lineItemId,
+        discountPreserved: discountPercent > 0,
+        discountPercent,
+        discountReason
+      },
+      performedBy,
+      performedByName
+    });
+    
+    if (!isProduction) {
+      console.log(`[HubSpotDeals] Tier change completed for ${normalizedEmail}: ${oldTier} -> ${newTier}`);
+    }
+    
+    return {
+      success: true,
+      oldLineItemRemoved,
+      newLineItemAdded: true,
+      newLineItemId: lineItemResult.lineItemId
+    };
+    
+  } catch (error: any) {
+    console.error('[HubSpotDeals] Error handling tier change:', error);
+    return { success: false, error: error.message || 'Failed to handle tier change' };
   }
 }
