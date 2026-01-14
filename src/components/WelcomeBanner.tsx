@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useData } from '../contexts/DataContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useScrollLockManager } from '../hooks/useScrollLockManager';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -104,12 +105,7 @@ const WelcomeBanner: React.FC = () => {
 };
 
 const IOSModal: React.FC<{ isDark: boolean; onClose: () => void }> = ({ isDark, onClose }) => {
-  useEffect(() => {
-    document.documentElement.classList.add('overflow-hidden');
-    return () => {
-      document.documentElement.classList.remove('overflow-hidden');
-    };
-  }, []);
+  useScrollLockManager(true);
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">

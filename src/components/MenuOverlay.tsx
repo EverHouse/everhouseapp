@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
-import { useSmoothScroll } from './motion/SmoothScroll';
+import { useScrollLockManager } from '../hooks/useScrollLockManager';
 import { haptic } from '../utils/haptics';
 
 interface MenuOverlayProps {
@@ -14,50 +14,36 @@ const MenuOverlay: React.FC<MenuOverlayProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === 'dark';
-  const { stop, start } = useSmoothScroll();
   const [isVisible, setIsVisible] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const wasOpenRef = useRef(false);
 
-  // Handle menu open/close state changes
   useEffect(() => {
     if (isOpen) {
-      // Clear any pending close timer
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
       }
-      wasOpenRef.current = true;
       setIsVisible(true);
       setIsClosing(false);
-      document.documentElement.classList.add('overflow-hidden');
-      stop();
     } else if (isVisible) {
       setIsClosing(true);
       timerRef.current = setTimeout(() => {
         setIsVisible(false);
         setIsClosing(false);
-        document.documentElement.classList.remove('overflow-hidden');
-        start();
-        wasOpenRef.current = false;
         timerRef.current = null;
       }, 250);
     }
-  }, [isOpen]);
-
-  // Cleanup on unmount - only restore scrolling if menu was open
-  useEffect(() => {
+    
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
-      }
-      if (wasOpenRef.current) {
-        document.documentElement.classList.remove('overflow-hidden');
-        start();
+        timerRef.current = null;
       }
     };
-  }, [start]);
+  }, [isOpen, isVisible]);
+
+  useScrollLockManager(isVisible);
 
   const handleClose = () => {
     haptic.selection();

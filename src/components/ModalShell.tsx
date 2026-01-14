@@ -1,6 +1,7 @@
-import { useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import { useScrollLockManager } from '../hooks/useScrollLockManager';
 
 interface ModalShellProps {
   isOpen: boolean;
@@ -45,32 +46,13 @@ export function ModalShell({
     dismissibleRef.current = dismissible;
   });
 
+  useScrollLockManager(isOpen, dismissible ? onClose : undefined);
+
   useEffect(() => {
     if (!isOpen) return;
 
     previousActiveElement.current = document.activeElement as HTMLElement;
     
-    const handleEscapeKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && dismissibleRef.current) {
-        onCloseRef.current();
-      }
-    };
-    
-    // Save current scroll position
-    const scrollY = window.scrollY;
-    
-    document.addEventListener('keydown', handleEscapeKey);
-    
-    // Lock body scroll - more robust approach for iOS
-    document.documentElement.classList.add('overflow-hidden');
-    document.body.classList.add('overflow-hidden');
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.left = '0';
-    document.body.style.right = '0';
-    document.body.style.overscrollBehavior = 'none';
-    
-    // Track modal open state for PullToRefresh
     const currentCount = parseInt(document.body.getAttribute('data-modal-count') || '0', 10);
     document.body.setAttribute('data-modal-count', String(currentCount + 1));
     
@@ -79,27 +61,12 @@ export function ModalShell({
     }, 50);
 
     return () => {
-      document.removeEventListener('keydown', handleEscapeKey);
-      
-      // Decrement modal count for PullToRefresh
       const currentCount = parseInt(document.body.getAttribute('data-modal-count') || '0', 10);
       if (currentCount <= 1) {
         document.body.removeAttribute('data-modal-count');
       } else {
         document.body.setAttribute('data-modal-count', String(currentCount - 1));
       }
-      
-      // Restore scroll position
-      document.documentElement.classList.remove('overflow-hidden');
-      document.body.classList.remove('overflow-hidden');
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
-      document.body.style.overscrollBehavior = '';
-      
-      // Restore scroll position after removing fixed positioning
-      window.scrollTo(0, scrollY);
       
       if (previousActiveElement.current) {
         previousActiveElement.current.focus();

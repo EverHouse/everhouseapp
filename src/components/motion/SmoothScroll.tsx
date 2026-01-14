@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useCallback, useMemo, useRef } from 'react';
+import { acquireScrollLock, releaseScrollLock } from '../../hooks/useScrollLockManager';
 
 interface SmoothScrollContextType {
   lenis: null;
@@ -21,6 +22,8 @@ interface SmoothScrollProviderProps {
 }
 
 export const SmoothScrollProvider: React.FC<SmoothScrollProviderProps> = ({ children }) => {
+  const lockIdRef = useRef<string | null>(null);
+
   const scrollTo = useCallback((target: number | string | HTMLElement, options?: { offset?: number; duration?: number }) => {
     const offset = options?.offset ?? 0;
     
@@ -41,13 +44,16 @@ export const SmoothScrollProvider: React.FC<SmoothScrollProviderProps> = ({ chil
   }, []);
 
   const stop = useCallback(() => {
-    document.documentElement.classList.add('overflow-hidden');
-    document.body.classList.add('overflow-hidden');
+    if (!lockIdRef.current) {
+      lockIdRef.current = acquireScrollLock('smooth-scroll');
+    }
   }, []);
 
   const start = useCallback(() => {
-    document.documentElement.classList.remove('overflow-hidden');
-    document.body.classList.remove('overflow-hidden');
+    if (lockIdRef.current) {
+      releaseScrollLock(lockIdRef.current);
+      lockIdRef.current = null;
+    }
   }, []);
 
   const value = useMemo(() => ({ lenis: null, scrollTo, stop, start }), [scrollTo, stop, start]);

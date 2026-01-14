@@ -728,7 +728,7 @@ html.dark select,
 
 /* Modal scrollable content - restore scrollbar for accessibility */
 .modal-scroll-content {
-  overflow-y: auto !important;
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   scrollbar-width: thin;
