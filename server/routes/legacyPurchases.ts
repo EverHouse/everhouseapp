@@ -217,4 +217,122 @@ router.post("/api/legacy-purchases/admin/link-guest-fees", isAdmin, async (req: 
   }
 });
 
+// Admin: Sync purchase data to HubSpot for all members
+router.post("/api/legacy-purchases/admin/sync-hubspot", isAdmin, async (req: Request, res: Response) => {
+  try {
+    const { getHubSpotClient } = await import("../core/hubspot/client");
+    const hubspot = await getHubSpotClient();
+    
+    // Get all members with purchases and their HubSpot IDs
+    const memberStats = await db.select({
+      email: users.email,
+      hubspotId: users.hubspotId,
+      totalPurchases: sql<number>`COUNT(${legacyPurchases.id})`,
+      totalSpentCents: sql<number>`COALESCE(SUM(${legacyPurchases.itemTotalCents}), 0)`,
+      lastPurchaseDate: sql<string>`MAX(${legacyPurchases.saleDate})`,
+    })
+      .from(users)
+      .leftJoin(legacyPurchases, eq(legacyPurchases.userId, users.id))
+      .where(sql`${users.hubspotId} IS NOT NULL`)
+      .groupBy(users.email, users.hubspotId);
+    
+    let updated = 0;
+    let errors = 0;
+    const errorDetails: string[] = [];
+    
+    for (const member of memberStats) {
+      if (!member.hubspotId) continue;
+      
+      try {
+        const properties: Record<string, string> = {
+          eh_total_purchases: String(member.totalPurchases || 0),
+          eh_total_spend: ((member.totalSpentCents || 0) / 100).toFixed(2),
+        };
+        
+        if (member.lastPurchaseDate) {
+          // Format date as YYYY-MM-DD for HubSpot
+          const date = new Date(member.lastPurchaseDate);
+          properties.eh_last_purchase_date = date.toISOString().split('T')[0];
+        }
+        
+        await hubspot.crm.contacts.basicApi.update(member.hubspotId, { properties });
+        updated++;
+      } catch (err: any) {
+        errors++;
+        if (errorDetails.length < 5) {
+          errorDetails.push(`${member.email}: ${err.message}`);
+        }
+      }
+    }
+    
+    res.json({
+      success: true,
+      totalMembers: memberStats.length,
+      updated,
+      errors,
+      errorDetails: errorDetails.length > 0 ? errorDetails : undefined,
+    });
+  } catch (error) {
+    console.error("[LegacyPurchases] HubSpot sync error:", error);
+    res.status(500).json({ 
+      error: "HubSpot sync failed",
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Admin: Sync purchase data to HubSpot for a single member
+router.post("/api/legacy-purchases/admin/sync-hubspot/:email", isAdmin, async (req: Request, res: Response) => {
+  try {
+    const { email } = req.params;
+    const { getHubSpotClient } = await import("../core/hubspot/client");
+    const hubspot = await getHubSpotClient();
+    
+    // Get the member
+    const member = await db.select({
+      hubspotId: users.hubspotId,
+    })
+      .from(users)
+      .where(eq(users.email, email.toLowerCase()))
+      .limit(1);
+    
+    if (!member[0]?.hubspotId) {
+      return res.status(404).json({ error: "Member not found or no HubSpot ID" });
+    }
+    
+    // Get their purchase stats
+    const stats = await db.select({
+      totalPurchases: sql<number>`COUNT(*)`,
+      totalSpentCents: sql<number>`COALESCE(SUM(item_total_cents), 0)`,
+      lastPurchaseDate: sql<string>`MAX(sale_date)`,
+    })
+      .from(legacyPurchases)
+      .where(eq(legacyPurchases.memberEmail, email.toLowerCase()));
+    
+    const properties: Record<string, string> = {
+      eh_total_purchases: String(stats[0]?.totalPurchases || 0),
+      eh_total_spend: ((stats[0]?.totalSpentCents || 0) / 100).toFixed(2),
+    };
+    
+    if (stats[0]?.lastPurchaseDate) {
+      const date = new Date(stats[0].lastPurchaseDate);
+      properties.eh_last_purchase_date = date.toISOString().split('T')[0];
+    }
+    
+    await hubspot.crm.contacts.basicApi.update(member[0].hubspotId, { properties });
+    
+    res.json({
+      success: true,
+      email,
+      properties,
+    });
+  } catch (error) {
+    console.error("[LegacyPurchases] HubSpot sync error:", error);
+    res.status(500).json({ 
+      error: "HubSpot sync failed",
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router;

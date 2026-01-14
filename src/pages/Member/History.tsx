@@ -189,7 +189,7 @@ const History: React.FC = () => {
     if (!user?.email) return;
     try {
       const { ok, data } = await apiRequest<LegacyPurchase[]>(
-        `/api/legacy-purchases/member/${encodeURIComponent(user.email)}`
+        `/api/legacy-purchases/my-purchases`
       );
       if (ok && data) {
         setPurchases(data);
