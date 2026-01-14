@@ -1083,4 +1083,166 @@ router.post('/api/members', isStaffOrAdmin, async (req, res) => {
   }
 });
 
+// Admin: Bulk update member tiers from CSV data
+router.post('/api/members/admin/bulk-tier-update', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { members, syncToHubspot = true, dryRun = false } = req.body;
+    const sessionUser = getSessionUser(req);
+    
+    if (!Array.isArray(members) || members.length === 0) {
+      return res.status(400).json({ error: 'Members array is required' });
+    }
+    
+    const performedBy = sessionUser?.email || 'system';
+    const performedByName = sessionUser?.firstName 
+      ? `${sessionUser.firstName} ${sessionUser.lastName || ''}`.trim() 
+      : 'Bulk Update';
+    
+    const results: {
+      updated: { email: string; name: string; oldTier: string; newTier: string; hubspotSynced?: boolean }[];
+      unchanged: { email: string; name: string; tier: string }[];
+      notFound: { email: string; tier: string }[];
+      errors: { email: string; error: string }[];
+    } = { updated: [], unchanged: [], notFound: [], errors: [] };
+    
+    // Map tier names from CSV to normalized tier names
+    function normalizeCsvTier(csvTier: string): string | null {
+      if (!csvTier) return null;
+      const lower = csvTier.toLowerCase();
+      if (lower.includes('vip')) return 'VIP';
+      if (lower.includes('premium')) return 'Premium';
+      if (lower.includes('corporate')) return 'Corporate';
+      if (lower.includes('core')) return 'Core';
+      if (lower.includes('social')) return 'Social';
+      return null;
+    }
+    
+    // Get tier ID from tier name
+    const tierIdMap: Record<string, number> = {
+      'Social': 1,
+      'Core': 2,
+      'Premium': 3,
+      'Corporate': 4,
+      'VIP': 5
+    };
+    
+    for (const member of members) {
+      const { email, tier: csvTier, name } = member;
+      
+      if (!email) {
+        results.errors.push({ email: 'unknown', error: 'Email missing' });
+        continue;
+      }
+      
+      const normalizedEmail = email.toLowerCase().trim();
+      const normalizedTier = normalizeCsvTier(csvTier);
+      
+      if (!normalizedTier) {
+        results.errors.push({ email: normalizedEmail, error: `Invalid tier: ${csvTier}` });
+        continue;
+      }
+      
+      try {
+        // Find the member
+        const userResult = await db.select({
+          id: users.id,
+          email: users.email,
+          tier: users.tier,
+          tierId: users.tierId,
+          firstName: users.firstName,
+          lastName: users.lastName
+        })
+          .from(users)
+          .where(sql`LOWER(${users.email}) = ${normalizedEmail}`);
+        
+        if (userResult.length === 0) {
+          results.notFound.push({ email: normalizedEmail, tier: normalizedTier });
+          continue;
+        }
+        
+        const user = userResult[0];
+        const oldTier = user.tier || 'Social';
+        const memberName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || normalizedEmail;
+        
+        // Check if tier is already correct
+        if (oldTier === normalizedTier) {
+          results.unchanged.push({ email: normalizedEmail, name: memberName, tier: normalizedTier });
+          continue;
+        }
+        
+        if (dryRun) {
+          results.updated.push({ 
+            email: normalizedEmail, 
+            name: memberName, 
+            oldTier, 
+            newTier: normalizedTier,
+            hubspotSynced: false
+          });
+          continue;
+        }
+        
+        // Update both tier and tier_id
+        const tierId = tierIdMap[normalizedTier];
+        await db.update(users)
+          .set({ 
+            tier: normalizedTier, 
+            tierId: tierId,
+            membershipTier: csvTier, // Store the original CSV tier for reference
+            updatedAt: new Date() 
+          })
+          .where(sql`LOWER(${users.email}) = ${normalizedEmail}`);
+        
+        // Sync to HubSpot if enabled
+        let hubspotSynced = false;
+        if (syncToHubspot) {
+          const hubspotResult = await handleTierChange(
+            normalizedEmail,
+            oldTier,
+            normalizedTier,
+            performedBy,
+            performedByName
+          );
+          hubspotSynced = hubspotResult.success;
+          
+          if (!hubspotResult.success && hubspotResult.error) {
+            console.warn(`[BulkTierUpdate] HubSpot sync failed for ${normalizedEmail}: ${hubspotResult.error}`);
+          }
+        }
+        
+        results.updated.push({ 
+          email: normalizedEmail, 
+          name: memberName, 
+          oldTier, 
+          newTier: normalizedTier,
+          hubspotSynced
+        });
+        
+        // Add a small delay to avoid rate limiting
+        if (syncToHubspot) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      } catch (error: any) {
+        console.error(`[BulkTierUpdate] Error processing ${normalizedEmail}:`, error);
+        results.errors.push({ email: normalizedEmail, error: error.message });
+      }
+    }
+    
+    res.json({
+      success: true,
+      dryRun,
+      summary: {
+        total: members.length,
+        updated: results.updated.length,
+        unchanged: results.unchanged.length,
+        notFound: results.notFound.length,
+        errors: results.errors.length
+      },
+      results
+    });
+  } catch (error: any) {
+    console.error('Bulk tier update error:', error);
+    res.status(500).json({ error: 'Failed to process bulk tier update' });
+  }
+});
+
 export default router;
