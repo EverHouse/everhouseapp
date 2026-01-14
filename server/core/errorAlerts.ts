@@ -121,6 +121,67 @@ export type AlertType =
   | 'payment_failure'
   | 'security_alert';
 
+function getFriendlyTypeName(type: AlertType): string {
+  switch (type) {
+    case 'server_error': return 'App Issue';
+    case 'database_error': return 'Database Issue';
+    case 'external_service_error': return 'Connection Issue';
+    case 'booking_failure': return 'Booking Issue';
+    case 'payment_failure': return 'Payment Issue';
+    case 'security_alert': return 'Security Notice';
+    default: return 'System Issue';
+  }
+}
+
+function getFriendlyAreaName(path?: string): string {
+  if (!path) return 'the app';
+  
+  if (path.includes('/booking') || path.includes('/bays')) return 'Golf Simulator Bookings';
+  if (path.includes('/notification')) return 'Notifications';
+  if (path.includes('/event')) return 'Events';
+  if (path.includes('/wellness')) return 'Wellness Classes';
+  if (path.includes('/member') || path.includes('/hubspot')) return 'Member Directory';
+  if (path.includes('/auth')) return 'Login System';
+  if (path.includes('/calendar')) return 'Calendar Sync';
+  if (path.includes('/push')) return 'Push Notifications';
+  if (path.includes('/admin')) return 'Admin Dashboard';
+  
+  return 'the app';
+}
+
+function translateErrorToPlainLanguage(message: string, path?: string): string {
+  const area = getFriendlyAreaName(path);
+  
+  // Common error patterns translated to plain language
+  if (message.includes('Cannot destructure') || message.includes('undefined')) {
+    return `Something went wrong in ${area}. A member tried to use a feature but the app didn't receive all the information it needed. This might have caused their action to fail.`;
+  }
+  if (message.includes('timeout') || message.includes('Timeout')) {
+    return `${area} took too long to respond. This could be a temporary slowdown. If members report issues, they can try again.`;
+  }
+  if (message.includes('connection') || message.includes('ECONNREFUSED')) {
+    return `The app had trouble connecting to ${area}. This might affect some features temporarily.`;
+  }
+  if (message.includes('401') || message.includes('Unauthorized')) {
+    return `A login or access issue occurred in ${area}. A member may have been logged out unexpectedly.`;
+  }
+  if (message.includes('403') || message.includes('Forbidden')) {
+    return `Someone tried to access something in ${area} they don't have permission for. This might be a normal access attempt or could indicate a configuration issue.`;
+  }
+  if (message.includes('404') || message.includes('Not found')) {
+    return `Something was requested in ${area} that doesn't exist. This could be a deleted item or a broken link.`;
+  }
+  if (message.includes('database') || message.includes('SQL') || message.includes('query')) {
+    return `There was a database issue in ${area}. Some data might not have saved correctly.`;
+  }
+  if (message.includes('rate limit') || message.includes('too many')) {
+    return `${area} received too many requests too quickly. The system is protecting itself from overload.`;
+  }
+  
+  // Default: simplify the message
+  return `An issue occurred in ${area}. The app encountered an unexpected situation while processing a request.`;
+}
+
 interface AlertOptions {
   type: AlertType;
   title: string;
@@ -145,22 +206,60 @@ export async function sendErrorAlert(options: AlertOptions): Promise<boolean> {
   try {
     const { client, fromEmail } = await getResendClient();
     
-    const detailsHtml = details 
-      ? Object.entries(details)
-          .map(([k, v]) => `<li><strong>${k}:</strong> ${typeof v === 'object' ? JSON.stringify(v) : v}</li>`)
-          .join('')
-      : '';
-    
     const timestamp = new Date().toLocaleString('en-US', { 
       timeZone: 'America/Los_Angeles',
-      dateStyle: 'medium',
-      timeStyle: 'short'
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
     });
     
+    const friendlyType = getFriendlyTypeName(type);
+    const friendlyMessage = translateErrorToPlainLanguage(message, details?.path || context);
+    const area = getFriendlyAreaName(details?.path || context);
+    
+    // Build a simple, human-friendly details section
+    let contextInfo = '';
+    if (userEmail) {
+      const userName = userEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      contextInfo += `<p style="margin: 8px 0;"><strong>Who was affected:</strong> ${userName} (${userEmail})</p>`;
+    }
+    if (area !== 'the app') {
+      contextInfo += `<p style="margin: 8px 0;"><strong>Where it happened:</strong> ${area}</p>`;
+    }
+    
+    // Suggested action based on error type
+    let suggestedAction = '';
+    switch (type) {
+      case 'server_error':
+        suggestedAction = 'If members report issues, ask them to try again. If this keeps happening, the development team should investigate.';
+        break;
+      case 'database_error':
+        suggestedAction = 'Check if the affected data was saved correctly. If not, the member may need to re-enter their information.';
+        break;
+      case 'external_service_error':
+        suggestedAction = 'This might resolve on its own. If it persists, there may be an issue with an external service like HubSpot or Google Calendar.';
+        break;
+      case 'booking_failure':
+        suggestedAction = 'Check the booking queue to make sure the member\'s request was received. They may need to submit again.';
+        break;
+      case 'payment_failure':
+        suggestedAction = 'Follow up with the member about their payment. They may need to try a different payment method.';
+        break;
+      case 'security_alert':
+        suggestedAction = 'Review the access logs for any suspicious activity. Consider if any action is needed to protect member data.';
+        break;
+      default:
+        suggestedAction = 'Monitor for recurring issues. If this happens frequently, it may need technical attention.';
+    }
+    
     await client.emails.send({
-      from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
+      from: fromEmail || 'Even House <noreply@everhouse.app>',
       to: ALERT_EMAIL,
-      subject: `[Alert] ${title}`,
+      subject: `${friendlyType}: ${area}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -168,29 +267,42 @@ export async function sendErrorAlert(options: AlertOptions): Promise<boolean> {
           <meta charset="utf-8">
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20px; background: #f5f5f5;">
-          <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-            <div style="border-left: 4px solid #dc2626; padding-left: 16px; margin-bottom: 20px;">
-              <h2 style="margin: 0 0 8px 0; color: #dc2626;">${title}</h2>
-              <p style="margin: 0; color: #666; font-size: 14px;">${timestamp} PT</p>
+          <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            
+            <div style="text-align: center; margin-bottom: 24px;">
+              <div style="display: inline-block; background: #fef2f2; border-radius: 50%; padding: 16px; margin-bottom: 16px;">
+                <span style="font-size: 32px;">⚠️</span>
+              </div>
+              <h1 style="margin: 0; color: #1f2937; font-size: 24px; font-weight: 600;">${friendlyType}</h1>
+              <p style="margin: 8px 0 0 0; color: #6b7280; font-size: 14px;">${timestamp} PT</p>
             </div>
             
-            <div style="margin-bottom: 20px;">
-              <p style="margin: 0; color: #333; line-height: 1.6;">${message}</p>
+            <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+              <h2 style="margin: 0 0 12px 0; color: #374151; font-size: 16px; font-weight: 600;">What happened</h2>
+              <p style="margin: 0; color: #4b5563; line-height: 1.6; font-size: 15px;">${friendlyMessage}</p>
             </div>
             
-            <div style="background: #f8f9fa; border-radius: 6px; padding: 16px; font-size: 14px;">
-              <p style="margin: 0 0 8px 0; font-weight: 600; color: #333;">Details:</p>
-              <ul style="margin: 0; padding-left: 20px; color: #555;">
-                <li><strong>Type:</strong> ${type}</li>
-                ${userEmail ? `<li><strong>User:</strong> ${userEmail}</li>` : ''}
-                ${requestId ? `<li><strong>Request ID:</strong> ${requestId}</li>` : ''}
-                ${detailsHtml}
-              </ul>
+            ${contextInfo ? `
+            <div style="margin-bottom: 24px;">
+              <h2 style="margin: 0 0 12px 0; color: #374151; font-size: 16px; font-weight: 600;">Details</h2>
+              <div style="color: #4b5563; font-size: 15px;">
+                ${contextInfo}
+              </div>
+            </div>
+            ` : ''}
+            
+            <div style="background: #f0fdf4; border-radius: 8px; padding: 20px; margin-bottom: 24px; border-left: 4px solid #22c55e;">
+              <h2 style="margin: 0 0 12px 0; color: #166534; font-size: 16px; font-weight: 600;">What to do</h2>
+              <p style="margin: 0; color: #15803d; line-height: 1.6; font-size: 15px;">${suggestedAction}</p>
             </div>
             
-            <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #eee; font-size: 12px; color: #888;">
-              <p style="margin: 0;">This is an automated alert from the Ever House app. Max ${MAX_ALERTS_PER_DAY}/day, ${MAX_ALERTS_PER_HOUR}/hour.</p>
+            <div style="text-align: center; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                This is an automated alert from the Even House app.<br>
+                You'll receive at most ${MAX_ALERTS_PER_DAY} of these per day.
+              </p>
             </div>
+            
           </div>
         </body>
         </html>
@@ -224,8 +336,7 @@ export async function alertOnServerError(
     context: context.path,
     details: {
       path: context.path,
-      method: context.method,
-      stack: error.stack?.split('\n').slice(0, 5).join('\n')
+      method: context.method
     },
     userEmail: context.userEmail,
     requestId: context.requestId
@@ -237,15 +348,19 @@ export async function alertOnExternalServiceError(
   error: Error,
   operation?: string
 ): Promise<void> {
+  const friendlyServiceName = service === 'HubSpot' ? 'HubSpot (member data)' 
+    : service === 'Google' ? 'Google Calendar' 
+    : service === 'Resend' ? 'Email Service'
+    : service;
+    
   await sendErrorAlert({
     type: 'external_service_error',
-    title: `${service} Service Error`,
-    message: `Failed during: ${operation || 'unknown operation'}`,
+    title: `${friendlyServiceName} Connection Issue`,
+    message: `The app couldn't connect to ${friendlyServiceName}${operation ? ` while trying to ${operation}` : ''}.`,
     context: service,
     details: {
-      service,
-      operation,
-      error: error.message
+      service: friendlyServiceName,
+      operation
     }
   });
 }
@@ -257,7 +372,7 @@ export async function alertOnBookingFailure(
 ): Promise<void> {
   await sendErrorAlert({
     type: 'booking_failure',
-    title: 'Booking System Failure',
+    title: 'Booking Issue',
     message: reason,
     context: 'booking',
     details: bookingDetails,
