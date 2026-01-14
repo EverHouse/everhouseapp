@@ -244,7 +244,8 @@ export async function syncWellnessCalendarEvents(): Promise<{ synced: number; cr
             dbRow.duration !== duration ||
             dbRow.category !== category
           );
-          const isConflict = wasReviewed && hasChanges;
+          // Only mark as conflict if reviewed AND has changes AND not dismissed
+          const isConflict = wasReviewed && hasChanges && !reviewDismissed;
           
           await pool.query(
             `UPDATE wellness_classes SET 
