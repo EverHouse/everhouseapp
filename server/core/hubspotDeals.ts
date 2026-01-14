@@ -808,6 +808,43 @@ async function createDealForLegacyMember(
       tier
     );
     
+    // Step 4.5: Check if contact already has a deal in our pipeline (prevent duplicates)
+    const existingDeals = await getContactDeals(contactId);
+    const existingMembershipDeal = existingDeals.find((deal: any) => 
+      deal.properties?.pipeline === MEMBERSHIP_PIPELINE_ID
+    );
+    
+    if (existingMembershipDeal) {
+      console.log(`[HubSpotDeals] Contact ${normalizedEmail} already has a membership deal in HubSpot (ID: ${existingMembershipDeal.id}), skipping creation`);
+      
+      // Store in local database if not already there
+      const localRecord = await db.select()
+        .from(hubspotDeals)
+        .where(eq(hubspotDeals.hubspotDealId, existingMembershipDeal.id))
+        .limit(1);
+      
+      if (localRecord.length === 0) {
+        await db.insert(hubspotDeals).values({
+          memberEmail: normalizedEmail,
+          hubspotContactId: contactId,
+          hubspotDealId: existingMembershipDeal.id,
+          dealName: existingMembershipDeal.properties?.dealname || `${firstName} ${lastName} - Membership`,
+          pipelineId: MEMBERSHIP_PIPELINE_ID,
+          pipelineStage: existingMembershipDeal.properties?.dealstage || targetStage,
+          isPrimary: true,
+          lastKnownMindbodyStatus: normalizedStatus,
+          billingProvider: 'mindbody'
+        });
+      }
+      
+      return { 
+        success: true, 
+        dealId: existingMembershipDeal.id, 
+        contactId,
+        error: 'Used existing deal (duplicate prevention)'
+      };
+    }
+    
     // Step 5: Create deal in HubSpot with appropriate stage
     const dealName = `${firstName} ${lastName} - ${tier} Membership (Legacy)`;
     const dealId = await createMembershipDeal(
