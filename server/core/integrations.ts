@@ -39,10 +39,14 @@ async function getHubSpotAccessToken() {
     }
   ).then(res => res.json()).then((data: any) => data.items?.[0]);
 
-  const accessToken = hubspotConnectionSettings?.settings?.access_token || hubspotConnectionSettings.settings?.oauth?.credentials?.access_token;
+  if (!hubspotConnectionSettings || !hubspotConnectionSettings.settings) {
+    throw new Error('HubSpot not connected - no connection settings found');
+  }
+  
+  const accessToken = hubspotConnectionSettings.settings?.access_token || hubspotConnectionSettings.settings?.oauth?.credentials?.access_token;
 
-  if (!hubspotConnectionSettings || !accessToken) {
-    throw new Error('HubSpot not connected');
+  if (!accessToken) {
+    throw new Error('HubSpot not connected - no access token found');
   }
   return accessToken;
 }
