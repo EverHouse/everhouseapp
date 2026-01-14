@@ -35,6 +35,7 @@ const MINDBODY_TO_STAGE_MAP: Record<string, string> = {
   'terminated': HUBSPOT_STAGE_IDS.CLOSED_LOST,       // Cancelled/Churned stage
   'cancelled': HUBSPOT_STAGE_IDS.CLOSED_LOST,        // Cancelled/Churned stage
   'froze': HUBSPOT_STAGE_IDS.PAYMENT_DECLINED,       // Keep in Payment Declined (frozen but not churned)
+  'frozen': HUBSPOT_STAGE_IDS.PAYMENT_DECLINED,      // Alternate spelling - same as froze
   'non-member': HUBSPOT_STAGE_IDS.CLOSED_LOST,
 };
 
@@ -48,6 +49,7 @@ const MINDBODY_TO_CONTACT_STATUS_MAP: Record<string, ContactMembershipStatus> = 
   'declined': 'inactive',          // Payment issue - kill switch
   'suspended': 'inactive',         // Payment issue - kill switch
   'froze': 'inactive',             // Frozen - kill switch
+  'frozen': 'inactive',            // Alternate spelling - same as froze
   'expired': 'former_member',      // Churned
   'terminated': 'former_member',   // Churned
   'cancelled': 'former_member',    // Churned
@@ -55,7 +57,7 @@ const MINDBODY_TO_CONTACT_STATUS_MAP: Record<string, ContactMembershipStatus> = 
 };
 
 // Statuses that should mark contact as inactive (kill switch for app features)
-const INACTIVE_STATUSES = ['declined', 'suspended', 'froze'];
+const INACTIVE_STATUSES = ['declined', 'suspended', 'froze', 'frozen'];
 const CHURNED_STATUSES = ['expired', 'terminated', 'cancelled', 'non-member'];
 const ACTIVE_STATUSES = ['active', 'pending'];
 
