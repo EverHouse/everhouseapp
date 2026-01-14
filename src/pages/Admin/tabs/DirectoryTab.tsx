@@ -306,7 +306,7 @@ const DirectoryTab: React.FC = () => {
                 </button>
             </div>
 
-            <div className="mb-6 space-y-3 animate-pop-in" style={{animationDelay: '0.05s'}}>
+            <div className="mb-6 space-y-3 animate-pop-in sticky top-0 z-10 bg-white dark:bg-surface-dark pt-2 pb-3 -mt-2" style={{animationDelay: '0.05s'}}>
                 {/* Search */}
                 <div className="relative">
                     <span aria-hidden="true" className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-[20px]">search</span>
@@ -426,28 +426,49 @@ const DirectoryTab: React.FC = () => {
                 </p>
             </div>
 
-            {/* Loading state for former members */}
-            {formerLoading && memberTab === 'former' && (
-                <div className="text-center py-12">
-                    <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-                    <p className="text-gray-500 dark:text-gray-400">Loading former members...</p>
-                </div>
-            )}
+            {/* Content area with min-height to prevent layout shift */}
+            <div className="min-h-[400px]">
+                {/* Loading state for former members */}
+                {formerLoading && memberTab === 'former' && (
+                    <div className="flex flex-col items-center justify-center py-16">
+                        <div className="relative">
+                            <div className="animate-spin w-12 h-12 border-4 border-primary/20 dark:border-lavender/20 border-t-primary dark:border-t-lavender rounded-full"></div>
+                        </div>
+                        <p className="mt-4 text-gray-500 dark:text-gray-400 font-medium">Loading former members...</p>
+                    </div>
+                )}
 
-            {/* Empty state */}
-            {!formerLoading && filteredList.length === 0 && (
-                <div className="text-center py-12 px-6 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-white/5">
-                    <span aria-hidden="true" className="material-symbols-outlined text-5xl mb-4 text-gray-500 dark:text-white/20">person_off</span>
-                    <h3 className="text-lg font-bold mb-2 text-gray-600 dark:text-white/70">
-                        {searchQuery ? 'No results found' : memberTab === 'former' ? 'No former members' : 'No members yet'}
-                    </h3>
-                    <p className="text-sm text-gray-500 dark:text-white/70 max-w-xs mx-auto">
-                        {searchQuery 
-                            ? 'Try a different search term or clear the filter.'
-                            : memberTab === 'former' ? 'Former members will appear here.' : 'Members will appear here once they sign up.'}
-                    </p>
-                </div>
-            )}
+                {/* Empty state - no former members in system */}
+                {!formerLoading && memberTab === 'former' && formerMembers.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-16 px-6 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-white/5">
+                        <span aria-hidden="true" className="material-symbols-outlined text-6xl mb-4 text-gray-400 dark:text-white/30">group_off</span>
+                        <h3 className="text-lg font-bold mb-2 text-gray-600 dark:text-white/70">
+                            No former members found
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-white/60 max-w-sm mx-auto text-center">
+                            When members leave or their membership expires, they will appear here.
+                        </p>
+                    </div>
+                )}
+
+                {/* Empty state - search/filter returned no results */}
+                {!formerLoading && filteredList.length === 0 && (memberTab === 'active' || formerMembers.length > 0) && (
+                    <div className="flex flex-col items-center justify-center py-16 px-6 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-white/5">
+                        <span aria-hidden="true" className="material-symbols-outlined text-6xl mb-4 text-gray-400 dark:text-white/30">
+                            {searchQuery || tierFilter !== 'All' || tagFilter !== 'All' || statusFilter !== 'All' ? 'search_off' : 'person_off'}
+                        </span>
+                        <h3 className="text-lg font-bold mb-2 text-gray-600 dark:text-white/70">
+                            {searchQuery || tierFilter !== 'All' || tagFilter !== 'All' || statusFilter !== 'All' 
+                                ? 'No results found' 
+                                : memberTab === 'former' ? 'No former members' : 'No members yet'}
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-white/60 max-w-sm mx-auto text-center">
+                            {searchQuery || tierFilter !== 'All' || tagFilter !== 'All' || statusFilter !== 'All'
+                                ? 'Try adjusting your search or filters to find what you\'re looking for.'
+                                : memberTab === 'former' ? 'Former members will appear here.' : 'Members will appear here once they sign up.'}
+                        </p>
+                    </div>
+                )}
 
             {/* Mobile view */}
             {!formerLoading && filteredList.length > 0 && (
@@ -571,6 +592,7 @@ const DirectoryTab: React.FC = () => {
                 </table>
             </div>
             )}
+            </div>
 
             <MemberProfileDrawer
                 isOpen={isViewingDetails && !!selectedMember}
@@ -580,16 +602,28 @@ const DirectoryTab: React.FC = () => {
                 onViewAs={(member) => { setIsViewingDetails(false); setSelectedMember(null); handleViewAs(member); }}
             />
 
-            {/* Add Member FAB */}
+            {/* Add Member FAB - Improved with safe-area padding, tooltip, and glow effect */}
             {createPortal(
-                <button
-                    onClick={() => setAddMemberModalOpen(true)}
-                    className="fixed right-5 bottom-32 lg:bottom-8 z-[9998] w-14 h-14 rounded-full shadow-lg flex items-center justify-center bg-green-600 hover:bg-green-700 text-white transition-all duration-300 hover:scale-110 active:scale-95"
-                    title="Add New Member"
-                    aria-label="Add New Member"
-                >
-                    <span className="material-symbols-outlined text-2xl">person_add</span>
-                </button>,
+                <div className="fixed right-5 z-[9998] pointer-events-none" style={{ bottom: 'calc(120px + env(safe-area-inset-bottom, 0px))' }}>
+                    <div className="relative group pointer-events-auto">
+                        {/* Desktop Tooltip */}
+                        <div className="absolute bottom-full right-0 mb-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                            <div className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium px-3 py-2 rounded-lg whitespace-nowrap shadow-lg">
+                                Add Member
+                                <div className="absolute top-full right-2 w-2 h-2 bg-gray-900 dark:bg-white transform rotate-45"></div>
+                            </div>
+                        </div>
+                        
+                        {/* FAB Button with Enhanced Styling */}
+                        <button
+                            onClick={() => setAddMemberModalOpen(true)}
+                            className="w-14 h-14 rounded-full flex items-center justify-center bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 dark:from-green-600 dark:to-green-700 dark:hover:from-green-700 dark:hover:to-green-800 text-white transition-all duration-300 hover:scale-110 active:scale-95 shadow-[0_4px_12px_rgba(34,197,94,0.4),inset_0_1px_2px_rgba(255,255,255,0.2)]  dark:shadow-[0_4px_12px_rgba(34,197,94,0.3),inset_0_1px_2px_rgba(255,255,255,0.1)] hover:shadow-[0_6px_20px_rgba(34,197,94,0.5),inset_0_1px_2px_rgba(255,255,255,0.2)] dark:hover:shadow-[0_6px_20px_rgba(34,197,94,0.4),inset_0_1px_2px_rgba(255,255,255,0.1)]"
+                            aria-label="Add New Member"
+                        >
+                            <span className="material-symbols-outlined text-2xl">person_add</span>
+                        </button>
+                    </div>
+                </div>,
                 document.body
             )}
 

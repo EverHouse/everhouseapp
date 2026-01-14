@@ -29,7 +29,7 @@ interface DataContextType {
   isDataReady: boolean;
   sessionChecked: boolean;
   sessionVersion: number;
-  fetchFormerMembers: () => Promise<void>;
+  fetchFormerMembers: (forceRefresh?: boolean) => Promise<void>;
   
   // Auth Actions
   login: (email: string) => Promise<void>;
@@ -80,6 +80,8 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   const sessionCheckDone = useRef(false);
   const loginInProgressRef = useRef(false);
   const formerMembersFetched = useRef(false);
+  const formerMembersLastFetch = useRef<number>(0);
+  const FORMER_MEMBERS_CACHE_MS = 10 * 60 * 1000; // 10 minutes
   const [cafeMenuLoaded, setCafeMenuLoaded] = useState(false);
   const [eventsLoaded, setEventsLoaded] = useState(false);
   const [announcementsLoaded, setAnnouncementsLoaded] = useState(false);
@@ -334,12 +336,18 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     fetchMembers();
   }, [actualUser]);
 
-  // Function to fetch former/inactive members on demand
-  const fetchFormerMembers = useCallback(async () => {
-    if (formerMembersFetched.current) return;
+  // Function to fetch former/inactive members on demand with 10-minute cache
+  const fetchFormerMembers = useCallback(async (forceRefresh = false) => {
     if (!actualUser || (actualUser.role !== 'admin' && actualUser.role !== 'staff')) return;
     
-    formerMembersFetched.current = true;
+    const now = Date.now();
+    const cacheValid = formerMembersFetched.current && 
+                       (now - formerMembersLastFetch.current) < FORMER_MEMBERS_CACHE_MS;
+    
+    // Return cached data if still valid and not forcing refresh
+    if (cacheValid && !forceRefresh && formerMembers.length > 0) {
+      return;
+    }
     
     try {
       const res = await fetch('/api/hubspot/contacts?status=former', { credentials: 'include' });
@@ -364,16 +372,16 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             manuallyLinkedEmails: contact.manuallyLinkedEmails || []
           }));
           setFormerMembers(formatted);
+          formerMembersFetched.current = true;
+          formerMembersLastFetch.current = now;
         }
       } else {
         console.error('Failed to fetch former members: API returned', res.status);
-        formerMembersFetched.current = false;
       }
     } catch (err) {
       console.error('Failed to fetch former members:', err);
-      formerMembersFetched.current = false;
     }
-  }, [actualUser]);
+  }, [actualUser, formerMembers.length]);
 
   const refreshMembers = useCallback(async (): Promise<{ success: boolean; count: number }> => {
     if (!actualUser || (actualUser.role !== 'admin' && actualUser.role !== 'staff')) {

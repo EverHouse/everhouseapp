@@ -689,12 +689,21 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
         };
         
         const categoryColors: Record<string, string> = {
-          sim_walk_in: 'bg-blue-100 text-blue-700',
-          guest_pass: 'bg-purple-100 text-purple-700',
-          membership: 'bg-green-100 text-green-700',
-          cafe: 'bg-orange-100 text-orange-700',
-          retail: 'bg-pink-100 text-pink-700',
-          other: 'bg-gray-100 text-gray-700',
+          sim_walk_in: isDark ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-100 text-blue-700',
+          guest_pass: isDark ? 'bg-purple-500/20 text-purple-300' : 'bg-purple-100 text-purple-700',
+          membership: isDark ? 'bg-green-500/20 text-green-300' : 'bg-green-100 text-green-700',
+          cafe: isDark ? 'bg-orange-500/20 text-orange-300' : 'bg-orange-100 text-orange-700',
+          retail: isDark ? 'bg-pink-500/20 text-pink-300' : 'bg-pink-100 text-pink-700',
+          other: isDark ? 'bg-gray-500/20 text-gray-300' : 'bg-gray-100 text-gray-700',
+        };
+        
+        const categoryIcons: Record<string, string> = {
+          sim_walk_in: 'golf_course',
+          guest_pass: 'badge',
+          membership: 'card_membership',
+          cafe: 'local_cafe',
+          retail: 'shopping_bag',
+          other: 'receipt',
         };
         
         const categoryOrder = ['membership', 'sim_walk_in', 'guest_pass', 'cafe', 'retail', 'other'];
@@ -707,6 +716,11 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
           return acc;
         }, {});
         
+        const formatCurrency = (cents: number | undefined | null): string => {
+          if (cents == null || isNaN(cents)) return '$0.00';
+          return `$${(cents / 100).toFixed(2)}`;
+        };
+        
         return (
           <div className="space-y-6">
             {categoryOrder.map(category => {
@@ -716,24 +730,25 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
               return (
                 <div key={category}>
                   <h4 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${categoryColors[category] || categoryColors.other}`}>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium flex items-center gap-1 ${categoryColors[category] || categoryColors.other}`}>
+                      <span className="material-symbols-outlined text-xs">{categoryIcons[category] || 'receipt'}</span>
                       {categoryLabels[category] || category}
                     </span>
                     <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
                       ({categoryPurchases.length})
                     </span>
                   </h4>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {categoryPurchases.map((purchase: any) => (
                       <div key={purchase.id} className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                        <div className="flex items-start justify-between">
+                        <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                               <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                                 {purchase.itemName}
                               </span>
                               {purchase.quantity > 1 && (
-                                <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                                <span className={`text-xs px-1.5 py-0.5 rounded ${isDark ? 'bg-white/10 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
                                   x{purchase.quantity}
                                 </span>
                               )}
@@ -744,11 +759,11 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                             </p>
                           </div>
                           <div className="text-right shrink-0">
-                            <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                              ${purchase.itemTotal}
+                            <span className={`text-base font-bold ${isDark ? 'text-accent' : 'text-brand-green'}`}>
+                              {formatCurrency(purchase.salePriceCents)}
                             </span>
                             {purchase.isComp && (
-                              <span className="block text-[10px] text-green-500 font-medium">COMP</span>
+                              <span className="block text-[10px] text-green-500 font-medium mt-0.5">COMP</span>
                             )}
                           </div>
                         </div>

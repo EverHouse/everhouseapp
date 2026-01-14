@@ -422,6 +422,37 @@ const History: React.FC = () => {
               ) : (
                 <div className="space-y-6">
                   {(() => {
+                    const categoryIcons: Record<string, string> = {
+                      sim_walk_in: 'golf_course',
+                      guest_pass: 'badge',
+                      membership: 'card_membership',
+                      cafe: 'local_cafe',
+                      retail: 'shopping_bag',
+                      other: 'receipt',
+                    };
+                    
+                    const categoryColors: Record<string, { dark: string; light: string }> = {
+                      sim_walk_in: { dark: 'bg-blue-500/20 text-blue-300', light: 'bg-blue-100 text-blue-700' },
+                      guest_pass: { dark: 'bg-purple-500/20 text-purple-300', light: 'bg-purple-100 text-purple-700' },
+                      membership: { dark: 'bg-accent/20 text-accent', light: 'bg-accent/20 text-brand-green' },
+                      cafe: { dark: 'bg-orange-500/20 text-orange-300', light: 'bg-orange-100 text-orange-700' },
+                      retail: { dark: 'bg-pink-500/20 text-pink-300', light: 'bg-pink-100 text-pink-700' },
+                    };
+                    
+                    const getCategoryStyle = (category: string) => {
+                      const colors = categoryColors[category?.toLowerCase()] || { dark: 'bg-amber-500/20 text-amber-300', light: 'bg-amber-100 text-amber-700' };
+                      return isDark ? colors.dark : colors.light;
+                    };
+                    
+                    const getCategoryIcon = (category: string) => {
+                      return categoryIcons[category?.toLowerCase()] || 'receipt';
+                    };
+                    
+                    const formatCurrency = (cents: number): string => {
+                      if (cents == null || isNaN(cents)) return '$0.00';
+                      return `$${(cents / 100).toFixed(2)}`;
+                    };
+                    
                     const groupedByMonth: { [key: string]: LegacyPurchase[] } = {};
                     purchases.forEach(p => {
                       const date = new Date(p.saleDate);
@@ -451,16 +482,15 @@ const History: React.FC = () => {
                                 className={`rounded-xl p-4 border glass-card animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`}
                                 style={{animationDelay: `${0.05 * (monthIndex + index)}s`}}
                               >
-                                <div className="flex items-start justify-between">
+                                <div className="flex items-start justify-between gap-3">
                                   <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${
-                                        isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-700'
-                                      }`}>
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 ${getCategoryStyle(purchase.itemCategory)}`}>
+                                        <span className="material-symbols-outlined text-xs">{getCategoryIcon(purchase.itemCategory)}</span>
                                         {purchase.itemCategory || 'Purchase'}
                                       </span>
                                       {purchase.quantity > 1 && (
-                                        <span className={`text-xs font-medium ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
+                                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${isDark ? 'bg-white/10 text-white/70' : 'bg-gray-200 text-primary/70'}`}>
                                           x{purchase.quantity}
                                         </span>
                                       )}
@@ -474,7 +504,7 @@ const History: React.FC = () => {
                                   </div>
                                   <div className="text-right flex-shrink-0">
                                     <p className={`text-lg font-bold ${isDark ? 'text-accent' : 'text-brand-green'}`}>
-                                      ${(purchase.salePriceCents / 100).toFixed(2)}
+                                      {formatCurrency(purchase.salePriceCents)}
                                     </p>
                                   </div>
                                 </div>
