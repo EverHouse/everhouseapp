@@ -95,9 +95,9 @@ const PrivateHire: React.FC = () => {
        {/* Content wrapper with cream background */}
        <div className="bg-[#F2F2EC]">
 
-       <section className="py-20 px-6 bg-[#F2F2EC]">
+       <section className="py-20 px-4 md:px-6 bg-[#F2F2EC]">
          <div className="max-w-7xl mx-auto">
-           <div className="text-center mb-12">
+           <div className="text-center mb-12 px-2">
              <h2 className="text-3xl md:text-4xl font-light text-primary mb-4 font-serif">
                Explore the Space
              </h2>
