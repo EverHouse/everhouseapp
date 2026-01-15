@@ -8,6 +8,7 @@ import { logAndRespond } from '../core/logger';
 import { getSessionUser } from '../types/session';
 import { notifyMember } from '../core/notificationService';
 import { calculateAndCacheParticipantFees } from '../core/billing/feeCalculator';
+import { consumeGuestPassForParticipant, canUseGuestPass } from '../core/billing/guestPassConsumer';
 
 const router = Router();
 
@@ -189,8 +190,8 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
 
     const { participantId, action, reason } = req.body;
 
-    if (!action || !['confirm', 'waive', 'confirm_all', 'waive_all'].includes(action)) {
-      return res.status(400).json({ error: 'Invalid action. Must be confirm, waive, confirm_all, or waive_all' });
+    if (!action || !['confirm', 'waive', 'use_guest_pass', 'confirm_all', 'waive_all'].includes(action)) {
+      return res.status(400).json({ error: 'Invalid action. Must be confirm, waive, use_guest_pass, confirm_all, or waive_all' });
     }
 
     if (action === 'waive' && !reason) {
@@ -211,7 +212,7 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
     const booking = bookingResult.rows[0];
     const sessionId = booking.session_id;
 
-    if (action === 'confirm' || action === 'waive') {
+    if (action === 'confirm' || action === 'waive' || action === 'use_guest_pass') {
       if (!participantId) {
         return res.status(400).json({ error: 'participantId required for individual payment action' });
       }
@@ -219,11 +220,78 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
       const newStatus = action === 'confirm' ? 'paid' : 'waived';
       
       const participantResult = await pool.query(
-        `SELECT payment_status FROM booking_participants WHERE id = $1`,
+        `SELECT bp.payment_status, bp.participant_type, bp.display_name, bs.session_date
+         FROM booking_participants bp
+         LEFT JOIN booking_sessions bs ON bp.session_id = bs.id
+         WHERE bp.id = $1`,
         [participantId]
       );
       
-      const previousStatus = participantResult.rows[0]?.payment_status || 'pending';
+      const participant = participantResult.rows[0];
+      const previousStatus = participant?.payment_status || 'pending';
+      const isGuest = participant?.participant_type === 'guest';
+      const guestName = participant?.display_name || 'Guest';
+      const sessionDate = participant?.session_date ? new Date(participant.session_date) : new Date();
+      
+      const useGuestPass = action === 'use_guest_pass' || 
+        (action === 'waive' && isGuest && 
+          (reason?.toLowerCase().includes('guest pass') || reason?.toLowerCase().includes('pass')));
+      
+      if (useGuestPass && sessionId) {
+        if (!isGuest) {
+          return res.status(400).json({ 
+            error: 'Guest pass can only be used for guest participants, not members or owners'
+          });
+        }
+        
+        const passCheck = await canUseGuestPass(booking.owner_email);
+        
+        if (!passCheck.canUse) {
+          return res.status(400).json({ 
+            error: `No guest passes remaining. ${booking.owner_email} has ${passCheck.remaining}/${passCheck.total} passes available.`
+          });
+        }
+        
+        const consumeResult = await consumeGuestPassForParticipant(
+          participantId,
+          booking.owner_email,
+          guestName,
+          sessionId,
+          sessionDate,
+          staffEmail
+        );
+        
+        if (!consumeResult.success) {
+          return res.status(400).json({ 
+            error: consumeResult.error || 'Failed to consume guest pass'
+          });
+        }
+        
+        await pool.query(`
+          INSERT INTO booking_payment_audit 
+            (booking_id, session_id, participant_id, action, staff_email, staff_name, reason, previous_status, new_status)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `, [
+          bookingId,
+          sessionId,
+          participantId,
+          'guest_pass_used',
+          staffEmail,
+          staffName,
+          `Guest pass consumed for ${guestName}. ${consumeResult.passesRemaining} passes remaining.`,
+          previousStatus,
+          'waived'
+        ]);
+        
+        return res.json({ 
+          success: true, 
+          message: `Guest pass used for ${guestName}. ${consumeResult.passesRemaining} passes remaining.`,
+          participantId,
+          newStatus: 'waived',
+          guestPassConsumed: true,
+          passesRemaining: consumeResult.passesRemaining
+        });
+      }
 
       await pool.query(
         `UPDATE booking_participants SET payment_status = $1 WHERE id = $2`,
