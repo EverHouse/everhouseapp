@@ -9,6 +9,7 @@ import { createDealForLegacyMember } from "../core/hubspotDeals";
 import { getHubSpotClient } from "../core/integrations";
 import { retryableHubSpotRequest } from "../core/hubspot/request";
 import { listCustomerInvoices } from "../core/stripe/invoices";
+import { getSessionUser } from "../types/session";
 import path from "path";
 
 interface UnifiedPurchase {
@@ -57,7 +58,8 @@ router.get("/api/legacy-purchases/member/:email", isStaffOrAdmin, async (req: Re
 // Supports ?user_email param for "View As" feature when staff views as another member
 router.get("/api/legacy-purchases/my-purchases", async (req: Request, res: Response) => {
   try {
-    const sessionEmail = (req as any).user?.email;
+    const sessionUser = getSessionUser(req);
+    const sessionEmail = sessionUser?.email;
     if (!sessionEmail) {
       return res.status(401).json({ error: "Not authenticated" });
     }
@@ -68,7 +70,7 @@ router.get("/api/legacy-purchases/my-purchases", async (req: Request, res: Respo
     
     if (requestedEmail && requestedEmail.toLowerCase() !== sessionEmail.toLowerCase()) {
       // Only staff/admin can view other members' purchases
-      const userRole = (req as any).user?.role;
+      const userRole = sessionUser?.role;
       if (userRole === 'admin' || userRole === 'staff') {
         targetEmail = decodeURIComponent(requestedEmail);
       }
@@ -262,7 +264,8 @@ router.get("/api/members/:email/unified-purchases", isStaffOrAdmin, async (req: 
 // Supports ?user_email param for "View As" feature when staff views as another member
 router.get("/api/my-unified-purchases", async (req: Request, res: Response) => {
   try {
-    const sessionEmail = (req as any).user?.email;
+    const sessionUser = getSessionUser(req);
+    const sessionEmail = sessionUser?.email;
     if (!sessionEmail) {
       return res.status(401).json({ error: "Not authenticated" });
     }
@@ -272,7 +275,7 @@ router.get("/api/my-unified-purchases", async (req: Request, res: Response) => {
     let targetEmail = sessionEmail;
     
     if (requestedEmail && requestedEmail.toLowerCase() !== sessionEmail.toLowerCase()) {
-      const userRole = (req as any).user?.role;
+      const userRole = sessionUser?.role;
       if (userRole === 'admin' || userRole === 'staff') {
         targetEmail = decodeURIComponent(requestedEmail);
       }
