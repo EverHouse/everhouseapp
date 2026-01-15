@@ -247,7 +247,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
 
         {/* Desktop Layout */}
         <div className="hidden lg:block space-y-6">
-          {/* Top row: Next Tour, Next Event, Internal Notice Board */}
+          {/* Top row: Next Tour, Next Event, Facility Status */}
           <div className="grid grid-cols-3 gap-6">
             <TodayScheduleSection
               upcomingTours={data.upcomingTours}
@@ -261,15 +261,19 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
               onTabChange={onTabChange}
               variant="desktop-top"
             />
-            <NoticeBoardWidget
+            <ResourcesSection
+              bayStatuses={data.bayStatuses}
               closures={data.closures}
               upcomingClosure={data.upcomingClosure}
               announcements={data.announcements}
               onTabChange={onTabChange}
+              variant="desktop"
+              recentActivity={data.recentActivity}
+              notifications={data.notifications}
             />
           </div>
 
-          {/* Row 1: Booking Requests, Upcoming Wellness, Facility Status */}
+          {/* Row 1: Booking Requests, Upcoming Wellness, Internal Notice Board */}
           <div className="grid grid-cols-3 gap-6">
             <BookingQueuesSection
               pendingRequests={data.pendingRequests}
@@ -294,15 +298,11 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
               onTabChange={onTabChange}
               variant="desktop-wellness"
             />
-            <ResourcesSection
-              bayStatuses={data.bayStatuses}
+            <NoticeBoardWidget
               closures={data.closures}
               upcomingClosure={data.upcomingClosure}
               announcements={data.announcements}
               onTabChange={onTabChange}
-              variant="desktop"
-              recentActivity={data.recentActivity}
-              notifications={data.notifications}
             />
           </div>
 
