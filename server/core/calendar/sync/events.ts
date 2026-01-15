@@ -139,6 +139,21 @@ export async function syncGoogleCalendarEvents(): Promise<{ synced: number; crea
               
               const formattedDate = new Date(dbRow.event_date).toISOString().split('T')[0];
               
+              // Handle events that span midnight (end time is earlier than start time)
+              let endDate = formattedDate;
+              if (dbRow.end_time && dbRow.start_time) {
+                const startParts = String(dbRow.start_time).split(':').map(Number);
+                const endParts = String(dbRow.end_time).split(':').map(Number);
+                const startMinutes = startParts[0] * 60 + (startParts[1] || 0);
+                const endMinutes = endParts[0] * 60 + (endParts[1] || 0);
+                if (endMinutes < startMinutes) {
+                  // Event spans midnight, end date should be next day
+                  const nextDay = new Date(dbRow.event_date);
+                  nextDay.setDate(nextDay.getDate() + 1);
+                  endDate = nextDay.toISOString().split('T')[0];
+                }
+              }
+              
               const patchResult = await calendar.events.patch({
                 calendarId,
                 eventId: googleEventId,
@@ -151,7 +166,7 @@ export async function syncGoogleCalendarEvents(): Promise<{ synced: number; crea
                     timeZone: 'America/Los_Angeles',
                   },
                   end: dbRow.end_time ? {
-                    dateTime: `${formattedDate}T${dbRow.end_time}`,
+                    dateTime: `${endDate}T${dbRow.end_time}`,
                     timeZone: 'America/Los_Angeles',
                   } : undefined,
                   extendedProperties: {
