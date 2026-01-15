@@ -33,6 +33,7 @@ const RESOURCES_ITEMS: NavItem[] = [
 
 const ADMIN_ITEMS: NavItem[] = [
   { id: 'tiers', icon: 'loyalty', label: 'Manage Tiers' },
+  { id: 'billing', icon: 'payments', label: 'Billing' },
   { id: 'gallery', icon: 'photo_library', label: 'Gallery' },
   { id: 'faqs', icon: 'help_outline', label: 'FAQs' },
   { id: 'inquiries', icon: 'mail', label: 'Inquiries' },
