@@ -21,3 +21,14 @@ export {
   type CreateSubscriptionParams,
   type SubscriptionResult
 } from './subscriptions';
+export {
+  createInvoice,
+  previewInvoice,
+  finalizeAndSendInvoice,
+  listCustomerInvoices,
+  getInvoice,
+  voidInvoice,
+  type InvoiceItem,
+  type CreateInvoiceParams,
+  type InvoiceResult
+} from './invoices';
