@@ -1,0 +1,441 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { useTheme } from '../../contexts/ThemeContext';
+import { apiRequest } from '../../lib/apiRequest';
+import {
+  Elements,
+  PaymentElement,
+  useStripe,
+  useElements,
+} from '@stripe/react-stripe-js';
+import { loadStripe, Stripe, StripeElementsOptions } from '@stripe/stripe-js';
+
+let stripePromise: Promise<Stripe | null> | null = null;
+
+async function getStripePromise(): Promise<Stripe | null> {
+  if (stripePromise) return stripePromise;
+  
+  try {
+    const res = await fetch('/api/stripe/config', { credentials: 'include' });
+    if (!res.ok) return null;
+    const { publishableKey } = await res.json();
+    if (!publishableKey) return null;
+    stripePromise = loadStripe(publishableKey);
+    return stripePromise;
+  } catch {
+    return null;
+  }
+}
+
+interface PassOption {
+  quantity: 1 | 3 | 5;
+  price: number;
+  pricePerPass: number;
+  savings?: number;
+}
+
+const PASS_OPTIONS: PassOption[] = [
+  { quantity: 1, price: 30, pricePerPass: 30 },
+  { quantity: 3, price: 75, pricePerPass: 25, savings: 15 },
+  { quantity: 5, price: 100, pricePerPass: 20, savings: 50 },
+];
+
+export interface GuestPassPurchaseModalProps {
+  userEmail: string;
+  userName: string;
+  onSuccess: () => void;
+  onClose: () => void;
+}
+
+interface PurchaseResponse {
+  clientSecret: string;
+  paymentIntentId: string;
+  quantity: number;
+  amountCents: number;
+}
+
+function GuestPassCheckoutForm({ 
+  onSuccess, 
+  onCancel,
+  quantity,
+  paymentIntentId
+}: { 
+  onSuccess: () => void; 
+  onCancel: () => void;
+  quantity: number;
+  paymentIntentId: string;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!stripe || !elements) {
+      return;
+    }
+
+    setIsProcessing(true);
+    setErrorMessage(null);
+
+    const { error, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: window.location.href,
+      },
+      redirect: 'if_required',
+    });
+
+    if (error) {
+      setErrorMessage(error.message || 'Payment failed');
+      setIsProcessing(false);
+    } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+      try {
+        await apiRequest(
+          `/api/member/guest-passes/confirm`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paymentIntentId, quantity })
+          }
+        );
+      } catch (err) {
+        console.error('[GuestPassPurchaseModal] Error confirming payment:', err);
+      }
+      onSuccess();
+    } else {
+      setErrorMessage('Payment incomplete. Please try again.');
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="bg-white dark:bg-[#1a1d12] rounded-lg p-4 border border-primary/10 dark:border-white/10">
+        <PaymentElement
+          options={{
+            layout: 'tabs',
+          }}
+        />
+      </div>
+
+      {errorMessage && (
+        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/30 rounded-xl text-red-700 dark:text-red-300 text-sm">
+          {errorMessage}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={!stripe || isProcessing}
+          className="flex-1 py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {isProcessing ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+              Processing...
+            </>
+          ) : (
+            <>
+              <span className="material-symbols-outlined">credit_card</span>
+              Complete Purchase
+            </>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isProcessing}
+          className="px-4 py-3 bg-primary/10 dark:bg-white/10 text-primary dark:text-white font-medium rounded-xl hover:bg-primary/20 dark:hover:bg-white/20 transition-colors disabled:opacity-50"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+export function GuestPassPurchaseModal({
+  userEmail,
+  userName,
+  onSuccess,
+  onClose
+}: GuestPassPurchaseModalProps) {
+  const { effectiveTheme } = useTheme();
+  const isDark = effectiveTheme === 'dark';
+
+  const [selectedOption, setSelectedOption] = useState<PassOption | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [paymentData, setPaymentData] = useState<PurchaseResponse | null>(null);
+  const [stripeInstance, setStripeInstance] = useState<Stripe | null>(null);
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
+  const initializePayment = useCallback(async (option: PassOption) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const stripe = await getStripePromise();
+      if (!stripe) {
+        setError('Payment system not available');
+        setLoading(false);
+        return;
+      }
+      setStripeInstance(stripe);
+
+      const { ok, data, error: apiError } = await apiRequest<PurchaseResponse>(
+        `/api/member/guest-passes/purchase`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ quantity: option.quantity })
+        }
+      );
+
+      if (ok && data) {
+        setPaymentData(data);
+      } else {
+        setError(apiError || 'Failed to initialize payment');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to initialize payment');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleSelectOption = (option: PassOption) => {
+    setSelectedOption(option);
+    initializePayment(option);
+  };
+
+  const handleBack = () => {
+    setSelectedOption(null);
+    setPaymentData(null);
+    setError(null);
+  };
+
+  const options: StripeElementsOptions | null = paymentData?.clientSecret ? {
+    clientSecret: paymentData.clientSecret,
+    appearance: {
+      theme: 'stripe',
+      variables: {
+        colorPrimary: '#31543C',
+        colorBackground: '#ffffff',
+        colorText: '#31543C',
+        colorDanger: '#df1b41',
+        fontFamily: 'system-ui, sans-serif',
+        borderRadius: '8px',
+      },
+    },
+  } : null;
+
+  const modalContent = (
+    <div
+      className={`fixed inset-0 z-[60] ${isDark ? 'dark' : ''}`}
+      style={{ overscrollBehavior: 'contain', touchAction: 'none' }}
+    >
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm animate-backdrop-fade-in"
+        aria-hidden="true"
+        onClick={onClose}
+        style={{ touchAction: 'none' }}
+      />
+
+      <div
+        className="fixed inset-0 overflow-y-auto"
+        style={{ overscrollBehavior: 'contain' }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            onClose();
+          }
+        }}
+      >
+        <div
+          className="flex min-h-full items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              onClose();
+            }
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="guest-pass-modal-title"
+            onClick={(e) => e.stopPropagation()}
+            className={`relative w-full max-w-md max-h-[90vh] overflow-hidden ${
+              isDark ? 'bg-black/80' : 'bg-white/80'
+            } backdrop-blur-xl border border-primary/10 dark:border-white/10 rounded-2xl shadow-2xl animate-modal-slide-up`}
+          >
+            <div className={`flex items-center justify-between p-4 border-b ${isDark ? 'bg-white/5 border-white/10' : 'bg-primary/5 border-primary/10'}`}>
+              <div className="flex items-center gap-2">
+                {selectedOption && (
+                  <button
+                    onClick={handleBack}
+                    className={`p-2 -ml-2 rounded-full transition-colors ${
+                      isDark ? 'hover:bg-white/10 text-gray-300' : 'hover:bg-gray-100 text-gray-600'
+                    }`}
+                    aria-label="Go back"
+                  >
+                    <span className="material-symbols-outlined text-xl">arrow_back</span>
+                  </button>
+                )}
+                <h3
+                  id="guest-pass-modal-title"
+                  className={`text-xl font-bold font-serif ${isDark ? 'text-white' : 'text-primary'}`}
+                >
+                  {selectedOption ? 'Complete Purchase' : 'Buy Guest Passes'}
+                </h3>
+              </div>
+              <button
+                onClick={onClose}
+                className={`p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-colors ${
+                  isDark ? 'hover:bg-white/10 text-gray-300' : 'hover:bg-gray-100 text-gray-600'
+                }`}
+                aria-label="Close modal"
+              >
+                <span className="material-symbols-outlined text-xl" aria-hidden="true">close</span>
+              </button>
+            </div>
+
+            <div
+              className="overflow-y-auto p-4"
+              style={{ maxHeight: 'calc(90vh - 80px)', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', overscrollBehavior: 'contain' }}
+            >
+              {!selectedOption && (
+                <div className="space-y-3">
+                  <p className={`text-sm mb-4 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
+                    Purchase additional guest passes to bring more friends and family to the club.
+                  </p>
+                  
+                  {PASS_OPTIONS.map((option) => (
+                    <button
+                      key={option.quantity}
+                      onClick={() => handleSelectOption(option)}
+                      className={`w-full p-4 rounded-2xl border transition-all text-left ${
+                        isDark 
+                          ? 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20' 
+                          : 'bg-primary/5 border-primary/10 hover:bg-primary/10 hover:border-primary/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-primary'}`}>
+                              {option.quantity} {option.quantity === 1 ? 'Pass' : 'Passes'}
+                            </span>
+                            {option.savings && (
+                              <span className="px-2 py-0.5 text-xs font-bold bg-green-500/20 text-green-600 dark:text-green-400 rounded-full">
+                                Save ${option.savings}
+                              </span>
+                            )}
+                          </div>
+                          <p className={`text-sm mt-1 ${isDark ? 'text-white/60' : 'text-primary/60'}`}>
+                            ${option.pricePerPass} per pass
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <span className={`text-2xl font-bold font-serif ${isDark ? 'text-white' : 'text-primary'}`}>
+                            ${option.price}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {selectedOption && loading && (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
+                </div>
+              )}
+
+              {selectedOption && error && (
+                <div className="text-center py-8">
+                  <span className="material-symbols-outlined text-4xl text-red-500 mb-2">error</span>
+                  <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+                  <button
+                    onClick={handleBack}
+                    className="px-4 py-2 bg-primary/10 dark:bg-white/10 text-primary dark:text-white rounded-xl"
+                  >
+                    Go Back
+                  </button>
+                </div>
+              )}
+
+              {selectedOption && !loading && !error && paymentData && stripeInstance && options && (
+                <div className="space-y-4">
+                  <div className={`rounded-xl p-4 ${isDark ? 'bg-white/5' : 'bg-primary/5'}`}>
+                    <h4 className={`text-sm font-bold mb-3 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
+                      Order Summary
+                    </h4>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold ${
+                          isDark
+                            ? 'bg-primary/20 text-primary'
+                            : 'bg-primary/10 text-primary'
+                        }`}>
+                          {selectedOption.quantity}
+                        </span>
+                        <span className={`text-sm ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
+                          Guest {selectedOption.quantity === 1 ? 'Pass' : 'Passes'}
+                        </span>
+                      </div>
+                      <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-primary'}`}>
+                        ${selectedOption.price.toFixed(2)}
+                      </span>
+                    </div>
+                    {selectedOption.savings && (
+                      <div className={`mt-2 pt-2 border-t flex items-center justify-between ${isDark ? 'border-white/10' : 'border-primary/10'}`}>
+                        <span className={`text-xs ${isDark ? 'text-green-400' : 'text-green-600'}`}>
+                          You save
+                        </span>
+                        <span className={`text-xs font-medium ${isDark ? 'text-green-400' : 'text-green-600'}`}>
+                          ${selectedOption.savings.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    <div className={`mt-3 pt-3 border-t flex items-center justify-between ${isDark ? 'border-white/10' : 'border-primary/10'}`}>
+                      <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-primary'}`}>
+                        Total
+                      </span>
+                      <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-primary'}`}>
+                        ${selectedOption.price.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <Elements stripe={stripeInstance} options={options}>
+                    <GuestPassCheckoutForm 
+                      onSuccess={onSuccess} 
+                      onCancel={onClose}
+                      quantity={selectedOption.quantity}
+                      paymentIntentId={paymentData.paymentIntentId}
+                    />
+                  </Elements>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return createPortal(modalContent, document.body);
+}
+
+export default GuestPassPurchaseModal;

@@ -852,6 +852,575 @@ router.post('/api/member/bookings/:id/confirm-payment', async (req: Request, res
   }
 });
 
+router.post('/api/member/invoices/:invoiceId/pay', async (req: Request, res: Response) => {
+  try {
+    const sessionEmail = (req as any).user?.email;
+    if (!sessionEmail) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { invoiceId } = req.params;
+    if (!invoiceId || !invoiceId.startsWith('in_')) {
+      return res.status(400).json({ error: 'Invalid invoice ID' });
+    }
+
+    const userResult = await pool.query(
+      'SELECT id, stripe_customer_id, first_name, last_name, email FROM users WHERE LOWER(email) = $1',
+      [sessionEmail.toLowerCase()]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userResult.rows[0];
+    const stripeCustomerId = user.stripe_customer_id;
+
+    if (!stripeCustomerId) {
+      return res.status(400).json({ error: 'No billing account found. Please contact support.' });
+    }
+
+    const invoiceResult = await getInvoice(invoiceId);
+
+    if (!invoiceResult.success || !invoiceResult.invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    const invoice = invoiceResult.invoice;
+
+    const { getStripeClient } = await import('../core/stripe/client');
+    const stripe = await getStripeClient();
+    const stripeInvoice = await stripe.invoices.retrieve(invoiceId);
+
+    if (stripeInvoice.customer !== stripeCustomerId) {
+      return res.status(403).json({ error: 'You do not have permission to pay this invoice' });
+    }
+
+    if (invoice.status !== 'open') {
+      if (invoice.status === 'paid') {
+        return res.status(400).json({ error: 'This invoice has already been paid' });
+      }
+      return res.status(400).json({ error: `Cannot pay invoice with status: ${invoice.status}` });
+    }
+
+    const amountDue = invoice.amountDue;
+    if (amountDue < 50) {
+      return res.status(400).json({ error: 'Invoice amount is too small to process' });
+    }
+
+    const primaryLine = invoice.lines?.[0];
+    const description = primaryLine?.description || invoice.description || `Invoice ${invoiceId}`;
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amountDue,
+      currency: invoice.currency || 'usd',
+      customer: stripeCustomerId,
+      metadata: {
+        invoice_id: invoiceId,
+        purpose: 'invoice_payment',
+        member_email: sessionEmail,
+        source: 'ever_house_member_portal'
+      },
+      description: `Payment for: ${description}`,
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    console.log(`[Stripe] Member invoice payment intent created for ${invoiceId}: $${(amountDue / 100).toFixed(2)}`);
+
+    res.json({
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      invoiceId: invoiceId,
+      amount: amountDue / 100,
+      description: description,
+      currency: invoice.currency || 'usd'
+    });
+  } catch (error: any) {
+    console.error('[Stripe] Error creating invoice payment intent:', error);
+    res.status(500).json({ error: 'Failed to initialize payment' });
+  }
+});
+
+router.post('/api/member/invoices/:invoiceId/confirm', async (req: Request, res: Response) => {
+  try {
+    const sessionEmail = (req as any).user?.email;
+    if (!sessionEmail) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { invoiceId } = req.params;
+    const { paymentIntentId } = req.body;
+
+    if (!invoiceId || !paymentIntentId) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const userResult = await pool.query(
+      'SELECT stripe_customer_id FROM users WHERE LOWER(email) = $1',
+      [sessionEmail.toLowerCase()]
+    );
+
+    const stripeCustomerId = userResult.rows[0]?.stripe_customer_id;
+    if (!stripeCustomerId) {
+      return res.status(400).json({ error: 'No billing account found' });
+    }
+
+    const { getStripeClient } = await import('../core/stripe/client');
+    const stripe = await getStripeClient();
+
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+    if (paymentIntent.status !== 'succeeded') {
+      return res.status(400).json({ error: 'Payment has not succeeded' });
+    }
+
+    if (paymentIntent.metadata?.invoice_id !== invoiceId) {
+      return res.status(400).json({ error: 'Payment does not match invoice' });
+    }
+
+    try {
+      await stripe.invoices.pay(invoiceId, {
+        paid_out_of_band: true,
+      });
+      console.log(`[Stripe] Invoice ${invoiceId} marked as paid out of band after PaymentIntent ${paymentIntentId} succeeded`);
+    } catch (payErr: any) {
+      if (payErr.code === 'invoice_already_paid') {
+        console.log(`[Stripe] Invoice ${invoiceId} was already marked as paid`);
+      } else {
+        console.error('[Stripe] Error marking invoice as paid:', payErr);
+      }
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[Stripe] Error confirming invoice payment:', error);
+    res.status(500).json({ error: 'Failed to confirm payment' });
+  }
+});
+
+const GUEST_PASS_PRICING: Record<number, number> = {
+  1: 3000,
+  3: 7500,
+  5: 10000,
+};
+
+router.post('/api/member/guest-passes/purchase', async (req: Request, res: Response) => {
+  try {
+    const sessionEmail = (req as any).user?.email;
+    if (!sessionEmail) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { quantity } = req.body;
+
+    if (!quantity || ![1, 3, 5].includes(quantity)) {
+      return res.status(400).json({ error: 'Invalid quantity. Must be 1, 3, or 5.' });
+    }
+
+    const amountCents = GUEST_PASS_PRICING[quantity];
+    if (!amountCents) {
+      return res.status(400).json({ error: 'Invalid pricing configuration' });
+    }
+
+    const userResult = await pool.query(
+      'SELECT id, stripe_customer_id, first_name, last_name FROM users WHERE LOWER(email) = $1',
+      [sessionEmail.toLowerCase()]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userResult.rows[0];
+    const memberName = [user.first_name, user.last_name].filter(Boolean).join(' ') || sessionEmail.split('@')[0];
+
+    let stripeCustomerId = user.stripe_customer_id;
+    if (!stripeCustomerId) {
+      const customerResult = await getOrCreateStripeCustomer(sessionEmail, sessionEmail, memberName);
+      stripeCustomerId = customerResult.customerId;
+    }
+
+    const { getStripeClient } = await import('../core/stripe/client');
+    const stripe = await getStripeClient();
+
+    const description = `${quantity} Guest Pass${quantity > 1 ? 'es' : ''} - Ever House`;
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amountCents,
+      currency: 'usd',
+      customer: stripeCustomerId,
+      metadata: {
+        purpose: 'guest_pass_purchase',
+        quantity: quantity.toString(),
+        member_email: sessionEmail,
+        source: 'ever_house_member_portal'
+      },
+      description,
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    console.log(`[Stripe] Guest pass purchase intent created for ${sessionEmail}: ${quantity} passes, $${(amountCents / 100).toFixed(2)}`);
+
+    res.json({
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      quantity,
+      amountCents
+    });
+  } catch (error: any) {
+    console.error('[Stripe] Error creating guest pass payment intent:', error);
+    res.status(500).json({ error: 'Failed to initialize payment' });
+  }
+});
+
+router.post('/api/member/guest-passes/confirm', async (req: Request, res: Response) => {
+  try {
+    const sessionEmail = (req as any).user?.email;
+    if (!sessionEmail) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { paymentIntentId, quantity } = req.body;
+
+    if (!paymentIntentId || !quantity) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    if (![1, 3, 5].includes(quantity)) {
+      return res.status(400).json({ error: 'Invalid quantity' });
+    }
+
+    const { getStripeClient } = await import('../core/stripe/client');
+    const stripe = await getStripeClient();
+
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+    if (paymentIntent.status !== 'succeeded') {
+      return res.status(400).json({ error: 'Payment has not succeeded' });
+    }
+
+    if (paymentIntent.metadata?.purpose !== 'guest_pass_purchase') {
+      return res.status(400).json({ error: 'Invalid payment type' });
+    }
+
+    const paymentQuantity = parseInt(paymentIntent.metadata?.quantity || '0');
+    if (paymentQuantity !== quantity) {
+      return res.status(400).json({ error: 'Quantity mismatch' });
+    }
+
+    const expectedAmount = GUEST_PASS_PRICING[quantity];
+    if (paymentIntent.amount !== expectedAmount) {
+      console.error(`[Stripe] Amount mismatch for guest pass purchase: expected ${expectedAmount}, got ${paymentIntent.amount}`);
+      return res.status(400).json({ error: 'Payment amount mismatch' });
+    }
+
+    const existingPass = await pool.query(
+      'SELECT id, passes_total FROM guest_passes WHERE member_email = $1',
+      [sessionEmail]
+    );
+
+    if (existingPass.rows.length > 0) {
+      await pool.query(
+        'UPDATE guest_passes SET passes_total = passes_total + $1 WHERE member_email = $2',
+        [quantity, sessionEmail]
+      );
+      console.log(`[Stripe] Added ${quantity} guest passes to existing record for ${sessionEmail}`);
+    } else {
+      await pool.query(
+        'INSERT INTO guest_passes (member_email, passes_used, passes_total) VALUES ($1, 0, $2)',
+        [sessionEmail, quantity]
+      );
+      console.log(`[Stripe] Created new guest pass record with ${quantity} passes for ${sessionEmail}`);
+    }
+
+    res.json({ success: true, passesAdded: quantity });
+  } catch (error: any) {
+    console.error('[Stripe] Error confirming guest pass purchase:', error);
+    res.status(500).json({ error: 'Failed to confirm payment' });
+  }
+});
+
+// ============================================================================
+// Member Balance Endpoints
+// ============================================================================
+
+router.get('/api/member/balance', async (req: Request, res: Response) => {
+  try {
+    const sessionUser = (req.session as any)?.user;
+    if (!sessionUser?.email) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const memberEmail = sessionUser.email.toLowerCase();
+
+    // Query all unpaid booking_participants for this member
+    const result = await pool.query(
+      `SELECT 
+        bp.id as participant_id,
+        bp.session_id,
+        bp.participant_type,
+        bp.display_name,
+        bp.payment_status,
+        bp.cached_fee_cents,
+        bs.session_date,
+        bs.start_time,
+        bs.end_time,
+        r.name as resource_name,
+        COALESCE(ul.overage_fee, 0) + COALESCE(ul.guest_fee, 0) as ledger_fee
+       FROM booking_participants bp
+       JOIN booking_sessions bs ON bs.id = bp.session_id
+       LEFT JOIN resources r ON r.id = bs.resource_id
+       LEFT JOIN usage_ledger ul ON ul.session_id = bp.session_id AND ul.member_id = bp.user_id
+       WHERE LOWER(bp.user_id) = $1
+         AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
+         AND bp.participant_type IN ('owner', 'member')
+       ORDER BY bs.session_date DESC, bs.start_time DESC`,
+      [memberEmail]
+    );
+
+    // Also get unpaid guest fees where this member is the owner (responsible for guests)
+    const guestResult = await pool.query(
+      `SELECT 
+        bp.id as participant_id,
+        bp.session_id,
+        bp.participant_type,
+        bp.display_name,
+        bp.payment_status,
+        bp.cached_fee_cents,
+        bs.session_date,
+        bs.start_time,
+        bs.end_time,
+        r.name as resource_name,
+        owner_bp.user_id as owner_email
+       FROM booking_participants bp
+       JOIN booking_sessions bs ON bs.id = bp.session_id
+       LEFT JOIN resources r ON r.id = bs.resource_id
+       JOIN booking_participants owner_bp ON owner_bp.session_id = bp.session_id 
+         AND owner_bp.participant_type = 'owner'
+       WHERE bp.participant_type = 'guest'
+         AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
+         AND LOWER(owner_bp.user_id) = $1
+         AND bp.cached_fee_cents > 0
+       ORDER BY bs.session_date DESC, bs.start_time DESC`,
+      [memberEmail]
+    );
+
+    const GUEST_FEE_CENTS = 2500;
+    const breakdown: Array<{
+      id: number;
+      sessionId: number;
+      type: 'overage' | 'guest';
+      description: string;
+      date: string;
+      amountCents: number;
+    }> = [];
+
+    // Process member fees (overage/personal fees)
+    for (const row of result.rows) {
+      let amountCents = 0;
+      
+      if (row.cached_fee_cents > 0) {
+        amountCents = row.cached_fee_cents;
+      } else if (parseFloat(row.ledger_fee) > 0) {
+        amountCents = Math.round(parseFloat(row.ledger_fee) * 100);
+      }
+      
+      if (amountCents > 0) {
+        const dateStr = row.session_date ? new Date(row.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+        breakdown.push({
+          id: row.participant_id,
+          sessionId: row.session_id,
+          type: 'overage',
+          description: `${row.resource_name || 'Booking'} - ${dateStr}`,
+          date: row.session_date,
+          amountCents
+        });
+      }
+    }
+
+    // Process guest fees
+    for (const row of guestResult.rows) {
+      const amountCents = row.cached_fee_cents || GUEST_FEE_CENTS;
+      const dateStr = row.session_date ? new Date(row.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+      breakdown.push({
+        id: row.participant_id,
+        sessionId: row.session_id,
+        type: 'guest',
+        description: `Guest: ${row.display_name} - ${dateStr}`,
+        date: row.session_date,
+        amountCents
+      });
+    }
+
+    const totalCents = breakdown.reduce((sum, item) => sum + item.amountCents, 0);
+
+    res.json({
+      totalCents,
+      totalDollars: totalCents / 100,
+      itemCount: breakdown.length,
+      breakdown
+    });
+  } catch (error: any) {
+    console.error('[Member Balance] Error getting balance:', error);
+    res.status(500).json({ error: 'Failed to get balance' });
+  }
+});
+
+router.post('/api/member/balance/pay', async (req: Request, res: Response) => {
+  try {
+    const sessionUser = (req.session as any)?.user;
+    if (!sessionUser?.email) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const memberEmail = sessionUser.email.toLowerCase();
+    const memberName = sessionUser.name || memberEmail.split('@')[0];
+
+    // Recalculate the balance server-side (never trust client)
+    const result = await pool.query(
+      `SELECT 
+        bp.id as participant_id,
+        bp.session_id,
+        bp.cached_fee_cents,
+        COALESCE(ul.overage_fee, 0) + COALESCE(ul.guest_fee, 0) as ledger_fee
+       FROM booking_participants bp
+       LEFT JOIN usage_ledger ul ON ul.session_id = bp.session_id AND ul.member_id = bp.user_id
+       WHERE LOWER(bp.user_id) = $1
+         AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
+         AND bp.participant_type IN ('owner', 'member')`,
+      [memberEmail]
+    );
+
+    const guestResult = await pool.query(
+      `SELECT 
+        bp.id as participant_id,
+        bp.session_id,
+        bp.cached_fee_cents
+       FROM booking_participants bp
+       JOIN booking_participants owner_bp ON owner_bp.session_id = bp.session_id 
+         AND owner_bp.participant_type = 'owner'
+       WHERE bp.participant_type = 'guest'
+         AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
+         AND LOWER(owner_bp.user_id) = $1
+         AND bp.cached_fee_cents > 0`,
+      [memberEmail]
+    );
+
+    const GUEST_FEE_CENTS = 2500;
+    const participantFees: Array<{id: number; amountCents: number}> = [];
+
+    for (const row of result.rows) {
+      let amountCents = 0;
+      if (row.cached_fee_cents > 0) {
+        amountCents = row.cached_fee_cents;
+      } else if (parseFloat(row.ledger_fee) > 0) {
+        amountCents = Math.round(parseFloat(row.ledger_fee) * 100);
+      }
+      if (amountCents > 0) {
+        participantFees.push({ id: row.participant_id, amountCents });
+      }
+    }
+
+    for (const row of guestResult.rows) {
+      const amountCents = row.cached_fee_cents || GUEST_FEE_CENTS;
+      participantFees.push({ id: row.participant_id, amountCents });
+    }
+
+    const totalCents = participantFees.reduce((sum, f) => sum + f.amountCents, 0);
+
+    if (totalCents < 50) {
+      return res.status(400).json({ error: 'No outstanding balance to pay or amount too small' });
+    }
+
+    // Create fee snapshot
+    const client = await pool.connect();
+    let snapshotId: number | null = null;
+
+    try {
+      await client.query('BEGIN');
+      
+      const snapshotResult = await client.query(
+        `INSERT INTO booking_fee_snapshots (booking_id, session_id, participant_fees, total_cents, status)
+         VALUES (0, 0, $1, $2, 'pending') RETURNING id`,
+        [JSON.stringify(participantFees), totalCents]
+      );
+      snapshotId = snapshotResult.rows[0].id;
+      
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    // Create payment intent
+    const paymentResult = await createPaymentIntent({
+      userId: memberEmail,
+      email: memberEmail,
+      memberName,
+      amountCents: totalCents,
+      purpose: 'overage_fee',
+      description: `Outstanding balance payment - ${participantFees.length} item(s)`,
+      metadata: {
+        feeSnapshotId: snapshotId!.toString(),
+        participantFees: JSON.stringify(participantFees),
+        balancePayment: 'true'
+      }
+    });
+
+    // Update snapshot with payment intent ID
+    await pool.query(
+      `UPDATE booking_fee_snapshots SET stripe_payment_intent_id = $1 WHERE id = $2`,
+      [paymentResult.paymentIntentId, snapshotId]
+    );
+
+    res.json({
+      clientSecret: paymentResult.clientSecret,
+      paymentIntentId: paymentResult.paymentIntentId,
+      totalCents,
+      itemCount: participantFees.length,
+      participantFees
+    });
+  } catch (error: any) {
+    console.error('[Member Balance] Error creating payment:', error);
+    res.status(500).json({ error: 'Failed to create payment' });
+  }
+});
+
+router.post('/api/member/balance/confirm', async (req: Request, res: Response) => {
+  try {
+    const sessionUser = (req.session as any)?.user;
+    if (!sessionUser?.email) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { paymentIntentId } = req.body;
+    if (!paymentIntentId) {
+      return res.status(400).json({ error: 'Missing paymentIntentId' });
+    }
+
+    const result = await confirmPaymentSuccess(
+      paymentIntentId,
+      sessionUser.email,
+      sessionUser.name || 'Member'
+    );
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[Member Balance] Error confirming payment:', error);
+    res.status(500).json({ error: 'Failed to confirm payment' });
+  }
+});
+
 router.get('/api/billing/members/search', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
     const { query, includeInactive } = req.query;

@@ -10,6 +10,7 @@ import MemberBottomNav from '../../components/MemberBottomNav';
 import { BottomSentinel } from '../../components/layout/BottomSentinel';
 import { formatDateShort, getTodayString, formatTime12Hour, getNowTimePacific, getRelativeDateLabel } from '../../utils/dateUtils';
 import { getStatusColor, formatStatusLabel } from '../../utils/statusColors';
+import InvoicePaymentModal from '../../components/billing/InvoicePaymentModal';
 
 interface Participant {
   name: string;
@@ -112,6 +113,7 @@ const History: React.FC = () => {
   const [purchases, setPurchases] = useState<UnifiedPurchase[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null);
 
   const fetchBookings = useCallback(async () => {
     if (!user?.email) return;
@@ -633,7 +635,16 @@ const History: React.FC = () => {
                             <p className={`text-lg font-bold ${invoice.status === 'paid' ? (isDark ? 'text-accent' : 'text-brand-green') : (isDark ? 'text-white' : 'text-primary')}`}>
                               {formatAmount(invoice.amountDue)}
                             </p>
-                            {invoice.hostedInvoiceUrl && (
+                            {(invoice.status === 'open') && (
+                              <button
+                                onClick={() => setPayingInvoice(invoice)}
+                                className="bg-primary text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-primary/90 transition-colors flex items-center gap-1.5 mt-2"
+                              >
+                                <span className="material-symbols-outlined text-sm">credit_card</span>
+                                Pay Now
+                              </button>
+                            )}
+                            {invoice.hostedInvoiceUrl && invoice.status !== 'open' && (
                               <a 
                                 href={invoice.hostedInvoiceUrl}
                                 target="_blank"
@@ -658,6 +669,19 @@ const History: React.FC = () => {
         <BottomSentinel />
       </SwipeablePage>
       <MemberBottomNav currentPath="/history" isDarkTheme={isDark} />
+
+      {payingInvoice && user && (
+        <InvoicePaymentModal
+          invoice={payingInvoice}
+          userEmail={user.email || ''}
+          userName={user.name || user.email?.split('@')[0] || 'Member'}
+          onSuccess={async () => {
+            setPayingInvoice(null);
+            await fetchInvoices();
+          }}
+          onClose={() => setPayingInvoice(null)}
+        />
+      )}
     </PullToRefresh>
   );
 };

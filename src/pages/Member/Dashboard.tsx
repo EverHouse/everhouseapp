@@ -26,6 +26,8 @@ import ModalShell from '../../components/ModalShell';
 import MetricsGrid from '../../components/MetricsGrid';
 import { RosterManager } from '../../components/booking';
 import { apiRequest } from '../../lib/apiRequest';
+import BalanceCard from '../../components/billing/BalanceCard';
+import BalancePaymentModal from '../../components/billing/BalancePaymentModal';
 
 const GUEST_CHECKIN_FIELDS = [
   { name: 'guest_firstname', label: 'Guest First Name', type: 'text' as const, required: true, placeholder: 'John' },
@@ -145,6 +147,8 @@ const Dashboard: React.FC = () => {
   const [bannerAnnouncement, setBannerAnnouncement] = useState<{ id: string; title: string; desc: string; linkType?: string; linkTarget?: string } | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [processingInviteId, setProcessingInviteId] = useState<number | null>(null);
+  const [showBalancePaymentModal, setShowBalancePaymentModal] = useState(false);
+  const [balanceRefreshKey, setBalanceRefreshKey] = useState(0);
 
   const isStaffOrAdminProfile = user?.role === 'admin' || user?.role === 'staff';
   const { permissions: tierPermissions } = useTierPermissions(user?.tier);
@@ -978,6 +982,16 @@ const Dashboard: React.FC = () => {
           </div>
         )}
 
+        {/* My Balance Section */}
+        {!isStaffOrAdminProfile && (
+          <div className="mb-6 animate-pop-in" style={{animationDelay: '0.125s'}}>
+            <BalanceCard 
+              key={balanceRefreshKey}
+              onPayNow={() => setShowBalancePaymentModal(true)} 
+            />
+          </div>
+        )}
+
         {error ? (
         <div className="p-4 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 text-sm flex items-center gap-3 mb-6">
           <span className="material-symbols-outlined">error</span>
@@ -1246,6 +1260,20 @@ const Dashboard: React.FC = () => {
         }
       }}
     />
+
+    {/* Balance Payment Modal */}
+    {showBalancePaymentModal && user && (
+      <BalancePaymentModal
+        memberEmail={user.email}
+        memberName={user.name}
+        onSuccess={() => {
+          setShowBalancePaymentModal(false);
+          setBalanceRefreshKey(prev => prev + 1);
+          showToast('Payment successful! Your balance has been cleared.', 'success');
+        }}
+        onClose={() => setShowBalancePaymentModal(false)}
+      />
+    )}
 
     {/* Membership Details Modal */}
     <ModalShell 

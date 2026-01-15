@@ -18,6 +18,7 @@ import MemberBottomNav from '../../components/MemberBottomNav';
 import { BottomSentinel } from '../../components/layout/BottomSentinel';
 import BugReportModal from '../../components/BugReportModal';
 import ModalShell from '../../components/ModalShell';
+import GuestPassPurchaseModal from '../../components/billing/GuestPassPurchaseModal';
 
 
 const GUEST_CHECKIN_FIELDS = [
@@ -57,6 +58,7 @@ const Profile: React.FC = () => {
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [showBugReport, setShowBugReport] = useState(false);
   const [staffDetails, setStaffDetails] = useState<{phone?: string; job_title?: string} | null>(null);
+  const [showGuestPassPurchase, setShowGuestPassPurchase] = useState(false);
 
   // Check if viewing a staff/admin profile (either directly or via view-as)
   const isStaffOrAdminProfile = user?.role === 'admin' || user?.role === 'staff';
@@ -353,6 +355,41 @@ const Profile: React.FC = () => {
             <Row icon="lock" label="Privacy" arrow isDark={isDark} />
          </Section>
 
+         {/* Guest Passes Section - only for members, not staff/admin */}
+         {!isStaffOrAdminProfile && guestPasses && (
+           <Section title="Guest Passes" isDark={isDark} delay="0.15s">
+             <div className={`p-4 ${isDark ? '' : ''}`}>
+               <div className="flex items-center justify-between mb-4">
+                 <div className="flex items-center gap-4">
+                   <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>group_add</span>
+                   <div>
+                     <span className={`font-medium text-sm ${isDark ? '' : 'text-primary'}`}>Monthly Balance</span>
+                     <p className={`text-xs mt-0.5 ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
+                       Passes remaining this month
+                     </p>
+                   </div>
+                 </div>
+                 <div className="text-right">
+                   <span className={`text-2xl font-bold font-serif ${isDark ? 'text-white' : 'text-primary'}`}>
+                     {guestPasses.passes_remaining}
+                   </span>
+                   <span className={`text-sm ${isDark ? 'opacity-60' : 'text-primary/60'}`}>
+                     {' '}/ {guestPasses.passes_total}
+                   </span>
+                 </div>
+               </div>
+               
+               <button
+                 onClick={() => setShowGuestPassPurchase(true)}
+                 className="w-full py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+               >
+                 <span className="material-symbols-outlined text-lg">add_shopping_cart</span>
+                 Buy More Passes
+               </button>
+             </div>
+           </Section>
+         )}
+
          {/* Password Setup Banner for Staff/Admin */}
          {showPasswordSetupBanner && isStaffOrAdminProfile && (
            <div className={`rounded-2xl p-4 mb-4 ${isDark ? 'bg-accent/20 border border-accent/30' : 'bg-amber-50 border border-amber-200'}`}>
@@ -493,6 +530,28 @@ const Profile: React.FC = () => {
         isOpen={showBugReport}
         onClose={() => setShowBugReport(false)}
       />
+
+      {/* Guest Pass Purchase Modal */}
+      {showGuestPassPurchase && user && (
+        <GuestPassPurchaseModal
+          userEmail={user.email}
+          userName={user.name}
+          onSuccess={async () => {
+            setShowGuestPassPurchase(false);
+            showToast('Guest passes purchased successfully!', 'success');
+            try {
+              const res = await fetch(`/api/guest-passes/${encodeURIComponent(user.email)}?tier=${encodeURIComponent(user.tier || 'Social')}`, { credentials: 'include' });
+              if (res.ok) {
+                const data = await res.json();
+                setGuestPasses(data);
+              }
+            } catch (err) {
+              console.error('Error refreshing guest passes:', err);
+            }
+          }}
+          onClose={() => setShowGuestPassPurchase(false)}
+        />
+      )}
 
       {/* Guest Check-In Modal */}
       <HubSpotFormModal
