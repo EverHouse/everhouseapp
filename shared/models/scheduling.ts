@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { index, uniqueIndex, jsonb, pgTable, timestamp, varchar, serial, boolean, text, date, time, integer, numeric, pgEnum } from "drizzle-orm/pg-core";
+import { users } from "./auth-session";
 
 export const bookingSourceEnum = pgEnum("booking_source", ["member_request", "staff_manual", "trackman_import"]);
 export const paymentMethodEnum = pgEnum("payment_method", ["guest_pass", "credit_card", "unpaid", "waived"]);
@@ -17,10 +18,10 @@ export const resources = pgTable("resources", {
 });
 
 // Availability blocks table - blocked time slots
-// Note: resource_id references resources.id (simulators and conference room)
+// FK constraint: resource_id references resources.id with CASCADE delete
 export const availabilityBlocks = pgTable("availability_blocks", {
   id: serial("id").primaryKey(),
-  resourceId: integer("resource_id"),
+  resourceId: integer("resource_id").references(() => resources.id, { onDelete: 'cascade' }),
   blockDate: date("block_date").notNull(),
   startTime: time("start_time").notNull(),
   endTime: time("end_time").notNull(),
@@ -38,11 +39,14 @@ export const availabilityBlocks = pgTable("availability_blocks", {
 ]);
 
 // Booking requests table - pending booking requests
+// FK constraints: user_id references users.id (SET NULL on delete to preserve history)
+//                 resource_id references resources.id (CASCADE on delete)
 export const bookingRequests = pgTable("booking_requests", {
   id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'set null' }),
   userEmail: varchar("user_email").notNull(),
   userName: varchar("user_name"),
-  resourceId: integer("resource_id"),
+  resourceId: integer("resource_id").references(() => resources.id, { onDelete: 'cascade' }),
   resourcePreference: varchar("resource_preference"),
   requestDate: date("request_date").notNull(),
   startTime: time("start_time").notNull(),
@@ -79,6 +83,7 @@ export const bookingRequests = pgTable("booking_requests", {
   uniqueIndex("booking_requests_trackman_id_idx").on(table.trackmanBookingId),
   index("booking_requests_session_idx").on(table.sessionId),
   index("booking_requests_date_resource_idx").on(table.requestDate, table.resourceId),
+  index("booking_requests_user_id_idx").on(table.userId),
 ]);
 
 // Facility closures table - scheduled closures
@@ -212,10 +217,11 @@ export type TrackmanImportRun = typeof trackmanImportRuns.$inferSelect;
 // ============================================================================
 
 // Booking sessions table - central hub linking bookings to Trackman and participants
+// FK constraint: resource_id references resources.id (CASCADE on delete)
 export const bookingSessions = pgTable("booking_sessions", {
   id: serial("id").primaryKey(),
   trackmanBookingId: varchar("trackman_booking_id").unique(),
-  resourceId: integer("resource_id").notNull(),
+  resourceId: integer("resource_id").notNull().references(() => resources.id, { onDelete: 'cascade' }),
   sessionDate: date("session_date").notNull(),
   startTime: time("start_time").notNull(),
   endTime: time("end_time").notNull(),

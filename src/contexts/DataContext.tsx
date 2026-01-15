@@ -335,12 +335,15 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   };
 
   // Fetch members from HubSpot for admin/staff users
+  // Optimization: Only fetch first page (200 members) initially for faster load
+  // Full member list loads on-demand via fetchMembersPaginated when accessing directory
   useEffect(() => {
-    const fetchMembers = async () => {
+    const fetchInitialMembers = async () => {
       if (!actualUser || (actualUser.role !== 'admin' && actualUser.role !== 'staff')) return;
       
       try {
-        const res = await fetch('/api/hubspot/contacts', { credentials: 'include' });
+        // Fetch first 200 members with pagination for faster initial load
+        const res = await fetch('/api/hubspot/contacts?page=1&limit=200', { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
           const contacts = Array.isArray(data) ? data : (data.contacts || []);
@@ -361,12 +364,22 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             manuallyLinkedEmails: contact.manuallyLinkedEmails || []
           }));
           setMembers(formatted);
+          
+          // Store pagination info for incremental loading
+          if (data.total && data.totalPages) {
+            setMembersPagination({
+              total: data.total,
+              page: 1,
+              totalPages: data.totalPages,
+              hasMore: data.hasMore || data.totalPages > 1
+            });
+          }
         }
       } catch (err) {
-        console.error('Failed to fetch HubSpot contacts:', err);
+        console.error('Failed to fetch initial members:', err);
       }
     };
-    fetchMembers();
+    fetchInitialMembers();
   }, [actualUser]);
 
   // Function to fetch former/inactive members on demand with 10-minute cache
