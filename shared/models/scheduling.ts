@@ -40,13 +40,13 @@ export const availabilityBlocks = pgTable("availability_blocks", {
 
 // Booking requests table - pending booking requests
 // FK constraints: user_id references users.id (SET NULL on delete to preserve history)
-//                 resource_id references resources.id (CASCADE on delete)
+//                 resource_id references resources.id (SET NULL on delete to preserve booking history)
 export const bookingRequests = pgTable("booking_requests", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id, { onDelete: 'set null' }),
   userEmail: varchar("user_email").notNull(),
   userName: varchar("user_name"),
-  resourceId: integer("resource_id").references(() => resources.id, { onDelete: 'cascade' }),
+  resourceId: integer("resource_id").references(() => resources.id, { onDelete: 'set null' }),
   resourcePreference: varchar("resource_preference"),
   requestDate: date("request_date").notNull(),
   startTime: time("start_time").notNull(),
@@ -217,11 +217,11 @@ export type TrackmanImportRun = typeof trackmanImportRuns.$inferSelect;
 // ============================================================================
 
 // Booking sessions table - central hub linking bookings to Trackman and participants
-// FK constraint: resource_id references resources.id (CASCADE on delete)
+// FK constraint: resource_id references resources.id (RESTRICT to prevent accidental deletion of resources with sessions)
 export const bookingSessions = pgTable("booking_sessions", {
   id: serial("id").primaryKey(),
   trackmanBookingId: varchar("trackman_booking_id").unique(),
-  resourceId: integer("resource_id").notNull().references(() => resources.id, { onDelete: 'cascade' }),
+  resourceId: integer("resource_id").notNull().references(() => resources.id, { onDelete: 'restrict' }),
   sessionDate: date("session_date").notNull(),
   startTime: time("start_time").notNull(),
   endTime: time("end_time").notNull(),
