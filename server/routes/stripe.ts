@@ -57,7 +57,9 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
 
     if (isBookingPayment) {
       const sessionCheck = await pool.query(
-        `SELECT id FROM booking_sessions WHERE id = $1 AND booking_id = $2`,
+        `SELECT bs.id FROM booking_sessions bs
+         JOIN booking_requests br ON br.session_id = bs.id
+         WHERE bs.id = $1 AND br.id = $2`,
         [sessionId, bookingId]
       );
       if (sessionCheck.rows.length === 0) {

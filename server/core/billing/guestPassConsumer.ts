@@ -28,13 +28,13 @@ export async function consumeGuestPassForParticipant(
     const ownerId = ownerResult.rows[0]?.id;
     
     const tierResult = await client.query(
-      `SELECT mt.guest_passes 
+      `SELECT mt.guest_passes_per_month 
        FROM users u 
        JOIN membership_tiers mt ON LOWER(u.tier) = LOWER(mt.name)
        WHERE LOWER(u.email) = $1`,
       [ownerEmailLower]
     );
-    const tierGuestPasses = tierResult.rows[0]?.guest_passes ?? 4;
+    const tierGuestPasses = tierResult.rows[0]?.guest_passes_per_month ?? 4;
     
     const existingPass = await client.query(
       `SELECT id, passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = $1`,
@@ -168,13 +168,13 @@ export async function canUseGuestPass(ownerEmail: string): Promise<{
   
   try {
     const tierResult = await pool.query(
-      `SELECT mt.guest_passes 
+      `SELECT mt.guest_passes_per_month 
        FROM users u 
        JOIN membership_tiers mt ON LOWER(u.tier) = LOWER(mt.name)
        WHERE LOWER(u.email) = $1`,
       [ownerEmailLower]
     );
-    const tierGuestPasses = tierResult.rows[0]?.guest_passes ?? 4;
+    const tierGuestPasses = tierResult.rows[0]?.guest_passes_per_month ?? 4;
     
     const result = await pool.query(
       `SELECT passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = $1`,

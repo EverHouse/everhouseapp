@@ -462,18 +462,23 @@ router.get('/api/bookings/overdue-payments', isStaffOrAdmin, async (req: Request
       ORDER BY booking_date DESC
     `);
 
-    const overduePayments: OverduePayment[] = result.rows.map(row => ({
-      bookingId: row.booking_id,
-      sessionId: row.session_id,
-      ownerEmail: row.owner_email,
-      ownerName: row.owner_name || row.owner_email,
-      bookingDate: row.booking_date,
-      startTime: row.start_time,
-      endTime: row.end_time,
-      resourceName: row.resource_name || 'Unknown',
-      totalOutstanding: parseFloat(row.total_outstanding) || 0,
-      unresolvedGuestWaivers: parseInt(row.unresolved_guest_waivers) || 0
-    }));
+    const overduePayments: OverduePayment[] = result.rows.map(row => {
+      const bookingDate = row.booking_date instanceof Date 
+        ? row.booking_date.toISOString().split('T')[0]
+        : String(row.booking_date || '').split('T')[0];
+      return {
+        bookingId: row.booking_id,
+        sessionId: row.session_id,
+        ownerEmail: row.owner_email,
+        ownerName: row.owner_name || row.owner_email,
+        bookingDate,
+        startTime: row.start_time,
+        endTime: row.end_time,
+        resourceName: row.resource_name || 'Unknown',
+        totalOutstanding: parseFloat(row.total_outstanding) || 0,
+        unresolvedGuestWaivers: parseInt(row.unresolved_guest_waivers) || 0
+      };
+    });
 
     res.json(overduePayments);
   } catch (error: any) {
