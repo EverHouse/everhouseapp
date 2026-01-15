@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useData } from '../../contexts/DataContext';
 
 export interface SelectedMember {
@@ -36,8 +37,22 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Update dropdown position when open
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + window.scrollY + 4,
+        left: rect.left + window.scrollX,
+        width: rect.width
+      });
+    }
+  }, [isOpen, query]);
 
   const filteredMembers = members.filter(m => {
     if (!query.trim()) return false;
@@ -128,7 +143,7 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
   };
 
   return (
-    <div className={`relative ${className}`}>
+    <div ref={containerRef} className={`relative ${className}`}>
       {label && (
         <label className="block text-sm font-medium text-primary dark:text-white mb-2">
           {label}
@@ -161,11 +176,15 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
         )}
       </div>
 
-      {isOpen && filteredMembers.length > 0 && (
+      {isOpen && filteredMembers.length > 0 && createPortal(
         <div 
           ref={dropdownRef}
-          className="absolute z-[100] w-full mt-1 bg-white dark:bg-gray-900 border border-primary/10 dark:border-white/10 rounded-xl shadow-xl overflow-hidden max-h-64 overflow-y-auto"
-          style={{ position: 'absolute' }}
+          className="fixed z-[9999] bg-white dark:bg-gray-900 border border-primary/10 dark:border-white/10 rounded-xl shadow-xl overflow-hidden max-h-64 overflow-y-auto"
+          style={{ 
+            top: dropdownPosition.top,
+            left: dropdownPosition.left,
+            width: dropdownPosition.width
+          }}
         >
           {filteredMembers.map((member, index) => (
             <button
@@ -190,13 +209,22 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
               </div>
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
 
-      {isOpen && query.trim() && filteredMembers.length === 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-900 border border-primary/10 dark:border-white/10 rounded-xl shadow-lg p-4 text-center">
+      {isOpen && query.trim() && filteredMembers.length === 0 && createPortal(
+        <div 
+          className="fixed z-[9999] bg-white dark:bg-gray-900 border border-primary/10 dark:border-white/10 rounded-xl shadow-lg p-4 text-center"
+          style={{ 
+            top: dropdownPosition.top,
+            left: dropdownPosition.left,
+            width: dropdownPosition.width
+          }}
+        >
           <p className="text-sm text-primary/60 dark:text-white/60">No members found</p>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
