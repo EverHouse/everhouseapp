@@ -1906,7 +1906,7 @@ router.get('/api/payments/refundable', isStaffOrAdmin, async (req: Request, res:
         spi.id,
         spi.stripe_payment_intent_id as "paymentIntentId",
         u.email as "memberEmail",
-        u.name as "memberName",
+        COALESCE(TRIM(CONCAT(u.first_name, ' ', u.last_name)), u.email) as "memberName",
         spi.amount_cents as amount,
         spi.description,
         spi.created_at as "createdAt",
@@ -1933,13 +1933,13 @@ router.get('/api/payments/failed', isStaffOrAdmin, async (req: Request, res: Res
         spi.id,
         spi.stripe_payment_intent_id as "paymentIntentId",
         u.email as "memberEmail",
-        COALESCE(u.name, 'Unknown') as "memberName",
+        COALESCE(TRIM(CONCAT(u.first_name, ' ', u.last_name)), 'Unknown') as "memberName",
         spi.amount_cents as amount,
         spi.description,
         spi.status,
         spi.created_at as "createdAt"
        FROM stripe_payment_intents spi
-       LEFT JOIN users u ON u.id::text = spi.user_id
+       LEFT JOIN users u ON u.id = spi.user_id
        WHERE spi.status IN ('failed', 'canceled', 'requires_action', 'requires_payment_method')
        ORDER BY spi.created_at DESC
        LIMIT 50`
@@ -1974,7 +1974,7 @@ router.post('/api/payments/refund', isStaffOrAdmin, async (req: Request, res: Re
     }
 
     const localRecord = await pool.query(
-      `SELECT spi.*, u.email as member_email, u.name as member_name
+      `SELECT spi.*, u.email as member_email, TRIM(CONCAT(u.first_name, ' ', u.last_name)) as member_name
        FROM stripe_payment_intents spi
        LEFT JOIN users u ON u.id = spi.user_id
        WHERE spi.stripe_payment_intent_id = $1`,
@@ -2052,7 +2052,7 @@ router.get('/api/payments/pending-authorizations', isStaffOrAdmin, async (req: R
         spi.id,
         spi.stripe_payment_intent_id as "paymentIntentId",
         u.email as "memberEmail",
-        COALESCE(u.name, spi.description) as "memberName",
+        COALESCE(TRIM(CONCAT(u.first_name, ' ', u.last_name)), spi.description) as "memberName",
         spi.amount_cents as "amount",
         spi.description,
         spi.created_at as "createdAt"
@@ -2084,7 +2084,7 @@ router.post('/api/payments/capture', isStaffOrAdmin, async (req: Request, res: R
     }
 
     const localRecord = await pool.query(
-      `SELECT spi.*, u.email as member_email, u.name as member_name
+      `SELECT spi.*, u.email as member_email, TRIM(CONCAT(u.first_name, ' ', u.last_name)) as member_name
        FROM stripe_payment_intents spi
        LEFT JOIN users u ON u.id = spi.user_id
        WHERE spi.stripe_payment_intent_id = $1`,
@@ -2158,7 +2158,7 @@ router.post('/api/payments/void-authorization', isStaffOrAdmin, async (req: Requ
     }
 
     const localRecord = await pool.query(
-      `SELECT spi.*, u.email as member_email, u.name as member_name
+      `SELECT spi.*, u.email as member_email, TRIM(CONCAT(u.first_name, ' ', u.last_name)) as member_name
        FROM stripe_payment_intents spi
        LEFT JOIN users u ON u.id = spi.user_id
        WHERE spi.stripe_payment_intent_id = $1`,
