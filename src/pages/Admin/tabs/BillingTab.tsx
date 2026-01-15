@@ -379,6 +379,31 @@ const SubscriptionsView: React.FC = () => {
     fetchStripeProducts();
   }, []);
 
+  useEffect(() => {
+    const handleBillingUpdate = (e: CustomEvent) => {
+      const { action, memberEmail } = e.detail || {};
+      const billingActions = [
+        'subscription_created', 'subscription_cancelled', 'subscription_updated',
+        'payment_succeeded', 'payment_failed', 'invoice_paid', 'invoice_failed'
+      ];
+      
+      if (billingActions.includes(action)) {
+        setSelectedMember(current => {
+          if (current?.stripeCustomerId && (current.email === memberEmail || !memberEmail)) {
+            fetch(`/api/stripe/subscriptions/${current.stripeCustomerId}`, { credentials: 'include' })
+              .then(res => res.json())
+              .then(data => setSubscriptions(data.subscriptions || []))
+              .catch(console.error);
+          }
+          return current;
+        });
+      }
+    };
+
+    window.addEventListener('billing-update', handleBillingUpdate as EventListener);
+    return () => window.removeEventListener('billing-update', handleBillingUpdate as EventListener);
+  }, []);
+
   const fetchStripeProducts = async () => {
     try {
       const res = await fetch('/api/stripe/products', { credentials: 'include' });

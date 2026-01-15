@@ -782,6 +782,37 @@ export function broadcastDataIntegrityUpdate(action: 'check_complete' | 'issue_r
   return sent;
 }
 
+export function broadcastBillingUpdate(data: {
+  action: 'subscription_created' | 'subscription_cancelled' | 'subscription_updated' | 
+          'payment_succeeded' | 'payment_failed' | 'invoice_paid' | 'invoice_failed';
+  customerId?: string;
+  memberEmail?: string;
+  memberName?: string;
+  amount?: number;
+  planName?: string;
+  status?: string;
+}) {
+  const payload = JSON.stringify({
+    type: 'billing_update',
+    ...data
+  });
+
+  let sent = 0;
+  clients.forEach((connections) => {
+    connections.forEach(conn => {
+      if (conn.isStaff && conn.ws.readyState === WebSocket.OPEN) {
+        conn.ws.send(payload);
+        sent++;
+      }
+    });
+  });
+
+  if (sent > 0) {
+    console.log(`[WebSocket] Broadcast billing ${data.action} to ${sent} staff connections`);
+  }
+  return sent;
+}
+
 export function getConnectedUsers(): string[] {
   return Array.from(clients.keys());
 }

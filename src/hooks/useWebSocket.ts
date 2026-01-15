@@ -123,6 +123,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           if (message.type === 'data_integrity_update') {
             window.dispatchEvent(new CustomEvent('data-integrity-update', { detail: message }));
           }
+
+          // Handle billing updates (for Billing tab real-time updates)
+          if (message.type === 'billing_update') {
+            window.dispatchEvent(new CustomEvent('billing-update', { detail: message }));
+          }
         } catch (e) {
           console.error('[WebSocket] Error parsing message:', e);
         }

@@ -4,6 +4,7 @@ import { pool } from '../db';
 import { notifyPaymentSuccess, notifyPaymentFailed, notifyStaffPaymentFailed, notifyMember, notifyAllStaff } from '../notificationService';
 import { sendPaymentReceiptEmail, sendPaymentFailedEmail } from '../../emails/paymentEmails';
 import { sendMembershipRenewalEmail, sendMembershipFailedEmail } from '../../emails/membershipEmails';
+import { broadcastBillingUpdate } from '../websocket';
 
 export async function processStripeWebhook(
   payload: Buffer,
@@ -32,6 +33,8 @@ export async function processStripeWebhook(
     await handleInvoicePaymentSucceeded(event.data.object);
   } else if (event.type === 'invoice.payment_failed') {
     await handleInvoicePaymentFailed(event.data.object);
+  } else if (event.type === 'customer.subscription.created') {
+    await handleSubscriptionCreated(event.data.object);
   } else if (event.type === 'customer.subscription.updated') {
     await handleSubscriptionUpdated(event.data.object);
   } else if (event.type === 'customer.subscription.deleted') {
@@ -263,6 +266,13 @@ async function handlePaymentIntentSucceeded(paymentIntent: any): Promise<void> {
         transactionId: id
       });
 
+      broadcastBillingUpdate({
+        action: 'payment_succeeded',
+        memberEmail: email,
+        memberName,
+        amount: amount / 100
+      });
+
       console.log(`[Stripe Webhook] Payment notifications sent to ${email}`);
     } catch (error) {
       console.error('[Stripe Webhook] Error sending payment notifications:', error);
@@ -316,6 +326,13 @@ async function handlePaymentIntentFailed(paymentIntent: any): Promise<void> {
 
     await notifyStaffPaymentFailed(email, memberName, amount / 100, reason);
 
+    broadcastBillingUpdate({
+      action: 'payment_failed',
+      memberEmail: email,
+      memberName,
+      amount: amount / 100
+    });
+
     console.log(`[Stripe Webhook] Staff notified about payment failure for ${email}`);
   } catch (error) {
     console.error('[Stripe Webhook] Error sending payment failed notifications:', error);
@@ -360,6 +377,14 @@ async function handleInvoicePaymentSucceeded(invoice: any): Promise<void> {
       amount: amountPaid / 100,
       planName,
       nextBillingDate,
+    });
+
+    broadcastBillingUpdate({
+      action: 'invoice_paid',
+      memberEmail: email,
+      memberName,
+      amount: amountPaid / 100,
+      planName
     });
 
     console.log(`[Stripe Webhook] Membership renewal processed for ${email}, amount: $${(amountPaid / 100).toFixed(2)}`);
@@ -414,9 +439,64 @@ async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
       { sendPush: true }
     );
 
+    broadcastBillingUpdate({
+      action: 'invoice_failed',
+      memberEmail: email,
+      memberName,
+      amount: amountDue / 100,
+      planName
+    });
+
     console.log(`[Stripe Webhook] Membership payment failure processed for ${email}, amount: $${(amountDue / 100).toFixed(2)}`);
   } catch (error) {
     console.error('[Stripe Webhook] Error handling invoice payment failed:', error);
+  }
+}
+
+async function handleSubscriptionCreated(subscription: any): Promise<void> {
+  try {
+    const customerId = subscription.customer;
+    const planName = subscription.items?.data?.[0]?.price?.nickname || 
+                     subscription.items?.data?.[0]?.plan?.nickname || 
+                     'Membership';
+
+    const userResult = await pool.query(
+      'SELECT email, first_name, last_name FROM users WHERE stripe_customer_id = $1',
+      [customerId]
+    );
+
+    if (userResult.rows.length === 0) {
+      console.warn(`[Stripe Webhook] No user found for Stripe customer ${customerId}`);
+      return;
+    }
+
+    const { email, first_name, last_name } = userResult.rows[0];
+    const memberName = `${first_name || ''} ${last_name || ''}`.trim() || email;
+
+    await notifyMember({
+      userEmail: email,
+      title: 'Subscription Started',
+      message: `Your ${planName} subscription has been activated. Welcome!`,
+      type: 'membership_renewed',
+    });
+
+    await notifyAllStaff(
+      'New Subscription Created',
+      `${memberName} (${email}) has subscribed to ${planName}.`,
+      'membership_renewed',
+      { sendPush: false }
+    );
+
+    broadcastBillingUpdate({
+      action: 'subscription_created',
+      memberEmail: email,
+      memberName,
+      planName
+    });
+
+    console.log(`[Stripe Webhook] New subscription created for ${memberName} (${email}): ${planName}`);
+  } catch (error) {
+    console.error('[Stripe Webhook] Error handling subscription created:', error);
   }
 }
 
@@ -460,6 +540,13 @@ async function handleSubscriptionUpdated(subscription: any): Promise<void> {
       console.log(`[Stripe Webhook] Unpaid notification sent to ${email}`);
     }
 
+    broadcastBillingUpdate({
+      action: 'subscription_updated',
+      memberEmail: email,
+      memberName,
+      status
+    });
+
     console.log(`[Stripe Webhook] Subscription status changed to '${status}' for ${memberName} (${email})`);
   } catch (error) {
     console.error('[Stripe Webhook] Error handling subscription updated:', error);
@@ -488,6 +575,12 @@ async function handleSubscriptionDeleted(subscription: any): Promise<void> {
       title: 'Membership Cancelled',
       message: 'Your membership has been cancelled. We hope to see you again soon.',
       type: 'membership_cancelled',
+    });
+
+    broadcastBillingUpdate({
+      action: 'subscription_cancelled',
+      memberEmail: email,
+      memberName
     });
 
     console.log(`[Stripe Webhook] Membership cancellation processed for ${memberName} (${email})`);
