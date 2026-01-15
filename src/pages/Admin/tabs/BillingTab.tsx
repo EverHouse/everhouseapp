@@ -403,7 +403,8 @@ const SubscriptionsView: React.FC = () => {
       const data = await res.json();
       
       const searchTerm = searchEmail.toLowerCase().trim();
-      const filtered = (data || []).filter((m: any) => {
+      const contacts = data.contacts || [];
+      const filtered = contacts.filter((m: any) => {
         const email = (m.email || '').toLowerCase();
         const name = `${m.firstname || ''} ${m.lastname || ''}`.toLowerCase();
         return email.includes(searchTerm) || name.includes(searchTerm);
@@ -797,7 +798,8 @@ const InvoicesView: React.FC = () => {
       const data = await res.json();
       
       const searchTerm = searchEmail.toLowerCase().trim();
-      const filtered = (data || []).filter((m: any) => {
+      const contacts = data.contacts || [];
+      const filtered = contacts.filter((m: any) => {
         const email = (m.email || '').toLowerCase();
         const name = `${m.firstname || ''} ${m.lastname || ''}`.toLowerCase();
         return email.includes(searchTerm) || name.includes(searchTerm);
