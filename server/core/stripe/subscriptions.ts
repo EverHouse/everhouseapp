@@ -100,7 +100,7 @@ export async function listCustomerSubscriptions(customerId: string): Promise<{
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
       status: 'all',
-      expand: ['data.items.data.price.product'],
+      expand: ['data.items.data.price'],
     });
     
     return {
@@ -108,13 +108,14 @@ export async function listCustomerSubscriptions(customerId: string): Promise<{
       subscriptions: subscriptions.data.map(sub => {
         const item = sub.items.data[0];
         const price = item?.price;
-        const product = price?.product as Stripe.Product;
+        const productRef = price?.product;
+        const productId = typeof productRef === 'string' ? productRef : (productRef as Stripe.Product)?.id || '';
         
         return {
           id: sub.id,
           status: sub.status,
           priceId: price?.id || '',
-          productId: product?.id || '',
+          productId,
           currentPeriodStart: new Date(sub.current_period_start * 1000),
           currentPeriodEnd: new Date(sub.current_period_end * 1000),
           cancelAtPeriodEnd: sub.cancel_at_period_end,
