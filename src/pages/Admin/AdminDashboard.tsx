@@ -144,7 +144,10 @@ const AdminDashboard: React.FC = () => {
 
       <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
         <button 
-          onClick={() => handleTabChange('updates')}
+          onClick={() => {
+            handleTabChange('updates');
+            setTimeout(() => window.dispatchEvent(new CustomEvent('switch-to-alerts-tab')), 100);
+          }}
           className="flex items-center justify-center min-w-[44px] min-h-[44px] hover:opacity-70 transition-opacity relative"
           aria-label="Updates"
         >
