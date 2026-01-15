@@ -4,6 +4,7 @@ import { db } from '../db';
 import { notifications, staffUsers, pushSubscriptions, users } from '../../shared/schema';
 import { sendNotificationToUser, broadcastToStaff } from './websocket';
 import { logger } from './logger';
+import { getResendClient } from '../utils/resend';
 
 export type NotificationType = 
   | 'booking'
@@ -19,7 +20,17 @@ export type NotificationType =
   | 'guest_pass'
   | 'tour_scheduled'
   | 'system'
-  | 'staff_note';
+  | 'staff_note'
+  | 'payment_success'
+  | 'payment_failed'
+  | 'payment_receipt'
+  | 'outstanding_balance'
+  | 'fee_waived'
+  | 'membership_renewed'
+  | 'membership_failed'
+  | 'membership_past_due'
+  | 'membership_cancelled'
+  | 'card_expiring';
 
 export interface NotificationPayload {
   userEmail: string;
@@ -32,7 +43,7 @@ export interface NotificationPayload {
 }
 
 export interface DeliveryResult {
-  channel: 'database' | 'websocket' | 'push';
+  channel: 'database' | 'websocket' | 'push' | 'email';
   success: boolean;
   error?: string;
   details?: Record<string, any>;
@@ -218,11 +229,50 @@ async function deliverViaPush(userEmail: string, payload: { title: string; body:
   }
 }
 
+async function deliverViaEmail(to: string, subject: string, html: string): Promise<DeliveryResult> {
+  try {
+    const { client, fromEmail } = await getResendClient();
+    
+    await client.emails.send({
+      from: fromEmail || 'Ever House <noreply@everhouse.app>',
+      to,
+      subject,
+      html
+    });
+    
+    logger.info(`[Notification] Email delivered to ${to}`, {
+      userEmail: to,
+      extra: {
+        event: 'notification.email_delivered',
+        subject
+      }
+    });
+    
+    return {
+      channel: 'email',
+      success: true,
+      details: { to, subject }
+    };
+  } catch (error) {
+    logger.error(`[Notification] Email delivery failed for ${to}`, {
+      userEmail: to,
+      error: error instanceof Error ? error.message : String(error),
+      extra: { event: 'notification.email_failed', subject }
+    });
+    
+    return {
+      channel: 'email',
+      success: false,
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
 export async function notifyMember(
   payload: NotificationPayload,
-  options: { sendPush?: boolean; sendWebSocket?: boolean } = {}
+  options: { sendPush?: boolean; sendWebSocket?: boolean; sendEmail?: boolean; emailSubject?: string; emailHtml?: string } = {}
 ): Promise<NotificationResult> {
-  const { sendPush = true, sendWebSocket = true } = options;
+  const { sendPush = true, sendWebSocket = true, sendEmail = false, emailSubject, emailHtml } = options;
   const deliveryResults: DeliveryResult[] = [];
   
   const dbResult = await insertNotificationToDatabase(payload);
@@ -245,6 +295,11 @@ export async function notifyMember(
       tag: payload.type
     });
     deliveryResults.push(pushResult);
+  }
+  
+  if (sendEmail && emailSubject && emailHtml) {
+    const emailResult = await deliverViaEmail(payload.userEmail, emailSubject, emailHtml);
+    deliveryResults.push(emailResult);
   }
   
   const allSucceeded = deliveryResults.every(r => r.success);
@@ -470,3 +525,133 @@ async function deliverPushToStaff(payload: { title: string; body: string; url?: 
 }
 
 export { deliverViaPush as sendPushToUser, deliverPushToStaff as sendPushToAllStaff };
+
+export async function notifyPaymentSuccess(
+  userEmail: string,
+  amountDollars: number,
+  description: string,
+  options?: { sendEmail?: boolean; bookingId?: number }
+): Promise<NotificationResult> {
+  const formattedAmount = `$${amountDollars.toFixed(2)}`;
+  
+  return notifyMember(
+    {
+      userEmail,
+      title: 'Payment Successful',
+      message: `Your payment of ${formattedAmount} for ${description} was successful.`,
+      type: 'payment_success',
+      relatedId: options?.bookingId,
+      relatedType: options?.bookingId ? 'booking' : undefined
+    },
+    {
+      sendEmail: options?.sendEmail,
+      emailSubject: 'Payment Confirmation - Ever House',
+      emailHtml: `
+        <h2>Payment Successful</h2>
+        <p>Your payment of <strong>${formattedAmount}</strong> for ${description} has been processed successfully.</p>
+        <p>Thank you for your payment.</p>
+      `
+    }
+  );
+}
+
+export async function notifyPaymentFailed(
+  userEmail: string,
+  amountDollars: number,
+  reason: string,
+  options?: { sendEmail?: boolean; bookingId?: number }
+): Promise<NotificationResult> {
+  const formattedAmount = `$${amountDollars.toFixed(2)}`;
+  
+  return notifyMember(
+    {
+      userEmail,
+      title: 'Payment Failed',
+      message: `Your payment of ${formattedAmount} could not be processed. Reason: ${reason}`,
+      type: 'payment_failed',
+      relatedId: options?.bookingId,
+      relatedType: options?.bookingId ? 'booking' : undefined
+    },
+    {
+      sendEmail: options?.sendEmail,
+      emailSubject: 'Payment Failed - Ever House',
+      emailHtml: `
+        <h2>Payment Failed</h2>
+        <p>We were unable to process your payment of <strong>${formattedAmount}</strong>.</p>
+        <p><strong>Reason:</strong> ${reason}</p>
+        <p>Please update your payment method or contact us for assistance.</p>
+      `
+    }
+  );
+}
+
+export async function notifyFeeWaived(
+  userEmail: string,
+  amountDollars: number,
+  reason: string,
+  bookingId?: number
+): Promise<NotificationResult> {
+  const formattedAmount = `$${amountDollars.toFixed(2)}`;
+  
+  return notifyMember(
+    {
+      userEmail,
+      title: 'Fee Waived',
+      message: `A fee of ${formattedAmount} has been waived. Reason: ${reason}`,
+      type: 'fee_waived',
+      relatedId: bookingId,
+      relatedType: bookingId ? 'booking' : undefined
+    },
+    {
+      sendPush: true,
+      sendWebSocket: true
+    }
+  );
+}
+
+export async function notifyOutstandingBalance(
+  userEmail: string,
+  amountDollars: number,
+  description: string,
+  options?: { sendEmail?: boolean; sendPush?: boolean }
+): Promise<NotificationResult> {
+  const formattedAmount = `$${amountDollars.toFixed(2)}`;
+  
+  return notifyMember(
+    {
+      userEmail,
+      title: 'Outstanding Balance',
+      message: `You have an outstanding balance of ${formattedAmount} for ${description}.`,
+      type: 'outstanding_balance'
+    },
+    {
+      sendPush: options?.sendPush ?? true,
+      sendEmail: options?.sendEmail,
+      emailSubject: 'Outstanding Balance - Ever House',
+      emailHtml: `
+        <h2>Outstanding Balance</h2>
+        <p>You have an outstanding balance of <strong>${formattedAmount}</strong> for ${description}.</p>
+        <p>Please settle this balance at your earliest convenience.</p>
+      `
+    }
+  );
+}
+
+export async function notifyStaffPaymentFailed(
+  memberEmail: string,
+  memberName: string,
+  amountDollars: number,
+  reason: string
+): Promise<{ staffCount: number; deliveryResults: DeliveryResult[] }> {
+  const formattedAmount = `$${amountDollars.toFixed(2)}`;
+  
+  return notifyAllStaff(
+    'Member Payment Failed',
+    `Payment of ${formattedAmount} failed for ${memberName} (${memberEmail}). Reason: ${reason}`,
+    'payment_failed',
+    {
+      sendPush: true,
+      sendWebSocket: true
+    }
+  );
+}

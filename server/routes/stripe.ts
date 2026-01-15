@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { isStaffOrAdmin } from '../core/middleware';
+import { isStaffOrAdmin, isAdmin } from '../core/middleware';
 import { pool } from '../core/db';
 import {
   getStripePublishableKey,
@@ -10,6 +10,8 @@ import {
   getOrCreateStripeCustomer
 } from '../core/stripe';
 import { calculateAndCacheParticipantFees } from '../core/billing/feeCalculator';
+import { checkExpiringCards } from '../core/billing/cardExpiryChecker';
+import { checkStaleWaivers } from '../schedulers/waiverReviewScheduler';
 
 const router = Router();
 
@@ -277,6 +279,26 @@ router.get('/api/stripe/payments/:email', isStaffOrAdmin, async (req: Request, r
   } catch (error: any) {
     console.error('[Stripe] Error fetching payments:', error);
     res.status(500).json({ error: 'Failed to fetch payments' });
+  }
+});
+
+router.post('/api/admin/check-expiring-cards', isAdmin, async (req: Request, res: Response) => {
+  try {
+    const result = await checkExpiringCards();
+    res.json(result);
+  } catch (error: any) {
+    console.error('[Stripe] Error checking expiring cards:', error);
+    res.status(500).json({ error: 'Failed to check expiring cards', details: error.message });
+  }
+});
+
+router.post('/api/admin/check-stale-waivers', isAdmin, async (req: Request, res: Response) => {
+  try {
+    const result = await checkStaleWaivers();
+    res.json(result);
+  } catch (error: any) {
+    console.error('[Admin] Error checking stale waivers:', error);
+    res.status(500).json({ error: 'Failed to check stale waivers', details: error.message });
   }
 });
 

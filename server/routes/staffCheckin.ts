@@ -6,7 +6,8 @@ import { eq, and, sql } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../core/middleware';
 import { logAndRespond } from '../core/logger';
 import { getSessionUser } from '../types/session';
-import { notifyMember } from '../core/notificationService';
+import { notifyMember, notifyFeeWaived } from '../core/notificationService';
+import { sendFeeWaivedEmail } from '../emails/paymentEmails';
 import { calculateAndCacheParticipantFees } from '../core/billing/feeCalculator';
 import { consumeGuestPassForParticipant, canUseGuestPass } from '../core/billing/guestPassConsumer';
 
@@ -324,6 +325,37 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
         newStatus
       ]);
 
+      if (action === 'waive') {
+        try {
+          const participantEmailResult = await pool.query(
+            `SELECT bp.user_email, bp.display_name, bp.cached_fee_cents
+             FROM booking_participants bp
+             WHERE bp.id = $1`,
+            [participantId]
+          );
+          
+          if (participantEmailResult.rows[0]) {
+            const { user_email, display_name, cached_fee_cents } = participantEmailResult.rows[0];
+            const recipientEmail = user_email || booking.owner_email;
+            const feeAmount = (cached_fee_cents || 0) / 100;
+            const memberName = display_name || recipientEmail.split('@')[0];
+            
+            await notifyFeeWaived(recipientEmail, feeAmount, reason, bookingId);
+            
+            await sendFeeWaivedEmail(recipientEmail, {
+              memberName,
+              originalAmount: feeAmount,
+              reason,
+              bookingDescription: `${booking.resource_name} on ${new Date().toLocaleDateString()}`
+            });
+            
+            console.log(`[StaffCheckin] Sent waiver notification to ${recipientEmail}`);
+          }
+        } catch (notifyErr) {
+          console.error('[StaffCheckin] Failed to send waiver notification:', notifyErr);
+        }
+      }
+
       return res.json({ 
         success: true, 
         message: `Payment ${action === 'confirm' ? 'confirmed' : 'waived'} for participant`,
@@ -378,6 +410,37 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
           relatedType: 'booking',
           url: '/#/bookings'
         });
+      }
+
+      if (action === 'waive_all' && pendingParticipants.rows.length > 0) {
+        try {
+          const totalWaivedResult = await pool.query(
+            `SELECT COALESCE(SUM(COALESCE(cached_fee_cents, 0)), 0) as total_cents
+             FROM booking_participants
+             WHERE id = ANY($1)`,
+            [pendingParticipants.rows.map(p => p.id)]
+          );
+          const totalWaived = (parseInt(totalWaivedResult.rows[0]?.total_cents) || 0) / 100;
+          const ownerName = booking.owner_email.split('@')[0];
+          
+          await notifyFeeWaived(
+            booking.owner_email,
+            totalWaived,
+            reason || 'Bulk waiver applied',
+            bookingId
+          );
+          
+          await sendFeeWaivedEmail(booking.owner_email, {
+            memberName: ownerName,
+            originalAmount: totalWaived,
+            reason: reason || 'Bulk waiver applied',
+            bookingDescription: `${booking.resource_name} on ${new Date().toLocaleDateString()} (${pendingParticipants.rows.length} participant${pendingParticipants.rows.length > 1 ? 's' : ''})`
+          });
+          
+          console.log(`[StaffCheckin] Sent bulk waiver notification to ${booking.owner_email} for ${pendingParticipants.rows.length} participants`);
+        } catch (notifyErr) {
+          console.error('[StaffCheckin] Failed to send bulk waiver notification:', notifyErr);
+        }
       }
 
       return res.json({ 

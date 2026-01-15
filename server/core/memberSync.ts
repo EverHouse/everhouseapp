@@ -8,9 +8,43 @@ import { broadcastMemberDataUpdated, broadcastDataIntegrityUpdate } from './webs
 import { syncDealStageFromMindbodyStatus } from './hubspotDeals';
 import { alertOnHubSpotSyncComplete, alertOnSyncFailure } from './dataAlerts';
 import pLimit from 'p-limit';
+import { notifyMember, notifyAllStaff } from './notificationService';
+import { sendOutstandingBalanceEmail } from '../emails/paymentEmails';
 
 // Helper to add delay between operations
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function detectAndNotifyStatusChange(
+  email: string,
+  firstName: string | null,
+  lastName: string | null,
+  oldStatus: string | null,
+  newStatus: string
+): Promise<void> {
+  if (!oldStatus || oldStatus === newStatus) return;
+  
+  const memberName = [firstName, lastName].filter(Boolean).join(' ') || email;
+  
+  const problematicStatuses = ['past_due', 'declined', 'suspended', 'expired', 'terminated', 'cancelled', 'frozen'];
+  
+  if (problematicStatuses.includes(newStatus) && !problematicStatuses.includes(oldStatus)) {
+    await notifyMember({
+      userEmail: email,
+      title: 'Membership Status Update',
+      message: `Your membership status has been updated to: ${newStatus}. Please contact the club if you have questions.`,
+      type: 'membership_past_due'
+    }, { sendPush: true });
+    
+    await notifyAllStaff(
+      'Member Status Changed',
+      `${memberName}'s membership status changed from ${oldStatus} to ${newStatus}`,
+      'system',
+      { relatedType: 'membership_status' }
+    );
+    
+    console.log(`[MemberSync] Notified about status change for ${email}: ${oldStatus} -> ${newStatus}`);
+  }
+}
 
 interface HubSpotContact {
   id: string;
@@ -100,6 +134,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
     
     let synced = 0;
     let errors = 0;
+    let statusChanges = 0;
     
     // Parse opt-in values from HubSpot (they come as strings like "true"/"false" or "Yes"/"No")
     const parseOptIn = (val?: string): boolean | null => {
@@ -157,6 +192,12 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           const smsOptIn = parseOptIn(contact.properties.eh_sms_updates_opt_in);
           const { firstName, lastName } = getNameFromContact(contact);
           
+          const existingUser = await db.select({ membershipStatus: users.membershipStatus })
+            .from(users)
+            .where(eq(users.email, email))
+            .limit(1);
+          const oldStatus = existingUser[0]?.membershipStatus || null;
+          
           await db.insert(users)
             .values({
               id: sql`gen_random_uuid()`,
@@ -196,13 +237,22 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
               }
             });
           
-          return email;
+          if (oldStatus !== status) {
+            detectAndNotifyStatusChange(email, firstName, lastName, oldStatus, status).catch(err => {
+              console.error(`[MemberSync] Failed to notify status change for ${email}:`, err);
+            });
+          }
+          
+          return { email, statusChanged: oldStatus !== null && oldStatus !== status };
         }))
       );
       
       for (const result of results) {
         if (result.status === 'fulfilled' && result.value) {
           synced++;
+          if (result.value.statusChanged) {
+            statusChanges++;
+          }
         } else if (result.status === 'rejected') {
           errors++;
           if (!isProduction) console.error(`[MemberSync] Error syncing contact:`, result.reason);
@@ -210,7 +260,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
       }
     }
     
-    if (!isProduction) console.log(`[MemberSync] Complete - Synced: ${synced}, Errors: ${errors}`);
+    if (!isProduction) console.log(`[MemberSync] Complete - Synced: ${synced}, Errors: ${errors}, Status Changes: ${statusChanges}`);
     
     // Sync deal stages in batches with throttling to avoid HubSpot rate limits
     // Run this AFTER the main sync completes to avoid blocking member data updates

@@ -31,13 +31,26 @@ function getNotificationColor(type: string): string {
     case 'booking_pending':
       return 'text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30';
     case 'booking_approved':
+    case 'payment_success':
+    case 'payment_receipt':
+    case 'membership_renewed':
+    case 'fee_waived':
       return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30';
     case 'booking_cancelled':
     case 'booking_declined':
+    case 'payment_failed':
+    case 'membership_failed':
+    case 'membership_past_due':
+    case 'outstanding_balance':
       return 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30';
     case 'system_alert':
     case 'warning':
+    case 'membership_cancelled':
       return 'text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30';
+    case 'card_expiring':
+      return 'text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30';
+    case 'guest_pass':
+      return 'text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/30';
     default:
       return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-900/30';
   }
@@ -59,6 +72,25 @@ function getNotificationIcon(type: string): string {
     case 'system_alert':
     case 'warning':
       return 'warning';
+    case 'payment_success':
+    case 'payment_receipt':
+      return 'payments';
+    case 'payment_failed':
+    case 'outstanding_balance':
+      return 'credit_card_off';
+    case 'membership_renewed':
+      return 'card_membership';
+    case 'membership_failed':
+    case 'membership_past_due':
+      return 'error';
+    case 'membership_cancelled':
+      return 'person_remove';
+    case 'fee_waived':
+      return 'money_off';
+    case 'card_expiring':
+      return 'credit_score';
+    case 'guest_pass':
+      return 'confirmation_number';
     default:
       return 'notifications';
   }

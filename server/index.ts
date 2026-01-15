@@ -55,6 +55,7 @@ import { registerObjectStorageRoutes } from './replit_integrations/object_storag
 import { ensureDatabaseConstraints, seedDefaultNoticeTypes } from './db-init';
 import { initWebSocketServer } from './core/websocket';
 import { startIntegrityScheduler } from './schedulers/integrityScheduler';
+import { startWaiverReviewScheduler } from './schedulers/waiverReviewScheduler';
 import { processStripeWebhook, getStripeSync } from './core/stripe';
 import { runMigrations } from 'stripe-replit-sync';
 
@@ -806,6 +807,9 @@ async function startServer() {
 
   // Daily integrity check scheduler - runs at midnight Pacific
   startIntegrityScheduler();
+
+  // Waiver review scheduler - checks for stale waivers every 4 hours
+  startWaiverReviewScheduler();
 }
 
 startServer().catch((err) => {
