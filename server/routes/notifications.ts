@@ -10,48 +10,47 @@ function getSessionEmail(req: any): string | null {
   return getSessionUser(req)?.email?.toLowerCase() || null;
 }
 
-async function isAuthorizedForEmail(req: any, targetEmail: string): Promise<boolean> {
-  const sessionEmail = getSessionEmail(req);
-  if (!sessionEmail) return false;
-  
-  // User can access their own notifications
-  if (sessionEmail === targetEmail.toLowerCase()) return true;
-  
-  // Staff/admins can view any user's notifications
-  const isAdmin = await isAdminEmail(sessionEmail);
-  if (isAdmin) return true;
-  
-  // Check if user is staff
+async function isStaffUser(email: string): Promise<boolean> {
   try {
+    const isAdmin = await isAdminEmail(email);
+    if (isAdmin) return true;
+    
     const result = await queryWithRetry(
       'SELECT id FROM staff_users WHERE LOWER(email) = LOWER($1) AND is_active = true',
-      [sessionEmail]
+      [email]
     );
-    if (result.rows.length > 0) return true;
+    return result.rows.length > 0;
   } catch (error) {
-    // If staff check fails, fall back to owner-only access
+    return false;
+  }
+}
+
+async function getEffectiveEmail(req: any, requestedEmail?: string): Promise<{ email: string; isStaff: boolean } | null> {
+  const sessionEmail = getSessionEmail(req);
+  if (!sessionEmail) return null;
+  
+  const isStaff = await isStaffUser(sessionEmail);
+  
+  if (isStaff && requestedEmail) {
+    return { email: requestedEmail.toLowerCase(), isStaff: true };
   }
   
-  return false;
+  return { email: sessionEmail, isStaff };
 }
 
 router.get('/api/notifications', isAuthenticated, async (req, res) => {
   try {
     const { user_email: rawEmail, unread_only } = req.query;
     
-    if (!rawEmail) {
-      return res.status(400).json(createErrorResponse(req, 'user_email is required', 'MISSING_EMAIL'));
+    const requestedEmail = rawEmail ? decodeURIComponent(rawEmail as string) : undefined;
+    const effective = await getEffectiveEmail(req, requestedEmail);
+    
+    if (!effective) {
+      return res.status(401).json(createErrorResponse(req, 'Authentication required', 'UNAUTHORIZED'));
     }
     
-    const user_email = decodeURIComponent(rawEmail as string);
-    
-    const authorized = await isAuthorizedForEmail(req, user_email);
-    if (!authorized) {
-      return res.status(403).json(createErrorResponse(req, 'You can only access your own notifications', 'FORBIDDEN'));
-    }
-    
-    let query = 'SELECT * FROM notifications WHERE user_email = $1';
-    const params: any[] = [user_email];
+    let query = 'SELECT * FROM notifications WHERE LOWER(user_email) = LOWER($1)';
+    const params: any[] = [effective.email];
     
     if (unread_only === 'true') {
       query += ' AND is_read = false';
@@ -70,20 +69,16 @@ router.get('/api/notifications/count', isAuthenticated, async (req, res) => {
   try {
     const { user_email: rawEmail } = req.query;
     
-    if (!rawEmail) {
-      return res.status(400).json(createErrorResponse(req, 'user_email is required', 'MISSING_EMAIL'));
-    }
+    const requestedEmail = rawEmail ? decodeURIComponent(rawEmail as string) : undefined;
+    const effective = await getEffectiveEmail(req, requestedEmail);
     
-    const user_email = decodeURIComponent(rawEmail as string);
-    
-    const authorized = await isAuthorizedForEmail(req, user_email);
-    if (!authorized) {
-      return res.status(403).json(createErrorResponse(req, 'You can only access your own notifications', 'FORBIDDEN'));
+    if (!effective) {
+      return res.status(401).json(createErrorResponse(req, 'Authentication required', 'UNAUTHORIZED'));
     }
     
     const result = await queryWithRetry(
-      'SELECT COUNT(*) as count FROM notifications WHERE user_email = $1 AND is_read = false',
-      [user_email]
+      'SELECT COUNT(*) as count FROM notifications WHERE LOWER(user_email) = LOWER($1) AND is_read = false',
+      [effective.email]
     );
     
     res.json({ count: parseInt(result.rows[0].count) });
@@ -116,18 +111,15 @@ router.put('/api/notifications/mark-all-read', isAuthenticated, async (req, res)
   try {
     const { user_email } = req.body;
     
-    if (!user_email) {
-      return res.status(400).json(createErrorResponse(req, 'user_email is required', 'MISSING_EMAIL'));
-    }
+    const effective = await getEffectiveEmail(req, user_email);
     
-    const authorized = await isAuthorizedForEmail(req, user_email);
-    if (!authorized) {
-      return res.status(403).json(createErrorResponse(req, 'You can only modify your own notifications', 'FORBIDDEN'));
+    if (!effective) {
+      return res.status(401).json(createErrorResponse(req, 'Authentication required', 'UNAUTHORIZED'));
     }
     
     await pool.query(
-      'UPDATE notifications SET is_read = true WHERE user_email = $1 AND is_read = false',
-      [user_email]
+      'UPDATE notifications SET is_read = true WHERE LOWER(user_email) = LOWER($1) AND is_read = false',
+      [effective.email]
     );
     
     res.json({ success: true });
@@ -140,18 +132,15 @@ router.delete('/api/notifications/dismiss-all', isAuthenticated, async (req, res
   try {
     const { user_email } = req.body;
     
-    if (!user_email) {
-      return res.status(400).json(createErrorResponse(req, 'user_email is required', 'MISSING_EMAIL'));
-    }
+    const effective = await getEffectiveEmail(req, user_email);
     
-    const authorized = await isAuthorizedForEmail(req, user_email);
-    if (!authorized) {
-      return res.status(403).json(createErrorResponse(req, 'You can only delete your own notifications', 'FORBIDDEN'));
+    if (!effective) {
+      return res.status(401).json(createErrorResponse(req, 'Authentication required', 'UNAUTHORIZED'));
     }
     
     const result = await pool.query(
-      'DELETE FROM notifications WHERE user_email = $1',
-      [user_email]
+      'DELETE FROM notifications WHERE LOWER(user_email) = LOWER($1)',
+      [effective.email]
     );
     
     res.json({ success: true, deletedCount: result.rowCount });
