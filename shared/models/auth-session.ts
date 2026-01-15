@@ -32,11 +32,12 @@ export const users = pgTable("users", {
   dataSource: varchar("data_source"),
   hubspotId: varchar("hubspot_id"),
   membershipStatus: varchar("membership_status").default("active"),
-  billingProvider: varchar("billing_provider").default("mindbody"), // 'mindbody' | 'hubspot'
+  billingProvider: varchar("billing_provider").default("mindbody"),
+  stripeCustomerId: varchar("stripe_customer_id"),
   lastSyncedAt: timestamp("last_synced_at"),
   joinDate: date("join_date"),
-  memberSince: timestamp("member_since"), // Original Mindbody "Joined On" date
-  legacySource: varchar("legacy_source"), // 'mindbody_import' if migrated from Mindbody
+  memberSince: timestamp("member_since"),
+  legacySource: varchar("legacy_source"),
   welcomeEmailSent: boolean("welcome_email_sent").default(false),
   welcomeEmailSentAt: timestamp("welcome_email_sent_at"),
   trackmanEmail: varchar("trackman_email"),
