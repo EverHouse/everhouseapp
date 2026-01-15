@@ -1079,4 +1079,36 @@ router.post('/api/hubspot/push-db-tiers', isStaffOrAdmin, async (req, res) => {
   }
 });
 
+router.get('/api/hubspot/products', isStaffOrAdmin, async (req, res) => {
+  try {
+    const hubspot = await getHubSpotClient();
+    
+    const properties = ['name', 'price', 'hs_sku', 'description', 'hs_recurring_billing_period'];
+    let allProducts: any[] = [];
+    let after: string | undefined = undefined;
+    
+    do {
+      const response = await retryableHubSpotRequest(() => 
+        hubspot.crm.products.basicApi.getPage(100, after, properties)
+      );
+      allProducts = allProducts.concat(response.results);
+      after = response.paging?.next?.after;
+    } while (after);
+    
+    const products = allProducts.map((product: any) => ({
+      id: product.id,
+      name: product.properties.name || '',
+      price: parseFloat(product.properties.price) || 0,
+      sku: product.properties.hs_sku || null,
+      description: product.properties.description || null,
+      recurringPeriod: product.properties.hs_recurring_billing_period || null,
+    }));
+    
+    res.json({ products, count: products.length });
+  } catch (error: any) {
+    console.error('[HubSpot] Error fetching products:', error);
+    res.status(500).json({ error: 'Failed to fetch HubSpot products' });
+  }
+});
+
 export default router;

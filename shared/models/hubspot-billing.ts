@@ -186,3 +186,24 @@ export type LegacyPurchase = typeof legacyPurchases.$inferSelect;
 export type InsertLegacyPurchase = typeof legacyPurchases.$inferInsert;
 export type LegacyImportJob = typeof legacyImportJobs.$inferSelect;
 export type InsertLegacyImportJob = typeof legacyImportJobs.$inferInsert;
+
+export const stripeProducts = pgTable("stripe_products", {
+  id: serial("id").primaryKey(),
+  hubspotProductId: varchar("hubspot_product_id").notNull().unique(),
+  stripeProductId: varchar("stripe_product_id").notNull().unique(),
+  stripePriceId: varchar("stripe_price_id").notNull(),
+  name: varchar("name").notNull(),
+  priceCents: integer("price_cents").notNull(),
+  billingInterval: varchar("billing_interval").notNull(),
+  billingIntervalCount: integer("billing_interval_count").notNull().default(1),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("stripe_products_hubspot_product_id_idx").on(table.hubspotProductId),
+  index("stripe_products_stripe_product_id_idx").on(table.stripeProductId),
+  index("stripe_products_is_active_idx").on(table.isActive),
+]);
+
+export type StripeProduct = typeof stripeProducts.$inferSelect;
+export type InsertStripeProduct = typeof stripeProducts.$inferInsert;

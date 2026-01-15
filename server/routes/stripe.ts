@@ -7,7 +7,16 @@ import {
   confirmPaymentSuccess,
   getPaymentIntentStatus,
   cancelPaymentIntent,
-  getOrCreateStripeCustomer
+  getOrCreateStripeCustomer,
+  getStripeProducts,
+  getProductSyncStatus,
+  syncHubSpotProductToStripe,
+  syncAllHubSpotProductsToStripe,
+  fetchHubSpotProducts,
+  createSubscription,
+  cancelSubscription,
+  listCustomerSubscriptions,
+  getSubscription
 } from '../core/stripe';
 import { calculateAndCacheParticipantFees } from '../core/billing/feeCalculator';
 import { checkExpiringCards } from '../core/billing/cardExpiryChecker';
@@ -299,6 +308,135 @@ router.post('/api/admin/check-stale-waivers', isAdmin, async (req: Request, res:
   } catch (error: any) {
     console.error('[Admin] Error checking stale waivers:', error);
     res.status(500).json({ error: 'Failed to check stale waivers', details: error.message });
+  }
+});
+
+router.get('/api/stripe/products', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const syncStatus = await getProductSyncStatus();
+    const stripeProducts = await getStripeProducts();
+    
+    res.json({
+      products: stripeProducts,
+      syncStatus,
+      count: stripeProducts.length
+    });
+  } catch (error: any) {
+    console.error('[Stripe] Error getting products:', error);
+    res.status(500).json({ error: 'Failed to get Stripe products' });
+  }
+});
+
+router.post('/api/stripe/products/sync', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { hubspotProductId } = req.body;
+    
+    if (!hubspotProductId) {
+      return res.status(400).json({ error: 'Missing required field: hubspotProductId' });
+    }
+    
+    const hubspotProducts = await fetchHubSpotProducts();
+    const product = hubspotProducts.find(p => p.id === hubspotProductId);
+    
+    if (!product) {
+      return res.status(404).json({ error: 'HubSpot product not found' });
+    }
+    
+    const result = await syncHubSpotProductToStripe(product);
+    
+    if (!result.success) {
+      return res.status(500).json({ error: result.error || 'Failed to sync product' });
+    }
+    
+    res.json({
+      success: true,
+      stripeProductId: result.stripeProductId,
+      stripePriceId: result.stripePriceId
+    });
+  } catch (error: any) {
+    console.error('[Stripe] Error syncing product:', error);
+    res.status(500).json({ error: 'Failed to sync product to Stripe' });
+  }
+});
+
+router.post('/api/stripe/products/sync-all', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const result = await syncAllHubSpotProductsToStripe();
+    
+    res.json({
+      success: result.success,
+      synced: result.synced,
+      failed: result.failed,
+      errors: result.errors
+    });
+  } catch (error: any) {
+    console.error('[Stripe] Error syncing all products:', error);
+    res.status(500).json({ error: 'Failed to sync products to Stripe' });
+  }
+});
+
+router.get('/api/stripe/subscriptions/:customerId', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { customerId } = req.params;
+    
+    const result = await listCustomerSubscriptions(customerId);
+    
+    if (!result.success) {
+      return res.status(500).json({ error: result.error || 'Failed to list subscriptions' });
+    }
+    
+    res.json({
+      subscriptions: result.subscriptions,
+      count: result.subscriptions?.length || 0
+    });
+  } catch (error: any) {
+    console.error('[Stripe] Error listing subscriptions:', error);
+    res.status(500).json({ error: 'Failed to list subscriptions' });
+  }
+});
+
+router.post('/api/stripe/subscriptions', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { customerId, priceId, memberEmail } = req.body;
+    
+    if (!customerId || !priceId) {
+      return res.status(400).json({ error: 'Missing required fields: customerId, priceId' });
+    }
+    
+    const result = await createSubscription({
+      customerId,
+      priceId,
+      metadata: memberEmail ? { memberEmail } : undefined
+    });
+    
+    if (!result.success) {
+      return res.status(500).json({ error: result.error || 'Failed to create subscription' });
+    }
+    
+    res.json({
+      success: true,
+      subscription: result.subscription
+    });
+  } catch (error: any) {
+    console.error('[Stripe] Error creating subscription:', error);
+    res.status(500).json({ error: 'Failed to create subscription' });
+  }
+});
+
+router.delete('/api/stripe/subscriptions/:subscriptionId', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { subscriptionId } = req.params;
+    
+    const result = await cancelSubscription(subscriptionId);
+    
+    if (!result.success) {
+      return res.status(500).json({ error: result.error || 'Failed to cancel subscription' });
+    }
+    
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[Stripe] Error canceling subscription:', error);
+    res.status(500).json({ error: 'Failed to cancel subscription' });
   }
 });
 

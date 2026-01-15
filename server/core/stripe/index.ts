@@ -3,3 +3,21 @@ export { getOrCreateStripeCustomer, getStripeCustomerByEmail, updateCustomerPaym
 export { createPaymentIntent, confirmPaymentSuccess, getPaymentIntentStatus, cancelPaymentIntent, type PaymentPurpose, type CreatePaymentIntentParams, type PaymentIntentResult } from './payments';
 export { processStripeWebhook } from './webhooks';
 export { syncPaymentToHubSpot, type SyncPaymentParams } from './hubspotSync';
+export { 
+  fetchHubSpotProducts, 
+  syncHubSpotProductToStripe, 
+  syncAllHubSpotProductsToStripe, 
+  getStripeProducts, 
+  getProductSyncStatus,
+  type HubSpotProduct,
+  type StripeProductWithPrice,
+  type ProductSyncStatus
+} from './products';
+export { 
+  createSubscription, 
+  cancelSubscription, 
+  listCustomerSubscriptions, 
+  getSubscription,
+  type CreateSubscriptionParams,
+  type SubscriptionResult
+} from './subscriptions';
