@@ -268,6 +268,152 @@ export async function linkBookingRequestToSession(
   }
 }
 
+export async function deductGuestPasses(
+  memberEmail: string,
+  passCount: number,
+  tierName?: string
+): Promise<{ success: boolean; passesDeducted: number }> {
+  if (passCount <= 0) {
+    return { success: true, passesDeducted: 0 };
+  }
+  
+  try {
+    // First, try to update an existing row (most common case)
+    // This handles members who already have a guest_passes record
+    const updateResult = await pool.query(
+      `UPDATE guest_passes 
+       SET passes_used = passes_used + $2
+       WHERE LOWER(member_email) = LOWER($1) 
+         AND passes_used + $2 <= passes_total
+       RETURNING passes_used, passes_total`,
+      [memberEmail, passCount]
+    );
+    
+    if (updateResult.rows.length > 0) {
+      logger.info('[deductGuestPasses] Guest passes deducted (existing record)', {
+        extra: { 
+          memberEmail, 
+          passCount, 
+          passesUsed: updateResult.rows[0].passes_used,
+          passesTotal: updateResult.rows[0].passes_total
+        }
+      });
+      return { success: true, passesDeducted: passCount };
+    }
+    
+    // Check if record exists - may have insufficient passes or need backfill
+    const existingCheck = await pool.query(
+      `SELECT passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = LOWER($1)`,
+      [memberEmail]
+    );
+    
+    if (existingCheck.rows.length > 0) {
+      const { passes_used, passes_total } = existingCheck.rows[0];
+      
+      // Check if passes_total needs backfill (was 0 or null from legacy data)
+      if (!passes_total || passes_total === 0) {
+        const { getTierLimits } = await import('../tierService');
+        const tierLimits = tierName ? await getTierLimits(tierName) : null;
+        const monthlyAllocation = tierLimits?.guest_passes_per_month ?? 4; // Default to 4 if unknown
+        
+        // Backfill passes_total and deduct
+        const backfillResult = await pool.query(
+          `UPDATE guest_passes 
+           SET passes_total = $3, passes_used = passes_used + $2
+           WHERE LOWER(member_email) = LOWER($1) 
+             AND passes_used + $2 <= $3
+           RETURNING passes_used, passes_total`,
+          [memberEmail, passCount, monthlyAllocation]
+        );
+        
+        if (backfillResult.rows.length > 0) {
+          logger.info('[deductGuestPasses] Guest passes deducted (backfilled passes_total)', {
+            extra: { 
+              memberEmail, 
+              passCount, 
+              passesUsed: backfillResult.rows[0].passes_used,
+              passesTotal: backfillResult.rows[0].passes_total
+            }
+          });
+          return { success: true, passesDeducted: passCount };
+        }
+      }
+      
+      // Record exists but insufficient passes
+      logger.warn('[deductGuestPasses] Insufficient passes available', {
+        extra: { memberEmail, passCount, passes_used, passes_total }
+      });
+      return { success: false, passesDeducted: 0 };
+    }
+    
+    // No existing record - create one using tier allocation
+    const { getTierLimits } = await import('../tierService');
+    const tierLimits = tierName ? await getTierLimits(tierName) : null;
+    const monthlyAllocation = tierLimits?.guest_passes_per_month ?? 4; // Default to 4 if unknown
+    
+    // Validate passCount doesn't exceed allocation for new records
+    if (passCount > monthlyAllocation) {
+      logger.warn('[deductGuestPasses] Pass count exceeds monthly allocation', {
+        extra: { memberEmail, passCount, monthlyAllocation }
+      });
+      return { success: false, passesDeducted: 0 };
+    }
+    
+    // Insert new record with passes deducted
+    const insertResult = await pool.query(
+      `INSERT INTO guest_passes (member_email, passes_used, passes_total)
+       VALUES (LOWER($1), $2, $3)
+       ON CONFLICT (member_email) DO NOTHING
+       RETURNING passes_used, passes_total`,
+      [memberEmail, passCount, monthlyAllocation]
+    );
+    
+    if (insertResult.rows.length > 0) {
+      logger.info('[deductGuestPasses] Guest passes deducted (new record created)', {
+        extra: { 
+          memberEmail, 
+          passCount, 
+          monthlyAllocation,
+          passesUsed: insertResult.rows[0].passes_used,
+          passesTotal: insertResult.rows[0].passes_total
+        }
+      });
+      return { success: true, passesDeducted: passCount };
+    }
+    
+    // Race condition: another process created the row between our check and insert
+    // Retry the update
+    const retryResult = await pool.query(
+      `UPDATE guest_passes 
+       SET passes_used = passes_used + $2
+       WHERE LOWER(member_email) = LOWER($1) 
+         AND passes_used + $2 <= passes_total
+       RETURNING passes_used, passes_total`,
+      [memberEmail, passCount]
+    );
+    
+    if (retryResult.rows.length > 0) {
+      logger.info('[deductGuestPasses] Guest passes deducted (retry after race)', {
+        extra: { 
+          memberEmail, 
+          passCount, 
+          passesUsed: retryResult.rows[0].passes_used,
+          passesTotal: retryResult.rows[0].passes_total
+        }
+      });
+      return { success: true, passesDeducted: passCount };
+    }
+    
+    logger.warn('[deductGuestPasses] Failed to deduct passes after retry', {
+      extra: { memberEmail, passCount }
+    });
+    return { success: false, passesDeducted: 0 };
+  } catch (error) {
+    logger.error('[deductGuestPasses] Error:', { error: error as Error });
+    return { success: false, passesDeducted: 0 };
+  }
+}
+
 // Import tier rules for orchestration
 import { enforceSocialTierRules, getMemberTier, type ParticipantForValidation } from './tierRules';
 import { 
@@ -446,6 +592,20 @@ export async function createSessionWithUsageTracking(
         guestPassesUsed: billingResult.guestPassesUsed
       }
     });
+    
+    // Deduct guest passes from host's allocation if any were used
+    if (billingResult.guestPassesUsed > 0) {
+      const deductResult = await deductGuestPasses(
+        request.ownerEmail, 
+        billingResult.guestPassesUsed, 
+        ownerTier || undefined
+      );
+      if (!deductResult.success) {
+        logger.warn('[createSessionWithUsageTracking] Failed to deduct guest passes', {
+          extra: { ownerEmail: request.ownerEmail, passesToDeduct: billingResult.guestPassesUsed, tierName: ownerTier }
+        });
+      }
+    }
     
     logger.info('[createSessionWithUsageTracking] Session created with usage tracking', {
       extra: {

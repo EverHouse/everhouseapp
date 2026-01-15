@@ -569,6 +569,8 @@ const Dashboard: React.FC = () => {
 
           if (res.ok) {
             setSelectedBooking(null);
+            // Also update global DataContext to keep state in sync
+            deleteBooking(String(bookingId));
             showToast('Booking cancelled successfully', 'success');
           } else {
             // Revert on failure
