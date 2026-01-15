@@ -89,7 +89,7 @@ function CheckoutForm({ onSuccess, onCancel }: { onSuccess: () => void; onCancel
       </div>
 
       {errorMessage && (
-        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/30 rounded-lg text-red-700 dark:text-red-300 text-sm">
+        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/30 rounded-xl text-red-700 dark:text-red-300 text-sm">
           {errorMessage}
         </div>
       )}
@@ -98,7 +98,7 @@ function CheckoutForm({ onSuccess, onCancel }: { onSuccess: () => void; onCancel
         <button
           type="submit"
           disabled={!stripe || isProcessing}
-          className="flex-1 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2"
+          className="flex-1 py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {isProcessing ? (
             <>
@@ -116,7 +116,7 @@ function CheckoutForm({ onSuccess, onCancel }: { onSuccess: () => void; onCancel
           type="button"
           onClick={onCancel}
           disabled={isProcessing}
-          className="px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
+          className="px-4 py-3 bg-primary/10 dark:bg-white/10 text-primary dark:text-white font-medium rounded-xl hover:bg-primary/20 dark:hover:bg-white/20 disabled:opacity-50"
         >
           Cancel
         </button>
@@ -208,7 +208,7 @@ export function StripePaymentForm({
         <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
         <button
           onClick={onCancel}
-          className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg"
+          className="px-4 py-2 bg-primary/10 dark:bg-white/10 text-primary dark:text-white rounded-xl"
         >
           Go Back
         </button>

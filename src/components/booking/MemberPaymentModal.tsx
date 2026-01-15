@@ -140,13 +140,13 @@ export function MemberPaymentModal({
             aria-labelledby="payment-modal-title"
             onClick={(e) => e.stopPropagation()}
             className={`relative w-full max-w-md max-h-[90vh] overflow-hidden ${
-              isDark ? 'bg-[#1a1d15] border-white/10' : 'bg-white border-gray-200'
-            } rounded-2xl shadow-2xl border animate-modal-slide-up`}
+              isDark ? 'bg-black/80' : 'bg-white/80'
+            } backdrop-blur-xl border border-primary/10 dark:border-white/10 rounded-2xl shadow-2xl animate-modal-slide-up`}
           >
-            <div className={`flex items-center justify-between p-4 border-b ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+            <div className={`flex items-center justify-between p-4 border-b ${isDark ? 'bg-white/5 border-white/10' : 'bg-primary/5 border-primary/10'}`}>
               <h3
                 id="payment-modal-title"
-                className={`text-xl font-bold ${isDark ? 'text-white' : 'text-primary'}`}
+                className={`text-xl font-bold font-serif ${isDark ? 'text-white' : 'text-primary'}`}
               >
                 Pay Guest Fees
               </h3>
@@ -177,7 +177,7 @@ export function MemberPaymentModal({
                   <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
                   <button
                     onClick={onClose}
-                    className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg"
+                    className="px-4 py-2 bg-primary/10 dark:bg-white/10 text-primary dark:text-white rounded-xl"
                   >
                     Go Back
                   </button>
@@ -186,8 +186,8 @@ export function MemberPaymentModal({
 
               {!loading && !error && paymentData && (
                 <div className="space-y-4">
-                  <div className={`rounded-xl p-4 ${isDark ? 'bg-white/5' : 'bg-black/[0.02]'}`}>
-                    <h4 className={`text-sm font-bold mb-3 ${isDark ? 'text-white/80' : 'text-[#293515]/80'}`}>
+                  <div className={`rounded-xl p-4 ${isDark ? 'bg-white/5' : 'bg-primary/5'}`}>
+                    <h4 className={`text-sm font-bold mb-3 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
                       Guest Fee Summary
                     </h4>
                     <div className="space-y-2">
@@ -201,21 +201,21 @@ export function MemberPaymentModal({
                             }`}>
                               G
                             </span>
-                            <span className={`text-sm ${isDark ? 'text-white/80' : 'text-[#293515]/80'}`}>
+                            <span className={`text-sm ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
                               {fee.displayName}
                             </span>
                           </div>
-                          <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-[#293515]'}`}>
+                          <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-primary'}`}>
                             ${fee.amount.toFixed(2)}
                           </span>
                         </div>
                       ))}
                     </div>
-                    <div className={`mt-3 pt-3 border-t flex items-center justify-between ${isDark ? 'border-white/10' : 'border-black/5'}`}>
-                      <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-[#293515]'}`}>
+                    <div className={`mt-3 pt-3 border-t flex items-center justify-between ${isDark ? 'border-white/10' : 'border-primary/10'}`}>
+                      <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-primary'}`}>
                         Total
                       </span>
-                      <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-[#293515]'}`}>
+                      <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-primary'}`}>
                         ${paymentData.totalAmount.toFixed(2)}
                       </span>
                     </div>

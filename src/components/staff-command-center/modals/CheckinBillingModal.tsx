@@ -507,7 +507,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
                               </span>
                             </div>
                             {p.paymentStatus === 'paid' && p.prepaidOnline && (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded">
+                              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 text-xs font-medium bg-lavender/20 dark:bg-lavender/20 text-primary dark:text-lavender rounded-full">
                                 <span className="material-symbols-outlined text-xs">credit_card</span>
                                 Prepaid online
                               </span>

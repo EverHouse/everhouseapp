@@ -492,13 +492,13 @@ const History: React.FC = () => {
                     };
                     
                     const sourceColors: Record<string, { dark: string; light: string }> = {
-                      Mindbody: { dark: 'bg-teal-500/20 text-teal-300', light: 'bg-teal-100 text-teal-700' },
-                      Stripe: { dark: 'bg-indigo-500/20 text-indigo-300', light: 'bg-indigo-100 text-indigo-700' },
-                      'Even House': { dark: 'bg-emerald-500/20 text-emerald-300', light: 'bg-emerald-100 text-emerald-700' },
+                      Mindbody: { dark: 'bg-white/10 text-white/80', light: 'bg-primary/10 text-primary' },
+                      Stripe: { dark: 'bg-accent/20 text-accent', light: 'bg-accent/20 text-primary' },
+                      'Even House': { dark: 'bg-lavender/30 text-lavender', light: 'bg-lavender/20 text-primary' },
                     };
                     
                     const getSourceStyle = (source: string) => {
-                      const colors = sourceColors[source] || { dark: 'bg-gray-500/20 text-gray-300', light: 'bg-gray-100 text-gray-700' };
+                      const colors = sourceColors[source] || { dark: 'bg-white/10 text-white/80', light: 'bg-primary/10 text-primary' };
                       return isDark ? colors.dark : colors.light;
                     };
                     
@@ -534,15 +534,15 @@ const History: React.FC = () => {
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="flex-1">
                                     <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 ${getCategoryStyle(purchase.itemCategory || '')}`}>
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 ${getCategoryStyle(purchase.itemCategory || '')}`}>
                                         <span className="material-symbols-outlined text-xs">{getCategoryIcon(purchase.itemCategory || '')}</span>
                                         {purchase.itemCategory || 'Purchase'}
                                       </span>
-                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${getSourceStyle(purchase.source)}`}>
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${getSourceStyle(purchase.source)}`}>
                                         {purchase.source}
                                       </span>
                                       {(purchase.quantity ?? 1) > 1 && (
-                                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${isDark ? 'bg-white/10 text-white/70' : 'bg-gray-200 text-primary/70'}`}>
+                                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${isDark ? 'bg-white/10 text-white/70' : 'bg-primary/10 text-primary/70'}`}>
                                           x{purchase.quantity}
                                         </span>
                                       )}
@@ -586,13 +586,13 @@ const History: React.FC = () => {
                   {invoices.map((invoice, index) => {
                     const getStatusBadge = (status: string) => {
                       const statusMap: Record<string, { label: string; style: string }> = {
-                        paid: { label: 'Paid', style: isDark ? 'bg-green-500/20 text-green-300' : 'bg-green-100 text-green-700' },
-                        open: { label: 'Due', style: isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-700' },
-                        draft: { label: 'Draft', style: isDark ? 'bg-gray-500/20 text-gray-300' : 'bg-gray-100 text-gray-700' },
-                        void: { label: 'Void', style: isDark ? 'bg-red-500/20 text-red-300' : 'bg-red-100 text-red-700' },
-                        uncollectible: { label: 'Uncollectible', style: isDark ? 'bg-red-500/20 text-red-300' : 'bg-red-100 text-red-700' },
+                        paid: { label: 'Paid', style: isDark ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700' },
+                        open: { label: 'Due', style: isDark ? 'bg-amber-900/30 text-amber-400' : 'bg-amber-100 text-amber-700' },
+                        draft: { label: 'Draft', style: isDark ? 'bg-white/10 text-white/80' : 'bg-primary/10 text-primary' },
+                        void: { label: 'Void', style: isDark ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700' },
+                        uncollectible: { label: 'Uncollectible', style: isDark ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700' },
                       };
-                      return statusMap[status] || { label: status, style: isDark ? 'bg-gray-500/20 text-gray-300' : 'bg-gray-100 text-gray-700' };
+                      return statusMap[status] || { label: status, style: isDark ? 'bg-white/10 text-white/80' : 'bg-primary/10 text-primary' };
                     };
                     
                     const formatAmount = (cents: number) => `$${(cents / 100).toFixed(2)}`;
@@ -614,10 +614,10 @@ const History: React.FC = () => {
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1.5">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${status.style}`}>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${status.style}`}>
                                 {status.label}
                               </span>
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${isDark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-700'}`}>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${isDark ? 'bg-accent/20 text-accent' : 'bg-accent/20 text-primary'}`}>
                                 Stripe
                               </span>
                             </div>

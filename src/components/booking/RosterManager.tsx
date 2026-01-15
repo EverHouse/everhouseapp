@@ -705,7 +705,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                       haptic.light();
                       setShowPaymentModal(true);
                     }}
-                    className="w-full py-3 px-4 rounded-xl bg-green-600 text-white font-bold text-sm transition-all hover:bg-green-700 active:scale-[0.98] flex items-center justify-center gap-2"
+                    className="w-full py-3 px-4 rounded-xl bg-primary text-white font-semibold text-sm transition-colors hover:bg-primary/90 active:scale-[0.98] flex items-center justify-center gap-2"
                   >
                     <span className="material-symbols-outlined text-lg">credit_card</span>
                     Pay Now
