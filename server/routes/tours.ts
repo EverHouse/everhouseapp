@@ -6,7 +6,7 @@ import { eq, gte, asc, desc, and, sql, or, ilike, inArray } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../core/middleware';
 import { getGoogleCalendarClient, getHubSpotClient } from '../core/integrations';
 import { CALENDAR_CONFIG, getCalendarIdByName, discoverCalendarIds } from '../core/calendar/index';
-import { notifyAllStaff } from '../core/staffNotifications';
+import { notifyAllStaff } from '../core/notificationService';
 import { getTodayPacific } from '../utils/dateUtils';
 import { getSessionUser } from '../types/session';
 
@@ -93,6 +93,13 @@ router.post('/api/tours/:id/checkin', isStaffOrAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Tour not found' });
     }
     
+    await notifyAllStaff(
+      'Tour Checked In',
+      `${updated.guestName || 'Guest'} has checked in for their tour`,
+      'tour_scheduled',
+      { relatedId: updated.id, relatedType: 'tour', url: '/#/staff/tours' }
+    );
+    
     res.json(updated);
   } catch (error: any) {
     if (!isProduction) console.error('Tour check-in error:', error);
@@ -131,6 +138,22 @@ router.patch('/api/tours/:id/status', isStaffOrAdmin, async (req, res) => {
     
     if (!updated) {
       return res.status(404).json({ error: 'Tour not found' });
+    }
+    
+    if (status === 'no-show') {
+      await notifyAllStaff(
+        'Tour No-Show',
+        `${updated.guestName || 'Guest'} did not show for their tour`,
+        'tour_scheduled',
+        { relatedId: updated.id, relatedType: 'tour', url: '/#/staff/tours' }
+      );
+    } else if (status === 'cancelled') {
+      await notifyAllStaff(
+        'Tour Cancelled',
+        `Tour for ${updated.guestName || 'Guest'} has been cancelled`,
+        'tour_scheduled',
+        { relatedId: updated.id, relatedType: 'tour', url: '/#/staff/tours' }
+      );
     }
     
     res.json(updated);
@@ -183,8 +206,7 @@ router.post('/api/tours/book', async (req, res) => {
       'New Tour Request',
       `${guestName} requested a tour and is selecting a time`,
       'tour_scheduled',
-      newTour.id,
-      'tour'
+      { relatedId: newTour.id, relatedType: 'tour', url: '/#/staff/tours' }
     );
     
     res.json({ id: newTour.id, message: 'Tour request created' });
@@ -214,8 +236,7 @@ router.patch('/api/tours/:id/confirm', async (req, res) => {
       'Tour Confirmed',
       `${updated.guestName || 'Guest'} confirmed their tour booking`,
       'tour_scheduled',
-      updated.id,
-      'tour'
+      { relatedId: updated.id, relatedType: 'tour', url: '/#/staff/tours' }
     );
     
     res.json(updated);

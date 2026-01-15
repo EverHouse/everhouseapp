@@ -3,6 +3,7 @@ import { db } from '../db';
 import { bugReports } from '../../shared/schema';
 import { eq, desc, and, SQL } from 'drizzle-orm';
 import { isAuthenticated, isStaffOrAdmin } from '../core/middleware';
+import { notifyAllStaff, notifyMember } from '../core/notificationService';
 
 const router = Router();
 
@@ -27,6 +28,14 @@ router.post('/api/bug-reports', isAuthenticated, async (req, res) => {
       userAgent: req.headers['user-agent'] || null,
       status: 'open',
     }).returning();
+    
+    // Notify staff about new bug report
+    await notifyAllStaff(
+      'New Bug Report',
+      `${report.userName || report.userEmail} submitted a bug report: "${description.substring(0, 100)}${description.length > 100 ? '...' : ''}"`,
+      'system',
+      { relatedId: report.id, relatedType: 'bug_report', url: '/#/admin/bug-reports' }
+    );
     
     res.status(201).json(report);
   } catch (error: any) {
@@ -97,6 +106,23 @@ router.put('/api/admin/bug-reports/:id', isStaffOrAdmin, async (req, res) => {
     
     if (staffNotes !== undefined) {
       updateData.staffNotes = staffNotes;
+    }
+    
+    // Notify the member when their bug report is resolved
+    if (status === 'resolved') {
+      // Need to fetch the original report to get the user email
+      const [original] = await db.select().from(bugReports).where(eq(bugReports.id, parseInt(id)));
+      if (original?.userEmail) {
+        await notifyMember({
+          userEmail: original.userEmail,
+          title: 'Bug Report Resolved',
+          message: 'Your bug report has been resolved. Thank you for helping us improve!',
+          type: 'system',
+          relatedId: parseInt(id),
+          relatedType: 'bug_report',
+          url: '/#/profile'
+        });
+      }
     }
     
     const [updated] = await db.update(bugReports)

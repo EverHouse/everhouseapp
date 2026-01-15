@@ -4,6 +4,7 @@ import { db } from '../db';
 import { guestPasses, notifications } from '../../shared/schema';
 import { getTierLimits } from '../core/tierService';
 import { sendPushNotification } from './push';
+import { sendNotificationToUser } from '../core/websocket';
 import { logAndRespond } from '../core/logger';
 import { withRetry } from '../core/retry';
 
@@ -206,6 +207,20 @@ export async function refundGuestPass(
         message: message,
         type: 'guest_pass',
         relatedType: 'guest_pass'
+      });
+      
+      // Send push notification
+      sendPushNotification(memberEmail, {
+        title: 'Guest Pass Refunded',
+        body: message,
+        url: '/#/profile'
+      }).catch(err => console.error('Push notification failed:', err));
+      
+      // Send WebSocket notification
+      sendNotificationToUser(memberEmail, {
+        type: 'guest_pass',
+        title: 'Guest Pass Refunded',
+        message: message
       });
     }
     

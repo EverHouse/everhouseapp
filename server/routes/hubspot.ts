@@ -5,7 +5,7 @@ import { getHubSpotClient } from '../core/integrations';
 import { db } from '../db';
 import { formSubmissions, users } from '../../shared/schema';
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
-import { notifyAllStaff } from '../core/staffNotifications';
+import { notifyAllStaff } from '../core/notificationService';
 import { isStaffOrAdmin } from '../core/middleware';
 import { normalizeTierName, extractTierTags, TIER_NAMES } from '../../shared/constants/tiers';
 import * as fs from 'fs';
@@ -640,9 +640,12 @@ router.post('/api/hubspot/forms/:formType', async (req, res) => {
       notifyAllStaff(
         `New ${formLabel}`,
         staffMessage,
-        'inquiry',
-        insertResult[0]?.id ?? undefined,
-        'form_submission'
+        'system',
+        {
+          relatedId: insertResult[0]?.id,
+          relatedType: 'inquiry',
+          url: '/#/admin/inquiries'
+        }
       ).catch(err => console.error('Staff inquiry notification failed:', err));
     } catch (dbError: any) {
       console.error('Failed to save form submission locally:', dbError);

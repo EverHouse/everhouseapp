@@ -6,7 +6,7 @@ import { events, eventRsvps, users, notifications, availabilityBlocks } from '..
 import { eq, and, or, sql, gte, desc, isNotNull } from 'drizzle-orm';
 import { syncGoogleCalendarEvents, syncWellnessCalendarEvents, backfillWellnessToCalendar, getCalendarIdByName, createCalendarEventOnCalendar, deleteCalendarEvent, updateCalendarEvent, CALENDAR_CONFIG } from '../core/calendar/index';
 import { sendPushNotification } from './push';
-import { notifyAllStaffRequired, notifyMemberRequired } from '../core/staffNotifications';
+import { notifyAllStaff, notifyMember } from '../core/notificationService';
 import { createPacificDate, parseLocalDate, formatDateDisplayWithDay, getTodayPacific, getPacificDateParts } from '../utils/dateUtils';
 import { getAllActiveBayIds, getConferenceRoomId } from '../core/affectedAreas';
 import { sendNotificationToUser, broadcastToStaff } from '../core/websocket';
@@ -791,12 +791,11 @@ router.post('/api/rsvps', async (req, res) => {
         relatedType: 'event'
       });
       
-      await notifyAllStaffRequired(
+      await notifyAllStaff(
         'New Event RSVP',
         staffMessage,
         'event_rsvp',
-        event_id,
-        'event'
+        { relatedId: event_id, relatedType: 'event', url: '/#/staff/calendar' }
       );
       
       return rsvpResult[0];
@@ -857,13 +856,22 @@ router.delete('/api/rsvps/:event_id/:user_email', async (req, res) => {
           eq(eventRsvps.userEmail, user_email)
         ));
       
-      await notifyAllStaffRequired(
+      await notifyAllStaff(
         'Event RSVP Cancelled',
         staffMessage,
         'event_rsvp_cancelled',
-        parseInt(event_id),
-        'event'
+        { relatedId: parseInt(event_id), relatedType: 'event', url: '/#/staff/calendar' }
       );
+      
+      await notifyMember({
+        userEmail: user_email,
+        title: 'RSVP Cancelled',
+        message: `Your RSVP for "${evt.title}" on ${formattedDate} has been cancelled`,
+        type: 'event',
+        relatedId: parseInt(event_id),
+        relatedType: 'event',
+        url: '/#/events'
+      });
     });
     
     // Broadcast to staff for real-time updates

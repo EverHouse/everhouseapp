@@ -15,7 +15,7 @@ import { bookingEvents } from '../core/bookingEvents';
 import { sendNotificationToUser, broadcastAvailabilityUpdate } from '../core/websocket';
 import { checkAllConflicts, parseTimeToMinutes } from '../core/bookingValidation';
 import { getSessionUser } from '../types/session';
-import { notifyMember } from '../core/notificationService';
+import { notifyMember, notifyAllStaff } from '../core/notificationService';
 import { refundGuestPass } from './guestPasses';
 import { createPacificDate, formatDateDisplayWithDay, formatTime12Hour } from '../utils/dateUtils';
 
@@ -985,13 +985,14 @@ router.put('/api/bookings/:id/member-cancel', async (req, res) => {
     const cancelMessage = `Booking for ${friendlyDate} at ${friendlyTime} was cancelled by member.`;
     
     try {
-      const { notifyAllStaff } = await import('../core/staffNotifications');
       await notifyAllStaff(
         'Member Cancelled Booking',
         cancelMessage,
         'booking_cancelled',
-        bookingId,
-        'booking_request'
+        {
+          relatedId: bookingId,
+          relatedType: 'booking_request'
+        }
       );
     } catch (staffNotifyErr) {
       console.error('Staff notification failed:', staffNotifyErr);

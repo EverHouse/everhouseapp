@@ -41,6 +41,7 @@ import {
   checkMemberAvailability,
   type ConflictingBooking 
 } from '../core/bookingService/conflictDetection';
+import { notifyMember } from '../core/notificationService';
 
 const router = Router();
 
@@ -1047,6 +1048,18 @@ router.post('/api/bookings/:id/invite/accept', async (req: Request, res: Respons
       extra: { bookingId, userEmail, sessionId: booking.session_id }
     });
 
+    // Notify the booking owner that invite was accepted
+    const invitedMemberName = participant.displayName || userEmail;
+    await notifyMember({
+      userEmail: booking.user_email || booking.owner_email,
+      title: 'Invite Accepted',
+      message: `${invitedMemberName} accepted your invite to the booking on ${booking.request_date}`,
+      type: 'booking_invite',
+      relatedId: bookingId,
+      relatedType: 'booking',
+      url: '/#/bookings'
+    });
+
     res.json({ success: true, message: 'Invite accepted successfully' });
   } catch (error: any) {
     logAndRespond(req, res, 500, 'Failed to accept invite', error);
@@ -1133,6 +1146,18 @@ router.post('/api/bookings/:id/invite/decline', async (req: Request, res: Respon
 
     logger.info('[Invite Decline] Member declined invite', {
       extra: { bookingId, userEmail, sessionId: booking.session_id, participantId: participant.id }
+    });
+
+    // Notify the booking owner that invite was declined
+    const declinedMemberName = participant.displayName || userEmail;
+    await notifyMember({
+      userEmail: booking.user_email || booking.owner_email,
+      title: 'Invite Declined',
+      message: `${declinedMemberName} declined your invite to the booking on ${booking.request_date}`,
+      type: 'booking_invite',
+      relatedId: bookingId,
+      relatedType: 'booking',
+      url: '/#/bookings'
     });
 
     res.json({ success: true, message: 'Invite declined successfully' });

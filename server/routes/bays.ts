@@ -8,7 +8,7 @@ import { getGoogleCalendarClient } from '../core/integrations';
 import { CALENDAR_CONFIG, getCalendarIdByName, createCalendarEvent, createCalendarEventOnCalendar, deleteCalendarEvent, getConferenceRoomBookingsFromCalendar } from '../core/calendar/index';
 import { sendPushNotification, sendPushNotificationToStaff } from './push';
 import { checkDailyBookingLimit } from '../core/tierService';
-import { notifyAllStaff } from '../core/staffNotifications';
+import { notifyAllStaff } from '../core/notificationService';
 import { isStaffOrAdmin } from '../core/middleware';
 import { formatNotificationDateTime, formatDateDisplayWithDay, formatTime12Hour, createPacificDate } from '../utils/dateUtils';
 import { parseAffectedAreas } from '../core/affectedAreas';
@@ -610,8 +610,11 @@ router.post('/api/booking-requests', async (req, res) => {
       staffTitle,
       staffMessage,
       'booking',
-      row.id,
-      'booking_request'
+      {
+        relatedId: row.id,
+        relatedType: 'booking_request',
+        url: '/#/admin'
+      }
     ).catch(err => console.error('Staff in-app notification failed:', err));
     
     // Push notification - already non-blocking

@@ -4,7 +4,7 @@ import { isStaffOrAdmin } from '../core/middleware';
 import { syncWellnessCalendarEvents, discoverCalendarIds, getCalendarIdByName, createCalendarEventOnCalendar, deleteCalendarEvent, updateCalendarEvent, CALENDAR_CONFIG } from '../core/calendar/index';
 import { db } from '../db';
 import { wellnessEnrollments, wellnessClasses, users, notifications } from '../../shared/schema';
-import { notifyAllStaffRequired, notifyMemberRequired } from '../core/staffNotifications';
+import { notifyAllStaff, notifyMember } from '../core/notificationService';
 import { eq, and, gte, sql, isNull, asc, desc } from 'drizzle-orm';
 import { sendPushNotification } from './push';
 import { formatDateDisplayWithDay, getTodayPacific } from '../utils/dateUtils';
@@ -682,12 +682,11 @@ router.post('/api/wellness-enrollments', async (req, res) => {
         relatedType: 'wellness_class'
       });
       
-      await notifyAllStaffRequired(
+      await notifyAllStaff(
         isWaitlisted ? 'New Waitlist Entry' : 'New Wellness Enrollment',
         staffMessage,
         'wellness_enrollment',
-        class_id,
-        'wellness_class'
+        { relatedId: class_id, relatedType: 'wellness_class', url: '/#/staff/calendar' }
       );
       
       return enrollmentResult[0];
@@ -789,13 +788,22 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res
           eq(wellnessEnrollments.userEmail, user_email)
         ));
       
-      await notifyAllStaffRequired(
+      await notifyAllStaff(
         'Wellness Enrollment Cancelled',
         staffMessage,
         'wellness_cancellation',
-        parseInt(class_id),
-        'wellness_class'
+        { relatedId: parseInt(class_id), relatedType: 'wellness_class', url: '/#/staff/calendar' }
       );
+    });
+    
+    await notifyMember({
+      userEmail: user_email,
+      title: 'Wellness Enrollment Cancelled',
+      message: `Your enrollment in "${cls.title}" on ${formattedDate} has been cancelled`,
+      type: 'wellness',
+      relatedId: parseInt(class_id),
+      relatedType: 'wellness',
+      url: '/#/wellness'
     });
     
     // If a regular enrollment was cancelled and there are waitlisted users, promote the first one
@@ -850,12 +858,11 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res
           }, { action: 'wellness_promoted', classId: parseInt(class_id), triggerSource: 'wellness.ts' });
           
           // Notify staff
-          await notifyAllStaffRequired(
+          await notifyAllStaff(
             'Waitlist Promotion',
             `${promotedName} was automatically promoted from waitlist for ${cls.title} on ${formattedDate}`,
             'wellness_enrollment',
-            parseInt(class_id),
-            'wellness_class'
+            { relatedId: parseInt(class_id), relatedType: 'wellness_class', url: '/#/staff/calendar' }
           );
         }
       } catch (promoteError) {

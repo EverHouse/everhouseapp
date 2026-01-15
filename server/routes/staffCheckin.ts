@@ -6,6 +6,7 @@ import { eq, and, sql } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../core/middleware';
 import { logAndRespond } from '../core/logger';
 import { getSessionUser } from '../types/session';
+import { notifyMember } from '../core/notificationService';
 
 const router = Router();
 
@@ -181,16 +182,19 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
       return res.status(400).json({ error: 'Reason required for waiving payment' });
     }
 
-    const bookingResult = await pool.query(
-      `SELECT session_id FROM booking_requests WHERE id = $1`,
-      [bookingId]
-    );
+    const bookingResult = await pool.query(`
+      SELECT br.session_id, br.user_email as owner_email, r.name as resource_name
+      FROM booking_requests br
+      LEFT JOIN resources r ON br.resource_id = r.id
+      WHERE br.id = $1
+    `, [bookingId]);
 
     if (bookingResult.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found' });
     }
 
-    const sessionId = bookingResult.rows[0].session_id;
+    const booking = bookingResult.rows[0];
+    const sessionId = booking.session_id;
 
     if (action === 'confirm' || action === 'waive') {
       if (!participantId) {
@@ -269,6 +273,18 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
           p.payment_status,
           newStatus
         ]);
+      }
+
+      if (action === 'confirm_all') {
+        await notifyMember({
+          userEmail: booking.owner_email,
+          title: 'Checked In',
+          message: `You've been checked in for your booking at ${booking.resource_name || 'the facility'}`,
+          type: 'booking',
+          relatedId: bookingId,
+          relatedType: 'booking',
+          url: '/#/bookings'
+        });
       }
 
       return res.json({ 
