@@ -164,7 +164,8 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
       {isOpen && filteredMembers.length > 0 && (
         <div 
           ref={dropdownRef}
-          className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-900 border border-primary/10 dark:border-white/10 rounded-xl shadow-lg overflow-hidden max-h-64 overflow-y-auto"
+          className="absolute z-[100] w-full mt-1 bg-white dark:bg-gray-900 border border-primary/10 dark:border-white/10 rounded-xl shadow-xl overflow-hidden max-h-64 overflow-y-auto"
+          style={{ position: 'absolute' }}
         >
           {filteredMembers.map((member, index) => (
             <button

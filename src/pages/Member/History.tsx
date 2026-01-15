@@ -465,18 +465,28 @@ const History: React.FC = () => {
                     const categoryIcons: Record<string, string> = {
                       sim_walk_in: 'golf_course',
                       guest_pass: 'badge',
+                      guest_fee: 'group_add',
+                      overage_fee: 'schedule',
+                      one_time_purchase: 'payments',
                       membership: 'card_membership',
                       cafe: 'local_cafe',
                       retail: 'shopping_bag',
+                      payment: 'paid',
+                      invoice: 'description',
                       other: 'receipt',
                     };
                     
                     const categoryColors: Record<string, { dark: string; light: string }> = {
                       sim_walk_in: { dark: 'bg-blue-500/20 text-blue-300', light: 'bg-blue-100 text-blue-700' },
                       guest_pass: { dark: 'bg-purple-500/20 text-purple-300', light: 'bg-purple-100 text-purple-700' },
+                      guest_fee: { dark: 'bg-indigo-500/20 text-indigo-300', light: 'bg-indigo-100 text-indigo-700' },
+                      overage_fee: { dark: 'bg-rose-500/20 text-rose-300', light: 'bg-rose-100 text-rose-700' },
+                      one_time_purchase: { dark: 'bg-accent/20 text-accent', light: 'bg-accent/20 text-brand-green' },
                       membership: { dark: 'bg-accent/20 text-accent', light: 'bg-accent/20 text-brand-green' },
                       cafe: { dark: 'bg-orange-500/20 text-orange-300', light: 'bg-orange-100 text-orange-700' },
                       retail: { dark: 'bg-pink-500/20 text-pink-300', light: 'bg-pink-100 text-pink-700' },
+                      payment: { dark: 'bg-teal-500/20 text-teal-300', light: 'bg-teal-100 text-teal-700' },
+                      invoice: { dark: 'bg-slate-500/20 text-slate-300', light: 'bg-slate-100 text-slate-700' },
                     };
                     
                     const getCategoryStyle = (category: string) => {
@@ -488,6 +498,23 @@ const History: React.FC = () => {
                       return categoryIcons[category?.toLowerCase()] || 'receipt';
                     };
                     
+                    const formatCategoryLabel = (category: string | null): string => {
+                      if (!category) return 'Purchase';
+                      const labels: Record<string, string> = {
+                        guest_fee: 'Guest Fee',
+                        overage_fee: 'Overage',
+                        one_time_purchase: 'Charge',
+                        sim_walk_in: 'Simulator',
+                        guest_pass: 'Guest Pass',
+                        membership: 'Membership',
+                        cafe: 'Cafe',
+                        retail: 'Retail',
+                        payment: 'Payment',
+                        invoice: 'Invoice',
+                      };
+                      return labels[category.toLowerCase()] || category;
+                    };
+                    
                     const formatCurrency = (cents: number): string => {
                       if (cents == null || isNaN(cents)) return '$0.00';
                       return `$${(cents / 100).toFixed(2)}`;
@@ -497,6 +524,8 @@ const History: React.FC = () => {
                       Mindbody: { dark: 'bg-white/10 text-white/80', light: 'bg-primary/10 text-primary' },
                       Stripe: { dark: 'bg-accent/20 text-accent', light: 'bg-accent/20 text-primary' },
                       'Even House': { dark: 'bg-lavender/30 text-lavender', light: 'bg-lavender/20 text-primary' },
+                      Cash: { dark: 'bg-emerald-500/20 text-emerald-300', light: 'bg-emerald-100 text-emerald-700' },
+                      Check: { dark: 'bg-cyan-500/20 text-cyan-300', light: 'bg-cyan-100 text-cyan-700' },
                     };
                     
                     const getSourceStyle = (source: string) => {
@@ -538,7 +567,7 @@ const History: React.FC = () => {
                                     <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 ${getCategoryStyle(purchase.itemCategory || '')}`}>
                                         <span className="material-symbols-outlined text-xs">{getCategoryIcon(purchase.itemCategory || '')}</span>
-                                        {purchase.itemCategory || 'Purchase'}
+                                        {formatCategoryLabel(purchase.itemCategory)}
                                       </span>
                                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${getSourceStyle(purchase.source)}`}>
                                         {purchase.source}

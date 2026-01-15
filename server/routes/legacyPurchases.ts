@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db";
+import { pool } from "../core/db";
 import { legacyPurchases, users, legacyImportJobs, hubspotDeals, hubspotProductMappings, hubspotLineItems } from "@shared/schema";
 import { eq, desc, and, sql, gte, lte } from "drizzle-orm";
 import { isStaffOrAdmin, isAdmin } from "../core/middleware";
@@ -99,6 +100,21 @@ router.get("/api/legacy-purchases/my-purchases", async (req: Request, res: Respo
   }
 });
 
+// Helper to safely format dates that may be Date objects or strings
+function safeToISOString(value: Date | string | null | undefined): string {
+  if (!value) return '';
+  if (typeof value === 'string' && value.trim() === '') return '';
+  try {
+    if (value instanceof Date) {
+      return isNaN(value.getTime()) ? '' : value.toISOString();
+    }
+    const parsed = new Date(value);
+    return isNaN(parsed.getTime()) ? '' : parsed.toISOString();
+  } catch {
+    return '';
+  }
+}
+
 // Helper function to fetch unified purchases for an email
 async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurchase[]> {
   const normalizedEmail = email.toLowerCase();
@@ -131,7 +147,7 @@ async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurcha
       itemName: p.itemName,
       itemCategory: p.itemCategory,
       amountCents: p.itemTotalCents,
-      date: p.saleDate?.toISOString() || '',
+      date: safeToISOString(p.saleDate),
       status: p.isComp ? 'comp' : 'paid',
       source,
       quantity: p.quantity || 1,
@@ -139,28 +155,89 @@ async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurcha
   });
   
   // Get Stripe invoices if customer exists
-  let unifiedStripe: UnifiedPurchase[] = [];
+  let unifiedStripeInvoices: UnifiedPurchase[] = [];
   
   if (userInfo?.stripeCustomerId) {
     const invoiceResult = await listCustomerInvoices(userInfo.stripeCustomerId);
     
     if (invoiceResult.success && invoiceResult.invoices) {
-      unifiedStripe = invoiceResult.invoices.map(inv => ({
+      unifiedStripeInvoices = invoiceResult.invoices.map(inv => ({
         id: `stripe-${inv.id}`,
         type: 'stripe' as const,
         itemName: inv.description || inv.lines.map(l => l.description).filter(Boolean).join(', ') || 'Stripe Invoice',
         itemCategory: 'invoice',
         amountCents: inv.amountPaid || inv.amountDue,
-        date: inv.paidAt?.toISOString() || inv.created.toISOString(),
+        date: safeToISOString(inv.paidAt) || safeToISOString(inv.created),
         status: inv.status,
         source: 'Stripe',
       }));
     }
   }
   
-  // Combine and sort by date descending
-  const combined = [...unifiedLegacy, ...unifiedStripe];
-  combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // Get Stripe Payment Intents (quick charges, guest fees)
+  let unifiedPaymentIntents: UnifiedPurchase[] = [];
+  
+  if (userInfo?.id) {
+    const paymentIntentsResult = await pool.query(
+      `SELECT * FROM stripe_payment_intents 
+       WHERE (user_id = $1 OR user_id = $2)
+       AND status = 'succeeded'
+       ORDER BY created_at DESC`,
+      [userInfo.id, normalizedEmail]
+    );
+    
+    unifiedPaymentIntents = paymentIntentsResult.rows.map((record: any) => ({
+      id: `payment-${record.id}`,
+      type: 'stripe' as const,
+      itemName: record.description || `${record.purpose} payment`,
+      itemCategory: record.purpose,
+      amountCents: record.amount_cents,
+      date: safeToISOString(record.created_at),
+      status: 'paid',
+      source: 'Stripe',
+    }));
+  }
+  
+  // Get Cash/Check Payments from billing_audit_log
+  let unifiedCashCheckPayments: UnifiedPurchase[] = [];
+  
+  const cashCheckResult = await pool.query(
+    `SELECT * FROM billing_audit_log 
+     WHERE member_email = $1 
+     AND action_type IN ('cash_payment_recorded', 'check_payment_recorded', 'cash_check_recorded')
+     ORDER BY created_at DESC`,
+    [normalizedEmail]
+  );
+  
+  unifiedCashCheckPayments = cashCheckResult.rows.map((record: any) => {
+    const actionDetails = record.action_details || {};
+    const paymentMethod = actionDetails.paymentMethod || actionDetails.payment_method || 'cash';
+    
+    return {
+      id: `cash-${record.id}`,
+      type: 'legacy' as const,
+      itemName: actionDetails.description || 'Cash/Check Payment',
+      itemCategory: 'payment',
+      amountCents: actionDetails.amountCents || actionDetails.amount_cents || 0,
+      date: safeToISOString(record.created_at),
+      status: 'paid',
+      source: paymentMethod === 'check' ? 'Check' : 'Cash',
+    };
+  });
+  
+  // Combine and sort by date descending (items with invalid/empty dates go to end)
+  const combined = [...unifiedLegacy, ...unifiedStripeInvoices, ...unifiedPaymentIntents, ...unifiedCashCheckPayments];
+  combined.sort((a, b) => {
+    const dateA = a.date ? new Date(a.date).getTime() : 0;
+    const dateB = b.date ? new Date(b.date).getTime() : 0;
+    // Handle invalid dates (NaN) by pushing them to the end
+    const validA = !isNaN(dateA) && dateA > 0;
+    const validB = !isNaN(dateB) && dateB > 0;
+    if (!validA && !validB) return 0;
+    if (!validA) return 1; // a goes after b
+    if (!validB) return -1; // b goes after a
+    return dateB - dateA; // descending order
+  });
   
   return combined;
 }
