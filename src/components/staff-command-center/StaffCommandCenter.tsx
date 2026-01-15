@@ -15,6 +15,7 @@ import { AlertsCard } from './sections/AlertsCard';
 import { QuickActionsGrid } from './sections/QuickActionsGrid';
 import { OverduePaymentsSection } from './sections/OverduePaymentsSection';
 import { CheckinBillingModal } from './modals/CheckinBillingModal';
+import { CompleteRosterModal } from './modals/CompleteRosterModal';
 import { AddMemberModal } from './modals/AddMemberModal';
 import type { StaffCommandCenterProps, BookingRequest, RecentActivity } from './types';
 
@@ -36,6 +37,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
   const [trackmanModal, setTrackmanModal] = useState<BookingRequest | null>(null);
   const [trackmanBookingIdInput, setTrackmanBookingIdInput] = useState('');
   const [billingModal, setBillingModal] = useState<{ isOpen: boolean; bookingId: number | null }>({ isOpen: false, bookingId: null });
+  const [rosterModal, setRosterModal] = useState<{ isOpen: boolean; bookingId: number | null }>({ isOpen: false, bookingId: null });
   const [addMemberModalOpen, setAddMemberModalOpen] = useState(false);
   
   const optimisticUpdateRef = useRef<OptimisticUpdateRef | null>(null);
@@ -187,13 +189,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
         safeRevertOptimisticUpdate(booking.id, optimisticStatus, newActivity.id);
         
         if (errorData.requiresRoster) {
-          // Store pending booking ID in sessionStorage so SimulatorTab can pick it up on mount
-          sessionStorage.setItem('pendingRosterBookingId', id.toString());
-          // Dispatch event immediately in case user is already on simulator tab
-          window.dispatchEvent(new CustomEvent('open-booking-details', { detail: { bookingId: id } }));
-          // Switch to simulator tab - the tab will check sessionStorage on mount
-          onTabChange('simulator');
-          showToast('Roster Incomplete: Please assign all player slots to proceed.', 'error');
+          // Open the Complete Roster modal directly instead of switching tabs
+          setRosterModal({ isOpen: true, bookingId: id });
         } else {
           setBillingModal({ isOpen: true, bookingId: id });
         }
@@ -504,6 +501,14 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
         onClose={() => setBillingModal({ isOpen: false, bookingId: null })}
         bookingId={billingModal.bookingId || 0}
         onCheckinComplete={handleBillingModalComplete}
+      />
+      
+      <CompleteRosterModal
+        isOpen={rosterModal.isOpen}
+        onClose={() => setRosterModal({ isOpen: false, bookingId: null })}
+        bookingId={rosterModal.bookingId || 0}
+        onRosterComplete={handleBillingModalComplete}
+        onBillingRequired={(id) => setBillingModal({ isOpen: true, bookingId: id })}
       />
       
       <AddMemberModal

@@ -894,7 +894,7 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
         // Add to booking_participants
         await pool.query(
           `INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, invite_status)
-           VALUES ($1, $2, 'member', $3, 'unpaid', 'confirmed')`,
+           VALUES ($1, $2, 'member', $3, 'pending', 'confirmed')`,
           [sessionId, memberEmail.toLowerCase(), displayName]
         );
       }
