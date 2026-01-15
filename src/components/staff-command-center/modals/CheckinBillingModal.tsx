@@ -281,7 +281,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
   
 
   const modalContent = (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center pt-16 pb-24 px-4 bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[10001] flex items-center justify-center pt-16 pb-24 px-4 bg-black/50 backdrop-blur-sm">
       <div className="w-full max-w-lg max-h-full bg-white dark:bg-[#1a1d12] rounded-2xl shadow-2xl border border-primary/20 dark:border-white/10 overflow-hidden flex flex-col">
         <div className="px-6 py-4 border-b border-primary/10 dark:border-white/10 bg-primary/5 dark:bg-white/5 flex-shrink-0">
           <div className="flex items-center justify-between">
