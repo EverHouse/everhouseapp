@@ -58,14 +58,16 @@ interface WellnessEnrollmentRecord {
   category: string;
 }
 
-interface LegacyPurchase {
-  id: number;
+interface UnifiedPurchase {
+  id: string;
+  type: 'legacy' | 'stripe';
   itemName: string;
-  itemCategory: string;
-  saleDate: string;
-  salePriceCents: number;
-  staffName: string;
-  quantity: number;
+  itemCategory: string | null;
+  amountCents: number;
+  date: string;
+  status: string;
+  source: string;
+  quantity?: number;
 }
 
 const normalizeTime = (time: string | null | undefined): string => {
@@ -87,7 +89,7 @@ const History: React.FC = () => {
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [rsvps, setRSVPs] = useState<RSVPRecord[]>([]);
   const [wellnessEnrollments, setWellnessEnrollments] = useState<WellnessEnrollmentRecord[]>([]);
-  const [purchases, setPurchases] = useState<LegacyPurchase[]>([]);
+  const [purchases, setPurchases] = useState<UnifiedPurchase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchBookings = useCallback(async () => {
@@ -188,8 +190,8 @@ const History: React.FC = () => {
   const fetchPurchases = useCallback(async () => {
     if (!user?.email) return;
     try {
-      const { ok, data } = await apiRequest<LegacyPurchase[]>(
-        `/api/legacy-purchases/my-purchases?user_email=${encodeURIComponent(user.email)}`
+      const { ok, data } = await apiRequest<UnifiedPurchase[]>(
+        `/api/my-unified-purchases?user_email=${encodeURIComponent(user.email)}`
       );
       if (ok && data) {
         setPurchases(data);
@@ -453,9 +455,19 @@ const History: React.FC = () => {
                       return `$${(cents / 100).toFixed(2)}`;
                     };
                     
-                    const groupedByMonth: { [key: string]: LegacyPurchase[] } = {};
+                    const sourceColors: Record<string, { dark: string; light: string }> = {
+                      Mindbody: { dark: 'bg-teal-500/20 text-teal-300', light: 'bg-teal-100 text-teal-700' },
+                      Stripe: { dark: 'bg-indigo-500/20 text-indigo-300', light: 'bg-indigo-100 text-indigo-700' },
+                    };
+                    
+                    const getSourceStyle = (source: string) => {
+                      const colors = sourceColors[source] || { dark: 'bg-gray-500/20 text-gray-300', light: 'bg-gray-100 text-gray-700' };
+                      return isDark ? colors.dark : colors.light;
+                    };
+                    
+                    const groupedByMonth: { [key: string]: UnifiedPurchase[] } = {};
                     purchases.forEach(p => {
-                      const date = new Date(p.saleDate);
+                      const date = new Date(p.date);
                       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
                       if (!groupedByMonth[monthKey]) {
                         groupedByMonth[monthKey] = [];
@@ -484,12 +496,15 @@ const History: React.FC = () => {
                               >
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1.5">
-                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 ${getCategoryStyle(purchase.itemCategory)}`}>
-                                        <span className="material-symbols-outlined text-xs">{getCategoryIcon(purchase.itemCategory)}</span>
+                                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 ${getCategoryStyle(purchase.itemCategory || '')}`}>
+                                        <span className="material-symbols-outlined text-xs">{getCategoryIcon(purchase.itemCategory || '')}</span>
                                         {purchase.itemCategory || 'Purchase'}
                                       </span>
-                                      {purchase.quantity > 1 && (
+                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${getSourceStyle(purchase.source)}`}>
+                                        {purchase.source}
+                                      </span>
+                                      {(purchase.quantity ?? 1) > 1 && (
                                         <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${isDark ? 'bg-white/10 text-white/70' : 'bg-gray-200 text-primary/70'}`}>
                                           x{purchase.quantity}
                                         </span>
@@ -499,12 +514,12 @@ const History: React.FC = () => {
                                       {purchase.itemName}
                                     </p>
                                     <p className={`text-sm ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
-                                      {getRelativeDateLabel(purchase.saleDate?.split('T')[0] || purchase.saleDate)}
+                                      {getRelativeDateLabel(purchase.date?.split('T')[0] || purchase.date)}
                                     </p>
                                   </div>
                                   <div className="text-right flex-shrink-0">
                                     <p className={`text-lg font-bold ${isDark ? 'text-accent' : 'text-brand-green'}`}>
-                                      {formatCurrency(purchase.salePriceCents)}
+                                      {formatCurrency(purchase.amountCents)}
                                     </p>
                                   </div>
                                 </div>

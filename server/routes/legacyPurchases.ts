@@ -7,7 +7,20 @@ import { importMembersFromCSV, importSalesFromCSV, importAttendanceFromCSV } fro
 import { createDealForLegacyMember } from "../core/hubspotDeals";
 import { getHubSpotClient } from "../core/integrations";
 import { retryableHubSpotRequest } from "../core/hubspot/request";
+import { listCustomerInvoices } from "../core/stripe/invoices";
 import path from "path";
+
+interface UnifiedPurchase {
+  id: string;
+  type: 'legacy' | 'stripe';
+  itemName: string;
+  itemCategory: string | null;
+  amountCents: number;
+  date: string;
+  status: string;
+  source: string;
+  quantity?: number;
+}
 
 const router = Router();
 
@@ -74,12 +87,120 @@ router.get("/api/legacy-purchases/my-purchases", async (req: Request, res: Respo
       salePriceCents: p.itemTotalCents,
       saleDate: p.saleDate,
       isComp: p.isComp,
+      quantity: p.quantity || 1,
+      staffName: p.staffName || null,
     }));
     
+    console.log(`[LegacyPurchases] my-purchases for ${targetEmail}: found ${formattedPurchases.length} purchases`);
     res.json(formattedPurchases);
   } catch (error) {
     console.error("[LegacyPurchases] Error fetching my purchases:", error);
     res.status(500).json({ error: "Failed to fetch purchases" });
+  }
+});
+
+// Helper function to fetch unified purchases for an email
+async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurchase[]> {
+  const normalizedEmail = email.toLowerCase();
+  
+  // Get user info for stripe_customer_id
+  const userResult = await db.select({
+    id: users.id,
+    stripeCustomerId: users.stripeCustomerId
+  })
+    .from(users)
+    .where(eq(users.email, normalizedEmail))
+    .limit(1);
+  
+  const userInfo = userResult[0];
+  
+  // Get legacy purchases
+  const legacyResult = await db.select()
+    .from(legacyPurchases)
+    .where(eq(legacyPurchases.memberEmail, normalizedEmail))
+    .orderBy(desc(legacyPurchases.saleDate));
+  
+  // Map legacy purchases to unified format
+  const unifiedLegacy: UnifiedPurchase[] = legacyResult.map(p => ({
+    id: `legacy-${p.id}`,
+    type: 'legacy' as const,
+    itemName: p.itemName,
+    itemCategory: p.itemCategory,
+    amountCents: p.itemTotalCents,
+    date: p.saleDate?.toISOString() || '',
+    status: p.isComp ? 'comp' : 'paid',
+    source: 'Mindbody',
+    quantity: p.quantity || 1,
+  }));
+  
+  // Get Stripe invoices if customer exists
+  let unifiedStripe: UnifiedPurchase[] = [];
+  
+  if (userInfo?.stripeCustomerId) {
+    const invoiceResult = await listCustomerInvoices(userInfo.stripeCustomerId);
+    
+    if (invoiceResult.success && invoiceResult.invoices) {
+      unifiedStripe = invoiceResult.invoices.map(inv => ({
+        id: `stripe-${inv.id}`,
+        type: 'stripe' as const,
+        itemName: inv.description || inv.lines.map(l => l.description).filter(Boolean).join(', ') || 'Stripe Invoice',
+        itemCategory: 'invoice',
+        amountCents: inv.amountPaid || inv.amountDue,
+        date: inv.paidAt?.toISOString() || inv.created.toISOString(),
+        status: inv.status,
+        source: 'Stripe',
+      }));
+    }
+  }
+  
+  // Combine and sort by date descending
+  const combined = [...unifiedLegacy, ...unifiedStripe];
+  combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  
+  return combined;
+}
+
+// Get unified purchases for a member (staff view)
+router.get("/api/members/:email/unified-purchases", isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { email } = req.params;
+    const purchases = await getUnifiedPurchasesForEmail(email);
+    
+    console.log(`[UnifiedPurchases] staff view for ${email}: found ${purchases.length} purchases`);
+    res.json(purchases);
+  } catch (error) {
+    console.error("[UnifiedPurchases] Error fetching unified purchases:", error);
+    res.status(500).json({ error: "Failed to fetch unified purchases" });
+  }
+});
+
+// Get unified purchases for current member (member view)
+// Supports ?user_email param for "View As" feature when staff views as another member
+router.get("/api/my-unified-purchases", async (req: Request, res: Response) => {
+  try {
+    const sessionEmail = (req as any).user?.email;
+    if (!sessionEmail) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    
+    // Support "View As" feature: staff can pass user_email param to view as another member
+    const requestedEmail = req.query.user_email as string | undefined;
+    let targetEmail = sessionEmail;
+    
+    if (requestedEmail && requestedEmail.toLowerCase() !== sessionEmail.toLowerCase()) {
+      const userRole = (req as any).user?.role;
+      if (userRole === 'admin' || userRole === 'staff') {
+        targetEmail = decodeURIComponent(requestedEmail);
+      }
+    }
+    
+    const purchases = await getUnifiedPurchasesForEmail(targetEmail);
+    
+    console.log(`[UnifiedPurchases] my-unified-purchases for ${targetEmail}: found ${purchases.length} purchases`);
+    res.json(purchases);
+  } catch (error) {
+    console.error("[UnifiedPurchases] Error fetching my unified purchases:", error);
+    res.status(500).json({ error: "Failed to fetch unified purchases" });
   }
 });
 
