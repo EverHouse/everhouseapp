@@ -465,6 +465,112 @@ function areNamesSimilar(name1: string, name2: string): boolean {
   return firstNameMatch && lastNameMatch;
 }
 
+// Search for members by name when email is not provided or not matched
+// Returns: { match: 'unique' | 'ambiguous' | 'none', members: Array<{id, email, name}> }
+async function findMembersByName(name: string): Promise<{
+  match: 'unique' | 'ambiguous' | 'none';
+  members: Array<{ id: string; email: string; name: string }>;
+}> {
+  if (!name || name.trim().length < 2) {
+    return { match: 'none', members: [] };
+  }
+  
+  const normalized = normalizeName(name);
+  const nameParts = normalized.split(' ').filter(p => p.length > 1);
+  
+  if (nameParts.length === 0) {
+    return { match: 'none', members: [] };
+  }
+  
+  const firstName = nameParts[0];
+  const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : null;
+  
+  // Search for members with matching name
+  let query: string;
+  let params: string[];
+  
+  if (lastName) {
+    // Full name search - more specific
+    query = `
+      SELECT id, email, 
+        COALESCE(
+          (SELECT contact->>'firstname' || ' ' || contact->>'lastname' 
+           FROM (SELECT $3::text) AS dummy(contact) WHERE false),
+          email
+        ) as name,
+        LOWER(COALESCE(
+          (SELECT hs.properties->>'firstname' FROM hubspot_contacts hs WHERE LOWER(hs.properties->>'email') = LOWER(u.email) LIMIT 1),
+          SPLIT_PART(u.email, '@', 1)
+        )) as first_name,
+        LOWER(COALESCE(
+          (SELECT hs.properties->>'lastname' FROM hubspot_contacts hs WHERE LOWER(hs.properties->>'email') = LOWER(u.email) LIMIT 1),
+          ''
+        )) as last_name
+      FROM users u
+      WHERE u.tier IS NOT NULL 
+        AND u.tier != ''
+        AND (
+          LOWER(u.email) LIKE $1 || '%'
+          OR EXISTS (
+            SELECT 1 FROM hubspot_contacts hs 
+            WHERE LOWER(hs.properties->>'email') = LOWER(u.email)
+            AND (
+              LOWER(hs.properties->>'firstname') LIKE $1 || '%'
+              OR LOWER(hs.properties->>'firstname') = $1
+            )
+            AND (
+              LOWER(hs.properties->>'lastname') LIKE $2 || '%'
+              OR LOWER(hs.properties->>'lastname') = $2
+            )
+          )
+        )
+      LIMIT 10
+    `;
+    params = [firstName, lastName, ''];
+  } else {
+    // First name only - will likely have multiple matches
+    query = `
+      SELECT u.id, u.email,
+        COALESCE(hs.properties->>'firstname', '') || ' ' || COALESCE(hs.properties->>'lastname', '') as name
+      FROM users u
+      LEFT JOIN hubspot_contacts hs ON LOWER(hs.properties->>'email') = LOWER(u.email)
+      WHERE u.tier IS NOT NULL 
+        AND u.tier != ''
+        AND (
+          LOWER(SPLIT_PART(u.email, '@', 1)) LIKE $1 || '%'
+          OR LOWER(COALESCE(hs.properties->>'firstname', '')) = $1
+          OR LOWER(COALESCE(hs.properties->>'firstname', '')) LIKE $1 || '%'
+        )
+      LIMIT 10
+    `;
+    params = [firstName];
+  }
+  
+  try {
+    const result = await pool.query(query, params);
+    
+    if (result.rows.length === 0) {
+      return { match: 'none', members: [] };
+    }
+    
+    if (result.rows.length === 1) {
+      return { 
+        match: 'unique', 
+        members: result.rows.map(r => ({ id: r.id, email: r.email, name: r.name?.trim() || r.email }))
+      };
+    }
+    
+    // Multiple matches - ambiguous
+    return { 
+      match: 'ambiguous', 
+      members: result.rows.map(r => ({ id: r.id, email: r.email, name: r.name?.trim() || r.email }))
+    };
+  } catch (error) {
+    process.stderr.write(`[Trackman Import] Error searching members by name "${name}": ${error}\n`);
+    return { match: 'none', members: [] };
+  }
+}
+
 // Simple Levenshtein distance for typo detection
 function levenshteinDistance(a: string, b: string): number {
   if (a.length === 0) return b.length;
@@ -589,7 +695,40 @@ async function createTrackmanSessionAndParticipants(input: SessionCreationInput)
           continue;
         }
         
-        // If member has no userId (unmatched), treat them as a guest
+        // If member has no userId (unmatched), try name-based matching as fallback
+        if (!memberUserId && member.name) {
+          const nameMatch = await findMembersByName(member.name);
+          
+          if (nameMatch.match === 'unique') {
+            // Single match found - use it
+            const matchedMember = nameMatch.members[0];
+            
+            // Check if this matched member is the owner (prevent duplicates)
+            if (matchedMember.id === ownerUserId) {
+              process.stderr.write(`[Trackman Import] Name match "${member.name}" resolved to owner - skipping\n`);
+              continue;
+            }
+            
+            const memberTier = await getMemberTierByEmail(matchedMember.email) || 'social';
+            
+            participantInputs.push({
+              userId: matchedMember.id,
+              participantType: 'member',
+              displayName: member.name,
+              slotDuration: perParticipantMinutes
+            });
+            
+            memberData.push({ userId: matchedMember.id, tier: memberTier, email: matchedMember.email });
+            process.stderr.write(`[Trackman Import] Name-matched "${member.name}" to ${matchedMember.email}\n`);
+            continue;
+          } else if (nameMatch.match === 'ambiguous') {
+            // Multiple matches - log for manual review but treat as guest for now
+            const matchList = nameMatch.members.map(m => `${m.name} (${m.email})`).join(', ');
+            process.stderr.write(`[Trackman Import] AMBIGUOUS: "${member.name}" matches multiple members: ${matchList} - treating as guest\n`);
+          }
+        }
+        
+        // If still no userId (unmatched or ambiguous), treat them as a guest
         if (!memberUserId) {
           let guestId: number | undefined;
           const guestName = member.name || normalizedMemberEmail;
