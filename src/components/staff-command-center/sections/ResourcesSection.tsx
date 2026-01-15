@@ -243,18 +243,8 @@ export const ResourcesSection: React.FC<ResourcesSectionProps> = ({
     );
   }
 
-  return (
-    <div className="flex flex-col gap-6 h-full">
-      <AlertsCard 
-        notifications={notifications} 
-        onAlertClick={() => {
-          onTabChange('updates');
-          setTimeout(() => window.dispatchEvent(new CustomEvent('switch-to-alerts-tab')), 100);
-        }}
-      />
-      <FacilityStatusCard />
-    </div>
-  );
+  // Desktop variant - just Facility Status (Alerts rendered separately)
+  return <FacilityStatusCard />;
 };
 
 export const NoticeBoardWidget: React.FC<{

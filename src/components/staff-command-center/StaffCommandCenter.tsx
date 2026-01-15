@@ -273,7 +273,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
             />
           </div>
 
-          {/* Row 1: Booking Requests, Upcoming Wellness, Internal Notice Board */}
+          {/* Row 1: Booking Requests, Upcoming Wellness, Alerts + Notice Board */}
           <div className="grid grid-cols-3 gap-6">
             <BookingQueuesSection
               pendingRequests={data.pendingRequests}
@@ -298,12 +298,21 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
               onTabChange={onTabChange}
               variant="desktop-wellness"
             />
-            <NoticeBoardWidget
-              closures={data.closures}
-              upcomingClosure={data.upcomingClosure}
-              announcements={data.announcements}
-              onTabChange={onTabChange}
-            />
+            <div className="flex flex-col gap-4">
+              <AlertsCard 
+                notifications={data.notifications} 
+                onAlertClick={() => {
+                  onTabChange('updates');
+                  setTimeout(() => window.dispatchEvent(new CustomEvent('switch-to-alerts-tab')), 100);
+                }}
+              />
+              <NoticeBoardWidget
+                closures={data.closures}
+                upcomingClosure={data.upcomingClosure}
+                announcements={data.announcements}
+                onTabChange={onTabChange}
+              />
+            </div>
           </div>
 
           {/* Row 2: Upcoming Bookings, Upcoming Events, Overdue Payments */}
