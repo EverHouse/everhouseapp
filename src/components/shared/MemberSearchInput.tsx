@@ -20,7 +20,17 @@ interface MemberSearchInputProps {
   className?: string;
   showTier?: boolean;
   autoFocus?: boolean;
+  privacyMode?: boolean;
 }
+
+const redactEmail = (email: string): string => {
+  if (!email) return '';
+  const [local, domain] = email.split('@');
+  if (!domain) return email;
+  const visibleChars = Math.min(2, local.length);
+  const redacted = local.slice(0, visibleChars) + '***';
+  return `${redacted}@${domain}`;
+};
 
 export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
   onSelect,
@@ -31,7 +41,8 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
   disabled = false,
   className = '',
   showTier = true,
-  autoFocus = false
+  autoFocus = false,
+  privacyMode = false
 }) => {
   const { members } = useData();
   const [query, setQuery] = useState('');
@@ -204,7 +215,7 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
               <div className="text-left flex-1 min-w-0">
                 <p className="font-medium text-primary dark:text-white truncate">{member.name}</p>
                 <p className="text-xs text-primary/60 dark:text-white/60 truncate">
-                  {showTier && member.tier ? `${member.tier} • ` : ''}{member.email}
+                  {showTier && member.tier ? `${member.tier} • ` : ''}{privacyMode ? redactEmail(member.email) : member.email}
                 </p>
               </div>
             </button>
