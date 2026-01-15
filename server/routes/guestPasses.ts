@@ -38,7 +38,7 @@ router.get('/api/guest-passes/:email', async (req, res) => {
           .from(guestPasses)
           .where(eq(guestPasses.memberEmail, email))
       );
-    } else if (result[0].passesTotal !== passesTotal) {
+    } else if (result[0].passesTotal < passesTotal) {
       await withRetry(() =>
         db.update(guestPasses)
           .set({ passesTotal: passesTotal })
