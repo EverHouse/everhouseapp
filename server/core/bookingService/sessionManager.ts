@@ -95,7 +95,23 @@ export async function linkParticipants(
   }
   
   try {
-    const participantRecords: InsertBookingParticipant[] = participants.map(p => ({
+    const owner = participants.find(p => p.participantType === 'owner');
+    const ownerUserId = owner?.userId?.toLowerCase();
+    
+    const filteredParticipants = participants.filter(p => {
+      if (p.participantType === 'owner') {
+        return true;
+      }
+      if (ownerUserId && p.userId?.toLowerCase() === ownerUserId) {
+        logger.warn('[linkParticipants] Skipping duplicate owner as guest/member', {
+          extra: { sessionId, userId: p.userId, displayName: p.displayName }
+        });
+        return false;
+      }
+      return true;
+    });
+    
+    const participantRecords: InsertBookingParticipant[] = filteredParticipants.map(p => ({
       sessionId,
       userId: p.userId,
       guestId: p.guestId,
