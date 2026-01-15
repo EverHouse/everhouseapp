@@ -14,6 +14,7 @@ interface OverduePayment {
   endTime: string;
   resourceName: string;
   totalOutstanding: number;
+  unresolvedGuestWaivers?: number;
 }
 
 interface OverduePaymentsSectionProps {
@@ -100,9 +101,19 @@ export const OverduePaymentsSection: React.FC<OverduePaymentsSectionProps> = ({ 
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-sm font-bold text-red-600 dark:text-red-400">
-                    ${payment.totalOutstanding.toFixed(2)}
-                  </span>
+                  {payment.totalOutstanding > 0 ? (
+                    <span className="text-sm font-bold text-red-600 dark:text-red-400">
+                      ${payment.totalOutstanding.toFixed(2)}
+                    </span>
+                  ) : payment.unresolvedGuestWaivers && payment.unresolvedGuestWaivers > 0 ? (
+                    <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full">
+                      Needs Review
+                    </span>
+                  ) : (
+                    <span className="text-sm font-bold text-red-600 dark:text-red-400">
+                      $0.00
+                    </span>
+                  )}
                   <span className="material-symbols-outlined text-base text-primary/40 dark:text-white/40">chevron_right</span>
                 </div>
               </GlassListRow>

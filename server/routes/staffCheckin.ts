@@ -393,6 +393,7 @@ interface OverduePayment {
   endTime: string;
   resourceName: string;
   totalOutstanding: number;
+  unresolvedGuestWaivers: number;
 }
 
 router.get('/api/bookings/overdue-payments', isStaffOrAdmin, async (req: Request, res: Response) => {
@@ -409,10 +410,26 @@ router.get('/api/bookings/overdue-payments', isStaffOrAdmin, async (req: Request
           br.end_time,
           r.name as resource_name,
           COALESCE(SUM(
-            CASE WHEN bp.payment_status = 'pending' 
-            THEN COALESCE(ul.overage_fee, 0) + COALESCE(ul.guest_fee, 0)
-            ELSE 0 END
-          ), 0)::numeric as total_outstanding
+            CASE 
+              WHEN bp.payment_status = 'pending' AND COALESCE(bp.cached_fee_cents, 0) > 0
+              THEN COALESCE(bp.cached_fee_cents, 0) / 100.0
+              WHEN bp.payment_status = 'pending' 
+              THEN COALESCE(ul.overage_fee, 0) + COALESCE(ul.guest_fee, 0)
+              ELSE 0 
+            END
+          ), 0)::numeric as total_outstanding,
+          SUM(CASE 
+            WHEN bp.participant_type = 'guest' 
+              AND bp.payment_status = 'waived' 
+              AND NOT EXISTS (
+                SELECT 1 FROM legacy_purchases lp 
+                WHERE lp.linked_booking_session_id = bp.session_id
+                  AND lp.item_category = 'guest_pass'
+                  AND LOWER(lp.member_email) = LOWER(br.user_email)
+                  AND lp.item_name LIKE '%' || bp.display_name || '%'
+              )
+            THEN 1 ELSE 0 
+          END) as unresolved_guest_waivers
         FROM booking_requests br
         LEFT JOIN resources r ON br.resource_id = r.id
         LEFT JOIN booking_participants bp ON bp.session_id = br.session_id
@@ -424,9 +441,22 @@ router.get('/api/bookings/overdue-payments', isStaffOrAdmin, async (req: Request
                  br.request_date, br.start_time, br.end_time, r.name
         HAVING SUM(
           CASE WHEN bp.payment_status = 'pending' 
-               AND (COALESCE(ul.overage_fee, 0) + COALESCE(ul.guest_fee, 0)) > 0
+               AND (COALESCE(bp.cached_fee_cents, 0) > 0 
+                    OR COALESCE(ul.overage_fee, 0) + COALESCE(ul.guest_fee, 0) > 0)
           THEN 1 ELSE 0 END
         ) > 0
+        OR SUM(CASE 
+            WHEN bp.participant_type = 'guest' 
+              AND bp.payment_status = 'waived' 
+              AND NOT EXISTS (
+                SELECT 1 FROM legacy_purchases lp 
+                WHERE lp.linked_booking_session_id = bp.session_id
+                  AND lp.item_category = 'guest_pass'
+                  AND LOWER(lp.member_email) = LOWER(br.user_email)
+                  AND lp.item_name LIKE '%' || bp.display_name || '%'
+              )
+            THEN 1 ELSE 0 
+          END) > 0
       )
       SELECT * FROM overdue_bookings
       ORDER BY booking_date DESC
@@ -441,7 +471,8 @@ router.get('/api/bookings/overdue-payments', isStaffOrAdmin, async (req: Request
       startTime: row.start_time,
       endTime: row.end_time,
       resourceName: row.resource_name || 'Unknown',
-      totalOutstanding: parseFloat(row.total_outstanding) || 0
+      totalOutstanding: parseFloat(row.total_outstanding) || 0,
+      unresolvedGuestWaivers: parseInt(row.unresolved_guest_waivers) || 0
     }));
 
     res.json(overduePayments);
