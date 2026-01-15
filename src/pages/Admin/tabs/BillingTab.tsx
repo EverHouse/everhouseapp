@@ -398,15 +398,22 @@ const SubscriptionsView: React.FC = () => {
       setSelectedMember(null);
       setSubscriptions([]);
 
-      const res = await fetch(`/api/members?search=${encodeURIComponent(searchEmail)}`, { credentials: 'include' });
+      const res = await fetch('/api/hubspot/contacts', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to search members');
       const data = await res.json();
       
-      const results = (data.members || data || []).slice(0, 5).map((m: any) => ({
-        id: m.id,
+      const searchTerm = searchEmail.toLowerCase().trim();
+      const filtered = (data || []).filter((m: any) => {
+        const email = (m.email || '').toLowerCase();
+        const name = `${m.firstname || ''} ${m.lastname || ''}`.toLowerCase();
+        return email.includes(searchTerm) || name.includes(searchTerm);
+      });
+      
+      const results = filtered.slice(0, 5).map((m: any) => ({
+        id: m.hs_object_id || m.id,
         email: m.email,
-        name: m.name || `${m.firstName || ''} ${m.lastName || ''}`.trim() || m.email,
-        stripeCustomerId: m.stripe_customer_id || m.stripeCustomerId || null,
+        name: `${m.firstname || ''} ${m.lastname || ''}`.trim() || m.email,
+        stripeCustomerId: m.stripe_customer_id || null,
       }));
       
       setSearchResults(results);
@@ -785,15 +792,22 @@ const InvoicesView: React.FC = () => {
       setSelectedMember(null);
       setInvoices([]);
 
-      const res = await fetch(`/api/members?search=${encodeURIComponent(searchEmail)}`, { credentials: 'include' });
+      const res = await fetch('/api/hubspot/contacts', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to search members');
       const data = await res.json();
       
-      const results = (data.members || data || []).slice(0, 5).map((m: any) => ({
-        id: m.id,
+      const searchTerm = searchEmail.toLowerCase().trim();
+      const filtered = (data || []).filter((m: any) => {
+        const email = (m.email || '').toLowerCase();
+        const name = `${m.firstname || ''} ${m.lastname || ''}`.toLowerCase();
+        return email.includes(searchTerm) || name.includes(searchTerm);
+      });
+      
+      const results = filtered.slice(0, 5).map((m: any) => ({
+        id: m.hs_object_id || m.id,
         email: m.email,
-        name: m.name || `${m.firstName || ''} ${m.lastName || ''}`.trim() || m.email,
-        stripeCustomerId: m.stripe_customer_id || m.stripeCustomerId || null,
+        name: `${m.firstname || ''} ${m.lastname || ''}`.trim() || m.email,
+        stripeCustomerId: m.stripe_customer_id || null,
       }));
       
       setSearchResults(results);
