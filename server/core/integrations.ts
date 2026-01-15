@@ -78,6 +78,24 @@ export async function getHubSpotClient() {
   return new Client({ accessToken });
 }
 
+export function getHubSpotPrivateAppClient(): Client | null {
+  const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN;
+  if (!token) {
+    return null;
+  }
+  return new Client({ accessToken: token });
+}
+
+export async function getHubSpotClientWithFallback(): Promise<{ client: Client; source: 'connector' | 'private_app' }> {
+  const privateAppToken = process.env.HUBSPOT_PRIVATE_APP_TOKEN;
+  if (privateAppToken) {
+    return { client: new Client({ accessToken: privateAppToken }), source: 'private_app' };
+  }
+  
+  const accessToken = await getHubSpotAccessToken();
+  return { client: new Client({ accessToken }), source: 'connector' };
+}
+
 async function getGoogleCalendarAccessToken() {
   const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // Refresh 5 minutes before expiry
   

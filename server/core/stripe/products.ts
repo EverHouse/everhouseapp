@@ -3,7 +3,7 @@ import { db } from '../../db';
 import { stripeProducts } from '../../../shared/schema';
 import { eq } from 'drizzle-orm';
 import { getStripeClient } from './client';
-import { getHubSpotClient } from '../integrations';
+import { getHubSpotClientWithFallback } from '../integrations';
 
 export interface HubSpotProduct {
   id: string;
@@ -66,7 +66,8 @@ function parseRecurringPeriod(period: string | null): { interval: 'month' | 'yea
 
 export async function fetchHubSpotProducts(): Promise<HubSpotProduct[]> {
   try {
-    const hubspot = await getHubSpotClient();
+    const { client: hubspot, source } = await getHubSpotClientWithFallback();
+    console.log(`[Stripe Products] Using HubSpot ${source} for products API`);
     
     const properties = ['name', 'price', 'hs_sku', 'description', 'hs_recurring_billing_period'];
     let allProducts: any[] = [];
@@ -87,6 +88,10 @@ export async function fetchHubSpotProducts(): Promise<HubSpotProduct[]> {
       recurringPeriod: product.properties.hs_recurring_billing_period || null,
     }));
   } catch (error: any) {
+    if (error.code === 403 && error.body?.category === 'MISSING_SCOPES') {
+      console.error('[Stripe Products] Missing HubSpot scopes. Add HUBSPOT_PRIVATE_APP_TOKEN secret with a Private App that has crm.objects.products.read scope.');
+      throw new Error('HubSpot products access denied. Please add HUBSPOT_PRIVATE_APP_TOKEN secret with your Private App token that has products read permission.');
+    }
     console.error('[Stripe Products] Error fetching HubSpot products:', error);
     throw error;
   }
