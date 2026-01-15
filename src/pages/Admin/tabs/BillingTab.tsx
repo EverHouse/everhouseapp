@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
+import { MemberSearchInput, SelectedMember } from '../../../components/shared/MemberSearchInput';
 
 type SubTab = 'products' | 'subscriptions' | 'invoices';
 
@@ -362,12 +363,9 @@ const ProductsView: React.FC = () => {
 };
 
 const SubscriptionsView: React.FC = () => {
-  const [searchEmail, setSearchEmail] = useState('');
-  const [searchResults, setSearchResults] = useState<MemberSearchResult[]>([]);
   const [selectedMember, setSelectedMember] = useState<MemberSearchResult | null>(null);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [stripeProducts, setStripeProducts] = useState<StripeProduct[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [isLoadingSubscriptions, setIsLoadingSubscriptions] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -416,37 +414,19 @@ const SubscriptionsView: React.FC = () => {
     }
   };
 
-  const handleSearch = async () => {
-    if (!searchEmail.trim()) return;
-    try {
-      setIsSearching(true);
-      setError(null);
-      setSelectedMember(null);
-      setSubscriptions([]);
-
-      const res = await fetch(`/api/billing/members/search?query=${encodeURIComponent(searchEmail.trim())}`, { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to search members');
-      const data = await res.json();
-      
-      const results = (data.members || []).map((m: any) => ({
-        id: m.hubspotId || m.id,
-        email: m.email,
-        name: m.name,
-        stripeCustomerId: m.stripeCustomerId || null,
-        membershipTier: m.membershipTier || null,
-      }));
-      
-      setSearchResults(results);
-    } catch (err: any) {
-      setError(err.message || 'Search failed');
-    } finally {
-      setIsSearching(false);
-    }
+  const handleMemberSelect = (member: SelectedMember) => {
+    const mappedMember: MemberSearchResult = {
+      id: member.id,
+      email: member.email,
+      name: member.name,
+      stripeCustomerId: member.stripeCustomerId || null,
+      membershipTier: member.tier,
+    };
+    handleSelectMember(mappedMember);
   };
 
   const handleSelectMember = async (member: MemberSearchResult) => {
     setSelectedMember(member);
-    setSearchResults([]);
     
     if (!member.stripeCustomerId) {
       setSubscriptions([]);
@@ -600,50 +580,15 @@ const SubscriptionsView: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <input
-            type="text"
-            value={searchEmail}
-            onChange={(e) => setSearchEmail(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="Enter name or email..."
-            className="flex-1 px-4 py-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent"
-          />
-          <button
-            onClick={handleSearch}
-            disabled={isSearching || !searchEmail.trim()}
-            className="flex items-center gap-2 px-5 py-3 bg-primary dark:bg-accent text-white dark:text-primary rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            {isSearching ? (
-              <span aria-hidden="true" className="material-symbols-outlined animate-spin">progress_activity</span>
-            ) : (
-              <span aria-hidden="true" className="material-symbols-outlined">search</span>
-            )}
-            Search
-          </button>
-        </div>
-
-        {searchResults.length > 0 && (
-          <div className="mt-4 space-y-2">
-            {searchResults.map((member) => (
-              <button
-                key={member.id}
-                onClick={() => handleSelectMember(member)}
-                className="w-full p-3 text-left bg-gray-50 dark:bg-black/20 rounded-lg hover:bg-gray-100 dark:hover:bg-black/30 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <p className="font-medium text-primary dark:text-white">{member.name}</p>
-                  {member.membershipTier && (
-                    <span className="text-xs px-2 py-1 rounded-full bg-accent/20 dark:bg-accent/30 text-primary dark:text-white">
-                      {member.membershipTier}
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{member.email}</p>
-              </button>
-            ))}
-          </div>
-        )}
+        <MemberSearchInput
+          onSelect={handleMemberSelect}
+          onClear={() => {
+            setSelectedMember(null);
+            setSubscriptions([]);
+          }}
+          placeholder="Search by name or email..."
+          showTier={true}
+        />
       </div>
 
       {selectedMember && (

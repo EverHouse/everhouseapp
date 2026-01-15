@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import TierBadge from '../TierBadge';
+import { MemberSearchInput, SelectedMember } from '../shared/MemberSearchInput';
 
 interface BookingMember {
   id: number;
@@ -23,14 +24,6 @@ interface BookingGuest {
   slotNumber: number;
   fee: number;
   feeNote: string;
-}
-
-interface MemberSearchResult {
-  email: string;
-  firstName: string | null;
-  lastName: string | null;
-  tier: string | null;
-  status: string | null;
 }
 
 interface ValidationInfo {
@@ -70,11 +63,6 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ bookingId, 
   const [error, setError] = useState<string | null>(null);
   const [linkingSlotId, setLinkingSlotId] = useState<number | null>(null);
   const [unlinkingSlotId, setUnlinkingSlotId] = useState<number | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<MemberSearchResult[]>([]);
-  const [allMembers, setAllMembers] = useState<MemberSearchResult[]>([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
   const [activeSearchSlot, setActiveSearchSlot] = useState<number | null>(null);
   const [guestAddSlot, setGuestAddSlot] = useState<number | null>(null);
   const [guestName, setGuestName] = useState('');
@@ -88,10 +76,6 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ bookingId, 
     guestName: string;
     memberMatch: { email: string; name: string; tier: string; status: string; note: string };
   } | null>(null);
-  
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchBookingMembers = useCallback(async () => {
     setIsLoading(true);
@@ -120,74 +104,6 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ bookingId, 
     fetchBookingMembers();
   }, [fetchBookingMembers]);
 
-  useEffect(() => {
-    const fetchAllMembers = async () => {
-      try {
-        const res = await fetch('/api/hubspot/contacts?status=all', { credentials: 'include' });
-        if (res.ok) {
-          const rawData = await res.json();
-          const data = Array.isArray(rawData) ? rawData : (rawData.contacts || []);
-          const membersList: MemberSearchResult[] = data.map((m: { email: string; firstName?: string; lastName?: string; tier?: string; status?: string }) => ({
-            email: m.email,
-            firstName: m.firstName || null,
-            lastName: m.lastName || null,
-            tier: m.tier || null,
-            status: m.status || null
-          }));
-          setAllMembers(membersList);
-        }
-      } catch (err) {
-        console.error('Failed to fetch members:', err);
-      }
-    };
-    fetchAllMembers();
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
-          inputRef.current && !inputRef.current.contains(e.target as Node)) {
-        setShowDropdown(false);
-        setActiveSearchSlot(null);
-        setSearchQuery('');
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    if (!searchQuery || searchQuery.length < 2) {
-      setSearchResults([]);
-      setShowDropdown(false);
-      return;
-    }
-
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    setIsSearching(true);
-    searchTimeoutRef.current = setTimeout(() => {
-      const query = searchQuery.toLowerCase();
-      const linkedEmails = new Set(members.filter(m => m.userEmail).map(m => m.userEmail!.toLowerCase()));
-      const filtered = allMembers.filter(m => {
-        if (linkedEmails.has(m.email.toLowerCase())) return false;
-        const fullName = `${m.firstName || ''} ${m.lastName || ''}`.toLowerCase();
-        return m.email.toLowerCase().includes(query) || fullName.includes(query);
-      }).slice(0, 8);
-      setSearchResults(filtered);
-      setShowDropdown(filtered.length > 0);
-      setIsSearching(false);
-    }, 200);
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [searchQuery, allMembers, members]);
-
   const handleLinkMember = async (slotId: number, memberEmail: string) => {
     setLinkingSlotId(slotId);
     try {
@@ -200,18 +116,12 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ bookingId, 
       
       if (res.ok) {
         await fetchBookingMembers();
-        setShowDropdown(false);
         setActiveSearchSlot(null);
-        setSearchQuery('');
         onMemberLinked?.();
       } else if (res.status === 400) {
-        // Slot might already be linked - refresh to get current state
         const data = await res.json();
         await fetchBookingMembers();
-        setShowDropdown(false);
         setActiveSearchSlot(null);
-        setSearchQuery('');
-        // Show error if slot is linked to a different member
         if (data.error && data.error.includes('different member')) {
           setError(data.error);
         }
@@ -270,7 +180,6 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ bookingId, 
         setGuestName('');
         setGuestEmail('');
         setActiveSearchSlot(null);
-        setSearchQuery('');
         setMemberMatchWarning(null);
         if (typeof data.guestPassesRemaining === 'number') {
           setGuestPassesRemaining(data.guestPassesRemaining);
@@ -312,7 +221,6 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ bookingId, 
         setGuestAddSlot(null);
         setGuestName('');
         setActiveSearchSlot(null);
-        setSearchQuery('');
         setMemberMatchWarning(null);
         onMemberLinked?.();
       } else {
@@ -452,108 +360,14 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ bookingId, 
                 </div>
                 
                 {activeSearchSlot === slot.id ? (
-                  <div className="flex-1 relative">
-                    <div className="relative">
-                      <span className="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-sm">search</span>
-                      <input
-                        ref={inputRef}
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        onFocus={() => searchQuery.length >= 2 && searchResults.length > 0 && setShowDropdown(true)}
-                        placeholder="Search by name or email..."
-                        autoFocus
-                        className="w-full py-1.5 pl-7 pr-8 text-sm rounded-lg border border-gray-200 dark:border-white/20 bg-white dark:bg-black/30 text-primary dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-accent"
-                      />
-                      {isSearching && (
-                        <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm animate-spin">progress_activity</span>
-                      )}
-                      {!isSearching && searchQuery && (
-                        <button
-                          onClick={() => {
-                            setSearchQuery('');
-                            setActiveSearchSlot(null);
-                          }}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                        >
-                          <span className="material-symbols-outlined text-sm">close</span>
-                        </button>
-                      )}
-                    </div>
-                    
-                    {showDropdown && searchResults.length > 0 && (
-                      <div 
-                        ref={dropdownRef}
-                        className="absolute z-50 w-full mt-1 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/20 rounded-lg shadow-lg max-h-48 overflow-y-auto"
-                      >
-                        {searchResults.map((member, idx) => (
-                          <button
-                            key={member.email}
-                            type="button"
-                            onClick={() => handleLinkMember(slot.id, member.email)}
-                            disabled={linkingSlotId === slot.id}
-                            className={`w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-white/5 flex items-center justify-between disabled:opacity-50 ${idx !== searchResults.length - 1 ? 'border-b border-gray-100 dark:border-white/10' : ''}`}
-                          >
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium text-primary dark:text-white truncate">
-                                {member.firstName && member.lastName ? `${member.firstName} ${member.lastName}` : member.email}
-                              </p>
-                              {member.firstName && member.lastName && (
-                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{member.email}</p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              {member.status && member.status !== 'active' && (
-                                <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 uppercase">
-                                  {member.status === 'former' ? 'Former' : member.status}
-                                </span>
-                              )}
-                              {member.tier && (
-                                <TierBadge tier={member.tier} size="sm" />
-                              )}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {searchQuery.length >= 2 && !isSearching && searchResults.length === 0 && (
-                      <div className="mt-2 space-y-2">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">No members found for "{searchQuery}"</p>
-                        {guestAddSlot !== slot.id ? (
-                          <button
-                            onClick={() => { setGuestAddSlot(slot.id); setGuestName(searchQuery); }}
-                            className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 hover:underline"
-                          >
-                            <span className="material-symbols-outlined text-sm">person_add</span>
-                            Add as guest (uses guest pass)
-                          </button>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={guestName}
-                              onChange={(e) => setGuestName(e.target.value)}
-                              placeholder="Guest name"
-                              className="flex-1 py-1 px-2 text-sm rounded border border-gray-200 dark:border-white/20 bg-white dark:bg-black/30 text-primary dark:text-white"
-                            />
-                            <button
-                              onClick={() => handleAddGuest(slot.id)}
-                              disabled={isAddingGuest || !guestName.trim()}
-                              className="px-2 py-1 text-xs bg-amber-500 text-white rounded hover:bg-amber-600 disabled:opacity-50"
-                            >
-                              {isAddingGuest ? 'Adding...' : 'Add'}
-                            </button>
-                            <button
-                              onClick={() => { setGuestAddSlot(null); setGuestName(''); }}
-                              className="p-1 text-gray-400 hover:text-gray-600"
-                            >
-                              <span className="material-symbols-outlined text-sm">close</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                  <div className="flex-1">
+                    <MemberSearchInput
+                      placeholder="Search by name or email..."
+                      autoFocus
+                      disabled={linkingSlotId === slot.id}
+                      onSelect={(member: SelectedMember) => handleLinkMember(slot.id, member.email)}
+                      onClear={() => setActiveSearchSlot(null)}
+                    />
                   </div>
                 ) : guestAddSlot === slot.id ? (
                   <div className="flex-1 space-y-2">

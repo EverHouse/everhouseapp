@@ -1,12 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useData } from '../../../contexts/DataContext';
-
-interface MemberSearchResult {
-  email: string;
-  name: string;
-  tier: string;
-}
+import { MemberSearchInput, SelectedMember } from '../../shared/MemberSearchInput';
 
 interface StaffDirectAddModalProps {
   isOpen: boolean;
@@ -31,10 +25,8 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
   ownerTier,
   onSuccess
 }) => {
-  const { members } = useData();
   const [mode, setMode] = useState<'member' | 'guest'>('member');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMember, setSelectedMember] = useState<MemberSearchResult | null>(null);
+  const [selectedMember, setSelectedMember] = useState<SelectedMember | null>(null);
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
   const [useGuestPassOption, setUseGuestPassOption] = useState(true);
@@ -101,15 +93,6 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
 
   const isSocialHost = ownerTier?.toLowerCase() === 'social';
 
-  const filteredMembers = members.filter(m => {
-    if (!searchQuery.trim()) return false;
-    const query = searchQuery.toLowerCase();
-    return (
-      m.name?.toLowerCase().includes(query) ||
-      m.email?.toLowerCase().includes(query)
-    );
-  }).slice(0, 8);
-
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
@@ -169,7 +152,6 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
   };
 
   const resetForm = useCallback(() => {
-    setSearchQuery('');
     setSelectedMember(null);
     setGuestName('');
     setGuestEmail('');
@@ -240,48 +222,14 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
 
           {mode === 'member' ? (
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-primary dark:text-white mb-2">
-                  Search Members
-                </label>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setSelectedMember(null);
-                  }}
-                  placeholder="Type name or email..."
-                  className="w-full px-4 py-2 border border-primary/20 dark:border-white/20 rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white"
-                />
-              </div>
-
-              {filteredMembers.length > 0 && !selectedMember && (
-                <div className="border border-primary/10 dark:border-white/10 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
-                  {filteredMembers.map(member => (
-                    <button
-                      key={member.email}
-                      onClick={() => {
-                        setSelectedMember({
-                          email: member.email,
-                          name: member.name,
-                          tier: member.tier || 'Platinum'
-                        });
-                        setSearchQuery(member.name);
-                      }}
-                      className="w-full px-4 py-3 flex items-center gap-3 hover:bg-primary/5 dark:hover:bg-white/5 border-b border-primary/5 dark:border-white/5 last:border-0"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-primary/10 dark:bg-white/10 flex items-center justify-center">
-                        <span className="material-symbols-outlined text-sm text-primary dark:text-white">person</span>
-                      </div>
-                      <div className="text-left">
-                        <p className="font-medium text-primary dark:text-white">{member.name}</p>
-                        <p className="text-xs text-primary/60 dark:text-white/60">{member.tier || 'Member'}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
+              <MemberSearchInput
+                label="Search Members"
+                placeholder="Type name or email..."
+                selectedMember={selectedMember}
+                onSelect={setSelectedMember}
+                onClear={() => setSelectedMember(null)}
+                showTier={true}
+              />
 
               {selectedMember && (
                 <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/30 rounded-xl flex items-center gap-3">
