@@ -100,6 +100,46 @@ router.post('/api/tours/:id/checkin', isStaffOrAdmin, async (req, res) => {
   }
 });
 
+router.patch('/api/tours/:id/status', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const staffEmail = getSessionUser(req)?.email || null;
+    
+    const validStatuses = ['scheduled', 'checked_in', 'completed', 'no-show', 'cancelled'];
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+    }
+    
+    const updateData: any = {
+      status,
+      updatedAt: new Date(),
+    };
+    
+    if (status === 'checked_in') {
+      updateData.checkedInAt = new Date();
+      updateData.checkedInBy = staffEmail;
+    } else {
+      updateData.checkedInAt = null;
+      updateData.checkedInBy = null;
+    }
+    
+    const [updated] = await db.update(tours)
+      .set(updateData)
+      .where(eq(tours.id, parseInt(id)))
+      .returning();
+    
+    if (!updated) {
+      return res.status(404).json({ error: 'Tour not found' });
+    }
+    
+    res.json(updated);
+  } catch (error: any) {
+    if (!isProduction) console.error('Tour status update error:', error);
+    res.status(500).json({ error: 'Failed to update tour status' });
+  }
+});
+
 router.post('/api/tours/sync', isStaffOrAdmin, async (req, res) => {
   try {
     const { source } = req.query;

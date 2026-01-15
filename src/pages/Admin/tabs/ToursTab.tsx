@@ -64,6 +64,8 @@ const ToursTab: React.FC = () => {
   const [dismissingMeeting, setDismissingMeeting] = useState<UnmatchedMeeting | null>(null);
   const [dismissNotes, setDismissNotes] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [statusMenuTourId, setStatusMenuTourId] = useState<number | null>(null);
+  const [statusUpdating, setStatusUpdating] = useState<number | null>(null);
 
   useEffect(() => {
     setPageReady(true);
@@ -283,6 +285,45 @@ const ToursTab: React.FC = () => {
     }
   };
 
+  const handleStatusUpdate = async (tourId: number, newStatus: string) => {
+    setStatusUpdating(tourId);
+    setStatusMenuTourId(null);
+    
+    const previousTodayTours = [...todayTours];
+    const previousTours = [...tours];
+    const previousPastTours = [...pastTours];
+    
+    const updateTourStatus = (t: Tour) => 
+      t.id === tourId ? { ...t, status: newStatus } : t;
+    
+    setTodayTours(prev => prev.map(updateTourStatus));
+    setTours(prev => prev.map(updateTourStatus));
+    setPastTours(prev => prev.map(updateTourStatus));
+    
+    try {
+      const res = await fetch(`/api/tours/${tourId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (res.ok) {
+        await fetchTours();
+      } else {
+        setTodayTours(previousTodayTours);
+        setTours(previousTours);
+        setPastTours(previousPastTours);
+      }
+    } catch (err) {
+      console.error('Status update failed:', err);
+      setTodayTours(previousTodayTours);
+      setTours(previousTours);
+      setPastTours(previousPastTours);
+    } finally {
+      setStatusUpdating(null);
+    }
+  };
+
   useEffect(() => {
     if (checkInModalOpen && typeformContainerRef.current && selectedTour) {
       typeformContainerRef.current.innerHTML = '';
@@ -313,67 +354,111 @@ const ToursTab: React.FC = () => {
     );
   }
 
-  const TourCard = ({ tour, isToday = false, isPast = false }: { tour: Tour; isToday?: boolean; isPast?: boolean }) => (
-    <div className={`p-4 rounded-2xl border ${tour.status === 'checked_in' 
-      ? 'bg-green-500/10 border-green-500/30' 
-      : isPast
-        ? 'bg-primary/5 dark:bg-white/3 border-primary/5 dark:border-white/20'
-        : 'bg-white/60 dark:bg-white/5 border-primary/10 dark:border-white/25'
-    }`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className={`text-sm font-bold ${isPast ? 'text-primary/70 dark:text-white/70' : 'text-primary dark:text-white'}`}>
-              {formatTime12Hour(tour.startTime)}
-            </span>
-            {tour.endTime && (
-              <span className="text-xs text-primary/70 dark:text-white/70">
-                - {formatTime12Hour(tour.endTime)}
+  const statusConfig: Record<string, { label: string; icon: string; colors: string }> = {
+    scheduled: { label: 'Scheduled', icon: 'schedule', colors: 'bg-primary/10 dark:bg-white/10 text-primary/70 dark:text-white/70' },
+    checked_in: { label: 'Checked In', icon: 'check_circle', colors: 'bg-green-500/20 text-green-700 dark:text-green-400' },
+    completed: { label: 'Completed', icon: 'task_alt', colors: 'bg-blue-500/20 text-blue-700 dark:text-blue-400' },
+    'no-show': { label: 'No Show', icon: 'person_off', colors: 'bg-red-500/20 text-red-700 dark:text-red-400' },
+    cancelled: { label: 'Cancelled', icon: 'cancel', colors: 'bg-gray-500/20 text-gray-600 dark:text-gray-400' },
+    pending: { label: 'Pending', icon: 'hourglass_empty', colors: 'bg-amber-500/20 text-amber-700 dark:text-amber-400' },
+  };
+
+  const TourCard = ({ tour, isToday = false, isPast = false }: { tour: Tour; isToday?: boolean; isPast?: boolean }) => {
+    const config = statusConfig[tour.status] || statusConfig.scheduled;
+    const isMenuOpen = statusMenuTourId === tour.id;
+    const isUpdating = statusUpdating === tour.id;
+    
+    return (
+      <div className={`p-4 rounded-2xl border ${tour.status === 'checked_in' 
+        ? 'bg-green-500/10 border-green-500/30' 
+        : tour.status === 'no-show'
+          ? 'bg-red-500/5 border-red-500/20'
+          : tour.status === 'cancelled'
+            ? 'bg-gray-500/5 border-gray-500/20'
+            : isPast
+              ? 'bg-primary/5 dark:bg-white/3 border-primary/5 dark:border-white/20'
+              : 'bg-white/60 dark:bg-white/5 border-primary/10 dark:border-white/25'
+      }`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`text-sm font-bold ${isPast ? 'text-primary/70 dark:text-white/70' : 'text-primary dark:text-white'}`}>
+                {formatTime12Hour(tour.startTime)}
               </span>
+              {tour.endTime && (
+                <span className="text-xs text-primary/70 dark:text-white/70">
+                  - {formatTime12Hour(tour.endTime)}
+                </span>
+              )}
+            </div>
+            <h4 className={`font-semibold truncate ${isPast ? 'text-primary/80 dark:text-white/80' : 'text-primary dark:text-white'}`}>
+              {tour.guestName || tour.title}
+            </h4>
+            {tour.guestEmail && (
+              <p className="text-xs text-primary/80 dark:text-white/80 truncate">{tour.guestEmail}</p>
+            )}
+            {tour.guestPhone && (
+              <p className="text-xs text-primary/80 dark:text-white/80">{formatPhoneNumber(tour.guestPhone)}</p>
+            )}
+            {!isToday && (
+              <p className="text-xs text-primary/70 dark:text-white/70 mt-1">{formatDate(tour.tourDate)}</p>
             )}
           </div>
-          <h4 className={`font-semibold truncate ${isPast ? 'text-primary/80 dark:text-white/80' : 'text-primary dark:text-white'}`}>
-            {tour.guestName || tour.title}
-          </h4>
-          {tour.guestEmail && (
-            <p className="text-xs text-primary/80 dark:text-white/80 truncate">{tour.guestEmail}</p>
-          )}
-          {tour.guestPhone && (
-            <p className="text-xs text-primary/80 dark:text-white/80">{formatPhoneNumber(tour.guestPhone)}</p>
-          )}
-          {!isToday && (
-            <p className="text-xs text-primary/70 dark:text-white/70 mt-1">{formatDate(tour.tourDate)}</p>
-          )}
-        </div>
-        <div className="flex-shrink-0">
-          {tour.status === 'checked_in' ? (
-            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-green-500/20 text-green-700 dark:text-green-400 text-xs font-bold">
-              <span aria-hidden="true" className="material-symbols-outlined text-sm">check_circle</span>
-              Checked In
-            </span>
-          ) : isToday ? (
-            <button
-              onClick={() => openCheckIn(tour)}
-              className="px-4 py-2 rounded-full bg-accent text-primary text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1"
-            >
-              <span aria-hidden="true" className="material-symbols-outlined text-sm">how_to_reg</span>
-              Check In
-            </button>
-          ) : isPast ? (
-            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary/5 dark:bg-white/5 text-primary/70 dark:text-white/70 text-xs font-medium">
-              <span aria-hidden="true" className="material-symbols-outlined text-sm">event_busy</span>
-              Completed
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary/10 dark:bg-white/10 text-primary/70 dark:text-white/70 text-xs font-medium">
-              <span aria-hidden="true" className="material-symbols-outlined text-sm">schedule</span>
-              Scheduled
-            </span>
-          )}
+          <div className="flex-shrink-0 relative">
+            {isToday && tour.status === 'scheduled' ? (
+              <button
+                onClick={() => openCheckIn(tour)}
+                className="px-4 py-2 rounded-full bg-accent text-primary text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-sm">how_to_reg</span>
+                Check In
+              </button>
+            ) : (
+              <button
+                onClick={() => setStatusMenuTourId(isMenuOpen ? null : tour.id)}
+                disabled={isUpdating}
+                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${config.colors} ${isUpdating ? 'opacity-50' : 'hover:ring-2 hover:ring-primary/20 dark:hover:ring-white/20 cursor-pointer'}`}
+              >
+                {isUpdating ? (
+                  <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin"></div>
+                ) : (
+                  <span aria-hidden="true" className="material-symbols-outlined text-sm">{config.icon}</span>
+                )}
+                {config.label}
+                <span aria-hidden="true" className="material-symbols-outlined text-sm ml-0.5">expand_more</span>
+              </button>
+            )}
+            
+            {isMenuOpen && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setStatusMenuTourId(null)}
+                />
+                <div className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-primary/10 dark:border-white/20 py-1 min-w-[140px] animate-pop-in">
+                  {Object.entries(statusConfig).filter(([key]) => key !== 'pending').map(([key, { label, icon, colors }]) => (
+                    <button
+                      key={key}
+                      onClick={() => handleStatusUpdate(tour.id, key)}
+                      className={`w-full px-3 py-2 text-left text-xs flex items-center gap-2 hover:bg-primary/5 dark:hover:bg-white/5 transition-colors ${tour.status === key ? 'font-bold' : ''}`}
+                    >
+                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full ${colors}`}>
+                        <span aria-hidden="true" className="material-symbols-outlined text-xs">{icon}</span>
+                      </span>
+                      {label}
+                      {tour.status === key && (
+                        <span aria-hidden="true" className="material-symbols-outlined text-sm ml-auto text-green-600">check</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const NeedsReviewSection = () => {
     const count = unmatchedMeetings.length;
