@@ -18,6 +18,7 @@ interface StaffSidebarProps {
 const MAIN_NAV_ITEMS: NavItem[] = [
   { id: 'home', icon: 'dashboard', label: 'Dashboard' },
   { id: 'simulator', icon: 'event_note', label: 'Bookings' },
+  { id: 'payments', icon: 'point_of_sale', label: 'Payments' },
   { id: 'tours', icon: 'directions_walk', label: 'Tours' },
   { id: 'events', icon: 'calendar_month', label: 'Calendar' },
   { id: 'blocks', icon: 'domain', label: 'Facility' },

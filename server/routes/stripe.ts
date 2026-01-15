@@ -1472,4 +1472,206 @@ router.get('/api/billing/members/search', isStaffOrAdmin, async (req: Request, r
   }
 });
 
+// ============================================================================
+// Staff Quick Charge Endpoints
+// ============================================================================
+
+router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { memberEmail, memberName, amountCents, description } = req.body;
+    const staffUser = (req as any).user;
+
+    if (!memberEmail || !amountCents) {
+      return res.status(400).json({ error: 'Missing required fields: memberEmail, amountCents' });
+    }
+
+    if (amountCents < 50) {
+      return res.status(400).json({ error: 'Minimum charge amount is $0.50' });
+    }
+
+    const memberResult = await pool.query(
+      `SELECT id, email, first_name, last_name, stripe_customer_id 
+       FROM users WHERE LOWER(email) = LOWER($1)`,
+      [memberEmail]
+    );
+
+    if (memberResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Member not found in database' });
+    }
+
+    const member = memberResult.rows[0];
+    const resolvedName = memberName || [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email.split('@')[0];
+
+    const result = await createPaymentIntent({
+      userId: member.id.toString(),
+      email: member.email,
+      memberName: resolvedName,
+      amountCents: Math.round(amountCents),
+      purpose: 'one_time_purchase',
+      description: description || 'Quick charge',
+      metadata: {
+        staffInitiated: 'true',
+        staffEmail: staffUser?.email || 'unknown',
+        chargeType: 'quick_charge',
+        memberId: member.id.toString(),
+        memberEmail: member.email,
+        memberName: resolvedName
+      }
+    });
+
+    res.json({
+      clientSecret: result.clientSecret,
+      paymentIntentId: result.paymentIntentId
+    });
+  } catch (error: any) {
+    console.error('[Stripe] Error creating quick charge:', error);
+    res.status(500).json({ error: 'Failed to create payment' });
+  }
+});
+
+router.post('/api/stripe/staff/quick-charge/confirm', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { paymentIntentId } = req.body;
+    const staffUser = (req as any).user;
+
+    if (!paymentIntentId) {
+      return res.status(400).json({ error: 'Missing paymentIntentId' });
+    }
+
+    const result = await confirmPaymentSuccess(
+      paymentIntentId,
+      staffUser?.email || 'staff',
+      staffUser?.name || 'Staff Member'
+    );
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error || 'Payment confirmation failed' });
+    }
+
+    console.log(`[Stripe] Quick charge confirmed: ${paymentIntentId} by ${staffUser?.email}`);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[Stripe] Error confirming quick charge:', error);
+    res.status(500).json({ error: 'Failed to confirm payment' });
+  }
+});
+
+router.get('/api/staff/member-balance/:email', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const memberEmail = decodeURIComponent(req.params.email).toLowerCase();
+
+    const result = await pool.query(
+      `SELECT 
+        bp.id as participant_id,
+        bp.session_id,
+        bp.cached_fee_cents,
+        bs.session_date,
+        r.name as resource_name,
+        bp.participant_type,
+        COALESCE(ul.overage_fee, 0) + COALESCE(ul.guest_fee, 0) as ledger_fee
+       FROM booking_participants bp
+       JOIN booking_sessions bs ON bs.id = bp.session_id
+       LEFT JOIN resources r ON r.id = bs.resource_id
+       LEFT JOIN usage_ledger ul ON ul.session_id = bp.session_id AND ul.member_id = bp.user_id
+       WHERE LOWER(bp.user_id) = $1
+         AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
+         AND bp.participant_type IN ('owner', 'member')
+       ORDER BY bs.session_date DESC`,
+      [memberEmail]
+    );
+
+    const guestResult = await pool.query(
+      `SELECT 
+        bp.id as participant_id,
+        bp.session_id,
+        bp.cached_fee_cents,
+        bs.session_date,
+        r.name as resource_name
+       FROM booking_participants bp
+       JOIN booking_sessions bs ON bs.id = bp.session_id
+       LEFT JOIN resources r ON r.id = bs.resource_id
+       JOIN booking_participants owner_bp ON owner_bp.session_id = bp.session_id 
+         AND owner_bp.participant_type = 'owner'
+       WHERE bp.participant_type = 'guest'
+         AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
+         AND LOWER(owner_bp.user_id) = $1
+         AND bp.cached_fee_cents > 0`,
+      [memberEmail]
+    );
+
+    const GUEST_FEE_CENTS = 2500;
+    const items: Array<{participantId: number; sessionId: number; sessionDate: string; resourceName: string; amountCents: number; type: string}> = [];
+
+    for (const row of result.rows) {
+      let amountCents = 0;
+      if (row.cached_fee_cents > 0) {
+        amountCents = row.cached_fee_cents;
+      } else if (parseFloat(row.ledger_fee) > 0) {
+        amountCents = Math.round(parseFloat(row.ledger_fee) * 100);
+      }
+      if (amountCents > 0) {
+        items.push({
+          participantId: row.participant_id,
+          sessionId: row.session_id,
+          sessionDate: row.session_date,
+          resourceName: row.resource_name || 'Unknown',
+          amountCents,
+          type: row.participant_type === 'owner' ? 'overage' : 'member_fee'
+        });
+      }
+    }
+
+    for (const row of guestResult.rows) {
+      items.push({
+        participantId: row.participant_id,
+        sessionId: row.session_id,
+        sessionDate: row.session_date,
+        resourceName: row.resource_name || 'Unknown',
+        amountCents: row.cached_fee_cents || GUEST_FEE_CENTS,
+        type: 'guest_fee'
+      });
+    }
+
+    const totalCents = items.reduce((sum, item) => sum + item.amountCents, 0);
+
+    res.json({ totalCents, items });
+  } catch (error: any) {
+    console.error('[Staff] Error fetching member balance:', error);
+    res.status(500).json({ error: 'Failed to fetch member balance' });
+  }
+});
+
+router.get('/api/stripe/transactions/today', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { getStripeClient } = await import('../core/stripe/client');
+    const stripe = await getStripeClient();
+
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const paymentIntents = await stripe.paymentIntents.list({
+      created: { gte: Math.floor(startOfDay.getTime() / 1000) },
+      limit: 50,
+    });
+
+    const transactions = paymentIntents.data
+      .filter(pi => pi.status === 'succeeded' || pi.status === 'processing')
+      .map(pi => ({
+        id: pi.id,
+        amount: pi.amount,
+        status: pi.status,
+        description: pi.description || pi.metadata?.purpose || 'Payment',
+        memberEmail: pi.metadata?.memberEmail || pi.metadata?.email || pi.receipt_email || '',
+        memberName: pi.metadata?.memberName || 'Unknown',
+        createdAt: new Date(pi.created * 1000).toISOString(),
+        type: pi.metadata?.purpose || 'payment'
+      }));
+
+    res.json(transactions);
+  } catch (error: any) {
+    console.error('[Stripe] Error fetching today transactions:', error);
+    res.status(500).json({ error: 'Failed to fetch transactions' });
+  }
+});
+
 export default router;
