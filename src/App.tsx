@@ -444,14 +444,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   useEffect(() => {
     const metaThemeColor = document.getElementById('theme-color-meta');
-    const isMember = ['/dashboard', '/book', '/member-events', '/member-wellness', '/profile', '/updates', '/history'].some(path => location.pathname.startsWith(path));
-    const isAdmin = location.pathname.startsWith('/admin');
+    const fullBleedHeroRoutes = ['/', '/private-hire'];
+    const isFullBleedHero = fullBleedHeroRoutes.includes(location.pathname);
     
     const updateThemeColor = (scrolledPastHero: boolean) => {
       if (!metaThemeColor) return;
       
       let themeColor: string;
-      if (location.pathname === '/' && !scrolledPastHero) {
+      if (isFullBleedHero && !scrolledPastHero) {
         themeColor = '#1a1610';
       } else {
         themeColor = '#293515';
@@ -459,7 +459,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       metaThemeColor.setAttribute('content', themeColor);
     };
     
-    if (location.pathname !== '/') {
+    if (!isFullBleedHero) {
       setHasScrolledPastHero(false);
       updateThemeColor(false);
       return;
@@ -546,7 +546,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     ? (isDarkTheme 
         ? "bg-[#293515] text-[#F2F2EC] shadow-lg shadow-black/20 border-b border-[#1e2810]"
         : "bg-[#293515] text-[#F2F2EC] shadow-lg shadow-black/20 border-b border-[#1e2810]")
-    : isLandingPage
+    : isFullBleedHeroPage
       ? (hasScrolledPastHero 
           ? "bg-[#293515] text-white shadow-lg shadow-black/20 border-b border-white/10"
           : "bg-transparent text-white")
@@ -649,7 +649,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   ) : null;
 
   return (
-    <div className={`${isDarkTheme ? 'dark liquid-bg text-white' : isLandingPage ? 'bg-[#293515] text-primary' : 'bg-[#F2F2EC] text-primary'} min-h-screen w-full relative transition-colors duration-500 font-sans`}>
+    <div className={`${isDarkTheme ? 'dark liquid-bg text-white' : isFullBleedHeroPage ? 'bg-[#293515] text-primary' : 'bg-[#F2F2EC] text-primary'} min-h-screen w-full relative transition-colors duration-500 font-sans`}>
       
       {/* Skip to main content link for keyboard navigation - WCAG 2.4.1 */}
       <a href="#main-content" className="skip-link">
