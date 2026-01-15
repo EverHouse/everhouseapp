@@ -555,8 +555,8 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
 
       await pool.query(`
         INSERT INTO booking_participants 
-          (session_id, participant_type, display_name, invite_status, payment_status)
-        VALUES ($1, 'guest', $2, 'accepted', 'pending')
+          (session_id, participant_type, display_name, invite_status, payment_status, cached_fee_cents)
+        VALUES ($1, 'guest', $2, 'accepted', 'pending', 2500)
       `, [sessionId, guestName]);
 
       await pool.query(`
