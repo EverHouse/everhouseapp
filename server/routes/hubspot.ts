@@ -177,6 +177,7 @@ const HUBSPOT_CONTACT_PROPERTIES = [
   'membership_tier',
   'membership_status',
   'membership_discount_reason',
+  'membership_start_date',
   'lastmodifieddate',
   'date_of_birth'
 ];
@@ -208,6 +209,7 @@ function transformHubSpotContact(contact: any): any {
     tier: normalizeTierName(rawTierValue),
     rawTier: rawTierValue && rawTierValue.trim() ? rawTierValue.trim() : null,
     tags: extractTierTags(contact.properties.membership_tier, contact.properties.membership_discount_reason),
+    membershipStartDate: contact.properties.membership_start_date || null,
     createdAt: contact.properties.createdate,
     lastModified: contact.properties.lastmodifieddate,
     dateOfBirth: contact.properties.date_of_birth || null,
@@ -417,21 +419,15 @@ async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
   }
   
   // Merge contact data with database data
-  let debugCount = 0;
+  // Priority for join date: DB joined_on → HubSpot membership_start_date → HubSpot createdate
   return contacts.map((contact: any) => {
     const emailLower = contact.email.toLowerCase();
     const dbUser = dbUserMap[emailLower];
     const pastBookings = pastBookingsMap[emailLower] || 0;
     const eventVisits = eventVisitsMap[emailLower] || 0;
     const wellnessVisits = wellnessVisitsMap[emailLower] || 0;
-    const rawJoinDate = dbUser?.joined_on || contact.createdAt;
+    const rawJoinDate = dbUser?.joined_on || contact.membershipStartDate || contact.createdAt;
     const normalizedJoinDate = normalizeDateToYYYYMMDD(rawJoinDate);
-    
-    // Debug: Log first 5 contacts to see what data we're getting
-    if (debugCount < 5 && !isProduction) {
-      console.log(`[DEBUG joinDate] email=${emailLower}, dbJoined=${dbUser?.joined_on}, hsCreated=${contact.createdAt}, raw=${rawJoinDate}, normalized=${normalizedJoinDate}`);
-      debugCount++;
-    }
     
     return {
       ...contact,
