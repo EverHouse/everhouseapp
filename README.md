@@ -1,4 +1,4 @@
-# Even House Members App
+# Ever House Members App
 
 A private members club application for golf and wellness centers.
 
