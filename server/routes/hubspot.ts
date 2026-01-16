@@ -18,15 +18,23 @@ import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts
  * Normalize a date string to YYYY-MM-DD format
  * Handles YYYY-MM-DD, ISO timestamp, and Unix timestamp (milliseconds) formats
  */
-function normalizeDateToYYYYMMDD(dateStr: string | null): string | null {
+function normalizeDateToYYYYMMDD(dateStr: string | null | undefined): string | null {
   if (!dateStr) return null;
   
+  // Convert to string in case it's passed as a number
+  const dateString = String(dateStr).trim();
+  if (!dateString) return null;
+  
   try {
-    // Check if it's a Unix timestamp (all digits, typically 13 digits for ms)
-    if (/^\d{10,13}$/.test(dateStr)) {
-      const timestamp = parseInt(dateStr, 10);
-      // Convert to date in Pacific timezone for consistency
+    // Check if it's a Unix timestamp (all digits, typically 10-13 digits)
+    if (/^\d+$/.test(dateString)) {
+      const timestamp = parseInt(dateString, 10);
+      // Convert to date
       const date = new Date(timestamp);
+      // Validate the date is reasonable (between 1990 and 2100)
+      if (date.getFullYear() < 1990 || date.getFullYear() > 2100) {
+        return null;
+      }
       const year = date.getUTCFullYear();
       const month = String(date.getUTCMonth() + 1).padStart(2, '0');
       const day = String(date.getUTCDate()).padStart(2, '0');
@@ -34,7 +42,7 @@ function normalizeDateToYYYYMMDD(dateStr: string | null): string | null {
     }
     
     // Extract just the date part (YYYY-MM-DD) from ISO or date strings
-    const cleanDate = dateStr.split('T')[0];
+    const cleanDate = dateString.split('T')[0];
     
     // Validate it's a proper date format
     const [year, month, day] = cleanDate.split('-').map(Number);
@@ -409,16 +417,26 @@ async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
   }
   
   // Merge contact data with database data
+  let debugCount = 0;
   return contacts.map((contact: any) => {
     const emailLower = contact.email.toLowerCase();
     const dbUser = dbUserMap[emailLower];
     const pastBookings = pastBookingsMap[emailLower] || 0;
     const eventVisits = eventVisitsMap[emailLower] || 0;
     const wellnessVisits = wellnessVisitsMap[emailLower] || 0;
+    const rawJoinDate = dbUser?.joined_on || contact.createdAt;
+    const normalizedJoinDate = normalizeDateToYYYYMMDD(rawJoinDate);
+    
+    // Debug: Log first 5 contacts to see what data we're getting
+    if (debugCount < 5 && !isProduction) {
+      console.log(`[DEBUG joinDate] email=${emailLower}, dbJoined=${dbUser?.joined_on}, hsCreated=${contact.createdAt}, raw=${rawJoinDate}, normalized=${normalizedJoinDate}`);
+      debugCount++;
+    }
+    
     return {
       ...contact,
       lifetimeVisits: pastBookings + eventVisits + wellnessVisits,
-      joinDate: normalizeDateToYYYYMMDD(dbUser?.joined_on || contact.createdAt) || null,
+      joinDate: normalizedJoinDate,
       mindbodyClientId: dbUser?.mindbody_client_id || null,
       manuallyLinkedEmails: dbUser?.manually_linked_emails || [],
       lastBookingDate: lastActivityMap[emailLower] || null
