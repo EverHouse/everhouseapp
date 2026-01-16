@@ -62,7 +62,8 @@ export function BalancePaymentModal({
         '/api/member/balance/pay',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ memberEmail })
         }
       );
 

@@ -987,6 +987,7 @@ const Dashboard: React.FC = () => {
           <div className="mb-6 animate-pop-in" style={{animationDelay: '0.125s'}}>
             <BalanceCard 
               key={balanceRefreshKey}
+              memberEmail={user?.email}
               onPayNow={() => setShowBalancePaymentModal(true)} 
             />
           </div>

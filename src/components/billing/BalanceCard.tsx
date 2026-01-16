@@ -19,11 +19,12 @@ interface BalanceData {
 }
 
 interface BalanceCardProps {
+  memberEmail?: string;
   onPayNow: () => void;
   className?: string;
 }
 
-export function BalanceCard({ onPayNow, className = '' }: BalanceCardProps) {
+export function BalanceCard({ memberEmail, onPayNow, className = '' }: BalanceCardProps) {
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === 'dark';
   
@@ -35,7 +36,10 @@ export function BalanceCard({ onPayNow, className = '' }: BalanceCardProps) {
   const fetchBalance = useCallback(async () => {
     try {
       setLoading(true);
-      const { ok, data, error: apiError } = await apiRequest<BalanceData>('/api/member/balance');
+      const url = memberEmail 
+        ? `/api/member/balance?email=${encodeURIComponent(memberEmail)}`
+        : '/api/member/balance';
+      const { ok, data, error: apiError } = await apiRequest<BalanceData>(url);
       
       if (ok && data) {
         setBalance(data);
@@ -48,7 +52,7 @@ export function BalanceCard({ onPayNow, className = '' }: BalanceCardProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [memberEmail]);
 
   useEffect(() => {
     fetchBalance();

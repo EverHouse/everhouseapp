@@ -1166,7 +1166,12 @@ router.get('/api/member/balance', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const memberEmail = sessionUser.email.toLowerCase();
+    // Allow staff to query any member's balance via query param (for view-as-member feature)
+    let memberEmail = sessionUser.email.toLowerCase();
+    const queryEmail = req.query.email as string | undefined;
+    if (queryEmail && sessionUser.isStaff) {
+      memberEmail = queryEmail.toLowerCase();
+    }
 
     // Query all unpaid booking_participants for this member
     // user_id is a UUID, so we must join through users table to match by email
@@ -1293,8 +1298,19 @@ router.post('/api/member/balance/pay', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const memberEmail = sessionUser.email.toLowerCase();
-    const memberName = sessionUser.name || memberEmail.split('@')[0];
+    // Allow staff to pay on behalf of a member (for view-as-member feature)
+    let memberEmail = sessionUser.email.toLowerCase();
+    const requestEmail = req.body?.memberEmail as string | undefined;
+    if (requestEmail && sessionUser.isStaff) {
+      memberEmail = requestEmail.toLowerCase();
+    }
+    
+    // Get member name from users table
+    const memberResult = await pool.query(
+      'SELECT display_name FROM users WHERE LOWER(email) = $1',
+      [memberEmail]
+    );
+    const memberName = memberResult.rows[0]?.display_name || memberEmail.split('@')[0];
 
     // Recalculate the balance server-side (never trust client)
     // user_id is a UUID, so we must join through users table to match by email
