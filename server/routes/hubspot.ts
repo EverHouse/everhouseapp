@@ -16,7 +16,7 @@ import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts
 
 /**
  * Normalize a date string to YYYY-MM-DD format
- * Handles YYYY-MM-DD, ISO timestamp, and Unix timestamp (milliseconds) formats
+ * Handles YYYY-MM-DD, ISO timestamp, space-separated datetime, and Unix timestamp formats
  */
 function normalizeDateToYYYYMMDD(dateStr: string | null | undefined): string | null {
   if (!dateStr) return null;
@@ -41,8 +41,9 @@ function normalizeDateToYYYYMMDD(dateStr: string | null | undefined): string | n
       return `${year}-${month}-${day}`;
     }
     
-    // Extract just the date part (YYYY-MM-DD) from ISO or date strings
-    const cleanDate = dateString.split('T')[0];
+    // Extract just the date part (YYYY-MM-DD) from ISO or datetime strings
+    // Handle both 'T' separator (ISO) and space separator (database datetime)
+    const cleanDate = dateString.split('T')[0].split(' ')[0];
     
     // Validate it's a proper date format
     const [year, month, day] = cleanDate.split('-').map(Number);
