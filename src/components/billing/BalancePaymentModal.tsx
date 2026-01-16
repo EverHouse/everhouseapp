@@ -39,9 +39,17 @@ export function BalancePaymentModal({
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
 
   useEffect(() => {
-    document.body.style.overflow = 'hidden';
+    const scrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      window.scrollTo(0, scrollY);
     };
   }, []);
 
@@ -104,7 +112,6 @@ export function BalancePaymentModal({
   const modalContent = (
     <div
       className={`fixed inset-0 z-[60] ${isDark ? 'dark' : ''}`}
-      style={{ overscrollBehavior: 'contain' }}
     >
       <div
         className="fixed inset-0 bg-black/60 backdrop-blur-sm animate-backdrop-fade-in"
@@ -113,8 +120,8 @@ export function BalancePaymentModal({
       />
 
       <div
-        className="fixed inset-0 overflow-y-auto"
-        style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
+        className="fixed inset-0 overflow-y-auto overscroll-contain"
+        style={{ WebkitOverflowScrolling: 'touch' }}
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             onClose();
@@ -134,7 +141,7 @@ export function BalancePaymentModal({
             aria-modal="true"
             aria-labelledby="balance-payment-modal-title"
             onClick={(e) => e.stopPropagation()}
-            className={`relative w-full max-w-md max-h-[85vh] overflow-hidden ${
+            className={`relative w-full max-w-md max-h-[85vh] flex flex-col ${
               isDark ? 'bg-black/80' : 'bg-white/80'
             } backdrop-blur-xl border border-primary/10 dark:border-white/10 rounded-2xl shadow-2xl animate-modal-slide-up`}
           >
@@ -157,8 +164,8 @@ export function BalancePaymentModal({
             </div>
 
             <div
-              className="overflow-y-auto p-4"
-              style={{ maxHeight: 'calc(85vh - 80px)', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
+              className="flex-1 overflow-y-auto p-4 overscroll-contain"
+              style={{ WebkitOverflowScrolling: 'touch' }}
             >
               {loading && (
                 <div className="flex items-center justify-center py-12">
