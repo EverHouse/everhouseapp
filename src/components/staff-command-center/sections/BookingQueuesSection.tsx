@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, useState } from 'react';
-import { FixedSizeList, ListChildComponentProps } from 'react-window';
-import AutoSizer from 'react-virtualized-auto-sizer';
+import { List as FixedSizeList, RowComponentProps as ListChildComponentProps } from 'react-window';
+import { AutoSizer } from 'react-virtualized-auto-sizer';
 import EmptyState from '../../EmptyState';
 import { formatTime12Hour, getNowTimePacific } from '../../../utils/dateUtils';
 import { DateBlock, GlassListRow } from '../helpers';
@@ -226,14 +226,12 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
           <AutoSizer>
             {({ height, width }) => (
               <FixedSizeList
-                height={height}
-                width={width}
-                itemCount={pendingRequests.length}
-                itemSize={PENDING_ROW_HEIGHT}
+                rowCount={pendingRequests.length}
+                rowHeight={PENDING_ROW_HEIGHT}
                 overscanCount={2}
-              >
-                {PendingRequestRow}
-              </FixedSizeList>
+                rowComponent={PendingRequestRow}
+                style={{ height, width }}
+              />
             )}
           </AutoSizer>
         </div>
@@ -309,14 +307,12 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
           <AutoSizer>
             {({ height, width }) => (
               <FixedSizeList
-                height={height}
-                width={width}
-                itemCount={upcomingBookings.length}
-                itemSize={BOOKING_ROW_HEIGHT}
+                rowCount={upcomingBookings.length}
+                rowHeight={BOOKING_ROW_HEIGHT}
                 overscanCount={2}
-              >
-                {UpcomingBookingRow}
-              </FixedSizeList>
+                rowComponent={UpcomingBookingRow}
+                style={{ height, width }}
+              />
             )}
           </AutoSizer>
         </div>

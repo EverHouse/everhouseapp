@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { FixedSizeList as List, ListChildComponentProps } from 'react-window';
-import AutoSizer from 'react-virtualized-auto-sizer';
+import { List, RowComponentProps as ListChildComponentProps } from 'react-window';
+import { AutoSizer } from 'react-virtualized-auto-sizer';
 import { useData, MemberProfile } from '../../../contexts/DataContext';
 import { usePageReady } from '../../../contexts/PageReadyContext';
 import TierBadge from '../../../components/TierBadge';
@@ -605,9 +605,9 @@ const DirectoryTab: React.FC = () => {
                     </div>
                 )}
 
-            {/* Mobile view - Virtualized only for large lists */}
-            {!formerLoading && filteredList.length > 0 && (
-            <div className="md:hidden">
+                {/* Mobile view - Virtualized only for large lists */}
+                {!formerLoading && filteredList.length > 0 && (
+                <div className="md:hidden">
                 {/* Non-virtualized rendering for small lists */}
                 {filteredList.length < VIRTUALIZATION_THRESHOLD ? (
                     <div className="space-y-3">
@@ -728,18 +728,18 @@ const DirectoryTab: React.FC = () => {
                         };
                         return (
                             <List
-                                height={height}
-                                width={width}
-                                itemCount={filteredList.length}
-                                itemSize={140}
+                                rowCount={filteredList.length}
+                                rowHeight={140}
                                 overscanCount={3}
-                            >
-                                {MobileRow}
-                            </List>
+                                rowComponent={MobileRow}
+                                style={{ height, width }}
+                            />
                         );
                     }}
                 </AutoSizer>
-            </div>
+                    </div>
+                )}
+                </div>
             )}
 
             {/* Desktop view - Virtualized only for large lists with flex-based layout */}
@@ -877,14 +877,12 @@ const DirectoryTab: React.FC = () => {
                                 };
                                 return (
                                     <List
-                                        height={height}
-                                        width={width}
-                                        itemCount={filteredList.length}
-                                        itemSize={56}
+                                        rowCount={filteredList.length}
+                                        rowHeight={56}
                                         overscanCount={5}
-                                    >
-                                        {DesktopRow}
-                                    </List>
+                                        rowComponent={DesktopRow}
+                                        style={{ height, width }}
+                                    />
                                 );
                             }}
                         </AutoSizer>
