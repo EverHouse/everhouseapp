@@ -9,7 +9,9 @@ import {
   detectIdentifierType,
   normalizeEmail,
   isUUID,
-  isEmail
+  isEmail,
+  isHubSpotId,
+  isMindbodyClientId
 } from './memberTypes';
 import type { MembershipTier } from '../../../shared/schema';
 
@@ -152,6 +154,104 @@ class MemberServiceClass {
     return member;
   }
   
+  async findByHubSpotId(
+    hubspotId: string,
+    options: MemberLookupOptions = {}
+  ): Promise<MemberRecord | null> {
+    if (!hubspotId) return null;
+    
+    const result = await pool.query(`
+      SELECT 
+        u.id,
+        u.email,
+        u.first_name,
+        u.last_name,
+        u.role,
+        u.tier,
+        u.tier_id,
+        u.phone,
+        u.tags,
+        u.stripe_customer_id,
+        u.hubspot_id,
+        u.mindbody_client_id,
+        u.membership_status,
+        u.join_date,
+        u.lifetime_visits,
+        u.linked_emails,
+        u.trackman_email,
+        u.archived_at,
+        mt.id as tier_config_id,
+        mt.name as tier_name,
+        mt.daily_sim_minutes,
+        mt.guest_passes_per_month,
+        mt.booking_window_days,
+        mt.can_book_simulators,
+        mt.can_book_conference,
+        mt.can_book_wellness,
+        mt.unlimited_access
+      FROM users u
+      LEFT JOIN membership_tiers mt ON u.tier_id = mt.id
+      WHERE u.hubspot_id = $1
+        ${options.includeArchived ? '' : 'AND u.archived_at IS NULL'}
+      LIMIT 1
+    `, [hubspotId]);
+    
+    if (result.rows.length === 0) return null;
+    
+    const member = this.rowToMemberRecord(result.rows[0], options.includeTierConfig);
+    memberCache.setMember(member);
+    return member;
+  }
+  
+  async findByMindbodyClientId(
+    mindbodyClientId: string,
+    options: MemberLookupOptions = {}
+  ): Promise<MemberRecord | null> {
+    if (!mindbodyClientId) return null;
+    
+    const result = await pool.query(`
+      SELECT 
+        u.id,
+        u.email,
+        u.first_name,
+        u.last_name,
+        u.role,
+        u.tier,
+        u.tier_id,
+        u.phone,
+        u.tags,
+        u.stripe_customer_id,
+        u.hubspot_id,
+        u.mindbody_client_id,
+        u.membership_status,
+        u.join_date,
+        u.lifetime_visits,
+        u.linked_emails,
+        u.trackman_email,
+        u.archived_at,
+        mt.id as tier_config_id,
+        mt.name as tier_name,
+        mt.daily_sim_minutes,
+        mt.guest_passes_per_month,
+        mt.booking_window_days,
+        mt.can_book_simulators,
+        mt.can_book_conference,
+        mt.can_book_wellness,
+        mt.unlimited_access
+      FROM users u
+      LEFT JOIN membership_tiers mt ON u.tier_id = mt.id
+      WHERE u.mindbody_client_id = $1
+        ${options.includeArchived ? '' : 'AND u.archived_at IS NULL'}
+      LIMIT 1
+    `, [mindbodyClientId]);
+    
+    if (result.rows.length === 0) return null;
+    
+    const member = this.rowToMemberRecord(result.rows[0], options.includeTierConfig);
+    memberCache.setMember(member);
+    return member;
+  }
+  
   async findByAnyIdentifier(
     identifier: string,
     options: MemberLookupOptions = {}
@@ -160,6 +260,7 @@ class MemberServiceClass {
     
     const identifierType = detectIdentifierType(identifier);
     
+    // Try direct match based on identifier type
     if (identifierType === 'uuid') {
       return this.findById(identifier, options);
     }
@@ -168,10 +269,29 @@ class MemberServiceClass {
       return this.findByEmail(identifier, options);
     }
     
+    if (identifierType === 'hubspot_id') {
+      const byHubSpot = await this.findByHubSpotId(identifier, options);
+      if (byHubSpot) return byHubSpot;
+    }
+    
+    // Fallback chain: try all methods in order of priority
+    // 1. Email (primary identifier)
+    const byEmail = await this.findByEmail(identifier, options);
+    if (byEmail) return byEmail;
+    
+    // 2. UUID (internal app ID)
     const byId = await this.findById(identifier, options);
     if (byId) return byId;
     
-    return this.findByEmail(identifier, options);
+    // 3. HubSpot ID (CRM identifier - future primary as Mindbody phases out)
+    const byHubSpot = await this.findByHubSpotId(identifier, options);
+    if (byHubSpot) return byHubSpot;
+    
+    // 4. Mindbody Client ID (legacy identifier - being phased out)
+    const byMindbody = await this.findByMindbodyClientId(identifier, options);
+    if (byMindbody) return byMindbody;
+    
+    return null;
   }
   
   async resolveMemberForBilling(

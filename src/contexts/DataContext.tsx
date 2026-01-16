@@ -350,7 +350,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           const formatted: MemberProfile[] = contacts.map((contact: any) => ({
             id: contact.id,
             name: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email || 'Unknown',
-            tier: contact.tier || 'Core',
+            tier: contact.tier || '',
             rawTier: contact.rawTier,
             tags: contact.tags || [],
             status: contact.status || 'Active',
@@ -408,7 +408,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         const formatted: MemberProfile[] = contacts.map((contact: any) => ({
           id: contact.id,
           name: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email || 'Unknown',
-          tier: contact.tier || 'Unknown',
+          tier: contact.tier || '',
           rawTier: contact.rawTier,
           tags: contact.tags || [],
           status: contact.status || 'Inactive',
@@ -445,7 +445,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         const formatted: MemberProfile[] = contacts.map((contact: any) => ({
           id: contact.id,
           name: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email || 'Unknown',
-          tier: contact.tier || 'Core',
+          tier: contact.tier || '',
           rawTier: contact.rawTier,
           tags: contact.tags || [],
           status: contact.status || 'Active',
@@ -498,7 +498,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         const formatted: MemberProfile[] = contacts.map((contact: any) => ({
           id: contact.id,
           name: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email || 'Unknown',
-          tier: contact.tier || (status === 'active' ? 'Core' : 'Unknown'),
+          tier: contact.tier || '',
           rawTier: contact.rawTier,
           tags: contact.tags || [],
           status: contact.status || (status === 'active' ? 'Active' : 'Inactive'),

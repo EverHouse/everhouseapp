@@ -1,8 +1,9 @@
 import { db } from '../db';
 import { users, membershipTiers } from '../../shared/schema';
+import { memberNotes } from '../../shared/models/membership';
 import { getHubSpotClient } from './integrations';
-import { normalizeTierName, extractTierTags } from '../../shared/constants/tiers';
-import { sql, eq } from 'drizzle-orm';
+import { normalizeTierName, extractTierTags, TIER_NAMES } from '../../shared/constants/tiers';
+import { sql, eq, and } from 'drizzle-orm';
 import { isProduction } from './db';
 import { broadcastMemberDataUpdated, broadcastDataIntegrityUpdate } from './websocket';
 import { syncDealStageFromMindbodyStatus } from './hubspotDeals';
@@ -10,6 +11,16 @@ import { alertOnHubSpotSyncComplete, alertOnSyncFailure } from './dataAlerts';
 import pLimit from 'p-limit';
 import { notifyMember, notifyAllStaff } from './notificationService';
 import { sendOutstandingBalanceEmail } from '../emails/paymentEmails';
+
+// Check if a tier string represents a valid/recognized tier (not blank/unknown)
+function isRecognizedTier(tierString: string | null | undefined): boolean {
+  if (!tierString || typeof tierString !== 'string') return false;
+  const normalized = tierString.trim().toLowerCase();
+  if (normalized.length === 0) return false;
+  
+  // Check if it contains any recognized tier keyword
+  return TIER_NAMES.some(tier => normalized.includes(tier.toLowerCase()));
+}
 
 // Helper to add delay between operations
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -68,6 +79,8 @@ interface HubSpotContact {
     interest_in_events?: string;
     interest_in_workspace?: string;
     total_visit_count?: string;
+    membership_notes?: string;
+    message?: string;
   };
 }
 
@@ -112,7 +125,9 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
       'interest_in_cafe',
       'interest_in_events',
       'interest_in_workspace',
-      'total_visit_count'
+      'total_visit_count',
+      'membership_notes',
+      'message'
     ];
     
     let allContacts: HubSpotContact[] = [];
@@ -176,12 +191,28 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           if (!email) return null;
           
           const status = (contact.properties.membership_status || 'non-member').toLowerCase();
-          const normalizedTier = normalizeTierName(contact.properties.membership_tier);
+          
+          // STRICT TIER LOGIC: Set to NULL if tier is blank/unrecognized (don't default to 'Social')
+          const rawTier = contact.properties.membership_tier;
+          const normalizedTier = isRecognizedTier(rawTier) ? normalizeTierName(rawTier) : null;
           const tierId = normalizedTier ? (tierCache.get(normalizedTier.toLowerCase()) || null) : null;
           const tags = extractTierTags(contact.properties.membership_tier, contact.properties.membership_discount_reason);
           
+          // PRIORITIZE createdate for joinDate, fallback to membership_start_date
           let joinDate: string | null = null;
-          if (contact.properties.membership_start_date) {
+          if (contact.properties.createdate) {
+            // createdate is a timestamp, parse it properly
+            try {
+              const createDate = new Date(contact.properties.createdate);
+              if (!isNaN(createDate.getTime())) {
+                joinDate = createDate.toISOString().split('T')[0];
+              }
+            } catch (e) {
+              // If parsing fails, fall through to membership_start_date
+            }
+          }
+          // Fallback to membership_start_date if createdate wasn't available
+          if (!joinDate && contact.properties.membership_start_date) {
             const dateStr = contact.properties.membership_start_date;
             if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
               joinDate = dateStr.split('T')[0];
@@ -241,6 +272,72 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
             detectAndNotifyStatusChange(email, firstName, lastName, oldStatus, status).catch(err => {
               console.error(`[MemberSync] Failed to notify status change for ${email}:`, err);
             });
+          }
+          
+          // Sync HubSpot notes to member_notes table (one-way sync, no push back to HubSpot)
+          const hubspotNotes = contact.properties.membership_notes?.trim();
+          const hubspotMessage = contact.properties.message?.trim();
+          
+          // Helper to sanitize HTML and limit length
+          const sanitizeNoteContent = (content: string): string => {
+            // Remove HTML tags but keep line breaks
+            return content
+              .replace(/<br\s*\/?>/gi, '\n')
+              .replace(/<\/?[^>]+(>|$)/g, '')
+              .trim()
+              .substring(0, 5000); // Limit to 5000 chars
+          };
+          
+          // Sync membership_notes from HubSpot
+          if (hubspotNotes) {
+            const noteContent = `[HubSpot Notes]: ${sanitizeNoteContent(hubspotNotes)}`;
+            const notePrefix = '[HubSpot Notes]:';
+            
+            // Check if this note already exists (by prefix match to avoid duplicates)
+            const existingNote = await db.select({ id: memberNotes.id })
+              .from(memberNotes)
+              .where(and(
+                eq(memberNotes.memberEmail, email),
+                sql`${memberNotes.content} LIKE ${notePrefix + '%'}`
+              ))
+              .limit(1);
+            
+            if (existingNote.length === 0) {
+              // Create new note synced from HubSpot
+              await db.insert(memberNotes).values({
+                memberEmail: email,
+                content: noteContent,
+                createdBy: 'system',
+                createdByName: 'HubSpot Sync',
+                isPinned: false
+              });
+            }
+          }
+          
+          // Sync message from HubSpot
+          if (hubspotMessage) {
+            const msgContent = `[HubSpot Message]: ${sanitizeNoteContent(hubspotMessage)}`;
+            const msgPrefix = '[HubSpot Message]:';
+            
+            // Check if this message already exists
+            const existingMsg = await db.select({ id: memberNotes.id })
+              .from(memberNotes)
+              .where(and(
+                eq(memberNotes.memberEmail, email),
+                sql`${memberNotes.content} LIKE ${msgPrefix + '%'}`
+              ))
+              .limit(1);
+            
+            if (existingMsg.length === 0) {
+              // Create new note synced from HubSpot message
+              await db.insert(memberNotes).values({
+                memberEmail: email,
+                content: msgContent,
+                createdBy: 'system',
+                createdByName: 'HubSpot Sync',
+                isPinned: false
+              });
+            }
           }
           
           return { email, statusChanged: oldStatus !== null && oldStatus !== status };

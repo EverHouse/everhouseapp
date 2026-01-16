@@ -47,7 +47,7 @@ export interface StaffRecord {
   isActive: boolean;
 }
 
-export type IdentifierType = 'email' | 'uuid' | 'unknown';
+export type IdentifierType = 'email' | 'uuid' | 'hubspot_id' | 'mindbody_id' | 'unknown';
 
 export interface ResolvedIdentifier {
   type: IdentifierType;
@@ -57,7 +57,7 @@ export interface ResolvedIdentifier {
 
 export interface BillingMemberMatch {
   member: MemberRecord | null;
-  matchedBy: 'uuid' | 'email' | 'linked_email' | 'trackman_email' | 'booking_email' | null;
+  matchedBy: 'uuid' | 'email' | 'linked_email' | 'trackman_email' | 'booking_email' | 'hubspot_id' | 'mindbody_id' | null;
   originalIdentifier: string;
 }
 
@@ -76,10 +76,19 @@ export function isEmail(value: string): boolean {
   return value.includes('@') && value.includes('.');
 }
 
+export function isHubSpotId(value: string): boolean {
+  return /^\d{6,15}$/.test(value);
+}
+
+export function isMindbodyClientId(value: string): boolean {
+  return /^\d{8,12}$/.test(value);
+}
+
 export function detectIdentifierType(value: string): IdentifierType {
   if (!value) return 'unknown';
   if (isUUID(value)) return 'uuid';
   if (isEmail(value)) return 'email';
+  if (isHubSpotId(value)) return 'hubspot_id';
   return 'unknown';
 }
 

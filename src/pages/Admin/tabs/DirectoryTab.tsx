@@ -11,6 +11,7 @@ import { formatPhoneNumber } from '../../../utils/formatting';
 import { getTierColor, getTagColor } from '../../../utils/tierUtils';
 
 const TIER_OPTIONS = ['All', 'Social', 'Core', 'Premium', 'Corporate', 'VIP'] as const;
+const ASSIGNABLE_TIERS = ['Social', 'Core', 'Premium', 'Corporate', 'VIP'] as const;
 
 type SortField = 'name' | 'tier' | 'visits' | 'joinDate' | 'lastVisit';
 type SortDirection = 'asc' | 'desc';
@@ -62,8 +63,62 @@ const DirectoryTab: React.FC = () => {
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncMessage, setSyncMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [addMemberModalOpen, setAddMemberModalOpen] = useState(false);
+    const [showMissingTierOnly, setShowMissingTierOnly] = useState(false);
+    const [assignTierModalOpen, setAssignTierModalOpen] = useState(false);
+    const [memberToAssignTier, setMemberToAssignTier] = useState<MemberProfile | null>(null);
+    const [selectedTierToAssign, setSelectedTierToAssign] = useState<string>('');
+    const [isAssigningTier, setIsAssigningTier] = useState(false);
+    const [assignTierError, setAssignTierError] = useState<string | null>(null);
     
     const isAdmin = actualUser?.role === 'admin';
+    
+    // Count active members without a tier assigned
+    const membersWithoutTierCount = useMemo(() => {
+        return members.filter(m => 
+            (!m.role || m.role === 'member') && 
+            (!m.tier || m.tier.trim() === '')
+        ).length;
+    }, [members]);
+    
+    // Handle opening the assign tier modal
+    const openAssignTierModal = (member: MemberProfile) => {
+        setMemberToAssignTier(member);
+        setSelectedTierToAssign('');
+        setAssignTierError(null);
+        setAssignTierModalOpen(true);
+    };
+    
+    // Handle tier assignment - push to HubSpot first, then update local DB
+    const handleAssignTier = async () => {
+        if (!memberToAssignTier || !selectedTierToAssign) return;
+        
+        setIsAssigningTier(true);
+        setAssignTierError(null);
+        
+        try {
+            // Push to HubSpot first, then update local DB
+            const res = await fetch(`/api/hubspot/contacts/${memberToAssignTier.id}/tier`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ tier: selectedTierToAssign })
+            });
+            
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || 'Failed to update tier in HubSpot');
+            }
+            
+            // Success - close modal and refresh members
+            setAssignTierModalOpen(false);
+            setMemberToAssignTier(null);
+            await refreshMembers();
+        } catch (err: any) {
+            setAssignTierError(err.message || 'Failed to assign tier. Please try again.');
+        } finally {
+            setIsAssigningTier(false);
+        }
+    };
 
     const handleSync = async () => {
         setIsSyncing(true);
@@ -188,8 +243,13 @@ const DirectoryTab: React.FC = () => {
     const filteredList = useMemo(() => {
         let filtered = regularMembers;
         
+        // Missing tier filter (takes priority when active)
+        if (showMissingTierOnly && memberTab === 'active') {
+            filtered = filtered.filter(m => !m.tier || m.tier.trim() === '');
+        }
+        
         // Tier filter
-        if (tierFilter !== 'All') {
+        if (tierFilter !== 'All' && !showMissingTierOnly) {
             filtered = filtered.filter(m => {
                 const tier = m.tier || '';
                 return tier === tierFilter || tier.includes(tierFilter);
@@ -248,7 +308,7 @@ const DirectoryTab: React.FC = () => {
         });
         
         return filtered;
-    }, [regularMembers, tierFilter, tagFilter, statusFilter, memberTab, searchQuery, sortField, sortDirection]);
+    }, [regularMembers, tierFilter, tagFilter, statusFilter, memberTab, searchQuery, sortField, sortDirection, showMissingTierOnly]);
     
     const handleViewAs = async (member: MemberProfile) => {
         if (!isAdmin) return;
@@ -281,6 +341,7 @@ const DirectoryTab: React.FC = () => {
                             e.preventDefault();
                             e.stopPropagation();
                             handleTabChange('active');
+                            setShowMissingTierOnly(false);
                         }}
                         className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${
                             memberTab === 'active'
@@ -296,6 +357,7 @@ const DirectoryTab: React.FC = () => {
                             e.preventDefault();
                             e.stopPropagation();
                             handleTabChange('former');
+                            setShowMissingTierOnly(false);
                         }}
                         className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${
                             memberTab === 'former'
@@ -322,6 +384,40 @@ const DirectoryTab: React.FC = () => {
                     {isSyncing ? 'Syncing...' : 'Sync'}
                 </button>
             </div>
+            
+            {/* Needs Attention Alert - Members without tier */}
+            {memberTab === 'active' && membersWithoutTierCount > 0 && (
+                <div className={`mb-4 p-3 rounded-xl flex items-center justify-between gap-3 ${
+                    showMissingTierOnly 
+                        ? 'bg-amber-100 dark:bg-amber-500/20 border-2 border-amber-400 dark:border-amber-500/50' 
+                        : 'bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30'
+                }`}>
+                    <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-xl">warning</span>
+                        <div>
+                            <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                                Needs Attention
+                            </p>
+                            <p className="text-xs text-amber-700 dark:text-amber-400">
+                                {membersWithoutTierCount} active member{membersWithoutTierCount !== 1 ? 's' : ''} without a tier assigned
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => {
+                            setShowMissingTierOnly(!showMissingTierOnly);
+                            setTierFilter('All');
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                            showMissingTierOnly
+                                ? 'bg-amber-600 text-white hover:bg-amber-700'
+                                : 'bg-amber-200 dark:bg-amber-500/30 text-amber-800 dark:text-amber-300 hover:bg-amber-300 dark:hover:bg-amber-500/40'
+                        }`}
+                    >
+                        {showMissingTierOnly ? 'Show All' : 'View Members'}
+                    </button>
+                </div>
+            )}
 
             <div className="mb-6 space-y-3 animate-pop-in sticky top-0 z-10 bg-white dark:bg-surface-dark pt-2 pb-3" style={{animationDelay: '0.05s'}}>
                 {/* Search */}
@@ -541,6 +637,15 @@ const DirectoryTab: React.FC = () => {
                                 {m.tags?.map(tag => (
                                     <TagBadge key={tag} tag={tag} size="sm" />
                                 ))}
+                                {isAdmin && memberTab === 'active' && (!m.tier || m.tier.trim() === '') && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); openAssignTierModal(m); }}
+                                        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-bold hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-colors"
+                                    >
+                                        <span aria-hidden="true" className="material-symbols-outlined text-[14px]">add_circle</span>
+                                        Assign Tier
+                                    </button>
+                                )}
                             </div>
                             {isAdmin && memberTab === 'active' && (
                                 <button 
@@ -598,6 +703,15 @@ const DirectoryTab: React.FC = () => {
                                         {m.tags?.map(tag => (
                                             <TagBadge key={tag} tag={tag} size="sm" />
                                         ))}
+                                        {isAdmin && memberTab === 'active' && (!m.tier || m.tier.trim() === '') && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); openAssignTierModal(m); }}
+                                                className="flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-[10px] font-bold hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-colors"
+                                            >
+                                                <span aria-hidden="true" className="material-symbols-outlined text-[12px]">add_circle</span>
+                                                Assign
+                                            </button>
+                                        )}
                                     </div>
                                 </td>
                                 <td className="p-4 text-center text-gray-600 dark:text-gray-400 text-sm font-medium">
@@ -672,6 +786,94 @@ const DirectoryTab: React.FC = () => {
                     refreshMembers();
                 }}
             />
+
+            {/* Assign Tier Modal */}
+            {assignTierModalOpen && memberToAssignTier && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+                    <div 
+                        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                        onClick={() => { setAssignTierModalOpen(false); setMemberToAssignTier(null); }}
+                    />
+                    <div className="relative bg-white dark:bg-surface-dark rounded-2xl shadow-2xl w-full max-w-md p-6 animate-pop-in">
+                        <button
+                            onClick={() => { setAssignTierModalOpen(false); setMemberToAssignTier(null); }}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        >
+                            <span className="material-symbols-outlined">close</span>
+                        </button>
+                        
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-amber-600 dark:text-amber-400">person_add</span>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Assign Tier</h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">{memberToAssignTier.name}</p>
+                            </div>
+                        </div>
+                        
+                        <div className="mb-6">
+                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                                Select Membership Tier
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {ASSIGNABLE_TIERS.map(tier => {
+                                    const colors = getTierColor(tier);
+                                    const isSelected = selectedTierToAssign === tier;
+                                    return (
+                                        <button
+                                            key={tier}
+                                            onClick={() => setSelectedTierToAssign(tier)}
+                                            className={`p-3 rounded-xl text-sm font-bold transition-all ${
+                                                isSelected 
+                                                    ? 'ring-2 ring-offset-2 ring-primary dark:ring-lavender scale-[1.02]' 
+                                                    : 'hover:scale-[1.02]'
+                                            }`}
+                                            style={{
+                                                backgroundColor: colors.bg,
+                                                color: colors.text,
+                                                border: `2px solid ${colors.border}`
+                                            }}
+                                        >
+                                            {tier}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        
+                        {assignTierError && (
+                            <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30">
+                                <p className="text-sm text-red-700 dark:text-red-400">{assignTierError}</p>
+                            </div>
+                        )}
+                        
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => { setAssignTierModalOpen(false); setMemberToAssignTier(null); }}
+                                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-300 dark:border-white/20 text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleAssignTier}
+                                disabled={!selectedTierToAssign || isAssigningTier}
+                                className="flex-1 px-4 py-2.5 rounded-xl bg-primary dark:bg-lavender text-white font-bold hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                {isAssigningTier ? (
+                                    <>
+                                        <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>
+                                        Saving...
+                                    </>
+                                ) : (
+                                    'Assign Tier'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
         </div>
     );
 };
