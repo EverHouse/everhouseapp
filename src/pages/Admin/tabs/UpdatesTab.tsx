@@ -32,7 +32,7 @@ const UpdatesTab: React.FC = () => {
     const navigate = useNavigate();
     const { setPageReady } = usePageReady();
     const { actualUser } = useData();
-    const [activeSubTab, setActiveSubTab] = useState<'alerts' | 'activity' | 'announcements'>('announcements');
+    const [activeSubTab, setActiveSubTab] = useState<'alerts' | 'activity' | 'announcements'>('alerts');
     const [notifications, setNotifications] = useState<StaffNotification[]>([]);
     const [notificationsLoading, setNotificationsLoading] = useState(true);
     const [unreadCount, setUnreadCount] = useState(0);
