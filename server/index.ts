@@ -117,13 +117,20 @@ const getAllowedOrigins = (): string[] | boolean | CorsOriginFunction => {
     return [`https://${replitDomain}`, `https://${replitDomain.replace('-00-', '-')}`];
   }
   // In production, frontend and API are same-origin (served from same Express server)
-  // Return function to dynamically check origin - allow same-origin and Replit domains
+  // Return function to dynamically check origin - allow same-origin, Replit domains, and mobile apps
   return (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     // Allow requests with no origin (same-origin, server-to-server, mobile apps)
     if (!origin) {
       callback(null, true);
       return;
     }
+    
+    // Allow Expo Go app (exp:// protocol)
+    if (origin.startsWith('exp://')) {
+      callback(null, true);
+      return;
+    }
+    
     try {
       const url = new URL(origin);
       const hostname = url.hostname;
@@ -132,13 +139,13 @@ const getAllowedOrigins = (): string[] | boolean | CorsOriginFunction => {
         callback(null, true);
         return;
       }
-      // Allow localhost for testing
+      // Allow localhost for testing (including Expo dev server on port 8081)
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
         callback(null, true);
         return;
       }
     } catch {
-      // Invalid URL, deny
+      // Invalid URL (like exp://), already handled above
     }
     callback(new Error('Not allowed by CORS'));
   };
