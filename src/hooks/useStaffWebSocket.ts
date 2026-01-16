@@ -207,6 +207,25 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           if (message.type === 'closure_update') {
             window.dispatchEvent(new CustomEvent('closure-update', { detail: message }));
           }
+
+          // Handle billing updates (payment status changes)
+          if (message.type === 'billing_update') {
+            console.log('[StaffWebSocket] Received billing_update:', message.action);
+            window.dispatchEvent(new CustomEvent('billing-update', { detail: message }));
+            
+            // Also trigger booking update to refresh booking lists
+            if (message.action === 'booking_payment_updated' && message.bookingId) {
+              handleBookingEvent({
+                eventType: 'payment_updated',
+                bookingId: message.bookingId,
+                memberEmail: message.memberEmail || '',
+                bookingDate: '',
+                startTime: '',
+                status: 'paid',
+                timestamp: new Date().toISOString()
+              });
+            }
+          }
         } catch (e) {
           console.error('[StaffWebSocket] Error parsing message:', e);
         }

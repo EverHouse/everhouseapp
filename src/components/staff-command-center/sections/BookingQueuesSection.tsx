@@ -13,6 +13,7 @@ interface BookingQueuesSectionProps {
   onApprove: (request: BookingRequest) => void;
   onDeny: (request: BookingRequest) => void;
   onCheckIn: (booking: BookingRequest) => void;
+  onPaymentClick?: (bookingId: number) => void;
   variant: 'desktop' | 'desktop-top' | 'desktop-bottom' | 'mobile';
 }
 
@@ -25,6 +26,7 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
   onApprove,
   onDeny,
   onCheckIn,
+  onPaymentClick,
   variant
 }) => {
   const isDesktop = variant === 'desktop' || variant === 'desktop-top' || variant === 'desktop-bottom';
@@ -133,6 +135,18 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
                     <span className="material-symbols-outlined text-sm">check_circle</span>
                     Checked In
                   </span>
+                ) : booking.has_unpaid_fees ? (
+                  <button
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
+                      onPaymentClick?.(bookingId);
+                    }}
+                    className="text-xs px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-sm">payments</span>
+                    ${(booking.total_owed || 0).toFixed(0)} Due
+                  </button>
                 ) : (
                   <button
                     onClick={(e) => { e.stopPropagation(); onCheckIn(booking); }}

@@ -784,13 +784,16 @@ export function broadcastDataIntegrityUpdate(action: 'check_complete' | 'issue_r
 
 export function broadcastBillingUpdate(data: {
   action: 'subscription_created' | 'subscription_cancelled' | 'subscription_updated' | 
-          'payment_succeeded' | 'payment_failed' | 'invoice_paid' | 'invoice_failed';
+          'payment_succeeded' | 'payment_failed' | 'invoice_paid' | 'invoice_failed' |
+          'booking_payment_updated';
   customerId?: string;
   memberEmail?: string;
   memberName?: string;
   amount?: number;
   planName?: string;
   status?: string;
+  bookingId?: number;
+  sessionId?: number;
 }) {
   const payload = JSON.stringify({
     type: 'billing_update',

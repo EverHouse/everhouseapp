@@ -15,7 +15,7 @@ import { parseAffectedAreas } from '../core/affectedAreas';
 import { logAndRespond } from '../core/logger';
 import { checkClosureConflict, checkAvailabilityBlockConflict, parseTimeToMinutes } from '../core/bookingValidation';
 import { bookingEvents } from '../core/bookingEvents';
-import { sendNotificationToUser, broadcastAvailabilityUpdate, broadcastMemberStatsUpdated } from '../core/websocket';
+import { sendNotificationToUser, broadcastAvailabilityUpdate, broadcastMemberStatsUpdated, broadcastBillingUpdate } from '../core/websocket';
 import { getSessionUser } from '../types/session';
 import { refundGuestPass } from './guestPasses';
 import { updateHubSpotContactVisitCount } from '../core/memberSync';
@@ -1687,6 +1687,14 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
             VALUES ($1, $2, $3, 'payment_confirmed', $4, $5, $6, 'pending', 'paid')
           `, [bookingId, existing.session_id, p.id, staffEmail, staffName, p.amount]);
         }
+        
+        broadcastBillingUpdate({
+          action: 'booking_payment_updated',
+          bookingId,
+          sessionId: existing.session_id,
+          memberEmail: existing.user_email,
+          amount: totalOutstanding * 100
+        });
       }
     }
     
@@ -1877,8 +1885,45 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
       console.error('Failed to fetch calendar conference bookings (non-blocking):', calError);
     }
     
+    // Get session IDs to check for unpaid fees
+    const bookingIds = dbResult.map(b => b.id).filter(Boolean);
+    
+    // Query unpaid fees for each booking's session
+    // Use a subquery to get participant fees without cross-product duplication
+    let paymentStatusMap = new Map<number, { hasUnpaidFees: boolean; totalOwed: number }>();
+    if (bookingIds.length > 0) {
+      const paymentStatusResult = await pool.query(`
+        SELECT 
+          br.id as booking_id,
+          COALESCE(pending_fees.total_owed, 0)::numeric as total_owed
+        FROM booking_requests br
+        LEFT JOIN LATERAL (
+          SELECT SUM(COALESCE(bp.cached_fee_cents, 0)) / 100.0 as total_owed
+          FROM booking_participants bp
+          WHERE bp.session_id = br.session_id
+            AND bp.payment_status = 'pending'
+        ) pending_fees ON true
+        WHERE br.id = ANY($1)
+      `, [bookingIds]);
+      
+      for (const row of paymentStatusResult.rows) {
+        const totalOwed = parseFloat(row.total_owed) || 0;
+        paymentStatusMap.set(row.booking_id, {
+          hasUnpaidFees: totalOwed > 0,
+          totalOwed
+        });
+      }
+    }
+    
+    // Enrich DB results with payment status
+    const enrichedDbResult = dbResult.map(b => ({
+      ...b,
+      has_unpaid_fees: paymentStatusMap.get(b.id)?.hasUnpaidFees || false,
+      total_owed: paymentStatusMap.get(b.id)?.totalOwed || 0
+    }));
+    
     // Merge DB results with calendar bookings
-    const allBookings = [...dbResult, ...calendarBookings]
+    const allBookings = [...enrichedDbResult, ...calendarBookings]
       .sort((a, b) => {
         const dateCompare = (a.request_date || '').localeCompare(b.request_date || '');
         if (dateCompare !== 0) return dateCompare;

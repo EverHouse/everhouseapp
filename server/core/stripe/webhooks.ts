@@ -185,6 +185,13 @@ async function handlePaymentIntentSucceeded(paymentIntent: any): Promise<void> {
         [bookingId, validatedParticipantIds, id]
       );
       console.log(`[Stripe Webhook] Updated ${updateResult.rowCount} participant(s) to paid and cleared cached fees with intent ${id}`);
+      
+      broadcastBillingUpdate({
+        action: 'booking_payment_updated',
+        bookingId,
+        sessionId: isNaN(sessionId) ? undefined : sessionId,
+        amount
+      });
     } catch (error) {
       console.error('[Stripe Webhook] Error updating participant payment status:', error);
     }

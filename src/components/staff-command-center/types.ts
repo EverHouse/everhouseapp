@@ -12,6 +12,8 @@ export interface BookingRequest {
   resource_name?: string;
   member_notes?: string | null;
   notes?: string | null;
+  has_unpaid_fees?: boolean;
+  total_owed?: number;
 }
 
 export interface Tour {

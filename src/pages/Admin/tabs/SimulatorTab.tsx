@@ -14,6 +14,7 @@ import { TabType } from '../layout/types';
 import BookingMembersEditor from '../../../components/admin/BookingMembersEditor';
 import { RosterManager } from '../../../components/booking';
 import { CheckinBillingModal } from '../../../components/staff-command-center/modals/CheckinBillingModal';
+import { CompleteRosterModal } from '../../../components/staff-command-center/modals/CompleteRosterModal';
 
 interface BookingRequest {
     id: number | string;
@@ -38,6 +39,8 @@ interface BookingRequest {
     reschedule_booking_id?: number | null;
     tier?: string | null;
     trackman_booking_id?: string | null;
+    has_unpaid_fees?: boolean;
+    total_owed?: number;
 }
 
 interface Bay {
@@ -724,6 +727,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
     const [trackmanIdDraft, setTrackmanIdDraft] = useState('');
     const [savingTrackmanId, setSavingTrackmanId] = useState(false);
     const [billingModal, setBillingModal] = useState<{isOpen: boolean; bookingId: number | null}>({isOpen: false, bookingId: null});
+    const [rosterModal, setRosterModal] = useState<{isOpen: boolean; bookingId: number | null}>({isOpen: false, bookingId: null});
 
     useEffect(() => {
         setEditingTrackmanId(false);
@@ -1088,6 +1092,22 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                 credentials: 'include',
                 body: JSON.stringify({ status: newStatus, source: booking.source })
             });
+            
+            if (res.status === 402) {
+                const errorData = await res.json();
+                // Revert optimistic update
+                setRequests(previousRequests);
+                setApprovedBookings(previousApproved);
+                
+                // Open the appropriate modal based on what's needed
+                const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
+                if (errorData.requiresRoster) {
+                    setRosterModal({ isOpen: true, bookingId });
+                } else {
+                    setBillingModal({ isOpen: true, bookingId });
+                }
+                return false;
+            }
             
             if (!res.ok) {
                 const err = await res.json();
@@ -1796,6 +1816,17 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                                         <span aria-hidden="true" className="material-symbols-outlined text-xs">check_circle</span>
                                                                         Checked In
                                                                     </span>
+                                                                ) : !isConferenceRoom && isToday && booking.has_unpaid_fees ? (
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
+                                                                            setBillingModal({ isOpen: true, bookingId });
+                                                                        }}
+                                                                        className="py-1.5 px-3 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-colors"
+                                                                    >
+                                                                        <span aria-hidden="true" className="material-symbols-outlined text-xs">payments</span>
+                                                                        ${(booking.total_owed || 0).toFixed(0)} Due
+                                                                    </button>
                                                                 ) : !isConferenceRoom && isToday && (
                                                                     <button
                                                                         onClick={() => updateBookingStatusOptimistic(booking, 'attended')}
@@ -2898,6 +2929,16 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
               bookingId={billingModal.bookingId || 0}
               onCheckinComplete={() => {
                 setBillingModal({isOpen: false, bookingId: null});
+                handleRefresh();
+              }}
+            />
+            
+            <CompleteRosterModal
+              isOpen={rosterModal.isOpen}
+              bookingId={rosterModal.bookingId || 0}
+              onClose={() => setRosterModal({isOpen: false, bookingId: null})}
+              onComplete={() => {
+                setRosterModal({isOpen: false, bookingId: null});
                 handleRefresh();
               }}
             />

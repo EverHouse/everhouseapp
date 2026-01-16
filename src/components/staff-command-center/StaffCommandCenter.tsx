@@ -283,6 +283,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
               onApprove={handleApprove}
               onDeny={handleDeny}
               onCheckIn={handleCheckIn}
+              onPaymentClick={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
               variant="desktop-top"
             />
             <TodayScheduleSection
@@ -316,6 +317,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
               onApprove={handleApprove}
               onDeny={handleDeny}
               onCheckIn={handleCheckIn}
+              onPaymentClick={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
               variant="desktop-bottom"
             />
             <TodayScheduleSection
@@ -393,6 +395,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
             onApprove={handleApprove}
             onDeny={handleDeny}
             onCheckIn={handleCheckIn}
+            onPaymentClick={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
             variant="mobile"
           />
           {/* Upcoming Events & Wellness */}
