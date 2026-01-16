@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { useData } from '../../contexts/DataContext';
 
 export interface SelectedMember {
@@ -57,47 +56,9 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Update dropdown position - recalculates on scroll/resize to follow input
-  const updateDropdownPosition = () => {
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + 4,  // Just below the input
-        left: rect.left,
-        width: rect.width
-      });
-    }
-  };
-
-  // Initial position update when dropdown opens
-  useEffect(() => {
-    if (isOpen) {
-      updateDropdownPosition();
-    }
-  }, [isOpen, query]);
-
-  // Update position on scroll and resize so dropdown follows the input
-  useEffect(() => {
-    if (!isOpen) return;
-    
-    const handleScrollOrResize = () => {
-      updateDropdownPosition();
-    };
-    
-    // Listen for scroll on window and any scrollable parent
-    window.addEventListener('scroll', handleScrollOrResize, true);
-    window.addEventListener('resize', handleScrollOrResize);
-    
-    return () => {
-      window.removeEventListener('scroll', handleScrollOrResize, true);
-      window.removeEventListener('resize', handleScrollOrResize);
-    };
-  }, [isOpen]);
 
   // Use multi-word matching for better "first last" name search
   // Always filter locally - members array should be populated by DataContext
@@ -123,10 +84,8 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
-        dropdownRef.current && 
-        !dropdownRef.current.contains(e.target as Node) &&
-        inputRef.current &&
-        !inputRef.current.contains(e.target as Node)
+        containerRef.current && 
+        !containerRef.current.contains(e.target as Node)
       ) {
         setIsOpen(false);
       }
@@ -219,15 +178,11 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
         )}
       </div>
 
-      {isOpen && filteredMembers.length > 0 && createPortal(
+      {/* Dropdown positioned absolutely within the container - moves naturally with scroll */}
+      {isOpen && filteredMembers.length > 0 && (
         <div 
           ref={dropdownRef}
-          className="fixed z-[9999] bg-white dark:bg-gray-900 border border-primary/10 dark:border-white/10 rounded-xl shadow-xl overflow-hidden max-h-64 overflow-y-auto"
-          style={{ 
-            top: dropdownPosition.top,
-            left: dropdownPosition.left,
-            width: dropdownPosition.width
-          }}
+          className="absolute left-0 right-0 top-full mt-1 z-[9999] bg-white dark:bg-gray-900 border border-primary/10 dark:border-white/10 rounded-xl shadow-xl overflow-hidden max-h-64 overflow-y-auto"
         >
           {filteredMembers.map((member, index) => (
             <button
@@ -252,22 +207,15 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
               </div>
             </button>
           ))}
-        </div>,
-        document.body
+        </div>
       )}
 
-      {isOpen && query.trim() && filteredMembers.length === 0 && createPortal(
+      {isOpen && query.trim() && filteredMembers.length === 0 && (
         <div 
-          className="fixed z-[9999] bg-white dark:bg-gray-900 border border-primary/10 dark:border-white/10 rounded-xl shadow-lg p-4 text-center"
-          style={{ 
-            top: dropdownPosition.top,
-            left: dropdownPosition.left,
-            width: dropdownPosition.width
-          }}
+          className="absolute left-0 right-0 top-full mt-1 z-[9999] bg-white dark:bg-gray-900 border border-primary/10 dark:border-white/10 rounded-xl shadow-lg p-4 text-center"
         >
           <p className="text-sm text-primary/60 dark:text-white/60">No members found</p>
-        </div>,
-        document.body
+        </div>
       )}
     </div>
   );
