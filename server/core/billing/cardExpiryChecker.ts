@@ -100,7 +100,6 @@ export async function checkExpiringCards(): Promise<CheckExpiringCardsResult> {
             });
 
             result.notified++;
-            console.log(`[CardExpiryChecker] Notified ${userEmail} about expiring card ****${cardLast4}`);
           }
         } catch (pmError: any) {
           result.errors.push(`Error processing customer ${customer.id}: ${pmError.message}`);
