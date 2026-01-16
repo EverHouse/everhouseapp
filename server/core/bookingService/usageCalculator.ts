@@ -1,6 +1,24 @@
 import { logger } from '../logger';
 import { getTierLimits, getMemberTierByEmail } from '../tierService';
 import { pool } from '../db';
+import { MemberService, isUUID, isEmail, normalizeEmail } from '../memberService';
+
+async function resolveToEmail(identifier: string | undefined): Promise<string> {
+  if (!identifier) return '';
+  
+  if (isEmail(identifier)) {
+    return normalizeEmail(identifier);
+  }
+  
+  if (isUUID(identifier)) {
+    const member = await MemberService.findById(identifier);
+    if (member) {
+      return member.normalizedEmail;
+    }
+  }
+  
+  return identifier;
+}
 
 export interface Participant {
   userId?: string;
@@ -230,7 +248,7 @@ export async function calculateSessionBilling(
       
       totalGuestFees += guestFee;
     } else {
-      const memberEmail = participant.email || participant.userId || '';
+      const memberEmail = await resolveToEmail(participant.email || participant.userId);
       const tierName = await getMemberTierByEmail(memberEmail);
       const tierLimits = tierName ? await getTierLimits(tierName) : null;
       const dailyAllowance = tierLimits?.daily_sim_minutes ?? 0;
@@ -375,13 +393,14 @@ export async function calculateFullSessionBilling(
       
       totalGuestFees += guestFee;
     } else if (participant.participantType === 'owner') {
+      const resolvedHostEmail = await resolveToEmail(hostEmail);
       const hostRemainingBefore = hostUnlimitedAccess || hostDailyAllowance >= 999
         ? 999
         : Math.max(0, hostDailyAllowance - hostUsedMinutesToday);
       
       billing = {
         userId: participant.userId,
-        email: hostEmail,
+        email: resolvedHostEmail,
         displayName: participant.displayName,
         participantType: 'owner',
         tierName: hostTier,
@@ -398,7 +417,7 @@ export async function calculateFullSessionBilling(
       
       totalOverageFees += hostOverageFee;
     } else {
-      const memberEmail = participant.email || participant.userId || '';
+      const memberEmail = await resolveToEmail(participant.email || participant.userId);
       const tierName = await getMemberTierByEmail(memberEmail);
       const tierLimits = tierName ? await getTierLimits(tierName) : null;
       const dailyAllowance = tierLimits?.daily_sim_minutes ?? 0;
@@ -632,12 +651,13 @@ export async function recalculateSessionFees(
           );
         }
       } else {
+        const resolvedEmail = await resolveToEmail(billing.email || billing.userId);
         await pool.query(
           `INSERT INTO usage_ledger (session_id, member_id, minutes_charged, overage_fee, guest_fee, tier_at_booking, payment_method, source)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
           [
             sessionId,
-            billing.email || billing.userId,
+            resolvedEmail,
             billing.minutesAllocated,
             billing.overageFee,
             0,
