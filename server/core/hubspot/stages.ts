@@ -152,8 +152,8 @@ export async function syncDealStageFromMindbodyStatus(
       );
       
       if (!legacyDealResult.success) {
-        console.error(`[HubSpotDeals] Failed to create deal for legacy member ${memberEmail}: ${legacyDealResult.error}`);
-        return { success: false };
+        if (!isProduction) console.log(`[HubSpotDeals] Skipped deal creation for ${memberEmail}: ${legacyDealResult.error}`);
+        return { success: false, error: legacyDealResult.error };
       }
       
       return {
