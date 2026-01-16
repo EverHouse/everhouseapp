@@ -1169,6 +1169,7 @@ router.get('/api/member/balance', async (req: Request, res: Response) => {
     const memberEmail = sessionUser.email.toLowerCase();
 
     // Query all unpaid booking_participants for this member
+    // user_id is a UUID, so we must join through users table to match by email
     const result = await pool.query(
       `SELECT 
         bp.id as participant_id,
@@ -1184,11 +1185,11 @@ router.get('/api/member/balance', async (req: Request, res: Response) => {
         COALESCE(ul.overage_fee, 0) + COALESCE(ul.guest_fee, 0) as ledger_fee
        FROM booking_participants bp
        JOIN booking_sessions bs ON bs.id = bp.session_id
+       JOIN users pu ON pu.id = bp.user_id
        LEFT JOIN resources r ON r.id = bs.resource_id
-       LEFT JOIN users pu ON pu.id = bp.user_id
        LEFT JOIN usage_ledger ul ON ul.session_id = bp.session_id 
          AND (ul.member_id = bp.user_id OR LOWER(ul.member_id) = LOWER(pu.email))
-       WHERE LOWER(bp.user_id) = $1
+       WHERE LOWER(pu.email) = $1
          AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
          AND bp.participant_type IN ('owner', 'member')
        ORDER BY bs.session_date DESC, bs.start_time DESC`,
@@ -1196,6 +1197,7 @@ router.get('/api/member/balance', async (req: Request, res: Response) => {
     );
 
     // Also get unpaid guest fees where this member is the owner (responsible for guests)
+    // owner_bp.user_id is a UUID, so we must join through users table to match by email
     const guestResult = await pool.query(
       `SELECT 
         bp.id as participant_id,
@@ -1208,15 +1210,16 @@ router.get('/api/member/balance', async (req: Request, res: Response) => {
         bs.start_time,
         bs.end_time,
         r.name as resource_name,
-        owner_bp.user_id as owner_email
+        owner_u.email as owner_email
        FROM booking_participants bp
        JOIN booking_sessions bs ON bs.id = bp.session_id
        LEFT JOIN resources r ON r.id = bs.resource_id
        JOIN booking_participants owner_bp ON owner_bp.session_id = bp.session_id 
          AND owner_bp.participant_type = 'owner'
+       JOIN users owner_u ON owner_u.id = owner_bp.user_id
        WHERE bp.participant_type = 'guest'
          AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
-         AND LOWER(owner_bp.user_id) = $1
+         AND LOWER(owner_u.email) = $1
          AND bp.cached_fee_cents > 0
        ORDER BY bs.session_date DESC, bs.start_time DESC`,
       [memberEmail]
@@ -1294,6 +1297,7 @@ router.post('/api/member/balance/pay', async (req: Request, res: Response) => {
     const memberName = sessionUser.name || memberEmail.split('@')[0];
 
     // Recalculate the balance server-side (never trust client)
+    // user_id is a UUID, so we must join through users table to match by email
     const result = await pool.query(
       `SELECT 
         bp.id as participant_id,
@@ -1301,10 +1305,10 @@ router.post('/api/member/balance/pay', async (req: Request, res: Response) => {
         bp.cached_fee_cents,
         COALESCE(ul.overage_fee, 0) + COALESCE(ul.guest_fee, 0) as ledger_fee
        FROM booking_participants bp
-       LEFT JOIN users pu ON pu.id = bp.user_id
+       JOIN users pu ON pu.id = bp.user_id
        LEFT JOIN usage_ledger ul ON ul.session_id = bp.session_id 
          AND (ul.member_id = bp.user_id OR LOWER(ul.member_id) = LOWER(pu.email))
-       WHERE LOWER(bp.user_id) = $1
+       WHERE LOWER(pu.email) = $1
          AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
          AND bp.participant_type IN ('owner', 'member')`,
       [memberEmail]
@@ -1318,9 +1322,10 @@ router.post('/api/member/balance/pay', async (req: Request, res: Response) => {
        FROM booking_participants bp
        JOIN booking_participants owner_bp ON owner_bp.session_id = bp.session_id 
          AND owner_bp.participant_type = 'owner'
+       JOIN users owner_u ON owner_u.id = owner_bp.user_id
        WHERE bp.participant_type = 'guest'
          AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
-         AND LOWER(owner_bp.user_id) = $1
+         AND LOWER(owner_u.email) = $1
          AND bp.cached_fee_cents > 0`,
       [memberEmail]
     );
