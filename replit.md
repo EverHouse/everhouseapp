@@ -42,7 +42,7 @@ The application features a React 19 frontend with Vite, styled using Tailwind CS
 - **Double-Tap Prevention**: `useAsyncAction` hook (`src/hooks/useAsyncAction.ts`) provides loading states, debounce protection, and error handling for all async button actions to prevent duplicate submissions.
 - **Toast Deduplication**: Toast component prevents stacking identical messages within 2 seconds and supports key-based updates for action-in-progress patterns. Exit animations for smooth dismissal.
 - **Performance Optimizations**: 
-  - List virtualization using react-window for DirectoryTab and StaffCommandCenter booking lists (threshold: 20+ items for directory, 6+ items for bookings).
+  - List virtualization using react-window v2.2.5 for DirectoryTab and StaffCommandCenter booking lists (threshold: 20+ items for directory, 6+ items for bookings). **v2 API**: Uses named row components (`MobileRowComponent`, `DesktopRowComponent`) with `rowComponent` prop and `rowProps` for data passing. v2 has automatic sizing (no AutoSizer needed) and requires React 18+.
   - Skeleton loaders for member/admin routes during data loading (`src/components/skeletons/`).
   - CSS glass effects optimized for mobile with reduced blur, touch device detection, and prefers-reduced-motion support.
   - Admin tabs lazy-loaded in AdminDashboard to reduce initial bundle size.
