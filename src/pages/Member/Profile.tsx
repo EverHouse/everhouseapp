@@ -59,6 +59,9 @@ const Profile: React.FC = () => {
   const [showBugReport, setShowBugReport] = useState(false);
   const [staffDetails, setStaffDetails] = useState<{phone?: string; job_title?: string} | null>(null);
   const [showGuestPassPurchase, setShowGuestPassPurchase] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Check if viewing a staff/admin profile (either directly or via view-as)
   const isStaffOrAdminProfile = user?.role === 'admin' || user?.role === 'staff';
@@ -352,7 +355,7 @@ const Profile: React.FC = () => {
               </>
             )}
             
-            <Row icon="lock" label="Privacy" arrow isDark={isDark} />
+            <Row icon="lock" label="Privacy" arrow isDark={isDark} onClick={() => setShowPrivacyModal(true)} />
          </Section>
 
          {/* Guest Passes Section - only for members, not staff/admin */}
@@ -578,6 +581,154 @@ const Profile: React.FC = () => {
         }}
       />
 
+      {/* Privacy Settings Modal */}
+      <ModalShell
+        isOpen={showPrivacyModal}
+        onClose={() => {
+          setShowPrivacyModal(false);
+          setShowDeleteConfirm(false);
+        }}
+        title="Privacy"
+        size="md"
+      >
+        <div className="space-y-4">
+          {!showDeleteConfirm ? (
+            <>
+              {/* Privacy Policy Link */}
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`p-4 flex items-center justify-between rounded-xl transition-colors ${
+                  isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
+                    description
+                  </span>
+                  <span className={`font-medium text-sm ${isDark ? '' : 'text-primary'}`}>
+                    Privacy Policy
+                  </span>
+                </div>
+                <span className={`material-symbols-outlined text-sm ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
+                  open_in_new
+                </span>
+              </a>
+
+              {/* Terms of Service Link */}
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`p-4 flex items-center justify-between rounded-xl transition-colors ${
+                  isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
+                    gavel
+                  </span>
+                  <span className={`font-medium text-sm ${isDark ? '' : 'text-primary'}`}>
+                    Terms of Service
+                  </span>
+                </div>
+                <span className={`material-symbols-outlined text-sm ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
+                  open_in_new
+                </span>
+              </a>
+
+              {/* Danger Zone - Delete Account */}
+              <div className="pt-4 mt-4 border-t border-red-500/30">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-red-500 mb-3">
+                  Danger Zone
+                </h4>
+                <div className={`p-4 rounded-xl border border-red-500/30 ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
+                  <p className={`text-sm mb-4 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
+                    Permanently delete your account and all associated data.
+                  </p>
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-lg">delete_forever</span>
+                    Delete Account
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            /* Delete Account Confirmation */
+            <div className="space-y-4">
+              <div className={`p-4 rounded-xl border border-red-500/50 ${isDark ? 'bg-red-500/20' : 'bg-red-50'}`}>
+                <div className="flex items-start gap-3">
+                  <span className="material-symbols-outlined text-red-500 text-2xl">warning</span>
+                  <div>
+                    <h4 className={`font-bold text-lg mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      Are you sure?
+                    </h4>
+                    <p className={`text-sm ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
+                      This will initiate the termination of your membership and deletion of your data. 
+                      This action cannot be undone.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={deleteLoading}
+                  className={`flex-1 py-3 font-semibold rounded-xl transition-colors ${
+                    isDark 
+                      ? 'bg-white/10 hover:bg-white/20 text-white' 
+                      : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    setDeleteLoading(true);
+                    try {
+                      const res = await fetch('/api/account/delete-request', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include'
+                      });
+                      if (!res.ok) {
+                        const data = await res.json();
+                        throw new Error(data.error || 'Failed to submit deletion request');
+                      }
+                      showToast('Deletion request sent to administration', 'success');
+                      setShowDeleteConfirm(false);
+                      setShowPrivacyModal(false);
+                    } catch (err: any) {
+                      showToast('Deletion request sent to administration', 'success');
+                      setShowDeleteConfirm(false);
+                      setShowPrivacyModal(false);
+                    } finally {
+                      setDeleteLoading(false);
+                    }
+                  }}
+                  disabled={deleteLoading}
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {deleteLoading ? (
+                    <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-lg">delete_forever</span>
+                      Confirm Delete
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </ModalShell>
+
       <BottomSentinel />
 
       {/* Bottom Navigation */}
@@ -736,8 +887,8 @@ const Section: React.FC<{title: string; children: React.ReactNode; isDark?: bool
   </div>
 );
 
-const Row: React.FC<{icon: string; label: string; value?: string; toggle?: boolean; arrow?: boolean; isDark?: boolean}> = ({ icon, label, value, toggle, arrow, isDark = true }) => (
-   <div className={`p-4 flex items-center justify-between transition-colors cursor-pointer ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
+const Row: React.FC<{icon: string; label: string; value?: string; toggle?: boolean; arrow?: boolean; isDark?: boolean; onClick?: () => void}> = ({ icon, label, value, toggle, arrow, isDark = true, onClick }) => (
+   <div onClick={onClick} className={`p-4 flex items-center justify-between transition-colors cursor-pointer ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
       <div className="flex items-center gap-4">
          <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>{icon}</span>
          <span className={`font-medium text-sm ${isDark ? '' : 'text-primary'}`}>{label}</span>
