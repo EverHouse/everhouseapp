@@ -179,3 +179,122 @@ export const DashboardSkeleton: React.FC<SkeletonCardProps> = ({ isDark = false 
     </div>
   );
 };
+
+export const MemberRowSkeleton: React.FC<SkeletonCardProps> = ({ isDark = false }) => {
+  const bg = isDark ? bgDark : bgLight;
+  return (
+    <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-white'} border ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+      <div className="flex justify-between items-start mb-2">
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <div className={`${shimmerClass} ${bg} h-5 w-32 rounded`} />
+            <div className={`${shimmerClass} ${bg} h-4 w-16 rounded-full`} />
+          </div>
+          <div className={`${shimmerClass} ${bg} h-3 w-40 rounded mt-2`} />
+          <div className={`${shimmerClass} ${bg} h-3 w-28 rounded mt-1`} />
+        </div>
+        <div className="text-right">
+          <div className={`${shimmerClass} ${bg} h-3 w-16 rounded`} />
+          <div className={`${shimmerClass} ${bg} h-3 w-20 rounded mt-1`} />
+        </div>
+      </div>
+      <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t ${isDark ? 'border-white/10' : 'border-gray-100'}">
+        <div className="flex items-center gap-1.5">
+          <div className={`${shimmerClass} ${bg} h-5 w-16 rounded-full`} />
+          <div className={`${shimmerClass} ${bg} h-5 w-20 rounded-full`} />
+        </div>
+        <div className={`${shimmerClass} ${bg} h-6 w-16 rounded-lg`} />
+      </div>
+    </div>
+  );
+};
+
+export const DirectoryTabSkeleton: React.FC<SkeletonCardProps> = ({ isDark = false }) => {
+  const bg = isDark ? bgDark : bgLight;
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <MemberRowSkeleton key={i} isDark={isDark} />
+      ))}
+    </div>
+  );
+};
+
+export const CommandCenterCardSkeleton: React.FC<SkeletonCardProps> = ({ isDark = false }) => {
+  const bg = isDark ? bgDark : bgLight;
+  return (
+    <div className={`rounded-2xl p-4 ${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200'} border`}>
+      <div className="flex items-center justify-between mb-4">
+        <div className={`${shimmerClass} ${bg} h-5 w-32 rounded`} />
+        <div className={`${shimmerClass} ${bg} h-4 w-20 rounded`} />
+      </div>
+      <div className="space-y-3">
+        <div className={`${shimmerClass} ${bg} h-16 w-full rounded-xl`} />
+        <div className={`${shimmerClass} ${bg} h-16 w-full rounded-xl`} />
+      </div>
+    </div>
+  );
+};
+
+export const StaffCommandCenterSkeleton: React.FC<SkeletonCardProps> = ({ isDark = false }) => {
+  const bg = isDark ? bgDark : bgLight;
+  return (
+    <div className="pb-40 space-y-6">
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <div className={`${shimmerClass} ${bg} h-7 w-48 rounded-lg`} />
+          <div className={`${shimmerClass} ${bg} h-4 w-32 rounded mt-2`} />
+        </div>
+        <div className="flex flex-col items-end gap-1.5">
+          <div className={`${shimmerClass} ${bg} h-4 w-24 rounded`} />
+          <div className={`${shimmerClass} ${bg} h-5 w-20 rounded-full`} />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
+        <CommandCenterCardSkeleton isDark={isDark} />
+        <CommandCenterCardSkeleton isDark={isDark} />
+        <CommandCenterCardSkeleton isDark={isDark} />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
+        <CommandCenterCardSkeleton isDark={isDark} />
+        <CommandCenterCardSkeleton isDark={isDark} />
+        <CommandCenterCardSkeleton isDark={isDark} />
+      </div>
+    </div>
+  );
+};
+
+export const BookGolfSkeleton: React.FC<SkeletonCardProps> = ({ isDark = false }) => {
+  const bg = isDark ? bgDark : bgLight;
+  return (
+    <div className="px-6 pb-32 space-y-6">
+      <section className="pt-4">
+        <div className={`${shimmerClass} ${bg} h-9 w-32 rounded-lg`} />
+        <div className={`${shimmerClass} ${bg} h-5 w-56 rounded mt-2`} />
+      </section>
+
+      <section className={`rounded-2xl p-4 border ${isDark ? 'bg-white/5 border-white/20' : 'bg-white/50 border-gray-200'}`}>
+        <div className={`${shimmerClass} ${bg} h-4 w-32 rounded mb-3`} />
+        <div className="flex gap-3 overflow-x-auto py-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <DateButtonSkeleton key={i} isDark={isDark} />
+          ))}
+        </div>
+        <div className="flex gap-2 mt-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className={`${shimmerClass} ${bg} h-10 flex-1 rounded-lg`} />
+          ))}
+        </div>
+      </section>
+
+      <section className={`rounded-2xl p-4 border ${isDark ? 'bg-white/5 border-white/20' : 'bg-white/50 border-gray-200'}`}>
+        <div className={`${shimmerClass} ${bg} h-4 w-40 rounded mb-4`} />
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className={`${shimmerClass} ${bg} h-14 w-full rounded-xl`} />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+};

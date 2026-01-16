@@ -18,6 +18,7 @@ import { getDateString, formatDateShort, getPacificDateParts, formatTime12Hour }
 import { getStatusColor } from '../../utils/statusColors';
 import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
 import ModalShell from '../../components/ModalShell';
+import { BookGolfSkeleton } from '../../components/skeletons';
 
 
 interface APIResource {
@@ -1260,13 +1261,13 @@ const BookGolf: React.FC = () => {
           <section ref={timeSlotsRef} className="min-h-[120px]">
             <h3 className={`text-sm font-bold uppercase tracking-wider mb-3 pl-1 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>Available Times</h3>
             
-            <div className={`transition-opacity duration-300 ${isLoading ? 'opacity-100' : 'opacity-0 hidden'}`}>
+            {isLoading && (
                 <div className="space-y-2">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="h-14 rounded-xl bg-white/5 animate-pulse" />
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className={`h-14 rounded-xl animate-pulse ${isDark ? 'bg-white/10' : 'bg-gray-200'}`} />
                   ))}
                 </div>
-              </div>
+            )}
               <div className={`transition-opacity duration-300 ${isLoading ? 'opacity-0 hidden' : 'opacity-100'}`}>
               <div className="space-y-2">
                 {slotsByHour.map((hourGroup, groupIndex) => {

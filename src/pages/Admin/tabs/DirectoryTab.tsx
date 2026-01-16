@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { FixedSizeList as List, ListChildComponentProps } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
 import { useData, MemberProfile } from '../../../contexts/DataContext';
 import { usePageReady } from '../../../contexts/PageReadyContext';
 import TierBadge from '../../../components/TierBadge';
 import TagBadge from '../../../components/TagBadge';
 import MemberProfileDrawer from '../../../components/MemberProfileDrawer';
 import { AddMemberModal } from '../../../components/staff-command-center/modals/AddMemberModal';
+import { DirectoryTabSkeleton } from '../../../components/skeletons';
 import { formatPhoneNumber } from '../../../utils/formatting';
 import { getTierColor, getTagColor } from '../../../utils/tierUtils';
 
@@ -543,12 +546,7 @@ const DirectoryTab: React.FC = () => {
             <div className="min-h-[400px]">
                 {/* Loading state for former members */}
                 {formerLoading && memberTab === 'former' && (
-                    <div className="flex flex-col items-center justify-center py-16">
-                        <div className="relative">
-                            <div className="animate-spin w-12 h-12 border-4 border-primary/20 dark:border-lavender/20 border-t-primary dark:border-t-lavender rounded-full"></div>
-                        </div>
-                        <p className="mt-4 text-gray-500 dark:text-gray-400 font-medium">Loading former members...</p>
-                    </div>
+                    <DirectoryTabSkeleton />
                 )}
 
                 {/* Error state - failed to load former members */}
@@ -603,68 +601,86 @@ const DirectoryTab: React.FC = () => {
                     </div>
                 )}
 
-            {/* Mobile view */}
+            {/* Mobile view - Virtualized */}
             {!formerLoading && filteredList.length > 0 && (
-            <div className="md:hidden space-y-3 animate-pop-in" style={{animationDelay: '0.1s'}}>
-                {filteredList.map((m, index) => (
-                    <div 
-                        key={m.id} 
-                        onClick={() => openDetailsModal(m)}
-                        className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm animate-pop-in cursor-pointer hover:border-primary/50 transition-colors" 
-                        style={{animationDelay: `${0.15 + Math.min(index, 10) * 0.03}s`}}
-                    >
-                        <div className="flex justify-between items-start mb-2">
-                            <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                    <h4 className="font-bold text-lg text-primary dark:text-white">{m.name}</h4>
-                                    {memberTab === 'former' && m.status && (
-                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getStatusColor(m.status)}`}>
-                                            {formatStatusLabel(m.status)}
-                                        </span>
-                                    )}
-                                </div>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">{m.email}</p>
-                                {m.phone && <p className="text-xs text-gray-500 dark:text-gray-400">{formatPhoneNumber(m.phone)}</p>}
-                            </div>
-                            <div className="text-right">
-                                <p className="text-xs text-gray-500 dark:text-gray-400">{m.lifetimeVisits || 0} visits</p>
-                                {m.lastBookingDate && <p className="text-xs text-gray-500 dark:text-gray-400">Last: {formatJoinDate(m.lastBookingDate)}</p>}
-                            </div>
-                        </div>
-                        <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-gray-50 dark:border-white/20">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                                <TierBadge tier={m.rawTier} size="sm" showNoTier={true} />
-                                {m.tags?.map(tag => (
-                                    <TagBadge key={tag} tag={tag} size="sm" />
-                                ))}
-                                {isAdmin && memberTab === 'active' && (!m.tier || m.tier.trim() === '') && (
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); openAssignTierModal(m); }}
-                                        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-bold hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-colors"
+            <div className="md:hidden h-[calc(100vh-400px)] min-h-[400px]">
+                <AutoSizer>
+                    {({ height, width }) => {
+                        const MobileRow = ({ index, style }: ListChildComponentProps) => {
+                            const m = filteredList[index];
+                            return (
+                                <div style={{ ...style, paddingBottom: 12 }}>
+                                    <div 
+                                        onClick={() => openDetailsModal(m)}
+                                        className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm cursor-pointer hover:border-primary/50 transition-colors h-full" 
                                     >
-                                        <span aria-hidden="true" className="material-symbols-outlined text-[14px]">add_circle</span>
-                                        Assign Tier
-                                    </button>
-                                )}
-                            </div>
-                            {isAdmin && memberTab === 'active' && (
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); handleViewAs(m); }} 
-                                    className="flex items-center gap-1 px-2 py-1 rounded-lg bg-accent/20 text-brand-green dark:bg-accent/30 dark:text-accent text-xs font-bold hover:bg-accent/30 transition-colors"
-                                >
-                                    <span aria-hidden="true" className="material-symbols-outlined text-[14px]">visibility</span>
-                                    View As
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                ))}
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <h4 className="font-bold text-lg text-primary dark:text-white">{m.name}</h4>
+                                                    {memberTab === 'former' && m.status && (
+                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getStatusColor(m.status)}`}>
+                                                            {formatStatusLabel(m.status)}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">{m.email}</p>
+                                                {m.phone && <p className="text-xs text-gray-500 dark:text-gray-400">{formatPhoneNumber(m.phone)}</p>}
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">{m.lifetimeVisits || 0} visits</p>
+                                                {m.lastBookingDate && <p className="text-xs text-gray-500 dark:text-gray-400">Last: {formatJoinDate(m.lastBookingDate)}</p>}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-gray-50 dark:border-white/20">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <TierBadge tier={m.rawTier} size="sm" showNoTier={true} />
+                                                {m.tags?.map(tag => (
+                                                    <TagBadge key={tag} tag={tag} size="sm" />
+                                                ))}
+                                                {isAdmin && memberTab === 'active' && (!m.tier || m.tier.trim() === '') && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); openAssignTierModal(m); }}
+                                                        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-bold hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-colors"
+                                                    >
+                                                        <span aria-hidden="true" className="material-symbols-outlined text-[14px]">add_circle</span>
+                                                        Assign Tier
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {isAdmin && memberTab === 'active' && (
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); handleViewAs(m); }} 
+                                                    className="flex items-center gap-1 px-2 py-1 rounded-lg bg-accent/20 text-brand-green dark:bg-accent/30 dark:text-accent text-xs font-bold hover:bg-accent/30 transition-colors"
+                                                >
+                                                    <span aria-hidden="true" className="material-symbols-outlined text-[14px]">visibility</span>
+                                                    View As
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        };
+                        return (
+                            <List
+                                height={height}
+                                width={width}
+                                itemCount={filteredList.length}
+                                itemSize={140}
+                                overscanCount={3}
+                            >
+                                {MobileRow}
+                            </List>
+                        );
+                    }}
+                </AutoSizer>
             </div>
             )}
 
-            {/* Desktop table view */}
+            {/* Desktop table view - Virtualized */}
             {!formerLoading && filteredList.length > 0 && (
-            <div className="hidden md:block overflow-hidden animate-pop-in" style={{animationDelay: '0.1s'}}>
+            <div className="hidden md:block overflow-hidden">
                 <table className="w-full text-left table-fixed">
                     <colgroup>
                         <col className="w-[15%]" />
@@ -688,59 +704,76 @@ const DirectoryTab: React.FC = () => {
                             )}
                         </tr>
                     </thead>
-                    <tbody>
-                        {filteredList.map((m, index) => (
-                            <tr 
-                                key={m.id} 
-                                onClick={() => openDetailsModal(m)}
-                                className="border-b border-gray-200 dark:border-white/20 last:border-0 hover:bg-gray-50 dark:hover:bg-white/5 animate-pop-in cursor-pointer" 
-                                style={{animationDelay: `${0.15 + Math.min(index, 10) * 0.03}s`}}
-                            >
-                                <td className="p-4 font-medium text-primary dark:text-white truncate">{m.name}</td>
-                                <td className="p-4">
-                                    <div className="flex items-center gap-1 flex-wrap">
-                                        <TierBadge tier={m.rawTier} size="sm" showNoTier={true} />
-                                        {m.tags?.map(tag => (
-                                            <TagBadge key={tag} tag={tag} size="sm" />
-                                        ))}
-                                        {isAdmin && memberTab === 'active' && (!m.tier || m.tier.trim() === '') && (
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); openAssignTierModal(m); }}
-                                                className="flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-[10px] font-bold hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-colors"
-                                            >
-                                                <span aria-hidden="true" className="material-symbols-outlined text-[12px]">add_circle</span>
-                                                Assign
-                                            </button>
+                </table>
+                <div className="h-[calc(100vh-450px)] min-h-[400px]">
+                    <AutoSizer>
+                        {({ height, width }) => {
+                            const DesktopRow = ({ index, style }: ListChildComponentProps) => {
+                                const m = filteredList[index];
+                                return (
+                                    <div 
+                                        style={style}
+                                        onClick={() => openDetailsModal(m)}
+                                        className="flex items-center border-b border-gray-200 dark:border-white/20 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer"
+                                    >
+                                        <div className="w-[15%] p-4 font-medium text-primary dark:text-white truncate">{m.name}</div>
+                                        <div className="w-[20%] p-4">
+                                            <div className="flex items-center gap-1 flex-wrap">
+                                                <TierBadge tier={m.rawTier} size="sm" showNoTier={true} />
+                                                {m.tags?.map(tag => (
+                                                    <TagBadge key={tag} tag={tag} size="sm" />
+                                                ))}
+                                                {isAdmin && memberTab === 'active' && (!m.tier || m.tier.trim() === '') && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); openAssignTierModal(m); }}
+                                                        className="flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-[10px] font-bold hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-colors"
+                                                    >
+                                                        <span aria-hidden="true" className="material-symbols-outlined text-[12px]">add_circle</span>
+                                                        Assign
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="w-[8%] p-4 text-center text-gray-600 dark:text-gray-400 text-sm font-medium">
+                                            {m.lifetimeVisits || 0}
+                                        </div>
+                                        <div className="w-[10%] p-4 text-gray-500 dark:text-gray-400 text-sm whitespace-nowrap">
+                                            {formatJoinDate(m.joinDate)}
+                                        </div>
+                                        <div className="w-[10%] p-4 text-gray-500 dark:text-gray-400 text-sm whitespace-nowrap">
+                                            {formatJoinDate(m.lastBookingDate)}
+                                        </div>
+                                        <div className={`${memberTab === 'former' ? 'w-[22%]' : 'w-[37%]'} p-4 text-gray-500 dark:text-gray-400 text-sm truncate`} title={m.email}>{m.email}</div>
+                                        {memberTab === 'former' && (
+                                            <div className="w-[15%] p-4">
+                                                {m.status ? (
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold whitespace-nowrap ${getStatusColor(m.status)}`}>
+                                                        {formatStatusLabel(m.status)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="px-2 py-1 rounded-full text-xs font-bold whitespace-nowrap bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                                                        Unknown
+                                                    </span>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
-                                </td>
-                                <td className="p-4 text-center text-gray-600 dark:text-gray-400 text-sm font-medium">
-                                    {m.lifetimeVisits || 0}
-                                </td>
-                                <td className="p-4 text-gray-500 dark:text-gray-400 text-sm whitespace-nowrap">
-                                    {formatJoinDate(m.joinDate)}
-                                </td>
-                                <td className="p-4 text-gray-500 dark:text-gray-400 text-sm whitespace-nowrap">
-                                    {formatJoinDate(m.lastBookingDate)}
-                                </td>
-                                <td className="p-4 text-gray-500 dark:text-gray-400 text-sm truncate" title={m.email}>{m.email}</td>
-                                {memberTab === 'former' && (
-                                    <td className="p-4">
-                                        {m.status ? (
-                                            <span className={`px-2 py-1 rounded-full text-xs font-bold whitespace-nowrap ${getStatusColor(m.status)}`}>
-                                                {formatStatusLabel(m.status)}
-                                            </span>
-                                        ) : (
-                                            <span className="px-2 py-1 rounded-full text-xs font-bold whitespace-nowrap bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
-                                                Unknown
-                                            </span>
-                                        )}
-                                    </td>
-                                )}
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                                );
+                            };
+                            return (
+                                <List
+                                    height={height}
+                                    width={width}
+                                    itemCount={filteredList.length}
+                                    itemSize={56}
+                                    overscanCount={5}
+                                >
+                                    {DesktopRow}
+                                </List>
+                            );
+                        }}
+                    </AutoSizer>
+                </div>
             </div>
             )}
             </div>

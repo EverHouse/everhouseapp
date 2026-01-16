@@ -181,6 +181,160 @@ input, select, textarea {
   }
 }
 
+/* ===== MOBILE PERFORMANCE OPTIMIZATIONS FOR GLASS EFFECTS ===== */
+/* Reduce blur on mobile devices to improve GPU performance */
+@media (max-width: 768px) {
+  :root {
+    --glass-blur-sm: 4px;
+    --glass-blur-md: 6px;
+    --glass-blur-lg: 8px;
+    --glass-blur-xl: 10px;
+    --liquid-glass-blur: 10px;
+  }
+  
+  .glass-card,
+  .glass-card-subtle,
+  .glass-panel,
+  .glass-navbar,
+  .glass-modal,
+  .glass-button,
+  .glass-input {
+    backdrop-filter: blur(var(--glass-blur-lg));
+    -webkit-backdrop-filter: blur(var(--glass-blur-lg));
+  }
+  
+  .glass-overlay,
+  .glass-modal-backdrop {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  
+  /* Override Tailwind backdrop-blur utilities on mobile for performance */
+  .backdrop-blur-xl,
+  .backdrop-blur-2xl,
+  .backdrop-blur-3xl {
+    --tw-backdrop-blur: blur(10px) !important;
+  }
+  
+  .backdrop-blur-lg {
+    --tw-backdrop-blur: blur(8px) !important;
+  }
+  
+  .backdrop-blur-md {
+    --tw-backdrop-blur: blur(6px) !important;
+  }
+}
+
+/* Touch device detection - additional optimization for touch screens */
+@media (pointer: coarse) {
+  .glass-card,
+  .glass-card-subtle,
+  .glass-panel,
+  .glass-navbar,
+  .glass-button {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  
+  .glass-modal-backdrop,
+  .glass-overlay {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  
+  /* Override Tailwind backdrop-blur utilities on touch devices */
+  .backdrop-blur-xl,
+  .backdrop-blur-2xl,
+  .backdrop-blur-3xl {
+    --tw-backdrop-blur: blur(8px) !important;
+  }
+}
+
+/* Prefers reduced motion - disable blur effects and animations for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .glass-card,
+  .glass-card-subtle,
+  .glass-panel,
+  .glass-navbar,
+  .glass-modal,
+  .glass-button,
+  .glass-input,
+  .glass-overlay,
+  .glass-modal-backdrop {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  
+  /* Disable Tailwind backdrop-blur utilities for reduced motion */
+  .backdrop-blur,
+  .backdrop-blur-sm,
+  .backdrop-blur-md,
+  .backdrop-blur-lg,
+  .backdrop-blur-xl,
+  .backdrop-blur-2xl,
+  .backdrop-blur-3xl,
+  [class*="backdrop-blur"] {
+    --tw-backdrop-blur: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  
+  .glass-card {
+    background: rgba(255, 255, 255, 0.92);
+  }
+  
+  .dark .glass-card {
+    background: rgba(30, 35, 25, 0.95);
+  }
+  
+  .glass-card-subtle {
+    background: rgba(255, 255, 255, 0.85);
+  }
+  
+  .dark .glass-card-subtle {
+    background: rgba(25, 30, 20, 0.9);
+  }
+  
+  .glass-panel,
+  .glass-navbar {
+    background: rgba(255, 255, 255, 0.95);
+  }
+  
+  html.dark .glass-panel,
+  html.dark .glass-navbar {
+    background: rgba(15, 18, 10, 0.95);
+  }
+  
+  .glass-modal {
+    background: rgba(255, 255, 255, 0.98);
+  }
+  
+  html.dark .glass-modal {
+    background: rgba(20, 25, 15, 0.98);
+  }
+  
+  .glass-button {
+    background: rgba(255, 255, 255, 0.9);
+  }
+  
+  html.dark .glass-button {
+    background: rgba(30, 35, 25, 0.9);
+  }
+  
+  .glass-overlay,
+  .glass-modal-backdrop {
+    background: rgba(0, 0, 0, 0.6);
+  }
+}
+
 /* Eliminate 300ms tap delay on touch devices */
 button, a, [role="button"], .tap-target, input[type="button"], input[type="submit"] {
   touch-action: manipulation;

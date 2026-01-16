@@ -5,6 +5,7 @@ import { useBottomNav } from '../../contexts/BottomNavContext';
 import PullToRefresh from '../PullToRefresh';
 import { useToast } from '../Toast';
 import { getTodayPacific, formatTime12Hour } from '../../utils/dateUtils';
+import { StaffCommandCenterSkeleton } from '../skeletons';
 
 import { useCommandCenterData } from './hooks/useCommandCenterData';
 import { formatLastSynced, formatTodayDate } from './helpers';
@@ -212,6 +213,10 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
   const handleRefresh = useCallback(async () => {
     await refresh();
   }, [refresh]);
+
+  if (data.isLoading) {
+    return <StaffCommandCenterSkeleton />;
+  }
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
