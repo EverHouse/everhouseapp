@@ -24,6 +24,9 @@ export async function calculateAndCacheParticipantFees(
   try {
     await client.query('BEGIN');
     
+    // Join usage_ledger by resolving user_id to email via users table
+    // This handles UUID-based user_ids, email-based member_ids, and fallback via booking_requests
+    // When user_id is null, we can still match via the booking_request's user_email
     const participantsResult = await client.query(
       `SELECT 
         bp.id as participant_id,
@@ -33,7 +36,14 @@ export async function calculateAndCacheParticipantFees(
         bp.cached_fee_cents,
         COALESCE(ul.overage_fee, 0) + COALESCE(ul.guest_fee, 0) as ledger_fee
        FROM booking_participants bp
-       LEFT JOIN usage_ledger ul ON ul.session_id = bp.session_id AND ul.member_id = bp.user_id
+       LEFT JOIN users u ON u.id = bp.user_id
+       LEFT JOIN booking_requests br ON br.session_id = bp.session_id
+       LEFT JOIN usage_ledger ul ON ul.session_id = bp.session_id 
+         AND (
+           ul.member_id = bp.user_id 
+           OR LOWER(ul.member_id) = LOWER(u.email)
+           OR (bp.user_id IS NULL AND LOWER(ul.member_id) = LOWER(br.user_email))
+         )
        WHERE bp.session_id = $1 AND bp.id = ANY($2::int[])`,
       [sessionId, participantIds]
     );

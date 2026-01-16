@@ -19,6 +19,8 @@ import { sendNotificationToUser, broadcastAvailabilityUpdate, broadcastMemberSta
 import { getSessionUser } from '../types/session';
 import { refundGuestPass } from './guestPasses';
 import { updateHubSpotContactVisitCount } from '../core/memberSync';
+import { createSessionWithUsageTracking } from '../core/bookingService/sessionManager';
+import { calculateAndCacheParticipantFees } from '../core/billing/feeCalculator';
 
 const router = Router();
 
@@ -887,6 +889,78 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
           })
           .where(eq(bookingRequests.id, bookingId))
           .returning();
+        
+        // Create booking session, participant, and usage ledger for simulator bookings
+        // This enables the Manage Players UI and fee calculations
+        let createdSessionId: number | null = null;
+        let createdParticipantIds: number[] = [];
+        if (!isConferenceRoom && !updatedRow.sessionId) {
+          try {
+            // Resolve user_id from email if not present on booking_request
+            let ownerUserId = updatedRow.userId;
+            if (!ownerUserId && updatedRow.userEmail) {
+              const userResult = await tx.select({ id: users.id })
+                .from(users)
+                .where(eq(users.email, updatedRow.userEmail.toLowerCase()))
+                .limit(1);
+              if (userResult.length > 0) {
+                ownerUserId = userResult[0].id;
+                // Also update the booking_request with the resolved user_id
+                await tx.update(bookingRequests)
+                  .set({ userId: ownerUserId })
+                  .where(eq(bookingRequests.id, bookingId));
+              }
+            }
+            
+            // Use createSessionWithUsageTracking for full billing calculation
+            // This creates session, participants, usage_ledger entries, and calculates fees
+            const sessionResult = await createSessionWithUsageTracking(
+              {
+                ownerEmail: updatedRow.userEmail,
+                resourceId: assignedBayId,
+                sessionDate: updatedRow.requestDate,
+                startTime: updatedRow.startTime,
+                endTime: updatedRow.endTime,
+                durationMinutes: updatedRow.durationMinutes,
+                participants: [{
+                  userId: ownerUserId || undefined,
+                  participantType: 'owner',
+                  displayName: updatedRow.userName || updatedRow.userEmail
+                }],
+                trackmanBookingId: updatedRow.trackmanBookingId || undefined
+              },
+              'member_request'
+            );
+            
+            if (sessionResult.success && sessionResult.session) {
+              createdSessionId = sessionResult.session.id;
+              createdParticipantIds = sessionResult.participants?.map(p => p.id) || [];
+              
+              // Link session to booking request
+              await tx.update(bookingRequests)
+                .set({ sessionId: createdSessionId })
+                .where(eq(bookingRequests.id, bookingId));
+              
+              console.log(`[Booking Approval] Created session ${createdSessionId} for booking ${bookingId} with ${createdParticipantIds.length} participants, ${sessionResult.usageLedgerEntries || 0} ledger entries`);
+            } else {
+              console.error(`[Booking Approval] Session creation failed: ${sessionResult.error}`);
+            }
+          } catch (sessionError) {
+            console.error('[Booking Approval] Failed to create session (non-blocking):', sessionError);
+          }
+        }
+        
+        // Calculate and cache fees for newly created participants
+        if (createdSessionId && createdParticipantIds.length > 0) {
+          setImmediate(async () => {
+            try {
+              await calculateAndCacheParticipantFees(createdSessionId!, createdParticipantIds);
+              console.log(`[Booking Approval] Cached fees for session ${createdSessionId}`);
+            } catch (feeError) {
+              console.error('[Booking Approval] Failed to cache fees (non-blocking):', feeError);
+            }
+          });
+        }
         
         const isReschedule = !!updatedRow.rescheduleBookingId;
         const approvalMessage = isReschedule
