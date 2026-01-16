@@ -98,7 +98,8 @@ export function getBugReportStatusColor(status: string): string {
 }
 
 export function formatStatusLabel(status: string): string {
-  switch (status?.toLowerCase()) {
+  if (!status || typeof status !== 'string') return '';
+  switch (status.toLowerCase()) {
     case 'pending_approval':
       return 'Pending Approval';
     case 'no_show':
@@ -108,7 +109,7 @@ export function formatStatusLabel(status: string): string {
     case 'wont_fix':
       return "Won't Fix";
     default:
-      return status ? status.charAt(0).toUpperCase() + status.slice(1).toLowerCase() : '';
+      return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
   }
 }
 
@@ -180,7 +181,7 @@ const DEFAULT_STATUS_INFO: MemberStatusInfo = {
 };
 
 export function getMemberStatusInfo(status: string | undefined | null): MemberStatusInfo {
-  if (!status) return DEFAULT_STATUS_INFO;
+  if (!status || typeof status !== 'string') return DEFAULT_STATUS_INFO;
   const s = status.toLowerCase();
   return STATUS_MAP[s] || { ...DEFAULT_STATUS_INFO, label: status.replace(/_/g, ' ') };
 }
