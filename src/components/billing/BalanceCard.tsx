@@ -79,19 +79,7 @@ export function BalanceCard({ memberEmail, onPayNow, className = '' }: BalanceCa
   const hasBalance = balance.totalCents > 0;
 
   if (!hasBalance) {
-    return (
-      <div className={`rounded-2xl p-4 border ${isDark ? 'bg-green-900/20 border-green-500/30' : 'bg-green-50 border-green-200'} ${className}`}>
-        <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-green-500/20' : 'bg-green-100'}`}>
-            <span className={`material-symbols-outlined text-xl ${isDark ? 'text-green-400' : 'text-green-600'}`}>check_circle</span>
-          </div>
-          <div className="flex-1">
-            <h3 className={`text-sm font-bold ${isDark ? 'text-green-300' : 'text-green-700'}`}>My Balance</h3>
-            <p className={`text-xs ${isDark ? 'text-green-400/80' : 'text-green-600/80'}`}>No outstanding balance</p>
-          </div>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
