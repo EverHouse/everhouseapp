@@ -907,6 +907,34 @@ html.dark select,
   border-radius: 3px;
 }
 
+/* Modal keyboard-aware content - handles mobile keyboard visibility */
+/* Cross-browser compatible without :has() selector */
+.modal-keyboard-aware {
+  /* Always apply safe-area padding for notched devices */
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+  scroll-padding-bottom: 120px;
+}
+
+/* Touch devices need more bottom padding to account for virtual keyboard */
+@media (pointer: coarse) {
+  .modal-keyboard-aware {
+    /* Extra bottom padding for touch devices - always visible buffer */
+    padding-bottom: max(env(safe-area-inset-bottom, 16px), 24px);
+  }
+  
+  /* Form inputs get scroll margin to stay visible above keyboard */
+  .modal-keyboard-aware input,
+  .modal-keyboard-aware textarea,
+  .modal-keyboard-aware select {
+    scroll-margin-bottom: 200px;
+  }
+}
+
+/* JS-controlled keyboard-open state - added via visualViewport listener */
+body.keyboard-open .modal-keyboard-aware {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 48px);
+}
+
 /* Debug Layout Mode - activate with ?debugLayout=1 */
 .debug-layout * {
   outline: 1px solid rgba(255, 0, 0, 0.3) !important;

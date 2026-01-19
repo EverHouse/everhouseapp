@@ -1,7 +1,10 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useScrollLockManager } from '../hooks/useScrollLockManager';
+
+const BASE_MODAL_Z_INDEX = 10000;
+const Z_INDEX_INCREMENT = 10;
 
 interface ModalShellProps {
   isOpen: boolean;
@@ -40,6 +43,7 @@ export function ModalShell({
   const previousActiveElement = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
   const dismissibleRef = useRef(dismissible);
+  const [modalZIndex, setModalZIndex] = useState(BASE_MODAL_Z_INDEX);
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -54,6 +58,8 @@ export function ModalShell({
     previousActiveElement.current = document.activeElement as HTMLElement;
     
     const currentCount = parseInt(document.body.getAttribute('data-modal-count') || '0', 10);
+    const newZIndex = BASE_MODAL_Z_INDEX + (currentCount * Z_INDEX_INCREMENT);
+    setModalZIndex(newZIndex);
     document.body.setAttribute('data-modal-count', String(currentCount + 1));
     
     setTimeout(() => {
@@ -80,7 +86,7 @@ export function ModalShell({
   const modalContent = (
     <div 
       className={`fixed inset-0 ${isDark ? 'dark' : ''}`}
-      style={{ overscrollBehavior: 'contain', touchAction: 'none', zIndex: 'var(--z-modal)' }}
+      style={{ overscrollBehavior: 'contain', touchAction: 'none', zIndex: modalZIndex }}
     >
       <div 
         className="fixed inset-0 bg-black/60 backdrop-blur-sm animate-backdrop-fade-in"
@@ -137,7 +143,7 @@ export function ModalShell({
             )}
             
             <div 
-              className={`overflow-y-auto overflow-x-hidden ${title || showCloseButton ? 'max-h-[calc(100dvh-180px)]' : 'max-h-[calc(100dvh-100px)]'}`}
+              className={`modal-keyboard-aware overflow-y-auto overflow-x-hidden ${title || showCloseButton ? 'max-h-[calc(100dvh-180px)]' : 'max-h-[calc(100dvh-100px)]'}`}
               style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', overscrollBehavior: 'contain' }}
             >
               {children}

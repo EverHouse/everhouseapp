@@ -12,14 +12,14 @@ const bgDark = "bg-white/10";
 export const EventCardSkeleton: React.FC<SkeletonCardProps> = ({ isDark = false }) => {
   const bg = isDark ? bgDark : bgLight;
   return (
-    <div className={`rounded-2xl overflow-hidden ${isDark ? 'bg-white/5' : 'bg-white'} shadow-sm`}>
-      <div className={`${shimmerClass} ${bg} h-32 w-full`} />
+    <div className={`rounded-2xl overflow-hidden min-h-[240px] ${isDark ? 'bg-white/5' : 'bg-white'} shadow-sm`}>
+      <div className={`${shimmerClass} ${bg} h-36 w-full`} />
       <div className="p-4 space-y-3">
-        <div className={`${shimmerClass} ${bg} h-5 w-3/4 rounded`} />
+        <div className={`${shimmerClass} ${bg} h-6 w-3/4 rounded`} />
         <div className={`${shimmerClass} ${bg} h-4 w-1/2 rounded`} />
         <div className="flex gap-2 pt-2">
-          <div className={`${shimmerClass} ${bg} h-6 w-16 rounded-full`} />
-          <div className={`${shimmerClass} ${bg} h-6 w-20 rounded-full`} />
+          <div className={`${shimmerClass} ${bg} h-7 w-16 rounded-full`} />
+          <div className={`${shimmerClass} ${bg} h-7 w-20 rounded-full`} />
         </div>
       </div>
     </div>
@@ -29,13 +29,13 @@ export const EventCardSkeleton: React.FC<SkeletonCardProps> = ({ isDark = false 
 export const BookingCardSkeleton: React.FC<SkeletonCardProps> = ({ isDark = false }) => {
   const bg = isDark ? bgDark : bgLight;
   return (
-    <div className={`flex items-center gap-4 p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-white'} shadow-sm`}>
-      <div className={`${shimmerClass} ${bg} w-12 h-12 rounded-xl flex-shrink-0`} />
-      <div className="flex-1 space-y-2">
-        <div className={`${shimmerClass} ${bg} h-5 w-2/3 rounded`} />
+    <div className={`flex items-center gap-4 p-4 rounded-2xl min-h-[88px] ${isDark ? 'bg-white/5' : 'bg-white'} shadow-sm`}>
+      <div className={`${shimmerClass} ${bg} w-14 h-14 rounded-2xl flex-shrink-0`} />
+      <div className="flex-1 space-y-2.5">
+        <div className={`${shimmerClass} ${bg} h-5 w-3/4 rounded`} />
         <div className={`${shimmerClass} ${bg} h-4 w-1/2 rounded`} />
       </div>
-      <div className={`${shimmerClass} ${bg} w-8 h-8 rounded-full`} />
+      <div className={`${shimmerClass} ${bg} w-10 h-10 rounded-full`} />
     </div>
   );
 };
@@ -183,27 +183,27 @@ export const DashboardSkeleton: React.FC<SkeletonCardProps> = ({ isDark = false 
 export const MemberRowSkeleton: React.FC<SkeletonCardProps> = ({ isDark = false }) => {
   const bg = isDark ? bgDark : bgLight;
   return (
-    <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-white'} border ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+    <div className={`p-4 rounded-xl min-h-[142px] ${isDark ? 'bg-white/5' : 'bg-white'} border ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
       <div className="flex justify-between items-start mb-2">
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <div className={`${shimmerClass} ${bg} h-5 w-32 rounded`} />
-            <div className={`${shimmerClass} ${bg} h-4 w-16 rounded-full`} />
+            <div className={`${shimmerClass} ${bg} h-6 w-36 rounded`} />
+            <div className={`${shimmerClass} ${bg} h-5 w-16 rounded-full`} />
           </div>
-          <div className={`${shimmerClass} ${bg} h-3 w-40 rounded mt-2`} />
-          <div className={`${shimmerClass} ${bg} h-3 w-28 rounded mt-1`} />
+          <div className={`${shimmerClass} ${bg} h-3.5 w-44 rounded mt-2`} />
+          <div className={`${shimmerClass} ${bg} h-3.5 w-32 rounded mt-1.5`} />
         </div>
-        <div className="text-right">
-          <div className={`${shimmerClass} ${bg} h-3 w-16 rounded`} />
-          <div className={`${shimmerClass} ${bg} h-3 w-20 rounded mt-1`} />
+        <div className="text-right space-y-1">
+          <div className={`${shimmerClass} ${bg} h-3.5 w-16 rounded`} />
+          <div className={`${shimmerClass} ${bg} h-3.5 w-20 rounded`} />
         </div>
       </div>
-      <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t ${isDark ? 'border-white/10' : 'border-gray-100'}">
+      <div className={`flex items-center justify-between gap-3 mt-3 pt-3 border-t ${isDark ? 'border-white/10' : 'border-gray-100'}`}>
         <div className="flex items-center gap-1.5">
-          <div className={`${shimmerClass} ${bg} h-5 w-16 rounded-full`} />
-          <div className={`${shimmerClass} ${bg} h-5 w-20 rounded-full`} />
+          <div className={`${shimmerClass} ${bg} h-6 w-16 rounded-full`} />
+          <div className={`${shimmerClass} ${bg} h-6 w-20 rounded-full`} />
         </div>
-        <div className={`${shimmerClass} ${bg} h-6 w-16 rounded-lg`} />
+        <div className={`${shimmerClass} ${bg} h-7 w-16 rounded-lg`} />
       </div>
     </div>
   );

@@ -25,6 +25,7 @@ import WalkingGolferLoader from './components/WalkingGolferLoader';
 import NavigationLoader from './components/NavigationLoader';
 import { useNotificationSounds } from './hooks/useNotificationSounds';
 import { useEdgeSwipe } from './hooks/useEdgeSwipe';
+import { useKeyboardDetection } from './hooks/useKeyboardDetection';
 import { useUserStore } from './stores/userStore';
 import { useWebSocket } from './hooks/useWebSocket';
 import { StaffBookingToast } from './components/StaffBookingToast';
@@ -432,6 +433,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [hasScrolledPastHero, setHasScrolledPastHero] = useState(false);
   
   useDebugLayout();
+  useKeyboardDetection();
 
   // Edge swipe back navigation for member and staff pages on touch devices
   const isRootPage = location.pathname === '/dashboard' || location.pathname === '/admin';
