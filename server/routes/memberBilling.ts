@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import Stripe from 'stripe';
 import { isStaffOrAdmin } from '../core/middleware';
 import { pool } from '../core/db';
 import { getStripeClient } from '../core/stripe/client';
@@ -7,6 +8,68 @@ import { listCustomerInvoices } from '../core/stripe/invoices';
 import { listCustomerSubscriptions } from '../core/stripe/subscriptions';
 
 const router = Router();
+
+type SubscriptionSelectionMode = 'pauseable' | 'resumable' | 'cancellable' | 'discountable';
+
+async function findEligibleSubscription(
+  stripe: Stripe,
+  customerId: string,
+  mode: SubscriptionSelectionMode
+): Promise<{ subscription: Stripe.Subscription | null; error: string | null }> {
+  const errorMessages: Record<SubscriptionSelectionMode, string> = {
+    pauseable: 'No active subscription found to pause',
+    resumable: 'No paused subscription found to resume',
+    cancellable: 'No subscription found to cancel',
+    discountable: 'No eligible subscription found to apply discount',
+  };
+
+  if (mode === 'resumable') {
+    const subscriptions = await stripe.subscriptions.list({
+      customer: customerId,
+    });
+
+    // A subscription is resumable if it has pause_collection set with a behavior
+    // (Stripe keeps pause_collection as an object with behavior when paused)
+    const subscription = subscriptions.data.find(s =>
+      s.pause_collection &&
+      typeof s.pause_collection === 'object' &&
+      s.pause_collection.behavior &&
+      (s.status === 'active' || s.status === 'trialing')
+    );
+
+    return subscription
+      ? { subscription, error: null }
+      : { subscription: null, error: errorMessages[mode] };
+  }
+
+  const activeSubscriptions = await stripe.subscriptions.list({
+    customer: customerId,
+    status: 'active',
+  });
+
+  const trialingSubscriptions = await stripe.subscriptions.list({
+    customer: customerId,
+    status: 'trialing',
+  });
+
+  const allActiveOrTrialing = [...activeSubscriptions.data, ...trialingSubscriptions.data];
+
+  let subscription: Stripe.Subscription | undefined;
+
+  switch (mode) {
+    case 'pauseable':
+      subscription = allActiveOrTrialing.find(s => !s.pause_collection);
+      break;
+    case 'cancellable':
+    case 'discountable':
+      subscription = allActiveOrTrialing.find(s => !s.cancel_at_period_end);
+      break;
+  }
+
+  return subscription
+    ? { subscription, error: null }
+    : { subscription: null, error: errorMessages[mode] };
+}
 
 async function getMemberByEmail(email: string) {
   const result = await pool.query(
@@ -140,22 +203,10 @@ router.post('/api/member-billing/:email/pause', isStaffOrAdmin, async (req, res)
     }
 
     const stripe = await getStripeClient();
-
-    const activeSubscriptions = await stripe.subscriptions.list({
-      customer: member.stripe_customer_id,
-      status: 'active',
-    });
-
-    const trialingSubscriptions = await stripe.subscriptions.list({
-      customer: member.stripe_customer_id,
-      status: 'trialing',
-    });
-
-    const allActiveOrTrialing = [...activeSubscriptions.data, ...trialingSubscriptions.data];
-    const subscription = allActiveOrTrialing.find(s => !s.pause_collection);
+    const { subscription, error } = await findEligibleSubscription(stripe, member.stripe_customer_id, 'pauseable');
 
     if (!subscription) {
-      return res.status(400).json({ error: 'No active subscription found to pause' });
+      return res.status(400).json({ error });
     }
 
     await stripe.subscriptions.update(subscription.id, {
@@ -190,26 +241,18 @@ router.post('/api/member-billing/:email/resume', isStaffOrAdmin, async (req, res
     }
 
     const stripe = await getStripeClient();
+    const { subscription, error } = await findEligibleSubscription(stripe, member.stripe_customer_id, 'resumable');
 
-    const subscriptions = await stripe.subscriptions.list({
-      customer: member.stripe_customer_id,
-    });
-
-    const pausedSub = subscriptions.data.find(s => 
-      s.pause_collection !== null && 
-      (s.status === 'active' || s.status === 'trialing')
-    );
-    
-    if (!pausedSub) {
-      return res.status(400).json({ error: 'No paused subscription found to resume' });
+    if (!subscription) {
+      return res.status(400).json({ error });
     }
 
-    await stripe.subscriptions.update(pausedSub.id, {
+    await stripe.subscriptions.update(subscription.id, {
       pause_collection: null as any,
     });
 
-    console.log(`[MemberBilling] Resumed subscription ${pausedSub.id} for ${email}`);
-    res.json({ success: true, subscriptionId: pausedSub.id, status: 'active' });
+    console.log(`[MemberBilling] Resumed subscription ${subscription.id} for ${email}`);
+    res.json({ success: true, subscriptionId: subscription.id, status: 'active' });
   } catch (error: any) {
     console.error('[MemberBilling] Error resuming subscription:', error);
     res.status(500).json({ error: error.message });
@@ -234,22 +277,10 @@ router.post('/api/member-billing/:email/cancel', isStaffOrAdmin, async (req, res
     }
 
     const stripe = await getStripeClient();
-
-    const activeSubscriptions = await stripe.subscriptions.list({
-      customer: member.stripe_customer_id,
-      status: 'active',
-    });
-
-    const trialingSubscriptions = await stripe.subscriptions.list({
-      customer: member.stripe_customer_id,
-      status: 'trialing',
-    });
-
-    const allActiveOrTrialing = [...activeSubscriptions.data, ...trialingSubscriptions.data];
-    const subscription = allActiveOrTrialing.find(s => !s.cancel_at_period_end);
+    const { subscription, error } = await findEligibleSubscription(stripe, member.stripe_customer_id, 'cancellable');
 
     if (!subscription) {
-      return res.status(400).json({ error: 'No subscription found to cancel' });
+      return res.status(400).json({ error });
     }
 
     const updated = await stripe.subscriptions.update(subscription.id, {
@@ -355,22 +386,10 @@ router.post('/api/member-billing/:email/discount', isStaffOrAdmin, async (req, r
     }
 
     const stripe = await getStripeClient();
-
-    const activeSubscriptions = await stripe.subscriptions.list({
-      customer: member.stripe_customer_id,
-      status: 'active',
-    });
-
-    const trialingSubscriptions = await stripe.subscriptions.list({
-      customer: member.stripe_customer_id,
-      status: 'trialing',
-    });
-
-    const allEligible = [...activeSubscriptions.data, ...trialingSubscriptions.data];
-    const subscription = allEligible.find(s => !s.cancel_at_period_end);
+    const { subscription, error: subError } = await findEligibleSubscription(stripe, member.stripe_customer_id, 'discountable');
 
     if (!subscription) {
-      return res.status(400).json({ error: 'No eligible subscription found to apply discount' });
+      return res.status(400).json({ error: subError });
     }
 
     let appliedCouponId = couponId;

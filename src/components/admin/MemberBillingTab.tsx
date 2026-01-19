@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ModalShell } from '../ModalShell';
+import { StripeBillingSection } from './billing/StripeBillingSection';
+import { MindbodyBillingSection } from './billing/MindbodyBillingSection';
+import { FamilyAddonBillingSection } from './billing/FamilyAddonBillingSection';
+import { CompedBillingSection } from './billing/CompedBillingSection';
 
 interface MemberBillingTabProps {
   memberEmail: string;
@@ -516,35 +520,6 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({ memberEmail }) => {
     }
   };
 
-  const formatCurrency = (cents: number) => {
-    return `$${(Math.abs(cents) / 100).toFixed(2)}`;
-  };
-
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp * 1000).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const getStatusBadge = (status: string) => {
-    const styles: Record<string, string> = {
-      active: isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700',
-      paused: isDark ? 'bg-yellow-500/20 text-yellow-400' : 'bg-yellow-100 text-yellow-700',
-      canceled: isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-700',
-      past_due: isDark ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-700',
-      trialing: isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700',
-      paid: isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700',
-      open: isDark ? 'bg-yellow-500/20 text-yellow-400' : 'bg-yellow-100 text-yellow-700',
-      draft: isDark ? 'bg-gray-500/20 text-gray-400' : 'bg-gray-100 text-gray-600',
-      uncollectible: isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-700',
-    };
-    return styles[status] || (isDark ? 'bg-gray-500/20 text-gray-400' : 'bg-gray-100 text-gray-600');
-  };
-
-  const isPaused = billingInfo?.activeSubscription?.pauseCollection !== null && billingInfo?.activeSubscription?.pauseCollection !== undefined;
-
   if (isLoading) {
     return (
       <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
@@ -605,382 +580,41 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({ memberEmail }) => {
       </div>
 
       {billingInfo?.billingProvider === 'stripe' && (
-        <>
-          <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-            <div className="flex items-center gap-2 mb-4">
-              <span className={`material-symbols-outlined ${isDark ? 'text-accent' : 'text-primary'}`}>subscriptions</span>
-              <h3 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-primary'}`}>Subscription</h3>
-            </div>
-
-            {billingInfo.activeSubscription ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(isPaused ? 'paused' : billingInfo.activeSubscription.status)}`}>
-                    {isPaused ? 'Paused' : billingInfo.activeSubscription.status.replace('_', ' ')}
-                  </span>
-                  {billingInfo.activeSubscription.cancelAtPeriodEnd && (
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${isDark ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-700'}`}>
-                      Cancels at period end
-                    </span>
-                  )}
-                </div>
-
-                <div className={`grid grid-cols-2 gap-3 text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                  {billingInfo.activeSubscription.planName && (
-                    <div>
-                      <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Plan</p>
-                      <p className={isDark ? 'text-white' : 'text-primary'}>{billingInfo.activeSubscription.planName}</p>
-                    </div>
-                  )}
-                  {billingInfo.activeSubscription.planAmount && (
-                    <div>
-                      <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Price</p>
-                      <p className={isDark ? 'text-white' : 'text-primary'}>
-                        {formatCurrency(billingInfo.activeSubscription.planAmount)}/{billingInfo.activeSubscription.interval || 'month'}
-                      </p>
-                    </div>
-                  )}
-                  {billingInfo.activeSubscription.currentPeriodStart && (
-                    <div>
-                      <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Current Period</p>
-                      <p className={isDark ? 'text-white' : 'text-primary'}>
-                        {formatDate(billingInfo.activeSubscription.currentPeriodStart)} - {formatDate(billingInfo.activeSubscription.currentPeriodEnd || 0)}
-                      </p>
-                    </div>
-                  )}
-                  {billingInfo.activeSubscription.currentPeriodEnd && !billingInfo.activeSubscription.cancelAtPeriodEnd && (
-                    <div>
-                      <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Next Payment</p>
-                      <p className={isDark ? 'text-white' : 'text-primary'}>
-                        {formatDate(billingInfo.activeSubscription.currentPeriodEnd)}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {billingInfo.activeSubscription.discount && (
-                  <div className={`p-2 rounded-lg ${isDark ? 'bg-purple-500/10' : 'bg-purple-50'}`}>
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-purple-500 text-base">sell</span>
-                      <span className={`text-sm ${isDark ? 'text-purple-400' : 'text-purple-700'}`}>
-                        {billingInfo.activeSubscription.discount.coupon.name || billingInfo.activeSubscription.discount.coupon.id}
-                        {billingInfo.activeSubscription.discount.coupon.percentOff && ` (${billingInfo.activeSubscription.discount.coupon.percentOff}% off)`}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex gap-2 pt-2">
-                  {isPaused ? (
-                    <button
-                      onClick={handleResumeSubscription}
-                      disabled={isResuming}
-                      className="flex items-center gap-1.5 px-3 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 disabled:opacity-50 transition-colors"
-                    >
-                      {isResuming ? (
-                        <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
-                      ) : (
-                        <span className="material-symbols-outlined text-base">play_arrow</span>
-                      )}
-                      Resume
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handlePauseSubscription}
-                      disabled={isPausing || billingInfo.activeSubscription.status !== 'active'}
-                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
-                        isDark ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      {isPausing ? (
-                        <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
-                      ) : (
-                        <span className="material-symbols-outlined text-base">pause</span>
-                      )}
-                      Pause
-                    </button>
-                  )}
-                  {!billingInfo.activeSubscription.cancelAtPeriodEnd && (
-                    <button
-                      onClick={() => setShowCancelModal(true)}
-                      className="flex items-center gap-1.5 px-3 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-base">cancel</span>
-                      Cancel
-                    </button>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className={`p-4 rounded-lg ${isDark ? 'bg-black/20' : 'bg-white'} border ${isDark ? 'border-white/10' : 'border-gray-100'}`}>
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isDark ? 'bg-white/10' : 'bg-gray-100'}`}>
-                    <span className={`material-symbols-outlined ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>block</span>
-                  </div>
-                  <div>
-                    <p className={`text-sm font-medium ${isDark ? 'text-white' : 'text-primary'}`}>No Active Subscription</p>
-                    <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>This member doesn't have an active Stripe subscription</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-            <div className="flex items-center gap-2 mb-4">
-              <span className={`material-symbols-outlined ${isDark ? 'text-accent' : 'text-primary'}`}>credit_card</span>
-              <h3 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-primary'}`}>Payment Method</h3>
-            </div>
-
-            {billingInfo.paymentMethods && billingInfo.paymentMethods.length > 0 ? (
-              <div className="space-y-3">
-                {billingInfo.paymentMethods.map((pm) => (
-                  <div key={pm.id} className={`p-3 rounded-lg ${isDark ? 'bg-black/20' : 'bg-white'} border ${isDark ? 'border-white/10' : 'border-gray-100'}`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className={`material-symbols-outlined ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>credit_card</span>
-                        <div>
-                          <p className={`text-sm font-medium ${isDark ? 'text-white' : 'text-primary'}`}>
-                            {pm.brand?.toUpperCase()} •••• {pm.last4}
-                          </p>
-                          <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                            Expires {pm.expMonth}/{pm.expYear}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <button
-                  onClick={handleGetPaymentLink}
-                  disabled={isGettingPaymentLink}
-                  className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    isDark ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  } disabled:opacity-50`}
-                >
-                  {isGettingPaymentLink ? (
-                    <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
-                  ) : (
-                    <span className="material-symbols-outlined text-base">open_in_new</span>
-                  )}
-                  Update Payment Method
-                </button>
-              </div>
-            ) : (
-              <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>No payment methods on file</p>
-            )}
-          </div>
-
-          <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <span className={`material-symbols-outlined ${isDark ? 'text-accent' : 'text-primary'}`}>account_balance_wallet</span>
-                <h3 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-primary'}`}>Account Balance</h3>
-              </div>
-              <button
-                onClick={() => setShowCreditModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary dark:bg-accent text-white dark:text-primary rounded-lg text-xs font-medium hover:opacity-90 transition-opacity"
-              >
-                <span className="material-symbols-outlined text-base">add</span>
-                Apply Credit
-              </button>
-            </div>
-            <div className={`p-3 rounded-lg ${isDark ? 'bg-black/20' : 'bg-white'} border ${isDark ? 'border-white/10' : 'border-gray-100'}`}>
-              <div className="flex items-center justify-between">
-                <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Current Balance</span>
-                <span className={`text-lg font-semibold ${
-                  (billingInfo.customerBalance || 0) < 0
-                    ? isDark ? 'text-green-400' : 'text-green-600'
-                    : isDark ? 'text-white' : 'text-primary'
-                }`}>
-                  {(billingInfo.customerBalance || 0) < 0 && '+'}
-                  {formatCurrency(billingInfo.customerBalance || 0)}
-                  {(billingInfo.customerBalance || 0) < 0 && ' credit'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <span className={`material-symbols-outlined ${isDark ? 'text-accent' : 'text-primary'}`}>sell</span>
-                <h3 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-primary'}`}>Discounts</h3>
-              </div>
-              <button
-                onClick={() => setShowDiscountModal(true)}
-                disabled={!billingInfo.activeSubscription}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary dark:bg-accent text-white dark:text-primary rounded-lg text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                <span className="material-symbols-outlined text-base">add</span>
-                Apply Discount
-              </button>
-            </div>
-            {billingInfo.activeSubscription?.discount ? (
-              <div className={`p-3 rounded-lg ${isDark ? 'bg-purple-500/10' : 'bg-purple-50'}`}>
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-purple-500 text-base">check_circle</span>
-                  <span className={`text-sm ${isDark ? 'text-purple-400' : 'text-purple-700'}`}>
-                    Active: {billingInfo.activeSubscription.discount.coupon.name || billingInfo.activeSubscription.discount.coupon.id}
-                    {billingInfo.activeSubscription.discount.coupon.percentOff && ` (${billingInfo.activeSubscription.discount.coupon.percentOff}% off)`}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>No active discounts</p>
-            )}
-          </div>
-
-          <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-            <div className="flex items-center gap-2 mb-4">
-              <span className={`material-symbols-outlined ${isDark ? 'text-accent' : 'text-primary'}`}>receipt_long</span>
-              <h3 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-primary'}`}>Invoice History</h3>
-            </div>
-            {billingInfo.recentInvoices && billingInfo.recentInvoices.length > 0 ? (
-              <div className="space-y-2">
-                {billingInfo.recentInvoices.map((inv) => (
-                  <div
-                    key={inv.id}
-                    className={`p-3 rounded-lg ${isDark ? 'bg-black/20' : 'bg-white'} border ${isDark ? 'border-white/10' : 'border-gray-100'}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(inv.status)}`}>
-                          {inv.status}
-                        </span>
-                        <span className={`text-sm ${isDark ? 'text-white' : 'text-primary'}`}>
-                          {formatCurrency(inv.amountDue)}
-                        </span>
-                        <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                          {formatDate(inv.created)}
-                        </span>
-                      </div>
-                      {inv.hostedInvoiceUrl && (
-                        <a
-                          href={inv.hostedInvoiceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`flex items-center gap-1 text-xs font-medium ${isDark ? 'text-accent hover:text-accent/80' : 'text-primary hover:text-primary/80'}`}
-                        >
-                          View
-                          <span className="material-symbols-outlined text-base">open_in_new</span>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>No invoices found</p>
-            )}
-          </div>
-        </>
+        <StripeBillingSection
+          activeSubscription={billingInfo.activeSubscription || null}
+          paymentMethods={billingInfo.paymentMethods}
+          recentInvoices={billingInfo.recentInvoices}
+          customerBalance={billingInfo.customerBalance}
+          isPausing={isPausing}
+          isResuming={isResuming}
+          isGettingPaymentLink={isGettingPaymentLink}
+          onPause={handlePauseSubscription}
+          onResume={handleResumeSubscription}
+          onShowCancelModal={() => setShowCancelModal(true)}
+          onShowCreditModal={() => setShowCreditModal(true)}
+          onShowDiscountModal={() => setShowDiscountModal(true)}
+          onGetPaymentLink={handleGetPaymentLink}
+          isDark={isDark}
+        />
       )}
 
       {billingInfo?.billingProvider === 'mindbody' && (
-        <div className={`p-4 rounded-xl ${isDark ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-blue-50 border border-blue-200'}`}>
-          <div className="flex items-start gap-3">
-            <span className={`material-symbols-outlined ${isDark ? 'text-blue-400' : 'text-blue-600'} text-xl`}>info</span>
-            <div className="flex-1">
-              <p className={`text-sm font-medium ${isDark ? 'text-blue-300' : 'text-blue-700'}`}>
-                This member is billed through Mindbody
-              </p>
-              {billingInfo.mindbodyClientId && (
-                <p className={`text-xs mt-1 ${isDark ? 'text-blue-400/80' : 'text-blue-600'}`}>
-                  Mindbody Client ID: {billingInfo.mindbodyClientId}
-                </p>
-              )}
-              <p className={`text-xs mt-2 ${isDark ? 'text-blue-400/80' : 'text-blue-600'}`}>
-                To make billing changes, please use the Mindbody system.
-              </p>
-              <a
-                href="https://clients.mindbodyonline.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`inline-flex items-center gap-1.5 mt-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isDark ? 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                }`}
-              >
-                <span className="material-symbols-outlined text-base">open_in_new</span>
-                Open Mindbody
-              </a>
-            </div>
-          </div>
-        </div>
+        <MindbodyBillingSection
+          mindbodyClientId={billingInfo.mindbodyClientId}
+          isDark={isDark}
+        />
       )}
 
       {billingInfo?.billingProvider === 'family_addon' && (
-        <div className={`p-4 rounded-xl ${isDark ? 'bg-purple-500/10 border border-purple-500/30' : 'bg-purple-50 border border-purple-200'}`}>
-          <div className="flex items-start gap-3">
-            <span className={`material-symbols-outlined ${isDark ? 'text-purple-400' : 'text-purple-600'} text-xl`}>family_restroom</span>
-            <div className="flex-1">
-              <p className={`text-sm font-medium ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>
-                Billed as family add-on
-              </p>
-              {billingInfo.familyGroup && (
-                <div className={`mt-3 p-3 rounded-lg ${isDark ? 'bg-black/20' : 'bg-white'}`}>
-                  <div className="space-y-2">
-                    <div>
-                      <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Primary Payer</p>
-                      <p className={`text-sm ${isDark ? 'text-white' : 'text-primary'}`}>
-                        {billingInfo.familyGroup.primaryName || billingInfo.familyGroup.primaryEmail}
-                      </p>
-                      <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                        {billingInfo.familyGroup.primaryEmail}
-                      </p>
-                    </div>
-                    {billingInfo.familyGroup.members && (
-                      <div>
-                        <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Add-on Price</p>
-                        <p className={`text-sm ${isDark ? 'text-white' : 'text-primary'}`}>
-                          {formatCurrency(
-                            billingInfo.familyGroup.members.find(
-                              (m) => m.memberEmail.toLowerCase() === memberEmail.toLowerCase()
-                            )?.addOnPriceCents || 0
-                          )}/month
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              <p className={`text-xs mt-3 ${isDark ? 'text-purple-400/80' : 'text-purple-600'}`}>
-                To make billing changes, check the primary payer's profile.
-              </p>
-            </div>
-          </div>
-        </div>
+        <FamilyAddonBillingSection
+          familyGroup={billingInfo.familyGroup}
+          memberEmail={memberEmail}
+          isDark={isDark}
+        />
       )}
 
       {billingInfo?.billingProvider === 'comped' && (
-        <div className={`p-4 rounded-xl ${isDark ? 'bg-green-500/10 border border-green-500/30' : 'bg-green-50 border border-green-200'}`}>
-          <div className="flex items-start gap-3">
-            <span className={`material-symbols-outlined ${isDark ? 'text-green-400' : 'text-green-600'} text-xl`}>card_giftcard</span>
-            <div className="flex-1">
-              <p className={`text-sm font-medium ${isDark ? 'text-green-300' : 'text-green-700'}`}>
-                Complimentary membership - no billing
-              </p>
-              <p className={`text-xs mt-1 ${isDark ? 'text-green-400/80' : 'text-green-600'}`}>
-                This member has a comped membership and is not charged.
-              </p>
-              <div className={`mt-3 p-3 rounded-lg ${isDark ? 'bg-black/20' : 'bg-white'} border ${isDark ? 'border-white/10' : 'border-gray-100'}`}>
-                <div className="flex items-start gap-2">
-                  <span className={`material-symbols-outlined text-base ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>info</span>
-                  <div>
-                    <p className={`text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                      To convert to a paid plan:
-                    </p>
-                    <ol className={`text-xs mt-1 list-decimal list-inside ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                      <li>Member must sign up through the membership page</li>
-                      <li>Complete payment via Stripe checkout</li>
-                      <li>Then change billing source above to "Stripe"</li>
-                    </ol>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <CompedBillingSection isDark={isDark} />
       )}
 
       {!billingInfo?.billingProvider && (
