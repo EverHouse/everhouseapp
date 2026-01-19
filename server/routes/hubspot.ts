@@ -26,9 +26,11 @@ const HUBSPOT_BATCH_IMPORT_CUTOFF = new Date('2025-11-12T00:00:00-08:00');
  * Compute the correct join date for a HubSpot contact based on when they were added.
  * 
  * Logic:
- * - DB join_date or joined_on takes priority (manual override)
- * - For contacts created ON or BEFORE Nov 12, 2025: Use membership_start_date (batch import)
- * - For contacts created AFTER Nov 12, 2025: Use createdate (real sync from Mindbody)
+ * - DB joined_on takes highest priority (true manual override from staff)
+ * - For contacts created ON or BEFORE Nov 12, 2025 (batch import):
+ *   Use HubSpot membership_start_date (the real join date manually entered by staff)
+ * - For contacts created AFTER Nov 12, 2025 (real Mindbody sync):
+ *   Use DB join_date if available, otherwise HubSpot createdate
  * 
  * @param contact - HubSpot contact with membershipStartDate and createdAt
  * @param dbUser - Database user record with join_date and joined_on fields
@@ -38,15 +40,14 @@ function computeHubSpotJoinDate(
   contact: { membershipStartDate?: string | null; createdAt?: string | null },
   dbUser?: { join_date?: string | null; joined_on?: string | null } | null
 ): string | null {
-  // DB fields take highest priority (manual override)
-  if (dbUser?.join_date) return dbUser.join_date;
+  // joined_on is the true manual override field (set by staff in the app)
   if (dbUser?.joined_on) return dbUser.joined_on;
   
   // Parse the HubSpot create date to determine which logic to apply
   const createdAtStr = contact.createdAt;
   if (!createdAtStr) {
     // No create date - fall back to membership_start_date if available
-    return contact.membershipStartDate || null;
+    return contact.membershipStartDate || dbUser?.join_date || null;
   }
   
   // Parse create date (could be timestamp or ISO string)
@@ -59,16 +60,19 @@ function computeHubSpotJoinDate(
   
   // If create date is invalid, fall back to membership_start_date
   if (isNaN(createdDate.getTime())) {
-    return contact.membershipStartDate || null;
+    return contact.membershipStartDate || dbUser?.join_date || null;
   }
   
-  // Apply the cutoff logic
+  // Apply the cutoff logic based on when the contact was created in HubSpot
   if (createdDate <= HUBSPOT_BATCH_IMPORT_CUTOFF) {
-    // Batch import period: prefer membership_start_date (manually entered real join date)
+    // Batch import period: these members existed before HubSpot integration
+    // Their real join date was manually entered in HubSpot's membership_start_date field
+    // DB join_date for these is typically the Nov 2025 import date, so ignore it
     return contact.membershipStartDate || contact.createdAt;
   } else {
-    // Post-batch import: prefer createdate (accurate sync from Mindbody)
-    return contact.createdAt || contact.membershipStartDate;
+    // Post-batch import: these are real Mindbody syncs with accurate create dates
+    // DB join_date (if set) represents the actual join date, otherwise use HubSpot createdate
+    return dbUser?.join_date || contact.createdAt || contact.membershipStartDate;
   }
 }
 
