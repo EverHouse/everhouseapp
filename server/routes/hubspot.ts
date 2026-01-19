@@ -15,6 +15,64 @@ import { broadcastDirectoryUpdate } from '../core/websocket';
 import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts';
 
 /**
+ * Cutoff date for HubSpot batch import.
+ * Contacts created on or before this date were batch-imported, so their real join date
+ * is in the membership_start_date field.
+ * Contacts created after this date were synced from Mindbody and have accurate create dates.
+ */
+const HUBSPOT_BATCH_IMPORT_CUTOFF = new Date('2025-11-12T00:00:00-08:00');
+
+/**
+ * Compute the correct join date for a HubSpot contact based on when they were added.
+ * 
+ * Logic:
+ * - DB join_date or joined_on takes priority (manual override)
+ * - For contacts created ON or BEFORE Nov 12, 2025: Use membership_start_date (batch import)
+ * - For contacts created AFTER Nov 12, 2025: Use createdate (real sync from Mindbody)
+ * 
+ * @param contact - HubSpot contact with membershipStartDate and createdAt
+ * @param dbUser - Database user record with join_date and joined_on fields
+ * @returns The appropriate join date string or null
+ */
+function computeHubSpotJoinDate(
+  contact: { membershipStartDate?: string | null; createdAt?: string | null },
+  dbUser?: { join_date?: string | null; joined_on?: string | null } | null
+): string | null {
+  // DB fields take highest priority (manual override)
+  if (dbUser?.join_date) return dbUser.join_date;
+  if (dbUser?.joined_on) return dbUser.joined_on;
+  
+  // Parse the HubSpot create date to determine which logic to apply
+  const createdAtStr = contact.createdAt;
+  if (!createdAtStr) {
+    // No create date - fall back to membership_start_date if available
+    return contact.membershipStartDate || null;
+  }
+  
+  // Parse create date (could be timestamp or ISO string)
+  let createdDate: Date;
+  if (/^\d+$/.test(createdAtStr)) {
+    createdDate = new Date(parseInt(createdAtStr, 10));
+  } else {
+    createdDate = new Date(createdAtStr);
+  }
+  
+  // If create date is invalid, fall back to membership_start_date
+  if (isNaN(createdDate.getTime())) {
+    return contact.membershipStartDate || null;
+  }
+  
+  // Apply the cutoff logic
+  if (createdDate <= HUBSPOT_BATCH_IMPORT_CUTOFF) {
+    // Batch import period: prefer membership_start_date (manually entered real join date)
+    return contact.membershipStartDate || contact.createdAt;
+  } else {
+    // Post-batch import: prefer createdate (accurate sync from Mindbody)
+    return contact.createdAt || contact.membershipStartDate;
+  }
+}
+
+/**
  * Normalize a date string to YYYY-MM-DD format
  * Handles YYYY-MM-DD, ISO timestamp, space-separated datetime, and Unix timestamp formats
  */
@@ -420,14 +478,14 @@ async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
   }
   
   // Merge contact data with database data
-  // Priority for join date: DB joined_on → HubSpot membership_start_date → HubSpot createdate
+  // Join date logic handles batch-import vs post-import contacts differently
   return contacts.map((contact: any) => {
     const emailLower = contact.email.toLowerCase();
     const dbUser = dbUserMap[emailLower];
     const pastBookings = pastBookingsMap[emailLower] || 0;
     const eventVisits = eventVisitsMap[emailLower] || 0;
     const wellnessVisits = wellnessVisitsMap[emailLower] || 0;
-    const rawJoinDate = dbUser?.join_date || dbUser?.joined_on || contact.membershipStartDate || contact.createdAt;
+    const rawJoinDate = computeHubSpotJoinDate(contact, dbUser);
     const normalizedJoinDate = normalizeDateToYYYYMMDD(rawJoinDate);
     
     return {
