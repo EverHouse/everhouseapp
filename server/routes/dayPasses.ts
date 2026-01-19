@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
-import { dayPassPurchases } from '../../shared/schema';
-import { DAY_PASS_PRODUCTS, DayPassProductType } from '../../shared/constants';
+import { dayPassPurchases, membershipTiers } from '../../shared/schema';
+import { eq } from 'drizzle-orm';
 import { getStripeClient } from '../core/stripe/client';
 import { getOrCreateStripeCustomer } from '../core/stripe/customers';
 import { upsertVisitor, linkPurchaseToUser } from '../core/visitors/matchingService';
@@ -10,22 +10,26 @@ const router = Router();
 
 /**
  * GET /api/day-passes/products
- * Returns available day pass products
+ * Returns available day pass products from DB (synced with Stripe)
  */
-router.get('/api/day-passes/products', (req: Request, res: Response) => {
+router.get('/api/day-passes/products', async (req: Request, res: Response) => {
   try {
-    const products = Object.entries(DAY_PASS_PRODUCTS).map(([id, product]) => ({
-      id,
-      name: `${product.name} Day Pass`,
-      priceCents: product.priceCents,
-      description: id === 'workspace' 
-        ? 'Full day workspace access'
-        : id === 'golf_sim'
-        ? '60 minute golf simulator session'
-        : ''
-    }));
+    const products = await db.select()
+      .from(membershipTiers)
+      .where(eq(membershipTiers.productType, 'one_time'));
 
-    res.json({ products });
+    const formattedProducts = products
+      .filter(p => p.isActive && p.priceCents && p.priceCents > 0)
+      .map(p => ({
+        id: p.slug,
+        name: p.name,
+        priceCents: p.priceCents,
+        description: p.description,
+        stripePriceId: p.stripePriceId,
+        hasPriceId: !!p.stripePriceId,
+      }));
+
+    res.json({ products: formattedProducts });
   } catch (error: any) {
     console.error('[DayPasses] Error getting products:', error);
     res.status(500).json({ error: 'Failed to get day pass products' });
@@ -34,112 +38,162 @@ router.get('/api/day-passes/products', (req: Request, res: Response) => {
 
 /**
  * POST /api/day-passes/checkout
- * Creates a PaymentIntent for day pass purchase
+ * Creates a Stripe Checkout Session using synced Price ID
  */
 router.post('/api/day-passes/checkout', async (req: Request, res: Response) => {
   try {
-    const { productType, email, firstName, lastName, phone } = req.body;
+    const { productSlug, email, firstName, lastName, phone } = req.body;
 
-    // Validate required fields
-    if (!productType || !email) {
-      return res.status(400).json({ error: 'Missing required fields: productType, email' });
+    if (!productSlug || !email) {
+      return res.status(400).json({ error: 'Missing required fields: productSlug, email' });
     }
 
-    // Validate productType
-    if (!Object.keys(DAY_PASS_PRODUCTS).includes(productType)) {
+    const [product] = await db.select()
+      .from(membershipTiers)
+      .where(eq(membershipTiers.slug, productSlug))
+      .limit(1);
+
+    if (!product) {
+      return res.status(404).json({ error: `Product not found: ${productSlug}` });
+    }
+
+    if (product.productType !== 'one_time') {
+      return res.status(400).json({ error: 'This endpoint is for one-time purchases only' });
+    }
+
+    if (!product.stripePriceId) {
       return res.status(400).json({ 
-        error: `Invalid productType. Must be one of: ${Object.keys(DAY_PASS_PRODUCTS).join(', ')}` 
+        error: 'Product not synced to Stripe. Please run Sync Tiers to Stripe from admin panel.' 
       });
     }
 
-    const product = DAY_PASS_PRODUCTS[productType as DayPassProductType];
-    const amountCents = product.priceCents;
-
-    // Get or create Stripe customer
-    const { customerId, isNew } = await getOrCreateStripeCustomer(
-      email, // Use email as userId for now
+    const { customerId } = await getOrCreateStripeCustomer(
+      email,
       email,
       firstName || email.split('@')[0]
     );
 
-    // Create PaymentIntent
     const stripe = await getStripeClient();
-    
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: amountCents,
-      currency: 'usd',
+
+    const replitDomains = process.env.REPLIT_DOMAINS?.split(',')[0];
+    const baseUrl = replitDomains ? `https://${replitDomains}` : 'http://localhost:5000';
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
       customer: customerId,
-      description: `${product.name} Day Pass`,
+      line_items: [
+        {
+          price: product.stripePriceId,
+          quantity: 1,
+        },
+      ],
+      payment_intent_data: {
+        metadata: {
+          purpose: 'day_pass',
+          product_slug: productSlug,
+          purchaser_email: email,
+          purchaser_first_name: firstName || '',
+          purchaser_last_name: lastName || '',
+          purchaser_phone: phone || '',
+        },
+      },
       metadata: {
-        productType,
-        email,
-        source: 'day_pass',
-        purchaserEmail: email,
-        purchaserFirstName: firstName || '',
-        purchaserLastName: lastName || ''
+        purpose: 'day_pass',
+        product_slug: productSlug,
+        purchaser_email: email,
       },
-      automatic_payment_methods: {
-        enabled: true,
-      },
+      success_url: `${baseUrl}/#/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/#/checkout/cancel`,
     });
 
-    console.log(`[DayPasses] Created PaymentIntent ${paymentIntent.id} for ${productType}: $${(amountCents / 100).toFixed(2)}`);
+    console.log(`[DayPasses] Created Checkout Session ${session.id} for ${productSlug}: $${((product.priceCents || 0) / 100).toFixed(2)}`);
 
     res.json({
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id,
-      customerId
+      sessionId: session.id,
+      sessionUrl: session.url,
+      customerId,
     });
   } catch (error: any) {
-    console.error('[DayPasses] Error creating payment intent:', error);
-    res.status(500).json({ error: 'Failed to create payment intent' });
+    console.error('[DayPasses] Error creating checkout session:', error);
+    res.status(500).json({ error: 'Failed to create checkout session' });
   }
 });
 
 /**
  * POST /api/day-passes/confirm
- * Called after successful payment to record purchase
+ * Called after successful payment to record purchase (supports both session_id and payment_intent_id)
  */
 router.post('/api/day-passes/confirm', async (req: Request, res: Response) => {
   try {
-    const { paymentIntentId } = req.body;
+    const { sessionId, paymentIntentId } = req.body;
 
-    if (!paymentIntentId) {
-      return res.status(400).json({ error: 'Missing required field: paymentIntentId' });
+    if (!sessionId && !paymentIntentId) {
+      return res.status(400).json({ error: 'Missing required field: sessionId or paymentIntentId' });
     }
 
-    // Verify payment succeeded via Stripe API
     const stripe = await getStripeClient();
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    let metadata: Record<string, string> = {};
+    let customerId: string | null = null;
+    let resolvedPaymentIntentId: string | null = null;
+    let amountPaid: number = 0;
 
-    if (paymentIntent.status !== 'succeeded') {
+    if (sessionId) {
+      const session = await stripe.checkout.sessions.retrieve(sessionId, {
+        expand: ['payment_intent'],
+      });
+
+      if (session.payment_status !== 'paid') {
+        return res.status(400).json({ 
+          error: `Payment status is ${session.payment_status}, not paid` 
+        });
+      }
+
+      metadata = session.metadata || {};
+      customerId = session.customer as string;
+      amountPaid = session.amount_total || 0;
+      
+      if (session.payment_intent && typeof session.payment_intent === 'object') {
+        resolvedPaymentIntentId = session.payment_intent.id;
+        metadata = { ...metadata, ...session.payment_intent.metadata };
+      } else if (typeof session.payment_intent === 'string') {
+        resolvedPaymentIntentId = session.payment_intent;
+      }
+    } else {
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      
+      if (paymentIntent.status !== 'succeeded') {
+        return res.status(400).json({ 
+          error: `Payment status is ${paymentIntent.status}, not succeeded` 
+        });
+      }
+
+      metadata = paymentIntent.metadata || {};
+      customerId = paymentIntent.customer as string;
+      resolvedPaymentIntentId = paymentIntentId;
+      amountPaid = paymentIntent.amount;
+    }
+
+    const productSlug = metadata.product_slug;
+    const email = metadata.purchaser_email;
+    const firstName = metadata.purchaser_first_name;
+    const lastName = metadata.purchaser_last_name;
+    const phone = metadata.purchaser_phone;
+
+    if (!productSlug || !email) {
       return res.status(400).json({ 
-        error: `Payment status is ${paymentIntent.status}, not succeeded` 
+        error: 'Missing required metadata: product_slug, purchaser_email' 
       });
     }
 
-    const metadata = paymentIntent.metadata || {};
-    const productType = metadata.productType as DayPassProductType;
-    const email = metadata.email || metadata.purchaserEmail;
-    const firstName = metadata.purchaserFirstName;
-    const lastName = metadata.purchaserLastName;
-    const phone = metadata.purchaserPhone;
+    const [product] = await db.select()
+      .from(membershipTiers)
+      .where(eq(membershipTiers.slug, productSlug))
+      .limit(1);
 
-    if (!productType || !email) {
-      return res.status(400).json({ 
-        error: 'Missing required metadata: productType, email' 
-      });
+    if (!product) {
+      console.warn(`[DayPasses] Product not found: ${productSlug}`);
     }
 
-    if (!Object.keys(DAY_PASS_PRODUCTS).includes(productType)) {
-      return res.status(400).json({ 
-        error: `Invalid productType in payment metadata: ${productType}` 
-      });
-    }
-
-    const product = DAY_PASS_PRODUCTS[productType];
-
-    // Find or create visitor user via matching service
     const user = await upsertVisitor({
       email,
       firstName,
@@ -147,16 +201,32 @@ router.post('/api/day-passes/confirm', async (req: Request, res: Response) => {
       phone
     });
 
-    // Insert record into day_pass_purchases table
+    const existingPurchase = resolvedPaymentIntentId 
+      ? await db.select()
+          .from(dayPassPurchases)
+          .where(eq(dayPassPurchases.stripePaymentIntentId, resolvedPaymentIntentId))
+          .limit(1)
+      : [];
+
+    if (existingPurchase.length > 0) {
+      console.log(`[DayPasses] Purchase already recorded for payment ${resolvedPaymentIntentId}`);
+      return res.json({
+        success: true,
+        purchaseId: existingPurchase[0].id,
+        userId: user.id,
+        alreadyRecorded: true
+      });
+    }
+
     const [purchase] = await db
       .insert(dayPassPurchases)
       .values({
         userId: user.id,
-        productType,
-        amountCents: product.priceCents,
+        productType: productSlug,
+        amountCents: amountPaid,
         quantity: 1,
-        stripePaymentIntentId: paymentIntentId,
-        stripeCustomerId: paymentIntent.customer as string,
+        stripePaymentIntentId: resolvedPaymentIntentId,
+        stripeCustomerId: customerId,
         purchaserEmail: email,
         purchaserFirstName: firstName,
         purchaserLastName: lastName,
@@ -166,12 +236,11 @@ router.post('/api/day-passes/confirm', async (req: Request, res: Response) => {
       })
       .returning();
 
-    // Link purchase to user if not already linked
     if (user.id) {
       await linkPurchaseToUser(purchase.id, user.id);
     }
 
-    console.log(`[DayPasses] Recorded purchase ${purchase.id} for ${productType}: $${(product.priceCents / 100).toFixed(2)} from ${email}`);
+    console.log(`[DayPasses] Recorded purchase ${purchase.id} for ${productSlug}: $${(amountPaid / 100).toFixed(2)} from ${email}`);
 
     res.json({
       success: true,
@@ -183,5 +252,68 @@ router.post('/api/day-passes/confirm', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to confirm payment' });
   }
 });
+
+/**
+ * Function to record a day pass purchase from webhook
+ * Called by checkout.session.completed webhook handler
+ */
+export async function recordDayPassPurchaseFromWebhook(data: {
+  productSlug: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  amountCents: number;
+  paymentIntentId: string;
+  customerId: string;
+}): Promise<{ success: boolean; purchaseId?: string; userId?: string; error?: string }> {
+  try {
+    const existingPurchase = await db.select()
+      .from(dayPassPurchases)
+      .where(eq(dayPassPurchases.stripePaymentIntentId, data.paymentIntentId))
+      .limit(1);
+
+    if (existingPurchase.length > 0) {
+      console.log(`[DayPasses] Purchase already recorded for payment ${data.paymentIntentId}`);
+      return { success: true, purchaseId: existingPurchase[0].id, userId: existingPurchase[0].userId || undefined };
+    }
+
+    const user = await upsertVisitor({
+      email: data.email,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      phone: data.phone
+    });
+
+    const [purchase] = await db
+      .insert(dayPassPurchases)
+      .values({
+        userId: user.id,
+        productType: data.productSlug,
+        amountCents: data.amountCents,
+        quantity: 1,
+        stripePaymentIntentId: data.paymentIntentId,
+        stripeCustomerId: data.customerId,
+        purchaserEmail: data.email,
+        purchaserFirstName: data.firstName,
+        purchaserLastName: data.lastName,
+        purchaserPhone: data.phone,
+        source: 'stripe',
+        purchasedAt: new Date()
+      })
+      .returning();
+
+    if (user.id) {
+      await linkPurchaseToUser(purchase.id, user.id);
+    }
+
+    console.log(`[DayPasses Webhook] Recorded purchase ${purchase.id} for ${data.productSlug}: $${(data.amountCents / 100).toFixed(2)} from ${data.email}`);
+
+    return { success: true, purchaseId: purchase.id, userId: user.id };
+  } catch (error: any) {
+    console.error('[DayPasses Webhook] Error recording purchase:', error);
+    return { success: false, error: error.message };
+  }
+}
 
 export default router;

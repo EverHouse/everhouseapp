@@ -341,16 +341,19 @@ export async function syncMembershipTiersToStripe(): Promise<{
         }
 
         const billingInterval = (tier.billingInterval as 'month' | 'year' | 'week' | 'day') || 'month';
+        const isOneTime = tier.productType === 'one_time';
+        const productName = isOneTime ? tier.name : `${tier.name} Membership`;
         let stripeProductId = tier.stripeProductId;
         let stripePriceId = tier.stripePriceId;
 
         if (stripeProductId) {
           await stripe.products.update(stripeProductId, {
-            name: `${tier.name} Membership`,
+            name: productName,
             description: tier.description || undefined,
             metadata: {
               tier_id: tier.id.toString(),
               tier_slug: tier.slug,
+              product_type: tier.productType || 'subscription',
             },
           });
           console.log(`[Tier Sync] Updated existing product for ${tier.name}`);
@@ -359,24 +362,30 @@ export async function syncMembershipTiersToStripe(): Promise<{
             const existingPrice = await stripe.prices.retrieve(stripePriceId);
             if (existingPrice.unit_amount !== tier.priceCents) {
               await stripe.prices.update(stripePriceId, { active: false });
-              const newPrice = await stripe.prices.create({
+              const priceParams: any = {
                 product: stripeProductId,
                 unit_amount: tier.priceCents,
                 currency: 'usd',
-                recurring: { interval: billingInterval },
-                metadata: { tier_id: tier.id.toString(), tier_slug: tier.slug },
-              });
+                metadata: { tier_id: tier.id.toString(), tier_slug: tier.slug, product_type: tier.productType || 'subscription' },
+              };
+              if (!isOneTime) {
+                priceParams.recurring = { interval: billingInterval };
+              }
+              const newPrice = await stripe.prices.create(priceParams);
               stripePriceId = newPrice.id;
               console.log(`[Tier Sync] Created new price for ${tier.name} (price changed)`);
             }
           } else {
-            const newPrice = await stripe.prices.create({
+            const priceParams: any = {
               product: stripeProductId,
               unit_amount: tier.priceCents,
               currency: 'usd',
-              recurring: { interval: billingInterval },
-              metadata: { tier_id: tier.id.toString(), tier_slug: tier.slug },
-            });
+              metadata: { tier_id: tier.id.toString(), tier_slug: tier.slug, product_type: tier.productType || 'subscription' },
+            };
+            if (!isOneTime) {
+              priceParams.recurring = { interval: billingInterval };
+            }
+            const newPrice = await stripe.prices.create(priceParams);
             stripePriceId = newPrice.id;
           }
 
@@ -396,22 +405,26 @@ export async function syncMembershipTiersToStripe(): Promise<{
           synced++;
         } else {
           const stripeProduct = await stripe.products.create({
-            name: `${tier.name} Membership`,
+            name: productName,
             description: tier.description || undefined,
             metadata: {
               tier_id: tier.id.toString(),
               tier_slug: tier.slug,
+              product_type: tier.productType || 'subscription',
             },
           });
           stripeProductId = stripeProduct.id;
 
-          const stripePrice = await stripe.prices.create({
+          const priceParams: any = {
             product: stripeProductId,
             unit_amount: tier.priceCents,
             currency: 'usd',
-            recurring: { interval: billingInterval },
-            metadata: { tier_id: tier.id.toString(), tier_slug: tier.slug },
-          });
+            metadata: { tier_id: tier.id.toString(), tier_slug: tier.slug, product_type: tier.productType || 'subscription' },
+          };
+          if (!isOneTime) {
+            priceParams.recurring = { interval: billingInterval };
+          }
+          const stripePrice = await stripe.prices.create(priceParams);
           stripePriceId = stripePrice.id;
 
           await db.update(membershipTiers)
