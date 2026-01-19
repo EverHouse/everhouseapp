@@ -454,6 +454,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           phone: contact.phone || '',
           role: 'member',
           lifetimeVisits: contact.lifetimeVisits || 0,
+          lastBookingDate: contact.lastBookingDate || null,
           joinDate: contact.joinDate || null,
           mindbodyClientId: contact.mindbodyClientId || null,
           manuallyLinkedEmails: contact.manuallyLinkedEmails || []
