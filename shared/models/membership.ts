@@ -44,6 +44,7 @@ export const membershipTiers = pgTable("membership_tiers", {
   foundingPriceId: varchar("founding_price_id"),
   priceCents: integer("price_cents"),
   billingInterval: varchar("billing_interval").default("month"),
+  productType: varchar("product_type").default("subscription"), // 'subscription' or 'one_time'
   
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
