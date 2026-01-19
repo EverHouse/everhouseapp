@@ -14,7 +14,8 @@ import {
   guestCheckIns,
   resources,
   bookingGuests,
-  bookingMembers
+  bookingMembers,
+  dayPassPurchases
 } from '../../shared/schema';
 import { isProduction } from '../core/db';
 import { isStaffOrAdmin, isAuthenticated } from '../core/middleware';
@@ -1527,6 +1528,120 @@ router.post('/api/members/admin/bulk-tier-update', isStaffOrAdmin, async (req, r
   } catch (error: any) {
     console.error('Bulk tier update error:', error);
     res.status(500).json({ error: 'Failed to process bulk tier update' });
+  }
+});
+
+router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { sortBy = 'lastPurchase', order = 'desc', limit = '100' } = req.query;
+    const maxResults = Math.min(parseInt(limit as string) || 100, 500);
+    const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
+    
+    // Determine sort column based on sortBy parameter
+    let orderByClause = `MAX(dpp.purchased_at) ${sortOrder}`;
+    if (sortBy === 'name') {
+      orderByClause = `u.first_name || ' ' || u.last_name ${sortOrder}`;
+    } else if (sortBy === 'totalSpent') {
+      orderByClause = `COALESCE(SUM(dpp.amount_cents), 0) ${sortOrder}`;
+    } else if (sortBy === 'purchaseCount') {
+      orderByClause = `COUNT(dpp.id) ${sortOrder}`;
+    }
+    
+    // Get visitors with aggregated purchase stats using raw SQL
+    const visitorsWithPurchases = await db.execute(sql`
+      SELECT 
+        u.id,
+        u.email,
+        u.first_name,
+        u.last_name,
+        u.phone,
+        COUNT(dpp.id)::int as purchase_count,
+        COALESCE(SUM(dpp.amount_cents), 0)::bigint as total_spent_cents,
+        MAX(dpp.purchased_at) as last_purchase_date,
+        u.membership_status,
+        u.role
+      FROM users u
+      LEFT JOIN day_pass_purchases dpp ON LOWER(u.email) = LOWER(dpp.purchaser_email)
+      WHERE (u.role = 'visitor' OR u.membership_status = 'visitor')
+      AND u.archived_at IS NULL
+      GROUP BY u.id, u.email, u.first_name, u.last_name, u.phone, u.membership_status, u.role
+      ORDER BY ${sql.raw(orderByClause)}
+      LIMIT ${maxResults}
+    `);
+    
+    const visitors = (visitorsWithPurchases.rows as any[]).map((row: any) => ({
+      id: row.id,
+      email: row.email,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      phone: row.phone,
+      purchaseCount: row.purchase_count,
+      totalSpentCents: row.total_spent_cents,
+      lastPurchaseDate: row.last_purchase_date,
+      membershipStatus: row.membership_status,
+      role: row.role
+    }));
+    
+    res.json({
+      success: true,
+      total: visitors.length,
+      visitors
+    });
+  } catch (error: any) {
+    if (!isProduction) console.error('Visitors list error:', error);
+    res.status(500).json({ error: 'Failed to fetch visitors' });
+  }
+});
+
+router.get('/api/visitors/:id/purchases', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get the visitor first to ensure they exist and are a visitor
+    const visitorResult = await db.select({
+      id: users.id,
+      email: users.email,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      role: users.role,
+      membershipStatus: users.membershipStatus
+    })
+      .from(users)
+      .where(eq(users.id, id));
+    
+    if (visitorResult.length === 0) {
+      return res.status(404).json({ error: 'Visitor not found' });
+    }
+    
+    const visitor = visitorResult[0];
+    
+    // Verify the user is actually a visitor
+    if (visitor.role !== 'visitor' && visitor.membershipStatus !== 'visitor') {
+      return res.status(403).json({ error: 'User is not a visitor' });
+    }
+    
+    // Get all day pass purchases for this visitor
+    const purchases = await db.select()
+      .from(dayPassPurchases)
+      .where(sql`LOWER(${dayPassPurchases.purchaserEmail}) = LOWER(${visitor.email || ''})`)
+      .orderBy(desc(dayPassPurchases.purchasedAt));
+    
+    res.json({
+      success: true,
+      visitor: {
+        id: visitor.id,
+        email: visitor.email,
+        firstName: visitor.firstName,
+        lastName: visitor.lastName,
+        role: visitor.role,
+        membershipStatus: visitor.membershipStatus
+      },
+      purchases,
+      total: purchases.length
+    });
+  } catch (error: any) {
+    if (!isProduction) console.error('Visitor purchases error:', error);
+    res.status(500).json({ error: 'Failed to fetch visitor purchases' });
   }
 });
 
