@@ -48,6 +48,10 @@ The application features a React 19 frontend with Vite, styled using Tailwind CS
 - **Waiver Management**: Tracks waiver versions, requires signing on login via a non-dismissible modal.
 - **Member Lookup**: Centralized `MemberService` handles member data lookups by various identifiers with caching.
 - **Billing Management**: Staff Payments Dashboard for full POS functionality. Unified payment history for members from multiple sources. Staff can manage member billing (subscriptions, credits, discounts) via a dedicated tab in the member profile. Members have a self-service billing portal to view subscriptions and invoices.
+- **Tier Normalization**: Centralized tier matching utility (`server/utils/tierUtils.ts`) provides exact slug-based matching with warning logs for fuzzy fallbacks. All tier name parsing uses this utility.
+- **Guest Fee Configuration**: Guest fees are stored per-tier in `membership_tiers.guest_fee_cents` (default $25), allowing pricing changes without code deployment.
+- **Guest Pass Accuracy**: Guest pass counting excludes cancelled/declined bookings so members don't lose passes when cancelling.
+- **PWA Gesture Handling**: Edge swipe gestures are disabled in standalone PWA mode to avoid conflicts with iOS native back gestures.
 
 ## External Dependencies
 - **Stripe Payments**: Integrated for in-app payment collection, customer management, subscription management, payment tracking, HubSpot sync, and webhook processing.
