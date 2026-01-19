@@ -56,6 +56,7 @@ import familyBillingRouter from './routes/familyBilling';
 import memberBillingRouter from './routes/memberBilling';
 import myBillingRouter from './routes/myBilling';
 import checkoutRouter from './routes/checkout';
+import dayPassesRouter from './routes/dayPasses';
 import { registerObjectStorageRoutes } from './replit_integrations/object_storage';
 import { ensureDatabaseConstraints, seedDefaultNoticeTypes } from './db-init';
 import { initWebSocketServer } from './core/websocket';
@@ -318,6 +319,7 @@ app.use(familyBillingRouter);
 app.use(memberBillingRouter);
 app.use(myBillingRouter);
 app.use(checkoutRouter);
+app.use(dayPassesRouter);
 registerObjectStorageRoutes(app);
 
 // SPA catch-all using middleware (avoids Express 5 path-to-regexp issues)
