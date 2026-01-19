@@ -73,23 +73,31 @@ function computeHubSpotJoinDate(
 }
 
 /**
- * Normalize a date string to YYYY-MM-DD format
- * Handles YYYY-MM-DD, ISO timestamp, space-separated datetime, and Unix timestamp formats
+ * Normalize a date to YYYY-MM-DD format
+ * Handles Date objects, YYYY-MM-DD strings, ISO timestamps, space-separated datetimes, and Unix timestamps
  */
-function normalizeDateToYYYYMMDD(dateStr: string | null | undefined): string | null {
-  if (!dateStr) return null;
-  
-  // Convert to string in case it's passed as a number
-  const dateString = String(dateStr).trim();
-  if (!dateString) return null;
+function normalizeDateToYYYYMMDD(dateInput: string | Date | null | undefined): string | null {
+  if (!dateInput) return null;
   
   try {
+    // Handle Date objects directly (e.g., from PostgreSQL)
+    if (dateInput instanceof Date) {
+      if (isNaN(dateInput.getTime())) return null;
+      const year = dateInput.getUTCFullYear();
+      const month = String(dateInput.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(dateInput.getUTCDate()).padStart(2, '0');
+      if (year < 1990 || year > 2100) return null;
+      return `${year}-${month}-${day}`;
+    }
+    
+    // Convert to string in case it's passed as a number
+    const dateString = String(dateInput).trim();
+    if (!dateString) return null;
+    
     // Check if it's a Unix timestamp (all digits, typically 10-13 digits)
     if (/^\d+$/.test(dateString)) {
       const timestamp = parseInt(dateString, 10);
-      // Convert to date
       const date = new Date(timestamp);
-      // Validate the date is reasonable (between 1990 and 2100)
       if (date.getFullYear() < 1990 || date.getFullYear() > 2100) {
         return null;
       }
