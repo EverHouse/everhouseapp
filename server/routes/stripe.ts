@@ -2345,4 +2345,159 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
   }
 });
 
+router.post('/api/stripe/staff/send-membership-link', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { email, firstName, lastName, tierId } = req.body;
+
+    if (!email || !firstName || !lastName || !tierId) {
+      return res.status(400).json({ error: 'Missing required fields: email, firstName, lastName, tierId' });
+    }
+
+    const tierResult = await pool.query(
+      `SELECT id, name, stripe_price_id, price_cents, billing_interval 
+       FROM membership_tiers 
+       WHERE id = $1 AND is_active = true`,
+      [tierId]
+    );
+
+    if (tierResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Tier not found or inactive' });
+    }
+
+    const tier = tierResult.rows[0];
+
+    if (!tier.stripe_price_id) {
+      return res.status(400).json({ error: 'This tier has not been synced to Stripe. Please sync tiers first.' });
+    }
+
+    const { getStripeClient } = await import('../core/stripe/client');
+    const stripe = await getStripeClient();
+
+    const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : 'https://everhouse.app';
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer_email: email,
+      line_items: [
+        {
+          price: tier.stripe_price_id,
+          quantity: 1,
+        },
+      ],
+      success_url: `${baseUrl}/welcome?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/`,
+      metadata: {
+        firstName,
+        lastName,
+        tierId: tier.id.toString(),
+        tierName: tier.name,
+        source: 'staff_invite',
+      },
+    });
+
+    const checkoutUrl = session.url;
+
+    try {
+      const { getResendClient } = await import('../utils/resend');
+      const { client: resend, fromEmail } = await getResendClient();
+
+      const priceFormatted = tier.billing_interval === 'year' 
+        ? `$${(tier.price_cents / 100).toFixed(0)}/year`
+        : `$${(tier.price_cents / 100).toFixed(0)}/month`;
+
+      await resend.emails.send({
+        from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
+        to: email,
+        subject: `Your Ever House Membership Invitation - ${tier.name}`,
+        html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #F2F2EC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F2F2EC;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; padding: 40px;">
+          <tr>
+            <td style="text-align: center; padding-bottom: 32px;">
+              <img src="https://everhouse.app/assets/logos/monogram-dark.webp" alt="Ever House" width="60" height="60" style="display: inline-block;">
+            </td>
+          </tr>
+          <tr>
+            <td style="text-align: center; padding-bottom: 16px;">
+              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; color: #293515;">
+                Welcome to Ever House
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="text-align: center; padding-bottom: 32px;">
+              <p style="margin: 0; font-size: 16px; color: #4b5563; line-height: 1.6;">
+                Hi ${firstName}, you've been invited to join Ever House as a <strong>${tier.name}</strong> member.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-bottom: 32px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F2F2EC; border-radius: 12px;">
+                <tr>
+                  <td style="padding: 24px; text-align: center;">
+                    <p style="margin: 0 0 8px 0; font-size: 14px; color: #4b5563;">Membership</p>
+                    <p style="margin: 0 0 4px 0; font-size: 24px; font-weight: 600; color: #293515;">${tier.name}</p>
+                    <p style="margin: 0; font-size: 18px; color: #293515;">${priceFormatted}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="text-align: center; padding-bottom: 32px;">
+              <a href="${checkoutUrl}" style="display: inline-block; background-color: #293515; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
+                Complete Your Membership
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-bottom: 24px;">
+              <p style="margin: 0; font-size: 14px; color: #4b5563; line-height: 1.6;">
+                Click the button above to complete your membership signup. You'll be asked to enter your payment details securely through Stripe.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="text-align: center; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 8px 0; font-size: 12px; color: #4b5563;">
+                Questions? Reply to this email or contact us at the club.
+              </p>
+              <a href="https://everhouse.app" style="font-size: 12px; color: #293515; text-decoration: none;">
+                everhouse.app
+              </a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+        `,
+      });
+
+      console.log(`[Stripe] Membership invite sent to ${email} for tier ${tier.name}`);
+    } catch (emailErr: any) {
+      console.error('[Stripe] Failed to send membership invite email:', emailErr.message);
+    }
+
+    res.json({ success: true, checkoutUrl });
+  } catch (error: any) {
+    console.error('[Stripe] Error sending membership invite:', error);
+    res.status(500).json({ error: 'Failed to create membership invite' });
+  }
+});
+
 export default router;

@@ -7,6 +7,7 @@ import { StripePaymentForm } from '../../../components/stripe/StripePaymentForm'
 import { CheckinBillingModal } from '../../../components/staff-command-center/modals/CheckinBillingModal';
 import { MemberSearchInput, SelectedMember } from '../../../components/shared/MemberSearchInput';
 import { getTodayPacific, formatTime12Hour } from '../../../utils/dateUtils';
+import SendMembershipInvite from '../../../components/admin/payments/SendMembershipInvite';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || '');
 
@@ -139,7 +140,7 @@ const PaymentsTab: React.FC = () => {
 };
 
 const MobilePaymentsView: React.FC = () => {
-  const [activeSection, setActiveSection] = useState<'quick-charge' | 'overdue' | 'lookup' | 'transactions' | 'record-payment' | 'refunds' | 'failed' | 'summary' | 'pending' | 'redeem-pass' | null>(null);
+  const [activeSection, setActiveSection] = useState<'quick-charge' | 'overdue' | 'lookup' | 'transactions' | 'record-payment' | 'refunds' | 'failed' | 'summary' | 'pending' | 'redeem-pass' | 'send-invite' | null>(null);
   const [overdueCount, setOverdueCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
@@ -265,6 +266,16 @@ const MobilePaymentsView: React.FC = () => {
       hoverClass: 'hover:bg-blue-200/60 dark:hover:bg-blue-900/60',
       iconClass: 'text-blue-600 dark:text-blue-400'
     },
+    { 
+      id: 'send-invite' as const, 
+      icon: 'mail', 
+      label: 'Send Invite', 
+      bgClass: 'bg-green-100/60 dark:bg-green-950/40',
+      textClass: 'text-green-900 dark:text-green-100',
+      borderClass: 'border-green-200 dark:border-green-500/20',
+      hoverClass: 'hover:bg-green-200/60 dark:hover:bg-green-900/60',
+      iconClass: 'text-green-600 dark:text-green-400'
+    },
   ];
 
   return (
@@ -317,6 +328,9 @@ const MobilePaymentsView: React.FC = () => {
       {activeSection === 'redeem-pass' && (
         <RedeemDayPassSection onClose={() => setActiveSection(null)} />
       )}
+      {activeSection === 'send-invite' && (
+        <SendMembershipInvite onClose={() => setActiveSection(null)} />
+      )}
     </div>
   );
 };
@@ -329,6 +343,7 @@ const DesktopPaymentsView: React.FC = () => {
         <QuickChargeSection variant="card" />
         <CashCheckPaymentSection variant="card" />
         <RedeemDayPassSection variant="card" />
+        <SendMembershipInvite variant="card" />
       </div>
       
       <div className="col-span-4 space-y-6">

@@ -4,6 +4,7 @@ import { pool } from '../db';
 import { notifyPaymentSuccess, notifyPaymentFailed, notifyStaffPaymentFailed, notifyMember, notifyAllStaff } from '../notificationService';
 import { sendPaymentReceiptEmail, sendPaymentFailedEmail } from '../../emails/paymentEmails';
 import { sendMembershipRenewalEmail, sendMembershipFailedEmail } from '../../emails/membershipEmails';
+import { sendPassWithQrEmail } from '../../emails/passEmails';
 import { broadcastBillingUpdate } from '../websocket';
 import { recordDayPassPurchaseFromWebhook } from '../../routes/dayPasses';
 
@@ -531,6 +532,19 @@ async function handleCheckoutSessionCompleted(session: any): Promise<void> {
     }
 
     console.log(`[Stripe Webhook] Day pass purchase recorded: ${result.purchaseId}`);
+
+    // Send email with QR code
+    try {
+      await sendPassWithQrEmail(email, {
+        passId: parseInt(result.purchaseId!, 10),
+        type: productSlug,
+        quantity: 1,
+        purchaseDate: new Date()
+      });
+      console.log(`[Stripe Webhook] QR pass email sent to ${email}`);
+    } catch (emailError) {
+      console.error('[Stripe Webhook] Failed to send QR pass email:', emailError);
+    }
 
     // Sync to HubSpot for non-members
     try {
