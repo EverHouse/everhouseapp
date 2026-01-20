@@ -219,6 +219,11 @@ export const stripePaymentIntents = pgTable("stripe_payment_intents", {
   sessionId: integer("session_id"),
   description: text("description"),
   status: varchar("status").notNull().default("pending"),
+  retryCount: integer("retry_count").default(0),
+  lastRetryAt: timestamp("last_retry_at"),
+  failureReason: text("failure_reason"),
+  dunningNotifiedAt: timestamp("dunning_notified_at"),
+  requiresCardUpdate: boolean("requires_card_update").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
