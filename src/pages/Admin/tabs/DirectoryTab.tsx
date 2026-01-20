@@ -149,7 +149,32 @@ const DesktopRowComponent = ({ index, style, data, memberTab, isAdmin, openDetai
 
 type SortField = 'name' | 'tier' | 'visits' | 'joinDate' | 'lastVisit';
 type SortDirection = 'asc' | 'desc';
-type MemberTab = 'active' | 'former';
+type MemberTab = 'active' | 'former' | 'visitors';
+
+interface Visitor {
+    id: string;
+    email: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    phone: string | null;
+    purchaseCount: number;
+    totalSpentCents: number;
+    lastPurchaseDate: string | null;
+    membershipStatus: string | null;
+    role: string | null;
+}
+
+interface VisitorPurchase {
+    id: string;
+    purchaserEmail: string;
+    purchaserFirstName: string | null;
+    purchaserLastName: string | null;
+    purchaserPhone: string | null;
+    quantity: number;
+    amountCents: number;
+    stripePaymentIntentId: string | null;
+    purchasedAt: string;
+}
 
 const formatJoinDate = (dateStr: string | null | undefined): string => {
     if (!dateStr) return '-';
@@ -203,6 +228,13 @@ const DirectoryTab: React.FC = () => {
     const [selectedTierToAssign, setSelectedTierToAssign] = useState<string>('');
     const [isAssigningTier, setIsAssigningTier] = useState(false);
     const [assignTierError, setAssignTierError] = useState<string | null>(null);
+    const [visitors, setVisitors] = useState<Visitor[]>([]);
+    const [visitorsLoading, setVisitorsLoading] = useState(false);
+    const [visitorsError, setVisitorsError] = useState(false);
+    const [selectedVisitor, setSelectedVisitor] = useState<Visitor | null>(null);
+    const [visitorPurchases, setVisitorPurchases] = useState<VisitorPurchase[]>([]);
+    const [purchasesLoading, setPurchasesLoading] = useState(false);
+    const [visitorDetailsOpen, setVisitorDetailsOpen] = useState(false);
     
     const isAdmin = actualUser?.role === 'admin';
     
@@ -297,7 +329,7 @@ const DirectoryTab: React.FC = () => {
         };
     }, [isViewingDetails, selectedMember]);
 
-    // Fetch former members when switching to that tab
+    // Fetch former members or visitors when switching to that tab
     const handleTabChange = useCallback(async (tab: MemberTab) => {
         setMemberTab(tab);
         setStatusFilter('All');
@@ -312,8 +344,10 @@ const DirectoryTab: React.FC = () => {
             } finally {
                 setFormerLoading(false);
             }
+        } else if (tab === 'visitors') {
+            await fetchVisitors();
         }
-    }, [fetchFormerMembers]);
+    }, [fetchFormerMembers, fetchVisitors]);
 
     // Retry loading former members
     const handleRetryFormer = useCallback(async () => {
@@ -328,6 +362,46 @@ const DirectoryTab: React.FC = () => {
             setFormerLoading(false);
         }
     }, [fetchFormerMembers]);
+
+    // Fetch visitors
+    const fetchVisitors = useCallback(async () => {
+        setVisitorsLoading(true);
+        setVisitorsError(false);
+        try {
+            const res = await fetch('/api/visitors', { credentials: 'include' });
+            if (!res.ok) throw new Error('Failed to fetch visitors');
+            const data = await res.json();
+            setVisitors(data.visitors || []);
+        } catch (err) {
+            console.error('Error loading visitors:', err);
+            setVisitorsError(true);
+        } finally {
+            setVisitorsLoading(false);
+        }
+    }, []);
+
+    // Fetch visitor purchases
+    const fetchVisitorPurchases = useCallback(async (visitorId: string) => {
+        setPurchasesLoading(true);
+        try {
+            const res = await fetch(`/api/visitors/${visitorId}/purchases`, { credentials: 'include' });
+            if (!res.ok) throw new Error('Failed to fetch purchases');
+            const data = await res.json();
+            setVisitorPurchases(data.purchases || []);
+        } catch (err) {
+            console.error('Error loading visitor purchases:', err);
+            setVisitorPurchases([]);
+        } finally {
+            setPurchasesLoading(false);
+        }
+    }, []);
+
+    // Open visitor details modal
+    const openVisitorDetails = useCallback((visitor: Visitor) => {
+        setSelectedVisitor(visitor);
+        setVisitorDetailsOpen(true);
+        fetchVisitorPurchases(visitor.id);
+    }, [fetchVisitorPurchases]);
 
     // Get current member list based on tab
     const currentMembers = memberTab === 'active' ? members : formerMembers;
@@ -502,6 +576,22 @@ const DirectoryTab: React.FC = () => {
                     >
                         Former
                     </button>
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleTabChange('visitors');
+                            setShowMissingTierOnly(false);
+                        }}
+                        className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${
+                            memberTab === 'visitors'
+                                ? 'bg-primary dark:bg-lavender text-white'
+                                : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
+                        }`}
+                    >
+                        Visitors
+                    </button>
                     {syncMessage && (
                         <span className={`text-[10px] font-medium ${syncMessage.type === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                             {syncMessage.text}
@@ -555,7 +645,8 @@ const DirectoryTab: React.FC = () => {
             )}
 
             <div className="mb-6 space-y-3 animate-pop-in sticky top-0 z-10 bg-white dark:bg-surface-dark pt-2 pb-3" style={{animationDelay: '0.05s'}}>
-                {/* Search */}
+                {/* Search - only show for active/former tabs */}
+                {memberTab !== 'visitors' && (
                 <div className="relative">
                     <span aria-hidden="true" className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-[20px]">search</span>
                     <input
@@ -574,8 +665,10 @@ const DirectoryTab: React.FC = () => {
                         </button>
                     )}
                 </div>
+                )}
                 
-                {/* Tier Filter */}
+                {/* Tier Filter - only for active/former tabs */}
+                {memberTab !== 'visitors' && (
                 <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">Tier:</span>
                     {TIER_OPTIONS.map(tier => {
@@ -603,9 +696,10 @@ const DirectoryTab: React.FC = () => {
                         );
                     })}
                 </div>
+                )}
 
-                {/* Tag Filter */}
-                {allTags.length > 0 && (
+                {/* Tag Filter - only for active/former tabs */}
+                {memberTab !== 'visitors' && allTags.length > 0 && (
                     <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">Tag:</span>
                         <button
@@ -670,7 +764,10 @@ const DirectoryTab: React.FC = () => {
                 )}
                 
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {filteredList.length} {memberTab === 'former' ? 'former ' : ''}member{filteredList.length !== 1 ? 's' : ''} found
+                    {memberTab === 'visitors' 
+                        ? `${visitors.length} visitor${visitors.length !== 1 ? 's' : ''} found`
+                        : `${filteredList.length} ${memberTab === 'former' ? 'former ' : ''}member${filteredList.length !== 1 ? 's' : ''} found`
+                    }
                 </p>
             </div>
 
@@ -715,7 +812,7 @@ const DirectoryTab: React.FC = () => {
                 )}
 
                 {/* Empty state - search/filter returned no results */}
-                {!formerLoading && filteredList.length === 0 && (memberTab === 'active' || formerMembers.length > 0) && (
+                {!formerLoading && filteredList.length === 0 && memberTab !== 'visitors' && (memberTab === 'active' || formerMembers.length > 0) && (
                     <div className="flex flex-col items-center justify-center py-16 px-6 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-white/5">
                         <span aria-hidden="true" className="material-symbols-outlined text-6xl mb-4 text-gray-400 dark:text-white/30">
                             {searchQuery || tierFilter !== 'All' || tagFilter !== 'All' || statusFilter !== 'All' ? 'search_off' : 'person_off'}
@@ -733,8 +830,140 @@ const DirectoryTab: React.FC = () => {
                     </div>
                 )}
 
-                {/* Mobile view - Virtualized only for large lists */}
-                {!formerLoading && filteredList.length > 0 && (
+                {/* Loading state for visitors */}
+                {visitorsLoading && memberTab === 'visitors' && (
+                    <DirectoryTabSkeleton />
+                )}
+
+                {/* Error state - failed to load visitors */}
+                {!visitorsLoading && visitorsError && memberTab === 'visitors' && (
+                    <div className="flex flex-col items-center justify-center py-16 px-6 rounded-2xl border-2 border-dashed border-red-200 dark:border-red-500/25 bg-red-50 dark:bg-red-500/5">
+                        <span aria-hidden="true" className="material-symbols-outlined text-6xl mb-4 text-red-400 dark:text-red-400/70">cloud_off</span>
+                        <h3 className="text-lg font-bold mb-2 text-red-600 dark:text-red-400">
+                            Failed to load visitors
+                        </h3>
+                        <p className="text-sm text-red-500 dark:text-red-400/80 max-w-sm mx-auto text-center mb-4">
+                            There was a problem connecting to the server. Please try again.
+                        </p>
+                        <button
+                            onClick={fetchVisitors}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold transition-colors"
+                        >
+                            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">refresh</span>
+                            Retry
+                        </button>
+                    </div>
+                )}
+
+                {/* Empty state - no visitors in system */}
+                {!visitorsLoading && !visitorsError && memberTab === 'visitors' && visitors.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-16 px-6 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-white/5">
+                        <span aria-hidden="true" className="material-symbols-outlined text-6xl mb-4 text-gray-400 dark:text-white/30">badge</span>
+                        <h3 className="text-lg font-bold mb-2 text-gray-600 dark:text-white/70">
+                            No visitors found
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-white/60 max-w-sm mx-auto text-center">
+                            Non-members who purchase day passes will appear here.
+                        </p>
+                    </div>
+                )}
+
+                {/* Visitors List - Mobile view */}
+                {!visitorsLoading && !visitorsError && memberTab === 'visitors' && visitors.length > 0 && (
+                    <div className="md:hidden flex-1 min-h-0 relative">
+                        <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-white dark:from-[#1e1e1e] to-transparent z-10 pointer-events-none" />
+                        <div className="h-full overflow-y-auto pt-2 pb-24">
+                            <div className="space-y-3 px-1">
+                                {visitors.map((v, index) => (
+                                    <div 
+                                        key={v.id}
+                                        onClick={() => openVisitorDetails(v)}
+                                        className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm cursor-pointer hover:border-primary/50 transition-colors animate-slide-in-up"
+                                        style={{ animationDelay: `${index * 40}ms` }}
+                                    >
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="flex-1">
+                                                <h4 className="font-bold text-lg text-primary dark:text-white">
+                                                    {[v.firstName, v.lastName].filter(Boolean).join(' ') || 'Unknown'}
+                                                </h4>
+                                                {v.email && <p className="text-xs text-gray-500 dark:text-gray-400">{v.email}</p>}
+                                                {v.phone && <p className="text-xs text-gray-500 dark:text-gray-400">{formatPhoneNumber(v.phone)}</p>}
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">{v.purchaseCount || 0} purchase{v.purchaseCount !== 1 ? 's' : ''}</p>
+                                                {v.lastPurchaseDate && <p className="text-xs text-gray-500 dark:text-gray-400">Last: {formatJoinDate(v.lastPurchaseDate)}</p>}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-gray-50 dark:border-white/20">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400">
+                                                    Day Pass
+                                                </span>
+                                                {v.totalSpentCents > 0 && (
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                        ${(v.totalSpentCents / 100).toFixed(2)} spent
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <span className="material-symbols-outlined text-gray-400 text-[16px]">chevron_right</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-white dark:from-[#1e1e1e] to-transparent z-10 pointer-events-none" />
+                    </div>
+                )}
+
+                {/* Visitors List - Desktop view */}
+                {!visitorsLoading && !visitorsError && memberTab === 'visitors' && visitors.length > 0 && (
+                    <div className="hidden md:flex flex-col flex-1 min-h-0 overflow-hidden">
+                        <div className="flex bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/20 shrink-0">
+                            <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '20%' }}>Name</div>
+                            <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '25%' }}>Email</div>
+                            <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '15%' }}>Phone</div>
+                            <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm text-center" style={{ width: '10%' }}>Purchases</div>
+                            <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm text-center" style={{ width: '15%' }}>Total Spent</div>
+                            <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '15%' }}>Last Visit</div>
+                        </div>
+                        <div className="relative flex-1 min-h-0">
+                            <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-white dark:from-[#1e1e1e] to-transparent z-10 pointer-events-none" />
+                            <div className="h-full overflow-y-auto pt-2">
+                                {visitors.map((v, index) => (
+                                    <div 
+                                        key={v.id}
+                                        onClick={() => openVisitorDetails(v)}
+                                        className="flex items-center border-b border-gray-200 dark:border-white/20 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer animate-slide-in-up"
+                                        style={{ animationDelay: `${index * 25}ms` }}
+                                    >
+                                        <div style={{ width: '20%' }} className="p-4 font-medium text-primary dark:text-white truncate">
+                                            {[v.firstName, v.lastName].filter(Boolean).join(' ') || 'Unknown'}
+                                        </div>
+                                        <div style={{ width: '25%' }} className="p-4 text-gray-500 dark:text-gray-400 text-sm truncate" title={v.email || ''}>
+                                            {v.email || '-'}
+                                        </div>
+                                        <div style={{ width: '15%' }} className="p-4 text-gray-500 dark:text-gray-400 text-sm">
+                                            {v.phone ? formatPhoneNumber(v.phone) : '-'}
+                                        </div>
+                                        <div style={{ width: '10%' }} className="p-4 text-center text-gray-600 dark:text-gray-400 text-sm font-medium">
+                                            {v.purchaseCount || 0}
+                                        </div>
+                                        <div style={{ width: '15%' }} className="p-4 text-center text-gray-600 dark:text-gray-400 text-sm font-medium">
+                                            ${((v.totalSpentCents || 0) / 100).toFixed(2)}
+                                        </div>
+                                        <div style={{ width: '15%' }} className="p-4 text-gray-500 dark:text-gray-400 text-sm whitespace-nowrap">
+                                            {formatJoinDate(v.lastPurchaseDate)}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-white dark:from-[#1e1e1e] to-transparent z-10 pointer-events-none" />
+                        </div>
+                    </div>
+                )}
+
+                {/* Mobile view - Virtualized only for large lists (members only) */}
+                {!formerLoading && memberTab !== 'visitors' && filteredList.length > 0 && (
                 <div className="md:hidden flex-1 min-h-0 relative">
                     {/* Top fade gradient */}
                     <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-white dark:from-[#1e1e1e] to-transparent z-10 pointer-events-none" />
@@ -816,8 +1045,8 @@ const DirectoryTab: React.FC = () => {
                 </div>
             )}
 
-            {/* Desktop view - Virtualized only for large lists with flex-based layout */}
-            {!formerLoading && filteredList.length > 0 && (
+            {/* Desktop view - Virtualized only for large lists with flex-based layout (members only) */}
+            {!formerLoading && memberTab !== 'visitors' && filteredList.length > 0 && (
             <div className="hidden md:flex flex-col flex-1 min-h-0 overflow-hidden">
                 {/* Header row - fixed */}
                 <div className="flex bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/20 shrink-0">
@@ -1043,6 +1272,121 @@ const DirectoryTab: React.FC = () => {
                                 ) : (
                                     'Assign Tier'
                                 )}
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* Visitor Details Modal */}
+            {visitorDetailsOpen && selectedVisitor && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+                    <div 
+                        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                        onClick={() => { setVisitorDetailsOpen(false); setSelectedVisitor(null); setVisitorPurchases([]); }}
+                    />
+                    <div className="relative bg-white dark:bg-surface-dark rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-pop-in max-h-[90vh] overflow-hidden flex flex-col">
+                        <button
+                            onClick={() => { setVisitorDetailsOpen(false); setSelectedVisitor(null); setVisitorPurchases([]); }}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        >
+                            <span className="material-symbols-outlined">close</span>
+                        </button>
+                        
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-2xl">badge</span>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                                    {[selectedVisitor.firstName, selectedVisitor.lastName].filter(Boolean).join(' ') || 'Unknown Visitor'}
+                                </h3>
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400">
+                                    Day Pass Visitor
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3 mb-6">
+                            {selectedVisitor.email && (
+                                <div className="flex items-center gap-3">
+                                    <span className="material-symbols-outlined text-gray-400 text-lg">mail</span>
+                                    <span className="text-sm text-gray-700 dark:text-gray-300">{selectedVisitor.email}</span>
+                                </div>
+                            )}
+                            {selectedVisitor.phone && (
+                                <div className="flex items-center gap-3">
+                                    <span className="material-symbols-outlined text-gray-400 text-lg">phone</span>
+                                    <span className="text-sm text-gray-700 dark:text-gray-300">{formatPhoneNumber(selectedVisitor.phone)}</span>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-3">
+                                <span className="material-symbols-outlined text-gray-400 text-lg">confirmation_number</span>
+                                <span className="text-sm text-gray-700 dark:text-gray-300">{selectedVisitor.purchaseCount} purchase{selectedVisitor.purchaseCount !== 1 ? 's' : ''}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="material-symbols-outlined text-gray-400 text-lg">payments</span>
+                                <span className="text-sm text-gray-700 dark:text-gray-300">${((selectedVisitor.totalSpentCents || 0) / 100).toFixed(2)} total spent</span>
+                            </div>
+                            {selectedVisitor.lastPurchaseDate && (
+                                <div className="flex items-center gap-3">
+                                    <span className="material-symbols-outlined text-gray-400 text-lg">schedule</span>
+                                    <span className="text-sm text-gray-700 dark:text-gray-300">Last visit: {formatJoinDate(selectedVisitor.lastPurchaseDate)}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="border-t border-gray-200 dark:border-white/20 pt-4 flex-1 overflow-hidden flex flex-col">
+                            <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Purchase History</h4>
+                            
+                            {purchasesLoading ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <span className="material-symbols-outlined text-2xl animate-spin text-gray-400">progress_activity</span>
+                                </div>
+                            ) : visitorPurchases.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <span className="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-600 mb-2">receipt_long</span>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">No purchases found</p>
+                                </div>
+                            ) : (
+                                <div className="overflow-y-auto flex-1 space-y-2">
+                                    {visitorPurchases.map(purchase => (
+                                        <div 
+                                            key={purchase.id}
+                                            className="p-3 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10"
+                                        >
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                                        {purchase.quantity} Day Pass{purchase.quantity !== 1 ? 'es' : ''}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                        {new Date(purchase.purchasedAt).toLocaleDateString('en-US', { 
+                                                            month: 'short', 
+                                                            day: 'numeric', 
+                                                            year: 'numeric',
+                                                            hour: 'numeric',
+                                                            minute: '2-digit'
+                                                        })}
+                                                    </p>
+                                                </div>
+                                                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                                                    ${(purchase.amountCents / 100).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-white/20">
+                            <button
+                                onClick={() => { setVisitorDetailsOpen(false); setSelectedVisitor(null); setVisitorPurchases([]); }}
+                                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-white/20 text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                            >
+                                Close
                             </button>
                         </div>
                     </div>

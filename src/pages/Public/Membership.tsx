@@ -551,6 +551,33 @@ const DiscountRow: React.FC<{count: string; price: string; icon: string}> = ({ c
     </div>
 );
 
+const StripePricingTableSection: React.FC = () => {
+  useEffect(() => {
+    const existingScript = document.querySelector('script[src="https://js.stripe.com/v3/pricing-table.js"]');
+    if (!existingScript) {
+      const script = document.createElement('script');
+      script.src = 'https://js.stripe.com/v3/pricing-table.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
+  return (
+    <div className="mt-8 animate-pop-in" style={{animationDelay: '0.15s'}}>
+      <div className="text-center mb-6">
+        <h3 className="text-2xl font-medium tracking-tight text-primary mb-2">Ready to Join?</h3>
+        <p className="text-primary/70 text-sm">Select your membership and complete checkout securely with Stripe.</p>
+      </div>
+      <div className="bg-white/60 backdrop-blur-xl rounded-3xl p-6 shadow-sm border border-white/60">
+        <stripe-pricing-table 
+          pricing-table-id="prctbl_1SrVHR4XrxqCSeuF8SgF4CfM"
+          publishable-key="pk_test_51SpgZU4XrxqCSeuFJAIikh4BIWShOvT55561Ek8kV6XDo019FX2Oti1M80pNWpgDGMKzzhs0hIDhwI9nqF7GSLT400Tp6xyKKn">
+        </stripe-pricing-table>
+      </div>
+    </div>
+  );
+};
+
 const CompareFeatures: React.FC = () => {
   const { setPageReady } = usePageReady();
   const [tiers, setTiers] = useState<MembershipTier[]>([]);
@@ -688,6 +715,8 @@ const CompareFeatures: React.FC = () => {
           })}
         </div>
       </div>
+      
+      <StripePricingTableSection />
     </div>
   );
 };

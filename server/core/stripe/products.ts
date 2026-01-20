@@ -37,15 +37,15 @@ export interface ProductSyncStatus {
   stripePriceId?: string;
 }
 
-function parseRecurringPeriod(period: string | null): { interval: 'month' | 'year' | 'week' | 'day'; intervalCount: number } {
+function parseRecurringPeriod(period: string | null): { interval: 'month' | 'year' | 'week' | 'day'; intervalCount: number } | null {
   if (!period) {
-    return { interval: 'month', intervalCount: 1 };
+    return null;
   }
   
   const cleanPeriod = period.trim().toUpperCase();
   const match = cleanPeriod.match(/^P(\d+)([YMWD])$/);
   if (!match) {
-    return { interval: 'month', intervalCount: 1 };
+    return null;
   }
   
   const count = parseInt(match[1], 10);
@@ -125,30 +125,37 @@ export async function syncHubSpotProductToStripe(hubspotProduct: HubSpotProduct)
       });
       
       const priceCents = Math.round(hubspotProduct.price * 100);
-      const { interval, intervalCount } = parseRecurringPeriod(hubspotProduct.recurringPeriod);
+      const isOneTimeName = /pass|pack|fee|merch/i.test(hubspotProduct.name);
+      let recurringConfig = parseRecurringPeriod(hubspotProduct.recurringPeriod);
+      if (isOneTimeName) recurringConfig = null;
       
       const currentPrice = await stripe.prices.retrieve(existing.stripePriceId);
       const priceChanged = currentPrice.unit_amount !== priceCents;
-      const intervalChanged = currentPrice.recurring?.interval !== interval || 
-                              currentPrice.recurring?.interval_count !== intervalCount;
+      const intervalChanged = recurringConfig 
+        ? (currentPrice.recurring?.interval !== recurringConfig.interval || 
+           currentPrice.recurring?.interval_count !== recurringConfig.intervalCount)
+        : !!currentPrice.recurring;
       
       let newPriceId = existing.stripePriceId;
       
       if (priceChanged || intervalChanged) {
         await stripe.prices.update(existing.stripePriceId, { active: false });
         
-        const newPrice = await stripe.prices.create({
+        const pricePayload: any = {
           product: existing.stripeProductId,
           unit_amount: priceCents,
           currency: 'usd',
-          recurring: {
-            interval,
-            interval_count: intervalCount,
-          },
           metadata: {
             hubspot_product_id: hubspotProduct.id,
           },
-        });
+        };
+        if (recurringConfig) {
+          pricePayload.recurring = {
+            interval: recurringConfig.interval,
+            interval_count: recurringConfig.intervalCount,
+          };
+        }
+        const newPrice = await stripe.prices.create(pricePayload);
         newPriceId = newPrice.id;
       }
       
@@ -156,8 +163,8 @@ export async function syncHubSpotProductToStripe(hubspotProduct: HubSpotProduct)
         .set({
           name: hubspotProduct.name,
           priceCents,
-          billingInterval: interval,
-          billingIntervalCount: intervalCount,
+          billingInterval: recurringConfig?.interval || null,
+          billingIntervalCount: recurringConfig?.intervalCount || null,
           stripePriceId: newPriceId,
           updatedAt: new Date(),
         })
@@ -182,20 +189,25 @@ export async function syncHubSpotProductToStripe(hubspotProduct: HubSpotProduct)
     });
     
     const priceCents = Math.round(hubspotProduct.price * 100);
-    const { interval, intervalCount } = parseRecurringPeriod(hubspotProduct.recurringPeriod);
+    const isOneTimeNameCreate = /pass|pack|fee|merch/i.test(hubspotProduct.name);
+    let recurringConfigCreate = parseRecurringPeriod(hubspotProduct.recurringPeriod);
+    if (isOneTimeNameCreate) recurringConfigCreate = null;
     
-    const stripePrice = await stripe.prices.create({
+    const pricePayloadCreate: any = {
       product: stripeProduct.id,
       unit_amount: priceCents,
       currency: 'usd',
-      recurring: {
-        interval,
-        interval_count: intervalCount,
-      },
       metadata: {
         hubspot_product_id: hubspotProduct.id,
       },
-    });
+    };
+    if (recurringConfigCreate) {
+      pricePayloadCreate.recurring = {
+        interval: recurringConfigCreate.interval,
+        interval_count: recurringConfigCreate.intervalCount,
+      };
+    }
+    const stripePrice = await stripe.prices.create(pricePayloadCreate);
     
     await db.insert(stripeProducts).values({
       hubspotProductId: hubspotProduct.id,
@@ -203,8 +215,8 @@ export async function syncHubSpotProductToStripe(hubspotProduct: HubSpotProduct)
       stripePriceId: stripePrice.id,
       name: hubspotProduct.name,
       priceCents,
-      billingInterval: interval,
-      billingIntervalCount: intervalCount,
+      billingInterval: recurringConfigCreate?.interval || null,
+      billingIntervalCount: recurringConfigCreate?.intervalCount || null,
       isActive: true,
     });
     

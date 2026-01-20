@@ -195,4 +195,59 @@ router.post('/api/my/billing/update-payment-method', requireAuth, async (req, re
   }
 });
 
+router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
+  try {
+    const sessionUser = req.session.user;
+    const isStaff = sessionUser.role === 'admin' || sessionUser.role === 'staff';
+    const targetEmail = (req.body.email && isStaff) ? String(req.body.email) : sessionUser.email;
+    
+    const result = await pool.query(
+      `SELECT stripe_customer_id, billing_provider, email FROM users WHERE LOWER(email) = $1`,
+      [targetEmail.toLowerCase()]
+    );
+    
+    const member = result.rows[0];
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    const stripe = await getStripeClient();
+    let customerId = member.stripe_customer_id;
+    
+    if (!customerId) {
+      const customers = await stripe.customers.list({ email: member.email, limit: 1 });
+      if (customers.data.length > 0) {
+        customerId = customers.data[0].id;
+        await pool.query(
+          `UPDATE users SET stripe_customer_id = $1, billing_provider = 'stripe' WHERE LOWER(email) = $2`,
+          [customerId, targetEmail.toLowerCase()]
+        );
+      } else {
+        const customer = await stripe.customers.create({ email: member.email });
+        customerId = customer.id;
+        await pool.query(
+          `UPDATE users SET stripe_customer_id = $1, billing_provider = 'stripe' WHERE LOWER(email) = $2`,
+          [customerId, targetEmail.toLowerCase()]
+        );
+      }
+    }
+    
+    const returnUrl = process.env.REPLIT_DEV_DOMAIN
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}/profile`
+      : process.env.REPLIT_DEPLOYMENT_DOMAIN
+        ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}/profile`
+        : 'https://everhouse.com/profile';
+    
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: returnUrl,
+    });
+    
+    res.json({ url: session.url });
+  } catch (error: any) {
+    console.error('[MyBilling] Portal error:', error);
+    res.status(500).json({ error: 'Failed to open billing portal' });
+  }
+});
+
 export default router;

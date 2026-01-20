@@ -58,6 +58,7 @@ export default function BillingSection({ isDark }: Props) {
   const [loading, setLoading] = useState(true);
   const [showInvoices, setShowInvoices] = useState(false);
   const [updatingPayment, setUpdatingPayment] = useState(false);
+  const [openingPortal, setOpeningPortal] = useState(false);
 
   useEffect(() => {
     const emailParam = viewAsUser?.email ? `?email=${encodeURIComponent(viewAsUser.email)}` : '';
@@ -88,6 +89,29 @@ export default function BillingSection({ isDark }: Props) {
       showToast('Failed to open payment portal', 'error');
     } finally {
       setUpdatingPayment(false);
+    }
+  };
+
+  const handleOpenBillingPortal = async () => {
+    setOpeningPortal(true);
+    try {
+      const emailParam = viewAsUser?.email ? JSON.stringify({ email: viewAsUser.email }) : '{}';
+      const res = await fetch('/api/my/billing/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: emailParam,
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.open(data.url, '_blank');
+      } else {
+        showToast(data.error || 'Unable to open billing portal', 'error');
+      }
+    } catch {
+      showToast('Failed to open billing portal', 'error');
+    } finally {
+      setOpeningPortal(false);
     }
   };
 
@@ -186,6 +210,23 @@ export default function BillingSection({ isDark }: Props) {
               </span>
             )}
           </div>
+          
+          <button
+            onClick={handleOpenBillingPortal}
+            disabled={openingPortal}
+            className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium text-sm transition-all disabled:opacity-50 ${
+              isDark 
+                ? 'bg-accent/20 text-accent hover:bg-accent/30' 
+                : 'bg-primary/10 text-primary hover:bg-primary/20'
+            }`}
+          >
+            {openingPortal ? (
+              <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>
+            ) : (
+              <span className="material-symbols-outlined text-lg">manage_accounts</span>
+            )}
+            {openingPortal ? 'Opening...' : 'Manage Subscription'}
+          </button>
           
           {card && (
             <div className={`flex items-center justify-between py-3 border-t ${isDark ? 'border-white/10' : 'border-black/5'}`}>
