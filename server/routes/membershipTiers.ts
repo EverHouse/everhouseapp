@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { pool, isProduction } from '../core/db';
-import { isAdmin } from '../core/middleware';
+import { isAdmin, isStaffOrAdmin } from '../core/middleware';
 import { invalidateTierCache, clearTierCache } from '../core/tierService';
+import { syncMembershipTiersToStripe, getTierSyncStatus } from '../core/stripe/products';
 
 const router = Router();
 
@@ -204,6 +205,36 @@ router.post('/api/membership-tiers', isAdmin, async (req, res) => {
     } else {
       res.status(500).json({ error: 'Failed to create membership tier' });
     }
+  }
+});
+
+// Admin endpoint to sync all membership tiers to Stripe
+router.post('/api/admin/stripe/sync-products', isStaffOrAdmin, async (req, res) => {
+  try {
+    console.log('[Admin] Starting Stripe product sync...');
+    const result = await syncMembershipTiersToStripe();
+    console.log(`[Admin] Stripe sync complete: ${result.synced} synced, ${result.failed} failed, ${result.skipped} skipped`);
+    res.json({ 
+      success: result.success, 
+      synced: result.synced,
+      failed: result.failed,
+      skipped: result.skipped,
+      details: result.results 
+    });
+  } catch (error: any) {
+    console.error('[Admin] Stripe sync error:', error);
+    res.status(500).json({ error: 'Failed to sync products to Stripe', message: error.message });
+  }
+});
+
+// Get sync status for all tiers
+router.get('/api/admin/stripe/sync-status', isStaffOrAdmin, async (req, res) => {
+  try {
+    const status = await getTierSyncStatus();
+    res.json({ tiers: status });
+  } catch (error: any) {
+    console.error('[Admin] Error getting sync status:', error);
+    res.status(500).json({ error: 'Failed to get sync status' });
   }
 });
 

@@ -57,6 +57,7 @@ const TiersTab: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [newFeatureKey, setNewFeatureKey] = useState('');
+    const [syncing, setSyncing] = useState(false);
 
     const SUB_TABS: { key: SubTab; label: string; icon: string }[] = [
         { key: 'tiers', label: 'Tiers', icon: 'layers' },
@@ -244,6 +245,26 @@ const TiersTab: React.FC = () => {
                 [key]: !selectedTier.all_features[key]
             }
         });
+    };
+
+    const handleSyncStripe = async () => {
+        setSyncing(true);
+        try {
+            const res = await fetch('/api/admin/stripe/sync-products', { 
+                method: 'POST',
+                credentials: 'include'
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                alert(`Synced ${data.synced} products to Stripe`);
+            } else {
+                alert('Sync failed: ' + (data.error || 'Unknown error'));
+            }
+        } catch (err) {
+            alert('Sync failed');
+        } finally {
+            setSyncing(false);
+        }
     };
 
     if (isLoading) {
@@ -577,6 +598,14 @@ const TiersTab: React.FC = () => {
                         <p className="text-sm text-gray-500 dark:text-gray-400">
                             {tiers.length} membership tier{tiers.length !== 1 ? 's' : ''}
                         </p>
+                        <button 
+                            onClick={handleSyncStripe}
+                            disabled={syncing}
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg transition-colors"
+                        >
+                            <span className={`material-symbols-outlined ${syncing ? 'animate-spin' : ''}`}>sync</span>
+                            {syncing ? 'Syncing...' : 'Sync to Stripe'}
+                        </button>
                     </div>
                     {tiers.length === 0 ? (
                         <div className="text-center py-12 px-6 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-white/5">

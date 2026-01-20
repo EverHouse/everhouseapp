@@ -2,7 +2,8 @@ import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin, isAdmin } from '../core/middleware';
 import { pool } from '../core/db';
 import { db } from '../db';
-import { billingAuditLog } from '../../shared/schema';
+import { billingAuditLog, membershipTiers } from '../../shared/schema';
+import { ilike } from 'drizzle-orm';
 import { getTodayPacific } from '../utils/dateUtils';
 import {
   getStripePublishableKey,
@@ -1101,12 +1102,6 @@ router.post('/api/member/invoices/:invoiceId/confirm', async (req: Request, res:
   }
 });
 
-const GUEST_PASS_PRICING: Record<number, number> = {
-  1: 3000,
-  3: 7500,
-  5: 10000,
-};
-
 router.post('/api/member/guest-passes/purchase', async (req: Request, res: Response) => {
   try {
     const sessionEmail = (req as any).user?.email;
@@ -1120,10 +1115,19 @@ router.post('/api/member/guest-passes/purchase', async (req: Request, res: Respo
       return res.status(400).json({ error: 'Invalid quantity. Must be 1, 3, or 5.' });
     }
 
-    const amountCents = GUEST_PASS_PRICING[quantity];
-    if (!amountCents) {
-      return res.status(400).json({ error: 'Invalid pricing configuration' });
+    // Look up the Guest Pass product from the database
+    const passProduct = await db.query.membershipTiers.findFirst({
+      where: ilike(membershipTiers.name, '%Guest Pass%')
+    });
+
+    if (!passProduct || !passProduct.stripePriceId || !passProduct.priceCents) {
+      return res.status(500).json({
+        error: 'Guest Pass product not configured. Please sync tiers to Stripe first.'
+      });
     }
+
+    const unitPriceCents = passProduct.priceCents;
+    const amountCents = unitPriceCents * quantity;
 
     const userResult = await pool.query(
       'SELECT id, stripe_customer_id, first_name, last_name FROM users WHERE LOWER(email) = $1',
@@ -1155,6 +1159,7 @@ router.post('/api/member/guest-passes/purchase', async (req: Request, res: Respo
       metadata: {
         purpose: 'guest_pass_purchase',
         quantity: quantity.toString(),
+        priceId: passProduct.stripePriceId,
         member_email: sessionEmail,
         source: 'ever_house_member_portal'
       },
@@ -1213,7 +1218,18 @@ router.post('/api/member/guest-passes/confirm', async (req: Request, res: Respon
       return res.status(400).json({ error: 'Quantity mismatch' });
     }
 
-    const expectedAmount = GUEST_PASS_PRICING[quantity];
+    // Look up the Guest Pass product from the database to validate pricing
+    const passProduct = await db.query.membershipTiers.findFirst({
+      where: ilike(membershipTiers.name, '%Guest Pass%')
+    });
+
+    if (!passProduct || !passProduct.stripePriceId || !passProduct.priceCents) {
+      return res.status(500).json({
+        error: 'Guest Pass product not configured. Please sync tiers to Stripe first.'
+      });
+    }
+
+    const expectedAmount = passProduct.priceCents * quantity;
     if (paymentIntent.amount !== expectedAmount) {
       console.error(`[Stripe] Amount mismatch for guest pass purchase: expected ${expectedAmount}, got ${paymentIntent.amount}`);
       return res.status(400).json({ error: 'Payment amount mismatch' });
