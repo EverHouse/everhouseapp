@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import Logo from './Logo';
 import { APP_VERSION, formatLastUpdated } from '../config/version';
 
@@ -54,8 +55,8 @@ export const Footer: React.FC<FooterProps> = ({ hideCta = false }) => (
      <div className="w-full max-w-xs mx-auto h-px bg-[#E7E7DC]/10 mb-8"></div>
      
      <div className="flex justify-center gap-6 mb-6 text-xs">
-        <a href="/privacy" className="text-[#E7E7DC]/60 hover:text-[#E7E7DC] transition-colors">Privacy Policy</a>
-        <a href="/terms" className="text-[#E7E7DC]/60 hover:text-[#E7E7DC] transition-colors">Terms of Service</a>
+        <Link to="/privacy" className="text-[#E7E7DC]/60 hover:text-[#E7E7DC] transition-colors">Privacy Policy</Link>
+        <Link to="/terms" className="text-[#E7E7DC]/60 hover:text-[#E7E7DC] transition-colors">Terms of Service</Link>
      </div>
      
      <div className="flex flex-col items-center gap-2">

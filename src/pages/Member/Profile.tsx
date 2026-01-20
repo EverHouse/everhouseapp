@@ -709,7 +709,7 @@ const Profile: React.FC = () => {
             <>
               {/* Privacy Policy Link */}
               <a
-                href="/privacy"
+                href="/#/privacy"
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`p-4 flex items-center justify-between rounded-xl transition-colors ${
@@ -731,7 +731,7 @@ const Profile: React.FC = () => {
 
               {/* Terms of Service Link */}
               <a
-                href="/terms"
+                href="/#/terms"
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`p-4 flex items-center justify-between rounded-xl transition-colors ${
