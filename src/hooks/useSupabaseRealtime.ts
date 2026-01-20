@@ -11,7 +11,7 @@ export interface UseSupabaseRealtimeOptions {
   onAnnouncementUpdate?: (payload: any) => void;
 }
 
-const DEFAULT_TABLES = ['notifications', 'bookings', 'announcements'];
+const DEFAULT_TABLES = ['notifications', 'booking_sessions', 'announcements'];
 
 export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
   const {
@@ -87,7 +87,7 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
                 handleNotification(payload);
               }
             );
-        } else if (table === 'bookings') {
+        } else if (table === 'booking_sessions') {
           channel = supabase
             .channel(`realtime-${table}`)
             .on(
