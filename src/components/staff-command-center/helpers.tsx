@@ -121,6 +121,7 @@ export const formatTodayDate = (): string => {
 };
 
 export const EMPLOYEE_RESOURCES_LINKS = [
+  { id: 'qr_scanner' as const, icon: 'qr_code_scanner', label: 'Scan QR' },
   { id: 'directory' as const, icon: 'groups', label: 'Member Directory' },
   { id: 'team' as const, icon: 'badge', label: 'Team' },
   { id: 'cafe' as const, icon: 'local_cafe', label: 'Cafe Menu' },

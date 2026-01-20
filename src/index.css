@@ -67,7 +67,7 @@
   
   /* Z-Index Hierarchy Scale - Centralized overlay stacking */
   --z-content: 0;
-  --z-header: 1000;
+  --z-header: 9000;
   --z-sticky: 2000;
   --z-dropdown: 5000;
   --z-overlay: 8000;

@@ -8,9 +8,10 @@ interface QuickActionsGridProps {
   isAdmin?: boolean;
   variant: 'desktop' | 'mobile';
   onNewMember?: () => void;
+  onScanQr?: () => void;
 }
 
-export const QuickActionsGrid: React.FC<QuickActionsGridProps> = ({ onTabChange, isAdmin, variant, onNewMember }) => {
+export const QuickActionsGrid: React.FC<QuickActionsGridProps> = ({ onTabChange, isAdmin, variant, onNewMember, onScanQr }) => {
   const navigate = useNavigate();
 
   if (variant === 'desktop') {
@@ -25,7 +26,7 @@ export const QuickActionsGrid: React.FC<QuickActionsGridProps> = ({ onTabChange,
               {EMPLOYEE_RESOURCES_LINKS.map(link => (
                 <button
                   key={link.id}
-                  onClick={() => onTabChange(link.id)}
+              onClick={() => link.id === 'qr_scanner' ? onScanQr?.() : onTabChange(link.id)}
                   className="flex flex-col items-center p-3 bg-[#CCB8E4]/30 dark:bg-[#CCB8E4]/20 rounded-xl hover:bg-[#CCB8E4]/50 dark:hover:bg-[#CCB8E4]/30 transition-colors"
                 >
                   <span className="material-symbols-outlined text-2xl text-primary dark:text-white mb-1">{link.icon}</span>
@@ -77,7 +78,7 @@ export const QuickActionsGrid: React.FC<QuickActionsGridProps> = ({ onTabChange,
           {EMPLOYEE_RESOURCES_LINKS.map(link => (
             <button
               key={link.id}
-              onClick={() => onTabChange(link.id)}
+              onClick={() => link.id === 'qr_scanner' ? onScanQr?.() : onTabChange(link.id)}
               className="flex flex-col items-center p-3 bg-[#CCB8E4]/30 dark:bg-[#CCB8E4]/20 rounded-xl hover:bg-[#CCB8E4]/50 transition-colors"
             >
               <span className="material-symbols-outlined text-xl text-primary dark:text-white mb-1">{link.icon}</span>

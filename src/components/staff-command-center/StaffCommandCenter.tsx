@@ -17,6 +17,7 @@ import { QuickActionsGrid } from './sections/QuickActionsGrid';
 import { CheckinBillingModal } from './modals/CheckinBillingModal';
 import { CompleteRosterModal } from './modals/CompleteRosterModal';
 import { AddMemberModal } from './modals/AddMemberModal';
+import QrScannerModal from './modals/QrScannerModal';
 import type { StaffCommandCenterProps, BookingRequest, RecentActivity } from './types';
 
 interface OptimisticUpdateRef {
@@ -39,8 +40,29 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
   const [billingModal, setBillingModal] = useState<{ isOpen: boolean; bookingId: number | null }>({ isOpen: false, bookingId: null });
   const [rosterModal, setRosterModal] = useState<{ isOpen: boolean; bookingId: number | null }>({ isOpen: false, bookingId: null });
   const [addMemberModalOpen, setAddMemberModalOpen] = useState(false);
+  const [qrScannerOpen, setQrScannerOpen] = useState(false);
   
   const optimisticUpdateRef = useRef<OptimisticUpdateRef | null>(null);
+
+  const handleScanSuccess = (decodedText: string) => {
+    try {
+      const data = JSON.parse(decodedText);
+      if (data.bookingId) {
+        const booking = data.todaysBookings.find(b => b.id === data.bookingId);
+        if (booking) {
+          handleCheckIn(booking);
+          showToast(`Checking in ${booking.user_name}...`, 'info');
+        } else {
+          showToast('Booking not found for today.', 'error');
+        }
+      } else {
+        showToast('Invalid QR code format.', 'error');
+      }
+    } catch (error) {
+      showToast('Invalid QR code.', 'error');
+    }
+    setQrScannerOpen(false);
+  };
   
   const safeRevertOptimisticUpdate = useCallback((
     bookingId: number | string,
@@ -455,9 +477,15 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
             onTabChange={onTabChange}
             variant="mobile-cards"
           />
-          <QuickActionsGrid onTabChange={onTabChange} isAdmin={isAdmin} variant="mobile" onNewMember={() => setAddMemberModalOpen(true)} />
+          <QuickActionsGrid onTabChange={onTabChange} isAdmin={isAdmin} variant="mobile" onNewMember={() => setAddMemberModalOpen(true)} onScanQr={() => setQrScannerOpen(true)} />
         </div>
       </div>
+
+      <QrScannerModal
+        isOpen={qrScannerOpen}
+        onClose={() => setQrScannerOpen(false)}
+        onScanSuccess={handleScanSuccess}
+      />
 
       {createPortal(
         <div 

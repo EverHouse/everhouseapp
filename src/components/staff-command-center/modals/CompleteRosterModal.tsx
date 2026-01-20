@@ -38,6 +38,7 @@ export const CompleteRosterModal: React.FC<CompleteRosterModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [rosterComplete, setRosterComplete] = useState(false);
+  const [playerCountConfirmed, setPlayerCountConfirmed] = useState(false);
   const [showBillingModal, setShowBillingModal] = useState(false);
 
   useEffect(() => {
@@ -205,17 +206,33 @@ export const CompleteRosterModal: React.FC<CompleteRosterModalProps> = ({
 
         <div className="px-6 py-4 border-t border-primary/10 dark:border-white/10 bg-primary/5 dark:bg-white/5 flex-shrink-0">
           <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-center gap-2 py-2">
+              <input
+                type="checkbox"
+                id="confirm-players"
+                checked={playerCountConfirmed}
+                onChange={(e) => setPlayerCountConfirmed(e.target.checked)}
+                disabled={!rosterComplete}
+                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500 disabled:opacity-50"
+              />
+              <label
+                htmlFor="confirm-players"
+                className={`text-sm font-medium ${rosterComplete ? 'text-primary dark:text-white' : 'text-gray-400 dark:text-gray-600'}`}
+              >
+                I confirm the player count is correct for billing.
+              </label>
+            </div>
             <button
               onClick={handleCheckIn}
-              disabled={isCheckingIn || !rosterComplete}
+              disabled={isCheckingIn || !rosterComplete || !playerCountConfirmed}
               className={`w-full py-3 font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors ${
-                rosterComplete
+                rosterComplete && playerCountConfirmed
                   ? 'bg-green-600 text-white hover:bg-green-700'
                   : 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
               } disabled:opacity-50`}
             >
               <span className="material-symbols-outlined">how_to_reg</span>
-              {isCheckingIn ? 'Checking In...' : rosterComplete ? 'Complete Check-In' : 'Assign All Players to Check In'}
+              {isCheckingIn ? 'Checking In...' : 'Complete Check-In'}
             </button>
             <button
               onClick={onClose}
