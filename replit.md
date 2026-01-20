@@ -67,7 +67,7 @@ The application features a React 19 frontend with Vite, styled using Tailwind CS
 - **Google Calendar**: Integrates with MBO_Conference_Room, Public/Member Events, and Wellness & Classes calendars.
 - **Apple Messages for Business**: Direct messaging support.
 - **Amarie Aesthetics MedSpa**: Direct booking link for wellness services.
-- **Supabase**: Backend admin client for billing reconciliations using SERVICE_ROLE_KEY. Frontend Realtime subscriptions for notifications, bookings, and announcements (works alongside WebSocket).
+- **Supabase**: Backend admin client for billing reconciliations using SERVICE_ROLE_KEY. Frontend Realtime subscriptions for notifications, bookings, and announcements (works alongside WebSocket). Auth routes generate Supabase session tokens for realtime connections using the generateLink + verifyOtp pattern (requires Supabase email confirmations enabled for full functionality).
 
 ## Corporate Membership
 - **Unified Billing Groups**: Single `billing_groups` table supports both family and corporate memberships via `type` field ('family' | 'corporate').

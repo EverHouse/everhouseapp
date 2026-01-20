@@ -109,52 +109,12 @@ export async function listCustomerSubscriptions(customerId: string): Promise<{
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
       status: 'all',
-      expand: ['data.items.data.price.product', 'data.schedule'],
+      expand: [
+        'data.items.data.price.product', 
+        'data.schedule',
+        'data.pending_update.subscription_items.data.price.product'
+      ],
     });
-    
-    const pendingPriceIds: string[] = [];
-    const subsWithPendingUpdates: { subId: string; priceId: string; effectiveTimestamp: number }[] = [];
-    
-    for (const sub of subscriptions.data) {
-      if (sub.pending_update && (sub.pending_update as any).subscription_items) {
-        const pendingItems = (sub.pending_update as any).subscription_items;
-        if (pendingItems && pendingItems.length > 0 && pendingItems[0].price) {
-          const pendingData = sub.pending_update as any;
-          const effectiveTimestamp = pendingData.billing_cycle_anchor 
-            || pendingData.expires_at 
-            || sub.current_period_end;
-          
-          const priceId = pendingItems[0].price;
-          if (!pendingPriceIds.includes(priceId)) {
-            pendingPriceIds.push(priceId);
-          }
-          subsWithPendingUpdates.push({ subId: sub.id, priceId, effectiveTimestamp });
-        }
-      }
-    }
-    
-    const priceProductMap = new Map<string, string>();
-    if (pendingPriceIds.length > 0) {
-      try {
-        const batchSize = 10;
-        for (let i = 0; i < pendingPriceIds.length; i += batchSize) {
-          const batch = pendingPriceIds.slice(i, i + batchSize);
-          const results = await Promise.all(
-            batch.map(priceId => 
-              stripe.prices.retrieve(priceId, { expand: ['product'] }).catch(() => null)
-            )
-          );
-          for (const result of results) {
-            if (result) {
-              const product = result.product as Stripe.Product;
-              priceProductMap.set(result.id, product?.name || '');
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('[Stripe Subscriptions] Error batch fetching pending prices:', e);
-      }
-    }
     
     return {
       success: true,
@@ -167,13 +127,26 @@ export async function listCustomerSubscriptions(customerId: string): Promise<{
         const productName = product?.name || '';
         
         let pendingUpdate: { newPriceId: string; newProductName: string; effectiveAt: Date } | null = null;
-        const pendingInfo = subsWithPendingUpdates.find(p => p.subId === sub.id);
-        if (pendingInfo) {
-          pendingUpdate = {
-            newPriceId: pendingInfo.priceId,
-            newProductName: priceProductMap.get(pendingInfo.priceId) || '',
-            effectiveAt: new Date(pendingInfo.effectiveTimestamp * 1000),
-          };
+        if (sub.pending_update?.subscription_items && sub.pending_update.subscription_items.data.length > 0) {
+          const pendingItem = sub.pending_update.subscription_items.data[0];
+          const pendingPriceRef = pendingItem?.price;
+          const pendingPriceId = typeof pendingPriceRef === 'string' 
+            ? pendingPriceRef 
+            : pendingPriceRef?.id || '';
+          const pendingProduct = typeof pendingPriceRef === 'string' 
+            ? null 
+            : (pendingPriceRef?.product as Stripe.Product | undefined);
+          const effectiveTimestamp = (sub.pending_update as any).billing_cycle_anchor 
+            || (sub.pending_update as any).expires_at 
+            || sub.current_period_end;
+            
+          if (pendingPriceId && effectiveTimestamp) {
+            pendingUpdate = {
+              newPriceId: pendingPriceId,
+              newProductName: pendingProduct?.name || '',
+              effectiveAt: new Date(effectiveTimestamp * 1000),
+            };
+          }
         }
         
         return {

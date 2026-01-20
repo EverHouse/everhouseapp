@@ -8,9 +8,10 @@ interface QuickActionsGridProps {
   isAdmin?: boolean;
   variant: 'desktop' | 'mobile';
   onNewMember?: () => void;
+  onScanQr?: () => void;
 }
 
-export const QuickActionsGrid: React.FC<QuickActionsGridProps> = ({ onTabChange, isAdmin, variant, onNewMember }) => {
+export const QuickActionsGrid: React.FC<QuickActionsGridProps> = ({ onTabChange, isAdmin, variant, onNewMember, onScanQr }) => {
   const navigate = useNavigate();
 
   if (variant === 'desktop') {
@@ -22,6 +23,15 @@ export const QuickActionsGrid: React.FC<QuickActionsGridProps> = ({ onTabChange,
           <div>
             <p className="text-xs text-primary/80 dark:text-white/80 uppercase tracking-wide mb-2">Quick Links</p>
             <div className="grid grid-cols-2 gap-2">
+              {onScanQr && (
+                <button
+                  onClick={onScanQr}
+                  className="flex flex-col items-center p-3 bg-green-500/20 dark:bg-green-500/30 rounded-xl hover:bg-green-500/30 dark:hover:bg-green-500/40 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-2xl text-primary dark:text-white mb-1">qr_code_scanner</span>
+                  <span className="text-xs text-primary dark:text-white font-medium text-center">Scan QR</span>
+                </button>
+              )}
               {EMPLOYEE_RESOURCES_LINKS.map(link => (
                 <button
                   key={link.id}
@@ -74,6 +84,15 @@ export const QuickActionsGrid: React.FC<QuickActionsGridProps> = ({ onTabChange,
       <div className="mb-4">
         <p className="text-xs text-primary/80 dark:text-white/80 uppercase tracking-wide mb-2">Quick Links</p>
         <div className="grid grid-cols-4 gap-2">
+          {onScanQr && (
+            <button
+              onClick={onScanQr}
+              className="flex flex-col items-center p-3 bg-green-500/20 dark:bg-green-500/30 rounded-xl hover:bg-green-500/30 transition-colors"
+            >
+              <span className="material-symbols-outlined text-xl text-primary dark:text-white mb-1">qr_code_scanner</span>
+              <span className="text-[10px] text-primary dark:text-white font-medium text-center leading-tight">Scan QR</span>
+            </button>
+          )}
           {EMPLOYEE_RESOURCES_LINKS.map(link => (
             <button
               key={link.id}
