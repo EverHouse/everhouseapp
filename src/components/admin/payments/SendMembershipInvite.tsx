@@ -101,10 +101,11 @@ const SendMembershipInvite: React.FC<SectionProps> = ({ onClose, variant = 'moda
         <>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-1">
+              <label htmlFor="invite-first-name" className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-1">
                 First Name
               </label>
               <input
+                id="invite-first-name"
                 type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
@@ -114,10 +115,11 @@ const SendMembershipInvite: React.FC<SectionProps> = ({ onClose, variant = 'moda
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-1">
+              <label htmlFor="invite-last-name" className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-1">
                 Last Name
               </label>
               <input
+                id="invite-last-name"
                 type="text"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
@@ -129,10 +131,11 @@ const SendMembershipInvite: React.FC<SectionProps> = ({ onClose, variant = 'moda
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-1">
+            <label htmlFor="invite-email" className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-1">
               Email
             </label>
             <input
+              id="invite-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -143,10 +146,11 @@ const SendMembershipInvite: React.FC<SectionProps> = ({ onClose, variant = 'moda
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-1">
+            <label htmlFor="invite-tier" className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-1">
               Membership Tier
             </label>
             <select
+              id="invite-tier"
               value={tierId || ''}
               onChange={(e) => setTierId(Number(e.target.value))}
               className="w-full px-3 py-2 bg-white/80 dark:bg-white/10 border border-primary/20 dark:border-white/20 rounded-lg text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500/50"

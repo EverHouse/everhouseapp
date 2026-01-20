@@ -166,11 +166,20 @@ const Login: React.FC = () => {
   const handleOtpChange = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return;
     
+    const digits = value.replace(/\D/g, '');
+    
+    if (digits.length >= 6) {
+      const codeDigits = digits.slice(0, 6).split('');
+      setOtpInputs(codeDigits);
+      handleVerifyOTP(codeDigits.join(''));
+      return;
+    }
+    
     const newInputs = [...otpInputs];
-    newInputs[index] = value.slice(-1);
+    newInputs[index] = digits.slice(-1);
     setOtpInputs(newInputs);
     
-    if (value && index < 5) {
+    if (digits && index < 5) {
       otpRefs.current[index + 1]?.focus();
     }
     

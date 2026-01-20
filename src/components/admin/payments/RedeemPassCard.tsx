@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Html5QrcodeScanner } from 'html5-qrcode';
+import ModalShell from '../../ModalShell';
 
 export interface SectionProps {
   onClose?: () => void;
@@ -63,6 +65,78 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
   const [showEmailSearch, setShowEmailSearch] = useState(true);
   const [confirmingRedeemAnyway, setConfirmingRedeemAnyway] = useState<string | null>(null);
   const [forceRedeeming, setForceRedeeming] = useState(false);
+  const [manualPassId, setManualPassId] = useState('');
+  const [showPassIdInput, setShowPassIdInput] = useState(false);
+  const [lastAttemptedPassId, setLastAttemptedPassId] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerInitializedRef = useRef(false);
+
+  useEffect(() => {
+    if (isScanning && !scannerInitializedRef.current) {
+      scannerInitializedRef.current = true;
+      
+      const timerId = setTimeout(() => {
+        const scanner = new Html5QrcodeScanner(
+          "qr-reader",
+          { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 },
+            rememberLastUsedCamera: true,
+            showTorchButtonIfSupported: true
+          },
+          false
+        );
+
+        scanner.render(
+          (decodedText) => {
+            scanner.clear().then(() => {
+              setIsScanning(false);
+              scannerInitializedRef.current = false;
+              
+              let passId = decodedText.trim();
+              if (passId.startsWith('PASS:')) {
+                passId = passId.replace('PASS:', '');
+              } else if (passId.startsWith('MEMBER:')) {
+                setErrorState({
+                  message: 'This is a member QR code, not a day pass. Please scan a day pass QR code.',
+                  errorCode: 'INVALID_QR_TYPE'
+                });
+                return;
+              }
+              
+              if (passId) {
+                setShowEmailSearch(false);
+                handleRedeem(passId);
+              }
+            }).catch(err => console.error("Failed to clear scanner", err));
+          },
+          () => {}
+        );
+
+        scannerRef.current = scanner;
+      }, 100);
+
+      return () => clearTimeout(timerId);
+    }
+
+    return () => {
+      if (scannerRef.current && !isScanning) {
+        scannerRef.current.clear().catch(err => console.error("Cleanup error", err));
+        scannerRef.current = null;
+        scannerInitializedRef.current = false;
+      }
+    };
+  }, [isScanning]);
+
+  const handleCloseScanner = () => {
+    if (scannerRef.current) {
+      scannerRef.current.clear().catch(err => console.error("Cleanup error", err));
+      scannerRef.current = null;
+    }
+    scannerInitializedRef.current = false;
+    setIsScanning(false);
+  };
 
   const handleSearch = async () => {
     if (!searchEmail.trim()) return;
@@ -98,6 +172,7 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
     setRedeemingId(passId);
     setErrorState(null);
     setSuccessMessage(null);
+    setLastAttemptedPassId(passId);
     if (force) setForceRedeeming(true);
     
     try {
@@ -138,10 +213,17 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
   };
 
   const handleScanQR = () => {
-    const passId = window.prompt('Enter Pass ID:');
-    if (passId && passId.trim()) {
+    setSuccessMessage(null);
+    setErrorState(null);
+    setIsScanning(true);
+  };
+
+  const handleManualPassIdSubmit = () => {
+    if (manualPassId.trim()) {
       setShowEmailSearch(false);
-      handleRedeem(passId.trim());
+      setShowPassIdInput(false);
+      handleRedeem(manualPassId.trim());
+      setManualPassId('');
     }
   };
 
@@ -367,10 +449,9 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
               <div className="flex gap-2">
                 <button
                   onClick={() => {
-                    const passId = window.prompt('Confirm Pass ID to redeem:');
-                    if (passId) handleRedeem(passId, true);
+                    if (lastAttemptedPassId) handleRedeem(lastAttemptedPassId, true);
                   }}
-                  disabled={forceRedeeming}
+                  disabled={forceRedeeming || !lastAttemptedPassId}
                   className="flex-1 px-4 py-2.5 rounded-lg bg-red-500 text-white font-medium text-sm hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {forceRedeeming ? (
@@ -378,7 +459,7 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
                   ) : (
                     <span className="material-symbols-outlined text-lg">check</span>
                   )}
-                  Confirm
+                  Yes, redeem again
                 </button>
                 <button
                   onClick={() => setConfirmingRedeemAnyway(null)}
@@ -446,7 +527,28 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
 
   const content = (
     <div className="space-y-4">
-      {showEmailSearch && (
+      {isScanning && (
+        <ModalShell title="Scan Guest Pass" onClose={handleCloseScanner}>
+          <div className="p-4">
+            <div id="qr-reader" className="overflow-hidden rounded-xl border-2 border-teal-500/30" />
+            <p className="text-center text-sm text-primary/60 dark:text-white/60 mt-4">
+              Center the QR code within the frame to scan
+            </p>
+            <button
+              onClick={() => {
+                handleCloseScanner();
+                setShowPassIdInput(true);
+              }}
+              className="w-full mt-4 py-3 rounded-xl bg-primary/10 dark:bg-white/10 text-primary dark:text-white font-medium hover:bg-primary/20 dark:hover:bg-white/20 transition-colors flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-lg">keyboard</span>
+              Enter Pass ID manually
+            </button>
+          </div>
+        </ModalShell>
+      )}
+
+      {showEmailSearch && !showPassIdInput && (
         <div className="flex gap-2">
           <input
             type="email"
@@ -474,6 +576,46 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
           >
             <span className="material-symbols-outlined text-lg">qr_code_scanner</span>
           </button>
+        </div>
+      )}
+
+      {showPassIdInput && (
+        <div className="p-4 rounded-xl bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800/30 space-y-3">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="material-symbols-outlined text-teal-600 dark:text-teal-400">qr_code_scanner</span>
+            <p className="font-medium text-teal-900 dark:text-teal-100">Enter Pass ID</p>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={manualPassId}
+              onChange={(e) => setManualPassId(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleManualPassIdSubmit()}
+              placeholder="Enter or scan Pass ID..."
+              className="flex-1 px-4 py-3 rounded-xl bg-white dark:bg-black/20 border border-teal-200 dark:border-teal-700 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-teal-400"
+              autoFocus
+            />
+            <button
+              onClick={handleManualPassIdSubmit}
+              disabled={!manualPassId.trim() || redeemingId !== null}
+              className="px-4 py-3 rounded-xl bg-teal-500 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {redeemingId !== null ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+              ) : (
+                <span className="material-symbols-outlined text-lg">check</span>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                setShowPassIdInput(false);
+                setManualPassId('');
+              }}
+              className="px-4 py-3 rounded-xl bg-primary/10 dark:bg-white/10 text-primary dark:text-white font-semibold hover:bg-primary/20 dark:hover:bg-white/20 transition-colors"
+            >
+              <span className="material-symbols-outlined text-lg">close</span>
+            </button>
+          </div>
         </div>
       )}
 

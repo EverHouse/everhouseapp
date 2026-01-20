@@ -120,7 +120,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   const [isFetchingMembers, setIsFetchingMembers] = useState(false);
   const paginatedMembersCache = useRef<Map<string, MemberProfile[]>>(new Map());
   
-  const isDataReady = !isLoading && cafeMenuLoaded && eventsLoaded && announcementsLoaded;
+  const isDataReady = !isLoading && sessionChecked && cafeMenuLoaded && eventsLoaded && announcementsLoaded;
   
   const isViewingAs = viewAsUser !== null;
   const user = viewAsUser || actualUser;

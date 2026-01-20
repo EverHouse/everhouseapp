@@ -110,10 +110,11 @@ const QuickChargeSection: React.FC<SectionProps> = ({ onClose, variant = 'modal'
           {selectedMember && (
             <>
               <div>
-                <label className="block text-sm font-medium text-primary dark:text-white mb-2">Amount</label>
+                <label htmlFor="quick-charge-amount" className="block text-sm font-medium text-primary dark:text-white mb-2">Amount</label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-primary/60 dark:text-white/60 font-medium">$</span>
                   <input
+                    id="quick-charge-amount"
                     type="number"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
@@ -126,8 +127,9 @@ const QuickChargeSection: React.FC<SectionProps> = ({ onClose, variant = 'modal'
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-primary dark:text-white mb-2">Description (optional)</label>
+                <label htmlFor="quick-charge-description" className="block text-sm font-medium text-primary dark:text-white mb-2">Description (optional)</label>
                 <input
+                  id="quick-charge-description"
                   type="text"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}

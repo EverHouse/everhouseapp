@@ -12,6 +12,7 @@ import QuickChargeSection from '../../../components/admin/payments/QuickChargeCa
 import RedeemDayPassSection from '../../../components/admin/payments/RedeemPassCard';
 import RecentTransactionsSection from '../../../components/admin/payments/TransactionList';
 import OverduePaymentsPanel from '../../../components/admin/payments/OverduePaymentsPanel';
+import { useIsMobile } from '../../../hooks/useBreakpoint';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || '');
 
@@ -128,13 +129,7 @@ interface DayPass {
 }
 
 const PaymentsTab: React.FC = () => {
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
-  
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 1024);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const isMobile = useIsMobile();
 
   return (
     <div className="animate-pop-in pb-32">

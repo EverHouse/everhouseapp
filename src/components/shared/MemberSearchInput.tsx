@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useData } from '../../contexts/DataContext';
 
 export interface SelectedMember {
@@ -60,12 +60,12 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Use multi-word matching for better "first last" name search
-  // Always filter locally - members array should be populated by DataContext
-  const filteredMembers = members.filter(m => {
-    if (!query.trim()) return false;
-    return matchesMultiWordQuery(m.name, query) || matchesMultiWordQuery(m.email, query);
-  }).slice(0, 8);
+  const filteredMembers = useMemo(() => {
+    if (!query.trim()) return [];
+    return members.filter(m => 
+      matchesMultiWordQuery(m.name, query) || matchesMultiWordQuery(m.email, query)
+    ).slice(0, 8);
+  }, [members, query]);
 
   useEffect(() => {
     if (selectedMember) {
@@ -147,7 +147,7 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       {label && (
-        <label className="block text-sm font-medium text-primary dark:text-white mb-2">
+        <label htmlFor="member-search-input" className="block text-sm font-medium text-primary dark:text-white mb-2">
           {label}
         </label>
       )}
@@ -156,6 +156,7 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
           search
         </span>
         <input
+          id="member-search-input"
           ref={inputRef}
           type="text"
           value={query}
