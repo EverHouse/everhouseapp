@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useContext, ErrorInfo, useMemo, useRef, lazy, Suspense, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { HashRouter, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { DataProvider, useData } from './contexts/DataContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { SmoothScrollProvider } from './components/motion/SmoothScroll';
@@ -739,7 +739,7 @@ const App: React.FC = () => {
           <InitialLoadingScreen>
             <OfflineBanner />
             <StaffBookingToast />
-            <HashRouter>
+            <BrowserRouter>
               <NavigationLoader />
               <SmoothScrollProvider>
                 <ScrollToTop />
@@ -747,7 +747,7 @@ const App: React.FC = () => {
                   <AnimatedRoutes />
                 </Layout>
               </SmoothScrollProvider>
-            </HashRouter>
+            </BrowserRouter>
           </InitialLoadingScreen>
           </PageReadyProvider>
           </NavigationLoadingProvider>

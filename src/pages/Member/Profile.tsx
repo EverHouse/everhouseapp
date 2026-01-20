@@ -361,15 +361,9 @@ const Profile: React.FC = () => {
            </div>
          )}
 
-         <Section title="Account" isDark={isDark} delay="0.05s">
-            <Row icon="person" label="Name" value={user.name} isDark={isDark} />
-            <Row icon="mail" label="Email" value={user.email} isDark={isDark} />
-            <Row icon="call" label="Phone" value={formatPhoneNumber(staffDetails?.phone || user.phone)} isDark={isDark} />
-         </Section>
-
          {/* Digital Access Card - only for members, not staff/admin */}
          {!isStaffOrAdminProfile && user.id && (
-           <Section title="Digital Access Card" isDark={isDark} delay="0.07s">
+           <Section title="Digital Access Card" isDark={isDark} delay="0.05s">
              <div className={`p-6 flex flex-col items-center ${isDark ? '' : ''}`}>
                <div className={`w-full max-w-xs rounded-2xl overflow-hidden ${isDark ? 'bg-gradient-to-br from-primary via-primary/90 to-primary/80' : 'bg-gradient-to-br from-primary via-primary/95 to-primary/85'} p-6 shadow-xl`}>
                  <div className="flex justify-center mb-4">
@@ -394,6 +388,12 @@ const Profile: React.FC = () => {
              </div>
            </Section>
          )}
+
+         <Section title="Account" isDark={isDark} delay="0.07s">
+            <Row icon="person" label="Name" value={user.name} isDark={isDark} />
+            <Row icon="mail" label="Email" value={user.email} isDark={isDark} />
+            <Row icon="call" label="Phone" value={formatPhoneNumber(staffDetails?.phone || user.phone)} isDark={isDark} />
+         </Section>
 
          <Section title="Settings" isDark={isDark} delay="0.1s">
             <div className={`p-4 flex items-center justify-between transition-colors ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
@@ -709,7 +709,7 @@ const Profile: React.FC = () => {
             <>
               {/* Privacy Policy Link */}
               <a
-                href="/#/privacy"
+                href="/privacy"
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`p-4 flex items-center justify-between rounded-xl transition-colors ${
@@ -731,7 +731,7 @@ const Profile: React.FC = () => {
 
               {/* Terms of Service Link */}
               <a
-                href="/#/terms"
+                href="/terms"
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`p-4 flex items-center justify-between rounded-xl transition-colors ${
@@ -984,6 +984,22 @@ const Profile: React.FC = () => {
                      </>
                    )}
                </div>
+
+               {/* QR Code Section - Members Only */}
+               {!isStaffOrAdminProfile && user.id && (
+                 <div className="px-6 pb-4 flex flex-col items-center" style={{ backgroundColor: cardBgColor }}>
+                   <div className="bg-white p-3 rounded-xl shadow-md">
+                     <img
+                       src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`MEMBER:${user.id}`)}`}
+                       alt="Member QR Code"
+                       className="w-28 h-28"
+                     />
+                   </div>
+                   <p className="text-xs mt-2 text-center opacity-60" style={{ color: cardTextColor }}>
+                     Show for quick check-in
+                   </p>
+                 </div>
+               )}
 
                {/* Benefits Section - Members Only */}
                {!isStaffOrAdminProfile && (
