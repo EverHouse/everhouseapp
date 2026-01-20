@@ -33,11 +33,11 @@ The application features a React 19 frontend with Vite, styled using Tailwind CS
 - **Core Stack**: React 19 (Vite), React Router DOM, Express.js (REST API), PostgreSQL, Tailwind CSS.
 - **Modular Architecture**: Components like AdminDashboard and StaffCommandCenter are modular.
 - **Timezone Handling**: All date/time operations prioritize America/Los_Angeles timezone.
-- **Member Management**: Supports member tiers, tags, comprehensive member directory with history and notes, and family billing with primary payer and add-on members.
+- **Member Management**: Supports member tiers, tags, comprehensive member directory with history and notes, and unified billing groups (family and corporate) with primary payer and add-on members.
 - **Booking System**: Supports "Request & Hold," conflict detection, staff-initiated bookings, member rescheduling, multi-member bookings with fair usage tracking, and calendar management. Includes features for staff check-in, payment guards, fee waiving, and Trackman import/reconciliation. Guardian consent for minors is integrated.
 - **Security**: Role-based access control with `isAdmin` and `isStaffOrAdmin` middleware.
 - **Notifications & Notices**: In-app real-time notifications and a database-tracked sequential notice dismissal system with 3-channel delivery (database + push + real-time) and user targeting.
-- **Real-Time Sync**: Instant updates across clients via WebSocket.
+- **Real-Time Sync**: Instant updates across clients via WebSocket, with Supabase Realtime as a parallel channel (when enabled in Supabase dashboard).
 - **PWA Features**: Service Worker caching, offline support, and iOS-style interactions.
 - **Action Management**: `useAsyncAction` hook prevents double-tap submissions, provides loading states, and error handling. Toast component prevents stacking identical messages and supports key-based updates.
 - **Performance Optimizations**: List virtualization using `react-window` for large lists, skeleton loaders, optimized CSS glass effects, lazy-loaded admin tabs, and optimistic updates for booking actions.
@@ -66,3 +66,11 @@ The application features a React 19 frontend with Vite, styled using Tailwind CS
 - **Google Calendar**: Integrates with MBO_Conference_Room, Public/Member Events, and Wellness & Classes calendars.
 - **Apple Messages for Business**: Direct messaging support.
 - **Amarie Aesthetics MedSpa**: Direct booking link for wellness services.
+- **Supabase**: Backend admin client for billing reconciliations using SERVICE_ROLE_KEY. Frontend Realtime subscriptions for notifications, bookings, and announcements (works alongside WebSocket).
+
+## Corporate Membership
+- **Unified Billing Groups**: Single `billing_groups` table supports both family and corporate memberships via `type` field ('family' | 'corporate').
+- **Volume Pricing**: Corporate tier offers volume discounts from $350/seat (1-4 employees) down to $249/seat (50+).
+- **Checkout Flow**: Corporate checkout captures company name, job title, and employee count with real-time price calculation.
+- **HubSpot Company Sync**: Corporate members sync to HubSpot as Companies with contact associations.
+- **Individual Tracking**: Each corporate member tracked in `group_members` table with Stripe subscription item linking.
