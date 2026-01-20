@@ -1,6 +1,6 @@
 import { getStripeClient } from './client';
 import { db } from '../../db';
-import { membershipTiers, users } from '../../../shared/schema';
+import { membershipTiers, users, memberNotes } from '../../../shared/schema';
 import { eq, ilike } from 'drizzle-orm';
 import { changeSubscriptionTier } from './subscriptions';
 import { pool } from '../db';
@@ -103,13 +103,25 @@ export async function commitTierChange(
   staffEmail: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Get new tier info from price
     const stripe = await getStripeClient();
-    const newPrice = await stripe.prices.retrieve(newPriceId, { expand: ['product'] });
-    const newProduct = newPrice.product as any;
-    const tierSlug = newPrice.metadata?.tier_slug || newProduct.metadata?.tier_slug;
     
-    // Find tier in DB
+    // Get current subscription to find current price ID
+    const currentSub = await stripe.subscriptions.retrieve(subscriptionId);
+    const currentPriceId = currentSub.items.data[0]?.price?.id;
+    
+    // Look up current tier from DB using price ID (consistent naming)
+    let currentTierName = 'Unknown';
+    if (currentPriceId) {
+      const currentTierResult = await pool.query(
+        'SELECT name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
+        [currentPriceId]
+      );
+      if (currentTierResult.rows.length > 0) {
+        currentTierName = currentTierResult.rows[0].name;
+      }
+    }
+    
+    // Find new tier in DB
     const tier = await db.query.membershipTiers.findFirst({
       where: eq(membershipTiers.stripePriceId, newPriceId)
     });
@@ -124,14 +136,28 @@ export async function commitTierChange(
       return result;
     }
     
-    // Update user tier in DB
-    await pool.query(
-      'UPDATE users SET tier = $1, updated_at = NOW() WHERE LOWER(email) = LOWER($2)',
-      [tier.slug, memberEmail]
-    );
+    // Only update DB tier immediately if this is an immediate change
+    // Scheduled changes are handled by the subscription.updated webhook when Stripe applies them
+    if (immediate) {
+      await pool.query(
+        'UPDATE users SET tier = $1, updated_at = NOW() WHERE LOWER(email) = LOWER($2)',
+        [tier.slug, memberEmail]
+      );
+    }
     
-    // Log the change
-    console.log(`[Tier Change] Staff ${staffEmail} changed ${memberEmail} to tier ${tier.name} (immediate: ${immediate})`);
+    // Add member note for audit trail using DB tier names for consistency
+    const changeType = immediate ? 'immediately' : 'at end of billing cycle';
+    const noteContent = `Membership tier changed from ${currentTierName} to ${tier.name} (${changeType}). Changed by staff: ${staffEmail}`;
+    
+    await db.insert(memberNotes).values({
+      memberEmail: memberEmail.toLowerCase(),
+      content: noteContent,
+      createdBy: staffEmail,
+      createdByName: staffEmail.split('@')[0] || 'Staff',
+      isPinned: false,
+    });
+    
+    console.log(`[Tier Change] Staff ${staffEmail} changed ${memberEmail} from ${currentTierName} to ${tier.name} (${changeType})`);
     
     return { success: true };
   } catch (error: any) {

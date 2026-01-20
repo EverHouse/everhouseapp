@@ -67,7 +67,7 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
                 pendingTierChange: activeSub.pendingUpdate
                   ? {
                       newPlanName: activeSub.pendingUpdate.newProductName || 'New Plan',
-                      effectiveDate: Math.floor(activeSub.currentPeriodEnd.getTime() / 1000),
+                      effectiveDate: Math.floor(activeSub.pendingUpdate.effectiveAt.getTime() / 1000),
                     }
                   : null,
               };
