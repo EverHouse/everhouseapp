@@ -35,6 +35,7 @@ interface MembershipTier {
     stripe_price_id?: string | null;
     stripe_product_id?: string | null;
     price_cents?: number | null;
+    product_type?: 'subscription' | 'one_time' | null;
 }
 
 interface StripePrice {
@@ -333,7 +334,62 @@ const TiersTab: React.FC = () => {
 
             {/* Products/Fees/Discounts sub-tabs */}
             {activeSubTab === 'products' && <ProductsSubTab activeSubTab="membership" />}
-            {activeSubTab === 'fees' && <ProductsSubTab activeSubTab="fees" />}
+            {activeSubTab === 'fees' && (() => {
+                const oneTimePasses = tiers.filter(t => t.product_type === 'one_time');
+                return (
+                    <div className="space-y-6">
+                        {oneTimePasses.length > 0 && (
+                            <div>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                        Day Passes & Guest Passes
+                                    </h3>
+                                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                                        {oneTimePasses.length} item{oneTimePasses.length !== 1 ? 's' : ''}
+                                    </span>
+                                </div>
+                                <div className="space-y-3">
+                                    {oneTimePasses.map((pass, index) => (
+                                        <div 
+                                            key={pass.id} 
+                                            onClick={() => openEdit(pass)}
+                                            className="bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 cursor-pointer hover:border-primary/30 transition-all animate-pop-in"
+                                            style={{animationDelay: `${0.05 + index * 0.03}s`}}
+                                        >
+                                            <div className="flex items-start justify-between">
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <h4 className="font-bold text-lg text-primary dark:text-white">{pass.name}</h4>
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded">
+                                                            One-time
+                                                        </span>
+                                                        {!pass.is_active && (
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded">Inactive</span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xl font-bold text-primary dark:text-white">{pass.price_string}</p>
+                                                    {pass.description && (
+                                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">{pass.description}</p>
+                                                    )}
+                                                </div>
+                                                <button className="text-gray-600 hover:text-primary dark:hover:text-white transition-colors">
+                                                    <span aria-hidden="true" className="material-symbols-outlined">edit</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        <div>
+                            <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">
+                                HubSpot Fee Products
+                            </h3>
+                            <ProductsSubTab activeSubTab="fees" />
+                        </div>
+                    </div>
+                );
+            })()}
             {activeSubTab === 'discounts' && <ProductsSubTab activeSubTab="discounts" />}
 
 
@@ -701,11 +757,13 @@ const TiersTab: React.FC = () => {
                 </div>
             </ModalShell>
 
-            {activeSubTab === 'tiers' && (
+            {activeSubTab === 'tiers' && (() => {
+                const subscriptionTiers = tiers.filter(t => t.product_type !== 'one_time');
+                return (
                 <>
                     <div className="flex justify-between items-center mb-6">
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {tiers.length} membership tier{tiers.length !== 1 ? 's' : ''}
+                            {subscriptionTiers.length} membership tier{subscriptionTiers.length !== 1 ? 's' : ''}
                         </p>
                         <button 
                             onClick={handleSyncStripe}
@@ -716,7 +774,7 @@ const TiersTab: React.FC = () => {
                             {syncing ? 'Syncing...' : 'Sync to Stripe'}
                         </button>
                     </div>
-                    {tiers.length === 0 ? (
+                    {subscriptionTiers.length === 0 ? (
                         <div className="text-center py-12 px-6 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-white/5">
                             <span aria-hidden="true" className="material-symbols-outlined text-5xl mb-4 text-gray-500 dark:text-white/20">loyalty</span>
                             <h3 className="text-lg font-bold mb-2 text-gray-600 dark:text-white/70">No tiers found</h3>
@@ -726,7 +784,7 @@ const TiersTab: React.FC = () => {
                         </div>
                     ) : (
                         <div className="space-y-3 animate-pop-in" style={{animationDelay: '0.1s'}}>
-                            {tiers.map((tier, index) => (
+                            {subscriptionTiers.map((tier, index) => (
                                 <div 
                                     key={tier.id} 
                                     onClick={() => openEdit(tier)}
@@ -781,7 +839,8 @@ const TiersTab: React.FC = () => {
                     )}
                     <FloatingActionButton onClick={openCreate} color="brand" label="Add new tier" />
                 </>
-            )}
+                );
+            })()}
         </div>
     );
 };
