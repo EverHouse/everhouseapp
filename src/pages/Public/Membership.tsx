@@ -375,7 +375,7 @@ const MembershipOverview: React.FC = () => {
               <span className={`material-symbols-outlined font-light ${selectedPass === 'workspace' ? 'text-white' : 'text-primary'}`}>work</span>
               <div>
                  <p className="font-semibold text-sm">Workspace</p>
-                 <p className={`text-xs font-medium ${selectedPass === 'workspace' ? 'text-white/80' : 'text-primary/60'}`}>$25 / day</p>
+                 <p className={`text-xs font-medium ${selectedPass === 'workspace' ? 'text-white/80' : 'text-primary/60'}`}>$35 / day</p>
               </div>
            </button>
            <button 
@@ -390,10 +390,10 @@ const MembershipOverview: React.FC = () => {
            </button>
         </div>
         <Link 
-            to="/contact"
+            to="/checkout"
             className="w-full mt-4 py-3 text-sm font-semibold text-primary border-t border-primary/5 hover:bg-primary/5 transition-colors rounded-b-xl tracking-wide uppercase block text-center"
         >
-           Request a Pass
+           Buy a Day Pass
         </Link>
       </div>
 
