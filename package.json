@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:unit": "vitest run tests/unit",
-    "test:e2e": "vitest run tests/e2e"
+    "test:e2e": "vitest run tests/e2e",
+    "jules:sync": "tsx scripts/jules-sync.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.18.0",
