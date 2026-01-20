@@ -111,6 +111,17 @@ interface DailySummary {
   transactionCount: number;
 }
 
+interface DayPass {
+  id: string;
+  productType: string;
+  quantity: number;
+  remainingUses: number;
+  purchaserEmail: string;
+  purchaserFirstName: string | null;
+  purchaserLastName: string | null;
+  purchasedAt: string;
+}
+
 const PaymentsTab: React.FC = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   
@@ -128,7 +139,7 @@ const PaymentsTab: React.FC = () => {
 };
 
 const MobilePaymentsView: React.FC = () => {
-  const [activeSection, setActiveSection] = useState<'quick-charge' | 'overdue' | 'lookup' | 'transactions' | 'record-payment' | 'refunds' | 'failed' | 'summary' | 'pending' | null>(null);
+  const [activeSection, setActiveSection] = useState<'quick-charge' | 'overdue' | 'lookup' | 'transactions' | 'record-payment' | 'refunds' | 'failed' | 'summary' | 'pending' | 'redeem-pass' | null>(null);
   const [overdueCount, setOverdueCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
@@ -180,6 +191,16 @@ const MobilePaymentsView: React.FC = () => {
       borderClass: 'border-orange-200 dark:border-orange-500/20',
       hoverClass: 'hover:bg-orange-200/60 dark:hover:bg-orange-900/60',
       iconClass: 'text-orange-600 dark:text-orange-400'
+    },
+    { 
+      id: 'redeem-pass' as const, 
+      icon: 'qr_code_scanner', 
+      label: 'Redeem Pass', 
+      bgClass: 'bg-teal-100/60 dark:bg-teal-950/40',
+      textClass: 'text-teal-900 dark:text-teal-100',
+      borderClass: 'border-teal-200 dark:border-teal-500/20',
+      hoverClass: 'hover:bg-teal-200/60 dark:hover:bg-teal-900/60',
+      iconClass: 'text-teal-600 dark:text-teal-400'
     },
     { 
       id: 'pending' as const, 
@@ -293,6 +314,9 @@ const MobilePaymentsView: React.FC = () => {
       {activeSection === 'pending' && (
         <PendingAuthorizationsSection onClose={() => setActiveSection(null)} />
       )}
+      {activeSection === 'redeem-pass' && (
+        <RedeemDayPassSection onClose={() => setActiveSection(null)} />
+      )}
     </div>
   );
 };
@@ -304,6 +328,7 @@ const DesktopPaymentsView: React.FC = () => {
         <DailySummaryCard variant="card" />
         <QuickChargeSection variant="card" />
         <CashCheckPaymentSection variant="card" />
+        <RedeemDayPassSection variant="card" />
       </div>
       
       <div className="col-span-4 space-y-6">
@@ -870,6 +895,206 @@ const CashCheckPaymentSection: React.FC<SectionProps> = ({ onClose, variant = 'm
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-orange-600 dark:text-orange-400">savings</span>
           <h3 className="font-bold text-primary dark:text-white">Record Cash/Check</h3>
+        </div>
+        <button onClick={onClose} className="p-2 hover:bg-primary/10 dark:hover:bg-white/10 rounded-full">
+          <span className="material-symbols-outlined text-primary/60 dark:text-white/60">close</span>
+        </button>
+      </div>
+      {content}
+    </div>
+  );
+};
+
+const formatPassType = (productType: string): string => {
+  return productType
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .replace('Day Pass', 'Day Pass -');
+};
+
+const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'modal' }) => {
+  const [searchEmail, setSearchEmail] = useState('');
+  const [passes, setPasses] = useState<DayPass[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [redeemingId, setRedeemingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const handleSearch = async () => {
+    if (!searchEmail.trim()) return;
+    
+    setIsSearching(true);
+    setError(null);
+    setSuccessMessage(null);
+    
+    try {
+      const res = await fetch(`/api/staff/passes/search?email=${encodeURIComponent(searchEmail.trim())}`, {
+        credentials: 'include'
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to search passes');
+      }
+      
+      const data = await res.json();
+      setPasses(data.passes || []);
+      setHasSearched(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to search passes');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleRedeem = async (passId: string) => {
+    setRedeemingId(passId);
+    setError(null);
+    setSuccessMessage(null);
+    
+    try {
+      const res = await fetch(`/api/staff/passes/${passId}/redeem`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to redeem pass');
+      }
+      
+      const data = await res.json();
+      setSuccessMessage(`Pass redeemed! ${data.remainingUses} uses remaining.`);
+      
+      handleSearch();
+    } catch (err: any) {
+      setError(err.message || 'Failed to redeem pass');
+    } finally {
+      setRedeemingId(null);
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const content = (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <input
+          type="email"
+          value={searchEmail}
+          onChange={(e) => setSearchEmail(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          placeholder="Enter visitor email..."
+          className="flex-1 px-4 py-3 rounded-xl bg-white/80 dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+        <button
+          onClick={handleSearch}
+          disabled={!searchEmail.trim() || isSearching}
+          className="px-5 py-3 rounded-xl bg-teal-500 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {isSearching ? (
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+          ) : (
+            <span className="material-symbols-outlined text-lg">search</span>
+          )}
+          Search
+        </button>
+      </div>
+
+      {error && (
+        <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30">
+          <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30 flex items-center gap-2">
+          <span className="material-symbols-outlined text-green-600 dark:text-green-400">check_circle</span>
+          <p className="text-sm text-green-700 dark:text-green-400">{successMessage}</p>
+        </div>
+      )}
+
+      {!hasSearched ? (
+        <div className="text-center py-8">
+          <span className="material-symbols-outlined text-4xl text-primary/30 dark:text-white/30 mb-2">qr_code_scanner</span>
+          <p className="text-sm text-primary/60 dark:text-white/60">Search by email to find active passes</p>
+        </div>
+      ) : passes.length === 0 ? (
+        <div className="text-center py-8">
+          <span className="material-symbols-outlined text-4xl text-primary/30 dark:text-white/30 mb-2">search_off</span>
+          <p className="text-sm text-primary/60 dark:text-white/60">No active passes found for this email</p>
+        </div>
+      ) : (
+        <div className="space-y-3 max-h-[350px] overflow-y-auto">
+          {passes.map(pass => (
+            <div
+              key={pass.id}
+              className="p-4 rounded-xl bg-white/50 dark:bg-white/5 border border-primary/10 dark:border-white/10"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-primary dark:text-white">
+                    {formatPassType(pass.productType)}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="px-2 py-0.5 text-xs font-medium bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300 rounded-full">
+                      {pass.remainingUses} {pass.remainingUses === 1 ? 'use' : 'uses'} remaining
+                    </span>
+                  </div>
+                  <p className="text-xs text-primary/60 dark:text-white/60 mt-2">
+                    Purchased: {formatDate(pass.purchasedAt)}
+                  </p>
+                  {(pass.purchaserFirstName || pass.purchaserLastName) && (
+                    <p className="text-xs text-primary/60 dark:text-white/60">
+                      {[pass.purchaserFirstName, pass.purchaserLastName].filter(Boolean).join(' ')}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleRedeem(pass.id)}
+                  disabled={redeemingId === pass.id}
+                  className="px-4 py-2 rounded-lg bg-teal-500 text-white font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 flex-shrink-0"
+                >
+                  {redeemingId === pass.id ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                  ) : (
+                    <span className="material-symbols-outlined text-base">check</span>
+                  )}
+                  Redeem
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  if (variant === 'card') {
+    return (
+      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="material-symbols-outlined text-teal-600 dark:text-teal-400">qr_code_scanner</span>
+          <h3 className="font-bold text-primary dark:text-white">Redeem Day Pass</h3>
+        </div>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-teal-600 dark:text-teal-400">qr_code_scanner</span>
+          <h3 className="font-bold text-primary dark:text-white">Redeem Day Pass</h3>
         </div>
         <button onClick={onClose} className="p-2 hover:bg-primary/10 dark:hover:bg-white/10 rounded-full">
           <span className="material-symbols-outlined text-primary/60 dark:text-white/60">close</span>
