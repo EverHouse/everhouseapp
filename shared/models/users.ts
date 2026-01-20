@@ -1,17 +1,20 @@
 import { z } from "zod";
 
-// Update your User schema to include Corporate fields
+// User schema with Corporate fields - uses camelCase to match Drizzle model
 export const userSchema = z.object({
-  id: z.string(), // Replit uses 'id' as a varchar/string
+  id: z.string(),
   email: z.string().email(),
   role: z.enum(["admin", "member", "staff"]),
   membershipStatus: z.string().optional(),
 
-  // New Corporate & HubSpot Fields
-  company_name: z.string().nullable().optional(),
-  job_title: z.string().nullable().optional(),
-  hubspot_contact_id: z.string().nullable().optional(),
-  hubspot_company_id: z.string().nullable().optional(),
+  // Corporate & HubSpot Fields (camelCase to match Drizzle model in auth-session.ts)
+  companyName: z.string().nullable().optional(),
+  jobTitle: z.string().nullable().optional(),
+  hubspotContactId: z.string().nullable().optional(),
+  hubspotCompanyId: z.string().nullable().optional(),
+
+  // Billing group reference
+  billingGroupId: z.number().nullable().optional(),
 
   createdAt: z.date().optional(),
 });

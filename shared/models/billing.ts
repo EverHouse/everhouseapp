@@ -6,9 +6,10 @@ import {
   varchar,
   integer,
   text,
+  serial,
 } from "drizzle-orm/pg-core";
 
-// --- Existing Tables (Day Pass & Redemptions) ---
+// --- Day Pass & Redemptions Tables ---
 
 export const dayPassPurchases = pgTable(
   "day_pass_purchases",
@@ -68,61 +69,5 @@ export const passRedemptionLogs = pgTable(
 
 export type PassRedemptionLog = typeof passRedemptionLogs.$inferSelect;
 
-// --- New Unified Billing Group Tables ---
-
-// Replaces family_groups to support both Family and Corporate
-export const billingGroups = pgTable(
-  "billing_groups",
-  {
-    id: serial("id").primaryKey(), // Revert to serial to match existing logic
-    type: text("type").notNull().default("family"),
-    companyName: text("company_name"),
-    hubspotCompanyId: text("hubspot_company_id"),
-    stripeCustomerId: varchar("stripe_customer_id"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-  },
-  (table) => [
-    index("idx_billing_groups_type").on(table.type),
-    index("idx_billing_groups_hubspot_id").on(table.hubspotCompanyId),
-  ],
-);
-
-export type BillingGroup = typeof billingGroups.$inferSelect;
-export type InsertBillingGroup = typeof billingGroups.$inferInsert;
-
-// Tracks individual members within a group
-export const groupMembers = pgTable(
-  "group_members",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    groupId: varchar("group_id").notNull(), // References billing_groups.id
-    userId: varchar("user_id").notNull(), // References users.id
-    addedAt: timestamp("added_at", { withTimezone: true }).defaultNow(),
-  },
-  (table) => [
-    index("idx_group_members_group_id").on(table.groupId),
-    index("idx_group_members_user_id").on(table.userId),
-  ],
-);
-
-export type GroupMember = typeof groupMembers.$inferSelect;
-export type InsertGroupMember = typeof groupMembers.$inferInsert;
-
-// HubSpot Sync Audit - Tracks all HubSpot API activity
-export const hubspotSyncAudit = pgTable("hubspot_sync_audit", {
-  id: varchar("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  entityType: text("entity_type").notNull(), // 'contact' or 'company'
-  entityId: text("entity_id").notNull(), // Local ID
-  hubspotId: text("hubspot_id"), // HubSpot ID
-  status: text("status").notNull(), // 'success', 'failed', 'active'
-  errorMessage: text("error_message"),
-  payload: sql`jsonb`, // Detailed data sent/received
-  syncedAt: timestamp("synced_at", { withTimezone: true }).defaultNow(),
-});
-
-export type HubspotSyncAudit = typeof hubspotSyncAudit.$inferSelect;
+// Note: billingGroups, groupMembers, and familyAddOnProducts are defined in hubspot-billing.ts
+// to avoid duplicate exports. Import them from there or from the main schema.
