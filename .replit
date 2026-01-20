@@ -70,6 +70,8 @@ HUBSPOT_FORM_GUEST_CHECKIN = "ba04af2b-b1d5-435b-9e3e-bfd9086d2fa9"
 HUBSPOT_FORM_CONTACT = "63c397f3-faeb-4582-9176-ae9603188b9a"
 VAPID_PUBLIC_KEY = "BG-oXwIn5dHb93Y6SuyOpkHm7Qu2La9ge5pwQFAx98WRllqI6-zg-n3A5CURITIR_wA6sIo8zEaBVwGhLz3CCFw"
 SUPABASE_URL = "https://vramupyxmnzhgegltppg.supabase.co"
+ENABLE_CORPORATE_BILLING = "true"
+SUPABASE_DB_SCHEMA = "public"
 
 [userenv.development]
 DEV_LOGIN_ENABLED = "true"
