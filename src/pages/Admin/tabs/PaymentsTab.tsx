@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import EmptyState from '../../../components/EmptyState';
@@ -148,6 +148,18 @@ const MobilePaymentsView: React.FC = () => {
   const [overdueCount, setOverdueCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
+  const activeSectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (activeSection && activeSectionRef.current) {
+      setTimeout(() => {
+        activeSectionRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
+      }, 100);
+    }
+  }, [activeSection]);
 
   useEffect(() => {
     fetch('/api/bookings/overdue-payments', { credentials: 'include' })
@@ -302,39 +314,41 @@ const MobilePaymentsView: React.FC = () => {
         ))}
       </div>
 
-      {activeSection === 'summary' && (
-        <DailySummaryCard onClose={() => setActiveSection(null)} />
-      )}
-      {activeSection === 'quick-charge' && (
-        <QuickChargeSection onClose={() => setActiveSection(null)} />
-      )}
-      {activeSection === 'record-payment' && (
-        <CashCheckPaymentSection onClose={() => setActiveSection(null)} />
-      )}
-      {activeSection === 'overdue' && (
-        <OverduePaymentsPanel onClose={() => setActiveSection(null)} />
-      )}
-      {activeSection === 'refunds' && (
-        <RefundsSection onClose={() => setActiveSection(null)} />
-      )}
-      {activeSection === 'lookup' && (
-        <MemberLookupSection onClose={() => setActiveSection(null)} />
-      )}
-      {activeSection === 'transactions' && (
-        <RecentTransactionsSection onClose={() => setActiveSection(null)} />
-      )}
-      {activeSection === 'failed' && (
-        <FailedPaymentsSection onClose={() => setActiveSection(null)} />
-      )}
-      {activeSection === 'pending' && (
-        <PendingAuthorizationsSection onClose={() => setActiveSection(null)} />
-      )}
-      {activeSection === 'redeem-pass' && (
-        <RedeemDayPassSection onClose={() => setActiveSection(null)} />
-      )}
-      {activeSection === 'send-invite' && (
-        <SendMembershipInvite onClose={() => setActiveSection(null)} />
-      )}
+      <div ref={activeSectionRef}>
+        {activeSection === 'summary' && (
+          <DailySummaryCard onClose={() => setActiveSection(null)} />
+        )}
+        {activeSection === 'quick-charge' && (
+          <QuickChargeSection onClose={() => setActiveSection(null)} />
+        )}
+        {activeSection === 'record-payment' && (
+          <CashCheckPaymentSection onClose={() => setActiveSection(null)} />
+        )}
+        {activeSection === 'overdue' && (
+          <OverduePaymentsPanel onClose={() => setActiveSection(null)} />
+        )}
+        {activeSection === 'refunds' && (
+          <RefundsSection onClose={() => setActiveSection(null)} />
+        )}
+        {activeSection === 'lookup' && (
+          <MemberLookupSection onClose={() => setActiveSection(null)} />
+        )}
+        {activeSection === 'transactions' && (
+          <RecentTransactionsSection onClose={() => setActiveSection(null)} />
+        )}
+        {activeSection === 'failed' && (
+          <FailedPaymentsSection onClose={() => setActiveSection(null)} />
+        )}
+        {activeSection === 'pending' && (
+          <PendingAuthorizationsSection onClose={() => setActiveSection(null)} />
+        )}
+        {activeSection === 'redeem-pass' && (
+          <RedeemDayPassSection onClose={() => setActiveSection(null)} />
+        )}
+        {activeSection === 'send-invite' && (
+          <SendMembershipInvite onClose={() => setActiveSection(null)} />
+        )}
+      </div>
     </div>
   );
 };
@@ -344,15 +358,21 @@ const DesktopPaymentsView: React.FC = () => {
     <div className="grid grid-cols-12 gap-6">
       <div className="col-span-4 space-y-6">
         <DailySummaryCard variant="card" />
-        <QuickChargeSection variant="card" />
+        <div className="relative z-20 focus-within:z-50">
+          <QuickChargeSection variant="card" />
+        </div>
         <CashCheckPaymentSection variant="card" />
         <RedeemDayPassSection variant="card" />
         <SendMembershipInvite variant="card" />
       </div>
       
       <div className="col-span-4 space-y-6">
-        <MemberLookupSection variant="card" />
-        <RecentTransactionsSection variant="card" />
+        <div className="relative z-20 focus-within:z-50">
+          <MemberLookupSection variant="card" />
+        </div>
+        <div className="relative z-10">
+          <RecentTransactionsSection variant="card" />
+        </div>
       </div>
       
       <div className="col-span-4 space-y-6">
