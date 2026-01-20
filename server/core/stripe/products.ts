@@ -407,13 +407,24 @@ export async function syncMembershipTiersToStripe(): Promise<{
         // Build privilege metadata for this tier
         const privilegeMetadata = buildPrivilegeMetadata(tier);
 
+        // Build marketing features for Stripe Pricing Tables
+        const featuresArray = tier.highlightedFeatures as string[] | null;
+        const hasMarketingFeatures = Array.isArray(featuresArray) && featuresArray.length > 0;
+        const marketingFeatures = hasMarketingFeatures
+          ? featuresArray.slice(0, 15).map((f: string) => ({ name: f }))
+          : [];
+
         if (stripeProductId) {
-          await stripe.products.update(stripeProductId, {
+          const updateParams: any = {
             name: productName,
             description: tier.description || undefined,
             metadata: privilegeMetadata,
-          });
-          console.log(`[Tier Sync] Updated existing product for ${tier.name} with privileges`);
+          };
+          if (hasMarketingFeatures) {
+            updateParams.marketing_features = marketingFeatures;
+          }
+          await stripe.products.update(stripeProductId, updateParams);
+          console.log(`[Tier Sync] Updated existing product for ${tier.name} with privileges${hasMarketingFeatures ? ' and features' : ''}`);
 
           // Price metadata (subset of privilege metadata for reference)
           const priceMetadata = { tier_id: tier.id.toString(), tier_slug: tier.slug, product_type: tier.productType || 'subscription' };
@@ -464,12 +475,16 @@ export async function syncMembershipTiersToStripe(): Promise<{
           });
           synced++;
         } else {
-          // Create new product with privilege metadata
-          const stripeProduct = await stripe.products.create({
+          // Create new product with privilege metadata and marketing features
+          const createParams: any = {
             name: productName,
             description: tier.description || undefined,
             metadata: privilegeMetadata,
-          });
+          };
+          if (hasMarketingFeatures) {
+            createParams.marketing_features = marketingFeatures;
+          }
+          const stripeProduct = await stripe.products.create(createParams);
           stripeProductId = stripeProduct.id;
 
           const priceMetadata = { tier_id: tier.id.toString(), tier_slug: tier.slug, product_type: tier.productType || 'subscription' };
