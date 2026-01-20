@@ -29,6 +29,7 @@ import { membershipTiers } from '../../shared/schema';
 import { getResendClient } from '../utils/resend';
 import { withResendRetry } from '../core/retryUtils';
 import { staffUsers } from '../../shared/schema';
+import { previewTierChange, commitTierChange, getAvailableTiersForChange } from '../core/stripe/tierChanges';
 
 const router = Router();
 
@@ -1650,6 +1651,59 @@ router.get('/api/visitors/:id/purchases', isStaffOrAdmin, async (req, res) => {
   } catch (error: any) {
     if (!isProduction) console.error('Visitor purchases error:', error);
     res.status(500).json({ error: 'Failed to fetch visitor purchases' });
+  }
+});
+
+router.get('/api/admin/tier-change/tiers', isStaffOrAdmin, async (req, res) => {
+  try {
+    const tiers = await getAvailableTiersForChange();
+    res.json({ tiers });
+  } catch (error: any) {
+    console.error('[Tier Change] Error getting tiers:', error);
+    res.status(500).json({ error: 'Failed to get tiers' });
+  }
+});
+
+router.post('/api/admin/tier-change/preview', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { subscriptionId, newPriceId, immediate = true } = req.body;
+    
+    if (!subscriptionId || !newPriceId) {
+      return res.status(400).json({ error: 'subscriptionId and newPriceId required' });
+    }
+    
+    const result = await previewTierChange(subscriptionId, newPriceId, immediate);
+    
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    
+    res.json({ preview: result.preview });
+  } catch (error: any) {
+    console.error('[Tier Change] Preview error:', error);
+    res.status(500).json({ error: 'Failed to preview tier change' });
+  }
+});
+
+router.post('/api/admin/tier-change/commit', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { memberEmail, subscriptionId, newPriceId, immediate = true } = req.body;
+    const staffEmail = (req as any).user?.email || 'unknown';
+    
+    if (!memberEmail || !subscriptionId || !newPriceId) {
+      return res.status(400).json({ error: 'memberEmail, subscriptionId, and newPriceId required' });
+    }
+    
+    const result = await commitTierChange(memberEmail, subscriptionId, newPriceId, immediate, staffEmail);
+    
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[Tier Change] Commit error:', error);
+    res.status(500).json({ error: 'Failed to change tier' });
   }
 });
 

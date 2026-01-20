@@ -54,6 +54,7 @@ interface StripeBillingSectionProps {
   onShowCancelModal: () => void;
   onShowCreditModal: () => void;
   onShowDiscountModal: () => void;
+  onShowTierChangeModal: () => void;
   onGetPaymentLink: () => void;
   isDark: boolean;
 }
@@ -83,6 +84,7 @@ export const StripeBillingSection: React.FC<StripeBillingSectionProps> = ({
   onShowCancelModal,
   onShowCreditModal,
   onShowDiscountModal,
+  onShowTierChangeModal,
   onGetPaymentLink,
   isDark,
 }) => {
@@ -169,7 +171,15 @@ export const StripeBillingSection: React.FC<StripeBillingSectionProps> = ({
               </div>
             )}
 
-            <div className="flex gap-2 pt-2">
+            <div className="flex flex-wrap gap-2 pt-2">
+              <button
+                onClick={onShowTierChangeModal}
+                disabled={activeSubscription.status !== 'active'}
+                className="flex items-center gap-1.5 px-3 py-2 bg-primary dark:bg-accent text-white dark:text-primary rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+              >
+                <span className="material-symbols-outlined text-base">swap_vert</span>
+                Change Tier
+              </button>
               {isPaused ? (
                 <button
                   onClick={onResume}

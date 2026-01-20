@@ -5,6 +5,7 @@ import { StripeBillingSection } from './billing/StripeBillingSection';
 import { MindbodyBillingSection } from './billing/MindbodyBillingSection';
 import { FamilyAddonBillingSection } from './billing/FamilyAddonBillingSection';
 import { CompedBillingSection } from './billing/CompedBillingSection';
+import { TierChangeWizard } from './billing/TierChangeWizard';
 
 interface MemberBillingTabProps {
   memberEmail: string;
@@ -323,6 +324,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({ memberEmail }) => {
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showTierChangeModal, setShowTierChangeModal] = useState(false);
 
   const showSuccess = (message: string) => {
     setSuccessMessage(message);
@@ -593,6 +595,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({ memberEmail }) => {
           onShowCancelModal={() => setShowCancelModal(true)}
           onShowCreditModal={() => setShowCreditModal(true)}
           onShowDiscountModal={() => setShowDiscountModal(true)}
+          onShowTierChangeModal={() => setShowTierChangeModal(true)}
           onGetPaymentLink={handleGetPaymentLink}
           isDark={isDark}
         />
@@ -656,6 +659,20 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({ memberEmail }) => {
         isLoading={isCanceling}
         isDark={isDark}
       />
+
+      {billingInfo?.activeSubscription && (
+        <TierChangeWizard
+          isOpen={showTierChangeModal}
+          onClose={() => setShowTierChangeModal(false)}
+          memberEmail={memberEmail}
+          subscriptionId={billingInfo.activeSubscription.id}
+          currentTierName={billingInfo.activeSubscription.planName || billingInfo.tier || 'Unknown'}
+          onSuccess={() => {
+            fetchBillingInfo();
+            setShowTierChangeModal(false);
+          }}
+        />
+      )}
     </div>
   );
 };
