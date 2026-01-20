@@ -5,6 +5,7 @@ import { useData } from '../../contexts/DataContext';
 interface BillingInfo {
   billingProvider: 'stripe' | 'mindbody' | 'family_addon' | 'comped' | null;
   tier: string;
+  billingMigrationRequestedAt?: string;
   subscription?: {
     status: string;
     currentPeriodEnd: number;
@@ -59,6 +60,7 @@ export default function BillingSection({ isDark }: Props) {
   const [showInvoices, setShowInvoices] = useState(false);
   const [updatingPayment, setUpdatingPayment] = useState(false);
   const [openingPortal, setOpeningPortal] = useState(false);
+  const [migratingPayment, setMigratingPayment] = useState(false);
 
   useEffect(() => {
     const emailParam = viewAsUser?.email ? `?email=${encodeURIComponent(viewAsUser.email)}` : '';
@@ -112,6 +114,26 @@ export default function BillingSection({ isDark }: Props) {
       showToast('Failed to open billing portal', 'error');
     } finally {
       setOpeningPortal(false);
+    }
+  };
+
+  const handleMigrateToStripe = async () => {
+    setMigratingPayment(true);
+    try {
+      const res = await fetch('/api/my/billing/migrate-to-stripe', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        showToast(data.error || 'Unable to update payment method', 'error');
+      }
+    } catch {
+      showToast('Failed to open payment portal', 'error');
+    } finally {
+      setMigratingPayment(false);
     }
   };
 
@@ -333,6 +355,8 @@ export default function BillingSection({ isDark }: Props) {
   }
 
   if (billingInfo.billingProvider === 'mindbody') {
+    const hasMigrationPending = !!billingInfo.billingMigrationRequestedAt;
+    
     return (
       <div className={`rounded-2xl overflow-hidden ${isDark ? 'bg-white/5' : 'bg-white'}`}>
         <div className="p-4">
@@ -347,9 +371,41 @@ export default function BillingSection({ isDark }: Props) {
               </p>
             </div>
           </div>
-          <p className={`text-sm ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
-            Your billing is handled through our legacy system. Contact the front desk for billing questions.
-          </p>
+          
+          {hasMigrationPending ? (
+            <div className={`p-3 rounded-lg mb-4 ${isDark ? 'bg-green-900/20 border border-green-500/30' : 'bg-green-50 border border-green-200'}`}>
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-green-500 text-lg">check_circle</span>
+                <span className={`text-sm font-medium ${isDark ? 'text-green-400' : 'text-green-700'}`}>
+                  Payment method updated
+                </span>
+              </div>
+              <p className={`text-sm mt-1 ${isDark ? 'text-green-300/80' : 'text-green-700'}`}>
+                Our team is transitioning your billing. You'll receive a confirmation once complete.
+              </p>
+            </div>
+          ) : (
+            <p className={`text-sm mb-4 ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
+              Update your payment method to enable billing through the app and avoid payment issues.
+            </p>
+          )}
+          
+          <button
+            onClick={handleMigrateToStripe}
+            disabled={migratingPayment}
+            className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium text-sm transition-all disabled:opacity-50 ${
+              isDark 
+                ? 'bg-accent/20 text-accent hover:bg-accent/30' 
+                : 'bg-primary/10 text-primary hover:bg-primary/20'
+            }`}
+          >
+            {migratingPayment ? (
+              <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>
+            ) : (
+              <span className="material-symbols-outlined text-lg">credit_card</span>
+            )}
+            {migratingPayment ? 'Opening...' : hasMigrationPending ? 'Update Payment Method' : 'Update Payment Method'}
+          </button>
         </div>
       </div>
     );

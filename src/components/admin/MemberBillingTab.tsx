@@ -81,6 +81,7 @@ interface BillingInfo {
   familyGroup?: FamilyGroup | null;
   stripeError?: string;
   familyError?: string;
+  billingMigrationRequestedAt?: string;
 }
 
 const BILLING_PROVIDERS = [
@@ -602,10 +603,41 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({ memberEmail }) => {
       )}
 
       {billingInfo?.billingProvider === 'mindbody' && (
-        <MindbodyBillingSection
-          mindbodyClientId={billingInfo.mindbodyClientId}
-          isDark={isDark}
-        />
+        <>
+          {billingInfo.billingMigrationRequestedAt && (
+            <div className={`p-4 rounded-xl ${isDark ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-amber-50 border border-amber-200'}`}>
+              <div className="flex items-start gap-3">
+                <span className={`material-symbols-outlined ${isDark ? 'text-amber-400' : 'text-amber-600'} text-xl`}>sync</span>
+                <div className="flex-1">
+                  <p className={`text-sm font-medium ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+                    Member has updated payment info and is ready to migrate from MindBody
+                  </p>
+                  <p className={`text-xs mt-1 ${isDark ? 'text-amber-400/80' : 'text-amber-600'}`}>
+                    Migration requested on {new Date(billingInfo.billingMigrationRequestedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  </p>
+                  <button
+                    onClick={() => handleUpdateBillingSource('stripe')}
+                    disabled={isUpdatingSource}
+                    className={`inline-flex items-center gap-1.5 mt-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      isDark ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                    } disabled:opacity-50`}
+                  >
+                    {isUpdatingSource ? (
+                      <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+                    ) : (
+                      <span className="material-symbols-outlined text-base">swap_horiz</span>
+                    )}
+                    Migrate to Stripe Billing
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          <MindbodyBillingSection
+            mindbodyClientId={billingInfo.mindbodyClientId}
+            isDark={isDark}
+          />
+        </>
       )}
 
       {billingInfo?.billingProvider === 'family_addon' && (

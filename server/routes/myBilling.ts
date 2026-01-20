@@ -4,6 +4,7 @@ import { getStripeClient } from '../core/stripe/client';
 import { listCustomerSubscriptions } from '../core/stripe/subscriptions';
 import { getBillingGroupByMemberEmail } from '../core/stripe/groupBilling';
 import { listCustomerInvoices } from '../core/stripe/invoices';
+import { notifyAllStaffRequired, getStaffAndAdminEmails } from '../core/staffNotifications';
 
 const router = Router();
 
@@ -22,7 +23,7 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
     const email = targetEmail;
     
     const result = await pool.query(
-      `SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, tier
+      `SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, tier, billing_migration_requested_at
        FROM users WHERE LOWER(email) = $1`,
       [email.toLowerCase()]
     );
@@ -35,6 +36,7 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
     const billingInfo: any = {
       billingProvider: member.billing_provider,
       tier: member.tier,
+      billingMigrationRequestedAt: member.billing_migration_requested_at,
     };
     
     if (member.billing_provider === 'stripe' && member.stripe_customer_id) {
@@ -247,6 +249,105 @@ router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
   } catch (error: any) {
     console.error('[MyBilling] Portal error:', error);
     res.status(500).json({ error: 'Failed to open billing portal' });
+  }
+});
+
+router.post('/api/my/billing/migrate-to-stripe', requireAuth, async (req, res) => {
+  try {
+    const email = req.session.user.email;
+    
+    const result = await pool.query(
+      `SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id
+       FROM users WHERE LOWER(email) = $1`,
+      [email.toLowerCase()]
+    );
+    
+    const member = result.rows[0];
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    if (member.billing_provider === 'stripe') {
+      return res.json({ success: true, message: 'Already on Stripe billing' });
+    }
+    
+    const stripe = await getStripeClient();
+    let customerId = member.stripe_customer_id;
+    
+    if (!customerId) {
+      const customers = await stripe.customers.list({ email: member.email, limit: 1 });
+      if (customers.data.length > 0) {
+        customerId = customers.data[0].id;
+      } else {
+        const fullName = [member.first_name, member.last_name].filter(Boolean).join(' ') || undefined;
+        const customer = await stripe.customers.create({
+          email: member.email,
+          name: fullName,
+        });
+        customerId = customer.id;
+      }
+    }
+    
+    await pool.query(
+      `UPDATE users SET stripe_customer_id = $1, billing_migration_requested_at = NOW() WHERE id = $2`,
+      [customerId, member.id]
+    );
+    
+    const returnUrl = process.env.REPLIT_DEV_DOMAIN
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}/profile`
+      : process.env.REPLIT_DEPLOYMENT_DOMAIN
+        ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}/profile`
+        : 'https://everhouse.com/profile';
+    
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: returnUrl,
+      flow_data: {
+        type: 'payment_method_update',
+      },
+    });
+    
+    const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email;
+    const notificationTitle = 'Billing Migration Request';
+    const notificationMessage = `${memberName} has added a payment method and is ready to transition from MindBody billing`;
+    
+    try {
+      await notifyAllStaffRequired(
+        notificationTitle,
+        notificationMessage,
+        'billing_migration'
+      );
+      console.log(`[MyBilling] Staff notification sent for billing migration request from ${member.email}`);
+    } catch (notifyError: any) {
+      console.error(`[MyBilling] Real-time staff notification failed for ${member.email}:`, notifyError.message);
+      
+      try {
+        const staffEmails = await getStaffAndAdminEmails();
+        if (staffEmails.length > 0) {
+          const placeholders: string[] = [];
+          const params: string[] = [];
+          staffEmails.forEach((staffEmail, i) => {
+            const base = i * 4;
+            placeholders.push('($' + (base + 1) + ', $' + (base + 2) + ', $' + (base + 3) + ', $' + (base + 4) + ', NOW())');
+            params.push(staffEmail, notificationTitle, notificationMessage, 'billing_migration');
+          });
+          await pool.query(
+            'INSERT INTO notifications (user_email, title, message, type, created_at) VALUES ' + placeholders.join(', '),
+            params
+          );
+          console.log('[MyBilling] Fallback notification inserted for ' + staffEmails.length + ' staff members');
+        } else {
+          console.error('[MyBilling] No staff members found for fallback notification');
+        }
+      } catch (fallbackError: any) {
+        console.error('[MyBilling] Fallback notification insertion failed:', fallbackError.message);
+      }
+    }
+    
+    res.json({ url: session.url });
+  } catch (error: any) {
+    console.error('[MyBilling] Migration error:', error);
+    res.status(500).json({ error: 'Failed to initiate billing migration' });
   }
 });
 

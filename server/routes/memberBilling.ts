@@ -73,7 +73,7 @@ async function findEligibleSubscription(
 
 async function getMemberByEmail(email: string) {
   const result = await pool.query(
-    `SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, mindbody_client_id, tier
+    `SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, mindbody_client_id, tier, billing_migration_requested_at
      FROM users WHERE LOWER(email) = $1`,
     [email.toLowerCase()]
   );
@@ -96,6 +96,7 @@ router.get('/api/member-billing/:email', isStaffOrAdmin, async (req, res) => {
       billingProvider: member.billing_provider,
       stripeCustomerId: member.stripe_customer_id,
       tier: member.tier,
+      billingMigrationRequestedAt: member.billing_migration_requested_at,
     };
 
     if (member.billing_provider === 'stripe' && member.stripe_customer_id) {
