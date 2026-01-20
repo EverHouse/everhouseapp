@@ -1,0 +1,267 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Footer } from '../../components/Footer';
+import Input from '../../components/Input';
+import { usePageReady } from '../../contexts/PageReadyContext';
+
+interface DayPassTier {
+  id: number;
+  name: string;
+  slug: string;
+  priceString: string;
+  priceCents: number;
+  description: string | null;
+  stripePriceId: string | null;
+}
+
+const BuyDayPass: React.FC = () => {
+  const navigate = useNavigate();
+  const { setPageReady } = usePageReady();
+  const [tiers, setTiers] = useState<DayPassTier[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [processingSlug, setProcessingSlug] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchDayPassTiers();
+  }, []);
+
+  const fetchDayPassTiers = async () => {
+    try {
+      const response = await fetch('/api/membership-tiers?active=true');
+      if (!response.ok) throw new Error('Failed to fetch day passes');
+      
+      const allTiers = await response.json();
+      const dayPasses = allTiers
+        .filter((tier: any) => tier.product_type === 'one_time')
+        .map((tier: any) => ({
+          id: tier.id,
+          name: tier.name,
+          slug: tier.slug,
+          priceString: tier.price_string,
+          priceCents: tier.price_cents,
+          description: tier.description,
+          stripePriceId: tier.stripe_price_id,
+        }));
+      
+      setTiers(dayPasses);
+      setPageReady(true);
+    } catch (err) {
+      setError('Unable to load day passes. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePurchase = async (tier: DayPassTier) => {
+    if (!email) {
+      setError('Please enter your email address');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    setError(null);
+    setProcessingSlug(tier.slug);
+
+    try {
+      const response = await fetch('/api/public/day-pass/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          passType: tier.slug,
+          firstName,
+          lastName,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create checkout');
+      }
+
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      }
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong. Please try again.');
+      setProcessingSlug(null);
+    }
+  };
+
+  const formatPrice = (cents: number) => {
+    return `$${(cents / 100).toFixed(0)}`;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col min-h-screen bg-[#F2F2EC]">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col min-h-screen bg-[#F2F2EC] overflow-x-hidden">
+      <div className="px-6 pt-4 md:pt-2 pb-6 text-center animate-pop-in">
+        <h1 className="text-3xl font-bold tracking-tight text-primary mb-3">Day Passes</h1>
+        <p className="text-primary/70 text-sm leading-relaxed max-w-xs mx-auto">
+          Experience Ever House as a guest. No membership required.
+        </p>
+      </div>
+
+      <section className="px-4 mb-6">
+        <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-black/5">
+          <h2 className="text-lg font-bold text-primary mb-4 flex items-center gap-2">
+            <span className="material-symbols-outlined text-xl">person</span>
+            Your Information
+          </h2>
+          
+          <div className="space-y-4">
+            <Input 
+              label="Email Address" 
+              type="email" 
+              placeholder="your@email.com" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              variant="solid"
+              required 
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <Input 
+                label="First Name" 
+                placeholder="John" 
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                variant="solid"
+              />
+              <Input 
+                label="Last Name" 
+                placeholder="Doe" 
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                variant="solid"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {error && (
+        <div className="px-4 mb-4">
+          <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">
+            {error}
+          </div>
+        </div>
+      )}
+
+      <section className="px-4 mb-8">
+        <h2 className="text-lg font-bold text-primary mb-4 flex items-center gap-2 px-2">
+          <span className="material-symbols-outlined text-xl">confirmation_number</span>
+          Available Passes
+        </h2>
+
+        {tiers.length === 0 ? (
+          <div className="bg-white rounded-2xl p-8 text-center border border-black/5">
+            <span className="material-symbols-outlined text-4xl text-primary/30 mb-3">confirmation_number</span>
+            <p className="text-primary/60">No day passes available at this time.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {tiers.map((tier) => (
+              <div 
+                key={tier.id}
+                className="bg-white rounded-2xl p-5 border border-black/5 shadow-sm"
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-primary">{tier.name}</h3>
+                    {tier.description && (
+                      <p className="text-sm text-primary/60 mt-1">{tier.description}</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-bold text-primary">
+                      {tier.priceCents ? formatPrice(tier.priceCents) : tier.priceString}
+                    </span>
+                  </div>
+                </div>
+                
+                <button
+                  onClick={() => handlePurchase(tier)}
+                  disabled={processingSlug !== null || !tier.stripePriceId}
+                  className="w-full flex justify-center items-center gap-2 rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-white shadow-md hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {processingSlug === tier.slug ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Processing...
+                    </>
+                  ) : !tier.stripePriceId ? (
+                    'Coming Soon'
+                  ) : (
+                    <>
+                      Buy Now
+                      <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="px-4 mb-8">
+        <div className="bg-[#E8E8E0]/50 rounded-2xl p-5">
+          <h3 className="text-base font-bold text-primary mb-3 flex items-center gap-2">
+            <span className="material-symbols-outlined text-lg">info</span>
+            How It Works
+          </h3>
+          <ul className="space-y-2 text-sm text-primary/70">
+            <li className="flex items-start gap-2">
+              <span className="material-symbols-outlined text-base text-primary/50 mt-0.5">check_circle</span>
+              <span>Complete your purchase securely with Stripe</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="material-symbols-outlined text-base text-primary/50 mt-0.5">check_circle</span>
+              <span>Receive a QR code via email</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="material-symbols-outlined text-base text-primary/50 mt-0.5">check_circle</span>
+              <span>Show your QR code at the front desk when you arrive</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section className="px-4 py-8 mb-4">
+        <div className="bg-[#293515] rounded-2xl p-6 text-center">
+          <h3 className="text-xl font-bold text-white mb-2">Want more than a day pass?</h3>
+          <p className="text-white/70 text-sm mb-4">Become a member and enjoy unlimited access plus exclusive benefits.</p>
+          <button 
+            onClick={() => navigate('/membership')}
+            className="bg-[#F2F2EC] text-[#293515] px-6 py-3 rounded-xl font-bold text-sm hover:bg-white transition-colors"
+          >
+            Explore Memberships
+          </button>
+        </div>
+      </section>
+      
+      <Footer />
+    </div>
+  );
+};
+
+export default BuyDayPass;

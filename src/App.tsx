@@ -108,6 +108,8 @@ const WhatsOn = lazy(() => import('./pages/Public/WhatsOn'));
 const PrivateHire = lazy(() => import('./pages/Public/PrivateHire'));
 const PublicCafe = lazy(() => import('./pages/Public/Cafe'));
 const FAQ = lazy(() => import('./pages/Public/FAQ'));
+const BuyDayPass = lazy(() => import('./pages/Public/BuyDayPass'));
+const DayPassSuccess = lazy(() => import('./pages/Public/DayPassSuccess'));
 const Login = lazy(() => import('./pages/Public/Login'));
 const AuthCallback = lazy(() => import('./pages/Public/AuthCallback'));
 const AdminDashboard = lazy(() => import('./pages/Admin/AdminDashboard'));
@@ -329,6 +331,8 @@ const AnimatedRoutes: React.FC = () => {
             <Route path="/private-hire" element={<DirectionalPageTransition><PageErrorBoundary pageName="PrivateHire"><PrivateHire /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/menu" element={<DirectionalPageTransition><PageErrorBoundary pageName="Cafe"><PublicCafe /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/faq" element={<DirectionalPageTransition><PageErrorBoundary pageName="FAQ"><FAQ /></PageErrorBoundary></DirectionalPageTransition>} />
+            <Route path="/day-pass" element={<DirectionalPageTransition><PageErrorBoundary pageName="BuyDayPass"><BuyDayPass /></PageErrorBoundary></DirectionalPageTransition>} />
+            <Route path="/day-pass/success" element={<DirectionalPageTransition><PageErrorBoundary pageName="DayPassSuccess"><DayPassSuccess /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/login" element={<DirectionalPageTransition><PageErrorBoundary pageName="Login"><Login /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/auth/callback" element={<DirectionalPageTransition><PageErrorBoundary pageName="AuthCallback"><AuthCallback /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/reset-password" element={<DirectionalPageTransition><PageErrorBoundary pageName="ResetPassword"><Login /></PageErrorBoundary></DirectionalPageTransition>} />

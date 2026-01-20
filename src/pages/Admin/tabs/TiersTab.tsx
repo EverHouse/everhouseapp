@@ -32,6 +32,21 @@ interface MembershipTier {
     has_simulator_guest_passes: boolean;
     has_discounted_merch: boolean;
     unlimited_access: boolean;
+    stripe_price_id?: string | null;
+    stripe_product_id?: string | null;
+    price_cents?: number | null;
+}
+
+interface StripePrice {
+    id: string;
+    productId: string;
+    productName: string;
+    nickname: string | null;
+    amount: number;
+    amountCents: number;
+    currency: string;
+    interval: string;
+    displayString: string;
 }
 
 const BOOLEAN_FIELDS = [
@@ -58,6 +73,8 @@ const TiersTab: React.FC = () => {
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [newFeatureKey, setNewFeatureKey] = useState('');
     const [syncing, setSyncing] = useState(false);
+    const [stripePrices, setStripePrices] = useState<StripePrice[]>([]);
+    const [loadingPrices, setLoadingPrices] = useState(false);
 
     const SUB_TABS: { key: SubTab; label: string; icon: string }[] = [
         { key: 'tiers', label: 'Tiers', icon: 'layers' },
@@ -92,7 +109,25 @@ const TiersTab: React.FC = () => {
         has_simulator_guest_passes: false,
         has_discounted_merch: false,
         unlimited_access: false,
+        stripe_price_id: null,
+        stripe_product_id: null,
+        price_cents: null,
     });
+
+    const fetchStripePrices = async () => {
+        setLoadingPrices(true);
+        try {
+            const res = await fetch('/api/stripe/prices/recurring', { credentials: 'include' });
+            if (res.ok) {
+                const data = await res.json();
+                setStripePrices(data.prices || []);
+            }
+        } catch (err) {
+            console.error('Failed to fetch Stripe prices:', err);
+        } finally {
+            setLoadingPrices(false);
+        }
+    };
 
     const openCreate = () => {
         setSelectedTier(getDefaultTier());
@@ -123,6 +158,7 @@ const TiersTab: React.FC = () => {
 
     useEffect(() => {
         fetchTiers();
+        fetchStripePrices();
     }, []);
 
     useEffect(() => {
@@ -362,6 +398,79 @@ const TiersTab: React.FC = () => {
                                     label="Show in Compare Table"
                                 />
                             </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Stripe Pricing</h4>
+                        <div className="space-y-3">
+                            {selectedTier?.stripe_price_id && (
+                                <div className="flex items-center gap-2 p-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-500/30">
+                                    <span aria-hidden="true" className="material-symbols-outlined text-indigo-600 dark:text-indigo-400">link</span>
+                                    <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Linked to Stripe</span>
+                                    <span className="text-xs text-indigo-600 dark:text-indigo-400 ml-auto">{selectedTier.stripe_price_id}</span>
+                                </div>
+                            )}
+                            <div>
+                                <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Linked Stripe Price</label>
+                                <select
+                                    className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                                    value={selectedTier?.stripe_price_id || ''}
+                                    onChange={e => {
+                                        if (!selectedTier) return;
+                                        const priceId = e.target.value;
+                                        if (!priceId) {
+                                            setSelectedTier({
+                                                ...selectedTier,
+                                                stripe_price_id: null,
+                                                stripe_product_id: null,
+                                                price_cents: null
+                                            });
+                                        } else {
+                                            const selectedPrice = stripePrices.find(p => p.id === priceId);
+                                            if (selectedPrice) {
+                                                setSelectedTier({
+                                                    ...selectedTier,
+                                                    stripe_price_id: selectedPrice.id,
+                                                    stripe_product_id: selectedPrice.productId,
+                                                    price_cents: selectedPrice.amountCents
+                                                });
+                                            }
+                                        }
+                                    }}
+                                >
+                                    <option value="">Not linked to Stripe</option>
+                                    {loadingPrices ? (
+                                        <option disabled>Loading prices...</option>
+                                    ) : (
+                                        stripePrices.map(price => (
+                                            <option key={price.id} value={price.id}>
+                                                {price.displayString}
+                                            </option>
+                                        ))
+                                    )}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">
+                                    Price (Cents)
+                                    {selectedTier?.stripe_price_id && (
+                                        <span className="ml-2 text-indigo-600 dark:text-indigo-400 normal-case font-normal">Auto-filled from Stripe</span>
+                                    )}
+                                </label>
+                                <input
+                                    type="number"
+                                    className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                        selectedTier?.stripe_price_id
+                                            ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed'
+                                            : 'bg-gray-50 dark:bg-black/30'
+                                    }`}
+                                    value={selectedTier?.price_cents || ''}
+                                    onChange={e => selectedTier && !selectedTier.stripe_price_id && setSelectedTier({...selectedTier, price_cents: parseInt(e.target.value) || null})}
+                                    readOnly={!!selectedTier?.stripe_price_id}
+                                    placeholder="e.g., 19900 for $199"
+                                />
+                            </div>
                         </div>
                     </div>
 

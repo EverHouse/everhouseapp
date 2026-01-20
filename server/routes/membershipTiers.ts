@@ -98,7 +98,8 @@ router.put('/api/membership-tiers/:id', isAdmin, async (req, res) => {
       daily_conf_room_minutes, can_book_simulators, can_book_conference,
       can_book_wellness, has_group_lessons, has_extended_sessions,
       has_private_lesson, has_simulator_guest_passes, has_discounted_merch,
-      unlimited_access
+      unlimited_access,
+      stripe_price_id, stripe_product_id, price_cents
     } = req.body;
     
     const result = await pool.query(`
@@ -127,6 +128,9 @@ router.put('/api/membership-tiers/:id', isAdmin, async (req, res) => {
         has_simulator_guest_passes = COALESCE($22, has_simulator_guest_passes),
         has_discounted_merch = COALESCE($23, has_discounted_merch),
         unlimited_access = COALESCE($24, unlimited_access),
+        stripe_price_id = $26,
+        stripe_product_id = $27,
+        price_cents = $28,
         updated_at = NOW()
       WHERE id = $25
       RETURNING *
@@ -139,7 +143,8 @@ router.put('/api/membership-tiers/:id', isAdmin, async (req, res) => {
       daily_conf_room_minutes, can_book_simulators, can_book_conference,
       can_book_wellness, has_group_lessons, has_extended_sessions,
       has_private_lesson, has_simulator_guest_passes, has_discounted_merch,
-      unlimited_access, id
+      unlimited_access, id,
+      stripe_price_id || null, stripe_product_id || null, price_cents || null
     ]);
     
     if (result.rows.length === 0) {

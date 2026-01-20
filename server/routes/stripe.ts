@@ -57,6 +57,44 @@ router.get('/api/stripe/config', async (req: Request, res: Response) => {
   }
 });
 
+router.get('/api/stripe/prices/recurring', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { getStripeClient } = await import('../core/stripe/client');
+    const stripe = await getStripeClient();
+    
+    const prices = await stripe.prices.list({
+      active: true,
+      type: 'recurring',
+      expand: ['data.product'],
+      limit: 100
+    });
+    
+    const formattedPrices = prices.data.map(price => {
+      const product = price.product as any;
+      const productName = typeof product === 'object' ? product.name : 'Unknown Product';
+      const amountDollars = (price.unit_amount || 0) / 100;
+      const interval = price.recurring?.interval || 'month';
+      
+      return {
+        id: price.id,
+        productId: typeof product === 'object' ? product.id : product,
+        productName,
+        nickname: price.nickname || null,
+        amount: amountDollars,
+        amountCents: price.unit_amount || 0,
+        currency: price.currency,
+        interval,
+        displayString: `$${amountDollars}/${interval} - ${price.nickname || productName}`
+      };
+    });
+    
+    res.json({ prices: formattedPrices });
+  } catch (error: any) {
+    console.error('[Stripe] Error fetching recurring prices:', error);
+    res.status(500).json({ error: 'Failed to fetch Stripe prices' });
+  }
+});
+
 router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
     const { 
@@ -2497,6 +2535,73 @@ router.post('/api/stripe/staff/send-membership-link', isStaffOrAdmin, async (req
   } catch (error: any) {
     console.error('[Stripe] Error sending membership invite:', error);
     res.status(500).json({ error: 'Failed to create membership invite' });
+  }
+});
+
+router.post('/api/public/day-pass/checkout', async (req: Request, res: Response) => {
+  try {
+    const { email, passType, firstName, lastName } = req.body;
+
+    if (!email || !passType) {
+      return res.status(400).json({ error: 'Missing required fields: email, passType' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+
+    const tierResult = await pool.query(
+      `SELECT id, name, slug, stripe_price_id, price_cents, description 
+       FROM membership_tiers 
+       WHERE slug = $1 AND product_type = 'one_time' AND is_active = true`,
+      [passType]
+    );
+
+    if (tierResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Day pass type not found' });
+    }
+
+    const tier = tierResult.rows[0];
+
+    if (!tier.stripe_price_id) {
+      return res.status(400).json({ error: 'This day pass is not available for purchase yet. Please contact us.' });
+    }
+
+    const stripe = await getStripeClient();
+
+    const domain = process.env.REPLIT_DEV_DOMAIN 
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
+      : 'https://everhouse.app';
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: tier.stripe_price_id,
+          quantity: 1,
+        },
+      ],
+      customer_email: email,
+      success_url: `${domain}/#/day-pass/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${domain}/#/day-pass`,
+      metadata: {
+        productType: passType,
+        tierName: tier.name,
+        email: email,
+        firstName: firstName || '',
+        lastName: lastName || '',
+        source: 'public_purchase',
+      },
+    });
+
+    console.log(`[Stripe] Day pass checkout session created for ${email}, pass type: ${tier.name}`);
+
+    res.json({ checkoutUrl: session.url });
+  } catch (error: any) {
+    console.error('[Stripe] Error creating day pass checkout:', error);
+    res.status(500).json({ error: 'Failed to create checkout session' });
   }
 });
 
