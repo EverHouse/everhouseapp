@@ -1,17 +1,19 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-
 let supabaseClient: SupabaseClient | null = null;
 
-function getSupabase(): SupabaseClient | null {
-  if (!supabaseUrl || !supabaseAnonKey) {
+export function getSupabase(): SupabaseClient | null {
+  if (supabaseClient) return supabaseClient;
+  
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  
+  if (!url || !anonKey) {
+    console.warn('[Supabase] Not configured - VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY missing');
     return null;
   }
-  if (!supabaseClient) {
-    supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
-  }
+  
+  supabaseClient = createClient(url, anonKey);
   return supabaseClient;
 }
 

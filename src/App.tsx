@@ -28,6 +28,7 @@ import { useEdgeSwipe } from './hooks/useEdgeSwipe';
 import { useKeyboardDetection } from './hooks/useKeyboardDetection';
 import { useUserStore } from './stores/userStore';
 import { useWebSocket } from './hooks/useWebSocket';
+import { useSupabaseRealtime } from './hooks/useSupabaseRealtime';
 import { StaffBookingToast } from './components/StaffBookingToast';
 
 const INITIAL_LOAD_SAFETY_TIMEOUT_MS = 100;
@@ -440,6 +441,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const unreadCount = useUserStore(state => state.unreadNotifications);
   useWebSocket({ effectiveEmail: user?.email });
+  useSupabaseRealtime({ userEmail: user?.email });
   const [hasScrolledPastHero, setHasScrolledPastHero] = useState(false);
   
   useDebugLayout();
