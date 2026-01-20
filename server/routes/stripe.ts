@@ -2391,10 +2391,25 @@ router.post('/api/stripe/staff/send-membership-link', isStaffOrAdmin, async (req
       return res.status(400).json({ error: 'Missing required fields: email, firstName, lastName, tierId' });
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+
+    // Sanitize name inputs
+    const sanitizedFirstName = String(firstName).trim().slice(0, 100);
+    const sanitizedLastName = String(lastName).trim().slice(0, 100);
+
+    if (!sanitizedFirstName || !sanitizedLastName) {
+      return res.status(400).json({ error: 'First name and last name are required' });
+    }
+
+    // Only allow subscription-based tiers (not one_time products like day passes)
     const tierResult = await pool.query(
       `SELECT id, name, stripe_price_id, price_cents, billing_interval 
        FROM membership_tiers 
-       WHERE id = $1 AND is_active = true`,
+       WHERE id = $1 AND is_active = true AND (product_type IS NULL OR product_type = 'subscription')`,
       [tierId]
     );
 
@@ -2427,8 +2442,8 @@ router.post('/api/stripe/staff/send-membership-link', isStaffOrAdmin, async (req
       success_url: `${baseUrl}/welcome?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/`,
       metadata: {
-        firstName,
-        lastName,
+        firstName: sanitizedFirstName,
+        lastName: sanitizedLastName,
         tierId: tier.id.toString(),
         tierName: tier.name,
         source: 'staff_invite',
@@ -2444,6 +2459,10 @@ router.post('/api/stripe/staff/send-membership-link', isStaffOrAdmin, async (req
       const priceFormatted = tier.billing_interval === 'year' 
         ? `$${(tier.price_cents / 100).toFixed(0)}/year`
         : `$${(tier.price_cents / 100).toFixed(0)}/month`;
+
+      // Escape HTML in name to prevent XSS
+      const escapeHtml = (str: string) => str.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c] || c));
+      const safeFirstName = escapeHtml(sanitizedFirstName);
 
       await resend.emails.send({
         from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
@@ -2476,7 +2495,7 @@ router.post('/api/stripe/staff/send-membership-link', isStaffOrAdmin, async (req
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
               <p style="margin: 0; font-size: 16px; color: #4b5563; line-height: 1.6;">
-                Hi ${firstName}, you've been invited to join Ever House as a <strong>${tier.name}</strong> member.
+                Hi ${safeFirstName}, you've been invited to join Ever House as a <strong>${tier.name}</strong> member.
               </p>
             </td>
           </tr>
@@ -2551,11 +2570,21 @@ router.post('/api/public/day-pass/checkout', async (req: Request, res: Response)
       return res.status(400).json({ error: 'Invalid email address' });
     }
 
+    // Sanitize passType slug - only allow alphanumeric and underscores
+    const sanitizedPassType = String(passType).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 50);
+    if (!sanitizedPassType) {
+      return res.status(400).json({ error: 'Invalid pass type' });
+    }
+
+    // Sanitize name inputs
+    const sanitizedFirstName = firstName ? String(firstName).trim().slice(0, 100) : '';
+    const sanitizedLastName = lastName ? String(lastName).trim().slice(0, 100) : '';
+
     const tierResult = await pool.query(
       `SELECT id, name, slug, stripe_price_id, price_cents, description 
        FROM membership_tiers 
        WHERE slug = $1 AND product_type = 'one_time' AND is_active = true`,
-      [passType]
+      [sanitizedPassType]
     );
 
     if (tierResult.rows.length === 0) {
@@ -2570,9 +2599,10 @@ router.post('/api/public/day-pass/checkout', async (req: Request, res: Response)
 
     const stripe = await getStripeClient();
 
-    const domain = process.env.REPLIT_DEV_DOMAIN 
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-      : 'https://everhouse.app';
+    // Use production URL as primary, dev domain only in development
+    const domain = process.env.NODE_ENV === 'production' 
+      ? 'https://everhouse.app'
+      : (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://everhouse.app');
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -2587,11 +2617,11 @@ router.post('/api/public/day-pass/checkout', async (req: Request, res: Response)
       success_url: `${domain}/#/day-pass/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${domain}/#/day-pass`,
       metadata: {
-        productType: passType,
+        productType: tier.slug,
         tierName: tier.name,
         email: email,
-        firstName: firstName || '',
-        lastName: lastName || '',
+        firstName: sanitizedFirstName,
+        lastName: sanitizedLastName,
         source: 'public_purchase',
       },
     });
