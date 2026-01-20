@@ -40,7 +40,7 @@ export async function processStripeWebhook(
   } else if (event.type === 'customer.subscription.created') {
     await handleSubscriptionCreated(event.data.object);
   } else if (event.type === 'customer.subscription.updated') {
-    await handleSubscriptionUpdated(event.data.object);
+    await handleSubscriptionUpdated(event.data.object, event.data.previous_attributes);
   } else if (event.type === 'customer.subscription.deleted') {
     await handleSubscriptionDeleted(event.data.object);
   }
@@ -613,11 +613,33 @@ async function handleSubscriptionCreated(subscription: any): Promise<void> {
   }
 }
 
-async function handleSubscriptionUpdated(subscription: any): Promise<void> {
+async function handleSubscriptionUpdated(subscription: any, previousAttributes?: any): Promise<void> {
   try {
     const customerId = subscription.customer;
     const status = subscription.status;
     const currentPriceId = subscription.items?.data?.[0]?.price?.id;
+
+    if (previousAttributes?.items?.data) {
+      const { handleSubscriptionItemsChanged } = await import('./familyBilling');
+      const currentItems = subscription.items?.data?.map((i: any) => ({
+        id: i.id,
+        metadata: i.metadata,
+      })) || [];
+      const previousItems = previousAttributes.items.data.map((i: any) => ({
+        id: i.id,
+        metadata: i.metadata,
+      }));
+      
+      const itemChanges = await handleSubscriptionItemsChanged({
+        subscriptionId: subscription.id,
+        currentItems,
+        previousItems,
+      });
+      
+      if (itemChanges.deactivated.length > 0) {
+        console.log(`[Stripe Webhook] Family members deactivated via subscription item removal: ${itemChanges.deactivated.join(', ')}`);
+      }
+    }
 
     const userResult = await pool.query(
       'SELECT id, email, first_name, last_name, tier FROM users WHERE stripe_customer_id = $1',

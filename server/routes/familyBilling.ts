@@ -11,6 +11,7 @@ import {
   linkStripeSubscriptionToFamilyGroup,
   updateFamilyAddOnPricing,
   getAllFamilyGroups,
+  reconcileFamilyBillingWithStripe,
 } from '../core/stripe/familyBilling';
 
 const router = Router();
@@ -182,6 +183,18 @@ router.post('/api/family-billing/groups/:groupId/link-subscription', isStaffOrAd
     }
   } catch (error: any) {
     console.error('[FamilyBilling] Error linking subscription:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/api/family-billing/reconcile', isStaffOrAdmin, async (req, res) => {
+  try {
+    console.log('[FamilyBilling] Starting reconciliation with Stripe...');
+    const result = await reconcileFamilyBillingWithStripe();
+    console.log(`[FamilyBilling] Reconciliation complete: ${result.groupsChecked} groups checked, ${result.membersDeactivated} deactivated, ${result.membersReactivated} reactivated, ${result.membersCreated} created, ${result.itemsRelinked} relinked`);
+    res.json(result);
+  } catch (error: any) {
+    console.error('[FamilyBilling] Error during reconciliation:', error);
     res.status(500).json({ error: error.message });
   }
 });

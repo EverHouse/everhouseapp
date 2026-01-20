@@ -187,6 +187,17 @@ const DataIntegrityTab: React.FC = () => {
   const [isRunningMindbodyImport, setIsRunningMindbodyImport] = useState(false);
   const [mindbodyResult, setMindbodyResult] = useState<{ success: boolean; message: string } | null>(null);
 
+  const [isReconciling, setIsReconciling] = useState(false);
+  const [reconcileResult, setReconcileResult] = useState<{
+    success: boolean;
+    groupsChecked: number;
+    membersDeactivated: number;
+    membersReactivated: number;
+    membersCreated: number;
+    itemsRelinked: number;
+    errors: string[];
+  } | null>(null);
+
   useEffect(() => {
     fetchCachedResults();
     fetchCalendarStatus();
@@ -690,6 +701,31 @@ const DataIntegrityTab: React.FC = () => {
       showToast('Failed to resync member', 'error');
     } finally {
       setIsResyncing(false);
+    }
+  };
+
+  const handleReconcileFamilyBilling = async () => {
+    setIsReconciling(true);
+    setReconcileResult(null);
+    try {
+      const res = await fetch('/api/family-billing/reconcile', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      
+      const data = await res.json();
+      if (res.ok) {
+        setReconcileResult(data);
+        const summary = `Checked ${data.groupsChecked} groups. Deactivated: ${data.membersDeactivated}, Reactivated: ${data.membersReactivated}, Created: ${data.membersCreated}, Relinked: ${data.itemsRelinked}`;
+        showToast(summary, data.success ? 'success' : 'info');
+      } else {
+        showToast(data.error || 'Failed to reconcile', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to reconcile family billing:', err);
+      showToast('Failed to reconcile family billing', 'error');
+    } finally {
+      setIsReconciling(false);
     }
   };
 
@@ -1274,6 +1310,49 @@ const DataIntegrityTab: React.FC = () => {
               )}
               {attendanceBookings.length === 0 && (attendanceSearchDate || attendanceSearchEmail) && !isSearchingAttendance && (
                 <p className="text-sm text-gray-500 text-center py-4">No bookings found</p>
+              )}
+            </div>
+
+            <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
+              <h4 className="font-semibold text-primary dark:text-white mb-3 flex items-center gap-2">
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">family_restroom</span>
+                Family Billing Reconciliation
+              </h4>
+              <p className="text-xs text-gray-500 mb-3">
+                Sync family member billing with Stripe. This checks all family groups and ensures local records match Stripe subscription items.
+                Members removed in Stripe will be deactivated, and missing links will be restored.
+              </p>
+              <button
+                onClick={handleReconcileFamilyBilling}
+                disabled={isReconciling}
+                className="px-4 py-2 bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515] rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isReconciling && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                {isReconciling ? 'Reconciling...' : 'Reconcile Family Billing'}
+              </button>
+              {reconcileResult && (
+                <div className={`mt-3 p-3 rounded-lg ${reconcileResult.success ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' : 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800'}`}>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="text-gray-600 dark:text-gray-300">Groups Checked:</div>
+                    <div className="font-medium text-primary dark:text-white">{reconcileResult.groupsChecked}</div>
+                    <div className="text-gray-600 dark:text-gray-300">Members Deactivated:</div>
+                    <div className="font-medium text-red-600 dark:text-red-400">{reconcileResult.membersDeactivated}</div>
+                    <div className="text-gray-600 dark:text-gray-300">Members Reactivated:</div>
+                    <div className="font-medium text-green-600 dark:text-green-400">{reconcileResult.membersReactivated}</div>
+                    <div className="text-gray-600 dark:text-gray-300">Members Created:</div>
+                    <div className="font-medium text-purple-600 dark:text-purple-400">{reconcileResult.membersCreated}</div>
+                    <div className="text-gray-600 dark:text-gray-300">Items Relinked:</div>
+                    <div className="font-medium text-blue-600 dark:text-blue-400">{reconcileResult.itemsRelinked}</div>
+                  </div>
+                  {reconcileResult.errors.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-amber-200 dark:border-amber-700">
+                      <p className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-1">Errors:</p>
+                      {reconcileResult.errors.map((err, idx) => (
+                        <p key={idx} className="text-xs text-amber-600 dark:text-amber-400">{err}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 

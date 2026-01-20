@@ -454,3 +454,303 @@ export async function getAllFamilyGroups(): Promise<FamilyGroupWithMembers[]> {
   
   return result;
 }
+
+export interface ReconciliationResult {
+  success: boolean;
+  groupsChecked: number;
+  membersDeactivated: number;
+  membersReactivated: number;
+  membersCreated: number;
+  itemsRelinked: number;
+  errors: string[];
+  details: ReconciliationDetail[];
+}
+
+export interface ReconciliationDetail {
+  familyGroupId: number;
+  primaryEmail: string;
+  action: 'deactivated' | 'reactivated' | 'relinked' | 'error' | 'ok';
+  memberEmail?: string;
+  reason: string;
+}
+
+export async function reconcileFamilyBillingWithStripe(): Promise<ReconciliationResult> {
+  const result: ReconciliationResult = {
+    success: true,
+    groupsChecked: 0,
+    membersDeactivated: 0,
+    membersReactivated: 0,
+    membersCreated: 0,
+    itemsRelinked: 0,
+    errors: [],
+    details: [],
+  };
+
+  try {
+    const stripe = await getStripeClient();
+    
+    const activeGroups = await db.select()
+      .from(familyGroups)
+      .where(eq(familyGroups.isActive, true));
+    
+    for (const group of activeGroups) {
+      result.groupsChecked++;
+      
+      if (!group.primaryStripeSubscriptionId) {
+        result.details.push({
+          familyGroupId: group.id,
+          primaryEmail: group.primaryEmail,
+          action: 'ok',
+          reason: 'No Stripe subscription linked - skipped',
+        });
+        continue;
+      }
+      
+      try {
+        const subscription = await stripe.subscriptions.retrieve(group.primaryStripeSubscriptionId, {
+          expand: ['items.data'],
+        });
+        
+        const stripeItemsMap = new Map<string, Stripe.SubscriptionItem>();
+        const stripeEmailToItemMap = new Map<string, Stripe.SubscriptionItem>();
+        
+        for (const item of subscription.items.data) {
+          stripeItemsMap.set(item.id, item);
+          const familyEmail = item.metadata?.family_member_email?.toLowerCase();
+          if (familyEmail) {
+            stripeEmailToItemMap.set(familyEmail, item);
+          }
+        }
+        
+        const localMembers = await db.select()
+          .from(familyMembers)
+          .where(and(
+            eq(familyMembers.familyGroupId, group.id),
+            eq(familyMembers.isActive, true)
+          ));
+        
+        for (const member of localMembers) {
+          if (member.stripeSubscriptionItemId) {
+            if (!stripeItemsMap.has(member.stripeSubscriptionItemId)) {
+              const stripeItem = stripeEmailToItemMap.get(member.memberEmail.toLowerCase());
+              if (stripeItem) {
+                await db.update(familyMembers)
+                  .set({
+                    stripeSubscriptionItemId: stripeItem.id,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(familyMembers.id, member.id));
+                
+                result.itemsRelinked++;
+                result.details.push({
+                  familyGroupId: group.id,
+                  primaryEmail: group.primaryEmail,
+                  action: 'relinked',
+                  memberEmail: member.memberEmail,
+                  reason: `Subscription item ID updated from ${member.stripeSubscriptionItemId} to ${stripeItem.id}`,
+                });
+              } else {
+                await db.update(familyMembers)
+                  .set({
+                    isActive: false,
+                    removedAt: new Date(),
+                  })
+                  .where(eq(familyMembers.id, member.id));
+                
+                await pool.query(
+                  'UPDATE users SET family_group_id = NULL, is_family_primary = false WHERE LOWER(email) = $1',
+                  [member.memberEmail.toLowerCase()]
+                );
+                
+                result.membersDeactivated++;
+                result.details.push({
+                  familyGroupId: group.id,
+                  primaryEmail: group.primaryEmail,
+                  action: 'deactivated',
+                  memberEmail: member.memberEmail,
+                  reason: 'Stripe subscription item no longer exists',
+                });
+              }
+            }
+          } else {
+            const stripeItem = stripeEmailToItemMap.get(member.memberEmail.toLowerCase());
+            if (stripeItem) {
+              await db.update(familyMembers)
+                .set({
+                  stripeSubscriptionItemId: stripeItem.id,
+                  updatedAt: new Date(),
+                })
+                .where(eq(familyMembers.id, member.id));
+              
+              result.itemsRelinked++;
+              result.details.push({
+                familyGroupId: group.id,
+                primaryEmail: group.primaryEmail,
+                action: 'relinked',
+                memberEmail: member.memberEmail,
+                reason: `Linked to existing Stripe item ${stripeItem.id}`,
+              });
+            }
+          }
+        }
+        
+        for (const [email, item] of stripeEmailToItemMap) {
+          const hasLocalMember = localMembers.some(
+            m => m.memberEmail.toLowerCase() === email
+          );
+          
+          if (!hasLocalMember) {
+            const inactiveMember = await db.select()
+              .from(familyMembers)
+              .where(and(
+                eq(familyMembers.familyGroupId, group.id),
+                eq(familyMembers.memberEmail, email),
+                eq(familyMembers.isActive, false)
+              ))
+              .limit(1);
+            
+            if (inactiveMember.length > 0) {
+              await db.update(familyMembers)
+                .set({
+                  isActive: true,
+                  stripeSubscriptionItemId: item.id,
+                  removedAt: null,
+                  updatedAt: new Date(),
+                })
+                .where(eq(familyMembers.id, inactiveMember[0].id));
+              
+              await pool.query(
+                'UPDATE users SET family_group_id = $1 WHERE LOWER(email) = $2',
+                [group.id, email]
+              );
+              
+              result.membersReactivated++;
+              result.details.push({
+                familyGroupId: group.id,
+                primaryEmail: group.primaryEmail,
+                action: 'reactivated',
+                memberEmail: email,
+                reason: 'Found active Stripe item, reactivated member',
+              });
+            } else {
+              const tierFromMetadata = item.metadata?.tier || 'Social';
+              const priceInfo = item.price;
+              const priceCents = priceInfo?.unit_amount || 0;
+              
+              await db.insert(familyMembers).values({
+                familyGroupId: group.id,
+                memberEmail: email,
+                memberTier: tierFromMetadata,
+                stripeSubscriptionItemId: item.id,
+                stripePriceId: priceInfo?.id || null,
+                addOnPriceCents: priceCents,
+                addedBy: 'system-reconcile',
+                addedByName: 'Stripe Reconciliation',
+              });
+              
+              await pool.query(
+                'UPDATE users SET family_group_id = $1, is_family_primary = false WHERE LOWER(email) = $2',
+                [group.id, email]
+              );
+              
+              result.membersCreated++;
+              result.details.push({
+                familyGroupId: group.id,
+                primaryEmail: group.primaryEmail,
+                action: 'reactivated',
+                memberEmail: email,
+                reason: `Created new family member from Stripe item (tier: ${tierFromMetadata})`,
+              });
+            }
+          }
+        }
+        
+      } catch (stripeErr: any) {
+        result.errors.push(`Group ${group.id} (${group.primaryEmail}): ${stripeErr.message}`);
+        result.details.push({
+          familyGroupId: group.id,
+          primaryEmail: group.primaryEmail,
+          action: 'error',
+          reason: stripeErr.message,
+        });
+      }
+    }
+    
+    result.success = result.errors.length === 0;
+    return result;
+  } catch (err: any) {
+    return {
+      success: false,
+      groupsChecked: result.groupsChecked,
+      membersDeactivated: result.membersDeactivated,
+      membersReactivated: result.membersReactivated,
+      membersCreated: result.membersCreated,
+      itemsRelinked: result.itemsRelinked,
+      errors: [err.message],
+      details: result.details,
+    };
+  }
+}
+
+export async function handleSubscriptionItemsChanged(params: {
+  subscriptionId: string;
+  currentItems: Array<{ id: string; metadata?: Record<string, string> }>;
+  previousItems?: Array<{ id: string; metadata?: Record<string, string> }>;
+}): Promise<{ deactivated: string[]; added: string[] }> {
+  const result = { deactivated: [] as string[], added: [] as string[] };
+  
+  try {
+    const group = await db.select()
+      .from(familyGroups)
+      .where(eq(familyGroups.primaryStripeSubscriptionId, params.subscriptionId))
+      .limit(1);
+    
+    if (group.length === 0) {
+      return result;
+    }
+    
+    const familyGroupId = group[0].id;
+    const currentItemIds = new Set(params.currentItems.map(i => i.id));
+    
+    if (params.previousItems) {
+      for (const prevItem of params.previousItems) {
+        if (!currentItemIds.has(prevItem.id)) {
+          const familyEmail = prevItem.metadata?.family_member_email?.toLowerCase();
+          
+          if (familyEmail) {
+            const member = await db.select()
+              .from(familyMembers)
+              .where(and(
+                eq(familyMembers.familyGroupId, familyGroupId),
+                eq(familyMembers.stripeSubscriptionItemId, prevItem.id),
+                eq(familyMembers.isActive, true)
+              ))
+              .limit(1);
+            
+            if (member.length > 0) {
+              await db.update(familyMembers)
+                .set({
+                  isActive: false,
+                  removedAt: new Date(),
+                })
+                .where(eq(familyMembers.id, member[0].id));
+              
+              await pool.query(
+                'UPDATE users SET family_group_id = NULL, is_family_primary = false WHERE LOWER(email) = $1',
+                [familyEmail]
+              );
+              
+              result.deactivated.push(familyEmail);
+              console.log(`[FamilyBilling] Deactivated family member ${familyEmail} - Stripe item ${prevItem.id} was removed`);
+            }
+          }
+        }
+      }
+    }
+    
+    return result;
+  } catch (err: any) {
+    console.error('[FamilyBilling] Error handling subscription items changed:', err);
+    return result;
+  }
+}
