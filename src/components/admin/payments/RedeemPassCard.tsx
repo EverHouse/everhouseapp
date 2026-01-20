@@ -1,0 +1,645 @@
+import React, { useState } from 'react';
+
+export interface SectionProps {
+  onClose?: () => void;
+  variant?: 'modal' | 'card';
+}
+
+interface DayPass {
+  id: string;
+  productType: string;
+  quantity: number;
+  remainingUses: number;
+  purchaserEmail: string;
+  purchaserFirstName: string | null;
+  purchaserLastName: string | null;
+  purchasedAt: string;
+}
+
+export interface RedemptionLog {
+  redeemedAt: string;
+  redeemedBy: string;
+  location: string | null;
+}
+
+interface PassDetails {
+  email: string;
+  name: string;
+  productType: string;
+  totalUses?: number;
+  usedCount?: number;
+  remainingUses?: number;
+  lastRedemption?: string;
+  redeemedTodayAt?: string;
+  history?: RedemptionLog[];
+}
+
+interface ErrorState {
+  message: string;
+  errorCode: string;
+  passDetails?: PassDetails;
+}
+
+export const formatPassType = (productType: string): string => {
+  return productType
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .replace('Day Pass', 'Day Pass -');
+};
+
+const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'modal' }) => {
+  const [searchEmail, setSearchEmail] = useState('');
+  const [passes, setPasses] = useState<DayPass[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [redeemingId, setRedeemingId] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<ErrorState | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [expandedPassId, setExpandedPassId] = useState<string | null>(null);
+  const [historyData, setHistoryData] = useState<{ passId: string; logs: RedemptionLog[] }[]>([]);
+  const [loadingHistoryId, setLoadingHistoryId] = useState<string | null>(null);
+  const [showEmailSearch, setShowEmailSearch] = useState(true);
+  const [confirmingRedeemAnyway, setConfirmingRedeemAnyway] = useState<string | null>(null);
+  const [forceRedeeming, setForceRedeeming] = useState(false);
+
+  const handleSearch = async () => {
+    if (!searchEmail.trim()) return;
+    
+    setIsSearching(true);
+    setErrorState(null);
+    setSuccessMessage(null);
+    
+    try {
+      const res = await fetch(`/api/staff/passes/search?email=${encodeURIComponent(searchEmail.trim())}`, {
+        credentials: 'include'
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to search passes');
+      }
+      
+      const data = await res.json();
+      setPasses(data.passes || []);
+      setHasSearched(true);
+    } catch (err: any) {
+      setErrorState({
+        message: err.message || 'Failed to search passes',
+        errorCode: 'SEARCH_ERROR'
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleRedeem = async (passId: string, force: boolean = false) => {
+    setRedeemingId(passId);
+    setErrorState(null);
+    setSuccessMessage(null);
+    if (force) setForceRedeeming(true);
+    
+    try {
+      const res = await fetch(`/api/staff/passes/${passId}/redeem`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ force })
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        setErrorState({
+          message: data.error || 'Failed to redeem pass',
+          errorCode: data.errorCode || 'UNKNOWN_ERROR',
+          passDetails: data.passDetails
+        });
+        setConfirmingRedeemAnyway(null);
+        return;
+      }
+      
+      const data = await res.json();
+      setSuccessMessage(`Pass redeemed! ${data.remainingUses} uses remaining.`);
+      setConfirmingRedeemAnyway(null);
+      
+      if (hasSearched && searchEmail) {
+        handleSearch();
+      }
+    } catch (err: any) {
+      setErrorState({
+        message: err.message || 'Failed to redeem pass',
+        errorCode: 'NETWORK_ERROR'
+      });
+    } finally {
+      setRedeemingId(null);
+      setForceRedeeming(false);
+    }
+  };
+
+  const handleScanQR = () => {
+    const passId = window.prompt('Enter Pass ID:');
+    if (passId && passId.trim()) {
+      setShowEmailSearch(false);
+      handleRedeem(passId.trim());
+    }
+  };
+
+  const handleViewHistory = async (passId: string) => {
+    if (expandedPassId === passId) {
+      setExpandedPassId(null);
+      return;
+    }
+
+    const cached = historyData.find(h => h.passId === passId);
+    if (cached) {
+      setExpandedPassId(passId);
+      return;
+    }
+
+    setLoadingHistoryId(passId);
+    try {
+      const res = await fetch(`/api/staff/passes/${passId}/history`, {
+        credentials: 'include'
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to fetch history');
+      }
+      
+      const data = await res.json();
+      setHistoryData(prev => [...prev, { passId, logs: data.logs || [] }]);
+      setExpandedPassId(passId);
+    } catch (err: any) {
+      setErrorState({
+        message: err.message || 'Failed to fetch history',
+        errorCode: 'HISTORY_ERROR'
+      });
+    } finally {
+      setLoadingHistoryId(null);
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const formatDateTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const formatTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleTimeString('en-US', { 
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const getPassHistory = (passId: string) => {
+    return historyData.find(h => h.passId === passId)?.logs || [];
+  };
+
+  const handleSearchByEmail = () => {
+    setShowEmailSearch(true);
+    setErrorState(null);
+  };
+
+  const handleSellNewPass = () => {
+    const email = errorState?.passDetails?.email || searchEmail;
+    window.open(`/#/buy-day-pass${email ? `?email=${encodeURIComponent(email)}` : ''}`, '_blank');
+  };
+
+  const handleProceedAnyway = (passId: string) => {
+    setConfirmingRedeemAnyway(passId);
+  };
+
+  const clearErrorAndReset = () => {
+    setErrorState(null);
+    setShowEmailSearch(true);
+    setConfirmingRedeemAnyway(null);
+  };
+
+  const renderErrorState = () => {
+    if (!errorState) return null;
+
+    const { errorCode, passDetails } = errorState;
+
+    if (errorCode === 'PASS_NOT_FOUND') {
+      return (
+        <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 space-y-3">
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-2xl text-amber-600 dark:text-amber-400">search_off</span>
+            <div className="flex-1">
+              <p className="font-semibold text-amber-900 dark:text-amber-100">Pass not found or invalid</p>
+              <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                The scanned QR code doesn't match any active day pass in our system.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 pt-2">
+            <button
+              onClick={handleSearchByEmail}
+              className="flex-1 min-w-[140px] px-4 py-2.5 rounded-lg bg-amber-100 dark:bg-amber-800/40 text-amber-900 dark:text-amber-100 font-medium text-sm hover:bg-amber-200 dark:hover:bg-amber-800/60 transition-colors flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-lg">mail</span>
+              Search by email
+            </button>
+            <button
+              onClick={handleSellNewPass}
+              className="flex-1 min-w-[140px] px-4 py-2.5 rounded-lg bg-teal-500 text-white font-medium text-sm hover:bg-teal-600 transition-colors flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-lg">add_shopping_cart</span>
+              Sell new pass
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (errorCode === 'PASS_EXHAUSTED') {
+      return (
+        <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 space-y-3">
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-2xl text-amber-600 dark:text-amber-400">check_circle</span>
+            <div className="flex-1">
+              <p className="font-semibold text-amber-900 dark:text-amber-100">This pass has been fully redeemed</p>
+              {passDetails && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    <span className="font-medium">{passDetails.name || passDetails.email}</span>
+                  </p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    Used {passDetails.usedCount} of {passDetails.totalUses} times
+                  </p>
+                  {passDetails.lastRedemption && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      Last used: {formatDateTime(passDetails.lastRedemption)}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 pt-2">
+            <button
+              onClick={handleSellNewPass}
+              className="flex-1 min-w-[140px] px-4 py-2.5 rounded-lg bg-teal-500 text-white font-medium text-sm hover:bg-teal-600 transition-colors flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-lg">add_shopping_cart</span>
+              Charge for new pass
+            </button>
+            <button
+              onClick={clearErrorAndReset}
+              className="px-4 py-2.5 rounded-lg bg-amber-100 dark:bg-amber-800/40 text-amber-900 dark:text-amber-100 font-medium text-sm hover:bg-amber-200 dark:hover:bg-amber-800/60 transition-colors flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-lg">refresh</span>
+              Start over
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (errorCode === 'ALREADY_REDEEMED_TODAY') {
+      const confirmingThis = confirmingRedeemAnyway === 'current';
+      return (
+        <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 space-y-3">
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-2xl text-amber-600 dark:text-amber-400">schedule</span>
+            <div className="flex-1">
+              <p className="font-semibold text-amber-900 dark:text-amber-100">Already checked in today</p>
+              {passDetails && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    <span className="font-medium">{passDetails.name || passDetails.email}</span>
+                  </p>
+                  {passDetails.redeemedTodayAt && (
+                    <p className="text-sm text-amber-700 dark:text-amber-300">
+                      Checked in at {formatTime(passDetails.redeemedTodayAt)}
+                    </p>
+                  )}
+                  {passDetails.remainingUses !== undefined && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      {passDetails.remainingUses} uses remaining on this pass
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {!confirmingThis ? (
+            <div className="flex flex-wrap gap-2 pt-2">
+              <button
+                onClick={() => handleProceedAnyway('current')}
+                className="flex-1 min-w-[140px] px-4 py-2.5 rounded-lg bg-amber-100 dark:bg-amber-800/40 text-amber-900 dark:text-amber-100 font-medium text-sm hover:bg-amber-200 dark:hover:bg-amber-800/60 transition-colors flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-lg">warning</span>
+                Redeem anyway
+              </button>
+              <button
+                onClick={clearErrorAndReset}
+                className="px-4 py-2.5 rounded-lg bg-primary/10 dark:bg-white/10 text-primary dark:text-white font-medium text-sm hover:bg-primary/20 dark:hover:bg-white/20 transition-colors flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="pt-2 space-y-3">
+              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800/40">
+                <p className="text-sm text-red-800 dark:text-red-200 font-medium">
+                  Are you sure? This will use another redemption from this pass.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const passId = window.prompt('Confirm Pass ID to redeem:');
+                    if (passId) handleRedeem(passId, true);
+                  }}
+                  disabled={forceRedeeming}
+                  className="flex-1 px-4 py-2.5 rounded-lg bg-red-500 text-white font-medium text-sm hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {forceRedeeming ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                  ) : (
+                    <span className="material-symbols-outlined text-lg">check</span>
+                  )}
+                  Confirm
+                </button>
+                <button
+                  onClick={() => setConfirmingRedeemAnyway(null)}
+                  className="px-4 py-2.5 rounded-lg bg-primary/10 dark:bg-white/10 text-primary dark:text-white font-medium text-sm hover:bg-primary/20 dark:hover:bg-white/20 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (errorCode === 'PASS_NOT_ACTIVE') {
+      return (
+        <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30 space-y-3">
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-2xl text-red-600 dark:text-red-400">block</span>
+            <div className="flex-1">
+              <p className="font-semibold text-red-900 dark:text-red-100">Pass is no longer active</p>
+              {passDetails && (
+                <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                  This pass for {passDetails.name || passDetails.email} has been deactivated.
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 pt-2">
+            <button
+              onClick={handleSellNewPass}
+              className="flex-1 min-w-[140px] px-4 py-2.5 rounded-lg bg-teal-500 text-white font-medium text-sm hover:bg-teal-600 transition-colors flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-lg">add_shopping_cart</span>
+              Sell new pass
+            </button>
+            <button
+              onClick={clearErrorAndReset}
+              className="px-4 py-2.5 rounded-lg bg-red-100 dark:bg-red-800/40 text-red-900 dark:text-red-100 font-medium text-sm hover:bg-red-200 dark:hover:bg-red-800/60 transition-colors flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-lg">refresh</span>
+              Start over
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30 space-y-3">
+        <div className="flex items-start gap-2">
+          <span className="material-symbols-outlined text-red-600 dark:text-red-400">error</span>
+          <p className="text-sm text-red-700 dark:text-red-400">{errorState.message}</p>
+        </div>
+        <button
+          onClick={clearErrorAndReset}
+          className="w-full px-4 py-2 rounded-lg bg-red-100 dark:bg-red-800/40 text-red-900 dark:text-red-100 font-medium text-sm hover:bg-red-200 dark:hover:bg-red-800/60 transition-colors flex items-center justify-center gap-2"
+        >
+          <span className="material-symbols-outlined text-lg">refresh</span>
+          Try again
+        </button>
+      </div>
+    );
+  };
+
+  const content = (
+    <div className="space-y-4">
+      {showEmailSearch && (
+        <div className="flex gap-2">
+          <input
+            type="email"
+            value={searchEmail}
+            onChange={(e) => setSearchEmail(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            placeholder="Enter visitor email..."
+            className="flex-1 px-4 py-3 rounded-xl bg-white/80 dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          <button
+            onClick={handleSearch}
+            disabled={!searchEmail.trim() || isSearching}
+            className="px-4 py-3 rounded-xl bg-teal-500 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {isSearching ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+            ) : (
+              <span className="material-symbols-outlined text-lg">search</span>
+            )}
+          </button>
+          <button
+            onClick={handleScanQR}
+            className="px-4 py-3 rounded-xl bg-teal-600 text-white font-semibold flex items-center gap-2 hover:bg-teal-700 transition-colors"
+            title="Scan QR / Enter Pass ID"
+          >
+            <span className="material-symbols-outlined text-lg">qr_code_scanner</span>
+          </button>
+        </div>
+      )}
+
+      {renderErrorState()}
+
+      {successMessage && (
+        <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30 flex items-center gap-2">
+          <span className="material-symbols-outlined text-green-600 dark:text-green-400">check_circle</span>
+          <p className="text-sm text-green-700 dark:text-green-400">{successMessage}</p>
+        </div>
+      )}
+
+      {!errorState && !hasSearched ? (
+        <div className="text-center py-8">
+          <span className="material-symbols-outlined text-4xl text-primary/30 dark:text-white/30 mb-2">qr_code_scanner</span>
+          <p className="text-sm text-primary/60 dark:text-white/60">Search by email or scan QR to find passes</p>
+        </div>
+      ) : !errorState && passes.length === 0 && hasSearched ? (
+        <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 space-y-3">
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-2xl text-amber-600 dark:text-amber-400">search_off</span>
+            <div className="flex-1">
+              <p className="font-semibold text-amber-900 dark:text-amber-100">No active passes found</p>
+              <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                No passes with remaining uses found for {searchEmail}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 pt-2">
+            <button
+              onClick={handleSellNewPass}
+              className="flex-1 min-w-[140px] px-4 py-2.5 rounded-lg bg-teal-500 text-white font-medium text-sm hover:bg-teal-600 transition-colors flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-lg">add_shopping_cart</span>
+              Sell new pass
+            </button>
+            <button
+              onClick={() => {
+                setSearchEmail('');
+                setHasSearched(false);
+                setPasses([]);
+              }}
+              className="px-4 py-2.5 rounded-lg bg-amber-100 dark:bg-amber-800/40 text-amber-900 dark:text-amber-100 font-medium text-sm hover:bg-amber-200 dark:hover:bg-amber-800/60 transition-colors flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-lg">refresh</span>
+              Search again
+            </button>
+          </div>
+        </div>
+      ) : !errorState && passes.length > 0 ? (
+        <div className="space-y-3 max-h-[350px] overflow-y-auto">
+          {passes.map(pass => (
+            <div
+              key={pass.id}
+              className="p-4 rounded-xl bg-white/50 dark:bg-white/5 border border-primary/10 dark:border-white/10"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-primary dark:text-white">
+                    {formatPassType(pass.productType)}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="px-2 py-0.5 text-xs font-medium bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300 rounded-full">
+                      {pass.remainingUses} {pass.remainingUses === 1 ? 'use' : 'uses'} remaining
+                    </span>
+                  </div>
+                  <p className="text-xs text-primary/60 dark:text-white/60 mt-2">
+                    Purchased: {formatDate(pass.purchasedAt)}
+                  </p>
+                  {(pass.purchaserFirstName || pass.purchaserLastName) && (
+                    <p className="text-xs text-primary/60 dark:text-white/60">
+                      {[pass.purchaserFirstName, pass.purchaserLastName].filter(Boolean).join(' ')}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => handleViewHistory(pass.id)}
+                    disabled={loadingHistoryId === pass.id}
+                    className="px-3 py-2 rounded-lg bg-primary/10 dark:bg-white/10 text-primary dark:text-white font-medium text-sm hover:bg-primary/20 dark:hover:bg-white/20 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {loadingHistoryId === pass.id ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary dark:border-white border-t-transparent" />
+                    ) : (
+                      <span className="material-symbols-outlined text-base">
+                        {expandedPassId === pass.id ? 'expand_less' : 'history'}
+                      </span>
+                    )}
+                    History
+                  </button>
+                  <button
+                    onClick={() => handleRedeem(pass.id)}
+                    disabled={redeemingId === pass.id}
+                    className="px-4 py-2 rounded-lg bg-teal-500 text-white font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                  >
+                    {redeemingId === pass.id ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                    ) : (
+                      <span className="material-symbols-outlined text-base">check</span>
+                    )}
+                    Redeem
+                  </button>
+                </div>
+              </div>
+              
+              {expandedPassId === pass.id && (
+                <div className="mt-3 pt-3 border-t border-primary/10 dark:border-white/10">
+                  {getPassHistory(pass.id).length === 0 ? (
+                    <p className="text-sm text-primary/50 dark:text-white/50 text-center py-2">
+                      No redemptions yet
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {getPassHistory(pass.id).map((log, idx) => (
+                        <div 
+                          key={idx} 
+                          className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-primary/5 dark:bg-white/5"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-sm text-primary/60 dark:text-white/60">schedule</span>
+                            <span className="text-xs text-primary dark:text-white">
+                              {formatDateTime(log.redeemedAt)}
+                            </span>
+                          </div>
+                          <span className="text-xs text-primary/70 dark:text-white/70">
+                            {log.redeemedBy}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+
+  if (variant === 'card') {
+    return (
+      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="material-symbols-outlined text-teal-600 dark:text-teal-400">qr_code_scanner</span>
+          <h3 className="font-bold text-primary dark:text-white">Redeem Day Pass</h3>
+        </div>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-teal-600 dark:text-teal-400">qr_code_scanner</span>
+          <h3 className="font-bold text-primary dark:text-white">Redeem Day Pass</h3>
+        </div>
+        <button onClick={onClose} className="p-2 hover:bg-primary/10 dark:hover:bg-white/10 rounded-full">
+          <span className="material-symbols-outlined text-primary/60 dark:text-white/60">close</span>
+        </button>
+      </div>
+      {content}
+    </div>
+  );
+};
+
+export default RedeemDayPassSection;

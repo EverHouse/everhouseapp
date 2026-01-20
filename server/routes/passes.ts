@@ -76,21 +76,88 @@ router.post('/api/staff/passes/:id/redeem', isStaffOrAdmin, async (req: Request,
     if (updateResult.length === 0) {
       // No rows updated - pass doesn't exist, is not active, or has no uses
       const [pass] = await db
-        .select({ status: dayPassPurchases.status, remainingUses: dayPassPurchases.remainingUses })
+        .select({ 
+          status: dayPassPurchases.status, 
+          remainingUses: dayPassPurchases.remainingUses,
+          quantity: dayPassPurchases.quantity,
+          purchaserEmail: dayPassPurchases.purchaserEmail,
+          purchaserFirstName: dayPassPurchases.purchaserFirstName,
+          purchaserLastName: dayPassPurchases.purchaserLastName,
+          productType: dayPassPurchases.productType
+        })
         .from(dayPassPurchases)
         .where(eq(dayPassPurchases.id, id))
         .limit(1);
 
       if (!pass) {
-        return res.status(404).json({ error: 'Pass not found' });
+        return res.status(404).json({ 
+          error: 'Pass not found',
+          errorCode: 'PASS_NOT_FOUND'
+        });
       }
+      
+      // Get redemption history for this pass
+      const logs = await db
+        .select({
+          redeemedAt: passRedemptionLogs.redeemedAt,
+          redeemedBy: passRedemptionLogs.redeemedBy,
+          location: passRedemptionLogs.location,
+        })
+        .from(passRedemptionLogs)
+        .where(eq(passRedemptionLogs.purchaseId, id))
+        .orderBy(desc(passRedemptionLogs.redeemedAt))
+        .limit(10);
+
+      // Check if already redeemed today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const redeemedToday = logs.find(log => new Date(log.redeemedAt) >= today);
+      
       if (pass.status !== 'active') {
-        return res.status(400).json({ error: 'Pass is not active' });
+        return res.status(400).json({ 
+          error: 'Pass is not active',
+          errorCode: 'PASS_NOT_ACTIVE',
+          passDetails: {
+            email: pass.purchaserEmail,
+            name: [pass.purchaserFirstName, pass.purchaserLastName].filter(Boolean).join(' '),
+            productType: pass.productType,
+            totalUses: pass.quantity,
+            usedCount: (pass.quantity ?? 1) - (pass.remainingUses ?? 0)
+          }
+        });
       }
       if ((pass.remainingUses ?? 0) <= 0) {
-        return res.status(409).json({ error: 'Pass has no remaining uses' });
+        return res.status(409).json({ 
+          error: 'Pass has no remaining uses',
+          errorCode: 'PASS_EXHAUSTED',
+          passDetails: {
+            email: pass.purchaserEmail,
+            name: [pass.purchaserFirstName, pass.purchaserLastName].filter(Boolean).join(' '),
+            productType: pass.productType,
+            totalUses: pass.quantity,
+            usedCount: (pass.quantity ?? 1) - (pass.remainingUses ?? 0),
+            lastRedemption: logs[0] ? logs[0].redeemedAt : null,
+            history: logs
+          }
+        });
       }
-      return res.status(409).json({ error: 'Pass could not be redeemed' });
+      
+      // Check if already redeemed today
+      if (redeemedToday) {
+        return res.status(409).json({ 
+          error: 'Already redeemed today',
+          errorCode: 'ALREADY_REDEEMED_TODAY',
+          passDetails: {
+            email: pass.purchaserEmail,
+            name: [pass.purchaserFirstName, pass.purchaserLastName].filter(Boolean).join(' '),
+            productType: pass.productType,
+            remainingUses: pass.remainingUses,
+            redeemedTodayAt: redeemedToday.redeemedAt
+          }
+        });
+      }
+      
+      return res.status(409).json({ error: 'Pass could not be redeemed', errorCode: 'REDEMPTION_FAILED' });
     }
 
     const { remainingUses, status } = updateResult[0];
