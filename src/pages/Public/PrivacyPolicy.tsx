@@ -6,7 +6,7 @@ const PrivacyPolicy: React.FC = () => {
     <div className="min-h-screen bg-[#F2F2EC] dark:bg-[#0f120a] text-[#293515] dark:text-[#F2F2EC] pt-24 pb-12">
       <div className="max-w-4xl mx-auto px-6">
         <h1 className="text-4xl md:text-5xl font-display mb-8">Privacy Policy</h1>
-        <p className="text-sm opacity-60 mb-12">Last updated: {new Date().toLocaleDateString()}</p>
+        <p className="text-sm opacity-60 mb-12">Last updated: January 20, 2026</p>
 
         <div className="space-y-8 leading-relaxed font-sans text-lg">
           <section>

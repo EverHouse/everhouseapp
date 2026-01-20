@@ -53,6 +53,11 @@ export const Footer: React.FC<FooterProps> = ({ hideCta = false }) => (
      
      <div className="w-full max-w-xs mx-auto h-px bg-[#E7E7DC]/10 mb-8"></div>
      
+     <div className="flex justify-center gap-6 mb-6 text-xs">
+        <a href="/privacy" className="text-[#E7E7DC]/60 hover:text-[#E7E7DC] transition-colors">Privacy Policy</a>
+        <a href="/terms" className="text-[#E7E7DC]/60 hover:text-[#E7E7DC] transition-colors">Terms of Service</a>
+     </div>
+     
      <div className="flex flex-col items-center gap-2">
         <p className="text-[10px] opacity-40">© {new Date().getFullYear()} Ever House. All rights reserved.</p>
         <p className="text-[10px] opacity-30">v{APP_VERSION} · Updated {formatLastUpdated()}</p>
