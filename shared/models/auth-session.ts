@@ -52,6 +52,7 @@ export const users = pgTable("users", {
   jobTitle: text("job_title"),
   hubspotCompanyId: text("hubspot_company_id"),
   billingGroupId: integer("billing_group_id"),
+  billingMigrationRequestedAt: timestamp("billing_migration_requested_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   archivedAt: timestamp("archived_at"),

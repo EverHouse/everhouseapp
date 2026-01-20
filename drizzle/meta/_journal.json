@@ -148,6 +148,13 @@
       "when": 1768865363404,
       "tag": "0020_add_day_pass_purchases",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1768925989000,
+      "tag": "0021_add_billing_migration_requested_at",
+      "breakpoints": true
     }
   ]
 }
