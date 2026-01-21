@@ -170,12 +170,14 @@ router.get('/api/wellness-classes/needs-review', isStaffOrAdmin, async (req, res
 router.post('/api/wellness-classes/:id/mark-reviewed', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const { applyToAll } = req.body;
     const sessionUser = getSessionUser(req);
     const reviewedBy = sessionUser?.email || 'staff';
     
     const result = await pool.query(
       `UPDATE wellness_classes 
-       SET needs_review = false, reviewed_by = $1, reviewed_at = NOW(), updated_at = NOW(), review_dismissed = true, conflict_detected = false
+       SET needs_review = false, reviewed_by = $1, reviewed_at = NOW(), updated_at = NOW(), review_dismissed = true, conflict_detected = false,
+           locally_edited = true, app_last_modified_at = NOW()
        WHERE id = $2 RETURNING *`,
       [reviewedBy, id]
     );
@@ -184,7 +186,52 @@ router.post('/api/wellness-classes/:id/mark-reviewed', isStaffOrAdmin, async (re
       return res.status(404).json({ error: 'Wellness class not found' });
     }
     
-    res.json(result.rows[0]);
+    const updatedClass = result.rows[0];
+    let additionalUpdated = 0;
+    
+    if (applyToAll !== false && updatedClass.recurring_event_id) {
+      const bulkResult = await pool.query(
+        `UPDATE wellness_classes 
+         SET needs_review = false, 
+             reviewed_by = $1, 
+             reviewed_at = NOW(), 
+             updated_at = NOW(), 
+             review_dismissed = true, 
+             conflict_detected = false,
+             category = $3,
+             instructor = $4,
+             title = $5,
+             image_url = COALESCE($6, image_url),
+             external_url = COALESCE($7, external_url),
+             locally_edited = true,
+             app_last_modified_at = NOW()
+         WHERE recurring_event_id = $2 
+           AND id != $8 
+           AND date >= $9
+           AND is_active = true
+         RETURNING id`,
+        [
+          reviewedBy, 
+          updatedClass.recurring_event_id, 
+          updatedClass.category,
+          updatedClass.instructor,
+          updatedClass.title,
+          updatedClass.image_url,
+          updatedClass.external_url,
+          id,
+          updatedClass.date
+        ]
+      );
+      additionalUpdated = bulkResult.rows.length;
+    }
+    
+    res.json({ 
+      ...updatedClass, 
+      additionalUpdated,
+      message: additionalUpdated > 0 
+        ? `Also updated ${additionalUpdated} other instances of this recurring event` 
+        : undefined 
+    });
   } catch (error: any) {
     if (!isProduction) console.error('Mark reviewed error:', error);
     res.status(500).json({ error: 'Failed to mark wellness class as reviewed' });
@@ -344,9 +391,9 @@ router.post('/api/wellness-classes', isStaffOrAdmin, async (req, res) => {
 router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, time, instructor, duration, category, spots, status, description, date, is_active, image_url, external_url, block_bookings, capacity, waitlist_enabled } = req.body;
+    const { title, time, instructor, duration, category, spots, status, description, date, is_active, image_url, external_url, block_bookings, capacity, waitlist_enabled, apply_to_recurring } = req.body;
     
-    const existing = await pool.query('SELECT google_calendar_id, title, time, instructor, duration, category, date, block_bookings FROM wellness_classes WHERE id = $1', [id]);
+    const existing = await pool.query('SELECT google_calendar_id, title, time, instructor, duration, category, date, block_bookings, recurring_event_id FROM wellness_classes WHERE id = $1', [id]);
     
     const previousBlockBookings = existing.rows[0]?.block_bookings || false;
     const newBlockBookings = block_bookings === true || block_bookings === 'true';
@@ -445,6 +492,46 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
     }
     
     const updated = result.rows[0];
+    let recurringUpdated = 0;
+    
+    if (apply_to_recurring !== false && existing.rows[0]?.recurring_event_id) {
+      try {
+        const recurringResult = await pool.query(
+          `UPDATE wellness_classes 
+           SET category = COALESCE($1, category),
+               instructor = COALESCE($2, instructor),
+               title = COALESCE($3, title),
+               duration = COALESCE($4, duration),
+               spots = COALESCE($5, spots),
+               capacity = COALESCE($6, capacity),
+               image_url = COALESCE($7, image_url),
+               external_url = COALESCE($8, external_url),
+               needs_review = false,
+               reviewed_by = $9,
+               reviewed_at = NOW(),
+               review_dismissed = true,
+               conflict_detected = false,
+               updated_at = NOW(),
+               locally_edited = true,
+               app_last_modified_at = NOW()
+           WHERE recurring_event_id = $10 
+             AND id != $11 
+             AND date > $12
+             AND is_active = true
+           RETURNING id, google_calendar_id, date, time, duration`,
+          [
+            category, instructor, title, duration, spots, capacity || null, 
+            image_url, external_url, reviewedBy,
+            existing.rows[0].recurring_event_id, id, updated.date
+          ]
+        );
+        recurringUpdated = recurringResult.rows.length;
+      } catch (recurError) {
+        if (!isProduction) console.error('Failed to update recurring wellness classes:', recurError);
+      }
+    }
+    
+    (updated as any).recurringUpdated = recurringUpdated;
     const wellnessClassId = parseInt(id);
     const userEmail = getSessionUser(req)?.email || 'system';
     

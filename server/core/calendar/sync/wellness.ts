@@ -42,6 +42,7 @@ export async function syncWellnessCalendarEvents(): Promise<{ synced: number; cr
       const googleEventId = event.id;
       const googleEtag = event.etag || null;
       const googleUpdatedAt = event.updated ? new Date(event.updated) : null;
+      const recurringEventId = event.recurringEventId || null;
       fetchedEventIds.add(googleEventId);
       const rawTitle = event.summary;
       const description = event.description || null;
@@ -139,10 +140,11 @@ export async function syncWellnessCalendarEvents(): Promise<{ synced: number; cr
                 image_url = COALESCE($10, image_url),
                 external_url = COALESCE($11, external_url),
                 google_event_etag = $12, google_event_updated_at = $13, last_synced_at = NOW(),
-                locally_edited = false, app_last_modified_at = NULL, needs_review = $15
+                locally_edited = false, app_last_modified_at = NULL, needs_review = $15,
+                recurring_event_id = COALESCE($16, recurring_event_id)
                WHERE google_calendar_id = $14`,
               [title, startTime, instructor, duration, category, spots, status, description, eventDate,
-               appMetadata.imageUrl, appMetadata.externalUrl, googleEtag, googleUpdatedAt, googleEventId, needsReview]
+               appMetadata.imageUrl, appMetadata.externalUrl, googleEtag, googleUpdatedAt, googleEventId, needsReview, recurringEventId]
             );
             updated++;
           } else {
@@ -262,10 +264,11 @@ export async function syncWellnessCalendarEvents(): Promise<{ synced: number; cr
               external_url = COALESCE($11, external_url),
               google_event_etag = $12, google_event_updated_at = $13, last_synced_at = NOW(),
               needs_review = CASE WHEN $15 THEN needs_review ELSE CASE WHEN $17 THEN true ELSE $16 END END,
-              conflict_detected = CASE WHEN $17 THEN true ELSE conflict_detected END
+              conflict_detected = CASE WHEN $17 THEN true ELSE conflict_detected END,
+              recurring_event_id = COALESCE($18, recurring_event_id)
              WHERE google_calendar_id = $14`,
             [title, startTime, instructor, duration, category, spots, status, description, eventDate,
-             appMetadata.imageUrl, appMetadata.externalUrl, googleEtag, googleUpdatedAt, googleEventId, reviewDismissed, shouldSetNeedsReview, isConflict]
+             appMetadata.imageUrl, appMetadata.externalUrl, googleEtag, googleUpdatedAt, googleEventId, reviewDismissed, shouldSetNeedsReview, isConflict, recurringEventId]
           );
           updated++;
         }
@@ -273,10 +276,10 @@ export async function syncWellnessCalendarEvents(): Promise<{ synced: number; cr
         await pool.query(
           `INSERT INTO wellness_classes 
             (title, time, instructor, duration, category, spots, status, description, date, is_active, 
-             google_calendar_id, image_url, external_url, google_event_etag, google_event_updated_at, last_synced_at, created_at, needs_review)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11, $12, $13, $14, NOW(), NOW(), $15)`,
+             google_calendar_id, image_url, external_url, google_event_etag, google_event_updated_at, last_synced_at, created_at, needs_review, recurring_event_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11, $12, $13, $14, NOW(), NOW(), $15, $16)`,
           [title, startTime, instructor, duration, category, spots, status, description, eventDate, googleEventId,
-           appMetadata.imageUrl, appMetadata.externalUrl, googleEtag, googleUpdatedAt, needsReview]
+           appMetadata.imageUrl, appMetadata.externalUrl, googleEtag, googleUpdatedAt, needsReview, recurringEventId]
         );
         created++;
       }
