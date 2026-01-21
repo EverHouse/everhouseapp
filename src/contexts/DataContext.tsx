@@ -343,8 +343,8 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       if (!actualUser || (actualUser.role !== 'admin' && actualUser.role !== 'staff')) return;
       
       try {
-        // Fetch first 200 members with pagination for faster initial load
-        const res = await fetch('/api/hubspot/contacts?page=1&limit=200', { credentials: 'include' });
+        // Fetch first 200 members with force refresh for fresh data on page load
+        const res = await fetch('/api/hubspot/contacts?page=1&limit=200&refresh=true', { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
           const contacts = Array.isArray(data) ? data : (data.contacts || []);
