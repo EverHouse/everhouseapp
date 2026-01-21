@@ -31,6 +31,7 @@ const RecordPurchaseCard: React.FC<SectionProps> = ({ onClose, variant = 'modal'
   
   const [products, setProducts] = useState<StripeProduct[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<StripeProduct | null>(null);
+  const [quantity, setQuantity] = useState(1);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'check' | 'other'>('cash');
@@ -71,13 +72,25 @@ const RecordPurchaseCard: React.FC<SectionProps> = ({ onClose, variant = 'modal'
   const handleProductSelect = (productId: string) => {
     if (!productId) {
       setSelectedProduct(null);
+      setQuantity(1);
       return;
     }
     const product = products.find(p => p.stripeProductId === productId);
     if (product) {
       setSelectedProduct(product);
+      setQuantity(1);
       setAmount((product.priceCents / 100).toFixed(2));
       setDescription(product.name);
+    }
+  };
+
+  const handleQuantityChange = (newQuantity: number) => {
+    const qty = Math.max(1, Math.min(99, newQuantity));
+    setQuantity(qty);
+    if (selectedProduct) {
+      const totalCents = selectedProduct.priceCents * qty;
+      setAmount((totalCents / 100).toFixed(2));
+      setDescription(qty > 1 ? `${selectedProduct.name} x${qty}` : selectedProduct.name);
     }
   };
 
@@ -86,6 +99,7 @@ const RecordPurchaseCard: React.FC<SectionProps> = ({ onClose, variant = 'modal'
     setAmount('');
     setDescription('');
     setSelectedProduct(null);
+    setQuantity(1);
     setPaymentMethod('cash');
     setCategory('other');
     setNotes('');
@@ -310,9 +324,40 @@ const RecordPurchaseCard: React.FC<SectionProps> = ({ onClose, variant = 'modal'
                     </select>
                   )}
                   {selectedProduct && (
-                    <p className="text-xs text-primary/50 dark:text-white/50 mt-1">
-                      Amount auto-filled from product price
-                    </p>
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium text-primary dark:text-white mb-2">
+                        Quantity
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => handleQuantityChange(quantity - 1)}
+                          disabled={quantity <= 1}
+                          className="w-10 h-10 rounded-lg bg-primary/10 dark:bg-white/10 text-primary dark:text-white flex items-center justify-center hover:bg-primary/20 dark:hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <span className="material-symbols-outlined">remove</span>
+                        </button>
+                        <input
+                          type="number"
+                          value={quantity}
+                          onChange={(e) => handleQuantityChange(parseInt(e.target.value) || 1)}
+                          min="1"
+                          max="99"
+                          className="w-16 text-center py-2 rounded-lg bg-white/80 dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleQuantityChange(quantity + 1)}
+                          disabled={quantity >= 99}
+                          className="w-10 h-10 rounded-lg bg-primary/10 dark:bg-white/10 text-primary dark:text-white flex items-center justify-center hover:bg-primary/20 dark:hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <span className="material-symbols-outlined">add</span>
+                        </button>
+                        <span className="text-sm text-primary/60 dark:text-white/60">
+                          @ ${(selectedProduct.priceCents / 100).toFixed(2)} each
+                        </span>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
