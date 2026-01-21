@@ -1846,13 +1846,17 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
     const limitParam = parseInt(req.query.limit as string, 10);
     const isPaginated = !isNaN(pageParam) || !isNaN(limitParam);
     const page = isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
-    const limit = isNaN(limitParam) ? 200 : Math.min(Math.max(limitParam, 1), 500);
+    const limit = isNaN(limitParam) ? 500 : Math.min(Math.max(limitParam, 1), 500);
     
     let statusCondition = sql`1=1`;
     if (statusFilter === 'active') {
-      statusCondition = sql`(${users.membershipStatus} = 'active' OR ${users.membershipStatus} IS NULL)`;
+      statusCondition = sql`(
+        ${users.membershipStatus} = 'active' 
+        OR ${users.membershipStatus} IS NULL
+        OR (${users.stripeSubscriptionId} IS NOT NULL AND (${users.membershipStatus} = 'non-member' OR ${users.membershipStatus} = 'pending'))
+      )`;
     } else if (statusFilter === 'former') {
-      statusCondition = sql`${users.membershipStatus} IN ('inactive', 'cancelled', 'expired', 'terminated', 'former_member', 'churned', 'suspended', 'frozen')`;
+      statusCondition = sql`${users.membershipStatus} IN ('inactive', 'cancelled', 'expired', 'terminated', 'former_member', 'churned', 'suspended', 'frozen', 'past_due')`;
     }
     
     let searchCondition = sql`1=1`;

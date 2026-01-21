@@ -780,7 +780,7 @@ async function handleSubscriptionCreated(subscription: any): Promise<void> {
                      'Membership';
 
     const userResult = await pool.query(
-      'SELECT email, first_name, last_name, tier, status FROM users WHERE stripe_customer_id = $1',
+      'SELECT email, first_name, last_name, tier, membership_status FROM users WHERE stripe_customer_id = $1',
       [customerId]
     );
 
@@ -789,7 +789,7 @@ async function handleSubscriptionCreated(subscription: any): Promise<void> {
       return;
     }
 
-    const { email, first_name, last_name, tier: currentTier, status: currentStatus } = userResult.rows[0];
+    const { email, first_name, last_name, tier: currentTier, membership_status: currentStatus } = userResult.rows[0];
     const memberName = `${first_name || ''} ${last_name || ''}`.trim() || email;
 
     await notifyMember({
@@ -824,16 +824,24 @@ async function handleSubscriptionCreated(subscription: any): Promise<void> {
         if (tierResult.rows.length > 0) {
           const { slug: tierSlug, name: tierName } = tierResult.rows[0];
           
-          // Update user's tier and conditionally activate if status is pending/inactive/null
+          // Update user's tier and conditionally activate if membership_status is pending/inactive/null/non-member
           const updateResult = await pool.query(
-            `UPDATE users SET tier = $1, status = CASE WHEN status IS NULL OR status IN ('pending', 'inactive') THEN 'active' ELSE status END, updated_at = NOW() WHERE email = $2 AND (tier IS NULL OR tier != $1) RETURNING id`,
+            `UPDATE users SET 
+              tier = $1, 
+              membership_status = CASE 
+                WHEN membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member') THEN 'active' 
+                ELSE membership_status 
+              END, 
+              updated_at = NOW() 
+            WHERE email = $2 
+            RETURNING id`,
             [tierSlug, email]
           );
           
           if (updateResult.rowCount && updateResult.rowCount > 0) {
-            console.log(`[Stripe Webhook] User activation: ${email} tier updated to ${tierSlug}, status conditionally updated (only if pending/inactive/null)`);
+            console.log(`[Stripe Webhook] User activation: ${email} tier updated to ${tierSlug}, membership_status conditionally set to active`);
           } else {
-            console.log(`[Stripe Webhook] User activation: ${email} tier already ${tierSlug}, no tier update needed`);
+            console.log(`[Stripe Webhook] User activation: ${email} - no update performed`);
           }
 
           // Update hubspot deal status
@@ -933,7 +941,18 @@ async function handleSubscriptionUpdated(subscription: any, previousAttributes?:
       }
     }
 
-    if (status === 'past_due') {
+    if (status === 'active') {
+      await pool.query(
+        `UPDATE users SET membership_status = 'active', updated_at = NOW() 
+         WHERE id = $1 AND (membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'past_due'))`,
+        [userId]
+      );
+      console.log(`[Stripe Webhook] Membership status set to active for ${email}`);
+    } else if (status === 'past_due') {
+      await pool.query(
+        `UPDATE users SET membership_status = 'past_due', updated_at = NOW() WHERE id = $1`,
+        [userId]
+      );
       await notifyMember({
         userEmail: email,
         title: 'Membership Past Due',
@@ -945,6 +964,10 @@ async function handleSubscriptionUpdated(subscription: any, previousAttributes?:
     } else if (status === 'canceled') {
       console.log(`[Stripe Webhook] Subscription canceled for ${email} - handled by subscription.deleted webhook`);
     } else if (status === 'unpaid') {
+      await pool.query(
+        `UPDATE users SET membership_status = 'suspended', updated_at = NOW() WHERE id = $1`,
+        [userId]
+      );
       await notifyMember({
         userEmail: email,
         title: 'Membership Unpaid',
