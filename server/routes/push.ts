@@ -9,20 +9,38 @@ import { sendNotificationToUser } from '../core/websocket';
 
 const router = Router();
 
-if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+// Push notification configuration status
+const vapidConfigured = !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+
+if (vapidConfigured) {
   webpush.setVapidDetails(
     'mailto:hello@everhouse.app',
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
+    process.env.VAPID_PUBLIC_KEY!,
+    process.env.VAPID_PRIVATE_KEY!
   );
+  console.log('[Push] VAPID keys configured - push notifications enabled');
+} else {
+  console.warn('[Push] VAPID keys not configured - push notifications will be skipped');
 }
 
-export async function sendPushNotification(userEmail: string, payload: { title: string; body: string; url?: string; tag?: string }) {
+export function isPushNotificationsEnabled(): boolean {
+  return vapidConfigured;
+}
+
+export async function sendPushNotification(userEmail: string, payload: { title: string; body: string; url?: string; tag?: string }): Promise<{ sent: boolean; reason?: string }> {
+  if (!vapidConfigured) {
+    return { sent: false, reason: 'VAPID not configured' };
+  }
+  
   try {
     const result = await pool.query(
       'SELECT * FROM push_subscriptions WHERE user_email = $1',
       [userEmail]
     );
+    
+    if (result.rows.length === 0) {
+      return { sent: false, reason: 'No push subscriptions' };
+    }
     
     const notifications = result.rows.map(async (sub) => {
       const pushSubscription = {
@@ -43,12 +61,18 @@ export async function sendPushNotification(userEmail: string, payload: { title: 
     });
     
     await Promise.all(notifications);
+    return { sent: true };
   } catch (error) {
     console.error('Failed to send push notification:', error);
+    return { sent: false, reason: 'Error sending push' };
   }
 }
 
-export async function sendPushNotificationToStaff(payload: { title: string; body: string; url?: string; tag?: string }) {
+export async function sendPushNotificationToStaff(payload: { title: string; body: string; url?: string; tag?: string }): Promise<{ sent: boolean; count: number; reason?: string }> {
+  if (!vapidConfigured) {
+    return { sent: false, count: 0, reason: 'VAPID not configured' };
+  }
+  
   try {
     const staffSubscriptions = await db
       .selectDistinct({
@@ -61,6 +85,10 @@ export async function sendPushNotificationToStaff(payload: { title: string; body
       .from(pushSubscriptions)
       .innerJoin(users, eq(pushSubscriptions.userEmail, users.email))
       .where(inArray(users.role, ['admin', 'staff']));
+    
+    if (staffSubscriptions.length === 0) {
+      return { sent: false, count: 0, reason: 'No staff subscriptions' };
+    }
     
     const notifications = staffSubscriptions.map(async (sub) => {
       const pushSubscription = {
@@ -81,12 +109,19 @@ export async function sendPushNotificationToStaff(payload: { title: string; body
     });
     
     await Promise.all(notifications);
+    return { sent: true, count: staffSubscriptions.length };
   } catch (error) {
     console.error('Failed to send push notification to staff:', error);
+    return { sent: false, count: 0, reason: 'Error sending push' };
   }
 }
 
 export async function sendPushNotificationToAllMembers(payload: { title: string; body: string; url?: string; tag?: string }): Promise<number> {
+  if (!vapidConfigured) {
+    console.log('[Push to Members] Skipped - VAPID not configured');
+    return 0;
+  }
+  
   const results = { sent: 0, pushFailed: 0 };
   
   try {
