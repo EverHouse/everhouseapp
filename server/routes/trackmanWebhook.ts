@@ -6,6 +6,7 @@ import { isStaffOrAdmin } from '../core/middleware';
 import { sendNotificationToUser, broadcastToStaff } from '../core/websocket';
 import { sendBookingConfirmationEmail } from '../emails/bookingEmails';
 import { notifyAllStaff } from '../core/staffNotifications';
+import { notifyMember } from '../core/notificationService';
 
 const router = Router();
 
@@ -614,45 +615,41 @@ async function notifyMemberBookingConfirmed(
     
     if (userResult.rows.length > 0) {
       const user = userResult.rows[0];
+      const memberName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Member';
+      const message = `Your simulator booking for ${slotDate} at ${startTime}${bayName ? ` (${bayName})` : ''} has been confirmed.`;
       
-      // Always save notification to database (for history)
-      await pool.query(
-        `INSERT INTO notifications (user_id, title, message, type, link, created_at)
-         VALUES ($1, $2, $3, $4, $5, NOW())`,
-        [
-          user.id,
-          'Booking Confirmed',
-          `Your simulator booking for ${slotDate} at ${startTime}${bayName ? ` (${bayName})` : ''} has been confirmed.`,
-          'booking',
-          '/bookings'
-        ]
+      // Use unified notification service - sends to database, WebSocket, and push
+      const result = await notifyMember(
+        {
+          userEmail: customerEmail,
+          title: 'Booking Confirmed',
+          message,
+          type: 'booking_approved',
+          relatedId: bookingId,
+          relatedType: 'booking',
+          url: '/bookings'
+        },
+        {
+          sendPush: true,
+          sendWebSocket: true,
+          sendEmail: true,
+          emailSubject: 'Your Booking is Confirmed - Ever House',
+          emailHtml: `
+            <h2>Booking Confirmed</h2>
+            <p>Hi ${memberName},</p>
+            <p>${message}</p>
+            <p>We look forward to seeing you!</p>
+          `
+        }
       );
       
-      // Try WebSocket notification first - returns whether user has active connection
-      const wsResult = sendNotificationToUser(user.email, {
-        type: 'booking_confirmed',
-        title: 'Booking Confirmed',
-        message: `Your booking for ${slotDate} at ${startTime} is confirmed!`,
-        data: { bookingId },
+      logger.info('[Trackman Webhook] Member notified via unified service', { 
+        extra: { 
+          email: customerEmail, 
+          bookingId,
+          channels: result.deliveryResults.map(r => ({ channel: r.channel, success: r.success }))
+        } 
       });
-      
-      // Only send email if user is NOT actively viewing the app
-      // This prevents double-notifying someone already looking at the screen
-      if (!wsResult.hasActiveSocket) {
-        try {
-          await sendBookingConfirmationEmail(customerEmail, {
-            date: slotDate,
-            time: startTime,
-            bayName: bayName || 'Simulator Bay',
-            memberName: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Member',
-          });
-          logger.info('[Trackman Webhook] Sent email (no active socket)', { extra: { email: customerEmail } });
-        } catch (emailError) {
-          logger.warn('[Trackman Webhook] Failed to send confirmation email', { extra: { email: customerEmail } });
-        }
-      } else {
-        logger.info('[Trackman Webhook] Skipped email - user has active socket', { extra: { email: customerEmail } });
-      }
     }
   } catch (e) {
     logger.error('[Trackman Webhook] Failed to notify member', { error: e as Error });
