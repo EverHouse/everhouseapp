@@ -373,12 +373,12 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
   }, [fetchBillingInfo]);
 
   const handleManualTierSave = async () => {
-    if (!memberId || !manualTier) return;
+    if (!memberEmail || !manualTier) return;
     
     setIsSavingTier(true);
     try {
-      const res = await fetch(`/api/hubspot/contacts/${memberId}/tier`, {
-        method: 'PUT',
+      const res = await fetch(`/api/members/${encodeURIComponent(memberEmail)}/tier`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ tier: manualTier })
