@@ -291,24 +291,53 @@ const DirectoryTab: React.FC = () => {
     const handleSync = async () => {
         setIsSyncing(true);
         setSyncMessage(null);
+        
+        let stripeCount = 0;
+        let hubspotCount = 0;
+        let errors: string[] = [];
+        
+        try {
+            const stripeRes = await fetch('/api/stripe/sync-subscriptions', { 
+                method: 'POST',
+                credentials: 'include'
+            });
+            if (stripeRes.ok) {
+                const stripeData = await stripeRes.json();
+                stripeCount = stripeData.synced || 0;
+            } else {
+                errors.push('Stripe');
+            }
+        } catch {
+            errors.push('Stripe');
+        }
+        
         try {
             const result = await refreshMembers();
             if (result.success) {
-                setSyncMessage({ type: 'success', text: `Synced ${result.count} members from HubSpot` });
-                if (memberTab === 'former') {
-                    setFormerLoading(true);
-                    await fetchFormerMembers();
-                    setFormerLoading(false);
-                }
+                hubspotCount = result.count || 0;
             } else {
-                setSyncMessage({ type: 'error', text: 'Failed to sync with HubSpot' });
+                errors.push('HubSpot');
             }
-        } catch (err) {
-            setSyncMessage({ type: 'error', text: 'Failed to sync with HubSpot' });
-        } finally {
-            setIsSyncing(false);
-            setTimeout(() => setSyncMessage(null), 5000);
+        } catch {
+            errors.push('HubSpot');
         }
+        
+        if (errors.length === 0) {
+            setSyncMessage({ type: 'success', text: `Synced ${stripeCount} from Stripe, ${hubspotCount} from HubSpot` });
+        } else if (errors.length === 2) {
+            setSyncMessage({ type: 'error', text: 'Failed to sync with Stripe and HubSpot' });
+        } else {
+            setSyncMessage({ type: 'success', text: `Partial sync: ${errors[0]} failed, other source synced` });
+        }
+        
+        if (memberTab === 'former') {
+            setFormerLoading(true);
+            await fetchFormerMembers();
+            setFormerLoading(false);
+        }
+        
+        setIsSyncing(false);
+        setTimeout(() => setSyncMessage(null), 5000);
     };
 
     const openDetailsModal = (member: MemberProfile) => {
