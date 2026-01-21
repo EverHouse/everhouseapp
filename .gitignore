@@ -37,3 +37,6 @@ attached_assets/
 
 # Test output
 coverage/
+
+# Environment files
+.env

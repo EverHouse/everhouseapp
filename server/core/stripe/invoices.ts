@@ -51,8 +51,7 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<{
     const invoice = await stripe.invoices.create({
       customer: customerId,
       description: description || undefined,
-      collection_method: 'send_invoice',
-      days_until_due: 30,
+      collection_method: 'charge_automatically',
       metadata: {
         ...metadata,
         source: 'ever_house_app',

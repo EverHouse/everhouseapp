@@ -6,9 +6,13 @@ import { MindbodyBillingSection } from './billing/MindbodyBillingSection';
 import { FamilyAddonBillingSection } from './billing/FamilyAddonBillingSection';
 import { CompedBillingSection } from './billing/CompedBillingSection';
 import { TierChangeWizard } from './billing/TierChangeWizard';
+import { TIER_NAMES } from '../../../shared/constants/tiers';
 
 interface MemberBillingTabProps {
   memberEmail: string;
+  memberId?: number;
+  currentTier?: string;
+  onTierUpdate?: (tier: string) => void;
 }
 
 interface Subscription {
@@ -305,7 +309,12 @@ function ConfirmCancelModal({
   );
 }
 
-const MemberBillingTab: React.FC<MemberBillingTabProps> = ({ memberEmail }) => {
+const MemberBillingTab: React.FC<MemberBillingTabProps> = ({ 
+  memberEmail, 
+  memberId, 
+  currentTier, 
+  onTierUpdate 
+}) => {
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === 'dark';
 
@@ -313,6 +322,11 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({ memberEmail }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const [isEditingTier, setIsEditingTier] = useState(false);
+  const [manualTier, setManualTier] = useState('');
+  const [isSavingTier, setIsSavingTier] = useState(false);
+  const VALID_TIERS = [...TIER_NAMES, 'Founding', 'Unlimited'];
 
   const [isUpdatingSource, setIsUpdatingSource] = useState(false);
   const [isPausing, setIsPausing] = useState(false);
@@ -357,6 +371,35 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({ memberEmail }) => {
   useEffect(() => {
     fetchBillingInfo();
   }, [fetchBillingInfo]);
+
+  const handleManualTierSave = async () => {
+    if (!memberId || !manualTier) return;
+    
+    setIsSavingTier(true);
+    try {
+      const res = await fetch(`/api/hubspot/contacts/${memberId}/tier`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ tier: manualTier })
+      });
+      
+      if (!res.ok) {
+        const error = await res.json();
+        setError('Failed to update tier: ' + (error.error || 'Unknown error'));
+      } else {
+        setIsEditingTier(false);
+        if (onTierUpdate) onTierUpdate(manualTier);
+        fetchBillingInfo();
+        showSuccess('Membership level updated');
+      }
+    } catch (err) {
+      console.error('Error updating tier:', err);
+      setError('Failed to update tier. Please try again.');
+    } finally {
+      setIsSavingTier(false);
+    }
+  };
 
   const handleUpdateBillingSource = async (newSource: string) => {
     setIsUpdatingSource(true);
@@ -552,6 +595,76 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({ memberEmail }) => {
           <p className={`text-sm ${isDark ? 'text-green-400' : 'text-green-600'}`}>{successMessage}</p>
         </div>
       )}
+
+      <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className={`material-symbols-outlined ${isDark ? 'text-purple-400' : 'text-purple-600'}`}>badge</span>
+            <h3 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-primary'}`}>Membership Level</h3>
+          </div>
+          {!isEditingTier && (
+            <button
+              onClick={() => {
+                setManualTier(currentTier || '');
+                setIsEditingTier(true);
+              }}
+              className={`text-xs font-medium ${isDark ? 'text-purple-400 hover:text-purple-300' : 'text-purple-600 hover:text-purple-700'}`}
+            >
+              Edit Level
+            </button>
+          )}
+        </div>
+
+        {isEditingTier ? (
+          <div className="flex items-center gap-2 mt-2">
+            <select
+              value={manualTier}
+              onChange={(e) => setManualTier(e.target.value)}
+              className={`flex-1 px-3 py-2 rounded-lg border text-sm ${
+                isDark 
+                  ? 'bg-black/30 border-white/20 text-white' 
+                  : 'bg-white border-gray-200 text-primary'
+              }`}
+              disabled={isSavingTier}
+            >
+              <option value="">No Tier</option>
+              {VALID_TIERS.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            <button
+              onClick={handleManualTierSave}
+              disabled={isSavingTier}
+              className="px-3 py-2 bg-brand-green text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50"
+            >
+              {isSavingTier ? '...' : 'Save'}
+            </button>
+            <button
+              onClick={() => setIsEditingTier(false)}
+              disabled={isSavingTier}
+              className={`px-3 py-2 rounded-lg text-sm font-medium ${
+                isDark ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-200 hover:bg-gray-300'
+              }`}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className={`text-lg font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              {currentTier || 'No Tier Assigned'}
+            </span>
+            {currentTier && (
+               <span className={`px-2 py-0.5 rounded text-[10px] ${isDark ? 'bg-white/10 text-gray-400' : 'bg-gray-200 text-gray-600'}`}>
+                 {billingInfo?.billingProvider === 'mindbody' ? 'Synced from Mindbody' : 'System Record'}
+               </span>
+            )}
+          </div>
+        )}
+        <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+          Use this to manually correct a member's tier if it falls out of sync with their billing provider (e.g. Mindbody).
+        </p>
+      </div>
 
       <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
         <div className="flex items-center gap-2 mb-4">
