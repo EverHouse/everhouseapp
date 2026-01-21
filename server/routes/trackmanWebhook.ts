@@ -89,16 +89,27 @@ function validateTrackmanWebhookSignature(req: Request): boolean {
     .digest('hex');
   
   const providedSig = Array.isArray(signature) ? signature[0] : signature;
-  const isValid = crypto.timingSafeEqual(
-    Buffer.from(providedSig),
-    Buffer.from(expectedSignature)
-  );
   
-  if (!isValid) {
-    logger.warn('[Trackman Webhook] Signature validation failed');
+  try {
+    const providedBuffer = Buffer.from(providedSig || '');
+    const expectedBuffer = Buffer.from(expectedSignature);
+    
+    if (providedBuffer.length !== expectedBuffer.length) {
+      logger.warn('[Trackman Webhook] Signature length mismatch');
+      return !isProduction;
+    }
+    
+    const isValid = crypto.timingSafeEqual(providedBuffer, expectedBuffer);
+    
+    if (!isValid) {
+      logger.warn('[Trackman Webhook] Signature validation failed');
+    }
+    
+    return isValid || !isProduction;
+  } catch (e) {
+    logger.error('[Trackman Webhook] Signature validation error', { error: e as Error });
+    return !isProduction;
   }
-  
-  return isValid || !isProduction;
 }
 
 function extractBookingData(payload: TrackmanWebhookPayload): TrackmanBookingPayload | null {
@@ -151,13 +162,24 @@ function mapBayNameToResourceId(
   
   const name = (bayName || bayId || '').toLowerCase().trim();
   
-  // Try exact bay number extraction first (handles "Bay 1", "bay-1", "bay_1", "simulator1", etc.)
-  const bayNumberMatch = name.match(/(\d+)/);
-  if (bayNumberMatch) {
-    const bayNum = parseInt(bayNumberMatch[1], 10);
-    // Only return valid bay numbers (1-4 for Ever House)
+  // Extract bay number only from patterns that clearly indicate a bay/simulator
+  // Pattern must include "bay", "sim", or "simulator" followed by a number
+  const bayPatternMatch = name.match(/(?:bay|sim(?:ulator)?)\s*[-_]?\s*(\d+)/i);
+  if (bayPatternMatch) {
+    const bayNum = parseInt(bayPatternMatch[1], 10);
     if (bayNum >= 1 && bayNum <= 4) {
       return bayNum;
+    }
+  }
+  
+  // Also accept standalone numbers only if the name is very short (e.g., "1", "Bay1")
+  if (name.length <= 5) {
+    const standaloneMatch = name.match(/^(\d)$/);
+    if (standaloneMatch) {
+      const bayNum = parseInt(standaloneMatch[1], 10);
+      if (bayNum >= 1 && bayNum <= 4) {
+        return bayNum;
+      }
     }
   }
   
