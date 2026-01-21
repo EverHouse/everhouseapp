@@ -107,6 +107,19 @@ export const guestCheckIns = pgTable("guest_check_ins", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Linked emails table - alternate email addresses for members (for Trackman matching)
+export const userLinkedEmails = pgTable("user_linked_emails", {
+  id: serial("id").primaryKey(),
+  primaryEmail: varchar("primary_email").notNull(), // The member's main email in the system
+  linkedEmail: varchar("linked_email").notNull(), // The alternate email (e.g., work email from Trackman)
+  source: varchar("source").default("manual"), // 'manual', 'trackman_resolution', 'hubspot'
+  createdBy: varchar("created_by"), // Staff email who created the link
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  primaryEmailIdx: index("user_linked_emails_primary_idx").on(table.primaryEmail),
+  linkedEmailIdx: uniqueIndex("user_linked_emails_linked_idx").on(table.linkedEmail),
+}));
+
 export type MembershipTier = typeof membershipTiers.$inferSelect;
 export type InsertMembershipTier = typeof membershipTiers.$inferInsert;
 export type MemberNote = typeof memberNotes.$inferSelect;
@@ -115,3 +128,5 @@ export type CommunicationLog = typeof communicationLogs.$inferSelect;
 export type InsertCommunicationLog = typeof communicationLogs.$inferInsert;
 export type GuestCheckIn = typeof guestCheckIns.$inferSelect;
 export type InsertGuestCheckIn = typeof guestCheckIns.$inferInsert;
+export type UserLinkedEmail = typeof userLinkedEmails.$inferSelect;
+export type InsertUserLinkedEmail = typeof userLinkedEmails.$inferInsert;

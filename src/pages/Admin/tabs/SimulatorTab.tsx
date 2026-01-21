@@ -724,7 +724,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
     const [isSyncingHistory, setIsSyncingHistory] = useState(false);
     const [unmatchedBookings, setUnmatchedBookings] = useState<UnmatchedBooking[]>([]);
     const [showDatePicker, setShowDatePicker] = useState(false);
-    const [resolveUnmatchedModal, setResolveUnmatchedModal] = useState<{ booking: UnmatchedBooking; memberEmail: string } | null>(null);
+    const [resolveUnmatchedModal, setResolveUnmatchedModal] = useState<{ booking: UnmatchedBooking; memberEmail: string; rememberEmail: boolean } | null>(null);
     const [resolveMembers, setResolveMembers] = useState<MemberSearchResult[]>([]);
     const [resolveSearchQuery, setResolveSearchQuery] = useState('');
     const [editingTrackmanId, setEditingTrackmanId] = useState(false);
@@ -1011,6 +1011,8 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
         if (!resolveUnmatchedModal) return;
         const bookingToResolve = resolveUnmatchedModal.booking;
         const memberEmail = resolveUnmatchedModal.memberEmail;
+        const rememberEmail = resolveUnmatchedModal.rememberEmail;
+        const originalEmail = bookingToResolve.originalEmail;
         
         // Optimistic UI: Remove the booking from unmatchedBookings immediately
         setUnmatchedBookings(prev => prev.filter(ub => ub.id !== bookingToResolve.id));
@@ -1026,6 +1028,26 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
             });
             if (res.ok) {
                 const data = await res.json();
+                
+                // Save email link if checkbox was checked and emails differ
+                const shouldRemember = rememberEmail && originalEmail && 
+                    originalEmail.toLowerCase() !== memberEmail.toLowerCase();
+                if (shouldRemember) {
+                    try {
+                        await fetch('/api/admin/linked-emails', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                primaryEmail: memberEmail,
+                                linkedEmail: originalEmail
+                            })
+                        });
+                    } catch (linkErr) {
+                        console.warn('Failed to save email link:', linkErr);
+                    }
+                }
+                
                 if (data.autoResolved > 0) {
                     // Also remove auto-resolved bookings from state
                     setUnmatchedBookings(prev => prev.filter(ub => 
@@ -2056,7 +2078,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                 <div
                                                     key={`${resource.id}-${slot}`}
                                                     title={closure ? `CLOSED: ${closure.title}` : eventBlock ? `EVENT BLOCK: ${eventBlock.closureTitle || eventBlock.blockType || 'Blocked'}` : isUnmatchedPlaceholder ? `UNMATCHED: ${booking?.user_name || 'Unknown'} - Click to resolve` : booking ? `${bookingDisplayName}${isInactiveMember ? ' (Inactive Member)' : ''} - Click for details` : unmatchedBooking ? `UNMATCHED: ${unmatchedBooking.userName || unmatchedBooking.originalEmail || 'Unknown'} - Click to resolve` : `Click to book ${resource.type === 'conference_room' ? 'Conference Room' : resource.name} at ${formatTime12Hour(slot)}`}
-                                                    onClick={closure || eventBlock ? undefined : booking ? () => setSelectedCalendarBooking(booking) : unmatchedBooking ? () => { setResolveSearchQuery(''); setResolveUnmatchedModal({ booking: unmatchedBooking, memberEmail: '' }); } : handleEmptyCellClick}
+                                                    onClick={closure || eventBlock ? undefined : booking ? () => setSelectedCalendarBooking(booking) : unmatchedBooking ? () => { setResolveSearchQuery(''); setResolveUnmatchedModal({ booking: unmatchedBooking, memberEmail: '', rememberEmail: true }); } : handleEmptyCellClick}
                                                     className={`h-7 sm:h-8 rounded border ${
                                                         closure
                                                             ? 'bg-red-100 dark:bg-red-500/20 border-red-300 dark:border-red-500/30'
@@ -2946,6 +2968,26 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                 Selected: <span className="font-medium">{resolveUnmatchedModal.memberEmail}</span>
                             </p>
                         </div>
+                    )}
+                    
+                    {resolveUnmatchedModal?.memberEmail && resolveUnmatchedModal?.booking?.originalEmail && 
+                      resolveUnmatchedModal.booking.originalEmail.toLowerCase() !== resolveUnmatchedModal.memberEmail.toLowerCase() && (
+                      <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-500/30">
+                        <label className="flex items-start gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={resolveUnmatchedModal.rememberEmail}
+                            onChange={(e) => setResolveUnmatchedModal({ ...resolveUnmatchedModal, rememberEmail: e.target.checked })}
+                            className="mt-0.5 w-4 h-4 rounded border-amber-400 text-amber-500 focus:ring-amber-500/50 focus:ring-offset-0"
+                          />
+                          <div>
+                            <p className="text-sm font-medium text-primary dark:text-white">Remember this email for future bookings</p>
+                            <p className="text-xs text-primary/70 dark:text-white/70 mt-0.5">
+                              Link "{resolveUnmatchedModal.booking.originalEmail}" to this member's account
+                            </p>
+                          </div>
+                        </label>
+                      </div>
                     )}
                     
                     <div className="flex gap-3">

@@ -121,12 +121,29 @@ function normalizeBookingFields(booking: TrackmanBookingPayload) {
 function mapBayNameToResourceId(bayName: string | undefined, bayId: string | undefined): number | null {
   if (!bayName && !bayId) return null;
   
-  const name = (bayName || bayId || '').toLowerCase();
+  const name = (bayName || bayId || '').toLowerCase().trim();
   
-  if (name.includes('1') || name === 'bay1' || name === 'bay 1') return 1;
-  if (name.includes('2') || name === 'bay2' || name === 'bay 2') return 2;
-  if (name.includes('3') || name === 'bay3' || name === 'bay 3') return 3;
-  if (name.includes('4') || name === 'bay4' || name === 'bay 4') return 4;
+  // Try exact bay number extraction first (handles "Bay 1", "bay-1", "bay_1", "simulator1", etc.)
+  const bayNumberMatch = name.match(/(\d+)/);
+  if (bayNumberMatch) {
+    const bayNum = parseInt(bayNumberMatch[1], 10);
+    // Only return valid bay numbers (1-4 for Ever House)
+    if (bayNum >= 1 && bayNum <= 4) {
+      return bayNum;
+    }
+  }
+  
+  // Fallback to explicit patterns for edge cases
+  if (name === 'bay1' || name === 'bay 1' || name === 'bay-1' || name === 'bay_1') return 1;
+  if (name === 'bay2' || name === 'bay 2' || name === 'bay-2' || name === 'bay_2') return 2;
+  if (name === 'bay3' || name === 'bay 3' || name === 'bay-3' || name === 'bay_3') return 3;
+  if (name === 'bay4' || name === 'bay 4' || name === 'bay-4' || name === 'bay_4') return 4;
+  
+  // Handle word-based numbers as last resort
+  if (name.includes('one') || name.includes('first')) return 1;
+  if (name.includes('two') || name.includes('second')) return 2;
+  if (name.includes('three') || name.includes('third')) return 3;
+  if (name.includes('four') || name.includes('fourth')) return 4;
   
   return null;
 }
@@ -232,6 +249,53 @@ async function updateBaySlotCache(
   }
 }
 
+async function resolveLinkedEmail(email: string): Promise<string> {
+  try {
+    const result = await pool.query(
+      `SELECT primary_email FROM user_linked_emails WHERE LOWER(linked_email) = LOWER($1)`,
+      [email]
+    );
+    
+    if (result.rows.length > 0) {
+      const primaryEmail = result.rows[0].primary_email;
+      logger.info('[Trackman Webhook] Resolved linked email to primary', {
+        extra: { linkedEmail: email, primaryEmail }
+      });
+      return primaryEmail;
+    }
+    
+    return email;
+  } catch (e) {
+    logger.error('[Trackman Webhook] Failed to resolve linked email', { error: e as Error });
+    return email;
+  }
+}
+
+async function findMemberByEmail(email: string): Promise<{ id: string; email: string; firstName: string | null; lastName: string | null; tier: string | null } | null> {
+  try {
+    const result = await pool.query(
+      `SELECT id, email, first_name, last_name, tier FROM users WHERE LOWER(email) = LOWER($1)`,
+      [email]
+    );
+    
+    if (result.rows.length > 0) {
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        email: row.email,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        tier: row.tier
+      };
+    }
+    
+    return null;
+  } catch (e) {
+    logger.error('[Trackman Webhook] Failed to find member by email', { error: e as Error });
+    return null;
+  }
+}
+
 async function tryAutoApproveBooking(
   customerEmail: string,
   slotDate: string,
@@ -289,6 +353,198 @@ async function tryAutoApproveBooking(
   } catch (e) {
     logger.error('[Trackman Webhook] Failed to auto-approve booking', { error: e as Error });
     return { matched: false };
+  }
+}
+
+async function createBookingForMember(
+  member: { id: string; email: string; firstName: string | null; lastName: string | null },
+  trackmanBookingId: string,
+  slotDate: string,
+  startTime: string,
+  endTime: string,
+  resourceId: number,
+  playerCount: number,
+  customerName?: string
+): Promise<{ success: boolean; bookingId?: number }> {
+  // Enforce non-null resource_id - bookings without a valid bay should go to unmatched queue
+  if (!resourceId || resourceId < 1 || resourceId > 4) {
+    logger.error('[Trackman Webhook] createBookingForMember called with invalid resourceId', {
+      extra: { resourceId, email: member.email, trackmanBookingId }
+    });
+    return { success: false };
+  }
+  
+  try {
+    const startParts = startTime.split(':').map(Number);
+    const endParts = endTime.split(':').map(Number);
+    const startMinutes = startParts[0] * 60 + startParts[1];
+    const endMinutes = endParts[0] * 60 + endParts[1];
+    const durationMinutes = endMinutes > startMinutes ? endMinutes - startMinutes : 60;
+    
+    const memberName = customerName || 
+      [member.firstName, member.lastName].filter(Boolean).join(' ') || 
+      member.email;
+    
+    const result = await pool.query(
+      `INSERT INTO booking_requests 
+       (user_id, user_email, user_name, resource_id, request_date, start_time, end_time, 
+        duration_minutes, status, trackman_booking_id, trackman_player_count, 
+        reviewed_by, reviewed_at, staff_notes, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'confirmed', $9, $10, 'trackman_webhook', NOW(), 
+               '[Auto-created via Trackman webhook - staff booking]', NOW(), NOW())
+       RETURNING id`,
+      [
+        member.id,
+        member.email,
+        memberName,
+        resourceId,
+        slotDate,
+        startTime,
+        endTime,
+        durationMinutes,
+        trackmanBookingId,
+        playerCount
+      ]
+    );
+    
+    if (result.rows.length > 0) {
+      const logLevel = resourceId ? 'info' : 'warn';
+      const logMethod = resourceId ? logger.info.bind(logger) : logger.warn.bind(logger);
+      logMethod(`[Trackman Webhook] Auto-created booking for member${resourceId ? '' : ' (no resource_id - bay unmapped)'}`, {
+        extra: { 
+          bookingId: result.rows[0].id, 
+          email: member.email, 
+          date: slotDate, 
+          time: startTime,
+          resourceId: resourceId || null,
+          trackmanBookingId 
+        }
+      });
+      return { success: true, bookingId: result.rows[0].id };
+    }
+    
+    return { success: false };
+  } catch (e) {
+    logger.error('[Trackman Webhook] Failed to create booking for member', { error: e as Error });
+    return { success: false };
+  }
+}
+
+async function saveToUnmatchedBookings(
+  trackmanBookingId: string,
+  slotDate: string,
+  startTime: string,
+  endTime: string,
+  resourceId: number | null,
+  customerEmail?: string,
+  customerName?: string,
+  playerCount?: number,
+  reason?: string
+): Promise<void> {
+  try {
+    const startParts = startTime.split(':').map(Number);
+    const endParts = endTime.split(':').map(Number);
+    const startMinutes = startParts[0] * 60 + startParts[1];
+    const endMinutes = endParts[0] * 60 + endParts[1];
+    const durationMinutes = endMinutes > startMinutes ? endMinutes - startMinutes : 60;
+    
+    // Determine the match attempt reason
+    let matchAttemptReason = reason;
+    if (!matchAttemptReason) {
+      if (!customerEmail) {
+        matchAttemptReason = 'No customer email provided';
+      } else if (!resourceId) {
+        matchAttemptReason = 'Bay could not be mapped to simulator';
+      } else {
+        matchAttemptReason = 'No member found with this email';
+      }
+    }
+    
+    await pool.query(
+      `INSERT INTO trackman_unmatched_bookings 
+       (trackman_booking_id, user_name, original_email, booking_date, start_time, end_time, 
+        duration_minutes, bay_number, player_count, match_attempt_reason, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+       ON CONFLICT DO NOTHING`,
+      [
+        trackmanBookingId,
+        customerName || 'Unknown',
+        customerEmail || null,
+        slotDate,
+        startTime,
+        endTime,
+        durationMinutes,
+        resourceId ? `Bay ${resourceId}` : null,
+        playerCount || 1,
+        matchAttemptReason
+      ]
+    );
+    
+    logger.info('[Trackman Webhook] Saved to unmatched bookings', {
+      extra: { trackmanBookingId, email: customerEmail, date: slotDate }
+    });
+  } catch (e) {
+    logger.error('[Trackman Webhook] Failed to save unmatched booking', { error: e as Error });
+  }
+}
+
+async function cancelBookingByTrackmanId(trackmanBookingId: string): Promise<{ cancelled: boolean; bookingId?: number }> {
+  try {
+    const result = await pool.query(
+      `UPDATE booking_requests 
+       SET status = 'cancelled',
+           staff_notes = COALESCE(staff_notes, '') || ' [Cancelled via Trackman webhook]',
+           updated_at = NOW()
+       WHERE trackman_booking_id = $1
+         AND status NOT IN ('cancelled', 'declined')
+       RETURNING id, user_email`,
+      [trackmanBookingId]
+    );
+    
+    if (result.rowCount && result.rowCount > 0) {
+      const { id: bookingId, user_email } = result.rows[0];
+      
+      logger.info('[Trackman Webhook] Cancelled booking via webhook', {
+        extra: { bookingId, trackmanBookingId }
+      });
+      
+      if (user_email) {
+        const userResult = await pool.query(
+          `SELECT id, email FROM users WHERE LOWER(email) = LOWER($1)`,
+          [user_email]
+        );
+        
+        if (userResult.rows.length > 0) {
+          const user = userResult.rows[0];
+          
+          await pool.query(
+            `INSERT INTO notifications (user_id, title, message, type, link, created_at)
+             VALUES ($1, $2, $3, $4, $5, NOW())`,
+            [
+              user.id,
+              'Booking Cancelled',
+              'Your simulator booking has been cancelled.',
+              'booking',
+              '/bookings'
+            ]
+          );
+          
+          sendNotificationToUser(user.email, {
+            type: 'booking_cancelled',
+            title: 'Booking Cancelled',
+            message: 'Your simulator booking has been cancelled.',
+            data: { bookingId },
+          });
+        }
+      }
+      
+      return { cancelled: true, bookingId };
+    }
+    
+    return { cancelled: false };
+  } catch (e) {
+    logger.error('[Trackman Webhook] Failed to cancel booking', { error: e as Error });
+    return { cancelled: false };
   }
 }
 
@@ -366,6 +622,17 @@ async function handleBookingUpdate(payload: TrackmanWebhookPayload): Promise<{ s
   
   const resourceId = mapBayNameToResourceId(normalized.bayName, normalized.bayId);
   
+  // Log warning if we couldn't map bay to resource - this helps debug bay naming issues
+  if (!resourceId && (normalized.bayName || normalized.bayId)) {
+    logger.warn('[Trackman Webhook] Could not map bay to resource ID', {
+      extra: { 
+        trackmanBookingId: normalized.trackmanBookingId,
+        bayName: normalized.bayName,
+        bayId: normalized.bayId
+      }
+    });
+  }
+  
   const status = normalized.status?.toLowerCase();
   const isCancel = status === 'cancelled' || status === 'canceled' || status === 'deleted';
   const slotStatus: 'booked' | 'cancelled' | 'completed' = isCancel ? 'cancelled' : 
@@ -387,26 +654,143 @@ async function handleBookingUpdate(payload: TrackmanWebhookPayload): Promise<{ s
   
   let matchedBookingId: number | undefined;
   
-  if (normalized.customerEmail && !isCancel) {
-    const autoApproveResult = await tryAutoApproveBooking(
-      normalized.customerEmail,
+  if (isCancel) {
+    const cancelResult = await cancelBookingByTrackmanId(normalized.trackmanBookingId);
+    if (cancelResult.cancelled) {
+      matchedBookingId = cancelResult.bookingId;
+      logger.info('[Trackman Webhook] Handled booking cancellation', {
+        extra: { trackmanBookingId: normalized.trackmanBookingId, bookingId: cancelResult.bookingId }
+      });
+    }
+    return { success: true, matchedBookingId };
+  }
+  
+  if (!normalized.customerEmail) {
+    logger.info('[Trackman Webhook] No customer email provided, saving to unmatched', {
+      extra: { trackmanBookingId: normalized.trackmanBookingId }
+    });
+    await saveToUnmatchedBookings(
+      normalized.trackmanBookingId,
       startParsed.date,
       startParsed.time,
-      normalized.trackmanBookingId
+      endParsed?.time || startParsed.time,
+      resourceId,
+      undefined,
+      normalized.customerName,
+      normalized.playerCount
+    );
+    return { success: true };
+  }
+  
+  const resolvedEmail = await resolveLinkedEmail(normalized.customerEmail);
+  const emailForLookup = resolvedEmail;
+  
+  logger.info('[Trackman Webhook] Processing booking', {
+    extra: { 
+      originalEmail: normalized.customerEmail, 
+      resolvedEmail: emailForLookup,
+      wasLinked: emailForLookup !== normalized.customerEmail,
+      date: startParsed.date,
+      time: startParsed.time
+    }
+  });
+  
+  const autoApproveResult = await tryAutoApproveBooking(
+    emailForLookup,
+    startParsed.date,
+    startParsed.time,
+    normalized.trackmanBookingId
+  );
+  
+  if (autoApproveResult.matched && autoApproveResult.bookingId) {
+    matchedBookingId = autoApproveResult.bookingId;
+    
+    await notifyMemberBookingConfirmed(
+      emailForLookup,
+      autoApproveResult.bookingId,
+      startParsed.date,
+      startParsed.time,
+      normalized.bayName
     );
     
-    if (autoApproveResult.matched && autoApproveResult.bookingId) {
-      matchedBookingId = autoApproveResult.bookingId;
+    logger.info('[Trackman Webhook] Auto-approved pending booking request', {
+      extra: { bookingId: matchedBookingId, email: emailForLookup }
+    });
+    return { success: true, matchedBookingId };
+  }
+  
+  const member = await findMemberByEmail(emailForLookup);
+  
+  if (member) {
+    // Only auto-create booking if we have a valid resource_id (bay mapping succeeded)
+    // Otherwise, save to unmatched so staff can manually assign the bay
+    if (!resourceId) {
+      logger.warn('[Trackman Webhook] Cannot auto-create booking - bay not mapped. Saving to unmatched for staff resolution.', {
+        extra: { 
+          email: member.email, 
+          bayName: normalized.bayName, 
+          bayId: normalized.bayId,
+          trackmanBookingId: normalized.trackmanBookingId
+        }
+      });
+      await saveToUnmatchedBookings(
+        normalized.trackmanBookingId,
+        startParsed.date,
+        startParsed.time,
+        endParsed?.time || startParsed.time,
+        null,
+        normalized.customerEmail,
+        normalized.customerName,
+        normalized.playerCount,
+        'bay_unmapped'
+      );
+      return { success: true, matchedBookingId };
+    }
+    
+    const createResult = await createBookingForMember(
+      member,
+      normalized.trackmanBookingId,
+      startParsed.date,
+      startParsed.time,
+      endParsed?.time || startParsed.time,
+      resourceId,
+      normalized.playerCount,
+      normalized.customerName
+    );
+    
+    if (createResult.success && createResult.bookingId) {
+      matchedBookingId = createResult.bookingId;
       
       await notifyMemberBookingConfirmed(
-        normalized.customerEmail,
-        autoApproveResult.bookingId,
+        member.email,
+        createResult.bookingId,
         startParsed.date,
         startParsed.time,
         normalized.bayName
       );
+      
+      logger.info('[Trackman Webhook] Auto-created booking for known member (no pending request)', {
+        extra: { bookingId: matchedBookingId, email: member.email, resourceId, memberName: `${member.firstName} ${member.lastName}` }
+      });
     }
+    
+    return { success: true, matchedBookingId };
   }
+  
+  logger.info('[Trackman Webhook] No member found for email, saving to unmatched', {
+    extra: { email: normalized.customerEmail, resolvedEmail: emailForLookup }
+  });
+  
+  await saveToUnmatchedBookings(
+    normalized.trackmanBookingId,
+    startParsed.date,
+    startParsed.time,
+    endParsed?.time || startParsed.time,
+    resourceId,
+    normalized.customerEmail,
+    normalized.customerName,
+    normalized.playerCount
+  );
   
   return { success: true, matchedBookingId };
 }
@@ -586,6 +970,84 @@ router.get('/api/admin/trackman-webhooks/stats', isStaffOrAdmin, async (req: Req
   } catch (error: any) {
     logger.error('[Trackman Webhook] Failed to fetch stats', { error });
     res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
+router.post('/api/admin/linked-emails', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { primaryEmail, linkedEmail } = req.body;
+    
+    if (!primaryEmail || !linkedEmail) {
+      return res.status(400).json({ error: 'primaryEmail and linkedEmail are required' });
+    }
+    
+    if (primaryEmail.toLowerCase() === linkedEmail.toLowerCase()) {
+      return res.status(400).json({ error: 'Primary email and linked email cannot be the same' });
+    }
+    
+    const existingLink = await pool.query(
+      `SELECT id FROM user_linked_emails WHERE LOWER(linked_email) = LOWER($1)`,
+      [linkedEmail]
+    );
+    
+    if (existingLink.rows.length > 0) {
+      return res.status(409).json({ error: 'This email is already linked to a member' });
+    }
+    
+    const session = (req as any).session;
+    const createdBy = session?.email || 'unknown';
+    
+    await pool.query(
+      `INSERT INTO user_linked_emails (primary_email, linked_email, source, created_by)
+       VALUES ($1, $2, 'trackman_resolution', $3)`,
+      [primaryEmail.toLowerCase(), linkedEmail.toLowerCase(), createdBy]
+    );
+    
+    logger.info('[Linked Emails] Created email link', {
+      extra: { primaryEmail, linkedEmail, createdBy }
+    });
+    
+    res.json({ success: true, message: 'Email link created successfully' });
+  } catch (error: any) {
+    logger.error('[Linked Emails] Failed to create link', { error });
+    res.status(500).json({ error: 'Failed to create email link' });
+  }
+});
+
+router.get('/api/admin/linked-emails/:email', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { email } = req.params;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+    
+    const asLinked = await pool.query(
+      `SELECT primary_email, linked_email, source, created_by, created_at
+       FROM user_linked_emails 
+       WHERE LOWER(linked_email) = LOWER($1)`,
+      [email]
+    );
+    
+    const asPrimary = await pool.query(
+      `SELECT primary_email, linked_email, source, created_by, created_at
+       FROM user_linked_emails 
+       WHERE LOWER(primary_email) = LOWER($1)`,
+      [email]
+    );
+    
+    res.json({
+      linkedTo: asLinked.rows.length > 0 ? asLinked.rows[0].primary_email : null,
+      linkedEmails: asPrimary.rows.map(r => ({
+        linkedEmail: r.linked_email,
+        source: r.source,
+        createdBy: r.created_by,
+        createdAt: r.created_at
+      }))
+    });
+  } catch (error: any) {
+    logger.error('[Linked Emails] Failed to fetch links', { error });
+    res.status(500).json({ error: 'Failed to fetch email links' });
   }
 });
 

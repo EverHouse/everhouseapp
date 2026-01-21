@@ -81,12 +81,12 @@ const TrackmanTab: React.FC = () => {
   const [potentialMatchesTotalCount, setPotentialMatchesTotalCount] = useState<number>(0);
   const [requiresReviewBookings, setRequiresReviewBookings] = useState<any[]>([]);
   const [requiresReviewTotalCount, setRequiresReviewTotalCount] = useState<number>(0);
-  const [fuzzyMatchModal, setFuzzyMatchModal] = useState<{ booking: any; matches: any[]; isLoading: boolean; selectedEmail: string } | null>(null);
+  const [fuzzyMatchModal, setFuzzyMatchModal] = useState<{ booking: any; matches: any[]; isLoading: boolean; selectedEmail: string; rememberEmail: boolean } | null>(null);
   const [importRuns, setImportRuns] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
-  const [resolveModal, setResolveModal] = useState<{ booking: any; memberEmail: string } | null>(null);
+  const [resolveModal, setResolveModal] = useState<{ booking: any; memberEmail: string; rememberEmail: boolean } | null>(null);
   const [editMatchedModal, setEditMatchedModal] = useState<{ booking: any; newMemberEmail: string } | null>(null);
   const [managePlayersModal, setManagePlayersModal] = useState<{ booking: any } | null>(null);
   const [members, setMembers] = useState<any[]>([]);
@@ -295,7 +295,7 @@ const TrackmanTab: React.FC = () => {
   };
 
   const handleOpenFuzzyMatchModal = async (booking: any) => {
-    setFuzzyMatchModal({ booking, matches: [], isLoading: true, selectedEmail: '' });
+    setFuzzyMatchModal({ booking, matches: [], isLoading: true, selectedEmail: '', rememberEmail: true });
     try {
       const res = await fetch(`/api/admin/trackman/fuzzy-matches/${booking.id}`, { credentials: 'include' });
       if (res.ok) {
@@ -323,6 +323,26 @@ const TrackmanTab: React.FC = () => {
       });
       if (res.ok) {
         const data = await res.json();
+        const originalEmail = fuzzyMatchModal.booking?.originalEmail || fuzzyMatchModal.booking?.original_email;
+        const shouldRemember = fuzzyMatchModal.rememberEmail && originalEmail && 
+          originalEmail.toLowerCase() !== fuzzyMatchModal.selectedEmail.toLowerCase();
+        
+        if (shouldRemember) {
+          try {
+            await fetch('/api/admin/linked-emails', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                primaryEmail: fuzzyMatchModal.selectedEmail,
+                linkedEmail: originalEmail
+              })
+            });
+          } catch (linkErr) {
+            console.warn('Failed to save email link:', linkErr);
+          }
+        }
+        
         setFuzzyMatchModal(null);
         setFuzzySearchQuery('');
         if (data.autoResolved > 0) {
@@ -548,6 +568,26 @@ const TrackmanTab: React.FC = () => {
       });
       if (res.ok) {
         const data = await res.json();
+        const originalEmail = resolveModal.booking?.originalEmail || resolveModal.booking?.original_email;
+        const shouldRemember = resolveModal.rememberEmail && originalEmail && 
+          originalEmail.toLowerCase() !== resolveModal.memberEmail.toLowerCase();
+        
+        if (shouldRemember) {
+          try {
+            await fetch('/api/admin/linked-emails', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                primaryEmail: resolveModal.memberEmail,
+                linkedEmail: originalEmail
+              })
+            });
+          } catch (linkErr) {
+            console.warn('Failed to save email link:', linkErr);
+          }
+        }
+        
         setResolveModal(null);
         if (data.autoResolved > 0) {
           showToast(`Resolved ${data.resolved} booking(s) (${data.autoResolved} auto-resolved with same email)`, 'success', 5000);
@@ -851,7 +891,7 @@ const TrackmanTab: React.FC = () => {
                     </p>
                   </div>
                   <button
-                    onClick={() => { setSearchQuery(''); setResolveModal({ booking, memberEmail: '' }); }}
+                    onClick={() => { setSearchQuery(''); setResolveModal({ booking, memberEmail: '', rememberEmail: true }); }}
                     className="px-3 py-1.5 bg-accent text-primary rounded-lg text-xs font-bold hover:opacity-90 transition-opacity shrink-0"
                   >
                     Resolve
@@ -1693,6 +1733,25 @@ const TrackmanTab: React.FC = () => {
                 <p className="text-center py-4 text-primary/70 dark:text-white/70">No members found</p>
               )}
             </div>
+            {resolveModal?.memberEmail && (resolveModal.booking?.originalEmail || resolveModal.booking?.original_email) && 
+              (resolveModal.booking?.originalEmail || resolveModal.booking?.original_email).toLowerCase() !== resolveModal.memberEmail.toLowerCase() && (
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-500/30">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={resolveModal.rememberEmail}
+                    onChange={(e) => setResolveModal({ ...resolveModal, rememberEmail: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 rounded border-amber-400 text-amber-500 focus:ring-amber-500/50 focus:ring-offset-0"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-primary dark:text-white">Remember this email for future bookings</p>
+                    <p className="text-xs text-primary/70 dark:text-white/70 mt-0.5">
+                      Link "{resolveModal.booking?.originalEmail || resolveModal.booking?.original_email}" to this member's account
+                    </p>
+                  </div>
+                </label>
+              </div>
+            )}
             <div className="flex justify-end gap-3 pt-4 border-t border-primary/10 dark:border-white/25">
               <button
                 onClick={() => setResolveModal(null)}
@@ -1995,6 +2054,26 @@ const TrackmanTab: React.FC = () => {
                   <span aria-hidden="true" className="material-symbols-outlined text-3xl text-primary/20 dark:text-white/20 mb-2">person_add</span>
                   <p className="text-primary/70 dark:text-white/70 text-sm">No auto-suggestions available</p>
                   <p className="text-xs text-primary/50 dark:text-white/50 mt-1">Use the search above to find a member</p>
+                </div>
+              )}
+              
+              {fuzzyMatchModal?.selectedEmail && (fuzzyMatchModal.booking?.originalEmail || fuzzyMatchModal.booking?.original_email) && 
+                (fuzzyMatchModal.booking?.originalEmail || fuzzyMatchModal.booking?.original_email).toLowerCase() !== fuzzyMatchModal.selectedEmail.toLowerCase() && (
+                <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-500/30 mb-4">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={fuzzyMatchModal.rememberEmail}
+                      onChange={(e) => setFuzzyMatchModal({ ...fuzzyMatchModal, rememberEmail: e.target.checked })}
+                      className="mt-0.5 w-4 h-4 rounded border-amber-400 text-amber-500 focus:ring-amber-500/50 focus:ring-offset-0"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-primary dark:text-white">Remember this email for future bookings</p>
+                      <p className="text-xs text-primary/70 dark:text-white/70 mt-0.5">
+                        Link "{fuzzyMatchModal.booking?.originalEmail || fuzzyMatchModal.booking?.original_email}" to this member's account
+                      </p>
+                    </div>
+                  </label>
                 </div>
               )}
             </>
