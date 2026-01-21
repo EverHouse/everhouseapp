@@ -124,7 +124,7 @@ export async function findOrCreateHubSpotContact(
           lastname: lastName,
           phone: phone || '',
           membership_tier: tier?.toLowerCase() || '',
-          membership_status: 'active',
+          membership_status: 'Active',
           lifecyclestage: 'customer'
         }
       })
