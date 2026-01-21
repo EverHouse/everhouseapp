@@ -34,7 +34,7 @@ The application features a React 19 frontend with Vite, styled using Tailwind CS
 - **Timezone Handling**: All date/time operations prioritize America/Los_Angeles timezone.
 - **Member Management**: Supports member tiers, tags, comprehensive directory, and unified billing groups (family and corporate) with primary payer and add-on members.
 - **Booking System**: Supports "Request & Hold," conflict detection, staff/member initiated bookings, multi-member bookings, and calendar management. Includes guardian consent for minors.
-- **Trackman Webhook Integration**: Real-time booking synchronization, secure endpoint with HMAC SHA256 validation, and auto-approval for pending requests.
+- **Trackman Webhook Integration**: Real-time booking synchronization via webhooks replaces manual email-parsing. Secure endpoint (`/api/webhooks/trackman`) validates HMAC SHA256 signatures. Bay serial mapping (24120062→Bay 1, 23510044→Bay 2, 24070104→Bay 3, 24080064→Bay 4) provides precise bay identification. Auto-approval matches Trackman bookings to pending member requests (exact or ±30-minute fuzzy). Auto-creates confirmed bookings for known members without prior request. Smart notification delivery: WebSocket first, email only if user not actively viewing app. Unmatched bookings queue for staff resolution with "Remember Email" feature.
 - **Linked Email Addresses**: Supports alternate email addresses for members to facilitate automatic booking creation.
 - **Security**: Role-based access control with `isAdmin` and `isStaffOrAdmin` middleware.
 - **Notifications & Notices**: In-app real-time notifications and a database-tracked sequential notice dismissal system with 3-channel delivery.
