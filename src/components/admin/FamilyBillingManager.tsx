@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import TierBadge from '../TierBadge';
 import { MemberSearchInput, SelectedMember } from '../shared/MemberSearchInput';
-import { TIER_NAMES } from '../../../shared/constants/tiers';
 
 interface FamilyMemberInfo {
   id: number;
@@ -465,12 +464,17 @@ const FamilyBillingManager: React.FC<FamilyBillingManagerProps> = ({ memberEmail
                     onClear={() => setSelectedNewMember(null)}
                     selectedMember={selectedNewMember}
                     placeholder="Search for a member..."
+                    excludeEmails={familyGroup ? [
+                      familyGroup.primaryEmail,
+                      ...familyGroup.members.map(m => m.memberEmail)
+                    ] : []}
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
                     Membership Tier
+                    <span className="ml-1 text-[10px] text-green-600 dark:text-green-400">(20% family discount applied)</span>
                   </label>
                   <select
                     value={selectedTier}
@@ -478,14 +482,11 @@ const FamilyBillingManager: React.FC<FamilyBillingManagerProps> = ({ memberEmail
                     className="w-full px-3 py-2 border border-gray-200 dark:border-white/20 rounded-lg bg-white dark:bg-black/30 text-sm text-primary dark:text-white"
                   >
                     <option value="">Select tier...</option>
-                    {TIER_NAMES.map((tier) => {
-                      const price = getProductPriceForTier(tier);
-                      return (
-                        <option key={tier} value={tier}>
-                          {tier} {price > 0 ? `(${formatCurrency(price)}/mo)` : ''}
-                        </option>
-                      );
-                    })}
+                    {products.map((product) => (
+                      <option key={product.tierName} value={product.tierName}>
+                        {product.tierName} ({formatCurrency(product.priceCents)}/mo)
+                      </option>
+                    ))}
                   </select>
                 </div>
 

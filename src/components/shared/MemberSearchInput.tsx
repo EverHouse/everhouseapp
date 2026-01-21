@@ -29,6 +29,7 @@ interface MemberSearchInputProps {
   showTier?: boolean;
   autoFocus?: boolean;
   privacyMode?: boolean;
+  excludeEmails?: string[];
 }
 
 const redactEmail = (email: string): string => {
@@ -50,7 +51,8 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
   className = '',
   showTier = true,
   autoFocus = false,
-  privacyMode = false
+  privacyMode = false,
+  excludeEmails = []
 }) => {
   const { members } = useData();
   const [query, setQuery] = useState('');
@@ -60,12 +62,18 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const excludeEmailsLower = useMemo(() => 
+    excludeEmails.map(e => e.toLowerCase()), 
+    [excludeEmails]
+  );
+
   const filteredMembers = useMemo(() => {
     if (!query.trim()) return [];
     return members.filter(m => 
-      matchesMultiWordQuery(m.name, query) || matchesMultiWordQuery(m.email, query)
+      (matchesMultiWordQuery(m.name, query) || matchesMultiWordQuery(m.email, query)) &&
+      !excludeEmailsLower.includes(m.email.toLowerCase())
     ).slice(0, 8);
-  }, [members, query]);
+  }, [members, query, excludeEmailsLower]);
 
   useEffect(() => {
     if (selectedMember) {
