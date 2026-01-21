@@ -59,6 +59,15 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
   const settleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const springBackAnimationRef = useRef<number | null>(null);
 
+  // By storing frequently changing state and props in a ref, we can avoid
+  // re-attaching the 'wheel' event listener on every render. The listener
+  // function can then access the latest values through this ref.
+  const stateRef = useRef({ disabled, isModalOpen, isRefreshing, isFillingScreen, isSpringBack, triggerRefresh, animateSpringBack });
+
+  useEffect(() => {
+    stateRef.current = { disabled, isModalOpen, isRefreshing, isFillingScreen, isSpringBack, triggerRefresh, animateSpringBack };
+  });
+
   // Track modal open state via MutationObserver
   useEffect(() => {
     const checkModalState = () => {
@@ -140,7 +149,9 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
   }, [isRefreshing, isFillingScreen, onRefresh]);
 
   // Desktop scroll wheel support with settlement tracking
-  // Only register on touch devices to avoid blocking native wheel scroll on desktop
+  // This effect is now optimized to run only once on mount, rather than on every
+  // state change. It uses a ref (stateRef) to access the latest component state,
+  // preventing the need to re-attach the event listener on every render.
   useEffect(() => {
     // Skip wheel listener on desktop - let browser handle wheel scroll natively
     if (!isTouchCapable) return;
@@ -149,6 +160,9 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
     if (!container) return;
     
     const handleWheel = (e: WheelEvent) => {
+      // Access latest state and props via ref to avoid re-binding the listener
+      const { disabled, isModalOpen, isRefreshing, isFillingScreen, isSpringBack, triggerRefresh, animateSpringBack } = stateRef.current;
+
       if (disabled || isModalOpen || isRefreshing || isFillingScreen || isSpringBack) return;
       
       const scrollTop = window.scrollY || document.documentElement.scrollTop;
@@ -221,7 +235,9 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
       }
     };
     
+    // With stateRef, this listener is stable and only needs to be attached once.
     container.addEventListener('wheel', handleWheel, { passive: true });
+
     return () => {
       container.removeEventListener('wheel', handleWheel);
       if (wheelTimeoutRef.current) {
@@ -231,7 +247,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
         clearTimeout(settleTimeoutRef.current);
       }
     };
-  }, [isTouchCapable, disabled, isModalOpen, isRefreshing, isFillingScreen, isSpringBack, triggerRefresh, animateSpringBack]);
+  }, [isTouchCapable]); // Now only depends on a stable value
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (disabled || isModalOpen || isRefreshing || isSpringBack) return;
