@@ -705,10 +705,12 @@ router.get('/api/hubspot/contacts/:id', isStaffOrAdmin, async (req, res) => {
   }
 });
 
+const HUBSPOT_PORTAL_ID_DEFAULT = '244200670';
 const HUBSPOT_FORMS: Record<string, string> = {
   'tour-request': process.env.HUBSPOT_FORM_TOUR_REQUEST || '',
   'membership': process.env.HUBSPOT_FORM_MEMBERSHIP || '',
-  'private-hire': process.env.HUBSPOT_FORM_PRIVATE_HIRE || '',
+  'private-hire': process.env.HUBSPOT_FORM_PRIVATE_HIRE || 'b69f9fe4-9b3b-4d1e-a689-ba3127e5f8f2',
+  'event-inquiry': process.env.HUBSPOT_FORM_EVENT_INQUIRY || 'b69f9fe4-9b3b-4d1e-a689-ba3127e5f8f2',
   'guest-checkin': process.env.HUBSPOT_FORM_GUEST_CHECKIN || '',
   'contact': process.env.HUBSPOT_FORM_CONTACT || ''
 };
@@ -717,9 +719,9 @@ router.post('/api/hubspot/forms/:formType', async (req, res) => {
   try {
     const { formType } = req.params;
     const formId = HUBSPOT_FORMS[formType];
-    const portalId = process.env.HUBSPOT_PORTAL_ID;
+    const portalId = process.env.HUBSPOT_PORTAL_ID || HUBSPOT_PORTAL_ID_DEFAULT;
     
-    if (!formId || !portalId) {
+    if (!formId) {
       return res.status(400).json({ error: 'Invalid form type or missing configuration' });
     }
     
