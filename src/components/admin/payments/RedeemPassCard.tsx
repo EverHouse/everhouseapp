@@ -575,7 +575,7 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
   const content = (
     <div className="space-y-4">
       {isScanning && (
-        <ModalShell title="Scan Guest Pass" onClose={handleCloseScanner} showCloseButton={true}>
+        <ModalShell isOpen={isScanning} title="Scan Guest Pass" onClose={handleCloseScanner} showCloseButton={true}>
           <div className="p-4">
             <div id={scannerElementId} className="w-full rounded-lg overflow-hidden" style={{ minHeight: 300 }} />
             {cameraPermission === 'pending' && (
