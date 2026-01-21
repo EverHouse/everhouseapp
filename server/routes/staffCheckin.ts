@@ -49,6 +49,10 @@ interface CheckinContext {
     reason: string | null;
     createdAt: Date;
   }>;
+  overageMinutes: number;
+  overageFeeCents: number;
+  overagePaid: boolean;
+  hasUnpaidOverage: boolean;
 }
 
 router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req: Request, res: Response) => {
@@ -69,7 +73,10 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
         br.start_time,
         br.end_time,
         br.member_notes,
-        r.name as resource_name
+        r.name as resource_name,
+        br.overage_minutes,
+        br.overage_fee_cents,
+        br.overage_paid
       FROM booking_requests br
       LEFT JOIN resources r ON br.resource_id = r.id
       LEFT JOIN users u ON LOWER(u.email) = LOWER(br.user_email)
@@ -186,6 +193,11 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
       LIMIT 20
     `, [bookingId]);
 
+    const overageMinutes = booking.overage_minutes || 0;
+    const overageFeeCents = booking.overage_fee_cents || 0;
+    const overagePaid = booking.overage_paid ?? (overageFeeCents === 0);
+    const hasUnpaidOverage = overageFeeCents > 0 && !overagePaid;
+
     const context: CheckinContext = {
       bookingId,
       sessionId: booking.session_id,
@@ -206,7 +218,11 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
         staffName: a.staff_name,
         reason: a.reason,
         createdAt: a.created_at
-      }))
+      })),
+      overageMinutes,
+      overageFeeCents,
+      overagePaid,
+      hasUnpaidOverage
     };
 
     res.json(context);

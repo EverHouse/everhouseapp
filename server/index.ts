@@ -517,6 +517,12 @@ async function startServer() {
           .then(({ getOrCreateFamilyCoupon }) => getOrCreateFamilyCoupon())
           .then(() => console.log('[Stripe] FAMILY20 coupon ready'))
           .catch((err: any) => console.error('[Stripe] FAMILY20 coupon setup failed:', err.message));
+        
+        // Ensure Simulator Overage product exists
+        import('./core/stripe/products.js')
+          .then(({ ensureSimulatorOverageProduct }) => ensureSimulatorOverageProduct())
+          .then((result) => console.log(`[Stripe] Simulator Overage product ${result.action}`))
+          .catch((err: any) => console.error('[Stripe] Simulator Overage setup failed:', err.message));
       }
     } catch (err: any) {
       console.error('[Stripe] Initialization failed (non-fatal):', err.message);

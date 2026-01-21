@@ -703,3 +703,115 @@ export async function cleanupOrphanStripeProducts(): Promise<{
     return { success: false, archived, skipped, errors, results };
   }
 }
+
+/**
+ * Ensure the Simulator Overage product exists in both database and Stripe.
+ * Called on server startup to guarantee the fee product is available.
+ */
+export async function ensureSimulatorOverageProduct(): Promise<{
+  success: boolean;
+  stripeProductId?: string;
+  stripePriceId?: string;
+  action: 'created' | 'exists' | 'error';
+}> {
+  const OVERAGE_SLUG = 'simulator-overage-30min';
+  const OVERAGE_NAME = 'Simulator Overage (30 min)';
+  const OVERAGE_PRICE_CENTS = 2500;
+  const OVERAGE_DESCRIPTION = 'Per 30 minutes over tier privileges';
+
+  try {
+    const stripe = await getStripeClient();
+    
+    // Check if product exists in database
+    const existing = await db.select()
+      .from(membershipTiers)
+      .where(eq(membershipTiers.slug, OVERAGE_SLUG))
+      .limit(1);
+    
+    let tierId: number;
+    let stripeProductId = existing[0]?.stripeProductId;
+    let stripePriceId = existing[0]?.stripePriceId;
+    
+    if (existing.length === 0) {
+      // Create in database
+      const [newTier] = await db.insert(membershipTiers).values({
+        name: OVERAGE_NAME,
+        slug: OVERAGE_SLUG,
+        priceString: '$25',
+        description: OVERAGE_DESCRIPTION,
+        buttonText: 'Pay Now',
+        sortOrder: 99,
+        isActive: true,
+        isPopular: false,
+        showInComparison: false,
+        highlightedFeatures: [],
+        allFeatures: {},
+        dailySimMinutes: 0,
+        guestPassesPerMonth: 0,
+        bookingWindowDays: 0,
+        dailyConfRoomMinutes: 0,
+        canBookSimulators: false,
+        canBookConference: false,
+        canBookWellness: false,
+        hasGroupLessons: false,
+        hasExtendedSessions: false,
+        hasPrivateLesson: false,
+        hasSimulatorGuestPasses: false,
+        hasDiscountedMerch: false,
+        unlimitedAccess: false,
+        productType: 'one_time',
+        priceCents: OVERAGE_PRICE_CENTS,
+      }).returning();
+      tierId = newTier.id;
+      console.log(`[Overage Product] Created database record: ${OVERAGE_NAME}`);
+    } else {
+      tierId = existing[0].id;
+    }
+    
+    // Create or verify Stripe product
+    if (!stripeProductId) {
+      const product = await stripe.products.create({
+        name: OVERAGE_NAME,
+        description: OVERAGE_DESCRIPTION,
+        metadata: {
+          tier_id: tierId.toString(),
+          tier_slug: OVERAGE_SLUG,
+          product_type: 'one_time',
+          fee_type: 'simulator_overage',
+        },
+      });
+      stripeProductId = product.id;
+      console.log(`[Overage Product] Created Stripe product: ${stripeProductId}`);
+    }
+    
+    // Create or verify Stripe price
+    if (!stripePriceId) {
+      const price = await stripe.prices.create({
+        product: stripeProductId,
+        unit_amount: OVERAGE_PRICE_CENTS,
+        currency: 'usd',
+        metadata: {
+          tier_id: tierId.toString(),
+          tier_slug: OVERAGE_SLUG,
+          product_type: 'one_time',
+        },
+      });
+      stripePriceId = price.id;
+      console.log(`[Overage Product] Created Stripe price: ${stripePriceId}`);
+    }
+    
+    // Update database with Stripe IDs
+    await db.update(membershipTiers)
+      .set({
+        stripeProductId,
+        stripePriceId,
+      })
+      .where(eq(membershipTiers.id, tierId));
+    
+    console.log(`[Overage Product] ${OVERAGE_NAME} ready (${stripePriceId})`);
+    return { success: true, stripeProductId, stripePriceId, action: existing.length > 0 && existing[0].stripePriceId ? 'exists' : 'created' };
+  } catch (error: any) {
+    console.error('[Overage Product] Error:', error.message);
+    return { success: false, action: 'error' };
+  }
+}

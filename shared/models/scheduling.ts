@@ -84,6 +84,11 @@ export const bookingRequests = pgTable("booking_requests", {
   guardianRelationship: varchar("guardian_relationship"),
   guardianPhone: varchar("guardian_phone"),
   guardianConsentAt: timestamp("guardian_consent_at"),
+  // Overage fee tracking for simulator usage beyond tier privileges
+  overageMinutes: integer("overage_minutes").default(0),
+  overageFeeCents: integer("overage_fee_cents").default(0),
+  overagePaid: boolean("overage_paid").default(false),
+  overagePaymentIntentId: varchar("overage_payment_intent_id"),
 }, (table) => [
   uniqueIndex("booking_requests_trackman_id_idx").on(table.trackmanBookingId),
   index("booking_requests_session_idx").on(table.sessionId),

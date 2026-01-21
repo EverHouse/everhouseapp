@@ -272,7 +272,10 @@ router.get('/api/booking-requests', async (req, res) => {
       guardian_name: bookingRequests.guardianName,
       guardian_relationship: bookingRequests.guardianRelationship,
       guardian_phone: bookingRequests.guardianPhone,
-      guardian_consent_at: bookingRequests.guardianConsentAt
+      guardian_consent_at: bookingRequests.guardianConsentAt,
+      overage_minutes: bookingRequests.overageMinutes,
+      overage_fee_cents: bookingRequests.overageFeeCents,
+      overage_paid: bookingRequests.overagePaid
     })
     .from(bookingRequests)
     .leftJoin(resources, eq(bookingRequests.resourceId, resources.id))
@@ -948,12 +951,42 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
               createdSessionId = sessionResult.session.id;
               createdParticipantIds = sessionResult.participants?.map(p => p.id) || [];
               
-              // Link session to booking request
+              // Get overage info from usage_ledger for the booking owner
+              let overageMinutes = 0;
+              let overageFeeCents = 0;
+              try {
+                const ledgerResult = await tx.execute(sql`
+                  SELECT minutes_charged, overage_fee 
+                  FROM usage_ledger 
+                  WHERE session_id = ${createdSessionId} 
+                    AND LOWER(member_id) = LOWER(${updatedRow.userEmail})
+                  LIMIT 1
+                `);
+                if (ledgerResult.rows.length > 0) {
+                  const ledger = ledgerResult.rows[0] as { minutes_charged?: number; overage_fee?: string };
+                  const overageFeeDecimal = parseFloat(String(ledger.overage_fee || 0));
+                  if (overageFeeDecimal > 0) {
+                    overageFeeCents = Math.round(overageFeeDecimal * 100);
+                    // Calculate overage minutes: fee / $25 * 30 min
+                    const overageBlocks = overageFeeDecimal / 25;
+                    overageMinutes = Math.round(overageBlocks * 30);
+                  }
+                }
+              } catch (ledgerError) {
+                console.error('[Booking Approval] Failed to get overage info:', ledgerError);
+              }
+              
+              // Link session to booking request and store overage info
               await tx.update(bookingRequests)
-                .set({ sessionId: createdSessionId })
+                .set({ 
+                  sessionId: createdSessionId,
+                  overageMinutes,
+                  overageFeeCents,
+                  overagePaid: overageFeeCents === 0  // No overage = considered "paid"
+                })
                 .where(eq(bookingRequests.id, bookingId));
               
-              console.log(`[Booking Approval] Created session ${createdSessionId} for booking ${bookingId} with ${createdParticipantIds.length} participants, ${sessionResult.usageLedgerEntries || 0} ledger entries`);
+              console.log(`[Booking Approval] Created session ${createdSessionId} for booking ${bookingId} with ${createdParticipantIds.length} participants, ${sessionResult.usageLedgerEntries || 0} ledger entries${overageFeeCents > 0 ? `, overage $${(overageFeeCents/100).toFixed(2)}` : ''}`);
             } else {
               console.error(`[Booking Approval] Session creation failed: ${sessionResult.error}`);
             }
@@ -1614,6 +1647,33 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
             totalSlots,
             declaredPlayerCount: declaredCount,
             message: `${emptySlots} player slot${emptySlots > 1 ? 's' : ''} not assigned. Staff must link members or add guests before check-in to ensure proper billing.`
+          });
+        }
+      }
+    }
+    
+    // OVERAGE PAYMENT GUARD: Block check-in if member has unpaid overage fee
+    const { skipOverageCheck } = req.body;
+    if (newStatus === 'attended' && !skipOverageCheck) {
+      const overageResult = await pool.query(`
+        SELECT overage_minutes, overage_fee_cents, overage_paid
+        FROM booking_requests
+        WHERE id = $1
+      `, [bookingId]);
+      
+      if (overageResult.rows.length > 0) {
+        const overage = overageResult.rows[0];
+        const overageFeeCents = overage.overage_fee_cents || 0;
+        const overagePaid = overage.overage_paid ?? (overageFeeCents === 0);
+        
+        if (overageFeeCents > 0 && !overagePaid) {
+          return res.status(402).json({
+            error: 'Unpaid overage fee',
+            requiresOveragePayment: true,
+            overageMinutes: overage.overage_minutes,
+            overageFeeCents: overageFeeCents,
+            overageBlocks: Math.ceil(overage.overage_minutes / 30),
+            message: `Member has an unpaid simulator overage fee of $${(overageFeeCents / 100).toFixed(2)} (${overage.overage_minutes} min over tier limit). Payment required before check-in.`
           });
         }
       }

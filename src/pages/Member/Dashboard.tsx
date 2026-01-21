@@ -109,6 +109,9 @@ interface DBBookingRequest {
   primary_booker_name?: string | null;
   declared_player_count?: number;
   invite_status?: 'pending' | 'accepted' | 'declined' | null;
+  overage_minutes?: number;
+  overage_fee_cents?: number;
+  overage_paid?: boolean;
 }
 
 const formatDate = (dateStr: string): string => {
@@ -149,6 +152,8 @@ const Dashboard: React.FC = () => {
   const [processingInviteId, setProcessingInviteId] = useState<number | null>(null);
   const [showBalancePaymentModal, setShowBalancePaymentModal] = useState(false);
   const [balanceRefreshKey, setBalanceRefreshKey] = useState(0);
+  const [overagePaymentBooking, setOveragePaymentBooking] = useState<{ id: number; amount: number; minutes: number } | null>(null);
+  const [isPayingOverage, setIsPayingOverage] = useState(false);
 
   const isStaffOrAdminProfile = user?.role === 'admin' || user?.role === 'staff';
   const { permissions: tierPermissions } = useTierPermissions(user?.tier);
@@ -1099,8 +1104,22 @@ const Dashboard: React.FC = () => {
                   const endTime24 = 'end_time' in rawBooking ? rawBooking.end_time : '';
                   const isLinkedMember = (item as any).isLinkedMember || false;
                   
+                  // Check for unpaid overage fee
+                  const hasUnpaidOverage = 'overage_fee_cents' in rawBooking && 
+                    rawBooking.overage_fee_cents && 
+                    rawBooking.overage_fee_cents > 0 && 
+                    !rawBooking.overage_paid;
+                  const overageAmount = hasUnpaidOverage ? (rawBooking.overage_fee_cents! / 100).toFixed(2) : null;
+                  
                   const primaryBookerName = (item as any).primaryBookerName;
                   actions = [
+                    // Pay Now button for unpaid overage fees (appears first)
+                    ...(hasUnpaidOverage && !isLinkedMember ? [{
+                      icon: 'payment',
+                      label: `Pay $${overageAmount}`,
+                      onClick: () => setOveragePaymentBooking({ id: item.dbId, amount: rawBooking.overage_fee_cents!, minutes: rawBooking.overage_minutes || 0 }),
+                      highlight: true
+                    }] : []),
                     ...(isConfirmed ? [{
                       icon: 'calendar_add_on',
                       label: 'Add to Calendar',
@@ -1275,6 +1294,87 @@ const Dashboard: React.FC = () => {
         onClose={() => setShowBalancePaymentModal(false)}
       />
     )}
+
+    {/* Overage Payment Modal */}
+    <ModalShell
+      isOpen={!!overagePaymentBooking}
+      onClose={() => !isPayingOverage && setOveragePaymentBooking(null)}
+      title="Pay Simulator Overage Fee"
+      size="sm"
+    >
+      {overagePaymentBooking && (
+        <div className="p-6 space-y-4">
+          <div className="text-center">
+            <p className="text-lg font-semibold text-primary dark:text-white mb-2">
+              ${(overagePaymentBooking.amount / 100).toFixed(2)}
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Overage: {overagePaymentBooking.minutes} minutes ({Math.ceil(overagePaymentBooking.minutes / 30)} x 30 min @ $25)
+            </p>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            This fee is for simulator usage exceeding your membership tier's daily allowance. Payment is required before check-in.
+          </p>
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => setOveragePaymentBooking(null)}
+              disabled={isPayingOverage}
+              className="flex-1 py-3 px-4 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={async () => {
+                setIsPayingOverage(true);
+                try {
+                  const res = await fetch('/api/stripe/overage/create-payment-intent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ bookingId: overagePaymentBooking.id })
+                  });
+                  if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Failed to create payment');
+                  }
+                  const data = await res.json();
+                  // Open Stripe checkout in new window
+                  const stripe = await import('@stripe/stripe-js').then(mod => mod.loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || ''));
+                  if (stripe && data.clientSecret) {
+                    const { error: paymentError } = await stripe.confirmPayment({
+                      clientSecret: data.clientSecret,
+                      confirmParams: {
+                        return_url: `${window.location.origin}/dashboard?overage_paid=true&booking_id=${overagePaymentBooking.id}`,
+                      },
+                    });
+                    if (paymentError) {
+                      throw new Error(paymentError.message);
+                    }
+                  }
+                } catch (err: any) {
+                  showToast(err.message || 'Payment failed', 'error');
+                  setIsPayingOverage(false);
+                }
+              }}
+              disabled={isPayingOverage}
+              className="flex-1 py-3 px-4 rounded-xl bg-primary text-white font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isPayingOverage ? (
+                <>
+                  <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-base">payment</span>
+                  Pay Now
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+    </ModalShell>
 
     {/* Membership Details Modal */}
     <ModalShell 
