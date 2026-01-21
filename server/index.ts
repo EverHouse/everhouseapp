@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 process.env.TZ = 'America/Los_Angeles';
 
 import express from 'express';

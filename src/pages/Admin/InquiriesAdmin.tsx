@@ -150,6 +150,11 @@ const InquiriesAdmin: React.FC = () => {
 
     const handleArchive = async () => {
         if (!selectedInquiry) return;
+
+        if (!window.confirm('Are you sure you want to archive this inquiry? This action cannot be undone.')) {
+            return;
+        }
+
         setIsSaving(true);
         try {
             const res = await fetch(`/api/admin/inquiries/${selectedInquiry.id}?archive=true`, {
