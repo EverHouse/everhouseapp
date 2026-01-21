@@ -605,7 +605,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
           {!isEditingTier && (
             <button
               onClick={() => {
-                setManualTier(currentTier || '');
+                setManualTier(currentTier || billingInfo?.tier || '');
                 setIsEditingTier(true);
               }}
               className={`text-xs font-medium ${isDark ? 'text-purple-400 hover:text-purple-300' : 'text-purple-600 hover:text-purple-700'}`}
@@ -652,17 +652,17 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         ) : (
           <div className="flex items-center gap-2">
             <span className={`text-lg font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              {currentTier || 'No Tier Assigned'}
+              {currentTier || billingInfo?.tier || 'No Tier Assigned'}
             </span>
-            {currentTier && (
+            {(currentTier || billingInfo?.tier) && (
                <span className={`px-2 py-0.5 rounded text-[10px] ${isDark ? 'bg-white/10 text-gray-400' : 'bg-gray-200 text-gray-600'}`}>
-                 {billingInfo?.billingProvider === 'mindbody' ? 'Synced from Mindbody' : 'System Record'}
+                 {billingInfo?.billingProvider === 'mindbody' ? 'Synced from Mindbody' : 'Database Record'}
                </span>
             )}
           </div>
         )}
         <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-          Use this to manually correct a member's tier if it falls out of sync with their billing provider (e.g. Mindbody).
+          Manually updating this will give the member app permissions immediately. It does not automatically update billing in Mindbody.
         </p>
       </div>
 
