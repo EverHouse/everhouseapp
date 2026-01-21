@@ -4,13 +4,18 @@ import { bugReports } from '../../shared/schema';
 import { eq, desc, and, SQL } from 'drizzle-orm';
 import { isAuthenticated, isStaffOrAdmin } from '../core/middleware';
 import { notifyAllStaff, notifyMember } from '../core/notificationService';
+import { getSessionUser } from '../types/session';
 
 const router = Router();
 
 router.post('/api/bug-reports', isAuthenticated, async (req, res) => {
   try {
     const { description, screenshotUrl, pageUrl } = req.body;
-    const user = (req as any).user;
+    const user = getSessionUser(req);
+    
+    if (!user?.email) {
+      return res.status(401).json({ error: 'Please log in to submit a bug report' });
+    }
     
     if (!description || typeof description !== 'string' || description.trim().length === 0) {
       return res.status(400).json({ error: 'Description is required' });
