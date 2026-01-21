@@ -174,6 +174,13 @@ router.post('/api/wellness-classes/:id/mark-reviewed', isStaffOrAdmin, async (re
     const sessionUser = getSessionUser(req);
     const reviewedBy = sessionUser?.email || 'staff';
     
+    const existing = await pool.query(
+      `SELECT title, time, date FROM wellness_classes WHERE id = $1`, [id]
+    );
+    const originalTitle = existing.rows[0]?.title;
+    const originalTime = existing.rows[0]?.time;
+    const originalDate = existing.rows[0]?.date;
+    
     const result = await pool.query(
       `UPDATE wellness_classes 
        SET needs_review = false, reviewed_by = $1, reviewed_at = NOW(), updated_at = NOW(), review_dismissed = true, conflict_detected = false,
@@ -189,40 +196,87 @@ router.post('/api/wellness-classes/:id/mark-reviewed', isStaffOrAdmin, async (re
     const updatedClass = result.rows[0];
     let additionalUpdated = 0;
     
-    if (applyToAll !== false && updatedClass.recurring_event_id) {
-      const bulkResult = await pool.query(
-        `UPDATE wellness_classes 
-         SET needs_review = false, 
-             reviewed_by = $1, 
-             reviewed_at = NOW(), 
-             updated_at = NOW(), 
-             review_dismissed = true, 
-             conflict_detected = false,
-             category = $3,
-             instructor = $4,
-             title = $5,
-             image_url = COALESCE($6, image_url),
-             external_url = COALESCE($7, external_url),
-             locally_edited = true,
-             app_last_modified_at = NOW()
-         WHERE recurring_event_id = $2 
-           AND id != $8 
-           AND date >= $9
-           AND is_active = true
-         RETURNING id`,
-        [
-          reviewedBy, 
-          updatedClass.recurring_event_id, 
-          updatedClass.category,
-          updatedClass.instructor,
-          updatedClass.title,
-          updatedClass.image_url,
-          updatedClass.external_url,
-          id,
-          updatedClass.date
-        ]
-      );
-      additionalUpdated = bulkResult.rows.length;
+    if (applyToAll !== false) {
+      let bulkResult;
+      
+      if (updatedClass.recurring_event_id) {
+        bulkResult = await pool.query(
+          `UPDATE wellness_classes 
+           SET needs_review = false, 
+               reviewed_by = $1, 
+               reviewed_at = NOW(), 
+               updated_at = NOW(), 
+               review_dismissed = true, 
+               conflict_detected = false,
+               category = $3,
+               instructor = $4,
+               title = $5,
+               image_url = COALESCE($6, image_url),
+               external_url = COALESCE($7, external_url),
+               locally_edited = true,
+               app_last_modified_at = NOW()
+           WHERE recurring_event_id = $2 
+             AND id != $8 
+             AND date >= $9
+             AND is_active = true
+           RETURNING id`,
+          [
+            reviewedBy, 
+            updatedClass.recurring_event_id, 
+            updatedClass.category,
+            updatedClass.instructor,
+            updatedClass.title,
+            updatedClass.image_url,
+            updatedClass.external_url,
+            id,
+            updatedClass.date
+          ]
+        );
+      } else if (originalTitle && originalTime && originalDate) {
+        const dayOfWeek = new Date(originalDate).getDay();
+        
+        bulkResult = await pool.query(
+          `UPDATE wellness_classes 
+           SET needs_review = false, 
+               reviewed_by = $1, 
+               reviewed_at = NOW(), 
+               updated_at = NOW(), 
+               review_dismissed = true, 
+               conflict_detected = false,
+               category = $3,
+               instructor = $4,
+               title = $5,
+               image_url = COALESCE($6, image_url),
+               external_url = COALESCE($7, external_url),
+               locally_edited = true,
+               app_last_modified_at = NOW()
+           WHERE title = $8
+             AND time = $9
+             AND EXTRACT(DOW FROM date) = $10
+             AND id != $11 
+             AND date >= $12
+             AND is_active = true
+           RETURNING id`,
+          [
+            reviewedBy, 
+            null,
+            updatedClass.category,
+            updatedClass.instructor,
+            updatedClass.title,
+            updatedClass.image_url,
+            updatedClass.external_url,
+            originalTitle,
+            originalTime,
+            dayOfWeek,
+            id,
+            updatedClass.date
+          ]
+        );
+      }
+      
+      if (bulkResult) {
+        additionalUpdated = bulkResult.rows.length;
+      }
     }
     
     res.json({ 
@@ -493,39 +547,82 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
     
     const updated = result.rows[0];
     let recurringUpdated = 0;
+    const existingRow = existing.rows[0];
     
-    if (apply_to_recurring !== false && existing.rows[0]?.recurring_event_id) {
+    if (apply_to_recurring !== false) {
       try {
-        const recurringResult = await pool.query(
-          `UPDATE wellness_classes 
-           SET category = COALESCE($1, category),
-               instructor = COALESCE($2, instructor),
-               title = COALESCE($3, title),
-               duration = COALESCE($4, duration),
-               spots = COALESCE($5, spots),
-               capacity = COALESCE($6, capacity),
-               image_url = COALESCE($7, image_url),
-               external_url = COALESCE($8, external_url),
-               needs_review = false,
-               reviewed_by = $9,
-               reviewed_at = NOW(),
-               review_dismissed = true,
-               conflict_detected = false,
-               updated_at = NOW(),
-               locally_edited = true,
-               app_last_modified_at = NOW()
-           WHERE recurring_event_id = $10 
-             AND id != $11 
-             AND date > $12
-             AND is_active = true
-           RETURNING id, google_calendar_id, date, time, duration`,
-          [
-            category, instructor, title, duration, spots, capacity || null, 
-            image_url, external_url, reviewedBy,
-            existing.rows[0].recurring_event_id, id, updated.date
-          ]
-        );
-        recurringUpdated = recurringResult.rows.length;
+        let recurringResult;
+        
+        if (existingRow?.recurring_event_id) {
+          recurringResult = await pool.query(
+            `UPDATE wellness_classes 
+             SET category = COALESCE($1, category),
+                 instructor = COALESCE($2, instructor),
+                 title = COALESCE($3, title),
+                 duration = COALESCE($4, duration),
+                 spots = COALESCE($5, spots),
+                 capacity = COALESCE($6, capacity),
+                 image_url = COALESCE($7, image_url),
+                 external_url = COALESCE($8, external_url),
+                 needs_review = false,
+                 reviewed_by = $9,
+                 reviewed_at = NOW(),
+                 review_dismissed = true,
+                 conflict_detected = false,
+                 updated_at = NOW(),
+                 locally_edited = true,
+                 app_last_modified_at = NOW()
+             WHERE recurring_event_id = $10 
+               AND id != $11 
+               AND date > $12
+               AND is_active = true
+             RETURNING id`,
+            [
+              category, instructor, title, duration, spots, capacity || null, 
+              image_url, external_url, reviewedBy,
+              existingRow.recurring_event_id, id, updated.date
+            ]
+          );
+        } else if (existingRow?.title) {
+          const dayOfWeek = new Date(existingRow.date).getDay();
+          const originalTime = existingRow.time;
+          
+          recurringResult = await pool.query(
+            `UPDATE wellness_classes 
+             SET category = COALESCE($1, category),
+                 instructor = COALESCE($2, instructor),
+                 title = COALESCE($3, title),
+                 duration = COALESCE($4, duration),
+                 spots = COALESCE($5, spots),
+                 capacity = COALESCE($6, capacity),
+                 image_url = COALESCE($7, image_url),
+                 external_url = COALESCE($8, external_url),
+                 needs_review = false,
+                 reviewed_by = $9,
+                 reviewed_at = NOW(),
+                 review_dismissed = true,
+                 conflict_detected = false,
+                 updated_at = NOW(),
+                 locally_edited = true,
+                 app_last_modified_at = NOW()
+             WHERE title = $10 
+               AND time = $11
+               AND EXTRACT(DOW FROM date) = $12
+               AND id != $13 
+               AND date > $14
+               AND is_active = true
+             RETURNING id`,
+            [
+              category, instructor, title, duration, spots, capacity || null, 
+              image_url, external_url, reviewedBy,
+              existingRow.title, originalTime, dayOfWeek, id, updated.date
+            ]
+          );
+        }
+        
+        if (recurringResult) {
+          recurringUpdated = recurringResult.rows.length;
+        }
       } catch (recurError) {
         if (!isProduction) console.error('Failed to update recurring wellness classes:', recurError);
       }

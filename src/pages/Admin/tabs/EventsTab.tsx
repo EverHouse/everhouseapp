@@ -1594,8 +1594,15 @@ const WellnessAdminContent: React.FC = () => {
                 
                 setIsEditing(false);
                 setFormData({ category: 'Classes', status: 'available', duration: '60 min' });
-                setSuccess(editId ? 'Class updated successfully' : 'Class created successfully');
-                showToast(editId ? 'Class updated successfully' : 'Class created successfully', 'success');
+                
+                const recurringCount = savedItem.recurringUpdated || 0;
+                const successMsg = editId 
+                    ? (recurringCount > 0 
+                        ? `Class updated + ${recurringCount} future instances updated` 
+                        : 'Class updated successfully')
+                    : 'Class created successfully';
+                setSuccess(successMsg);
+                showToast(successMsg, 'success');
                 setTimeout(() => setSuccess(null), 3000);
             } else {
                 const data = await res.json();
