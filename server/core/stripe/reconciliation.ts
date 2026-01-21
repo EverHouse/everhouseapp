@@ -1,5 +1,6 @@
 import { pool } from '../db';
 import { getStripeClient } from './client';
+import { confirmPaymentSuccess } from './payments';
 
 export async function reconcileDailyPayments() {
   console.log('[Reconcile] Starting daily payment reconciliation...');
@@ -35,24 +36,16 @@ export async function reconcileDailyPayments() {
             [pi.id]
           );
 
-          if (result.rows.length === 0) {
-            console.warn(`[Reconcile] Missing payment in DB: ${pi.id} - Amount: ${(pi.amount / 100).toFixed(2)} ${pi.currency.toUpperCase()}`);
-            missingPayments++;
+          // If missing in DB OR status mismatch (DB says pending, Stripe says succeeded)
+          if (result.rows.length === 0 || result.rows[0].status !== 'succeeded') {
+            console.warn(`[Reconcile] Healing payment: ${pi.id} (${(pi.amount / 100).toFixed(2)} ${pi.currency})`);
             
+            // A. Update the Audit Log / Intent Table
             await pool.query(
               `INSERT INTO stripe_payment_intents (
-                stripe_payment_intent_id, 
-                user_id, 
-                amount, 
-                currency, 
-                status, 
-                purpose, 
-                created_at, 
-                updated_at
+                stripe_payment_intent_id, user_id, amount, currency, status, purpose, created_at, updated_at
               ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-              ON CONFLICT (stripe_payment_intent_id) DO UPDATE SET
-                status = $5,
-                updated_at = NOW()`,
+              ON CONFLICT (stripe_payment_intent_id) DO UPDATE SET status = $5, updated_at = NOW()`,
               [
                 pi.id,
                 pi.metadata?.userId || pi.metadata?.email || 'unknown',
@@ -62,16 +55,13 @@ export async function reconcileDailyPayments() {
                 pi.metadata?.purpose || 'reconciled'
               ]
             );
-          } else if (result.rows[0].status !== 'succeeded') {
-            console.warn(`[Reconcile] Status mismatch for ${pi.id}: DB has '${result.rows[0].status}', Stripe has 'succeeded'`);
-            statusMismatches++;
+
+            // B. CRITICAL: Execute Business Logic (Mark booking paid, send email, etc.)
+            // We use 'system' as the performedBy to attribute reconciled actions to the system
+            await confirmPaymentSuccess(pi.id, 'system', 'System Reconciler');
             
-            await pool.query(
-              `UPDATE stripe_payment_intents 
-               SET status = 'succeeded', updated_at = NOW() 
-               WHERE stripe_payment_intent_id = $1`,
-              [pi.id]
-            );
+            if (result.rows.length === 0) missingPayments++;
+            else statusMismatches++;
           }
         }
       }
