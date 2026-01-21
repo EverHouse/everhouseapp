@@ -10,24 +10,12 @@ interface MenuOverlayProps {
   onClose: () => void;
 }
 
-const previewImages: Record<string, string> = {
-  'Membership': '/images/golf-sims-optimized.webp',
-  'Cafe': '/images/cafe-bar-optimized.webp',
-  'Host Events': '/images/private-dining-optimized.webp',
-  "What's On": '/images/events-crowd-optimized.webp',
-  'Gallery': '/images/venue-wide-optimized.webp',
-  'FAQ': '/images/cowork-optimized.webp',
-};
-
-const defaultPreviewImage = '/images/hero-lounge-optimized.webp';
-
 const MenuOverlay: React.FC<MenuOverlayProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === 'dark';
   const [isVisible, setIsVisible] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
-  const [hoveredLink, setHoveredLink] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -55,12 +43,6 @@ const MenuOverlay: React.FC<MenuOverlayProps> = ({ isOpen, onClose }) => {
     };
   }, [isOpen, isVisible]);
 
-  useEffect(() => {
-    if (!isVisible) {
-      setHoveredLink(null);
-    }
-  }, [isVisible]);
-
   useScrollLockManager(isVisible);
 
   const handleClose = () => {
@@ -76,8 +58,6 @@ const MenuOverlay: React.FC<MenuOverlayProps> = ({ isOpen, onClose }) => {
 
   if (!isVisible) return null;
 
-  const currentPreviewImage = hoveredLink ? previewImages[hoveredLink] || defaultPreviewImage : defaultPreviewImage;
-
   const menuContent = (
     <div className="fixed inset-0 flex justify-start overflow-hidden pointer-events-auto" style={{ zIndex: 'var(--z-drawer)' }}>
       <div 
@@ -85,7 +65,7 @@ const MenuOverlay: React.FC<MenuOverlayProps> = ({ isOpen, onClose }) => {
         onClick={handleClose}
       ></div>
 
-      <div className={`relative w-[85%] md:w-[320px] lg:w-[680px] h-full flex flex-col lg:flex-row overflow-hidden glass-navbar rounded-none rounded-r-[2rem] border-l-0 ${isClosing ? 'animate-slide-out-left' : 'animate-slide-in-left'}`}>
+      <div className={`relative w-[85%] md:w-[320px] lg:w-[320px] h-full flex flex-col overflow-hidden glass-navbar rounded-none rounded-r-[2rem] border-l-0 ${isClosing ? 'animate-slide-out-left' : 'animate-slide-in-left'}`}>
         
         <div className="absolute inset-0 opacity-[0.03] bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] pointer-events-none mix-blend-multiply"></div>
 
@@ -106,61 +86,19 @@ const MenuOverlay: React.FC<MenuOverlayProps> = ({ isOpen, onClose }) => {
                 <button 
                   onClick={handleClose}
                   aria-label="Close menu"
-                  className={`w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center hover:rotate-90 transition-transform duration-300 rounded-full active:scale-90 lg:hidden ${isDark ? 'text-[#F2F2EC] hover:bg-white/10' : 'text-[#293515] hover:bg-black/5'}`}
+                  className={`w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center hover:rotate-90 transition-transform duration-300 rounded-full active:scale-90 ${isDark ? 'text-[#F2F2EC] hover:bg-white/10' : 'text-[#293515] hover:bg-black/5'}`}
                 >
                     <span className="material-symbols-outlined text-3xl">close</span>
                 </button>
             </div>
             
             <nav className="flex flex-col gap-4 flex-1 overflow-y-auto scrollbar-hide py-2">
-                <MenuLink 
-                  label="Membership" 
-                  onClick={() => handleNav('/membership')} 
-                  delay="0.05s" 
-                  isDark={isDark}
-                  onMouseEnter={() => setHoveredLink('Membership')}
-                  onMouseLeave={() => setHoveredLink(null)}
-                />
-                <MenuLink 
-                  label="Cafe" 
-                  onClick={() => handleNav('/menu')} 
-                  delay="0.1s" 
-                  isDark={isDark}
-                  onMouseEnter={() => setHoveredLink('Cafe')}
-                  onMouseLeave={() => setHoveredLink(null)}
-                />
-                <MenuLink 
-                  label="Host Events" 
-                  onClick={() => handleNav('/private-hire')} 
-                  delay="0.15s" 
-                  isDark={isDark}
-                  onMouseEnter={() => setHoveredLink('Host Events')}
-                  onMouseLeave={() => setHoveredLink(null)}
-                />
-                <MenuLink 
-                  label="What's On" 
-                  onClick={() => handleNav('/whats-on')} 
-                  delay="0.2s" 
-                  isDark={isDark}
-                  onMouseEnter={() => setHoveredLink("What's On")}
-                  onMouseLeave={() => setHoveredLink(null)}
-                />
-                <MenuLink 
-                  label="Gallery" 
-                  onClick={() => handleNav('/gallery')} 
-                  delay="0.25s" 
-                  isDark={isDark}
-                  onMouseEnter={() => setHoveredLink('Gallery')}
-                  onMouseLeave={() => setHoveredLink(null)}
-                />
-                <MenuLink 
-                  label="FAQ" 
-                  onClick={() => handleNav('/faq')} 
-                  delay="0.3s" 
-                  isDark={isDark}
-                  onMouseEnter={() => setHoveredLink('FAQ')}
-                  onMouseLeave={() => setHoveredLink(null)}
-                />
+                <MenuLink label="Membership" onClick={() => handleNav('/membership')} delay="0.05s" isDark={isDark} />
+                <MenuLink label="Cafe" onClick={() => handleNav('/menu')} delay="0.1s" isDark={isDark} />
+                <MenuLink label="Host Events" onClick={() => handleNav('/private-hire')} delay="0.15s" isDark={isDark} />
+                <MenuLink label="What's On" onClick={() => handleNav('/whats-on')} delay="0.2s" isDark={isDark} />
+                <MenuLink label="Gallery" onClick={() => handleNav('/gallery')} delay="0.25s" isDark={isDark} />
+                <MenuLink label="FAQ" onClick={() => handleNav('/faq')} delay="0.3s" isDark={isDark} />
             </nav>
             
             <div className={`mt-4 pt-6 border-t animate-pop-in ${isDark ? 'border-[#F2F2EC]/10' : 'border-[#293515]/10'}`} style={{ animationDelay: '0.4s' }}>
@@ -175,37 +113,6 @@ const MenuOverlay: React.FC<MenuOverlayProps> = ({ isOpen, onClose }) => {
                 </button>
             </div>
         </div>
-
-        <div className="hidden lg:flex lg:flex-1 relative z-10 p-6 pl-0 items-center">
-          <div className="relative w-full h-full max-h-[500px] rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.15)]">
-            {Object.entries(previewImages).map(([label, imagePath]) => (
-              <img
-                key={label}
-                src={imagePath}
-                alt={`${label} preview`}
-                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out ${
-                  currentPreviewImage === imagePath ? 'opacity-100' : 'opacity-0'
-                }`}
-              />
-            ))}
-            {!Object.values(previewImages).includes(currentPreviewImage) && (
-              <img
-                src={defaultPreviewImage}
-                alt="Default preview"
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
-          </div>
-          
-          <button 
-            onClick={handleClose}
-            aria-label="Close menu"
-            className={`absolute top-6 right-6 w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center hover:rotate-90 transition-transform duration-300 rounded-full active:scale-90 ${isDark ? 'text-[#F2F2EC] hover:bg-white/10' : 'text-[#293515] hover:bg-black/5'}`}
-          >
-            <span className="material-symbols-outlined text-3xl">close</span>
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -218,11 +125,9 @@ interface MenuLinkProps {
   onClick: () => void;
   delay: string;
   isDark: boolean;
-  onMouseEnter?: () => void;
-  onMouseLeave?: () => void;
 }
 
-const MenuLink: React.FC<MenuLinkProps> = ({ label, onClick, delay, isDark, onMouseEnter, onMouseLeave }) => {
+const MenuLink: React.FC<MenuLinkProps> = ({ label, onClick, delay, isDark }) => {
   const lastTapRef = useRef(0);
   
   const handlePointerUp = () => {
@@ -236,8 +141,6 @@ const MenuLink: React.FC<MenuLinkProps> = ({ label, onClick, delay, isDark, onMo
       type="button"
       onClick={onClick}
       onPointerUp={handlePointerUp}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
       style={{ touchAction: 'manipulation', animationDelay: delay, animationFillMode: 'both' }}
       className={`text-left text-[24px] font-display font-medium transition-all duration-300 tracking-tight animate-pop-in leading-tight min-h-[44px] hoverable-translate active:translate-x-2 ${isDark ? 'text-[#F2F2EC] hover:text-[#F2F2EC]/80' : 'text-[#293515] hover:text-[#293515]/80'}`}
     >
