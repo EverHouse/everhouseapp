@@ -1503,6 +1503,34 @@ const SubscriptionsSubTab: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ created: number; updated: number; skipped: number } | null>(null);
+
+  const handleSyncFromStripe = async () => {
+    setIsSyncing(true);
+    setSyncResult(null);
+    setError(null);
+    try {
+      const res = await fetch('/api/stripe/sync-subscriptions', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to sync from Stripe');
+      }
+      const data = await res.json();
+      setSyncResult({ created: data.created, updated: data.updated, skipped: data.skipped });
+      setSuccessMessage(`Synced from Stripe: ${data.created} created, ${data.updated} updated`);
+      setTimeout(() => setSuccessMessage(null), 5000);
+      fetchSubscriptions();
+    } catch (err: any) {
+      setError(err.message);
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   useEffect(() => {
     fetchSubscriptions();
@@ -1645,6 +1673,20 @@ const SubscriptionsSubTab: React.FC = () => {
           <p className="text-green-800 dark:text-green-300">{successMessage}</p>
         </div>
       )}
+
+      {syncResult && (
+        <div className="bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-xl p-4">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">cloud_sync</span>
+            <p className="font-medium text-blue-800 dark:text-blue-300">Stripe Sync Results</p>
+          </div>
+          <div className="flex gap-4 text-sm text-blue-700 dark:text-blue-300">
+            <span><strong>{syncResult.created}</strong> created</span>
+            <span><strong>{syncResult.updated}</strong> updated</span>
+            <span><strong>{syncResult.skipped}</strong> skipped</span>
+          </div>
+        </div>
+      )}
       
       {error && (
         <div className="bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-xl p-4 flex items-center gap-3">
@@ -1685,6 +1727,17 @@ const SubscriptionsSubTab: React.FC = () => {
             </button>
           ))}
         </div>
+        
+        <button
+          onClick={handleSyncFromStripe}
+          disabled={isSyncing}
+          className="flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <span className={`material-symbols-outlined text-lg ${isSyncing ? 'animate-spin' : ''}`}>
+            {isSyncing ? 'sync' : 'cloud_sync'}
+          </span>
+          {isSyncing ? 'Syncing...' : 'Sync from Stripe'}
+        </button>
       </div>
 
       {filteredSubscriptions.length === 0 ? (

@@ -44,3 +44,7 @@ export {
   findOrCreateCoupon,
   type DiscountSyncResult
 } from './discounts';
+export {
+  syncActiveSubscriptionsFromStripe,
+  type SubscriptionSyncResult
+} from './subscriptionSync';

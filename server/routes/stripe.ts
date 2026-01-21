@@ -30,7 +30,8 @@ import {
   syncMembershipTiersToStripe,
   getTierSyncStatus,
   syncDiscountRulesToStripeCoupons,
-  getDiscountSyncStatus
+  getDiscountSyncStatus,
+  syncActiveSubscriptionsFromStripe
 } from '../core/stripe';
 import { calculateAndCacheParticipantFees } from '../core/billing/feeCalculator';
 import { checkExpiringCards } from '../core/billing/cardExpiryChecker';
@@ -3191,6 +3192,27 @@ router.get('/api/stripe/overage/check/:bookingId', async (req: Request, res: Res
   } catch (error: any) {
     console.error('[Overage Check] Error:', error);
     res.status(500).json({ error: error.message || 'Failed to check overage status.' });
+  }
+});
+
+router.post('/api/stripe/sync-subscriptions', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    console.log('[Stripe Sync] Subscription sync triggered by staff');
+    
+    const result = await syncActiveSubscriptionsFromStripe();
+    
+    res.json({
+      success: result.success,
+      created: result.created,
+      updated: result.updated,
+      skipped: result.skipped,
+      errorCount: result.errors.length,
+      errors: result.errors,
+      details: result.details,
+    });
+  } catch (error: any) {
+    console.error('[Stripe Sync] Error syncing subscriptions:', error);
+    res.status(500).json({ error: 'Failed to sync subscriptions from Stripe' });
   }
 });
 
