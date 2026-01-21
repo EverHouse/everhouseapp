@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 import ModalShell from '../../ModalShell';
 
 export interface SectionProps {
@@ -69,72 +69,119 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
   const [showPassIdInput, setShowPassIdInput] = useState(false);
   const [lastAttemptedPassId, setLastAttemptedPassId] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
-  const scannerInitializedRef = useRef(false);
+  const [scannerError, setScannerError] = useState<string | null>(null);
+  const [cameraPermission, setCameraPermission] = useState<'idle' | 'pending' | 'granted' | 'denied'>('idle');
+  const qrScannerRef = useRef<Html5Qrcode | null>(null);
+  const hasScannedRef = useRef(false);
+  
+  const scannerElementId = useMemo(() => `qr-pass-reader-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, []);
+
+  const stopScanner = useCallback(async () => {
+    if (qrScannerRef.current) {
+      try {
+        const state = qrScannerRef.current.getState();
+        if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
+          await qrScannerRef.current.stop();
+        }
+      } catch (err) {
+        console.error("[QrScanner] Failed to stop scanner:", err);
+      } finally {
+        qrScannerRef.current = null;
+      }
+    }
+  }, []);
+
+  const handleScanResult = useCallback((decodedText: string) => {
+    let passId = decodedText.trim();
+    if (passId.startsWith('PASS:')) {
+      passId = passId.replace('PASS:', '');
+    } else if (passId.startsWith('MEMBER:')) {
+      setErrorState({
+        message: 'This is a member QR code, not a day pass. Please scan a day pass QR code.',
+        errorCode: 'INVALID_QR_TYPE'
+      });
+      return;
+    }
+    
+    if (passId) {
+      setShowEmailSearch(false);
+      handleRedeem(passId);
+    }
+  }, []);
 
   useEffect(() => {
-    if (isScanning && !scannerInitializedRef.current) {
-      scannerInitializedRef.current = true;
-      
-      const timerId = setTimeout(() => {
-        const scanner = new Html5QrcodeScanner(
-          "qr-reader",
-          { 
-            fps: 10, 
-            qrbox: { width: 250, height: 250 },
-            rememberLastUsedCamera: true,
-            showTorchButtonIfSupported: true
-          },
-          false
-        );
+    if (!isScanning) {
+      stopScanner();
+      setScannerError(null);
+      setCameraPermission('idle');
+      hasScannedRef.current = false;
+      return;
+    }
 
-        scanner.render(
+    const startScanner = async () => {
+      await stopScanner();
+      
+      const containerEl = document.getElementById(scannerElementId);
+      if (!containerEl) {
+        setScannerError('Scanner container not found');
+        return;
+      }
+
+      setCameraPermission('pending');
+      setScannerError(null);
+      hasScannedRef.current = false;
+
+      try {
+        const cameras = await Html5Qrcode.getCameras();
+        if (!cameras || cameras.length === 0) {
+          setScannerError('No cameras found.');
+          setCameraPermission('denied');
+          return;
+        }
+
+        const qrScanner = new Html5Qrcode(scannerElementId);
+        qrScannerRef.current = qrScanner;
+        setCameraPermission('granted');
+
+        await qrScanner.start(
+          { facingMode: 'environment' },
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0,
+          },
           (decodedText) => {
-            scanner.clear().then(() => {
-              setIsScanning(false);
-              scannerInitializedRef.current = false;
-              
-              let passId = decodedText.trim();
-              if (passId.startsWith('PASS:')) {
-                passId = passId.replace('PASS:', '');
-              } else if (passId.startsWith('MEMBER:')) {
-                setErrorState({
-                  message: 'This is a member QR code, not a day pass. Please scan a day pass QR code.',
-                  errorCode: 'INVALID_QR_TYPE'
-                });
-                return;
-              }
-              
-              if (passId) {
-                setShowEmailSearch(false);
-                handleRedeem(passId);
-              }
-            }).catch(err => console.error("Failed to clear scanner", err));
+            if (!hasScannedRef.current) {
+              hasScannedRef.current = true;
+              stopScanner().then(() => {
+                setIsScanning(false);
+                handleScanResult(decodedText);
+              });
+            }
           },
           () => {}
         );
-
-        scannerRef.current = scanner;
-      }, 100);
-
-      return () => clearTimeout(timerId);
-    }
-
-    return () => {
-      if (scannerRef.current && !isScanning) {
-        scannerRef.current.clear().catch(err => console.error("Cleanup error", err));
-        scannerRef.current = null;
-        scannerInitializedRef.current = false;
+      } catch (err: any) {
+        setScannerError(`Error accessing camera: ${err.message}`);
+        setCameraPermission('denied');
       }
     };
-  }, [isScanning]);
+
+    const timeoutId = setTimeout(startScanner, 100);
+    
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [isScanning, scannerElementId, stopScanner, handleScanResult]);
+
+  useEffect(() => {
+    return () => {
+      stopScanner();
+    };
+  }, [stopScanner]);
 
   const handleCloseScanner = () => {
-    if (scannerRef.current) {
-      scannerRef.current.clear().catch(err => console.error("Cleanup error", err));
-      scannerRef.current = null;
-    }
-    scannerInitializedRef.current = false;
+    stopScanner();
     setIsScanning(false);
   };
 
@@ -528,12 +575,20 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
   const content = (
     <div className="space-y-4">
       {isScanning && (
-        <ModalShell title="Scan Guest Pass" onClose={handleCloseScanner}>
+        <ModalShell title="Scan Guest Pass" onClose={handleCloseScanner} showCloseButton={true}>
           <div className="p-4">
-            <div id="qr-reader" className="overflow-hidden rounded-xl border-2 border-teal-500/30" />
-            <p className="text-center text-sm text-primary/60 dark:text-white/60 mt-4">
-              Center the QR code within the frame to scan
-            </p>
+            <div id={scannerElementId} className="w-full rounded-lg overflow-hidden" style={{ minHeight: 300 }} />
+            {cameraPermission === 'pending' && (
+              <p className="text-center text-sm text-primary/60 dark:text-white/60 mt-4">Requesting camera permission...</p>
+            )}
+            {scannerError && (
+              <p className="text-red-500 text-center mt-2">{scannerError}</p>
+            )}
+            {cameraPermission === 'granted' && (
+              <p className="text-center text-sm text-primary/60 dark:text-white/60 mt-4">
+                Center the QR code within the frame to scan
+              </p>
+            )}
             <button
               onClick={() => {
                 handleCloseScanner();
