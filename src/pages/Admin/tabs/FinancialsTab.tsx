@@ -7,8 +7,7 @@ import { StripePaymentForm } from '../../../components/stripe/StripePaymentForm'
 import { CheckinBillingModal } from '../../../components/staff-command-center/modals/CheckinBillingModal';
 import { MemberSearchInput, SelectedMember } from '../../../components/shared/MemberSearchInput';
 import { getTodayPacific, formatTime12Hour } from '../../../utils/dateUtils';
-import SendMembershipInvite from '../../../components/admin/payments/SendMembershipInvite';
-import QuickChargeSection from '../../../components/admin/payments/QuickChargeCard';
+import RecordPurchaseCard from '../../../components/admin/payments/RecordPurchaseCard';
 import RedeemDayPassSection from '../../../components/admin/payments/RedeemPassCard';
 import RecentTransactionsSection from '../../../components/admin/payments/TransactionList';
 import OverduePaymentsPanel from '../../../components/admin/payments/OverduePaymentsPanel';
@@ -132,6 +131,33 @@ interface DayPass {
   purchasedAt: string;
 }
 
+interface SubscriptionListItem {
+  id: string;
+  memberEmail: string;
+  memberName: string;
+  planName: string;
+  amount: number;
+  currency: string;
+  interval: string;
+  status: string;
+  currentPeriodEnd: number;
+  cancelAtPeriodEnd: boolean;
+}
+
+interface InvoiceListItem {
+  id: string;
+  memberEmail: string;
+  memberName: string;
+  number: string | null;
+  amountDue: number;
+  amountPaid: number;
+  currency: string;
+  status: string;
+  created: number;
+  hostedInvoiceUrl: string | null;
+  invoicePdf: string | null;
+}
+
 const FinancialsTab: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'POS' | 'Subscriptions' | 'Invoices'>('POS');
   const isMobile = useIsMobile();
@@ -178,14 +204,14 @@ const FinancialsTab: React.FC = () => {
           {isMobile ? <MobilePaymentsView /> : <DesktopPaymentsView />}
         </>
       )}
-      {activeTab === 'Subscriptions' && <SubscriptionsPlaceholder />}
-      {activeTab === 'Invoices' && <InvoicesPlaceholder />}
+      {activeTab === 'Subscriptions' && <SubscriptionsSubTab />}
+      {activeTab === 'Invoices' && <InvoicesSubTab />}
     </div>
   );
 };
 
 const MobilePaymentsView: React.FC = () => {
-  const [activeSection, setActiveSection] = useState<'quick-charge' | 'overdue' | 'lookup' | 'transactions' | 'record-payment' | 'refunds' | 'failed' | 'summary' | 'pending' | 'redeem-pass' | 'send-invite' | null>(null);
+  const [activeSection, setActiveSection] = useState<'record-purchase' | 'overdue' | 'lookup' | 'transactions' | 'refunds' | 'failed' | 'summary' | 'pending' | 'redeem-pass' | null>(null);
   const [overdueCount, setOverdueCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
@@ -231,24 +257,14 @@ const MobilePaymentsView: React.FC = () => {
       iconClass: 'text-emerald-600 dark:text-emerald-400'
     },
     { 
-      id: 'quick-charge' as const, 
+      id: 'record-purchase' as const, 
       icon: 'point_of_sale', 
-      label: 'Quick Charge', 
+      label: 'Record Purchase', 
       bgClass: 'bg-slate-100/60 dark:bg-slate-800/40',
       textClass: 'text-slate-900 dark:text-slate-100',
       borderClass: 'border-slate-200 dark:border-slate-500/20',
       hoverClass: 'hover:bg-slate-200/60 dark:hover:bg-slate-700/60',
       iconClass: 'text-slate-600 dark:text-slate-400'
-    },
-    { 
-      id: 'record-payment' as const, 
-      icon: 'savings', 
-      label: 'Record Payment', 
-      bgClass: 'bg-orange-100/60 dark:bg-orange-950/40',
-      textClass: 'text-orange-900 dark:text-orange-100',
-      borderClass: 'border-orange-200 dark:border-orange-500/20',
-      hoverClass: 'hover:bg-orange-200/60 dark:hover:bg-orange-900/60',
-      iconClass: 'text-orange-600 dark:text-orange-400'
     },
     { 
       id: 'redeem-pass' as const, 
@@ -323,16 +339,6 @@ const MobilePaymentsView: React.FC = () => {
       hoverClass: 'hover:bg-blue-200/60 dark:hover:bg-blue-900/60',
       iconClass: 'text-blue-600 dark:text-blue-400'
     },
-    { 
-      id: 'send-invite' as const, 
-      icon: 'mail', 
-      label: 'Send Invite', 
-      bgClass: 'bg-green-100/60 dark:bg-green-950/40',
-      textClass: 'text-green-900 dark:text-green-100',
-      borderClass: 'border-green-200 dark:border-green-500/20',
-      hoverClass: 'hover:bg-green-200/60 dark:hover:bg-green-900/60',
-      iconClass: 'text-green-600 dark:text-green-400'
-    },
   ];
 
   return (
@@ -359,11 +365,8 @@ const MobilePaymentsView: React.FC = () => {
         {activeSection === 'summary' && (
           <DailySummaryCard onClose={() => setActiveSection(null)} />
         )}
-        {activeSection === 'quick-charge' && (
-          <QuickChargeSection onClose={() => setActiveSection(null)} />
-        )}
-        {activeSection === 'record-payment' && (
-          <CashCheckPaymentSection onClose={() => setActiveSection(null)} />
+        {activeSection === 'record-purchase' && (
+          <RecordPurchaseCard onClose={() => setActiveSection(null)} />
         )}
         {activeSection === 'overdue' && (
           <OverduePaymentsPanel onClose={() => setActiveSection(null)} />
@@ -386,9 +389,6 @@ const MobilePaymentsView: React.FC = () => {
         {activeSection === 'redeem-pass' && (
           <RedeemDayPassSection onClose={() => setActiveSection(null)} />
         )}
-        {activeSection === 'send-invite' && (
-          <SendMembershipInvite onClose={() => setActiveSection(null)} />
-        )}
       </div>
     </div>
   );
@@ -400,11 +400,9 @@ const DesktopPaymentsView: React.FC = () => {
       <div className="col-span-4 space-y-6">
         <DailySummaryCard variant="card" />
         <div className="relative z-20 focus-within:z-50">
-          <QuickChargeSection variant="card" />
+          <RecordPurchaseCard variant="card" />
         </div>
-        <CashCheckPaymentSection variant="card" />
         <RedeemDayPassSection variant="card" />
-        <SendMembershipInvite variant="card" />
       </div>
       
       <div className="col-span-4 space-y-6">
@@ -552,228 +550,6 @@ const DailySummaryCard: React.FC<SectionProps> = ({ onClose, variant = 'modal' }
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400">summarize</span>
           <h3 className="font-bold text-primary dark:text-white">Daily Summary</h3>
-        </div>
-        <button onClick={onClose} className="p-2 hover:bg-primary/10 dark:hover:bg-white/10 rounded-full">
-          <span className="material-symbols-outlined text-primary/60 dark:text-white/60">close</span>
-        </button>
-      </div>
-      {content}
-    </div>
-  );
-};
-
-const CashCheckPaymentSection: React.FC<SectionProps> = ({ onClose, variant = 'modal' }) => {
-  const [selectedMember, setSelectedMember] = useState<SelectedMember | null>(null);
-  const [amount, setAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'check' | 'other'>('cash');
-  const [category, setCategory] = useState<'guest_fee' | 'overage' | 'merchandise' | 'membership' | 'other'>('other');
-  const [description, setDescription] = useState('');
-  const [notes, setNotes] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-
-  const handleRecordPayment = async () => {
-    if (!selectedMember || !amount || parseFloat(amount) <= 0) return;
-    
-    setIsRecording(true);
-    setError(null);
-    
-    try {
-      const amountCents = Math.round(parseFloat(amount) * 100);
-      const res = await fetch('/api/payments/record-offline', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          memberEmail: selectedMember.email,
-          memberId: selectedMember.id,
-          memberName: selectedMember.name,
-          amountCents,
-          paymentMethod,
-          category,
-          description: description || undefined,
-          notes: notes || undefined
-        })
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to record payment');
-      }
-
-      setSuccess(true);
-      setTimeout(() => {
-        setSelectedMember(null);
-        setAmount('');
-        setPaymentMethod('cash');
-        setCategory('other');
-        setDescription('');
-        setNotes('');
-        setSuccess(false);
-      }, 2500);
-    } catch (err: any) {
-      setError(err.message || 'Failed to record payment');
-    } finally {
-      setIsRecording(false);
-    }
-  };
-
-  const paymentMethodOptions = [
-    { value: 'cash', label: 'Cash', icon: 'payments' },
-    { value: 'check', label: 'Check', icon: 'money' },
-    { value: 'other', label: 'Other', icon: 'more_horiz' },
-  ];
-
-  const categoryOptions = [
-    { value: 'guest_fee', label: 'Guest Fee' },
-    { value: 'overage', label: 'Overage' },
-    { value: 'merchandise', label: 'Merchandise' },
-    { value: 'membership', label: 'Membership' },
-    { value: 'other', label: 'Other' },
-  ];
-
-  const content = (
-    <div className="space-y-4">
-      {success ? (
-        <div className="flex flex-col items-center justify-center py-8 gap-3">
-          <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
-            <span className="material-symbols-outlined text-4xl text-green-600">check_circle</span>
-          </div>
-          <p className="text-lg font-semibold text-primary dark:text-white">Payment Recorded!</p>
-          <p className="text-sm text-primary/60 dark:text-white/60">${amount} via {paymentMethod}</p>
-        </div>
-      ) : (
-        <>
-          <MemberSearchInput
-            label="Search Member"
-            placeholder="Name or email..."
-            selectedMember={selectedMember}
-            onSelect={(member) => setSelectedMember(member)}
-            onClear={() => setSelectedMember(null)}
-          />
-
-          {selectedMember && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-primary dark:text-white mb-2">Amount</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-primary/60 dark:text-white/60 font-medium">$</span>
-                  <input
-                    type="number"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    step="0.01"
-                    min="0.01"
-                    className="w-full pl-8 pr-4 py-3 rounded-xl bg-white/80 dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary/30 text-lg font-semibold"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-primary dark:text-white mb-2">Payment Method</label>
-                <div className="flex gap-2">
-                  {paymentMethodOptions.map(opt => (
-                    <button
-                      key={opt.value}
-                      onClick={() => setPaymentMethod(opt.value as typeof paymentMethod)}
-                      className={`flex-1 py-2.5 px-3 rounded-xl font-medium text-sm flex items-center justify-center gap-1.5 transition-colors ${
-                        paymentMethod === opt.value
-                          ? 'bg-orange-500 text-white'
-                          : 'bg-white/50 dark:bg-white/5 text-primary dark:text-white border border-primary/10 dark:border-white/10'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-base">{opt.icon}</span>
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-primary dark:text-white mb-2">Category</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value as typeof category)}
-                  className="w-full px-4 py-3 rounded-xl bg-white/80 dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/30"
-                >
-                  {categoryOptions.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-primary dark:text-white mb-2">Description</label>
-                <input
-                  type="text"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="What is this payment for?"
-                  className="w-full px-4 py-3 rounded-xl bg-white/80 dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-primary dark:text-white mb-2">Notes (optional)</label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Additional notes..."
-                  rows={2}
-                  className="w-full px-4 py-3 rounded-xl bg-white/80 dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-                />
-              </div>
-
-              {error && (
-                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30">
-                  <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
-                </div>
-              )}
-
-              <button
-                onClick={handleRecordPayment}
-                disabled={!amount || parseFloat(amount) <= 0 || isRecording}
-                className="w-full py-3.5 rounded-full bg-orange-500 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {isRecording ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
-                    Recording...
-                  </>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined">savings</span>
-                    Record ${amount || '0.00'} Payment
-                  </>
-                )}
-              </button>
-            </>
-          )}
-        </>
-      )}
-    </div>
-  );
-
-  if (variant === 'card') {
-    return (
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <span className="material-symbols-outlined text-orange-600 dark:text-orange-400">savings</span>
-          <h3 className="font-bold text-primary dark:text-white">Record Cash/Check</h3>
-        </div>
-        {content}
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-orange-600 dark:text-orange-400">savings</span>
-          <h3 className="font-bold text-primary dark:text-white">Record Cash/Check</h3>
         </div>
         <button onClick={onClose} className="p-2 hover:bg-primary/10 dark:hover:bg-white/10 rounded-full">
           <span className="material-symbols-outlined text-primary/60 dark:text-white/60">close</span>
@@ -1997,36 +1773,674 @@ const QuickInvoiceCard: React.FC = () => {
   );
 };
 
-const SubscriptionsPlaceholder: React.FC = () => {
+const SubscriptionsSubTab: React.FC = () => {
+  const [subscriptions, setSubscriptions] = useState<SubscriptionListItem[]>([]);
+  const [filteredSubscriptions, setFilteredSubscriptions] = useState<SubscriptionListItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'past_due' | 'canceled'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sendingReminder, setSendingReminder] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchSubscriptions();
+  }, [statusFilter]);
+
+  useEffect(() => {
+    let filtered = subscriptions;
+    
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(sub => 
+        sub.memberName.toLowerCase().includes(query) ||
+        sub.memberEmail.toLowerCase().includes(query)
+      );
+    }
+    
+    setFilteredSubscriptions(filtered);
+  }, [subscriptions, searchQuery]);
+
+  const fetchSubscriptions = async (cursor?: string) => {
+    if (cursor) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoading(true);
+      setSubscriptions([]);
+    }
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      if (cursor) params.append('starting_after', cursor);
+      params.append('limit', '50');
+      
+      const url = `/api/financials/subscriptions${params.toString() ? `?${params.toString()}` : ''}`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch subscriptions');
+      const data = await res.json();
+      
+      if (cursor) {
+        setSubscriptions(prev => [...prev, ...(data.subscriptions || [])]);
+      } else {
+        setSubscriptions(data.subscriptions || []);
+      }
+      setHasMore(data.hasMore || false);
+      setNextCursor(data.nextCursor || null);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  };
+  
+  const handleLoadMore = () => {
+    if (nextCursor && !isLoadingMore) {
+      fetchSubscriptions(nextCursor);
+    }
+  };
+
+  const handleSendReminder = async (subscriptionId: string) => {
+    setSendingReminder(subscriptionId);
+    try {
+      const res = await fetch(`/api/financials/subscriptions/${subscriptionId}/send-reminder`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to send reminder');
+      }
+      setSuccessMessage('Payment reminder sent successfully');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      setError(err.message);
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setSendingReminder(null);
+    }
+  };
+
+  const formatCurrency = (cents: number, currency: string = 'usd') => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+    }).format(cents / 100);
+  };
+
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp * 1000).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+      case 'past_due':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+      case 'canceled':
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700/30 dark:text-gray-400';
+      case 'trialing':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+      case 'unpaid':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
+      default:
+        return 'bg-gray-100 text-gray-600 dark:bg-gray-700/30 dark:text-gray-400';
+    }
+  };
+
+  const getStripeSubscriptionUrl = (subscriptionId: string) => {
+    return `https://dashboard.stripe.com/subscriptions/${subscriptionId}`;
+  };
+
+  const statusCounts = {
+    all: subscriptions.length,
+    active: subscriptions.filter(s => s.status === 'active').length,
+    past_due: subscriptions.filter(s => s.status === 'past_due').length,
+    canceled: subscriptions.filter(s => s.status === 'canceled').length,
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary dark:border-white/30 dark:border-t-white rounded-full animate-spin"></div>
+          <p className="text-sm text-primary/60 dark:text-white/60">Loading subscriptions...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-8 max-w-md w-full">
-        <div className="flex flex-col items-center text-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-primary/10 dark:bg-lavender/20 flex items-center justify-center">
-            <span className="material-symbols-outlined text-4xl text-primary dark:text-lavender">subscriptions</span>
+    <div className="space-y-6">
+      {successMessage && (
+        <div className="bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-xl p-4 flex items-center gap-3">
+          <span className="material-symbols-outlined text-green-600 dark:text-green-400">check_circle</span>
+          <p className="text-green-800 dark:text-green-300">{successMessage}</p>
+        </div>
+      )}
+      
+      {error && (
+        <div className="bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-xl p-4 flex items-center gap-3">
+          <span className="material-symbols-outlined text-red-600 dark:text-red-400">error</span>
+          <p className="text-red-800 dark:text-red-300">{error}</p>
+        </div>
+      )}
+
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1">
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-primary/40 dark:text-white/40">search</span>
+            <input
+              type="text"
+              placeholder="Search by name or email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-white/60 dark:bg-white/5 border border-primary/10 dark:border-white/20 rounded-xl text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary/20 dark:focus:ring-white/20"
+            />
           </div>
-          <h3 className="text-xl font-bold text-primary dark:text-white">Subscription management coming soon</h3>
-          <p className="text-sm text-primary/60 dark:text-white/60">
-            This feature is currently being developed. Check back soon!
-          </p>
+        </div>
+        
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {(['all', 'active', 'past_due', 'canceled'] as const).map(status => (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              className={`px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition-colors ${
+                statusFilter === status
+                  ? 'bg-primary dark:bg-accent text-white dark:text-primary'
+                  : 'bg-white/60 dark:bg-white/10 text-primary/60 dark:text-white/60 hover:bg-white/80 dark:hover:bg-white/15'
+              }`}
+            >
+              {status === 'all' ? 'All' : status === 'past_due' ? 'Past Due' : status.charAt(0).toUpperCase() + status.slice(1)}
+              <span className="ml-1.5 px-1.5 py-0.5 text-xs rounded-full bg-black/10 dark:bg-white/10">
+                {statusCounts[status]}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {filteredSubscriptions.length === 0 ? (
+        <div className="flex items-center justify-center min-h-[300px]">
+          <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-8 max-w-md w-full">
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-primary/10 dark:bg-lavender/20 flex items-center justify-center">
+                <span className="material-symbols-outlined text-4xl text-primary dark:text-lavender">subscriptions</span>
+              </div>
+              <h3 className="text-xl font-bold text-primary dark:text-white">No subscriptions found</h3>
+              <p className="text-sm text-primary/60 dark:text-white/60">
+                {searchQuery || statusFilter !== 'all' 
+                  ? 'Try adjusting your search or filter criteria.' 
+                  : 'No Stripe subscriptions are currently configured.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-primary/10 dark:border-white/10">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Member</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Plan</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Amount</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Status</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Next Billing</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-primary/5 dark:divide-white/5">
+                {filteredSubscriptions.map((sub) => (
+                  <tr key={sub.id} className="hover:bg-primary/5 dark:hover:bg-white/5 transition-colors">
+                    <td className="px-4 py-3">
+                      <div>
+                        <p className="font-medium text-primary dark:text-white">{sub.memberName}</p>
+                        <p className="text-xs text-primary/60 dark:text-white/60">{sub.memberEmail}</p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-primary dark:text-white">{sub.planName}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-primary dark:text-white">
+                        {formatCurrency(sub.amount, sub.currency)}
+                        <span className="text-xs text-primary/60 dark:text-white/60">/{sub.interval}</span>
+                      </p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(sub.status)}`}>
+                          {sub.status === 'past_due' ? 'Past Due' : sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
+                        </span>
+                        {sub.cancelAtPeriodEnd && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                            Canceling
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-primary dark:text-white">{formatDate(sub.currentPeriodEnd)}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-2">
+                        {sub.status === 'past_due' && (
+                          <button
+                            onClick={() => handleSendReminder(sub.id)}
+                            disabled={sendingReminder === sub.id}
+                            className="px-3 py-1.5 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-sm">mail</span>
+                            {sendingReminder === sub.id ? 'Sending...' : 'Remind'}
+                          </button>
+                        )}
+                        <a
+                          href={getStripeSubscriptionUrl(sub.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 dark:bg-white/10 dark:hover:bg-white/15 text-primary dark:text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-sm">open_in_new</span>
+                          Stripe
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between text-sm text-primary/60 dark:text-white/60">
+        <p>Showing {filteredSubscriptions.length} of {subscriptions.length} subscriptions</p>
+        <div className="flex items-center gap-4">
+          {hasMore && (
+            <button
+              onClick={handleLoadMore}
+              disabled={isLoadingMore}
+              className="flex items-center gap-1 px-4 py-2 bg-primary dark:bg-accent text-white dark:text-primary rounded-full font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {isLoadingMore ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-sm">expand_more</span>
+                  Load More
+                </>
+              )}
+            </button>
+          )}
+          <button
+            onClick={() => fetchSubscriptions()}
+            className="flex items-center gap-1 hover:text-primary dark:hover:text-white transition-colors"
+          >
+            <span className="material-symbols-outlined text-sm">refresh</span>
+            Refresh
+          </button>
         </div>
       </div>
     </div>
   );
 };
 
-const InvoicesPlaceholder: React.FC = () => {
+const InvoicesSubTab: React.FC = () => {
+  const [invoices, setInvoices] = useState<InvoiceListItem[]>([]);
+  const [filteredInvoices, setFilteredInvoices] = useState<InvoiceListItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'open' | 'uncollectible'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [appliedStartDate, setAppliedStartDate] = useState('');
+  const [appliedEndDate, setAppliedEndDate] = useState('');
+
+  useEffect(() => {
+    fetchInvoices();
+  }, [statusFilter, appliedStartDate, appliedEndDate]);
+
+  useEffect(() => {
+    let filtered = invoices;
+    
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(inv => 
+        inv.memberName.toLowerCase().includes(query) ||
+        inv.memberEmail.toLowerCase().includes(query) ||
+        (inv.number && inv.number.toLowerCase().includes(query))
+      );
+    }
+    
+    setFilteredInvoices(filtered);
+  }, [invoices, searchQuery]);
+
+  const fetchInvoices = async (cursor?: string) => {
+    if (cursor) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoading(true);
+      setInvoices([]);
+    }
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      if (appliedStartDate) params.append('startDate', appliedStartDate);
+      if (appliedEndDate) params.append('endDate', appliedEndDate);
+      if (cursor) params.append('starting_after', cursor);
+      params.append('limit', '50');
+      
+      const url = `/api/financials/invoices${params.toString() ? `?${params.toString()}` : ''}`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch invoices');
+      const data = await res.json();
+      
+      if (cursor) {
+        setInvoices(prev => [...prev, ...(data.invoices || [])]);
+      } else {
+        setInvoices(data.invoices || []);
+      }
+      setHasMore(data.hasMore || false);
+      setNextCursor(data.nextCursor || null);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (nextCursor && !isLoadingMore) {
+      fetchInvoices(nextCursor);
+    }
+  };
+
+  const handleDateFilterApply = () => {
+    setAppliedStartDate(startDate);
+    setAppliedEndDate(endDate);
+  };
+
+  const handleClearDateFilters = () => {
+    setStartDate('');
+    setEndDate('');
+    setAppliedStartDate('');
+    setAppliedEndDate('');
+  };
+
+  const formatCurrency = (cents: number, currency: string = 'usd') => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+    }).format(cents / 100);
+  };
+
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp * 1000).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+      case 'open':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+      case 'uncollectible':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+      case 'void':
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700/30 dark:text-gray-400';
+      case 'draft':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
+      default:
+        return 'bg-gray-100 text-gray-600 dark:bg-gray-700/30 dark:text-gray-400';
+    }
+  };
+
+  const getStripeInvoiceUrl = (invoiceId: string) => {
+    return `https://dashboard.stripe.com/invoices/${invoiceId}`;
+  };
+
+  const statusCounts = {
+    all: invoices.length,
+    paid: invoices.filter(i => i.status === 'paid').length,
+    open: invoices.filter(i => i.status === 'open').length,
+    uncollectible: invoices.filter(i => i.status === 'uncollectible').length,
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary dark:border-white/30 dark:border-t-white rounded-full animate-spin"></div>
+          <p className="text-sm text-primary/60 dark:text-white/60">Loading invoices...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-8 max-w-md w-full">
-        <div className="flex flex-col items-center text-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-primary/10 dark:bg-lavender/20 flex items-center justify-center">
-            <span className="material-symbols-outlined text-4xl text-primary dark:text-lavender">description</span>
+    <div className="space-y-6">
+      {error && (
+        <div className="bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-xl p-4 flex items-center gap-3">
+          <span className="material-symbols-outlined text-red-600 dark:text-red-400">error</span>
+          <p className="text-red-800 dark:text-red-300">{error}</p>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-primary/40 dark:text-white/40">search</span>
+              <input
+                type="text"
+                placeholder="Search by name, email, or invoice number..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-white/60 dark:bg-white/5 border border-primary/10 dark:border-white/20 rounded-xl text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary/20 dark:focus:ring-white/20"
+              />
+            </div>
           </div>
-          <h3 className="text-xl font-bold text-primary dark:text-white">Invoice management coming soon</h3>
-          <p className="text-sm text-primary/60 dark:text-white/60">
-            This feature is currently being developed. Check back soon!
-          </p>
+          
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {(['all', 'paid', 'open', 'uncollectible'] as const).map(status => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition-colors ${
+                  statusFilter === status
+                    ? 'bg-primary dark:bg-accent text-white dark:text-primary'
+                    : 'bg-white/60 dark:bg-white/10 text-primary/60 dark:text-white/60 hover:bg-white/80 dark:hover:bg-white/15'
+                }`}
+              >
+                {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
+                <span className="ml-1.5 px-1.5 py-0.5 text-xs rounded-full bg-black/10 dark:bg-white/10">
+                  {statusCounts[status]}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 bg-white/40 dark:bg-white/5 border border-primary/10 dark:border-white/10 rounded-xl p-3">
+          <span className="text-sm font-medium text-primary/70 dark:text-white/70">Date Range:</span>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="px-3 py-1.5 bg-white/60 dark:bg-white/10 border border-primary/10 dark:border-white/20 rounded-lg text-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 dark:focus:ring-white/20"
+          />
+          <span className="text-primary/50 dark:text-white/50">to</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="px-3 py-1.5 bg-white/60 dark:bg-white/10 border border-primary/10 dark:border-white/20 rounded-lg text-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 dark:focus:ring-white/20"
+          />
+          <button
+            onClick={handleDateFilterApply}
+            className="px-3 py-1.5 bg-primary dark:bg-accent text-white dark:text-primary rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+          >
+            Apply
+          </button>
+          {(startDate || endDate) && (
+            <button
+              onClick={handleClearDateFilters}
+              className="px-3 py-1.5 bg-primary/10 dark:bg-white/10 text-primary dark:text-white rounded-lg text-sm font-medium hover:bg-primary/20 dark:hover:bg-white/15 transition-colors"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+
+      {filteredInvoices.length === 0 ? (
+        <div className="flex items-center justify-center min-h-[300px]">
+          <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-8 max-w-md w-full">
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-primary/10 dark:bg-lavender/20 flex items-center justify-center">
+                <span className="material-symbols-outlined text-4xl text-primary dark:text-lavender">description</span>
+              </div>
+              <h3 className="text-xl font-bold text-primary dark:text-white">No invoices found</h3>
+              <p className="text-sm text-primary/60 dark:text-white/60">
+                {searchQuery || statusFilter !== 'all' || startDate || endDate
+                  ? 'Try adjusting your search or filter criteria.' 
+                  : 'No Stripe invoices are currently available.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-primary/10 dark:border-white/10">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Invoice #</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Member</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Amount</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Status</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Date</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-primary/5 dark:divide-white/5">
+                {filteredInvoices.map((invoice) => (
+                  <tr key={invoice.id} className="hover:bg-primary/5 dark:hover:bg-white/5 transition-colors">
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-primary dark:text-white font-mono text-sm">
+                        {invoice.number || '-'}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div>
+                        <p className="font-medium text-primary dark:text-white">{invoice.memberName}</p>
+                        <p className="text-xs text-primary/60 dark:text-white/60">{invoice.memberEmail}</p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div>
+                        <p className="text-primary dark:text-white font-medium">
+                          {formatCurrency(invoice.amountDue, invoice.currency)}
+                        </p>
+                        {invoice.amountPaid > 0 && invoice.amountPaid < invoice.amountDue && (
+                          <p className="text-xs text-green-600 dark:text-green-400">
+                            Paid: {formatCurrency(invoice.amountPaid, invoice.currency)}
+                          </p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(invoice.status)}`}>
+                        {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-primary dark:text-white">{formatDate(invoice.created)}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-2">
+                        {invoice.invoicePdf && (
+                          <a
+                            href={invoice.invoicePdf}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-400 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
+                            PDF
+                          </a>
+                        )}
+                        <a
+                          href={getStripeInvoiceUrl(invoice.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 dark:bg-white/10 dark:hover:bg-white/15 text-primary dark:text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-sm">open_in_new</span>
+                          Stripe
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between text-sm text-primary/60 dark:text-white/60">
+        <p>Showing {filteredInvoices.length} of {invoices.length} invoices</p>
+        <div className="flex items-center gap-4">
+          {hasMore && (
+            <button
+              onClick={handleLoadMore}
+              disabled={isLoadingMore}
+              className="flex items-center gap-1 px-4 py-2 bg-primary dark:bg-accent text-white dark:text-primary rounded-full font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {isLoadingMore ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-sm">expand_more</span>
+                  Load More
+                </>
+              )}
+            </button>
+          )}
+          <button
+            onClick={() => fetchInvoices()}
+            className="flex items-center gap-1 hover:text-primary dark:hover:text-white transition-colors"
+          >
+            <span className="material-symbols-outlined text-sm">refresh</span>
+            Refresh
+          </button>
         </div>
       </div>
     </div>

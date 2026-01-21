@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../Toast';
 
 interface DiscountReason {
@@ -44,6 +45,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   onSuccess
 }) => {
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const [step, setStep] = useState<ModalStep>('form');
   const [createdMember, setCreatedMember] = useState<CreatedMemberInfo | null>(null);
   const [options, setOptions] = useState<AddMemberOptions | null>(null);
@@ -63,6 +65,8 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   
   const [sendingPaymentLink, setSendingPaymentLink] = useState(false);
+  const [paymentLinkUrl, setPaymentLinkUrl] = useState<string | null>(null);
+  const [paymentLinkSent, setPaymentLinkSent] = useState(false);
 
   const validateFirstName = (value: string): string | undefined => {
     if (!value.trim()) return 'First name is required';
@@ -153,6 +157,8 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
     setStep('form');
     setCreatedMember(null);
     setSendingPaymentLink(false);
+    setPaymentLinkUrl(null);
+    setPaymentLinkSent(false);
   }, []);
 
   useEffect(() => {
@@ -261,9 +267,10 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
       });
 
       if (res.ok) {
+        const data = await res.json();
+        setPaymentLinkUrl(data.paymentLink || data.url || null);
+        setPaymentLinkSent(true);
         showToast(`Payment link sent to ${createdMember.email}`, 'success');
-        onClose();
-        resetForm();
       } else {
         const data = await res.json();
         showToast(data.error || 'Failed to send payment link', 'error');
@@ -275,14 +282,30 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
     }
   };
 
+  const handleCopyPaymentLink = () => {
+    if (paymentLinkUrl) {
+      navigator.clipboard.writeText(paymentLinkUrl).then(() => {
+        showToast('Payment link copied to clipboard', 'success');
+      }).catch(() => {
+        showToast('Failed to copy link', 'error');
+      });
+    }
+  };
+
+  const handleDone = () => {
+    onClose();
+    resetForm();
+  };
+
   const handleChargeManually = () => {
     if (!createdMember) return;
     navigator.clipboard.writeText(createdMember.email).then(() => {
-      showToast(`Email copied: ${createdMember.email}. Use Quick Charge in the Financials tab to charge this member.`, 'info');
+      showToast(`Email copied: ${createdMember.email}`, 'success');
     }).catch(() => {
-      showToast(`Use Quick Charge in Financials tab for: ${createdMember.email}`, 'info');
+      showToast(`Member email: ${createdMember.email}`, 'info');
     });
     onClose();
+    navigate('/admin?tab=financials');
   };
 
   const handleSkip = () => {
@@ -298,7 +321,9 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
           <span className="material-symbols-outlined text-3xl text-green-600 dark:text-green-400">check_circle</span>
         </div>
-        <h3 className="text-xl font-bold text-primary dark:text-white mb-2">Member created successfully!</h3>
+        <h3 className="text-xl font-bold text-primary dark:text-white mb-2">
+          {paymentLinkSent ? 'Payment link sent!' : 'Member created successfully!'}
+        </h3>
         <div className="text-sm text-primary/70 dark:text-white/70">
           <p className="font-medium">{createdMember?.name}</p>
           <p>{createdMember?.email}</p>
@@ -306,67 +331,111 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
         </div>
       </div>
 
-      <div className="space-y-3">
-        <button
-          onClick={handleSendPaymentLink}
-          disabled={sendingPaymentLink}
-          className="w-full p-4 bg-white dark:bg-white/5 border border-primary/20 dark:border-white/20 rounded-xl hover:bg-primary/5 dark:hover:bg-white/10 transition-colors text-left group"
-        >
-          <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-              <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">link</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <h4 className="font-semibold text-primary dark:text-white group-hover:text-primary/80 dark:group-hover:text-white/80">
-                Send Payment Link
-              </h4>
-              <p className="text-sm text-primary/60 dark:text-white/60 mt-0.5">
-                Send member a payment link to set up their subscription
+      {paymentLinkSent ? (
+        <div className="space-y-4">
+          <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/30 rounded-xl">
+            <div className="flex items-start gap-3 mb-3">
+              <span className="material-symbols-outlined text-green-600 dark:text-green-400">mail</span>
+              <p className="text-sm text-green-700 dark:text-green-300">
+                Email sent to {createdMember?.email}
               </p>
             </div>
-            {sendingPaymentLink ? (
-              <div className="flex-shrink-0">
-                <span className="animate-spin rounded-full h-5 w-5 border-2 border-primary dark:border-white border-t-transparent inline-block" />
+            {paymentLinkUrl && (
+              <div className="mt-3">
+                <label className="block text-xs font-medium text-primary/60 dark:text-white/60 mb-1">
+                  Payment Link (for manual sharing)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={paymentLinkUrl}
+                    className="flex-1 px-3 py-2 text-xs border border-primary/20 dark:border-white/20 rounded-lg bg-white dark:bg-black/20 text-primary dark:text-white truncate"
+                  />
+                  <button
+                    onClick={handleCopyPaymentLink}
+                    className="px-3 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 flex items-center gap-1 text-sm"
+                  >
+                    <span className="material-symbols-outlined text-lg">content_copy</span>
+                    Copy
+                  </button>
+                </div>
               </div>
-            ) : (
-              <span className="material-symbols-outlined text-primary/40 dark:text-white/40 group-hover:text-primary/60 dark:group-hover:text-white/60 flex-shrink-0">
-                chevron_right
-              </span>
             )}
           </div>
-        </button>
 
-        <button
-          onClick={handleChargeManually}
-          className="w-full p-4 bg-white dark:bg-white/5 border border-primary/20 dark:border-white/20 rounded-xl hover:bg-primary/5 dark:hover:bg-white/10 transition-colors text-left group"
-        >
-          <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-              <span className="material-symbols-outlined text-purple-600 dark:text-purple-400">point_of_sale</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <h4 className="font-semibold text-primary dark:text-white group-hover:text-primary/80 dark:group-hover:text-white/80">
-                Charge via Financials Tab
-              </h4>
-              <p className="text-sm text-primary/60 dark:text-white/60 mt-0.5">
-                Copy email and use Quick Charge in Financials tab
-              </p>
-            </div>
-            <span className="material-symbols-outlined text-primary/40 dark:text-white/40 group-hover:text-primary/60 dark:group-hover:text-white/60 flex-shrink-0">
-              content_copy
-            </span>
+          <button
+            onClick={handleDone}
+            className="w-full py-3 px-4 bg-primary text-white rounded-xl font-medium hover:bg-primary/90"
+          >
+            Done
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="space-y-3">
+            <button
+              onClick={handleSendPaymentLink}
+              disabled={sendingPaymentLink}
+              className="w-full p-4 bg-white dark:bg-white/5 border border-primary/20 dark:border-white/20 rounded-xl hover:bg-primary/5 dark:hover:bg-white/10 transition-colors text-left group"
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">link</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-primary dark:text-white group-hover:text-primary/80 dark:group-hover:text-white/80">
+                    Send Payment Link
+                  </h4>
+                  <p className="text-sm text-primary/60 dark:text-white/60 mt-0.5">
+                    Send member a payment link to set up their subscription
+                  </p>
+                </div>
+                {sendingPaymentLink ? (
+                  <div className="flex-shrink-0">
+                    <span className="animate-spin rounded-full h-5 w-5 border-2 border-primary dark:border-white border-t-transparent inline-block" />
+                  </div>
+                ) : (
+                  <span className="material-symbols-outlined text-primary/40 dark:text-white/40 group-hover:text-primary/60 dark:group-hover:text-white/60 flex-shrink-0">
+                    chevron_right
+                  </span>
+                )}
+              </div>
+            </button>
+
+            <button
+              onClick={handleChargeManually}
+              className="w-full p-4 bg-white dark:bg-white/5 border border-primary/20 dark:border-white/20 rounded-xl hover:bg-primary/5 dark:hover:bg-white/10 transition-colors text-left group"
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-purple-600 dark:text-purple-400">point_of_sale</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-primary dark:text-white group-hover:text-primary/80 dark:group-hover:text-white/80">
+                    Charge via Financials Tab
+                  </h4>
+                  <p className="text-sm text-primary/60 dark:text-white/60 mt-0.5">
+                    Copy email and go to Quick Charge
+                  </p>
+                </div>
+                <span className="material-symbols-outlined text-primary/40 dark:text-white/40 group-hover:text-primary/60 dark:group-hover:text-white/60 flex-shrink-0">
+                  arrow_forward
+                </span>
+              </div>
+            </button>
           </div>
-        </button>
-      </div>
 
-      <div className="text-center pt-2">
-        <button
-          onClick={handleSkip}
-          className="text-sm text-primary/60 dark:text-white/60 hover:text-primary dark:hover:text-white underline underline-offset-2"
-        >
-          Skip for Now
-        </button>
-      </div>
+          <div className="text-center pt-2">
+            <button
+              onClick={handleSkip}
+              className="text-sm text-primary/60 dark:text-white/60 hover:text-primary dark:hover:text-white underline underline-offset-2"
+            >
+              Skip for Now
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 

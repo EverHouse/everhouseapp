@@ -16,6 +16,8 @@ export interface CreatePaymentIntentParams {
   sessionId?: number;
   description: string;
   metadata?: Record<string, string>;
+  productId?: string;
+  productName?: string;
 }
 
 export interface PaymentIntentResult {
@@ -37,7 +39,9 @@ export async function createPaymentIntent(
     bookingId,
     sessionId,
     description,
-    metadata = {}
+    metadata = {},
+    productId,
+    productName
   } = params;
 
   const { customerId } = await getOrCreateStripeCustomer(userId, email, memberName);
@@ -54,6 +58,8 @@ export async function createPaymentIntent(
   if (bookingId) stripeMetadata.bookingId = bookingId.toString();
   if (sessionId) stripeMetadata.sessionId = sessionId.toString();
   if (metadata?.participantFees) stripeMetadata.participantFees = metadata.participantFees;
+  if (productId) stripeMetadata.productId = productId;
+  if (productName) stripeMetadata.productName = productName;
 
   const paymentIntent = await stripe.paymentIntents.create({
     amount: amountCents,
@@ -68,12 +74,12 @@ export async function createPaymentIntent(
 
   await pool.query(
     `INSERT INTO stripe_payment_intents 
-     (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-    [userId, paymentIntent.id, customerId, amountCents, purpose, bookingId || null, sessionId || null, description, 'pending']
+     (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status, product_id, product_name)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [userId, paymentIntent.id, customerId, amountCents, purpose, bookingId || null, sessionId || null, description, 'pending', productId || null, productName || null]
   );
 
-  console.log(`[Stripe] Created PaymentIntent ${paymentIntent.id} for ${purpose}: $${(amountCents / 100).toFixed(2)}`);
+  console.log(`[Stripe] Created PaymentIntent ${paymentIntent.id} for ${purpose}: $${(amountCents / 100).toFixed(2)}${productName ? ` (${productName})` : ''}`);
 
   return {
     paymentIntentId: paymentIntent.id,

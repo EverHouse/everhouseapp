@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ModalShell from '../../../components/ModalShell';
 import Toggle from '../../../components/Toggle';
 import FloatingActionButton from '../../../components/FloatingActionButton';
 import ProductsSubTab from './ProductsSubTab';
+import DiscountsSubTab from './DiscountsSubTab';
 
 type SubTab = 'tiers' | 'products' | 'fees' | 'discounts';
 
@@ -390,7 +391,7 @@ const TiersTab: React.FC = () => {
                     </div>
                 );
             })()}
-            {activeSubTab === 'discounts' && <ProductsSubTab activeSubTab="discounts" />}
+            {activeSubTab === 'discounts' && <DiscountsSubTab />}
 
 
             <ModalShell isOpen={isEditing && !!selectedTier} onClose={() => { setIsEditing(false); setIsCreating(false); }} title={isCreating ? 'New Tier' : `Edit Tier: ${selectedTier?.name || ''}`} size="full">
@@ -837,10 +838,24 @@ const TiersTab: React.FC = () => {
                             ))}
                         </div>
                     )}
-                    <FloatingActionButton onClick={openCreate} color="brand" label="Add new tier" />
                 </>
                 );
             })()}
+
+            {activeSubTab === 'tiers' && (
+                <FloatingActionButton onClick={openCreate} color="brand" icon="add" label="Add new tier" />
+            )}
+            {activeSubTab === 'discounts' && (
+                <FloatingActionButton 
+                    onClick={() => {
+                        const createBtn = document.querySelector('[data-create-coupon-btn]') as HTMLButtonElement;
+                        if (createBtn) createBtn.click();
+                    }} 
+                    color="brand" 
+                    icon="add" 
+                    label="Create new coupon" 
+                />
+            )}
         </div>
     );
 };
