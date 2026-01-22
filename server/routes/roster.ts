@@ -337,6 +337,8 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
     }
 
     let memberInfo: { id: string; email: string; firstName: string; lastName: string } | null = null;
+    let matchingGuestId: number | null = null;
+    let matchingGuestName: string | null = null;
     
     if (type === 'member') {
       // Look up member first to get both ID and email for duplicate checking
@@ -363,6 +365,23 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
       );
       if (existingMember) {
         return res.status(400).json({ error: 'This member is already a participant' });
+      }
+
+      // Check if there's a guest with an exactly matching name - will auto-replace after successful member add
+      const memberFullName = `${memberInfo.firstName || ''} ${memberInfo.lastName || ''}`.trim().toLowerCase();
+      const normalize = (name: string) => name.replace(/\s+/g, ' ').trim().toLowerCase();
+      const normalizedMember = normalize(memberFullName);
+      
+      // Store matching guest ID for deletion AFTER successful member add (hoisted to broader scope)
+      const matchingGuest = existingParticipants.find(p => {
+        if (p.participantType !== 'guest') return false;
+        const normalizedGuest = normalize(p.displayName || '');
+        return normalizedGuest === normalizedMember;
+      });
+      
+      if (matchingGuest) {
+        matchingGuestId = matchingGuest.id;
+        matchingGuestName = matchingGuest.displayName;
       }
 
       // Check for time conflicts with other bookings
@@ -542,6 +561,60 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
           error: notifError as Error,
           extra: { bookingId, memberEmail: memberInfo.email }
         });
+      }
+      
+      // After member is successfully added, remove any matching guest to prevent duplicates
+      if (matchingGuestId !== null) {
+        // Re-verify the guest still exists and belongs to this session before deleting
+        const [guestToRemove] = await db
+          .select()
+          .from(bookingParticipants)
+          .where(and(
+            eq(bookingParticipants.id, matchingGuestId),
+            eq(bookingParticipants.sessionId, sessionId),
+            eq(bookingParticipants.participantType, 'guest')
+          ))
+          .limit(1);
+        
+        if (guestToRemove) {
+          logger.info('[roster] Removing matching guest after successful member add', {
+            extra: {
+              bookingId,
+              sessionId,
+              guestParticipantId: guestToRemove.id,
+              guestName: guestToRemove.displayName,
+              memberEmail: memberInfo.email
+            }
+          });
+          
+          await db
+            .delete(bookingParticipants)
+            .where(eq(bookingParticipants.id, guestToRemove.id));
+          
+          // Only refund if guest pass was actually used for this participant
+          if (guestToRemove.usedGuestPass === true) {
+            const refundResult = await refundGuestPass(
+              booking.owner_email,
+              guestToRemove.displayName || undefined,
+              true
+            );
+            
+            if (refundResult.success) {
+              logger.info('[roster] Guest pass refunded when replacing guest with member', {
+                extra: { 
+                  bookingId, 
+                  ownerEmail: booking.owner_email,
+                  guestName: guestToRemove.displayName,
+                  remainingPasses: refundResult.remaining 
+                }
+              });
+            }
+          }
+        } else {
+          logger.info('[roster] Matching guest already removed or changed, skipping delete', {
+            extra: { bookingId, sessionId, originalGuestId: matchingGuestId }
+          });
+        }
       }
     }
 
