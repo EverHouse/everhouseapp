@@ -324,7 +324,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
   };
 
   const validateGuestEmail = (value: string): string | undefined => {
-    if (!value.trim()) return undefined;
+    if (!value.trim()) return 'Email is required for guest tracking';
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(value)) return 'Please enter a valid email address';
     return undefined;
@@ -812,13 +812,14 @@ const RosterManager: React.FC<RosterManagerProps> = ({
           />
           
           <Input
-            label="Guest Email (optional)"
+            label="Guest Email"
             placeholder="Enter guest's email"
             type="email"
             value={guestEmail}
             onChange={handleGuestEmailChange}
             icon="mail"
             error={guestEmailError}
+            required
           />
           
           <div className={`p-3 rounded-xl ${isDark ? 'bg-[#CCB8E4]/10' : 'bg-[#CCB8E4]/20'}`}>
@@ -829,9 +830,9 @@ const RosterManager: React.FC<RosterManagerProps> = ({
           
           <button
             onClick={handleAddGuest}
-            disabled={addingGuest || !guestName.trim()}
+            disabled={addingGuest || !guestName.trim() || !guestEmail.trim()}
             className={`w-full py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              guestName.trim() && !addingGuest
+              guestName.trim() && guestEmail.trim() && !addingGuest
                 ? 'bg-[#293515] text-white hover:bg-[#3a4a20] active:scale-[0.98]'
                 : isDark
                   ? 'bg-white/10 text-white/40 cursor-not-allowed'

@@ -1842,6 +1842,84 @@ router.get('/api/visitors/:id/purchases', isStaffOrAdmin, async (req, res) => {
   }
 });
 
+// Get guests that are missing email addresses
+router.get('/api/guests/needs-email', isStaffOrAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        g.id as guest_id,
+        g.name as guest_name,
+        g.email,
+        bp.id as participant_id,
+        bp.session_id,
+        bp.display_name,
+        bs.session_date,
+        br.user_email as owner_email,
+        br.id as booking_id,
+        u.first_name || ' ' || u.last_name as owner_name
+      FROM guests g
+      JOIN booking_participants bp ON bp.guest_id = g.id
+      JOIN booking_sessions bs ON bs.id = bp.session_id
+      LEFT JOIN booking_requests br ON br.session_id = bs.id
+      LEFT JOIN users u ON LOWER(u.email) = LOWER(br.user_email)
+      WHERE (g.email IS NULL OR g.email = '')
+      ORDER BY bs.session_date DESC
+    `);
+    
+    res.json({
+      success: true,
+      guests: result.rows.map(row => ({
+        guestId: row.guest_id,
+        guestName: row.guest_name,
+        participantId: row.participant_id,
+        sessionId: row.session_id,
+        displayName: row.display_name,
+        sessionDate: row.session_date,
+        ownerEmail: row.owner_email,
+        ownerName: row.owner_name,
+        bookingId: row.booking_id
+      })),
+      count: result.rows.length
+    });
+  } catch (error: any) {
+    console.error('[Guests Needs Email] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch guests needing email' });
+  }
+});
+
+// Update a guest's email address
+router.patch('/api/guests/:guestId/email', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { guestId } = req.params;
+    const { email } = req.body;
+    
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({ error: 'Valid email is required' });
+    }
+    
+    const normalizedEmail = email.trim().toLowerCase();
+    
+    // Update the guest's email
+    const result = await pool.query(
+      `UPDATE guests SET email = $1 WHERE id = $2 RETURNING id, name, email`,
+      [normalizedEmail, guestId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Guest not found' });
+    }
+    
+    res.json({
+      success: true,
+      guest: result.rows[0],
+      message: `Email updated for ${result.rows[0].name}`
+    });
+  } catch (error: any) {
+    console.error('[Update Guest Email] Error:', error);
+    res.status(500).json({ error: 'Failed to update guest email' });
+  }
+});
+
 router.post('/api/admin/member/change-email', isStaffOrAdmin, async (req, res) => {
   try {
     const { oldEmail, newEmail } = req.body;

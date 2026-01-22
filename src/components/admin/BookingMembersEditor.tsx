@@ -386,14 +386,20 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ bookingId, 
                         type="email"
                         value={guestEmail}
                         onChange={(e) => setGuestEmail(e.target.value)}
-                        placeholder="Guest email (optional)"
-                        className="flex-1 py-1.5 px-2 text-sm rounded-lg border border-gray-200 dark:border-white/20 bg-white dark:bg-black/30 text-primary dark:text-white placeholder:text-gray-400"
+                        placeholder="Guest email (required)"
+                        className={`flex-1 py-1.5 px-2 text-sm rounded-lg border bg-white dark:bg-black/30 text-primary dark:text-white placeholder:text-gray-400 ${
+                          guestName.trim() && !guestEmail.trim() ? 'border-red-300 dark:border-red-500/50' : 'border-gray-200 dark:border-white/20'
+                        }`}
+                        required
                       />
                     </div>
+                    {guestName.trim() && !guestEmail.trim() && (
+                      <p className="text-[10px] text-red-600 dark:text-red-400">Email is required for guest tracking</p>
+                    )}
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleAddGuest(slot.id)}
-                        disabled={isAddingGuest || !guestName.trim()}
+                        disabled={isAddingGuest || !guestName.trim() || !guestEmail.trim()}
                         className="flex-1 py-1.5 text-xs font-medium bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 flex items-center justify-center gap-1"
                       >
                         {isAddingGuest ? (

@@ -305,9 +305,15 @@ router.get('/api/admin/trackman/matched', isStaffOrAdmin, async (req, res) => {
         u.email as member_email,
         COALESCE(br.trackman_player_count, 1) as total_slots,
         -- Count filled slots: use booking_participants if session exists, otherwise count owner + non-primary members
+        -- Guests without email are NOT counted as filled (slot shows unfilled until email is added)
         CASE 
           WHEN br.session_id IS NOT NULL THEN
-            COALESCE((SELECT COUNT(*) FROM booking_participants bp WHERE bp.session_id = br.session_id), 0)
+            COALESCE((
+              SELECT COUNT(*) FROM booking_participants bp 
+              LEFT JOIN guests g ON g.id = bp.guest_id
+              WHERE bp.session_id = br.session_id
+                AND (bp.participant_type != 'guest' OR (bp.participant_type = 'guest' AND g.email IS NOT NULL AND g.email != ''))
+            ), 0)
           ELSE
             -- No session: count owner as 1 if real email, plus non-primary booking_members
             CASE 
@@ -1338,9 +1344,15 @@ router.get('/api/admin/trackman/needs-players', isStaffOrAdmin, async (req, res)
         u.email as member_email,
         COALESCE(br.trackman_player_count, 1) as total_slots,
         -- Count filled slots: use booking_participants if session exists, otherwise count owner + non-primary members
+        -- Guests without email are NOT counted as filled (slot shows unfilled until email is added)
         CASE 
           WHEN br.session_id IS NOT NULL THEN
-            COALESCE((SELECT COUNT(*) FROM booking_participants bp WHERE bp.session_id = br.session_id), 0)
+            COALESCE((
+              SELECT COUNT(*) FROM booking_participants bp 
+              LEFT JOIN guests g ON g.id = bp.guest_id
+              WHERE bp.session_id = br.session_id
+                AND (bp.participant_type != 'guest' OR (bp.participant_type = 'guest' AND g.email IS NOT NULL AND g.email != ''))
+            ), 0)
           ELSE
             -- No session: count owner as 1 if real email, plus non-primary booking_members
             CASE 

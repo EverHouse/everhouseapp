@@ -276,6 +276,10 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
       return res.status(400).json({ error: 'Guest name is required' });
     }
 
+    if (type === 'guest' && (!guest.email || !guest.email.trim())) {
+      return res.status(400).json({ error: 'Guest email is required' });
+    }
+
     const booking = await getBookingWithSession(bookingId);
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });

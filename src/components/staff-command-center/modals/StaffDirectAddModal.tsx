@@ -44,7 +44,7 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
   };
 
   const validateGuestEmail = (value: string): string | undefined => {
-    if (!value.trim()) return undefined;
+    if (!value.trim()) return 'Guest email is required for tracking';
     if (!EMAIL_REGEX.test(value)) return 'Please enter a valid email address';
     if (value.length > 255) return 'Email must be 255 characters or less';
     return undefined;
@@ -283,7 +283,7 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
 
               <div>
                 <label className="block text-sm font-medium text-primary dark:text-white mb-2">
-                  Guest Email (Optional)
+                  Guest Email *
                 </label>
                 <input
                   type="email"
@@ -293,6 +293,7 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
                   className={`w-full px-4 py-2 border rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white ${
                     fieldErrors.guestEmail ? 'border-red-500' : 'border-primary/20 dark:border-white/20'
                   }`}
+                  required
                 />
                 {fieldErrors.guestEmail && (
                   <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.guestEmail}</p>

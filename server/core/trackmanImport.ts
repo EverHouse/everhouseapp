@@ -821,6 +821,11 @@ async function createTrackmanSessionAndParticipants(input: SessionCreationInput)
         }
       }
       
+      // Warn if guest has no email - slot will show as unfilled
+      if (!guest.email) {
+        process.stderr.write(`[Trackman Import] WARNING: Guest "${guest.name}" has no email - slot will show as unfilled until email is added\n`);
+      }
+      
       let guestId: number | undefined;
       if (guest.name) {
         const existingGuest = await db.select()
@@ -830,6 +835,13 @@ async function createTrackmanSessionAndParticipants(input: SessionCreationInput)
         
         if (existingGuest.length > 0) {
           guestId = existingGuest[0].id;
+          // If existing guest has no email but we have one now, update it
+          if (guest.email && !existingGuest[0].email) {
+            await db.update(guestsTable)
+              .set({ email: guest.email.toLowerCase() })
+              .where(eq(guestsTable.id, existingGuest[0].id));
+            process.stderr.write(`[Trackman Import] Updated guest "${guest.name}" with email: ${guest.email}\n`);
+          }
         } else {
           const [newGuest] = await db.insert(guestsTable).values({
             name: guest.name,

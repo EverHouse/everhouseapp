@@ -48,7 +48,7 @@ const GuestEntryModal: React.FC<GuestEntryModalProps> = ({
 
   const validateEmail = (value: string): string | undefined => {
     if (!value.trim()) {
-      return undefined;
+      return 'Email is required for guest tracking';
     }
     if (value.length > EMAIL_MAX_LENGTH) {
       return `Email must be ${EMAIL_MAX_LENGTH} characters or less`;
@@ -93,7 +93,7 @@ const GuestEntryModal: React.FC<GuestEntryModalProps> = ({
     onClose();
   };
 
-  const isSubmitDisabled = isSocialTier || !name.trim();
+  const isSubmitDisabled = isSocialTier || !name.trim() || !email.trim();
 
   return (
     <ModalShell
@@ -133,7 +133,7 @@ const GuestEntryModal: React.FC<GuestEntryModalProps> = ({
         />
         
         <Input
-          label="Email (optional)"
+          label="Email"
           placeholder="Enter guest's email address"
           type="email"
           value={email}
@@ -141,6 +141,7 @@ const GuestEntryModal: React.FC<GuestEntryModalProps> = ({
           icon="mail"
           error={emailError}
           maxLength={EMAIL_MAX_LENGTH}
+          required
           disabled={isSocialTier}
         />
         
