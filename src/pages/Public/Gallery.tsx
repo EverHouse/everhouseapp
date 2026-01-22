@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Footer } from '../../components/Footer';
 import { usePageReady } from '../../contexts/PageReadyContext';
+import { AnimatedPage } from '../../components/motion';
 
 interface GalleryImage {
   id: number;
@@ -284,16 +285,17 @@ const Gallery: React.FC = () => {
     <>
       <MascotLoader isVisible={showLoader} />
       
+      <AnimatedPage>
       <div 
         className="flex flex-col min-h-screen bg-[#F2F2EC] overflow-x-hidden"
         style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}
       >
-        <div className="px-5 pt-4 md:pt-2 pb-6 animate-pop-in">
+        <div className="px-5 pt-4 md:pt-2 pb-6 animate-content-enter">
           <h1 className="text-3xl font-medium tracking-tight text-primary leading-tight">Gallery</h1>
           <p className="text-primary/70 text-base mt-2 font-light">Explore the exclusive spaces of Ever House.</p>
         </div>
 
-        <div className="pl-5 pr-5 py-2 w-full overflow-x-auto scrollbar-hide mb-6 animate-pop-in" style={{animationDelay: '0.05s'}}>
+        <div className="pl-5 pr-5 py-2 w-full overflow-x-auto scrollbar-hide mb-6 animate-content-enter-delay-1">
           <div className="flex gap-3 min-w-max pr-5">
             {categories.map(cat => (
               <FilterButton 
@@ -307,7 +309,7 @@ const Gallery: React.FC = () => {
           </div>
         </div>
 
-        <div className="px-5 flex-1 animate-pop-in" style={{animationDelay: '0.1s'}}>
+        <div className="px-5 flex-1 animate-content-enter-delay-2">
           {filteredItems.length === 0 ? (
             <div className="text-center py-20">
               <span className="material-symbols-outlined text-5xl text-primary/30 mb-4">photo_library</span>
@@ -331,6 +333,8 @@ const Gallery: React.FC = () => {
         </div>
 
         <Footer />
+      </div>
+      </AnimatedPage>
 
         {viewerState && (
           <ImageViewer
@@ -341,7 +345,6 @@ const Gallery: React.FC = () => {
             onNext={handleNext}
           />
         )}
-      </div>
     </>
   );
 };
@@ -369,7 +372,7 @@ const GalleryItem: React.FC<{img: string; onClick: () => void; index: number}> =
   
   return (
     <div 
-      className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-sm cursor-pointer mb-4 border border-white/20 active:scale-[0.98] transition-transform"
+      className={`break-inside-avoid relative group rounded-2xl overflow-hidden shadow-sm cursor-pointer mb-4 border border-white/20 active:scale-[0.98] transition-transform animate-list-item-delay-${Math.min(index, 10)}`}
       onClick={onClick}
     >
       {!loaded && !error && (

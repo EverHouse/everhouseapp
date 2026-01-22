@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Footer } from '../../components/Footer';
 import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
 import { usePageReady } from '../../contexts/PageReadyContext';
+import { AnimatedPage } from '../../components/motion';
 
 interface FaqItem {
   id: number;
@@ -63,17 +64,18 @@ const FAQ: React.FC = () => {
   }, [faqs, selectedCategory]);
 
   return (
+    <AnimatedPage>
     <div 
       className="flex flex-col min-h-screen bg-[#F2F2EC] overflow-x-hidden"
       style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}
     >
-      <div className="px-6 pt-4 md:pt-2 pb-4 animate-pop-in">
+      <div className="px-6 pt-4 md:pt-2 pb-4 animate-content-enter">
         <h1 className="text-3xl font-bold tracking-tight text-primary mb-2">Frequently Asked Questions</h1>
         <p className="text-primary/70 text-base font-medium">Common questions about membership, amenities, and policies.</p>
       </div>
 
       {!loading && categories.length > 0 && (
-        <div className="px-6 pb-4 animate-pop-in" style={{animationDelay: '0.05s'}}>
+        <div className="px-6 pb-4 animate-content-enter-delay-1">
           <div className="flex gap-2 overflow-x-auto pb-2 -mx-6 px-6 scrollbar-hide scroll-fade-right">
             <button
               onClick={() => setSelectedCategory(null)}
@@ -102,7 +104,7 @@ const FAQ: React.FC = () => {
         </div>
       )}
 
-      <div className="px-6 pb-12 flex-1 space-y-3 animate-pop-in" style={{animationDelay: '0.1s'}}>
+      <div className="px-6 pb-12 flex-1 space-y-3 animate-content-enter-delay-2">
         {loading ? (
           <div className="flex justify-center py-8">
             <WalkingGolferSpinner size="md" />
@@ -112,14 +114,17 @@ const FAQ: React.FC = () => {
             No questions found in this category.
           </div>
         ) : (
-          filteredFaqs.map((faq) => (
-            <AccordionItem key={faq.id} question={faq.question} answer={faq.answer} />
+          filteredFaqs.map((faq, index) => (
+            <div key={faq.id} className={`animate-list-item-delay-${Math.min(index, 10)}`}>
+              <AccordionItem question={faq.question} answer={faq.answer} />
+            </div>
           ))
         )}
       </div>
 
       <Footer />
     </div>
+    </AnimatedPage>
   );
 };
 

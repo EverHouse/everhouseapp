@@ -4,6 +4,7 @@ import { Footer } from '../../components/Footer';
 import Input from '../../components/Input';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useNavigationLoading } from '../../contexts/NavigationLoadingContext';
+import { AnimatedPage } from '../../components/motion';
 
 const Contact: React.FC = () => {
   const navigate = useNavigate();
@@ -62,15 +63,16 @@ const Contact: React.FC = () => {
   };
 
   return (
+    <AnimatedPage>
     <div className="flex flex-col min-h-screen bg-[#F2F2EC] overflow-x-hidden">
-      <div className="px-6 pt-4 md:pt-2 pb-6 text-center animate-pop-in">
+      <div className="px-6 pt-4 md:pt-2 pb-6 text-center animate-content-enter">
         <h1 className="text-3xl font-bold tracking-tight text-primary mb-3">Get in Touch</h1>
         <p className="text-primary/70 text-sm leading-relaxed max-w-xs mx-auto">
            We look forward to hearing from you. Please fill out the form below or visit us in Tustin.
         </p>
       </div>
 
-      <section className="px-4 mb-8 space-y-3 animate-pop-in" style={{animationDelay: '0.1s'}}>
+      <section className="px-4 mb-8 space-y-3 animate-content-enter-delay-1">
            <ContactCard icon="location_on" title="VISIT US" value="15771 Red Hill Ave, Ste 500" />
            <ContactCard icon="call" title="CALL US" value="(949) 545-5855" href="tel:9495455855" />
            <ContactCard icon="mail" title="EMAIL US" value="info@evenhouse.club" href="mailto:info@evenhouse.club" />
@@ -259,6 +261,7 @@ const Contact: React.FC = () => {
       
       <Footer />
     </div>
+    </AnimatedPage>
   );
 };
 

@@ -8,7 +8,7 @@ import { apiRequest } from '../../lib/apiRequest';
 import TabButton from '../../components/TabButton';
 import SwipeablePage from '../../components/SwipeablePage';
 import PullToRefresh from '../../components/PullToRefresh';
-import { MotionList, MotionListItem } from '../../components/motion';
+import { MotionList, MotionListItem, AnimatedPage } from '../../components/motion';
 import { EmptyEvents } from '../../components/EmptyState';
 import { playSound } from '../../utils/sounds';
 import { formatDateDisplayWithDay } from '../../utils/dateUtils';
@@ -152,14 +152,15 @@ const Wellness: React.FC = () => {
   }, [refreshPromiseResolve]);
 
   return (
+    <AnimatedPage>
     <PullToRefresh onRefresh={handleRefresh}>
     <SwipeablePage className="px-6 relative overflow-hidden">
-      <section className="mb-4 pt-4 md:pt-2">
+      <section className="mb-4 pt-4 md:pt-2 animate-content-enter-delay-1">
         <h1 className={`text-3xl font-bold leading-tight drop-shadow-md ${isDark ? 'text-white' : 'text-primary'}`}>Wellness</h1>
         <p className={`text-sm font-medium mt-1 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>Book your next session.</p>
       </section>
 
-      <section className={`mb-8 border-b -mx-6 px-6 ${isDark ? 'border-white/25' : 'border-black/10'}`}>
+      <section className={`mb-8 border-b -mx-6 px-6 animate-content-enter-delay-2 ${isDark ? 'border-white/25' : 'border-black/10'}`}>
         <div className="flex gap-6 overflow-x-auto pb-0 scrollbar-hide scroll-fade-right">
           <TabButton label="Upcoming" active={activeTab === 'classes'} onClick={() => setActiveTab('classes')} isDark={isDark} />
           <TabButton label="MedSpa" active={activeTab === 'medspa'} onClick={() => setActiveTab('medspa')} isDark={isDark} />
@@ -184,6 +185,7 @@ const Wellness: React.FC = () => {
 
     </SwipeablePage>
     </PullToRefresh>
+    </AnimatedPage>
   );
 };
 

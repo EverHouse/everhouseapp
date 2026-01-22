@@ -4,6 +4,7 @@ import ModalShell from '../../../components/ModalShell';
 import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 import FloatingActionButton from '../../../components/FloatingActionButton';
 import { formatPhoneNumber } from '../../../utils/formatting';
+import { AnimatedPage } from '../../../components/motion';
 
 interface TeamMember {
   id: number;
@@ -300,8 +301,8 @@ const TeamTab: React.FC = () => {
   };
 
   return (
-    <div className="animate-pop-in">
-      <div className="bg-white dark:bg-surface-dark rounded-2xl p-6 border border-gray-200 dark:border-white/25 animate-pop-in" style={{animationDelay: '0.05s'}}>
+    <AnimatedPage>
+      <div className="bg-white dark:bg-surface-dark rounded-2xl p-6 border border-gray-200 dark:border-white/25 animate-content-enter-delay-1">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-lg font-bold text-primary dark:text-white">Team Directory</h3>
@@ -346,17 +347,16 @@ const TeamTab: React.FC = () => {
             {searchQuery ? 'No team members match your search.' : (isAdmin ? 'No team members added yet. Add an email to grant portal access.' : 'No team members to display.')}
           </div>
         ) : (
-          <div className="space-y-3 animate-pop-in" style={{animationDelay: '0.1s'}}>
+          <div className="space-y-3 animate-content-enter-delay-2">
             {filteredMembers.map((member, index) => (
               <div 
                 key={member.id}
                 onClick={() => openDetailsModal(member)}
-                className={`flex items-center justify-between p-4 rounded-xl border transition-colors animate-pop-in cursor-pointer hover:border-primary/50 ${
+                className={`flex items-center justify-between p-4 rounded-xl border transition-colors animate-list-item-delay-${Math.min(index, 10)} cursor-pointer hover:border-primary/50 ${
                   member.is_active 
                     ? 'bg-white dark:bg-surface-dark border-gray-200 dark:border-white/25 hover:bg-gray-50 dark:hover:bg-surface-dark' 
                     : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-white/20 opacity-60'
                 }`}
-                style={{animationDelay: `${0.15 + index * 0.03}s`}}
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center flex-wrap">
@@ -656,7 +656,7 @@ const TeamTab: React.FC = () => {
       </ModalShell>
 
       {isAdmin && <FloatingActionButton onClick={() => setIsAddingPerson(true)} color="brand" label="Add team member" />}
-    </div>
+    </AnimatedPage>
   );
 };
 

@@ -15,6 +15,7 @@ import BookingMembersEditor from '../../../components/admin/BookingMembersEditor
 import { RosterManager } from '../../../components/booking';
 import { CheckinBillingModal } from '../../../components/staff-command-center/modals/CheckinBillingModal';
 import { CompleteRosterModal } from '../../../components/staff-command-center/modals/CompleteRosterModal';
+import { AnimatedPage } from '../../../components/motion';
 
 interface BookingRequest {
     id: number | string;
@@ -1601,9 +1602,9 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
     };
 
     return (
-            <div className="flex justify-center animate-pop-in">
+            <AnimatedPage className="flex justify-center">
                 <div className="w-full bg-white dark:bg-surface-dark rounded-2xl shadow-lg border border-gray-200 dark:border-white/25 flex flex-col lg:h-[calc(100vh-160px)] lg:max-h-[calc(100vh-160px)]">
-                <div className="lg:hidden flex items-center justify-between border-b border-gray-200 dark:border-white/25 mb-0 animate-pop-in px-4 py-3" style={{animationDelay: '0.05s'}}>
+                <div className="lg:hidden flex items-center justify-between border-b border-gray-200 dark:border-white/25 mb-0 animate-content-enter-delay-1 px-4 py-3">
                     <div className="flex">
                         <button
                             onClick={() => setActiveView('requests')}
@@ -3030,7 +3031,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
             />
                 </div>
                 <FloatingActionButton onClick={() => setShowManualBooking(true)} color="brand" label="Create manual booking" />
-            </div>
+            </AnimatedPage>
     );
 };
 

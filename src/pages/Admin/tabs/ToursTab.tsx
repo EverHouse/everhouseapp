@@ -4,6 +4,7 @@ import { formatDateDisplayWithDay, formatTime12Hour, getRelativeDateLabel } from
 import { formatPhoneNumber } from '../../../utils/formatting';
 import PullToRefresh from '../../../components/PullToRefresh';
 import ModalShell from '../../../components/ModalShell';
+import { AnimatedPage } from '../../../components/motion';
 
 interface Tour {
   id: number;
@@ -336,8 +337,8 @@ const ToursTab: React.FC = () => {
 
   return (
     <PullToRefresh onRefresh={handlePullRefresh}>
-      <div className="space-y-6 animate-pop-in pb-32">
-        <p className="text-sm text-primary/80 dark:text-white/80">
+      <AnimatedPage className="space-y-6 pb-32">
+        <p className="text-sm text-primary/80 dark:text-white/80 animate-content-enter-delay-1">
           Synced from Google Calendar: <span className="font-medium">Tours Scheduled</span>
         </p>
 
@@ -427,7 +428,7 @@ const ToursTab: React.FC = () => {
           </div>
         </div>
       </ModalShell>
-      </div>
+      </AnimatedPage>
     </PullToRefresh>
   );
 };

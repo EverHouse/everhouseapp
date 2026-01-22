@@ -6,6 +6,7 @@ import BackToTop from '../../components/BackToTop';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useNavigationLoading } from '../../contexts/NavigationLoadingContext';
 import { formatDateDisplayWithDay } from '../../utils/dateUtils';
+import { AnimatedPage } from '../../components/motion';
 
 interface Event {
   id: number;
@@ -123,18 +124,19 @@ const WhatsOn: React.FC = () => {
   const getItemId = (item: ListItem) => `${item.type}-${item.id}`;
 
   return (
+    <AnimatedPage>
     <div 
       className="flex flex-col min-h-screen bg-[#EAEBE6] overflow-x-hidden"
       style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}
     >
-      <section className="px-6 pt-4 md:pt-2 pb-6 bg-[#EAEBE6] animate-pop-in">
+      <section className="px-6 pt-4 md:pt-2 pb-6 bg-[#EAEBE6] animate-content-enter">
         <h1 className="text-5xl font-light text-primary mb-4 tracking-tight">What's On</h1>
         <p className="text-primary/70 text-base leading-relaxed max-w-[90%]">
            Curated experiences at Ever House. Join us for culture, conversation, and community in Tustin.
         </p>
       </section>
 
-      <div className="flex gap-2 px-6 pb-4 animate-pop-in" style={{ animationDelay: '0.05s' }}>
+      <div className="flex gap-2 px-6 pb-4 animate-content-enter-delay-1">
         {(['all', 'events', 'wellness'] as const).map((f) => (
           <button
             key={f}
@@ -150,7 +152,7 @@ const WhatsOn: React.FC = () => {
         ))}
       </div>
 
-      <div className="px-4 space-y-3 pb-12 flex-1 animate-pop-in" style={{animationDelay: '0.1s'}}>
+      <div className="px-4 space-y-3 pb-12 flex-1 animate-content-enter-delay-2">
         {loading ? (
           <SkeletonList count={5} Component={BookingCardSkeleton} />
         ) : combinedItems.length === 0 ? (
@@ -170,8 +172,7 @@ const WhatsOn: React.FC = () => {
             return (
               <div 
                 key={itemId} 
-                className="bg-white rounded-2xl overflow-hidden shadow-layered transition-all animate-pop-in"
-                style={{ animationDelay: `${index * 0.05}s`, animationFillMode: 'both' }}
+                className={`bg-white rounded-2xl overflow-hidden shadow-layered transition-all animate-list-item-delay-${Math.min(index, 10)}`}
               >
                 <div 
                   onClick={() => setExpandedId(isExpanded ? null : itemId)}
@@ -279,6 +280,7 @@ const WhatsOn: React.FC = () => {
 
       <BackToTop threshold={200} />
     </div>
+    </AnimatedPage>
   );
 };
 

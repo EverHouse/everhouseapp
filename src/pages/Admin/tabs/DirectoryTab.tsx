@@ -11,6 +11,7 @@ import { AddMemberModal } from '../../../components/staff-command-center/modals/
 import { DirectoryTabSkeleton } from '../../../components/skeletons';
 import { formatPhoneNumber } from '../../../utils/formatting';
 import { getTierColor, getTagColor } from '../../../utils/tierUtils';
+import { AnimatedPage } from '../../../components/motion';
 
 const TIER_OPTIONS = ['All', 'Social', 'Core', 'Premium', 'Corporate', 'VIP'] as const;
 const ASSIGNABLE_TIERS = ['Social', 'Core', 'Premium', 'Corporate', 'VIP'] as const;
@@ -599,7 +600,7 @@ const DirectoryTab: React.FC = () => {
     );
 
     return (
-        <div className="animate-pop-in bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-white/20 flex flex-col h-full">
+        <AnimatedPage className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-white/20 flex flex-col h-full">
             {/* Active/Former Toggle + Sync Button */}
             <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -703,7 +704,7 @@ const DirectoryTab: React.FC = () => {
                 </div>
             )}
 
-            <div className="mb-6 space-y-3 animate-pop-in sticky top-0 z-10 bg-white dark:bg-surface-dark pt-2 pb-3" style={{animationDelay: '0.05s'}}>
+            <div className="mb-6 space-y-3 animate-content-enter-delay-1 sticky top-0 z-10 bg-white dark:bg-surface-dark pt-2 pb-3">
                 {/* Search - only show for active/former tabs */}
                 {memberTab !== 'visitors' && (
                 <div className="relative">
@@ -1500,7 +1501,7 @@ const DirectoryTab: React.FC = () => {
                 </div>,
                 document.body
             )}
-        </div>
+        </AnimatedPage>
     );
 };
 

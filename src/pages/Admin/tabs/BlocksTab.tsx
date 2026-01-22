@@ -7,6 +7,7 @@ import PullToRefresh from '../../../components/PullToRefresh';
 import ModalShell from '../../../components/ModalShell';
 import FloatingActionButton from '../../../components/FloatingActionButton';
 import AvailabilityBlocksContent from '../components/AvailabilityBlocksContent';
+import { AnimatedPage } from '../../../components/motion';
 
 interface BlocksClosure {
     id: number;
@@ -645,8 +646,8 @@ const BlocksTab: React.FC = () => {
 
     return (
         <PullToRefresh onRefresh={handlePullRefresh}>
-        <div className="space-y-6 animate-pop-in">
-            <div className="flex gap-2 mb-4 animate-pop-in" style={{animationDelay: '0.05s'}}>
+        <AnimatedPage className="space-y-6">
+            <div className="flex gap-2 mb-4 animate-content-enter-delay-1">
                 <button
                     onClick={() => setActiveSubTab('notices')}
                     className={`flex-1 py-2.5 px-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-1.5 ${
@@ -1477,7 +1478,7 @@ const BlocksTab: React.FC = () => {
             />
             </>
             )}
-        </div>
+        </AnimatedPage>
         </PullToRefresh>
     );
 };

@@ -20,6 +20,7 @@ import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
 import ModalShell from '../../components/ModalShell';
 import { BookGolfSkeleton } from '../../components/skeletons';
 import { GuardianConsentForm, type GuardianConsentData } from '../../components/booking';
+import { AnimatedPage } from '../../components/motion';
 
 
 interface APIResource {
@@ -901,9 +902,10 @@ const BookGolf: React.FC = () => {
   }, [fetchResources, fetchAvailability, fetchMyRequests, fetchClosures, selectedDateObj?.date, activeTab, rescheduleBookingId, checkExistingBookings]);
 
   return (
+    <AnimatedPage>
     <PullToRefresh onRefresh={handleRefresh}>
     <SwipeablePage className="px-6 relative">
-      <section className="mb-6 pt-4 md:pt-2">
+      <section className="mb-6 pt-4 md:pt-2 animate-content-enter-delay-1">
         <h1 className={`text-3xl font-bold leading-tight drop-shadow-md ${isDark ? 'text-white' : 'text-primary'}`}>Book</h1>
         <p className={`text-sm font-medium mt-1 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>Reserve simulators or conference room.</p>
       </section>
@@ -1562,6 +1564,7 @@ const BookGolf: React.FC = () => {
       </ModalShell>
     </SwipeablePage>
     </PullToRefresh>
+    </AnimatedPage>
   );
 };
 

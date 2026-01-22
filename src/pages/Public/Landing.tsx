@@ -7,6 +7,7 @@ import { useParallax } from '../../hooks/useParallax';
 import { playSound } from '../../utils/sounds';
 import ModalShell from '../../components/ModalShell';
 import EditorialSection from '../../components/layout/EditorialSection';
+import { AnimatedPage } from '../../components/motion';
 
 interface MembershipTier {
   id: number;
@@ -268,6 +269,7 @@ const Landing: React.FC = () => {
   };
 
   return (
+    <AnimatedPage>
     <div className="min-h-screen pb-0 overflow-x-hidden relative bg-[#F2F2EC]">
       {/* Fixed brand green status bar fill for iOS PWA */}
       <div 
@@ -333,7 +335,7 @@ const Landing: React.FC = () => {
       {/* Content wrapper with cream background */}
       <div className="bg-[#F2F2EC]">
       {/* Features Section - "Why Even House" (Moved to First Position) */}
-      <div className="px-6 py-12">
+      <div className="px-6 py-12 animate-content-enter-delay-1">
         <h2 className="text-3xl font-bold text-[#293515] mb-8 font-sans">Why Ever House</h2>
         <div className="grid grid-cols-2 gap-4">
           <FeatureCard 
@@ -398,7 +400,7 @@ const Landing: React.FC = () => {
       </div>
 
       {/* Press & Media Section */}
-      <div className="px-6 pt-6 pb-12 bg-[#F2F2EC]">
+      <div className="px-6 pt-6 pb-12 bg-[#F2F2EC] animate-content-enter-delay-2">
         <p className="text-center text-xs font-bold uppercase tracking-[0.2em] text-[#293515]/50 mb-8">As Featured In</p>
         
         {/* Quote Cards Grid */}
@@ -448,7 +450,7 @@ const Landing: React.FC = () => {
       </div>
 
       {/* Membership Preview Section */}
-      <div className="px-6 pb-12 bg-[#F2F2EC]">
+      <div className="px-6 pb-12 bg-[#F2F2EC] animate-content-enter-delay-3">
          <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-[#293515] mb-2">Membership Tiers</h2>
             <p className="text-[#293515]/70 text-sm">Select the plan that fits your lifestyle.</p>
@@ -517,7 +519,7 @@ const Landing: React.FC = () => {
       </div>
 
       {/* Social Proof Stats Section */}
-      <div className="px-6 py-10 bg-[#F2F2EC]">
+      <div className="px-6 py-10 bg-[#F2F2EC] animate-content-enter-delay-4">
         <h3 className="text-center text-2xl font-bold text-[#293515] mb-6">Join 200+ Members</h3>
         <div className="flex justify-center items-center gap-0 overflow-x-auto">
           <div className="flex-1 min-w-0 text-center px-3">
@@ -543,7 +545,7 @@ const Landing: React.FC = () => {
       </div>
 
       {/* Testimonial Section */}
-      <div className="px-6 py-12 bg-[#F2F2EC]">
+      <div className="px-6 py-12 bg-[#F2F2EC] animate-content-enter-delay-5">
         <div className="max-w-2xl mx-auto text-center">
           <span className="text-6xl text-[#293515]/20 font-serif leading-none block mb-2">"</span>
           <blockquote className="text-lg sm:text-xl italic text-[#293515]/90 mb-4 leading-relaxed -mt-8">
@@ -554,7 +556,7 @@ const Landing: React.FC = () => {
       </div>
 
       {/* Private Events Inquiry Section */}
-      <div className="px-4 pb-12">
+      <div className="px-4 pb-12 animate-content-enter-delay-6">
          <div className="relative rounded-[2rem] overflow-hidden h-[400px] group backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.1)] hover:scale-[1.01] transition-all duration-[400ms]">
             <div className="absolute inset-0 bg-[url('/images/events-crowd-optimized.webp')] bg-cover bg-center opacity-70 transition-transform duration-700 group-hover:scale-105"></div>
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-black/20"></div>
@@ -598,6 +600,7 @@ const Landing: React.FC = () => {
         </div>
       </div>
     </div>
+    </AnimatedPage>
   );
 };
 

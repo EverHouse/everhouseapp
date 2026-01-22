@@ -11,6 +11,7 @@ import { BottomSentinel } from '../../components/layout/BottomSentinel';
 import { formatDateShort, getTodayString, formatTime12Hour, getNowTimePacific, getRelativeDateLabel } from '../../utils/dateUtils';
 import { getStatusColor, formatStatusLabel } from '../../utils/statusColors';
 import InvoicePaymentModal from '../../components/billing/InvoicePaymentModal';
+import { AnimatedPage } from '../../components/motion';
 
 interface Participant {
   name: string;
@@ -269,14 +270,15 @@ const History: React.FC = () => {
   ].sort((a, b) => b.date.localeCompare(a.date));
 
   return (
+    <AnimatedPage>
     <PullToRefresh onRefresh={handleRefresh}>
       <SwipeablePage className="px-6 relative overflow-hidden">
-        <section className="mb-4 pt-4 md:pt-2 animate-pop-in">
+        <section className="mb-4 pt-4 md:pt-2 animate-content-enter-delay-1">
           <h1 className={`text-3xl font-bold leading-tight drop-shadow-md ${isDark ? 'text-white' : 'text-primary'}`}>History</h1>
           <p className={`text-sm font-medium mt-1 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>Your past bookings and experiences.</p>
         </section>
 
-        <section className={`mb-6 border-b -mx-6 px-6 animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`} style={{animationDelay: '0.05s'}}>
+        <section className={`mb-6 border-b -mx-6 px-6 animate-content-enter-delay-2 ${isDark ? 'border-white/25' : 'border-black/10'}`}>
           <div className="flex gap-6 overflow-x-auto pb-0 scrollbar-hide scroll-fade-right">
             <TabButton label="Bookings" active={activeTab === 'bookings'} onClick={() => setActiveTab('bookings')} isDark={isDark} />
             <TabButton label="Experiences" active={activeTab === 'experiences'} onClick={() => setActiveTab('experiences')} isDark={isDark} />
@@ -284,7 +286,7 @@ const History: React.FC = () => {
           </div>
         </section>
 
-        <div className="relative z-10 animate-pop-in" style={{animationDelay: '0.1s'}}>
+        <div className="relative z-10 animate-content-enter-delay-3">
           {isLoading ? (
             <div className="animate-pulse space-y-4">
               {[1, 2, 3].map(i => (
@@ -315,8 +317,7 @@ const History: React.FC = () => {
                     return (
                     <div 
                       key={booking.id} 
-                      className={`rounded-xl p-4 border glass-card animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`}
-                      style={{animationDelay: `${0.05 * index}s`}}
+                      className={`rounded-xl p-4 border glass-card animate-list-item-delay-${Math.min(index, 10)} ${isDark ? 'border-white/25' : 'border-black/10'}`}
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div>
@@ -642,6 +643,7 @@ const History: React.FC = () => {
         />
       )}
     </PullToRefresh>
+    </AnimatedPage>
   );
 };
 

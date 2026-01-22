@@ -7,6 +7,7 @@ import { useNotificationSounds } from '../../../hooks/useNotificationSounds';
 import FloatingActionButton from '../../../components/FloatingActionButton';
 import PullToRefresh from '../../../components/PullToRefresh';
 import AnnouncementManager from '../../../components/admin/AnnouncementManager';
+import { AnimatedPage } from '../../../components/motion';
 
 interface StaffNotification {
     id: number;
@@ -411,8 +412,8 @@ const UpdatesTab: React.FC = () => {
 
     return (
         <PullToRefresh onRefresh={handleRefresh}>
-            <div className="animate-pop-in pb-32">
-                <div className="flex gap-1.5 sm:gap-2 mb-6 animate-pop-in" style={{animationDelay: '0.05s'}}>
+            <AnimatedPage className="pb-32">
+                <div className="flex gap-1.5 sm:gap-2 mb-6 animate-content-enter-delay-1">
                     <button
                         onClick={() => setActiveSubTab('alerts')}
                         className={`flex-1 py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wide transition-all relative ${
@@ -454,7 +455,7 @@ const UpdatesTab: React.FC = () => {
                 {activeSubTab === 'activity' && renderActivityTab()}
                 {activeSubTab === 'announcements' && <AnnouncementManager triggerCreate={triggerCreateAnnouncement} />}
                 <FloatingActionButton onClick={handleCreateAnnouncement} color="purple" label="Add announcement" />
-            </div>
+            </AnimatedPage>
         </PullToRefresh>
     );
 };

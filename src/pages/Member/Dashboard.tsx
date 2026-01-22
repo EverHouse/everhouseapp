@@ -29,6 +29,7 @@ import { RosterManager } from '../../components/booking';
 import { apiRequest } from '../../lib/apiRequest';
 import BalanceCard from '../../components/billing/BalanceCard';
 import BalancePaymentModal from '../../components/billing/BalancePaymentModal';
+import { AnimatedPage } from '../../components/motion';
 
 const GUEST_CHECKIN_FIELDS = [
   { name: 'guest_firstname', label: 'Guest First Name', type: 'text' as const, required: true, placeholder: 'John' },
@@ -829,6 +830,7 @@ const Dashboard: React.FC = () => {
   }
 
   return (
+    <AnimatedPage>
     <div 
       className="min-h-screen flex flex-col"
       style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}
@@ -899,13 +901,13 @@ const Dashboard: React.FC = () => {
         
         <WelcomeBanner />
         
-        <div className="mb-6">
-          <div className="flex items-center gap-3 animate-pop-in">
+        <div className="mb-6 animate-content-enter-delay-1">
+          <div className="flex items-center gap-3">
             <h1 className={`text-3xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-primary'}`}>
               {getGreeting()}, {user?.name.split(' ')[0]}
             </h1>
           </div>
-          <p className={`text-sm font-medium mt-1 animate-pop-in ${isDark ? 'text-white/80' : 'text-primary/80'}`} style={{animationDelay: '0.1s'}}>
+          <p className={`text-sm font-medium mt-1 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
             {new Date().toLocaleDateString('en-US', { timeZone: CLUB_TIMEZONE, weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
         </div>
@@ -1511,6 +1513,7 @@ const Dashboard: React.FC = () => {
       })()}
     </ModalShell>
   </div>
+  </AnimatedPage>
   );
 };
 

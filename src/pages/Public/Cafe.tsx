@@ -4,6 +4,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { Footer } from '../../components/Footer';
 import { MenuItemSkeleton, SkeletonList } from '../../components/skeletons';
 import { usePageReady } from '../../contexts/PageReadyContext';
+import { AnimatedPage } from '../../components/motion';
 
 interface CafeItem {
   id: string;
@@ -87,11 +88,12 @@ const PublicCafe: React.FC = () => {
   }, [cafeMenu, categories]);
 
   return (
+    <AnimatedPage>
     <div 
       className="flex flex-col min-h-screen bg-[#EAEBE6] overflow-x-hidden w-full max-w-full"
       style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}
     >
-      <section className="px-6 pt-4 md:pt-2 pb-6 bg-[#EAEBE6] animate-pop-in">
+      <section className="px-6 pt-4 md:pt-2 pb-6 bg-[#EAEBE6] animate-content-enter">
         <h1 className="text-5xl font-light text-primary mb-4 tracking-tight">Cafe Menu</h1>
         <p className="text-primary/70 text-base leading-relaxed max-w-[90%]">
           Curated bites and beverages at the House. From artisan coffee to light fare.
@@ -100,8 +102,7 @@ const PublicCafe: React.FC = () => {
 
       <div 
         ref={categoryScrollRef}
-        className="flex gap-2 overflow-x-auto px-6 pb-4 scrollbar-hide animate-pop-in scroll-fade-right"
-        style={{ animationDelay: '0.1s' }}
+        className="flex gap-2 overflow-x-auto px-6 pb-4 scrollbar-hide animate-content-enter-delay-1 scroll-fade-right"
       >
         {categories.map((cat) => (
           <button
@@ -118,7 +119,7 @@ const PublicCafe: React.FC = () => {
         ))}
       </div>
 
-      <div className="px-6 space-y-3 pb-8 flex-1 animate-pop-in" style={{ animationDelay: '0.15s' }}>
+      <div className="px-6 space-y-3 pb-8 flex-1 animate-content-enter-delay-2">
         {isLoading ? (
           <SkeletonList count={5} Component={MenuItemSkeleton} isDark={isDark} />
         ) : cafeMenu.length === 0 ? (
@@ -138,8 +139,7 @@ const PublicCafe: React.FC = () => {
                 return (
                   <div
                     key={item.id}
-                    className="bg-white rounded-xl overflow-hidden shadow-layered transition-all animate-pop-in"
-                    style={{ animationDelay: `${index * 0.05}s`, animationFillMode: 'both' }}
+                    className={`bg-white rounded-xl overflow-hidden shadow-layered transition-all animate-list-item-delay-${Math.min(index, 10)}`}
                   >
                     <div
                       onClick={() => setExpandedItemId(isExpanded ? null : item.id)}
@@ -183,6 +183,7 @@ const PublicCafe: React.FC = () => {
 
       <Footer />
     </div>
+    </AnimatedPage>
   );
 };
 

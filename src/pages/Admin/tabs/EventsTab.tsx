@@ -8,6 +8,7 @@ import { useToast } from '../../../components/Toast';
 import FloatingActionButton from '../../../components/FloatingActionButton';
 import ModalShell from '../../../components/ModalShell';
 import TierBadge from '../../../components/TierBadge';
+import { AnimatedPage } from '../../../components/motion';
 
 interface Participant {
     id: number;
@@ -956,14 +957,14 @@ const EventsAdminContent: React.FC = () => {
     };
 
     return (
-        <div className="animate-pop-in">
-            <p className="text-sm text-primary/80 dark:text-white/80 mb-4">
+        <AnimatedPage>
+            <p className="text-sm text-primary/80 dark:text-white/80 mb-4 animate-content-enter-delay-1">
                 Synced from Google Calendar: <span className="font-medium">Events</span>
             </p>
             
             <NeedsReviewSection />
             
-            <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide -mx-4 px-4 animate-pop-in scroll-fade-right" style={{animationDelay: '0.05s'}}>
+            <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide -mx-4 px-4 animate-content-enter-delay-2 scroll-fade-right">
                 {CATEGORY_TABS.map(tab => (
                     <button
                         key={tab.id}
@@ -1340,7 +1341,7 @@ const EventsAdminContent: React.FC = () => {
                 onRefresh={() => selectedEvent && handleViewRsvps(selectedEvent)}
                 eventbriteId={selectedEvent?.eventbrite_id}
             />
-        </div>
+        </AnimatedPage>
     );
 };
 

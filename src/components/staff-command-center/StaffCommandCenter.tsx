@@ -6,6 +6,7 @@ import PullToRefresh from '../PullToRefresh';
 import { useToast } from '../Toast';
 import { getTodayPacific, formatTime12Hour } from '../../utils/dateUtils';
 import { StaffCommandCenterSkeleton } from '../skeletons';
+import { AnimatedPage } from '../motion';
 
 import { useCommandCenterData } from './hooks/useCommandCenterData';
 import { formatLastSynced, formatTodayDate } from './helpers';
@@ -281,8 +282,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
-      <div className="animate-pop-in pb-40">
-        <div className="flex items-start justify-between mb-4 lg:mb-6">
+      <AnimatedPage className="pb-40">
+        <div className="flex items-start justify-between mb-4 lg:mb-6 animate-content-enter-delay-1">
           <div>
             <h1 className="text-xl lg:text-2xl font-bold text-primary dark:text-white">Welcome, {actualUser?.name?.split(' ')[0] || 'Staff'}</h1>
             <p className="text-xs lg:text-sm text-primary/60 dark:text-white/60">{formatTodayDate()}</p>
@@ -311,7 +312,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
         </div>
 
         {/* Desktop Layout */}
-        <div className="hidden lg:block space-y-6">
+        <div className="hidden lg:block space-y-6 animate-content-enter-delay-2">
           {/* Top row: Next Tour, Next Event, Facility Status */}
           <div className="grid grid-cols-3 gap-6">
             <TodayScheduleSection
@@ -409,7 +410,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
         </div>
 
         {/* Mobile Layout - Order: Next Tour/Event → Notice Board → Alerts → Facility Status → Booking Requests → Upcoming Bookings → Upcoming Events → Upcoming Wellness */}
-        <div className="lg:hidden space-y-4">
+        <div className="lg:hidden space-y-4 animate-content-enter-delay-2">
           {/* Next Tour/Event cards */}
           <TodayScheduleSection
             upcomingTours={data.upcomingTours}
@@ -479,7 +480,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
           />
           <QuickActionsGrid onTabChange={onTabChange} isAdmin={isAdmin} variant="mobile" onNewMember={() => setAddMemberModalOpen(true)} onScanQr={() => setQrScannerOpen(true)} />
         </div>
-      </div>
+      </AnimatedPage>
 
       <QrScannerModal
         isOpen={qrScannerOpen}

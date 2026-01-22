@@ -5,6 +5,7 @@ import HubSpotFormModal from '../../components/HubSpotFormModal';
 import BackToTop from '../../components/BackToTop';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useNavigationLoading } from '../../contexts/NavigationLoadingContext';
+import { AnimatedPage } from '../../components/motion';
 
 const MEMBERSHIP_FIELDS = [
   { name: 'firstname', label: 'First Name', type: 'text' as const, required: true, placeholder: 'Jane' },
@@ -215,8 +216,9 @@ const MembershipOverview: React.FC = () => {
   }
 
   return (
+    <AnimatedPage>
     <div className="px-4 pt-4 pb-0 flex flex-col gap-8 bg-[#F2F2EC] min-h-screen overflow-x-hidden">
-      <div className="text-center px-2 animate-pop-in">
+      <div className="text-center px-2 animate-content-enter">
         <p className="text-primary/40 text-[10px] font-bold uppercase tracking-[0.3em] mb-2">Est. 2025</p>
         <h2 className="text-3xl font-medium tracking-tight text-primary mb-3">Membership Overview</h2>
         <p className="text-primary/70 text-base font-light leading-relaxed max-w-[320px] mx-auto">
@@ -224,12 +226,12 @@ const MembershipOverview: React.FC = () => {
         </p>
       </div>
 
-      <Link to="compare" className="w-full flex items-center justify-center gap-1 text-xs font-bold uppercase tracking-widest text-primary/60 hover:text-primary transition-colors py-2 animate-pop-in" style={{animationDelay: '0.05s'}}>
+      <Link to="compare" className="w-full flex items-center justify-center gap-1 text-xs font-bold uppercase tracking-widest text-primary/60 hover:text-primary transition-colors py-2 animate-content-enter-delay-1">
         Compare full feature table
         <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
       </Link>
 
-      <div className="flex flex-col gap-5 animate-pop-in" style={{animationDelay: '0.1s'}}>
+      <div className="flex flex-col gap-5 animate-content-enter-delay-2">
         {socialTier && (
           <MembershipCard 
             title={`${socialTier.name} Membership`}
@@ -302,7 +304,7 @@ const MembershipOverview: React.FC = () => {
         )}
       </div>
       
-      <div className="bg-white/40 backdrop-blur-xl rounded-3xl p-6 border border-white/60 shadow-sm animate-pop-in" style={{animationDelay: '0.2s'}}>
+      <div className="bg-white/40 backdrop-blur-xl rounded-3xl p-6 border border-white/60 shadow-sm animate-content-enter-delay-3">
         <div className="text-center mb-8">
           <h3 className="text-2xl font-medium text-primary mb-2">How to Join</h3>
           <p className="text-primary/60 text-sm font-light">Your path to membership in 3 simple steps</p>
@@ -359,7 +361,7 @@ const MembershipOverview: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white/40 backdrop-blur-xl rounded-3xl p-5 border border-white/60 shadow-sm animate-pop-in" style={{animationDelay: '0.25s'}}>
+      <div className="bg-white/40 backdrop-blur-xl rounded-3xl p-5 border border-white/60 shadow-sm animate-content-enter-delay-4">
         <div className="flex items-center gap-3 mb-4">
            <div className="p-2 bg-primary/5 rounded-xl text-primary">
               <span className="material-symbols-outlined font-light">id_card</span>
@@ -433,6 +435,7 @@ const MembershipOverview: React.FC = () => {
         </button>
       </div>
     </div>
+    </AnimatedPage>
   );
 };
 
@@ -485,8 +488,9 @@ const Corporate: React.FC = () => {
     }, [setPageReady]);
 
     return (
+      <AnimatedPage>
       <div className="px-6 pt-6 pb-12 flex flex-col gap-6 bg-[#F2F2EC] min-h-screen">
-        <div className="flex flex-col gap-2 mb-2 pt-4 animate-pop-in">
+        <div className="flex flex-col gap-2 mb-2 pt-4 animate-content-enter">
             <div className="flex items-center gap-2">
                 <span className="px-4 py-1 bg-white/50 backdrop-blur text-primary text-[10px] font-bold rounded-full uppercase tracking-wider border border-primary/5 shadow-sm">
                     For the team
@@ -500,7 +504,7 @@ const Corporate: React.FC = () => {
             </p>
         </div>
 
-        <div className="bg-white/40 backdrop-blur-xl rounded-[2rem] p-8 shadow-sm border border-white/60 animate-pop-in" style={{animationDelay: '0.05s'}}>
+        <div className="bg-white/40 backdrop-blur-xl rounded-[2rem] p-8 shadow-sm border border-white/60 animate-content-enter-delay-1">
             <ul className="space-y-8">
                 <li className="flex gap-4 items-center">
                     <div className="w-10 h-10 rounded-full bg-[#E8E8E0] flex items-center justify-center shrink-0">
@@ -532,7 +536,7 @@ const Corporate: React.FC = () => {
             </ul>
         </div>
 
-        <div className="mt-4 animate-pop-in" style={{animationDelay: '0.1s'}}>
+        <div className="mt-4 animate-content-enter-delay-2">
              <div className="flex justify-between items-center mb-6 px-2">
                 <h2 className="text-2xl font-medium text-primary tracking-tight">Volume Discounts</h2>
                 <span className="px-3 py-1 bg-white/50 rounded-full border border-primary/5 text-[10px] font-bold text-primary/60 uppercase tracking-wider">Per employee / mo</span>
@@ -588,11 +592,12 @@ const Corporate: React.FC = () => {
              </p>
         </div>
 
-        <Link to={`/checkout?tier=corporate&qty=${employeeCount}`} className="w-full py-5 px-6 rounded-2xl bg-primary text-white font-bold text-sm uppercase tracking-widest hover:bg-primary/90 shadow-xl shadow-primary/20 flex items-center justify-center gap-3 mt-4 mb-8 group animate-pop-in" style={{animationDelay: '0.15s'}}>
+        <Link to={`/checkout?tier=corporate&qty=${employeeCount}`} className="w-full py-5 px-6 rounded-2xl bg-primary text-white font-bold text-sm uppercase tracking-widest hover:bg-primary/90 shadow-xl shadow-primary/20 flex items-center justify-center gap-3 mt-4 mb-8 group animate-content-enter-delay-3">
             Join as Corporate
             <span className="material-symbols-outlined text-[20px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
         </Link>
       </div>
+      </AnimatedPage>
     );
 };
 
@@ -671,15 +676,16 @@ const CompareFeatures: React.FC = () => {
   }
 
   return (
+    <AnimatedPage>
     <div className="flex flex-col gap-6 pt-6 px-4 pb-12 bg-[#F2F2EC] min-h-screen">
-       <div className="text-center px-2 pt-4 animate-pop-in">
+       <div className="text-center px-2 pt-4 animate-content-enter">
         <h2 className="text-3xl font-medium tracking-tight text-primary mb-3">Compare Features</h2>
         <p className="text-primary/70 text-base font-light leading-relaxed max-w-[320px] mx-auto">
           Select up to 3 memberships to compare side-by-side.
         </p>
       </div>
       
-      <div className="bg-white/40 backdrop-blur-xl rounded-3xl p-4 shadow-sm border border-white/60 animate-pop-in" style={{animationDelay: '0.05s'}}>
+      <div className="bg-white/40 backdrop-blur-xl rounded-3xl p-4 shadow-sm border border-white/60 animate-content-enter-delay-1">
         <h3 className="text-xs font-bold text-primary/50 mb-3 uppercase tracking-wider">Select to Compare (Max 3)</h3>
         <div className="flex flex-wrap gap-2">
           {tierNames.map(t => {
@@ -698,7 +704,7 @@ const CompareFeatures: React.FC = () => {
         </div>
       </div>
 
-      <div className="w-full bg-white/40 backdrop-blur-xl rounded-3xl p-4 shadow-sm border border-white/60 overflow-x-auto animate-pop-in" style={{animationDelay: '0.1s'}}>
+      <div className="w-full bg-white/40 backdrop-blur-xl rounded-3xl p-4 shadow-sm border border-white/60 overflow-x-auto animate-content-enter-delay-2">
         <div className="min-w-[320px]">
           <div className="grid grid-cols-[25%_1fr_1fr_1fr] gap-1 mb-4 border-b border-primary/5 pb-4 items-end">
              <div className="text-[10px] font-bold text-primary/40 uppercase tracking-widest pl-1">Features</div>
@@ -746,6 +752,7 @@ const CompareFeatures: React.FC = () => {
         </div>
       </div>
     </div>
+    </AnimatedPage>
   );
 };
 

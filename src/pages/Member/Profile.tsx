@@ -22,6 +22,7 @@ import ModalShell from '../../components/ModalShell';
 import GuestPassPurchaseModal from '../../components/billing/GuestPassPurchaseModal';
 import WaiverModal from '../../components/WaiverModal';
 import BillingSection from '../../components/profile/BillingSection';
+import { AnimatedPage } from '../../components/motion';
 
 
 const GUEST_CHECKIN_FIELDS = [
@@ -341,6 +342,7 @@ const Profile: React.FC = () => {
   if (!user) return null;
 
   return (
+    <AnimatedPage>
     <div 
       className="px-6 pb-32 min-h-screen bg-transparent"
       style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'calc(var(--header-offset) + 1.5rem)' }}
@@ -1088,6 +1090,7 @@ const Profile: React.FC = () => {
         currentVersion={currentWaiverVersion}
       />
     </div>
+    </AnimatedPage>
   );
 };
 

@@ -12,6 +12,7 @@ import RedeemDayPassSection from '../../../components/admin/payments/RedeemPassC
 import RecentTransactionsSection from '../../../components/admin/payments/TransactionList';
 import OverduePaymentsPanel from '../../../components/admin/payments/OverduePaymentsPanel';
 import { useIsMobile } from '../../../hooks/useBreakpoint';
+import { AnimatedPage } from '../../../components/motion';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || '');
 
@@ -163,9 +164,9 @@ const FinancialsTab: React.FC = () => {
   const isMobile = useIsMobile();
 
   return (
-    <div className="animate-pop-in pb-32">
+    <AnimatedPage className="pb-32">
       {/* Sub-tab Navigation */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6 animate-content-enter-delay-1">
         <button
           onClick={() => setActiveTab('POS')}
           className={`px-4 py-2 rounded-full font-medium transition-colors ${
@@ -206,7 +207,7 @@ const FinancialsTab: React.FC = () => {
       )}
       {activeTab === 'Subscriptions' && <SubscriptionsSubTab />}
       {activeTab === 'Invoices' && <InvoicesSubTab />}
-    </div>
+    </AnimatedPage>
   );
 };
 
@@ -334,11 +335,11 @@ const MobilePaymentsView: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
-        {quickActions.map(action => (
+        {quickActions.map((action, index) => (
           <button
             key={action.id}
             onClick={() => setActiveSection(action.id)}
-            className={`${action.bgClass} ${action.textClass} ${action.borderClass} ${action.hoverClass} border backdrop-blur-md rounded-2xl p-4 flex flex-col items-center gap-2 min-h-[100px] shadow-lg active:scale-95 transition-all duration-300 relative`}
+            className={`${action.bgClass} ${action.textClass} ${action.borderClass} ${action.hoverClass} border backdrop-blur-md rounded-2xl p-4 flex flex-col items-center gap-2 min-h-[100px] shadow-lg active:scale-95 transition-all duration-300 relative animate-list-item-delay-${Math.min(index, 10)}`}
           >
             <span className={`material-symbols-outlined text-3xl ${action.iconClass}`}>{action.icon}</span>
             <span className="font-semibold text-sm">{action.label}</span>
