@@ -422,7 +422,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const { announcements, user, actualUser, isViewingAs } = useData();
   const { effectiveTheme } = useTheme();
-  const { endNavigation } = useNavigationLoading();
+  const { isNavigating, startNavigation, endNavigation } = useNavigationLoading();
   const { processNotifications } = useNotificationSounds(false, user?.email);
   
   // End navigation loading when route changes
@@ -519,6 +519,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         if (isProfilePage) {
             return;
         }
+        // Start navigation loading indicator
+        startNavigation();
         // For staff/admin (not viewing as member), go to Staff Portal
         if (isStaffOrAdmin && !isViewingAs) {
             navigate('/admin');
@@ -533,6 +535,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             }
         }
     } else {
+        startNavigation();
         navigate('/login');
     }
   };
@@ -653,17 +656,27 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {isMemberRoute && user ? (
           <button 
             onClick={handleTopRightClick}
-            className={`flex items-center justify-center ${headerBtnClasses} focus:ring-2 focus:ring-accent focus:outline-none rounded-full`}
+            disabled={isNavigating}
+            className={`flex items-center justify-center ${headerBtnClasses} focus:ring-2 focus:ring-accent focus:outline-none rounded-full relative ${isNavigating ? 'opacity-70' : ''}`}
             aria-label="View profile"
           >
             <Avatar name={user.name} email={user.email} size="md" />
+            {isNavigating && (
+              <span className="absolute inset-0 flex items-center justify-center">
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              </span>
+            )}
           </button>
         ) : (
           <button 
             onClick={handleTopRightClick}
-            className={`px-1.5 py-0.5 xs:px-2 xs:py-1 sm:px-3 sm:py-1.5 flex items-center justify-center shrink ${headerBtnClasses} focus:ring-2 focus:ring-accent focus:outline-none rounded-full backdrop-blur-xl bg-white/15 border border-white/40 shadow-[0_4px_16px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.4)] text-[9px] xs:text-[10px] sm:text-xs font-semibold tracking-wide hover:bg-white/25 hover:border-white/50 transition-all duration-300`}
+            disabled={isNavigating}
+            className={`px-1.5 py-0.5 xs:px-2 xs:py-1 sm:px-3 sm:py-1.5 flex items-center justify-center gap-1.5 shrink ${headerBtnClasses} focus:ring-2 focus:ring-accent focus:outline-none rounded-full backdrop-blur-xl bg-white/15 border border-white/40 shadow-[0_4px_16px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.4)] text-[9px] xs:text-[10px] sm:text-xs font-semibold tracking-wide hover:bg-white/25 hover:border-white/50 transition-all duration-300 ${isNavigating ? 'opacity-70' : ''}`}
             aria-label={user ? 'Go to dashboard' : 'Members login'}
           >
+            {isNavigating && (
+              <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            )}
             Members
           </button>
         )}
