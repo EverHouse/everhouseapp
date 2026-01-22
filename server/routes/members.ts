@@ -1078,6 +1078,46 @@ router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
   }
 });
 
+// Hard delete a member (ADMIN ONLY - for testing purposes)
+// This permanently removes the user from the database
+router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
+  try {
+    const { email } = req.params;
+    const normalizedEmail = decodeURIComponent(email).toLowerCase();
+    const sessionUser = getSessionUser(req);
+    
+    const userResult = await db.select({ 
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      stripeCustomerId: users.stripeCustomerId
+    })
+      .from(users)
+      .where(sql`LOWER(${users.email}) = ${normalizedEmail}`);
+    
+    if (userResult.length === 0) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    const userId = userResult[0].id;
+    const memberName = `${userResult[0].firstName || ''} ${userResult[0].lastName || ''}`.trim();
+    
+    await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+    
+    console.log(`[Admin] Member permanently deleted: ${normalizedEmail} (${memberName}) by ${sessionUser?.email}`);
+    
+    res.json({ 
+      success: true, 
+      deleted: true,
+      deletedBy: sessionUser?.email,
+      message: `Member ${memberName || normalizedEmail} permanently deleted`
+    });
+  } catch (error: any) {
+    if (!isProduction) console.error('Member permanent delete error:', error);
+    res.status(500).json({ error: 'Failed to permanently delete member' });
+  }
+});
+
 // Anonymize a member (CCPA/CPRA compliance - full data erasure)
 // This replaces PII with anonymized placeholders while preserving financial records
 router.post('/api/members/:email/anonymize', isStaffOrAdmin, async (req, res) => {
