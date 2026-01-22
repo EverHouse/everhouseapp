@@ -454,6 +454,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const metaThemeColor = document.getElementById('theme-color-meta');
     const isMember = ['/dashboard', '/book', '/member-events', '/member-wellness', '/profile', '/updates', '/history'].some(path => location.pathname.startsWith(path));
     const isAdmin = location.pathname.startsWith('/admin');
+    const isFullBleedPage = location.pathname === '/' || location.pathname === '/private-hire';
+    const isDark = (isAdmin || isMember) && effectiveTheme === 'dark';
     
     const updateThemeColor = (scrolledPastHero: boolean) => {
       if (!metaThemeColor) return;
@@ -461,29 +463,32 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       let themeColor: string;
       if (location.pathname === '/' && !scrolledPastHero) {
         themeColor = '#1a1610';
-      } else {
+      } else if (isFullBleedPage) {
         themeColor = '#293515';
+      } else if (isDark) {
+        themeColor = '#0f120a';
+      } else {
+        themeColor = '#F2F2EC';
       }
       metaThemeColor.setAttribute('content', themeColor);
     };
     
-    if (location.pathname !== '/') {
+    if (location.pathname === '/') {
+      const handleScroll = () => {
+        const heroThreshold = window.innerHeight * 0.6;
+        const scrolledPast = window.scrollY > heroThreshold;
+        setHasScrolledPastHero(scrolledPast);
+        updateThemeColor(scrolledPast);
+      };
+      
+      handleScroll();
+      window.addEventListener('scroll', handleScroll, { passive: true });
+      return () => window.removeEventListener('scroll', handleScroll);
+    } else {
       setHasScrolledPastHero(false);
       updateThemeColor(false);
-      return;
     }
-    
-    const handleScroll = () => {
-      const heroThreshold = window.innerHeight * 0.6;
-      const scrolledPast = window.scrollY > heroThreshold;
-      setHasScrolledPastHero(scrolledPast);
-      updateThemeColor(scrolledPast);
-    };
-    
-    handleScroll();
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [location.pathname]);
+  }, [location.pathname, effectiveTheme]);
   
   const isMemberRoute = ['/dashboard', '/book', '/member-events', '/member-wellness', '/profile', '/updates', '/history'].some(path => location.pathname.startsWith(path));
   const isAdminRoute = location.pathname.startsWith('/admin');
