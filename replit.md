@@ -35,7 +35,7 @@ The application features a React 19 frontend with Vite, styled using Tailwind CS
 - **Member Management**: Supports member tiers, tags, comprehensive directory, and unified billing groups (family and corporate) with primary payer and add-on members.
 - **Booking System**: Supports "Request & Hold," conflict detection, staff/member initiated bookings, multi-member bookings, and calendar management. Includes guardian consent for minors.
 - **Trackman Webhook Integration**: Real-time booking synchronization via webhooks replaces manual email-parsing. Secure endpoint (`/api/webhooks/trackman`) validates HMAC SHA256 signatures. Bay serial mapping (24120062→Bay 1, 23510044→Bay 2, 24070104→Bay 3, 24080064→Bay 4) provides precise bay identification. Auto-approval matches Trackman bookings to pending member requests (exact or ±30-minute fuzzy). Auto-creates confirmed bookings for known members without prior request. Smart notification delivery: WebSocket first, email only if user not actively viewing app. Unmatched bookings queue for staff resolution with "Remember Email" feature.
-- **Linked Email Addresses**: Supports alternate email addresses for members to facilitate automatic booking creation.
+- **Linked Email Addresses**: Supports alternate email addresses for members to facilitate automatic booking creation. Trackman import auto-learns email associations when M: entries are matched by name but have unrecognized emails.
 - **Security**: Role-based access control with `isAdmin` and `isStaffOrAdmin` middleware.
 - **Notifications & Notices**: In-app real-time notifications and a database-tracked sequential notice dismissal system with 3-channel delivery.
 - **Real-Time Sync**: Instant updates via WebSocket, with Supabase Realtime as a parallel channel.
@@ -57,6 +57,7 @@ The application features a React 19 frontend with Vite, styled using Tailwind CS
 - **Tier Normalization**: Centralized utility for tier matching and parsing.
 - **Guest Fee Configuration**: Guest fees are configurable per-tier.
 - **Guest Pass Accuracy**: Guest pass counting excludes cancelled/declined bookings.
+- **Guest Email Requirement**: Guest email is required on all UI and API paths for adding guests to bookings. Guests without email are treated as unfilled slots until email is provided. Staff API available at GET /api/guests/needs-email and PATCH /api/guests/:guestId/email.
 - **PWA Gesture Handling**: Edge swipe gestures are disabled in standalone PWA mode.
 - **Corporate Membership**: Supports unified billing groups, volume pricing, corporate checkout, HubSpot company sync, and individual tracking within groups.
 - **Data Integrity Architecture**: Stripe as the source of truth for billing, transaction rollback for group member operations, fail-fast on Stripe errors, webhook idempotency, and automatic status sync between Stripe and database. Dual-source active tracking using HubSpot and Stripe. Tier sync utility for consistency. Database pool client management ensures proper release.

@@ -721,6 +721,16 @@ async function createTrackmanSessionAndParticipants(input: SessionCreationInput)
               continue;
             }
             
+            // Auto-link the unmatched email to the matched member for future imports
+            // This teaches the system that e.g. jessica.dinh@evenhouse.club belongs to jessicadinh4@gmail.com
+            if (member.email && member.email.toLowerCase() !== matchedMember.email.toLowerCase()) {
+              await autoLinkEmailToOwner(
+                member.email, 
+                matchedMember.email,
+                `Name-match auto-link: "${member.name}" matched to ${matchedMember.email}, linking Trackman email ${member.email}`
+              );
+            }
+            
             const memberTier = await getMemberTierByEmail(matchedMember.email) || 'social';
             
             participantInputs.push({
@@ -1682,10 +1692,32 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 }
               }
               
+              // For multi-player bookings: try name-based matching to identify unmatched M: entries
+              // If we find a unique name match, auto-link the Trackman email to that member
+              let resolvedMemberEmail = memberExists;
+              if (!memberExists && memberName) {
+                const nameMatch = await findMembersByName(memberName);
+                if (nameMatch.match === 'unique') {
+                  const matchedMember = nameMatch.members[0];
+                  
+                  // Auto-link the Trackman email to this member for future imports
+                  if (memberEmail !== matchedMember.email.toLowerCase()) {
+                    await autoLinkEmailToOwner(
+                      memberEmail,
+                      matchedMember.email,
+                      `Multi-player name-match: "${memberName}" matched to ${matchedMember.email}`
+                    );
+                  }
+                  
+                  resolvedMemberEmail = matchedMember.email;
+                  process.stderr.write(`[Trackman Import] Name-matched "${memberName}" to ${matchedMember.email} for booking_members\n`);
+                }
+              }
+              
               if (memberSlot <= row.playerCount) {
                 await db.insert(bookingMembers).values({
                   bookingId: bookingId,
-                  userEmail: memberExists || memberEmail, // Use real email if mapped, otherwise placeholder
+                  userEmail: resolvedMemberEmail || memberEmail, // Use resolved email if matched, otherwise placeholder
                   slotNumber: memberSlot,
                   isPrimary: false,
                   trackmanBookingId: row.bookingId,
@@ -1694,17 +1726,17 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 });
                 
                 // Send notification to linked member for future bookings
-                if (memberExists && normalizedStatus === 'approved' && isUpcoming) {
+                if (resolvedMemberEmail && normalizedStatus === 'approved' && isUpcoming) {
                   const linkedMessage = `You've been added to a simulator booking on ${formatNotificationDateTime(bookingDate, startTime)}.`;
                   await db.insert(notifications).values({
-                    userEmail: memberExists,
+                    userEmail: resolvedMemberEmail,
                     title: 'Added to Booking',
                     message: linkedMessage,
                     type: 'booking_approved',
                     relatedId: bookingId,
                     relatedType: 'booking_request'
                   });
-                  sendPushNotification(memberExists, {
+                  sendPushNotification(resolvedMemberEmail, {
                     title: 'Added to Booking',
                     body: linkedMessage,
                     tag: `booking-linked-${bookingId}`
@@ -1712,11 +1744,11 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 }
                 
                 // Increment lifetime visits for linked members on attended bookings
-                if (memberExists && normalizedStatus === 'attended') {
+                if (resolvedMemberEmail && normalizedStatus === 'attended') {
                   await db.execute(sql`
                     UPDATE users 
                     SET lifetime_visits = COALESCE(lifetime_visits, 0) + 1 
-                    WHERE email = ${memberExists}
+                    WHERE email = ${resolvedMemberEmail}
                   `);
                 }
                 
