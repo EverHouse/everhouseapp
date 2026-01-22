@@ -1316,6 +1316,103 @@ html.dark .border-accessible {
   animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.15s forwards;
 }
 
+/* Extended stagger delays for lists (4-12) */
+.animate-content-enter-delay-4 { opacity: 0; animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.2s forwards; }
+.animate-content-enter-delay-5 { opacity: 0; animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.25s forwards; }
+.animate-content-enter-delay-6 { opacity: 0; animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.3s forwards; }
+.animate-content-enter-delay-7 { opacity: 0; animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.35s forwards; }
+.animate-content-enter-delay-8 { opacity: 0; animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.4s forwards; }
+.animate-content-enter-delay-9 { opacity: 0; animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.45s forwards; }
+.animate-content-enter-delay-10 { opacity: 0; animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.5s forwards; }
+.animate-content-enter-delay-11 { opacity: 0; animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.55s forwards; }
+.animate-content-enter-delay-12 { opacity: 0; animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.6s forwards; }
+
+/* List item stagger with slide - for lists/cards that need vertical motion */
+@keyframes listItemEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-list-item {
+  opacity: 0;
+  animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.animate-list-item-delay-1 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.05s forwards; }
+.animate-list-item-delay-2 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.1s forwards; }
+.animate-list-item-delay-3 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.15s forwards; }
+.animate-list-item-delay-4 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.2s forwards; }
+.animate-list-item-delay-5 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.25s forwards; }
+.animate-list-item-delay-6 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.3s forwards; }
+.animate-list-item-delay-7 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.35s forwards; }
+.animate-list-item-delay-8 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.4s forwards; }
+.animate-list-item-delay-9 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.45s forwards; }
+.animate-list-item-delay-10 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.5s forwards; }
+
+/* Skeleton crossfade - fades out skeleton while content fades in */
+@keyframes skeletonFadeOut {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+.animate-skeleton-out {
+  animation: skeletonFadeOut 0.25s ease-out forwards;
+}
+
+/* Content fade-in after skeleton (slight delay to overlap with skeleton exit) */
+.animate-content-in {
+  opacity: 0;
+  animation: fadeIn 0.3s ease-out 0.1s forwards;
+}
+
+/* Button active/pressed state utility */
+.btn-pressable {
+  transition: transform 0.1s ease-out, opacity 0.1s ease-out;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-pressable:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+/* Card pressable - slightly less scale for larger elements */
+.card-pressable {
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.card-pressable:active {
+  transform: scale(0.985);
+}
+
+/* Input focus animation */
+.input-animated {
+  transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out, background-color 0.2s ease-out;
+}
+
+.input-animated:focus {
+  outline: none;
+  border-color: rgba(41, 53, 21, 0.4);
+  box-shadow: 0 0 0 3px rgba(41, 53, 21, 0.1);
+}
+
+.dark .input-animated:focus {
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+}
+
 /* Fade In Animation */
 @keyframes fadeIn {
   from {
