@@ -17,6 +17,9 @@ const MenuOverlay: React.FC<MenuOverlayProps> = ({ isOpen, onClose }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const originalBgRef = useRef<string>('');
+
+  const menuBgColor = isDark ? '#0f120a' : '#F2F2EC';
 
   useEffect(() => {
     if (isOpen) {
@@ -24,11 +27,18 @@ const MenuOverlay: React.FC<MenuOverlayProps> = ({ isOpen, onClose }) => {
         clearTimeout(timerRef.current);
         timerRef.current = null;
       }
+      originalBgRef.current = document.body.style.backgroundColor || '';
+      document.documentElement.style.backgroundColor = menuBgColor;
+      document.body.style.backgroundColor = menuBgColor;
       setIsVisible(true);
       setIsClosing(false);
     } else if (isVisible) {
       setIsClosing(true);
       timerRef.current = setTimeout(() => {
+        if (originalBgRef.current) {
+          document.documentElement.style.backgroundColor = originalBgRef.current;
+          document.body.style.backgroundColor = originalBgRef.current;
+        }
         setIsVisible(false);
         setIsClosing(false);
         timerRef.current = null;
@@ -41,7 +51,7 @@ const MenuOverlay: React.FC<MenuOverlayProps> = ({ isOpen, onClose }) => {
         timerRef.current = null;
       }
     };
-  }, [isOpen, isVisible]);
+  }, [isOpen, isVisible, menuBgColor]);
 
   useScrollLockManager(isVisible);
 

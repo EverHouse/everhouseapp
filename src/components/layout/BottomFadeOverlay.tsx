@@ -12,8 +12,8 @@ export const BottomFadeOverlay: React.FC<BottomFadeOverlayProps> = ({ isDark = f
         className="fixed inset-x-0 bottom-0 pointer-events-none lg:hidden"
         style={{ 
           zIndex: 8400,
-          height: '80px',
-          background: 'linear-gradient(to top, rgba(0, 0, 0, 0.08) 0%, rgba(0, 0, 0, 0.04) 40%, transparent 100%)',
+          height: '60px',
+          background: 'linear-gradient(to top, rgba(0, 0, 0, 0.06) 0%, rgba(0, 0, 0, 0.03) 50%, transparent 100%)',
         }}
       />
     );
@@ -26,8 +26,8 @@ export const BottomFadeOverlay: React.FC<BottomFadeOverlayProps> = ({ isDark = f
       className="fixed inset-x-0 bottom-0 pointer-events-none lg:hidden"
       style={{ 
         zIndex: 8400,
-        height: '100px',
-        background: `linear-gradient(to top, rgba(${color}, 0.9) 0%, rgba(${color}, 0.7) 20%, rgba(${color}, 0.4) 40%, rgba(${color}, 0.1) 60%, transparent 80%)`,
+        height: '80px',
+        background: `linear-gradient(to top, rgba(${color}, 1) 0%, rgba(${color}, 0.85) 15%, rgba(${color}, 0.5) 35%, rgba(${color}, 0.15) 55%, rgba(${color}, 0.03) 75%, transparent 100%)`,
       }}
     />
   );
