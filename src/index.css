@@ -10,6 +10,9 @@
   --nav-height: 4rem; /* approximate nav bar height */
   --nav-clearance: calc(var(--nav-height) + var(--nav-bottom-offset) + env(safe-area-inset-bottom, 0px));
   
+  /* Nav Fade - subtle gradient above bottom nav for smooth transition */
+  --nav-fade-color: rgba(242, 242, 236, 0.8); /* bone with transparency */
+  
   /* Brand Colors */
   --brand-primary: #293515;
   --brand-secondary: #F2F2EC;
@@ -150,6 +153,7 @@ html, body {
 html.dark, html.dark body {
   background-color: #0f120a;
   color: #F2F2EC;
+  --nav-fade-color: rgba(15, 18, 10, 0.85); /* dark green with transparency */
 }
 
 #root {
