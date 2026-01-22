@@ -1687,11 +1687,11 @@ const WellnessAdminContent: React.FC = () => {
     };
 
     return (
-        <div className="animate-pop-in">
-            <p className="text-sm text-primary/80 dark:text-white/80 mb-4">
+        <div key={activeCategory}>
+            <p className="text-sm text-primary/80 dark:text-white/80 mb-4 animate-content-enter">
                 Synced from Google Calendar: <span className="font-medium">Wellness & Classes</span>
             </p>
-            <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide -mx-4 px-4 animate-pop-in scroll-fade-right" style={{animationDelay: '0.05s'}}>
+            <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide -mx-4 px-4 animate-content-enter-delay-1 scroll-fade-right">
                 {WELLNESS_CATEGORY_TABS.map(tab => (
                     <button
                         key={tab.id}
@@ -1721,7 +1721,7 @@ const WellnessAdminContent: React.FC = () => {
             )}
 
             {needsReviewClasses.length > 0 && (
-                <div className="mb-6 animate-pop-in">
+                <div className="mb-6 animate-content-enter-delay-2">
                     <div className="bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-sm border border-amber-200 dark:border-amber-700/50 rounded-xl p-4">
                         <div className="flex items-center gap-2 mb-3">
                             <span aria-hidden="true" className="material-symbols-outlined text-amber-500">rate_review</span>
@@ -1790,14 +1790,14 @@ const WellnessAdminContent: React.FC = () => {
             ) : (
                 <div className="space-y-6">
                     {upcomingClasses.length > 0 && (
-                        <div className="animate-pop-in" style={{animationDelay: '0.1s'}}>
+                        <div className="animate-content-enter-delay-2">
                             <div className="flex items-center gap-2 mb-3">
                                 <span aria-hidden="true" className="material-symbols-outlined text-green-500">schedule</span>
                                 <h3 className="font-bold text-primary dark:text-white">Upcoming ({upcomingClasses.length})</h3>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {upcomingClasses.map((cls, index) => (
-                                    <div key={cls.id} onClick={() => openEdit(cls)} className="bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 flex flex-col gap-3 relative overflow-hidden cursor-pointer hover:border-primary/30 transition-all animate-pop-in" style={{animationDelay: `${0.15 + index * 0.03}s`}}>
+                                    <div key={cls.id} onClick={() => openEdit(cls)} className={`bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 flex flex-col gap-3 relative overflow-hidden cursor-pointer hover:border-primary/30 transition-all animate-list-item-delay-${Math.min(index + 1, 10)}`}>
                                         <div className="flex gap-4">
                                             <div className="w-20 h-20 rounded-lg bg-[#CCB8E4]/20 dark:bg-[#CCB8E4]/10 flex-shrink-0 overflow-hidden flex items-center justify-center">
                                                 {cls.image_url ? (
@@ -1835,14 +1835,14 @@ const WellnessAdminContent: React.FC = () => {
                     )}
                     
                     {pastClasses.length > 0 && (
-                        <div className="animate-pop-in" style={{animationDelay: '0.2s'}}>
+                        <div className="animate-content-enter-delay-3">
                             <div className="flex items-center gap-2 mb-3">
                                 <span aria-hidden="true" className="material-symbols-outlined text-gray-600 dark:text-gray-500">history</span>
                                 <h3 className="font-bold text-gray-500 dark:text-gray-400">Past ({pastClasses.length})</h3>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-70">
                                 {pastClasses.map((cls, index) => (
-                                    <div key={cls.id} onClick={() => openEdit(cls)} className="bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 flex flex-col gap-3 relative overflow-hidden cursor-pointer hover:border-primary/30 transition-all animate-pop-in" style={{animationDelay: `${0.25 + index * 0.03}s`}}>
+                                    <div key={cls.id} onClick={() => openEdit(cls)} className={`bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 flex flex-col gap-3 relative overflow-hidden cursor-pointer hover:border-primary/30 transition-all animate-list-item-delay-${Math.min(index + 1, 10)}`}>
                                         <div className="flex gap-4">
                                             <div className="w-20 h-20 rounded-lg bg-[#CCB8E4]/20 dark:bg-[#CCB8E4]/10 flex-shrink-0 overflow-hidden flex items-center justify-center">
                                                 {cls.image_url ? (
@@ -2312,8 +2312,10 @@ const EventsTab: React.FC = () => {
                     </button>
                 </div>
 
-                {activeSubTab === 'events' && <EventsAdminContent />}
-                {activeSubTab === 'wellness' && <WellnessAdminContent />}
+                <div key={activeSubTab} className="animate-content-enter">
+                    {activeSubTab === 'events' && <EventsAdminContent />}
+                    {activeSubTab === 'wellness' && <WellnessAdminContent />}
+                </div>
                 <FloatingActionButton 
                     onClick={() => {
                         if (activeSubTab === 'events') {
