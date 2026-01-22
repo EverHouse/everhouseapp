@@ -7,16 +7,7 @@ interface BottomFadeOverlayProps {
 
 export const BottomFadeOverlay: React.FC<BottomFadeOverlayProps> = ({ isDark = false, variant = 'colored' }) => {
   if (variant === 'shadow') {
-    return (
-      <div 
-        className="fixed inset-x-0 bottom-0 pointer-events-none lg:hidden"
-        style={{ 
-          zIndex: 8400,
-          height: '60px',
-          background: 'linear-gradient(to top, rgba(0, 0, 0, 0.06) 0%, rgba(0, 0, 0, 0.03) 50%, transparent 100%)',
-        }}
-      />
-    );
+    return null;
   }
 
   const color = isDark ? '15, 18, 10' : '242, 242, 236';
