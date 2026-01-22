@@ -61,6 +61,7 @@ export interface MemberProfile {
   lastBookingDate?: string;
   manuallyLinkedEmails?: string[];
   dateOfBirth?: string | null;
+  billingGroupId?: number | null;
 }
 
 export interface Booking {

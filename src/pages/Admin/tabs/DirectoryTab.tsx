@@ -14,6 +14,16 @@ import { getTierColor, getTagColor } from '../../../utils/tierUtils';
 
 const TIER_OPTIONS = ['All', 'Social', 'Core', 'Premium', 'Corporate', 'VIP'] as const;
 const ASSIGNABLE_TIERS = ['Social', 'Core', 'Premium', 'Corporate', 'VIP'] as const;
+const BILLING_OPTIONS = ['All', 'Individual', 'Group'] as const;
+type BillingFilter = 'All' | 'Individual' | 'Group';
+
+const SORT_OPTIONS: { value: SortField; label: string }[] = [
+    { value: 'name', label: 'Name A-Z' },
+    { value: 'joinDate', label: 'Join Date' },
+    { value: 'lastVisit', label: 'Last Visit' },
+    { value: 'visits', label: 'Lifetime Visits' },
+    { value: 'tier', label: 'Tier' },
+];
 
 // Only virtualize lists with more than this many items to avoid overhead on small lists
 const VIRTUALIZATION_THRESHOLD = 20;
@@ -214,6 +224,7 @@ const DirectoryTab: React.FC = () => {
     const [tierFilter, setTierFilter] = useState<string>('All');
     const [tagFilter, setTagFilter] = useState<string>('All');
     const [statusFilter, setStatusFilter] = useState<string>('All');
+    const [billingFilter, setBillingFilter] = useState<BillingFilter>('All');
     const [selectedMember, setSelectedMember] = useState<MemberProfile | null>(null);
     const [isViewingDetails, setIsViewingDetails] = useState(false);
     const [memberTab, setMemberTab] = useState<MemberTab>('active');
@@ -510,6 +521,15 @@ const DirectoryTab: React.FC = () => {
             );
         }
         
+        // Billing filter
+        if (billingFilter !== 'All') {
+            if (billingFilter === 'Individual') {
+                filtered = filtered.filter(m => !m.billingGroupId);
+            } else if (billingFilter === 'Group') {
+                filtered = filtered.filter(m => !!m.billingGroupId);
+            }
+        }
+        
         // Status filter (former members tab only)
         if (memberTab === 'former' && statusFilter !== 'All') {
             filtered = filtered.filter(m => m.status === statusFilter);
@@ -555,7 +575,7 @@ const DirectoryTab: React.FC = () => {
         });
         
         return filtered;
-    }, [regularMembers, tierFilter, tagFilter, statusFilter, memberTab, searchQuery, sortField, sortDirection, showMissingTierOnly]);
+    }, [regularMembers, tierFilter, tagFilter, statusFilter, billingFilter, memberTab, searchQuery, sortField, sortDirection, showMissingTierOnly]);
     
     const handleViewAs = async (member: MemberProfile) => {
         if (!isAdmin) return;
@@ -799,6 +819,53 @@ const DirectoryTab: React.FC = () => {
                                 {formatStatusLabel(status)}
                             </button>
                         ))}
+                    </div>
+                )}
+
+                {/* Billing Filter - only for active/former tabs */}
+                {memberTab !== 'visitors' && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">Billing:</span>
+                        {BILLING_OPTIONS.map(option => (
+                            <button
+                                key={option}
+                                onClick={() => setBillingFilter(option)}
+                                className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${
+                                    billingFilter === option
+                                        ? 'bg-primary dark:bg-lavender text-white'
+                                        : 'bg-gray-200 dark:bg-white/20 text-gray-400 dark:text-gray-500 hover:bg-gray-300 dark:hover:bg-white/30'
+                                }`}
+                            >
+                                {option}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {/* Sort Dropdown with Direction Toggle - only for active/former tabs */}
+                {memberTab !== 'visitors' && (
+                    <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">Sort:</span>
+                        <select
+                            value={sortField}
+                            onChange={(e) => setSortField(e.target.value as SortField)}
+                            className="px-2 py-0.5 rounded text-[11px] font-bold bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        >
+                            {SORT_OPTIONS.map(option => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                        <button
+                            onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
+                            className="flex items-center justify-center w-6 h-6 rounded bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
+                            title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+                        >
+                            <span className="material-symbols-outlined text-[16px]">
+                                {sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward'}
+                            </span>
+                        </button>
                     </div>
                 )}
                 
