@@ -372,7 +372,7 @@ const Landing: React.FC = () => {
       {/* Editorial Sections */}
       <div>
         <EditorialSection
-          image="/images/golf-sims-optimized.webp"
+          image="/images/private-dining-optimized.webp"
           title="Curated Events & Wellness"
           description="From intimate tastings to golf socials and wellness workshops, discover experiences designed to inspire and connect."
           ctaLabel="See What's On"
@@ -390,7 +390,7 @@ const Landing: React.FC = () => {
         />
         
         <EditorialSection
-          image="/images/cowork-optimized.webp"
+          image="/images/gallery/gallery-l1050509.webp"
           title="Luxury Workspaces"
           description="Thoughtfully designed spaces where productivity meets comfort. High-speed wifi, private conference rooms, and an inspiring atmosphere."
           ctaLabel="View Gallery"
