@@ -1,7 +1,7 @@
 import { db } from '../db';
 import { systemSettings } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
-import { reconcileDailyPayments } from '../core/stripe/reconciliation';
+import { reconcileDailyPayments, reconcileSubscriptions } from '../core/stripe/reconciliation';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
 
 const RECONCILIATION_HOUR = 5;
@@ -45,8 +45,11 @@ async function checkAndRunReconciliation(): Promise<void> {
         console.log('[Stripe Reconciliation] Starting scheduled reconciliation...');
         
         try {
-          const results = await reconcileDailyPayments();
-          console.log('[Stripe Reconciliation] Complete:', results);
+          const paymentResults = await reconcileDailyPayments();
+          console.log('[Stripe Reconciliation] Payment reconciliation complete:', paymentResults);
+          
+          const subscriptionResults = await reconcileSubscriptions();
+          console.log('[Stripe Reconciliation] Subscription reconciliation complete:', subscriptionResults);
         } catch (error) {
           console.error('[Stripe Reconciliation] Error running reconciliation:', error);
         }

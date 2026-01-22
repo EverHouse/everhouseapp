@@ -1,6 +1,9 @@
 import { pool } from '../db';
 import { getStripeClient } from './client';
 import { confirmPaymentSuccess } from './payments';
+import { findOrCreateHubSpotContact } from '../hubspot/members';
+import { updateContactMembershipStatus } from '../hubspot/stages';
+import Stripe from 'stripe';
 
 export async function reconcileDailyPayments() {
   console.log('[Reconcile] Starting daily payment reconciliation...');
@@ -91,6 +94,7 @@ export async function reconcileSubscriptions() {
   try {
     const stripe = await getStripeClient();
     
+    // Phase 1: Check if DB active members have active Stripe subscriptions
     const activeMembers = await pool.query(
       `SELECT stripe_customer_id, email, tier 
        FROM users 
@@ -121,9 +125,160 @@ export async function reconcileSubscriptions() {
       }
     }
 
-    console.log(`[Reconcile] Subscription check complete - ${activeMembers.rows.length} members checked, ${mismatches} mismatches found`);
+    console.log(`[Reconcile] Phase 1 complete - ${activeMembers.rows.length} members checked, ${mismatches} mismatches found`);
     
-    return { membersChecked: activeMembers.rows.length, mismatches };
+    // Phase 2: Check for Stripe subscriptions missing DB users
+    console.log('[Reconcile] Phase 2: Checking for Stripe subscriptions missing DB users...');
+    
+    let subscriptionsChecked = 0;
+    let usersCreated = 0;
+    let hasMore = true;
+    let startingAfter: string | undefined;
+    
+    while (hasMore) {
+      const params: Stripe.SubscriptionListParams = {
+        status: 'active',
+        limit: 100,
+        expand: ['data.customer']
+      };
+      if (startingAfter) {
+        params.starting_after = startingAfter;
+      }
+      
+      const subscriptions = await stripe.subscriptions.list(params);
+      
+      for (const subscription of subscriptions.data) {
+        subscriptionsChecked++;
+        
+        try {
+          let customer: Stripe.Customer;
+          
+          // Handle case where customer is not expanded (returns as string ID)
+          if (typeof subscription.customer === 'string') {
+            try {
+              const fetchedCustomer = await stripe.customers.retrieve(subscription.customer);
+              if (!fetchedCustomer || (fetchedCustomer as Stripe.DeletedCustomer).deleted) {
+                console.warn(`[Reconcile] Subscription ${subscription.id} has deleted customer - skipping`);
+                continue;
+              }
+              customer = fetchedCustomer as Stripe.Customer;
+            } catch (fetchErr: any) {
+              console.warn(`[Reconcile] Failed to fetch customer for subscription ${subscription.id}: ${fetchErr.message}`);
+              continue;
+            }
+          } else {
+            customer = subscription.customer as Stripe.Customer;
+            
+            // Handle deleted customer
+            if (!customer || customer.deleted) {
+              console.warn(`[Reconcile] Subscription ${subscription.id} has deleted/missing customer - skipping`);
+              continue;
+            }
+          }
+          
+          const customerEmail = customer.email?.toLowerCase();
+          if (!customerEmail) {
+            console.warn(`[Reconcile] Subscription ${subscription.id} customer ${customer.id} has no email - skipping`);
+            continue;
+          }
+          
+          // Check if user exists in DB
+          const existingUser = await pool.query(
+            'SELECT id, email, stripe_customer_id FROM users WHERE LOWER(email) = LOWER($1)',
+            [customerEmail]
+          );
+          
+          if (existingUser.rows.length > 0) {
+            // User exists, ensure stripe_customer_id is set
+            if (!existingUser.rows[0].stripe_customer_id) {
+              await pool.query(
+                `UPDATE users SET stripe_customer_id = $1, updated_at = NOW() WHERE id = $2`,
+                [customer.id, existingUser.rows[0].id]
+              );
+              console.log(`[Reconcile] Updated missing stripe_customer_id for ${customerEmail}`);
+            }
+            continue;
+          }
+          
+          // User doesn't exist - create them
+          console.warn(`[Reconcile] MISSING USER: Stripe subscription ${subscription.id} for ${customerEmail} has no DB user - creating...`);
+          
+          const customerName = customer.name || '';
+          const nameParts = customerName.split(' ');
+          const firstName = nameParts[0] || '';
+          const lastName = nameParts.slice(1).join(' ') || '';
+          
+          // Get tier from subscription price ID
+          let tierSlug: string | null = null;
+          let tierName: string | null = null;
+          
+          const subscriptionItem = subscription.items?.data?.[0];
+          const priceId = subscriptionItem?.price?.id;
+          
+          if (priceId) {
+            const tierResult = await pool.query(
+              'SELECT slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
+              [priceId]
+            );
+            if (tierResult.rows.length > 0) {
+              tierSlug = tierResult.rows[0].slug;
+              tierName = tierResult.rows[0].name;
+            }
+          }
+          
+          // Create user in DB
+          await pool.query(
+            `INSERT INTO users (email, first_name, last_name, tier, status, stripe_customer_id, join_date, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, 'active', $5, NOW(), NOW(), NOW())
+             ON CONFLICT (email) DO UPDATE SET 
+               stripe_customer_id = EXCLUDED.stripe_customer_id,
+               status = 'active',
+               tier = COALESCE(EXCLUDED.tier, users.tier),
+               updated_at = NOW()`,
+            [customerEmail, firstName, lastName, tierSlug, customer.id]
+          );
+          
+          console.log(`[Reconcile] Created user ${customerEmail} with tier ${tierSlug || 'none'} from subscription ${subscription.id}`);
+          usersCreated++;
+          
+          // Sync to HubSpot
+          try {
+            const contactResult = await findOrCreateHubSpotContact(
+              customerEmail,
+              firstName,
+              lastName,
+              undefined,
+              tierName || undefined
+            );
+            
+            if (contactResult?.contactId) {
+              await updateContactMembershipStatus(contactResult.contactId, 'Active', 'system');
+              console.log(`[Reconcile] Synced ${customerEmail} to HubSpot contact ${contactResult.contactId}`);
+            }
+          } catch (hubspotError) {
+            console.error(`[Reconcile] HubSpot sync failed for ${customerEmail}:`, hubspotError);
+          }
+          
+        } catch (err: any) {
+          console.error(`[Reconcile] Error processing subscription ${subscription.id}:`, err.message);
+        }
+      }
+      
+      hasMore = subscriptions.has_more;
+      if (hasMore && subscriptions.data.length > 0) {
+        startingAfter = subscriptions.data[subscriptions.data.length - 1].id;
+      }
+    }
+    
+    console.log(`[Reconcile] Phase 2 complete - ${subscriptionsChecked} subscriptions checked, ${usersCreated} users created`);
+    console.log(`[Reconcile] Subscription reconciliation complete`);
+    
+    return { 
+      membersChecked: activeMembers.rows.length, 
+      mismatches,
+      subscriptionsChecked,
+      usersCreated
+    };
   } catch (error) {
     console.error('[Reconcile] Error during subscription reconciliation:', error);
     throw error;
