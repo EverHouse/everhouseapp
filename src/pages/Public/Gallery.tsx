@@ -320,7 +320,7 @@ const Gallery: React.FC = () => {
             <>
               <div className="columns-2 gap-4 space-y-4 animate-in fade-in duration-500">
                 {filteredItems.map((item, index) => (
-                  <GalleryItem key={item.id || item.img} img={item.img} onClick={() => openViewer(index)} index={index} />
+                  <GalleryItem key={item.id || item.img} img={item.img} onItemClick={openViewer} index={index} />
                 ))}
               </div>
               <div className="mt-12 flex justify-center pb-8">
@@ -362,17 +362,28 @@ const FilterButton: React.FC<{label: string; active?: boolean; onClick?: () => v
   </button>
 );
 
-const GalleryItem: React.FC<{img: string; onClick: () => void; index: number}> = ({ img, onClick, index }) => {
+// ⚡ Bolt: Memoized GalleryItem to prevent re-renders when the modal is opened/closed.
+interface GalleryItemProps {
+  img: string;
+  index: number;
+  // ⚡ Bolt: Renamed from onClick to onItemClick and passed openViewer directly
+  // to prevent re-creating the function on every render of the parent.
+  onItemClick: (index: number) => void;
+}
+const GalleryItem: React.FC<GalleryItemProps> = React.memo(({ img, index, onItemClick }) => {
   const [loaded, setLoaded] = React.useState(false);
   const [error, setError] = React.useState(false);
 
   const skeletonHeights = ['aspect-[4/3]', 'aspect-[3/4]', 'aspect-square', 'aspect-[4/5]'];
   const skeletonHeight = skeletonHeights[index % skeletonHeights.length];
   
+  // ⚡ Bolt: This handler calls the memoized function from the parent.
+  const handleClick = () => onItemClick(index);
+
   return (
     <div 
       className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-sm cursor-pointer mb-4 border border-white/20 active:scale-[0.98] transition-transform"
-      onClick={onClick}
+      onClick={handleClick}
     >
       {!loaded && !error && (
         <div className={`w-full ${skeletonHeight} bg-gradient-to-br from-gray-200 via-gray-100 to-gray-200 rounded-2xl overflow-hidden`}>
@@ -395,7 +406,7 @@ const GalleryItem: React.FC<{img: string; onClick: () => void; index: number}> =
       {loaded && <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300"></div>}
     </div>
   );
-};
+});
 
 interface ImageViewerProps {
   images: string[];
