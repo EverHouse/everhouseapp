@@ -1,5 +1,10 @@
 const isDev = import.meta.env.DEV;
 
+function getCsrfToken(): string | null {
+  const match = document.cookie.match(/csrf_token=([^;]+)/);
+  return match ? match[1] : null;
+}
+
 export interface ApiResult<T = any> {
   ok: boolean;
   data?: T;
@@ -68,8 +73,20 @@ export async function apiRequest<T = any>(
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
 
+      const headers: Record<string, string> = {
+        ...(options?.headers as Record<string, string> || {}),
+      };
+      
+      if (!['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase())) {
+        const csrfToken = getCsrfToken();
+        if (csrfToken) {
+          headers['x-csrf-token'] = csrfToken;
+        }
+      }
+
       const res = await fetch(url, {
         ...options,
+        headers,
         credentials: 'include',
         signal: controller.signal,
       });

@@ -6,6 +6,8 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { csrfTokenMiddleware, csrfProtectionWithExemptions } from './middleware/csrf';
+import { globalRateLimiter } from './middleware/rateLimiting';
 import { getSession, registerAuthRoutes } from './replit_integrations/auth';
 import { setupSupabaseAuthRoutes } from './supabase/auth';
 import { isProduction, pool } from './core/db';
@@ -230,6 +232,9 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ limit: '1mb' }));
 app.use(getSession());
+app.use(globalRateLimiter);
+app.use(csrfTokenMiddleware);
+app.use(csrfProtectionWithExemptions);
 
 app.get('/api/health', async (req, res) => {
   try {

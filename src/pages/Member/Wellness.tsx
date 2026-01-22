@@ -411,7 +411,7 @@ const ClassesView: React.FC<{onBook: (cls: WellnessClass) => void; isDark?: bool
             ))}
         </div>
         
-        <MotionList className="space-y-4">
+        <MotionList className="space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-2">
             {sortedClasses.length > 0 ? (
                 sortedClasses.map((cls) => {
                     const isExpanded = expandedId === cls.id;
@@ -587,9 +587,11 @@ const ClassCard: React.FC<any> = ({ title, date, time, instructor, duration, cat
   <div 
     className={`rounded-xl relative overflow-hidden transition-all glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}
   >
-    <div 
+    <button 
       onClick={onToggle}
-      className={`p-4 cursor-pointer transition-all ${isExpanded ? '' : 'active:scale-[0.98]'}`}
+      aria-expanded={isExpanded}
+      aria-label={`${title} on ${date} at ${formattedTime.time} ${formattedTime.period}. ${isExpanded ? 'Collapse' : 'Expand'} for details`}
+      className={`w-full p-4 cursor-pointer transition-all text-left ${isExpanded ? '' : 'active:scale-[0.98]'}`}
     >
       <div className="flex gap-4 items-start">
         <div className={`w-14 h-14 flex-shrink-0 rounded-xl flex items-center justify-center ${isDark ? 'bg-lavender/20' : 'bg-lavender/30'}`}>
@@ -607,15 +609,15 @@ const ClassCard: React.FC<any> = ({ title, date, time, instructor, duration, cat
               <span className="text-[10px] font-bold uppercase tracking-wider bg-accent text-brand-green px-1.5 py-0.5 rounded-md whitespace-nowrap">Going</span>
             ) : null}
           </div>
-          <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-primary'}`}>{title}</h3>
+          <h3 className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-primary'}`}>{title}</h3>
         </div>
         <div className="flex flex-col items-end flex-shrink-0">
-          <span className={`text-sm font-bold ${isDark ? 'text-accent' : 'text-primary'}`}>{date}</span>
-          <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-primary'}`}>{formattedTime.time}</span>
-          <span className={`text-xs font-medium ${isDark ? 'text-white/70' : 'text-primary/70'}`}>{formattedTime.period}</span>
+          <span className={`text-sm md:text-base font-bold ${isDark ? 'text-accent' : 'text-primary'}`}>{date}</span>
+          <span className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-primary'}`}>{formattedTime.time}</span>
+          <span className={`text-xs md:text-sm font-medium ${isDark ? 'text-white/70' : 'text-primary/70'}`}>{formattedTime.period}</span>
         </div>
       </div>
-    </div>
+    </button>
     <div className={`accordion-content ${isExpanded ? 'expanded' : ''}`}>
       <div className="px-4 pb-4 pt-0 space-y-3">
         <div className={`flex items-center gap-1.5 text-sm ${isDark ? 'text-gray-400' : 'text-primary/70'}`}>

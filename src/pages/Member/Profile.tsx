@@ -344,10 +344,10 @@ const Profile: React.FC = () => {
   return (
     <AnimatedPage>
     <div 
-      className="px-6 pb-32 min-h-screen bg-transparent"
+      className="px-6 pb-32 min-h-screen bg-transparent md:px-8 lg:px-12"
       style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'calc(var(--header-offset) + 1.5rem)' }}
     >
-      <div className="space-y-6">
+      <div className="space-y-6 md:max-w-2xl md:mx-auto lg:max-w-3xl">
          {/* Staff Portal Quick Return - mobile only */}
          {isStaffOrAdminProfile && (
            <div className="lg:hidden">

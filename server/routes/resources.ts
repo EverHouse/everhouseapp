@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { eq, and, or, sql, desc, asc, ne } from 'drizzle-orm';
 import { db } from '../db';
 import { pool } from '../core/db';
+import { bookingRateLimiter } from '../middleware/rateLimiting';
 import { resources, users, facilityClosures, notifications, bookingRequests, bookingParticipants, bookingMembers } from '../../shared/schema';
 import { isAuthorizedForMemberBooking } from '../core/bookingAuth';
 import { isStaffOrAdmin } from '../core/middleware';
@@ -577,7 +578,7 @@ router.put('/api/bookings/:id/decline', isStaffOrAdmin, async (req, res) => {
   }
 });
 
-router.post('/api/bookings', async (req, res) => {
+router.post('/api/bookings', bookingRateLimiter, async (req, res) => {
   try {
     const sessionUser = getSessionUser(req);
     

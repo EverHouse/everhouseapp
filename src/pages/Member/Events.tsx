@@ -256,7 +256,7 @@ const MemberEvents: React.FC = () => {
           {filteredAndSortedEvents.length === 0 ? (
             <EmptyEvents />
           ) : (
-            <MotionList className="space-y-4">
+            <MotionList className="space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-2">
               {filteredAndSortedEvents.map((event) => {
                 const isExpanded = expandedEventId === event.id;
                 const isRsvpd = hasRsvp(event.id);
@@ -267,12 +267,14 @@ const MemberEvents: React.FC = () => {
                     key={event.id}
                     className={`rounded-2xl overflow-hidden transition-all glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}
                   >
-                    <div 
+                    <button 
                       onClick={() => handleCardClick(event.id)}
-                      className={`flex gap-4 p-4 cursor-pointer transition-colors ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}
+                      aria-expanded={isExpanded}
+                      aria-label={`${event.title} on ${event.date} at ${event.time}. ${isExpanded ? 'Collapse' : 'Expand'} for details`}
+                      className={`w-full flex gap-4 p-4 cursor-pointer transition-colors text-left ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}
                     >
-                      <div className={`w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden relative flex items-center justify-center ${isDark ? 'bg-lavender/20' : 'bg-primary/10'}`}>
-                        <span className={`material-symbols-outlined text-3xl ${isDark ? 'text-lavender' : 'text-primary'}`}>
+                      <div className={`w-20 h-20 md:w-24 md:h-24 flex-shrink-0 rounded-xl overflow-hidden relative flex items-center justify-center ${isDark ? 'bg-lavender/20' : 'bg-primary/10'}`}>
+                        <span className={`material-symbols-outlined text-3xl md:text-4xl ${isDark ? 'text-lavender' : 'text-primary'}`}>
                           {event.category === 'Golf' ? 'golf_course' : 
                            event.category === 'Wellness' ? 'spa' : 
                            event.category === 'Social' ? 'groups' : 'event'}
@@ -285,7 +287,7 @@ const MemberEvents: React.FC = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-start mb-1">
-                          <h4 className={`text-base font-bold leading-tight truncate pr-2 ${isDark ? 'text-white' : 'text-primary'}`}>{event.title}</h4>
+                          <h4 className={`text-base md:text-lg font-bold leading-tight truncate pr-2 ${isDark ? 'text-white' : 'text-primary'}`}>{event.title}</h4>
                           {isRsvpd ? (
                             <span className="text-[10px] font-bold uppercase tracking-wider bg-accent text-brand-green px-1.5 py-0.5 rounded-md whitespace-nowrap">Going</span>
                           ) : event.source === 'eventbrite' ? (
@@ -294,15 +296,15 @@ const MemberEvents: React.FC = () => {
                             <span className="text-[10px] font-bold uppercase tracking-wider bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-md whitespace-nowrap">Open</span>
                           )}
                         </div>
-                        <p className={`text-xs mb-1 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>{event.date} • {event.time}</p>
-                        <p className={`text-xs truncate ${isDark ? 'text-white/70' : 'text-primary/70'}`}>{event.location}</p>
+                        <p className={`text-xs md:text-sm mb-1 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>{event.date} • {event.time}</p>
+                        <p className={`text-xs md:text-sm truncate ${isDark ? 'text-white/70' : 'text-primary/70'}`}>{event.location}</p>
                       </div>
-                      <div className="flex items-center">
+                      <div className="flex items-center" aria-hidden="true">
                         <span className={`material-symbols-outlined transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''} ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
                           expand_more
                         </span>
                       </div>
-                    </div>
+                    </button>
 
                     <div 
                       className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}

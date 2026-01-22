@@ -1,5 +1,6 @@
 import { db } from '../../db';
 import { pool } from '../db';
+import { PoolClient } from 'pg';
 import { 
   bookingSessions, 
   availabilityBlocks, 
@@ -115,6 +116,102 @@ async function checkSessionConflict(
     return { hasConflict: false };
   } catch (error) {
     logger.error('[checkSessionConflict] Error:', { error: error as Error });
+    throw error;
+  }
+}
+
+export async function checkSessionConflictWithLock(
+  client: PoolClient,
+  resourceId: number,
+  date: string,
+  startTime: string,
+  endTime: string,
+  excludeSessionId?: number
+): Promise<SessionConflictResult> {
+  try {
+    const result = await client.query(
+      `SELECT id, start_time, end_time
+       FROM booking_sessions
+       WHERE resource_id = $1
+         AND session_date = $2
+         AND start_time < $3
+         AND end_time > $4
+         ${excludeSessionId ? 'AND id != $5' : ''}
+       FOR UPDATE NOWAIT
+       LIMIT 1`,
+      excludeSessionId 
+        ? [resourceId, date, endTime, startTime, excludeSessionId]
+        : [resourceId, date, endTime, startTime]
+    );
+    
+    if (result.rows.length > 0) {
+      const conflict = result.rows[0];
+      return {
+        hasConflict: true,
+        conflictDetails: {
+          id: conflict.id,
+          startTime: conflict.start_time,
+          endTime: conflict.end_time
+        }
+      };
+    }
+    
+    return { hasConflict: false };
+  } catch (error: any) {
+    if (error.code === '55P03') {
+      logger.warn('[checkSessionConflictWithLock] Row locked by concurrent transaction', {
+        extra: { resourceId, date, startTime, endTime }
+      });
+      return {
+        hasConflict: true,
+        conflictDetails: undefined
+      };
+    }
+    logger.error('[checkSessionConflictWithLock] Error:', { error: error as Error });
+    throw error;
+  }
+}
+
+export async function checkUnifiedAvailabilityWithLock(
+  client: PoolClient,
+  resourceId: number,
+  date: string,
+  startTime: string,
+  endTime: string,
+  excludeSessionId?: number
+): Promise<AvailabilityResult> {
+  try {
+    const closureConflict = await checkClosureConflict(resourceId, date, startTime, endTime);
+    if (closureConflict.hasConflict) {
+      return {
+        available: false,
+        conflictType: 'closure',
+        conflictTitle: closureConflict.closureTitle || 'Facility Closure'
+      };
+    }
+    
+    const blockConflict = await checkAvailabilityBlockConflict(resourceId, date, startTime, endTime);
+    if (blockConflict.hasConflict) {
+      return {
+        available: false,
+        conflictType: 'availability_block',
+        conflictTitle: blockConflict.blockType || 'Event Block'
+      };
+    }
+    
+    const sessionConflict = await checkSessionConflictWithLock(client, resourceId, date, startTime, endTime, excludeSessionId);
+    if (sessionConflict.hasConflict) {
+      return {
+        available: false,
+        conflictType: 'session',
+        conflictTitle: 'Existing Booking Session',
+        conflictDetails: sessionConflict.conflictDetails
+      };
+    }
+    
+    return { available: true };
+  } catch (error) {
+    logger.error('[checkUnifiedAvailabilityWithLock] Error:', { error: error as Error });
     throw error;
   }
 }

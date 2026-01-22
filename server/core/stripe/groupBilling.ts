@@ -357,6 +357,8 @@ export async function addGroupMember(params: {
   addedBy: string;
   addedByName: string;
 }): Promise<{ success: boolean; memberId?: number; error?: string }> {
+  const client = await pool.connect();
+  
   try {
     const existingMember = await db.select()
       .from(groupMembers)
@@ -390,74 +392,28 @@ export async function addGroupMember(params: {
       return { success: false, error: 'Billing group not found' };
     }
     
-    let stripeSubscriptionItemId: string | null = null;
-    
-    // VERIFIED: This correctly adds a subscription_item to the primary payer's existing subscription
-    // (NOT creating a separate subscription). Uses stripe.subscriptionItems.create() with the
-    // primary's subscription ID, which is the correct approach for group/family billing.
-    if (group[0].primaryStripeSubscriptionId && product.stripePriceId) {
-      try {
-        const stripe = await getStripeClient();
-        
-        // Determine if this is a family group (not corporate/employee)
-        const isFamilyGroup = params.relationship !== 'employee';
-        
-        // Build subscription item creation params
-        const subscriptionItemParams: Stripe.SubscriptionItemCreateParams = {
-          subscription: group[0].primaryStripeSubscriptionId,
-          price: product.stripePriceId,
-          quantity: 1,
-          metadata: {
-            group_member_email: params.memberEmail.toLowerCase(),
-            billing_group_id: params.billingGroupId.toString(),
-            tier: params.memberTier,
-          },
-        };
-        
-        // Apply FAMILY20 coupon for family group members
-        if (isFamilyGroup) {
-          try {
-            const couponId = await getOrCreateFamilyCoupon();
-            subscriptionItemParams.discounts = [{ coupon: couponId }];
-            console.log(`[GroupBilling] Applying FAMILY20 coupon to family member ${params.memberEmail}`);
-          } catch (couponErr: any) {
-            console.warn(`[GroupBilling] Could not apply FAMILY20 coupon: ${couponErr.message}. Proceeding without discount.`);
-          }
-        }
-        
-        const subscriptionItem = await stripe.subscriptionItems.create(subscriptionItemParams);
-        stripeSubscriptionItemId = subscriptionItem.id;
-      } catch (stripeErr: any) {
-        console.error('[GroupBilling] Error adding Stripe subscription item:', stripeErr);
-        return { success: false, error: `Failed to add billing: ${stripeErr.message}` };
-      }
-    } else if (group[0].primaryStripeSubscriptionId && !product.stripePriceId) {
+    if (group[0].primaryStripeSubscriptionId && !product.stripePriceId) {
       return { success: false, error: 'Add-on product not synced to Stripe. Please sync products first.' };
     }
     
-    // Database Write with Rollback Protection using a REAL transaction
-    // Both the group member insert and user update are wrapped in a single transaction
-    // If either fails, the entire transaction rolls back, then we also rollback Stripe
-    const client = await pool.connect();
     let insertedMemberId: number | null = null;
+    let stripeSubscriptionItemId: string | null = null;
     
     try {
       await client.query('BEGIN');
       
-      // Step 1: Insert the group member record using raw SQL within transaction
       const insertResult = await client.query(
         `INSERT INTO group_members (
           billing_group_id, member_email, member_tier, relationship,
           stripe_subscription_item_id, stripe_price_id, add_on_price_cents,
           added_by, added_by_name, is_active, added_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, NOW())
+        ) VALUES ($1, $2, $3, $4, NULL, $5, $6, $7, $8, true, NOW())
         RETURNING id`,
         [
           params.billingGroupId,
           params.memberEmail.toLowerCase(),
           params.memberTier,
           params.relationship || null,
-          stripeSubscriptionItemId,
           product.stripePriceId,
           product.priceCents,
           params.addedBy,
@@ -467,23 +423,60 @@ export async function addGroupMember(params: {
       
       insertedMemberId = insertResult.rows[0].id;
 
-      // Step 2: Link user record within the same transaction
       await client.query(
         'UPDATE users SET billing_group_id = $1 WHERE LOWER(email) = $2',
         [params.billingGroupId, params.memberEmail.toLowerCase()]
       );
 
-      // Both operations succeeded - commit the transaction
+      if (group[0].primaryStripeSubscriptionId && product.stripePriceId) {
+        try {
+          const stripe = await getStripeClient();
+          
+          const isFamilyGroup = params.relationship !== 'employee';
+          
+          const subscriptionItemParams: Stripe.SubscriptionItemCreateParams = {
+            subscription: group[0].primaryStripeSubscriptionId,
+            price: product.stripePriceId,
+            quantity: 1,
+            metadata: {
+              group_member_email: params.memberEmail.toLowerCase(),
+              billing_group_id: params.billingGroupId.toString(),
+              tier: params.memberTier,
+            },
+          };
+          
+          if (isFamilyGroup) {
+            try {
+              const couponId = await getOrCreateFamilyCoupon();
+              subscriptionItemParams.discounts = [{ coupon: couponId }];
+              console.log(`[GroupBilling] Applying FAMILY20 coupon to family member ${params.memberEmail}`);
+            } catch (couponErr: any) {
+              console.warn(`[GroupBilling] Could not apply FAMILY20 coupon: ${couponErr.message}. Proceeding without discount.`);
+            }
+          }
+          
+          const subscriptionItem = await stripe.subscriptionItems.create(subscriptionItemParams);
+          stripeSubscriptionItemId = subscriptionItem.id;
+          
+          await client.query(
+            'UPDATE group_members SET stripe_subscription_item_id = $1 WHERE id = $2',
+            [stripeSubscriptionItemId, insertedMemberId]
+          );
+        } catch (stripeErr: any) {
+          console.error('[GroupBilling] Stripe API failed, rolling back DB reservation:', stripeErr);
+          await client.query('ROLLBACK');
+          return { success: false, error: `Failed to add billing: ${stripeErr.message}` };
+        }
+      }
+
       await client.query('COMMIT');
       
       return { success: true, memberId: insertedMemberId };
 
     } catch (dbErr: any) {
-      // Transaction failed - rollback all database changes
       await client.query('ROLLBACK');
-      console.error('[GroupBilling] DB transaction failed after Stripe charge. Initiating Stripe rollback.', dbErr);
+      console.error('[GroupBilling] DB transaction failed:', dbErr);
       
-      // CRITICAL: ROLLBACK STRIPE CHARGE since database transaction failed
       if (stripeSubscriptionItemId) {
         try {
           const stripe = await getStripeClient();
@@ -491,17 +484,16 @@ export async function addGroupMember(params: {
           console.log(`[GroupBilling] Successfully rolled back Stripe item ${stripeSubscriptionItemId}`);
         } catch (rollbackErr: any) {
           console.error(`[GroupBilling] CRITICAL: Failed to rollback Stripe item ${stripeSubscriptionItemId}. Manual intervention required.`, rollbackErr);
-          // In production, this would trigger an alert (PagerDuty, Slack, etc.)
         }
       }
       
-      return { success: false, error: 'System error. No charges were made.' };
-    } finally {
-      client.release();
+      return { success: false, error: 'System error. Please try again.' };
     }
   } catch (err: any) {
     console.error('[GroupBilling] Error adding group member:', err);
     return { success: false, error: err.message };
+  } finally {
+    client.release();
   }
 }
 
@@ -566,31 +558,8 @@ export async function addCorporateMember(params: {
     
     let originalQuantity: number | null = null;
     let corporateItemId: string | null = null;
-    
-    if (group[0].primaryStripeSubscriptionId) {
-      try {
-        const stripe = await getStripeClient();
-        const subscription = await stripe.subscriptions.retrieve(group[0].primaryStripeSubscriptionId, {
-          expand: ['items.data'],
-        });
-        
-        const corporateItem = subscription.items.data.find(
-          item => item.metadata?.corporate_membership === 'true'
-        );
-        
-        if (corporateItem) {
-          originalQuantity = corporateItem.quantity || 0;
-          corporateItemId = corporateItem.id;
-          
-          await stripe.subscriptionItems.update(corporateItem.id, {
-            quantity: newMemberCount,
-          });
-        }
-      } catch (stripeErr: any) {
-        console.error('[GroupBilling] Error updating corporate subscription quantity:', stripeErr);
-        return { success: false, error: `Failed to update billing: ${stripeErr.message}` };
-      }
-    }
+    let insertedMemberId: number | null = null;
+    let stripeUpdated = false;
     
     try {
       await client.query('BEGIN');
@@ -611,20 +580,49 @@ export async function addCorporateMember(params: {
         ]
       );
       
+      insertedMemberId = insertResult.rows[0].id;
+      
       await client.query(
         'UPDATE users SET billing_group_id = $1 WHERE LOWER(email) = $2',
         [params.billingGroupId, params.memberEmail.toLowerCase()]
       );
+
+      if (group[0].primaryStripeSubscriptionId) {
+        try {
+          const stripe = await getStripeClient();
+          const subscription = await stripe.subscriptions.retrieve(group[0].primaryStripeSubscriptionId, {
+            expand: ['items.data'],
+          });
+          
+          const corporateItem = subscription.items.data.find(
+            item => item.metadata?.corporate_membership === 'true'
+          );
+          
+          if (corporateItem) {
+            originalQuantity = corporateItem.quantity || 0;
+            corporateItemId = corporateItem.id;
+            
+            await stripe.subscriptionItems.update(corporateItem.id, {
+              quantity: newMemberCount,
+            });
+            stripeUpdated = true;
+          }
+        } catch (stripeErr: any) {
+          console.error('[GroupBilling] Stripe API failed, rolling back DB reservation:', stripeErr);
+          await client.query('ROLLBACK');
+          return { success: false, error: `Failed to update billing: ${stripeErr.message}` };
+        }
+      }
       
       await client.query('COMMIT');
       
-      return { success: true, memberId: insertResult.rows[0].id };
+      return { success: true, memberId: insertedMemberId };
       
     } catch (dbErr: any) {
       await client.query('ROLLBACK');
-      console.error('[GroupBilling] DB transaction failed. Initiating Stripe rollback.', dbErr);
+      console.error('[GroupBilling] DB transaction failed:', dbErr);
       
-      if (corporateItemId && originalQuantity !== null) {
+      if (stripeUpdated && corporateItemId && originalQuantity !== null) {
         try {
           const stripe = await getStripeClient();
           await stripe.subscriptionItems.update(corporateItemId, {
@@ -636,7 +634,7 @@ export async function addCorporateMember(params: {
         }
       }
       
-      return { success: false, error: 'System error. No charges were made.' };
+      return { success: false, error: 'System error. Please try again.' };
     }
   } catch (err: any) {
     console.error('[GroupBilling] Error adding corporate member:', err);

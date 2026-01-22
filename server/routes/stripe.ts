@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin, isAdmin } from '../core/middleware';
+import { paymentRateLimiter } from '../middleware/rateLimiting';
 import { pool } from '../core/db';
 import { db } from '../db';
 import { billingAuditLog, membershipTiers, passRedemptionLogs, dayPassPurchases } from '../../shared/schema';
@@ -767,7 +768,7 @@ router.get('/api/my-invoices', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/api/member/bookings/:id/pay-fees', async (req: Request, res: Response) => {
+router.post('/api/member/bookings/:id/pay-fees', paymentRateLimiter, async (req: Request, res: Response) => {
   try {
     const sessionEmail = (req as any).user?.email;
     if (!sessionEmail) {

@@ -186,39 +186,58 @@ const Dashboard: React.FC = () => {
         fetch('/api/events', { credentials: 'include' })
       ]);
 
+      const failedItems: string[] = [];
+
       if (results[0].status === 'fulfilled' && results[0].value.ok) {
         setDbBookings(await results[0].value.json());
       } else {
         console.error('Bookings failed to load');
+        failedItems.push('bookings');
       }
 
       if (results[1].status === 'fulfilled' && results[1].value.ok) {
         setDbRSVPs(await results[1].value.json());
+      } else {
+        failedItems.push('event RSVPs');
       }
 
       if (results[2].status === 'fulfilled' && results[2].value.ok) {
         setDbWellnessEnrollments(await results[2].value.json());
+      } else {
+        failedItems.push('wellness enrollments');
       }
       
       if (results[3].status === 'fulfilled' && results[3].value.ok) {
         setDbBookingRequests(await results[3].value.json());
+      } else {
+        failedItems.push('booking requests');
       }
       
       if (results[4].status === 'fulfilled' && results[4].value.ok) {
         setDbConferenceRoomBookings(await results[4].value.json());
+      } else {
+        failedItems.push('conference room bookings');
       }
       
       if (results[5].status === 'fulfilled' && results[5].value.ok) {
         setAllWellnessClasses(await results[5].value.json());
+      } else {
+        failedItems.push('wellness classes');
       }
       
       if (results[6].status === 'fulfilled' && results[6].value.ok) {
         setAllEvents(await results[6].value.json());
+      } else {
+        failedItems.push('events');
+      }
+
+      if (failedItems.length > 0) {
+        setError(`Failed to load: ${failedItems.join(', ')}. Pull down to refresh.`);
       }
       
     } catch (err) {
       console.error('Critical error fetching user data:', err);
-      setError('Some data could not be loaded.');
+      setError('Unable to connect to server. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
