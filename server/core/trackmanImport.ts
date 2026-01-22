@@ -786,6 +786,41 @@ async function createTrackmanSessionAndParticipants(input: SessionCreationInput)
     // Add guests from parsed notes
     const guestPlayers = input.parsedPlayers.filter(p => p.type === 'guest');
     for (const guest of guestPlayers) {
+      // Skip if guest name matches owner name (prevents duplicate owner as guest)
+      const ownerDisplayName = (input.ownerName || input.ownerEmail).toLowerCase().trim();
+      const guestDisplayName = (guest.name || '').toLowerCase().trim();
+      if (guestDisplayName && (
+        guestDisplayName === ownerDisplayName ||
+        ownerDisplayName.includes(guestDisplayName) ||
+        guestDisplayName.includes(ownerDisplayName.split(' ')[0]) // First name match
+      )) {
+        process.stderr.write(`[Trackman Import] Skipping guest "${guest.name}" - matches owner name "${input.ownerName || input.ownerEmail}"\n`);
+        continue;
+      }
+      
+      // Check if guest email matches any existing member - if so, add as member, not guest
+      if (guest.email) {
+        const memberByEmail = await getUserIdByEmail(guest.email);
+        if (memberByEmail) {
+          // Skip if this member is the owner
+          if (memberByEmail === ownerUserId) {
+            process.stderr.write(`[Trackman Import] Skipping guest "${guest.name}" - email resolves to owner\n`);
+            continue;
+          }
+          
+          const memberTier = await getMemberTierByEmail(guest.email) || 'social';
+          participantInputs.push({
+            userId: memberByEmail,
+            participantType: 'member',
+            displayName: guest.name || guest.email,
+            slotDuration: perParticipantMinutes
+          });
+          memberData.push({ userId: memberByEmail, tier: memberTier, email: guest.email });
+          process.stderr.write(`[Trackman Import] Guest "${guest.name}" has member email - adding as member\n`);
+          continue;
+        }
+      }
+      
       let guestId: number | undefined;
       if (guest.name) {
         const existingGuest = await db.select()

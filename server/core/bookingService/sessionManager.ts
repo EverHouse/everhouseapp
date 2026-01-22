@@ -97,17 +97,34 @@ export async function linkParticipants(
   try {
     const owner = participants.find(p => p.participantType === 'owner');
     const ownerUserId = owner?.userId?.toLowerCase();
+    const ownerDisplayName = owner?.displayName?.toLowerCase().trim();
     
     const filteredParticipants = participants.filter(p => {
       if (p.participantType === 'owner') {
         return true;
       }
+      
+      // Skip if userId matches owner
       if (ownerUserId && p.userId?.toLowerCase() === ownerUserId) {
-        logger.warn('[linkParticipants] Skipping duplicate owner as guest/member', {
+        logger.warn('[linkParticipants] Skipping duplicate owner (by userId)', {
           extra: { sessionId, userId: p.userId, displayName: p.displayName }
         });
         return false;
       }
+      
+      // Skip if displayName matches owner (catches name-only duplicates)
+      const participantName = p.displayName?.toLowerCase().trim();
+      if (ownerDisplayName && participantName && (
+        participantName === ownerDisplayName ||
+        ownerDisplayName.includes(participantName) ||
+        participantName.includes(ownerDisplayName)
+      )) {
+        logger.warn('[linkParticipants] Skipping duplicate owner (by name)', {
+          extra: { sessionId, ownerName: ownerDisplayName, duplicateName: participantName }
+        });
+        return false;
+      }
+      
       return true;
     });
     

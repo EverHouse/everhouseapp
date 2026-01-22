@@ -70,8 +70,12 @@ export async function calculateAndCacheParticipantFees(
         amountCents = Math.round(parseFloat(row.ledger_fee) * 100);
         source = 'ledger';
       } else if (row.participant_type === 'guest') {
-        amountCents = row.tier_guest_fee_cents ?? DEFAULT_GUEST_FEE_CENTS;
-        source = 'calculated';
+        // Only charge guest fee if participant has no user_id (i.e., not a member)
+        // Members incorrectly marked as guests should not be charged guest fees
+        if (!row.user_id) {
+          amountCents = row.tier_guest_fee_cents ?? DEFAULT_GUEST_FEE_CENTS;
+          source = 'calculated';
+        }
       }
       
       if (amountCents > 0) {
