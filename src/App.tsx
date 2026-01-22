@@ -663,7 +663,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   ) : null;
 
   return (
-    <div className={`${isDarkTheme ? 'dark liquid-bg text-white' : isLandingPage ? 'bg-[#293515] text-primary' : 'bg-[#F2F2EC] text-primary'} min-h-screen w-full relative transition-colors duration-500 font-sans`}>
+    <div className={`${isDarkTheme ? 'dark liquid-bg text-white' : isLandingPage ? 'bg-[#293515] text-primary' : 'bg-[#F2F2EC] text-primary'} min-h-screen min-h-dvh flex-1 w-full relative transition-colors duration-500 font-sans`}>
       
       {/* Skip to main content link for keyboard navigation - WCAG 2.4.1 */}
       <a href="#main-content" className="skip-link">
