@@ -312,15 +312,21 @@ const DirectoryTab: React.FC = () => {
         }
         
         try {
-            const result = await refreshMembers();
-            if (result.success) {
-                hubspotCount = result.count || 0;
+            const hubspotRes = await fetch('/api/hubspot/sync-all-members', { 
+                method: 'POST',
+                credentials: 'include'
+            });
+            if (hubspotRes.ok) {
+                const hubspotData = await hubspotRes.json();
+                hubspotCount = hubspotData.synced || 0;
             } else {
                 errors.push('HubSpot');
             }
         } catch {
             errors.push('HubSpot');
         }
+        
+        await refreshMembers();
         
         if (errors.length === 0) {
             setSyncMessage({ type: 'success', text: `Synced ${stripeCount} from Stripe, ${hubspotCount} from HubSpot` });
