@@ -699,8 +699,9 @@ async function handleCheckoutSessionCompleted(session: any): Promise<void> {
       
       // Sync to HubSpot with proper tier name
       try {
-        const { createOrGetContact, updateContactMembershipStatus } = await import('../hubspot/members');
-        const contactResult = await createOrGetContact(
+        const { findOrCreateHubSpotContact } = await import('../hubspot/members');
+        const { updateContactMembershipStatus } = await import('../hubspot/stages');
+        const contactResult = await findOrCreateHubSpotContact(
           email,
           firstName || '',
           lastName || '',
@@ -816,12 +817,93 @@ async function handleSubscriptionCreated(subscription: any): Promise<void> {
       [customerId]
     );
 
+    let email: string;
+    let first_name: string | null;
+    let last_name: string | null;
+    let currentTier: string | null;
+    let currentStatus: string | null;
+
     if (userResult.rows.length === 0) {
-      console.warn(`[Stripe Webhook] No user found for Stripe customer ${customerId}`);
-      return;
+      console.log(`[Stripe Webhook] No user found for Stripe customer ${customerId}, creating user from Stripe data`);
+      
+      const stripe = await getStripeClient();
+      const customer = await stripe.customers.retrieve(customerId);
+      
+      if (!customer || customer.deleted) {
+        console.error(`[Stripe Webhook] Customer ${customerId} not found or deleted`);
+        return;
+      }
+      
+      const customerEmail = customer.email?.toLowerCase();
+      if (!customerEmail) {
+        console.error(`[Stripe Webhook] No email found for Stripe customer ${customerId}`);
+        return;
+      }
+      
+      const customerName = customer.name || '';
+      const nameParts = customerName.split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      let tierSlug: string | null = null;
+      let tierName: string | null = null;
+      
+      if (priceId) {
+        const tierResult = await pool.query(
+          'SELECT slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
+          [priceId]
+        );
+        if (tierResult.rows.length > 0) {
+          tierSlug = tierResult.rows[0].slug;
+          tierName = tierResult.rows[0].name;
+        }
+      }
+      
+      await pool.query(
+        `INSERT INTO users (email, first_name, last_name, tier, status, stripe_customer_id, join_date, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 'active', $5, NOW(), NOW(), NOW())
+         ON CONFLICT (email) DO UPDATE SET 
+           stripe_customer_id = EXCLUDED.stripe_customer_id,
+           status = 'active',
+           tier = COALESCE(EXCLUDED.tier, users.tier),
+           updated_at = NOW()`,
+        [customerEmail, firstName, lastName, tierSlug, customerId]
+      );
+      
+      console.log(`[Stripe Webhook] Created user ${customerEmail} with tier ${tierSlug || 'none'} from subscription`);
+      
+      try {
+        const { findOrCreateHubSpotContact } = await import('../hubspot/members');
+        const { updateContactMembershipStatus } = await import('../hubspot/stages');
+        const contactResult = await findOrCreateHubSpotContact(
+          customerEmail,
+          firstName,
+          lastName,
+          undefined,
+          tierName || undefined
+        );
+        
+        if (contactResult?.contactId) {
+          await updateContactMembershipStatus(contactResult.contactId, 'Active');
+          console.log(`[Stripe Webhook] Synced ${customerEmail} to HubSpot contact ${contactResult.contactId}`);
+        }
+      } catch (hubspotError) {
+        console.error('[Stripe Webhook] HubSpot sync failed for subscription user creation:', hubspotError);
+      }
+      
+      email = customerEmail;
+      first_name = firstName;
+      last_name = lastName;
+      currentTier = tierSlug;
+      currentStatus = 'active';
+    } else {
+      email = userResult.rows[0].email;
+      first_name = userResult.rows[0].first_name;
+      last_name = userResult.rows[0].last_name;
+      currentTier = userResult.rows[0].tier;
+      currentStatus = userResult.rows[0].membership_status;
     }
 
-    const { email, first_name, last_name, tier: currentTier, membership_status: currentStatus } = userResult.rows[0];
     const memberName = `${first_name || ''} ${last_name || ''}`.trim() || email;
 
     await notifyMember({
