@@ -401,8 +401,8 @@ const MembershipOverview: React.FC = () => {
 
       <Footer hideCta />
       
-      {/* Spacer for sticky mobile CTA */}
-      <div className="h-24 md:hidden" aria-hidden="true"></div>
+      {/* Spacer for sticky mobile CTA - matches footer green background */}
+      <div className="h-24 md:hidden bg-[#293515] -mx-4 w-[calc(100%+2rem)]" aria-hidden="true"></div>
 
       <HubSpotFormModal
         isOpen={showApplicationForm}
