@@ -3,6 +3,7 @@ process.env.TZ = 'America/Los_Angeles';
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
+import expressStaticGzip from 'express-static-gzip';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -271,15 +272,19 @@ app.get('/api/health', async (req, res) => {
 });
 
 if (isProduction) {
-  app.use(express.static(path.join(__dirname, '../dist'), {
-    maxAge: '1y',
-    immutable: true,
-    etag: true,
-    setHeaders: (res, filePath) => {
-      if (filePath.endsWith('.html')) {
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      } else if (filePath.includes('/assets/')) {
-        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  app.use(expressStaticGzip(path.join(__dirname, '../dist'), {
+    enableBrotli: true,
+    orderPreference: ['br', 'gz'],
+    serveStatic: {
+      maxAge: '1y',
+      immutable: true,
+      etag: true,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        } else if (filePath.includes('/assets/')) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
       }
     }
   }));
