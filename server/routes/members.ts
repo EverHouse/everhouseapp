@@ -17,7 +17,7 @@ import {
   bookingMembers,
   dayPassPurchases
 } from '../../shared/schema';
-import { isProduction } from '../core/db';
+import { isProduction, pool } from '../core/db';
 import { isStaffOrAdmin, isAuthenticated } from '../core/middleware';
 import { getSessionUser } from '../types/session';
 import { updateHubSpotContactPreferences } from '../core/memberSync';
