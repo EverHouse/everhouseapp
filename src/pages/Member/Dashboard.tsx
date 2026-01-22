@@ -828,11 +828,11 @@ const Dashboard: React.FC = () => {
 
   return (
     <div 
-      className="min-h-screen bg-transparent"
+      className="min-h-screen flex flex-col"
       style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}
     >
-    <PullToRefresh onRefresh={handleRefresh} className="min-h-full">
-      <div className="px-6 pt-4 md:pt-2 pb-32 font-sans relative min-h-full">
+    <PullToRefresh onRefresh={handleRefresh} className="flex-1 flex flex-col">
+      <div className="px-6 pt-4 md:pt-2 pb-32 font-sans relative flex-1">
         <ClosureAlert />
         <AnnouncementAlert />
         
