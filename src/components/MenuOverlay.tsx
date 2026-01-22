@@ -59,20 +59,22 @@ const MenuOverlay: React.FC<MenuOverlayProps> = ({ isOpen, onClose }) => {
   if (!isVisible) return null;
 
   const menuContent = (
-    <div className="fixed inset-0 flex justify-start overflow-hidden pointer-events-auto" style={{ zIndex: 'var(--z-drawer)' }}>
+    <div 
+      className="fixed left-0 right-0 flex justify-start overflow-visible pointer-events-auto" 
+      style={{ zIndex: 'var(--z-drawer)', top: 0, bottom: '-100px', height: 'calc(100% + 100px)' }}
+    >
       <div 
         className={`absolute inset-0 bg-black/20 backdrop-blur-xl ${isClosing ? 'animate-backdrop-out' : 'animate-backdrop-in'}`}
         onClick={handleClose}
       ></div>
 
       <div 
-        className={`relative w-[85%] md:w-[320px] lg:w-[320px] flex flex-col overflow-hidden rounded-tr-[2rem] border-l-0 ${isDark ? 'bg-[#0f120a]' : 'bg-[#F2F2EC]'} backdrop-blur-xl ${isClosing ? 'animate-slide-out-left' : 'animate-slide-in-left'}`}
-        style={{ height: 'calc(100% + 50px)', marginBottom: '-50px' }}
+        className={`relative w-[85%] md:w-[320px] lg:w-[320px] h-full flex flex-col overflow-hidden rounded-tr-[2rem] border-l-0 ${isDark ? 'bg-[#0f120a]' : 'bg-[#F2F2EC]'} backdrop-blur-xl ${isClosing ? 'animate-slide-out-left' : 'animate-slide-in-left'}`}
       >
         
         <div className="absolute inset-0 opacity-[0.03] bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] pointer-events-none mix-blend-multiply"></div>
 
-        <div className={`relative z-10 flex flex-col h-full lg:w-[320px] py-8 safe-area-inset-menu pb-[calc(2rem+env(safe-area-inset-bottom,0px)+50px)] ${isDark ? 'text-[#F2F2EC]' : 'text-[#293515]'}`}>
+        <div className={`relative z-10 flex flex-col lg:w-[320px] py-8 safe-area-inset-menu pb-[calc(2rem+env(safe-area-inset-bottom,0px)+100px)] ${isDark ? 'text-[#F2F2EC]' : 'text-[#293515]'}`} style={{ height: 'calc(100% - 100px)' }}>
             
             <div className="flex items-center justify-between mb-8">
                 <button 
