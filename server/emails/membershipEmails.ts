@@ -371,3 +371,129 @@ export async function sendCardExpiringEmail(
     return { success: false, error: error.message };
   }
 }
+
+interface GracePeriodReminderParams {
+  memberName: string;
+  currentDay: number;
+  totalDays: number;
+  reactivationLink: string;
+}
+
+function getGracePeriodReminderHtml(params: GracePeriodReminderParams): string {
+  const { memberName, currentDay, totalDays, reactivationLink } = params;
+  const isUrgent = currentDay >= totalDays;
+  
+  const urgentStyles = isUrgent ? {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+    headlineColor: '#991b1b',
+    textColor: '#7f1d1d'
+  } : {
+    backgroundColor: '#fffbeb',
+    borderColor: '#fde68a',
+    headlineColor: '#92400e',
+    textColor: '#a16207'
+  };
+  
+  const headline = isUrgent 
+    ? 'Final Notice: Membership At Risk' 
+    : 'Action Required: Payment Failed';
+  
+  const urgencyMessage = isUrgent
+    ? 'This is your final notice. Your membership will be terminated today if payment is not received.'
+    : 'Please update your payment method to avoid losing access to your membership benefits.';
+  
+  const content = `
+          <!-- Headline -->
+          <tr>
+            <td style="text-align: center; padding-bottom: 16px;">
+              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; color: ${isUrgent ? urgentStyles.headlineColor : CLUB_COLORS.deepGreen};">
+                ${headline}
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Subtitle -->
+          <tr>
+            <td style="text-align: center; padding-bottom: 40px;">
+              <p style="margin: 0; font-size: 16px; color: ${CLUB_COLORS.textMuted}; line-height: 1.6;">
+                Hi ${memberName}, your membership payment could not be processed.
+              </p>
+            </td>
+          </tr>
+          
+          <!-- Alert Box -->
+          <tr>
+            <td style="padding-bottom: 32px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: ${urgentStyles.backgroundColor}; border-radius: 12px; border: 1px solid ${urgentStyles.borderColor};">
+                <tr>
+                  <td style="padding: 24px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td width="40" valign="top" style="padding-right: 16px;">
+                          <div style="width: 32px; height: 32px; background-color: ${isUrgent ? '#fee2e2' : '#fef3c7'}; border-radius: 50%; text-align: center; line-height: 32px;">
+                            <span style="font-size: 16px;">${isUrgent ? '🚨' : '⚠️'}</span>
+                          </div>
+                        </td>
+                        <td valign="top">
+                          <p style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: ${urgentStyles.headlineColor};">Day ${currentDay} of ${totalDays}</p>
+                          <p style="margin: 0; font-size: 14px; color: ${urgentStyles.textColor};">${urgencyMessage}</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Instructions -->
+          <tr>
+            <td style="padding-bottom: 32px;">
+              <p style="margin: 0; font-size: 14px; color: ${CLUB_COLORS.textMuted}; line-height: 1.6;">
+                ${isUrgent 
+                  ? 'Your membership access will be immediately suspended if we cannot process your payment today. Please click the button below to update your payment method and reactivate your membership.'
+                  : 'To continue enjoying Ever House benefits including golf simulators, wellness facilities, and exclusive events, please update your payment method at your earliest convenience.'}
+              </p>
+            </td>
+          </tr>
+          
+          <!-- CTA Button -->
+          <tr>
+            <td style="text-align: center; padding-bottom: 32px;">
+              <a href="${reactivationLink}" style="display: inline-block; background-color: ${isUrgent ? '#dc2626' : CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
+                ${isUrgent ? 'Reactivate Now' : 'Update Payment Method'}
+              </a>
+            </td>
+          </tr>
+  `;
+  
+  return getEmailWrapper(content);
+}
+
+export async function sendGracePeriodReminderEmail(
+  email: string, 
+  params: GracePeriodReminderParams
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { client, fromEmail } = await getResendClient();
+    
+    const isUrgent = params.currentDay >= params.totalDays;
+    const subject = isUrgent 
+      ? 'FINAL NOTICE: Membership Termination Today - Ever House'
+      : `Day ${params.currentDay} of ${params.totalDays}: Payment Required - Ever House`;
+    
+    await client.emails.send({
+      from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
+      to: email,
+      subject,
+      html: getGracePeriodReminderHtml(params)
+    });
+    
+    console.log(`[Grace Period Email] Day ${params.currentDay}/${params.totalDays} sent to ${email}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error(`[Grace Period Email] Failed to send to ${email}:`, error.message);
+    return { success: false, error: error.message };
+  }
+}

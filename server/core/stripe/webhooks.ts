@@ -518,6 +518,36 @@ async function handleInvoicePaymentSucceeded(invoice: any): Promise<void> {
       planName
     });
 
+    try {
+      const priceId = invoice.lines?.data?.[0]?.price?.id;
+      let restoreTierClause = '';
+      let queryParams: any[] = [email];
+      
+      if (priceId) {
+        const tierResult = await pool.query(
+          'SELECT slug FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
+          [priceId]
+        );
+        if (tierResult.rows.length > 0) {
+          restoreTierClause = ', tier = COALESCE(tier, $2)';
+          queryParams = [email, tierResult.rows[0].slug];
+        }
+      }
+      
+      await pool.query(
+        `UPDATE users SET 
+          grace_period_start = NULL,
+          grace_period_email_count = 0,
+          billing_provider = 'stripe'${restoreTierClause},
+          updated_at = NOW()
+        WHERE LOWER(email) = LOWER($1)`,
+        queryParams
+      );
+      console.log(`[Stripe Webhook] Cleared grace period and set billing_provider for ${email}`);
+    } catch (gracePeriodError) {
+      console.error('[Stripe Webhook] Error clearing grace period:', gracePeriodError);
+    }
+
     console.log(`[Stripe Webhook] Membership renewal processed for ${email}, amount: $${(amountPaid / 100).toFixed(2)}`);
   } catch (error) {
     console.error('[Stripe Webhook] Error handling invoice payment succeeded:', error);
@@ -592,6 +622,19 @@ async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
       amount: amountDue / 100,
       planName
     });
+
+    try {
+      await pool.query(
+        `UPDATE users SET 
+          grace_period_start = COALESCE(grace_period_start, NOW()),
+          updated_at = NOW()
+        WHERE LOWER(email) = LOWER($1) AND grace_period_start IS NULL`,
+        [email]
+      );
+      console.log(`[Stripe Webhook] Started grace period for ${email}`);
+    } catch (gracePeriodError) {
+      console.error('[Stripe Webhook] Error starting grace period:', gracePeriodError);
+    }
 
     console.log(`[Stripe Webhook] Membership payment failure processed for ${email}, amount: $${(amountDue / 100).toFixed(2)}`);
   } catch (error) {
@@ -980,6 +1023,35 @@ async function handleSubscriptionCreated(subscription: any): Promise<void> {
       }
     }
 
+    try {
+      let restoreTierClause = '';
+      let queryParams: any[] = [email];
+      
+      if (priceId) {
+        const tierResult = await pool.query(
+          'SELECT slug FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
+          [priceId]
+        );
+        if (tierResult.rows.length > 0) {
+          restoreTierClause = ', tier = COALESCE(tier, $2)';
+          queryParams = [email, tierResult.rows[0].slug];
+        }
+      }
+      
+      await pool.query(
+        `UPDATE users SET 
+          grace_period_start = NULL,
+          grace_period_email_count = 0,
+          billing_provider = 'stripe'${restoreTierClause},
+          updated_at = NOW()
+        WHERE LOWER(email) = LOWER($1)`,
+        queryParams
+      );
+      console.log(`[Stripe Webhook] Cleared grace period and set billing_provider for ${email}`);
+    } catch (gracePeriodError) {
+      console.error('[Stripe Webhook] Error clearing grace period:', gracePeriodError);
+    }
+
     console.log(`[Stripe Webhook] New subscription created for ${memberName} (${email}): ${planName}`);
   } catch (error) {
     console.error('[Stripe Webhook] Error handling subscription created:', error);
@@ -1179,16 +1251,20 @@ async function handleSubscriptionDeleted(subscription: any): Promise<void> {
       }
     }
 
-    // CRITICAL: Update the user's membership status to cancelled
+    // CRITICAL: Update the user's membership status to cancelled, preserve tier in last_tier
     await pool.query(
       `UPDATE users SET 
+        last_tier = tier,
+        tier = NULL,
         membership_status = 'cancelled',
         stripe_subscription_id = NULL,
+        grace_period_start = NULL,
+        grace_period_email_count = 0,
         updated_at = NOW()
       WHERE LOWER(email) = LOWER($1)`,
       [email]
     );
-    console.log(`[Stripe Webhook] Updated ${email} membership_status to cancelled`);
+    console.log(`[Stripe Webhook] Updated ${email} membership_status to cancelled, tier cleared`);
 
     await notifyMember({
       userEmail: email,

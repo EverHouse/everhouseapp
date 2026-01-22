@@ -68,6 +68,7 @@ import { initWebSocketServer } from './core/websocket';
 import { startIntegrityScheduler } from './schedulers/integrityScheduler';
 import { startWaiverReviewScheduler } from './schedulers/waiverReviewScheduler';
 import { startStripeReconciliationScheduler } from './schedulers/stripeReconciliationScheduler';
+import { startGracePeriodScheduler } from './schedulers/gracePeriodScheduler';
 import { processStripeWebhook, getStripeSync } from './core/stripe';
 import { runMigrations } from 'stripe-replit-sync';
 import { enableRealtimeForTable } from './core/supabase/client';
@@ -886,6 +887,9 @@ async function startServer() {
   
   // Stripe reconciliation scheduler - runs at 5am Pacific daily
   startStripeReconciliationScheduler();
+  
+  // Grace period scheduler - runs at 10am Pacific daily to send dunning emails
+  startGracePeriodScheduler();
   
   // Communication logs sync scheduler - runs every 30 minutes
   // Syncs calls and SMS from HubSpot Engagements API
