@@ -54,6 +54,35 @@ async function detectAndNotifyStatusChange(
     );
     
     console.log(`[MemberSync] Notified about status change for ${email}: ${oldStatus} -> ${newStatus}`);
+    
+    // Start grace period for Mindbody-billed members who become inactive
+    // They'll receive daily emails with Stripe reactivation link for 3 days
+    try {
+      const userResult = await db.select({ 
+        billingProvider: users.billingProvider,
+        gracePeriodStart: users.gracePeriodStart
+      })
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+      
+      const user = userResult[0];
+      
+      // Only start grace period for Mindbody members who don't already have one
+      if (user && user.billingProvider === 'mindbody' && !user.gracePeriodStart) {
+        await db.update(users)
+          .set({
+            gracePeriodStart: new Date(),
+            gracePeriodEmailCount: 0,
+            updatedAt: new Date()
+          })
+          .where(eq(users.email, email));
+        
+        console.log(`[MemberSync] Started grace period for Mindbody member ${email} - status changed to ${newStatus}`);
+      }
+    } catch (err) {
+      console.error(`[MemberSync] Failed to start grace period for ${email}:`, err);
+    }
   }
 }
 

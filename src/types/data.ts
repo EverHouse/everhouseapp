@@ -47,6 +47,9 @@ export interface MemberProfile {
   name: string;
   tier: string;
   rawTier?: string | null;
+  lastTier?: string | null;
+  membershipStatus?: string | null;
+  gracePeriodStart?: string | null;
   tags?: string[];
   isFounding?: boolean;
   status: 'Active' | 'Pending' | 'Expired' | 'Inactive' | 'Terminated' | 'former_member' | string;

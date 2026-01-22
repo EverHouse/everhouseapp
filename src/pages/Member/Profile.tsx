@@ -382,7 +382,7 @@ const Profile: React.FC = () => {
                  <div className="text-center text-white space-y-2">
                    <h4 className="font-bold text-lg font-serif tracking-wide">{user.name}</h4>
                    <div className="flex justify-center">
-                     <TierBadge tier={user.tier} size="sm" />
+                     <TierBadge tier={user.tier} size="sm" lastTier={user.lastTier} membershipStatus={user.membershipStatus} />
                    </div>
                  </div>
                </div>
@@ -973,7 +973,7 @@ const Profile: React.FC = () => {
                    ) : (
                      <>
                        <div className="flex items-center justify-center gap-2 flex-wrap mb-2">
-                          <TierBadge tier={user.tier || 'Social'} size="md" />
+                          <TierBadge tier={user.tier || 'Social'} size="md" lastTier={user.lastTier} membershipStatus={user.membershipStatus} />
                        </div>
                        {((user.tags || []).length > 0 || isFoundingMember(user.tier || '', user.isFounding)) && (
                          <div className="flex items-center justify-center gap-2 flex-wrap">

@@ -1048,7 +1048,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
             <div className="flex-1 min-w-0">
               <h2 className={`text-xl sm:text-2xl font-bold truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>{member.name}</h2>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <TierBadge tier={displayedTier || member.rawTier || member.tier} size="md" showNoTier={true} />
+                <TierBadge tier={displayedTier || member.rawTier || member.tier} size="md" showNoTier={true} lastTier={member.lastTier} membershipStatus={member.membershipStatus} />
                 {member.status && typeof member.status === 'string' && member.status.toLowerCase() !== 'active' && (
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                     getMemberStatusColor(member.status, isDark)
@@ -1118,6 +1118,39 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                 title="Permanently delete member (for testing)"
               >
                 <span className="material-symbols-outlined text-lg">delete_forever</span>
+              </button>
+            </div>
+          )}
+
+          {isAdmin && member.membershipStatus && ['terminated', 'cancelled', 'canceled', 'frozen', 'inactive', 'past_due', 'suspended'].includes(member.membershipStatus.toLowerCase()) && (
+            <div className="mt-3">
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/api/stripe/staff/send-reactivation-link', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({ memberEmail: member.email })
+                    });
+                    if (res.ok) {
+                      alert(`Reactivation link sent to ${member.email}`);
+                    } else {
+                      const data = await res.json();
+                      alert(data.error || 'Failed to send reactivation link');
+                    }
+                  } catch (err) {
+                    alert('Failed to send reactivation link');
+                  }
+                }}
+                className={`w-full py-2.5 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors ${
+                  isDark 
+                    ? 'bg-amber-600/20 text-amber-400 border border-amber-600/30 hover:bg-amber-600/30'
+                    : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                }`}
+              >
+                <span className="material-symbols-outlined text-lg">send</span>
+                Send Reactivation Link
               </button>
             </div>
           )}

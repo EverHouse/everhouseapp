@@ -2780,6 +2780,52 @@ router.post('/api/stripe/staff/send-membership-link', isStaffOrAdmin, async (req
   }
 });
 
+router.post('/api/stripe/staff/send-reactivation-link', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { memberEmail } = req.body;
+
+    if (!memberEmail) {
+      return res.status(400).json({ error: 'Missing required field: memberEmail' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(memberEmail)) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+
+    const memberResult = await pool.query(
+      `SELECT id, email, first_name, last_name, tier, last_tier, membership_status, billing_provider
+       FROM users WHERE LOWER(email) = LOWER($1)`,
+      [memberEmail]
+    );
+
+    if (memberResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    const member = memberResult.rows[0];
+    const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email;
+
+    const { sendGracePeriodReminderEmail } = await import('../emails/membershipEmails');
+    
+    const reactivationLink = 'https://everhouse.app/billing/reactivate';
+    
+    await sendGracePeriodReminderEmail(member.email, {
+      memberName,
+      currentDay: 1,
+      totalDays: 3,
+      reactivationLink
+    });
+
+    console.log(`[Stripe] Reactivation link sent manually to ${member.email} by staff`);
+
+    res.json({ success: true, message: `Reactivation link sent to ${member.email}` });
+  } catch (error: any) {
+    console.error('[Stripe] Error sending reactivation link:', error);
+    res.status(500).json({ error: 'Failed to send reactivation link' });
+  }
+});
+
 router.post('/api/public/day-pass/checkout', async (req: Request, res: Response) => {
   try {
     const { email, passType, firstName, lastName } = req.body;
