@@ -151,16 +151,14 @@ const Gallery: React.FC = () => {
   const { setPageReady } = usePageReady();
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
-  const [imagesLoaded, setImagesLoaded] = useState(false);
-  const [showLoader, setShowLoader] = useState(true);
+  const [imagesLoaded, setImagesLoaded] = useState(true);
+  const [showLoader, setShowLoader] = useState(false);
   const [filter, setFilter] = useState('All');
   const [viewerState, setViewerState] = useState<{images: string[], index: number} | null>(null);
 
   useEffect(() => {
-    if (!showLoader) {
-      setPageReady(true);
-    }
-  }, [showLoader, setPageReady]);
+    setPageReady(true);
+  }, [setPageReady]);
 
   useEffect(() => {
     const fetchGallery = async () => {
