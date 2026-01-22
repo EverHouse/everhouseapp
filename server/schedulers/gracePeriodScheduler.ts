@@ -1,11 +1,49 @@
 import { pool } from '../core/db';
-import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
+import { getPacificHour, getTodayPacific, CLUB_TIMEZONE } from '../utils/dateUtils';
 import { sendGracePeriodReminderEmail } from '../emails/membershipEmails';
 import { notifyAllStaff } from '../core/notificationService';
+import { getStripeClient } from '../core/stripe/client';
 
 const GRACE_PERIOD_HOUR = 10;
 const GRACE_PERIOD_DAYS = 3;
-const REACTIVATION_LINK = 'https://everhouse.app/billing/reactivate';
+
+function getDaysSinceStartPacific(graceStartDate: Date): number {
+  const now = new Date();
+  const nowPacific = new Date(now.toLocaleString('en-US', { timeZone: CLUB_TIMEZONE }));
+  const startPacific = new Date(graceStartDate.toLocaleString('en-US', { timeZone: CLUB_TIMEZONE }));
+  
+  nowPacific.setHours(0, 0, 0, 0);
+  startPacific.setHours(0, 0, 0, 0);
+  
+  return Math.floor((nowPacific.getTime() - startPacific.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+async function getReactivationLink(stripeCustomerId: string | null): Promise<string> {
+  const fallbackLink = 'https://everhouse.app/billing';
+  
+  if (!stripeCustomerId) {
+    return fallbackLink;
+  }
+  
+  try {
+    const stripe = await getStripeClient();
+    const returnUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://everhouse.app'
+      : (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://everhouse.app');
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: stripeCustomerId,
+      return_url: returnUrl,
+      flow_data: {
+        type: 'payment_method_update',
+      },
+    });
+    return session.url;
+  } catch (error) {
+    console.warn('[Grace Period] Could not create billing portal session, using fallback link');
+    return fallbackLink;
+  }
+}
 
 async function processGracePeriodMembers(): Promise<void> {
   try {
@@ -18,7 +56,7 @@ async function processGracePeriodMembers(): Promise<void> {
     console.log('[Grace Period] Starting daily grace period check...');
     
     const membersResult = await pool.query(
-      `SELECT id, email, first_name, last_name, tier, grace_period_start, grace_period_email_count
+      `SELECT id, email, first_name, last_name, tier, grace_period_start, grace_period_email_count, stripe_customer_id
        FROM users
        WHERE grace_period_start IS NOT NULL 
          AND grace_period_email_count < $1
@@ -34,16 +72,18 @@ async function processGracePeriodMembers(): Promise<void> {
     console.log(`[Grace Period] Found ${membersResult.rows.length} members in grace period`);
     
     for (const member of membersResult.rows) {
-      const { id, email, first_name, last_name, tier, grace_period_start, grace_period_email_count } = member;
+      const { id, email, first_name, last_name, tier, grace_period_start, grace_period_email_count, stripe_customer_id } = member;
       const memberName = `${first_name || ''} ${last_name || ''}`.trim() || email;
       const newEmailCount = (grace_period_email_count || 0) + 1;
       
       try {
+        const reactivationLink = await getReactivationLink(stripe_customer_id);
+        
         await sendGracePeriodReminderEmail(email, {
           memberName,
           currentDay: newEmailCount,
           totalDays: GRACE_PERIOD_DAYS,
-          reactivationLink: REACTIVATION_LINK
+          reactivationLink
         });
         
         await pool.query(
@@ -54,9 +94,7 @@ async function processGracePeriodMembers(): Promise<void> {
         console.log(`[Grace Period] Sent day ${newEmailCount} email to ${email}`);
         
         if (newEmailCount >= GRACE_PERIOD_DAYS) {
-          const gracePeriodStartDate = new Date(grace_period_start);
-          const now = new Date();
-          const daysSinceStart = Math.floor((now.getTime() - gracePeriodStartDate.getTime()) / (1000 * 60 * 60 * 24));
+          const daysSinceStart = getDaysSinceStartPacific(new Date(grace_period_start));
           
           if (daysSinceStart >= GRACE_PERIOD_DAYS) {
             await pool.query(
