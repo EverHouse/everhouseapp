@@ -479,7 +479,7 @@ async function createBookingForMember(
        (user_id, user_email, user_name, resource_id, request_date, start_time, end_time, 
         duration_minutes, status, trackman_booking_id, trackman_player_count, 
         reviewed_by, reviewed_at, staff_notes, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'confirmed', $9, $10, 'trackman_webhook', NOW(), 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'approved', $9, $10, 'trackman_webhook', NOW(), 
                '[Auto-created via Trackman webhook - staff booking]', NOW(), NOW())
        RETURNING id`,
       [
