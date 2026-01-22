@@ -2,9 +2,9 @@ import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin, isAdmin } from '../core/middleware';
 import { pool } from '../core/db';
 import { db } from '../db';
-import { billingAuditLog, membershipTiers } from '../../shared/schema';
-import { ilike } from 'drizzle-orm';
-import { getTodayPacific } from '../utils/dateUtils';
+import { billingAuditLog, membershipTiers, passRedemptionLogs, dayPassPurchases } from '../../shared/schema';
+import { ilike, eq, gte, desc } from 'drizzle-orm';
+import { getTodayPacific, getPacificMidnightUTC } from '../utils/dateUtils';
 import {
   getStripePublishableKey,
   createPaymentIntent,
@@ -2015,15 +2015,31 @@ router.get('/api/stripe/transactions/today', isStaffOrAdmin, async (req: Request
     const { getStripeClient } = await import('../core/stripe/client');
     const stripe = await getStripeClient();
 
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const startOfDay = getPacificMidnightUTC();
 
-    const paymentIntents = await stripe.paymentIntents.list({
-      created: { gte: Math.floor(startOfDay.getTime() / 1000) },
-      limit: 50,
-    });
+    const [paymentIntents, passRedemptions] = await Promise.all([
+      stripe.paymentIntents.list({
+        created: { gte: Math.floor(startOfDay.getTime() / 1000) },
+        limit: 50,
+      }),
+      db.select({
+        id: passRedemptionLogs.id,
+        purchaseId: passRedemptionLogs.purchaseId,
+        redeemedAt: passRedemptionLogs.redeemedAt,
+        redeemedBy: passRedemptionLogs.redeemedBy,
+        purchaserEmail: dayPassPurchases.purchaserEmail,
+        purchaserFirstName: dayPassPurchases.purchaserFirstName,
+        purchaserLastName: dayPassPurchases.purchaserLastName,
+        productType: dayPassPurchases.productType,
+      })
+        .from(passRedemptionLogs)
+        .innerJoin(dayPassPurchases, eq(passRedemptionLogs.purchaseId, dayPassPurchases.id))
+        .where(gte(passRedemptionLogs.redeemedAt, startOfDay))
+        .orderBy(desc(passRedemptionLogs.redeemedAt))
+        .limit(20)
+    ]);
 
-    const transactions = paymentIntents.data
+    const stripeTransactions = paymentIntents.data
       .filter(pi => pi.status === 'succeeded' || pi.status === 'processing')
       .map(pi => ({
         id: pi.id,
@@ -2036,7 +2052,29 @@ router.get('/api/stripe/transactions/today', isStaffOrAdmin, async (req: Request
         type: pi.metadata?.purpose || 'payment'
       }));
 
-    res.json(transactions);
+    const passRedemptionTransactions = passRedemptions.map(pr => {
+      const guestName = [pr.purchaserFirstName, pr.purchaserLastName].filter(Boolean).join(' ') || 'Guest';
+      const productLabel = pr.productType
+        ?.split('_')
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ')
+        .replace(/day pass/i, 'Day Pass') || 'Day Pass';
+      return {
+        id: `pass-redemption-${pr.id}`,
+        amount: 0,
+        status: 'succeeded',
+        description: `${productLabel} Redeemed`,
+        memberEmail: pr.purchaserEmail || '',
+        memberName: guestName,
+        createdAt: pr.redeemedAt?.toISOString() || new Date().toISOString(),
+        type: 'day_pass_redemption'
+      };
+    });
+
+    const allTransactions = [...stripeTransactions, ...passRedemptionTransactions]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    res.json(allTransactions);
   } catch (error: any) {
     console.error('[Stripe] Error fetching today transactions:', error);
     res.status(500).json({ error: 'Failed to fetch transactions' });

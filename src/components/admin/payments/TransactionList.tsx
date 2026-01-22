@@ -1,12 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
 import EmptyState from '../../EmptyState';
 
-export interface SectionProps {
-  onClose?: () => void;
-  variant?: 'modal' | 'card';
-}
-
-interface Transaction {
+export interface Transaction {
   id: string;
   amount: number;
   status: string;
@@ -17,6 +12,16 @@ interface Transaction {
   type: string;
 }
 
+export interface SectionProps {
+  onClose?: () => void;
+  variant?: 'modal' | 'card';
+}
+
+export interface TransactionListRef {
+  addTransaction: (tx: Transaction) => void;
+  refresh: () => void;
+}
+
 interface TransactionNote {
   id: number;
   note: string;
@@ -24,7 +29,7 @@ interface TransactionNote {
   createdAt: string;
 }
 
-const RecentTransactionsSection: React.FC<SectionProps> = ({ onClose, variant = 'modal' }) => {
+const RecentTransactionsSection = forwardRef<TransactionListRef, SectionProps>(({ onClose, variant = 'modal' }, ref) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTxId, setSelectedTxId] = useState<string | null>(null);
@@ -33,20 +38,30 @@ const RecentTransactionsSection: React.FC<SectionProps> = ({ onClose, variant = 
   const [newNote, setNewNote] = useState('');
   const [savingNote, setSavingNote] = useState(false);
 
-  useEffect(() => {
-    const fetchTransactions = async () => {
-      try {
-        const res = await fetch('/api/stripe/transactions/today', { credentials: 'include' });
-        if (res.ok) {
-          const data = await res.json();
-          setTransactions(data);
-        }
-      } catch (err) {
-        console.error('Failed to fetch transactions:', err);
-      } finally {
-        setLoading(false);
+  const fetchTransactions = async () => {
+    try {
+      const res = await fetch('/api/stripe/transactions/today', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setTransactions(data);
       }
-    };
+    } catch (err) {
+      console.error('Failed to fetch transactions:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useImperativeHandle(ref, () => ({
+    addTransaction: (tx: Transaction) => {
+      setTransactions(prev => [tx, ...prev.filter(t => t.id !== tx.id)]);
+    },
+    refresh: () => {
+      fetchTransactions();
+    }
+  }));
+
+  useEffect(() => {
     fetchTransactions();
   }, []);
 
@@ -243,6 +258,6 @@ const RecentTransactionsSection: React.FC<SectionProps> = ({ onClose, variant = 
       {content}
     </div>
   );
-};
+});
 
 export default RecentTransactionsSection;

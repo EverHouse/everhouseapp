@@ -76,6 +76,54 @@ export function formatDatePacific(date: Date): string {
 }
 
 /**
+ * Get a Date object representing midnight Pacific time for a given date string (YYYY-MM-DD)
+ * or for today if no date is provided. Returns the UTC timestamp that corresponds to
+ * 00:00:00 Pacific time on that date.
+ * 
+ * Uses an iterative approach to correctly handle DST transitions:
+ * 1. Make an initial guess using a default offset
+ * 2. Check what offset actually applies at that instant
+ * 3. If different, recalculate with the correct offset
+ */
+export function getPacificMidnightUTC(dateStr?: string): Date {
+  const targetDate = dateStr || getTodayPacific();
+  
+  // Helper to get offset for a specific UTC instant
+  const getOffsetAtInstant = (instant: Date): number => {
+    const offsetStr = new Intl.DateTimeFormat('en-US', {
+      timeZone: CLUB_TIMEZONE,
+      timeZoneName: 'shortOffset'
+    }).formatToParts(instant).find(p => p.type === 'timeZoneName')?.value || 'GMT-8';
+    
+    const offsetMatch = offsetStr.match(/GMT([+-]?\d+)/);
+    return offsetMatch ? parseInt(offsetMatch[1], 10) : -8;
+  };
+  
+  // Helper to format offset as ISO string (e.g., -08:00)
+  const formatOffset = (hours: number): string => {
+    return hours < 0 
+      ? `-${String(Math.abs(hours)).padStart(2, '0')}:00`
+      : `+${String(hours).padStart(2, '0')}:00`;
+  };
+  
+  // First guess: use PST offset (-8)
+  let guess = new Date(`${targetDate}T00:00:00-08:00`);
+  let actualOffset = getOffsetAtInstant(guess);
+  
+  // If the offset at our guess differs, recalculate
+  if (actualOffset !== -8) {
+    guess = new Date(`${targetDate}T00:00:00${formatOffset(actualOffset)}`);
+    // Double-check the offset (in case of edge cases)
+    const finalOffset = getOffsetAtInstant(guess);
+    if (finalOffset !== actualOffset) {
+      guess = new Date(`${targetDate}T00:00:00${formatOffset(finalOffset)}`);
+    }
+  }
+  
+  return guess;
+}
+
+/**
  * Format a date to HH:MM:SS in Pacific timezone (24-hour format)
  */
 export function formatTimePacific(date: Date): string {

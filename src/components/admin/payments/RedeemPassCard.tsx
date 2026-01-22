@@ -5,6 +5,23 @@ import ModalShell from '../../ModalShell';
 export interface SectionProps {
   onClose?: () => void;
   variant?: 'modal' | 'card';
+  onBookGuest?: (guestInfo: { email: string; firstName: string; lastName: string }) => void;
+  onRedemptionSuccess?: (redemption: { passHolder: PassHolder; remainingUses: number; productType: string; redeemedAt: string }) => void;
+}
+
+interface PassHolder {
+  email: string;
+  name: string;
+  firstName: string;
+  lastName: string;
+  productType: string;
+  totalUses: number;
+}
+
+interface RedemptionSuccess {
+  passHolder: PassHolder;
+  remainingUses: number;
+  redeemedAt: string;
 }
 
 interface DayPass {
@@ -51,7 +68,7 @@ export const formatPassType = (productType: string): string => {
     .replace('Day Pass', 'Day Pass -');
 };
 
-const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'modal' }) => {
+const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'modal', onBookGuest, onRedemptionSuccess }) => {
   const [searchEmail, setSearchEmail] = useState('');
   const [passes, setPasses] = useState<DayPass[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -59,6 +76,7 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
   const [redeemingId, setRedeemingId] = useState<string | null>(null);
   const [errorState, setErrorState] = useState<ErrorState | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [redemptionSuccess, setRedemptionSuccess] = useState<RedemptionSuccess | null>(null);
   const [expandedPassId, setExpandedPassId] = useState<string | null>(null);
   const [historyData, setHistoryData] = useState<{ passId: string; logs: RedemptionLog[] }[]>([]);
   const [loadingHistoryId, setLoadingHistoryId] = useState<string | null>(null);
@@ -219,6 +237,7 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
     setRedeemingId(passId);
     setErrorState(null);
     setSuccessMessage(null);
+    setRedemptionSuccess(null);
     setLastAttemptedPassId(passId);
     if (force) setForceRedeeming(true);
     
@@ -242,7 +261,26 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
       }
       
       const data = await res.json();
-      setSuccessMessage(`Pass redeemed! ${data.remainingUses} uses remaining.`);
+      
+      if (data.passHolder) {
+        const successInfo: RedemptionSuccess = {
+          passHolder: data.passHolder,
+          remainingUses: data.remainingUses,
+          redeemedAt: data.redeemedAt,
+        };
+        setRedemptionSuccess(successInfo);
+        
+        if (onRedemptionSuccess) {
+          onRedemptionSuccess({
+            passHolder: data.passHolder,
+            remainingUses: data.remainingUses,
+            productType: data.passHolder.productType,
+            redeemedAt: data.redeemedAt,
+          });
+        }
+      } else {
+        setSuccessMessage(`Pass redeemed! ${data.remainingUses} uses remaining.`);
+      }
       setConfirmingRedeemAnyway(null);
       
       if (hasSearched && searchEmail) {
@@ -676,10 +714,77 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
 
       {renderErrorState()}
 
-      {successMessage && (
+      {successMessage && !redemptionSuccess && (
         <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30 flex items-center gap-2">
           <span className="material-symbols-outlined text-green-600 dark:text-green-400">check_circle</span>
           <p className="text-sm text-green-700 dark:text-green-400">{successMessage}</p>
+        </div>
+      )}
+
+      {redemptionSuccess && (
+        <div className="p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30 space-y-4 animate-modal-slide-up">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 w-12 h-12 rounded-full bg-green-100 dark:bg-green-800/40 flex items-center justify-center">
+              <span className="material-symbols-outlined text-2xl text-green-600 dark:text-green-400">check_circle</span>
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-green-900 dark:text-green-100 text-lg">Guest Checked In!</h3>
+              <p className="text-sm text-green-700 dark:text-green-300 mt-0.5">
+                Confirmation email sent with WiFi details
+              </p>
+            </div>
+          </div>
+          
+          <div className="bg-white dark:bg-black/20 rounded-xl p-4 border border-green-200 dark:border-green-700/30">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 dark:bg-white/10 flex items-center justify-center">
+                <span className="material-symbols-outlined text-primary dark:text-white">person</span>
+              </div>
+              <div>
+                <p className="font-medium text-primary dark:text-white">{redemptionSuccess.passHolder.name || 'Guest'}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{redemptionSuccess.passHolder.email}</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500 dark:text-gray-400">{formatPassType(redemptionSuccess.passHolder.productType)}</span>
+              <span className="font-medium text-primary dark:text-white">
+                {redemptionSuccess.remainingUses} {redemptionSuccess.remainingUses === 1 ? 'use' : 'uses'} remaining
+              </span>
+            </div>
+          </div>
+          
+          <div className="flex gap-2">
+            {onBookGuest && (
+              <button
+                onClick={() => {
+                  onBookGuest({
+                    email: redemptionSuccess.passHolder.email,
+                    firstName: redemptionSuccess.passHolder.firstName,
+                    lastName: redemptionSuccess.passHolder.lastName,
+                  });
+                  setRedemptionSuccess(null);
+                  if (onClose) onClose();
+                }}
+                className="flex-1 py-3 px-4 rounded-xl bg-primary text-white font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-lg">golf_course</span>
+                Book Golf for Guest
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setRedemptionSuccess(null);
+                setSuccessMessage(null);
+                setSearchEmail('');
+                setPasses([]);
+                setHasSearched(false);
+              }}
+              className={`${onBookGuest ? 'px-4' : 'flex-1'} py-3 rounded-xl bg-green-100 dark:bg-green-800/40 text-green-900 dark:text-green-100 font-medium hover:bg-green-200 dark:hover:bg-green-800/60 transition-colors flex items-center justify-center gap-2`}
+            >
+              <span className="material-symbols-outlined text-lg">done</span>
+              Done
+            </button>
+          </div>
         </div>
       )}
 

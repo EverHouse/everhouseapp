@@ -3,6 +3,7 @@ import { db } from '../db';
 import { dayPassPurchases, passRedemptionLogs } from '../../shared/schema';
 import { eq, and, gt, ilike, sql, desc } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../core/middleware';
+import { sendRedemptionConfirmationEmail } from '../emails/passEmails';
 
 const router = Router();
 
@@ -168,12 +169,46 @@ router.post('/api/staff/passes/:id/redeem', isStaffOrAdmin, async (req: Request,
       location: location || 'front_desk',
     });
 
+    const [passDetails] = await db
+      .select({
+        purchaserEmail: dayPassPurchases.purchaserEmail,
+        purchaserFirstName: dayPassPurchases.purchaserFirstName,
+        purchaserLastName: dayPassPurchases.purchaserLastName,
+        productType: dayPassPurchases.productType,
+        quantity: dayPassPurchases.quantity,
+      })
+      .from(dayPassPurchases)
+      .where(eq(dayPassPurchases.id, id))
+      .limit(1);
+
+    const guestName = [passDetails?.purchaserFirstName, passDetails?.purchaserLastName]
+      .filter(Boolean)
+      .join(' ') || 'Guest';
+
     console.log(`[Passes] Pass ${id} redeemed by ${staffEmail}. Remaining uses: ${remainingUses}`);
+
+    if (passDetails?.purchaserEmail) {
+      sendRedemptionConfirmationEmail(passDetails.purchaserEmail, {
+        guestName,
+        passType: passDetails.productType,
+        remainingUses: remainingUses ?? 0,
+        redeemedAt: new Date(),
+      }).catch(err => console.error('[Passes] Email send failed:', err));
+    }
 
     res.json({
       success: true,
       remainingUses,
       status,
+      passHolder: {
+        email: passDetails?.purchaserEmail || '',
+        name: guestName,
+        firstName: passDetails?.purchaserFirstName || '',
+        lastName: passDetails?.purchaserLastName || '',
+        productType: passDetails?.productType || '',
+        totalUses: passDetails?.quantity || 1,
+      },
+      redeemedAt: new Date().toISOString(),
     });
   } catch (error: any) {
     console.error('[Passes] Error redeeming pass:', error);

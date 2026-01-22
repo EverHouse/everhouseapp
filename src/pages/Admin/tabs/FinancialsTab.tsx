@@ -9,7 +9,7 @@ import { MemberSearchInput, SelectedMember } from '../../../components/shared/Me
 import { getTodayPacific, formatTime12Hour } from '../../../utils/dateUtils';
 import RecordPurchaseCard from '../../../components/admin/payments/RecordPurchaseCard';
 import RedeemDayPassSection from '../../../components/admin/payments/RedeemPassCard';
-import RecentTransactionsSection from '../../../components/admin/payments/TransactionList';
+import RecentTransactionsSection, { TransactionListRef, Transaction } from '../../../components/admin/payments/TransactionList';
 import OverduePaymentsPanel from '../../../components/admin/payments/OverduePaymentsPanel';
 import { useIsMobile } from '../../../hooks/useBreakpoint';
 import { AnimatedPage } from '../../../components/motion';
@@ -37,16 +37,6 @@ interface MemberSearchResult {
   stripeCustomerId: string | null;
 }
 
-interface Transaction {
-  id: string;
-  amount: number;
-  status: string;
-  description: string;
-  memberEmail: string;
-  memberName: string;
-  createdAt: string;
-  type: string;
-}
 
 interface TransactionNote {
   id: number;
@@ -385,6 +375,22 @@ const MobilePaymentsView: React.FC = () => {
 };
 
 const DesktopPaymentsView: React.FC = () => {
+  const transactionListRef = useRef<TransactionListRef>(null);
+  
+  const handleRedemptionSuccess = (redemption: { passHolder: { email: string; name: string }; remainingUses: number; productType: string; redeemedAt: string }) => {
+    const newTransaction: Transaction = {
+      id: `redemption-${Date.now()}`,
+      amount: 0,
+      status: 'succeeded',
+      description: `Day Pass Redeemed (${redemption.remainingUses} remaining)`,
+      memberEmail: redemption.passHolder.email,
+      memberName: redemption.passHolder.name,
+      createdAt: redemption.redeemedAt,
+      type: 'day_pass_redemption',
+    };
+    transactionListRef.current?.addTransaction(newTransaction);
+  };
+  
   return (
     <div className="grid grid-cols-12 gap-6">
       <div className="col-span-6 space-y-6">
@@ -392,12 +398,12 @@ const DesktopPaymentsView: React.FC = () => {
         <div className="relative z-20 focus-within:z-50">
           <RecordPurchaseCard variant="card" />
         </div>
-        <RedeemDayPassSection variant="card" />
+        <RedeemDayPassSection variant="card" onRedemptionSuccess={handleRedemptionSuccess} />
       </div>
       
       <div className="col-span-6 space-y-6">
         <div className="relative z-10">
-          <RecentTransactionsSection variant="card" />
+          <RecentTransactionsSection ref={transactionListRef} variant="card" />
         </div>
         <PendingAuthorizationsSection variant="card" />
         <OverduePaymentsPanel variant="card" />
