@@ -19,6 +19,7 @@ import { BottomNavProvider } from './contexts/BottomNavContext';
 import { AnnouncementBadgeProvider } from './contexts/AnnouncementBadgeContext';
 import { BottomSentinel } from './components/layout/BottomSentinel';
 import { BottomFadeOverlay } from './components/layout/BottomFadeOverlay';
+import { AdaptiveBottomFade } from './components/layout/AdaptiveBottomFade';
 import MemberBottomNav from './components/MemberBottomNav';
 import { NavigationLoadingProvider, useNavigationLoading } from './contexts/NavigationLoadingContext';
 import { PageReadyProvider } from './contexts/PageReadyContext';
@@ -730,7 +731,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             )}
 
             {!isMemberRoute && !isAdminRoute && (
-              <BottomFadeOverlay variant="shadow" />
+              <AdaptiveBottomFade />
             )}
 
             <MenuOverlay isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
