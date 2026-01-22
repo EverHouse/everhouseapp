@@ -99,7 +99,7 @@ export async function reconcileSubscriptions() {
       `SELECT stripe_customer_id, email, tier 
        FROM users 
        WHERE stripe_customer_id IS NOT NULL 
-       AND status = 'active'`
+       AND membership_status = 'active'`
     );
 
     let mismatches = 0;
@@ -228,17 +228,18 @@ export async function reconcileSubscriptions() {
           
           // Create user in DB
           await pool.query(
-            `INSERT INTO users (email, first_name, last_name, tier, status, stripe_customer_id, join_date, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, 'active', $5, NOW(), NOW(), NOW())
+            `INSERT INTO users (email, first_name, last_name, tier, membership_status, stripe_customer_id, stripe_subscription_id, join_date, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, 'active', $5, $6, NOW(), NOW(), NOW())
              ON CONFLICT (email) DO UPDATE SET 
                stripe_customer_id = EXCLUDED.stripe_customer_id,
-               status = 'active',
+               stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+               membership_status = 'active',
                tier = COALESCE(EXCLUDED.tier, users.tier),
                updated_at = NOW()`,
-            [customerEmail, firstName, lastName, tierSlug, customer.id]
+            [customerEmail, firstName, lastName, tierSlug, customer.id, subscription.id]
           );
           
-          console.log(`[Reconcile] Created user ${customerEmail} with tier ${tierSlug || 'none'} from subscription ${subscription.id}`);
+          console.log(`[Reconcile] Created user ${customerEmail} with tier ${tierSlug || 'none'}, subscription ${subscription.id}`);
           usersCreated++;
           
           // Sync to HubSpot

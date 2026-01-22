@@ -302,6 +302,57 @@ router.post('/api/auth/verify-member', async (req, res) => {
     const staffUserData = await getStaffUserByEmail(normalizedEmail);
     const isStaffOrAdmin = staffUserData !== null;
     
+    // HYBRID APPROACH: Check database first for Stripe-billed members
+    // Fall back to HubSpot only for Mindbody legacy members
+    const dbUser = await db.select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+      phone: users.phone,
+      tier: users.tier,
+      tags: users.tags,
+      membershipStatus: users.membershipStatus,
+      stripeSubscriptionId: users.stripeSubscriptionId,
+      stripeCustomerId: users.stripeCustomerId,
+      mindbodyClientId: users.mindbodyClientId,
+      hubspotId: users.hubspotId,
+    })
+      .from(users)
+      .where(sql`LOWER(${users.email}) = LOWER(${normalizedEmail})`)
+      .limit(1);
+    
+    const hasDbUser = dbUser.length > 0;
+    const isStripeBilled = hasDbUser && (dbUser[0].stripeSubscriptionId || dbUser[0].stripeCustomerId);
+    
+    // For Stripe-billed members: use database as source of truth
+    if (hasDbUser && isStripeBilled && !isStaffOrAdmin) {
+      const dbMemberStatus = (dbUser[0].membershipStatus || '').toLowerCase();
+      const activeStatuses = ['active', 'trialing', 'past_due']; // past_due still has access while retrying payment
+      
+      if (!activeStatuses.includes(dbMemberStatus)) {
+        return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
+      }
+      
+      // Return member data from database
+      const member = {
+        id: dbUser[0].id,
+        firstName: dbUser[0].firstName || '',
+        lastName: dbUser[0].lastName || '',
+        email: dbUser[0].email || normalizedEmail,
+        phone: dbUser[0].phone || '',
+        jobTitle: '',
+        tier: normalizeTierName(dbUser[0].tier),
+        tags: dbUser[0].tags || [],
+        mindbodyClientId: dbUser[0].mindbodyClientId || '',
+        status: 'Active',
+        role: 'member' as const
+      };
+      
+      return res.json({ success: true, member });
+    }
+    
+    // For Mindbody legacy members or unknown users: check HubSpot
     const hubspot = await getHubSpotClient();
     
     const searchResponse = await hubspot.crm.contacts.searchApi.doSearch({
@@ -328,12 +379,17 @@ router.post('/api/auth/verify-member', async (req, res) => {
     const contact = searchResponse.results[0];
     
     // Staff/admin users can log in even without a HubSpot contact
+    // Stripe-billed members can log in without HubSpot (database is source of truth)
+    // Legacy Mindbody members MUST have HubSpot contact for status verification
     if (!contact && !isStaffOrAdmin) {
-      return res.status(404).json({ error: 'No member found with this email address' });
+      // Stripe-billed members don't need HubSpot
+      if (!isStripeBilled) {
+        return res.status(404).json({ error: 'No member found with this email address' });
+      }
     }
     
-    // Only check membership status for non-staff users with a HubSpot contact
-    if (contact && !isStaffOrAdmin) {
+    // For non-Stripe (Mindbody legacy) users: HubSpot is source of truth for membership status
+    if (!isStaffOrAdmin && !isStripeBilled && contact) {
       const status = (contact.properties.membership_status || '').toLowerCase();
       if (status !== 'active') {
         return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
@@ -342,12 +398,13 @@ router.post('/api/auth/verify-member', async (req, res) => {
     
     const role = isStaffOrAdmin ? staffUserData!.role : 'member';
 
-    let firstName = contact?.properties.firstname || '';
-    let lastName = contact?.properties.lastname || '';
-    let phone = contact?.properties.phone || '';
+    // Prefer database data, fall back to HubSpot
+    let firstName = dbUser[0]?.firstName || contact?.properties.firstname || '';
+    let lastName = dbUser[0]?.lastName || contact?.properties.lastname || '';
+    let phone = dbUser[0]?.phone || contact?.properties.phone || '';
     let jobTitle = '';
 
-    // Use staff user data if available (overrides HubSpot data for staff/admin)
+    // Use staff user data if available (overrides other data for staff/admin)
     if (isStaffOrAdmin && staffUserData) {
       firstName = staffUserData.firstName || firstName;
       lastName = staffUserData.lastName || lastName;
@@ -356,15 +413,15 @@ router.post('/api/auth/verify-member', async (req, res) => {
     }
 
     const member = {
-      id: contact?.id || crypto.randomUUID(),
+      id: dbUser[0]?.id || contact?.id || crypto.randomUUID(),
       firstName,
       lastName,
-      email: contact?.properties.email || normalizedEmail,
+      email: dbUser[0]?.email || contact?.properties.email || normalizedEmail,
       phone,
       jobTitle,
-      tier: isStaffOrAdmin ? null : normalizeTierName(contact?.properties.membership_tier),
-      tags: isStaffOrAdmin ? [] : extractTierTags(contact?.properties.membership_tier, contact?.properties.membership_discount_reason),
-      mindbodyClientId: contact?.properties.mindbody_client_id || '',
+      tier: isStaffOrAdmin ? null : normalizeTierName(dbUser[0]?.tier || contact?.properties.membership_tier),
+      tags: isStaffOrAdmin ? [] : (dbUser[0]?.tags || extractTierTags(contact?.properties.membership_tier, contact?.properties.membership_discount_reason)),
+      mindbodyClientId: dbUser[0]?.mindbodyClientId || contact?.properties.mindbody_client_id || '',
       status: 'Active',
       role
     };
@@ -622,42 +679,109 @@ router.post('/api/auth/verify-otp', async (req, res) => {
         expires_at: Date.now() + sessionTtl
       };
     } else {
-      const hubspot = await getHubSpotClient();
+      // HYBRID APPROACH: Check database first for Stripe-billed members
+      // Fall back to HubSpot only for Mindbody legacy members
+      const dbUser = await db.select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        phone: users.phone,
+        tier: users.tier,
+        tags: users.tags,
+        membershipStatus: users.membershipStatus,
+        stripeSubscriptionId: users.stripeSubscriptionId,
+        stripeCustomerId: users.stripeCustomerId,
+        mindbodyClientId: users.mindbodyClientId,
+        joinDate: users.joinDate,
+        dateOfBirth: users.dateOfBirth,
+      })
+        .from(users)
+        .where(sql`LOWER(${users.email}) = LOWER(${normalizedEmail})`)
+        .limit(1);
       
-      const searchResponse = await hubspot.crm.contacts.searchApi.doSearch({
-        filterGroups: [{
-          filters: [{
-            propertyName: 'email',
-            operator: 'EQ' as any,
-            value: normalizedEmail
-          }]
-        }],
-        properties: ['firstname', 'lastname', 'email', 'phone', 'membership_tier', 'membership_status', 'membership_discount_reason', 'mindbody_client_id', 'membership_start_date', 'date_of_birth'],
-        limit: 1
-      });
+      const hasDbUser = dbUser.length > 0;
+      const isStripeBilled = hasDbUser && (dbUser[0].stripeSubscriptionId || dbUser[0].stripeCustomerId);
       
-      if (searchResponse.results.length === 0) {
-        return res.status(404).json({ error: 'Member not found' });
+      // For Stripe-billed members: use database as source of truth
+      if (hasDbUser && isStripeBilled) {
+        const dbMemberStatus = (dbUser[0].membershipStatus || '').toLowerCase();
+        const activeStatuses = ['active', 'trialing', 'past_due']; // past_due still has access while retrying payment
+        
+        if (!activeStatuses.includes(dbMemberStatus)) {
+          return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
+        }
+        
+        member = {
+          id: dbUser[0].id,
+          firstName: dbUser[0].firstName || '',
+          lastName: dbUser[0].lastName || '',
+          email: dbUser[0].email || normalizedEmail,
+          phone: dbUser[0].phone || '',
+          tier: normalizeTierName(dbUser[0].tier),
+          tags: dbUser[0].tags || [],
+          mindbodyClientId: dbUser[0].mindbodyClientId || '',
+          membershipStartDate: dbUser[0].joinDate ? new Date(dbUser[0].joinDate).toISOString().split('T')[0] : '',
+          status: 'Active',
+          role,
+          expires_at: Date.now() + sessionTtl,
+          dateOfBirth: dbUser[0].dateOfBirth || null
+        };
+      } else {
+        // For Mindbody legacy members or unknown users: check HubSpot
+        const hubspot = await getHubSpotClient();
+        
+        const searchResponse = await hubspot.crm.contacts.searchApi.doSearch({
+          filterGroups: [{
+            filters: [{
+              propertyName: 'email',
+              operator: 'EQ' as any,
+              value: normalizedEmail
+            }]
+          }],
+          properties: ['firstname', 'lastname', 'email', 'phone', 'membership_tier', 'membership_status', 'membership_discount_reason', 'mindbody_client_id', 'membership_start_date', 'date_of_birth'],
+          limit: 1
+        });
+        
+        const contact = searchResponse.results[0];
+        
+        // Stripe-billed members can log in without HubSpot (database is source of truth)
+        // Legacy Mindbody members MUST have HubSpot contact for status verification
+        if (!contact) {
+          if (!isStripeBilled) {
+            return res.status(404).json({ error: 'Member not found' });
+          }
+        }
+        
+        // For non-Stripe (Mindbody legacy) members: HubSpot is source of truth
+        if (!isStripeBilled && contact) {
+          const hubspotStatus = (contact.properties.membership_status || '').toLowerCase();
+          if (hubspotStatus !== 'active') {
+            return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
+          }
+        }
+        
+        // Prefer database data, fall back to HubSpot
+        const tags = hasDbUser ? (dbUser[0].tags || []) : extractTierTags(contact?.properties.membership_tier, contact?.properties.membership_discount_reason);
+        
+        member = {
+          id: hasDbUser ? dbUser[0].id : (contact?.id || crypto.randomUUID()),
+          firstName: (hasDbUser ? dbUser[0].firstName : contact?.properties.firstname) || '',
+          lastName: (hasDbUser ? dbUser[0].lastName : contact?.properties.lastname) || '',
+          email: (hasDbUser ? dbUser[0].email : contact?.properties.email) || normalizedEmail,
+          phone: (hasDbUser ? dbUser[0].phone : contact?.properties.phone) || '',
+          tier: normalizeTierName(hasDbUser ? dbUser[0].tier : contact?.properties.membership_tier),
+          tags,
+          mindbodyClientId: (hasDbUser ? dbUser[0].mindbodyClientId : contact?.properties.mindbody_client_id) || '',
+          membershipStartDate: (hasDbUser && dbUser[0].joinDate) 
+            ? new Date(dbUser[0].joinDate).toISOString().split('T')[0] 
+            : (contact?.properties.membership_start_date || ''),
+          status: 'Active',
+          role,
+          expires_at: Date.now() + sessionTtl,
+          dateOfBirth: (hasDbUser ? dbUser[0].dateOfBirth : contact?.properties.date_of_birth) || null
+        };
       }
-      
-      const contact = searchResponse.results[0];
-      const tags = extractTierTags(contact.properties.membership_tier, contact.properties.membership_discount_reason);
-      
-      member = {
-        id: contact.id,
-        firstName: contact.properties.firstname || '',
-        lastName: contact.properties.lastname || '',
-        email: contact.properties.email || normalizedEmail,
-        phone: contact.properties.phone || '',
-        tier: normalizeTierName(contact.properties.membership_tier),
-        tags,
-        mindbodyClientId: contact.properties.mindbody_client_id || '',
-        membershipStartDate: contact.properties.membership_start_date || '',
-        status: 'Active',
-        role,
-        expires_at: Date.now() + sessionTtl,
-        dateOfBirth: contact.properties.date_of_birth || null
-      };
     }
     
     req.session.user = member;

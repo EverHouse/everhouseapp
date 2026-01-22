@@ -860,17 +860,18 @@ async function handleSubscriptionCreated(subscription: any): Promise<void> {
       }
       
       await pool.query(
-        `INSERT INTO users (email, first_name, last_name, tier, status, stripe_customer_id, join_date, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, 'active', $5, NOW(), NOW(), NOW())
+        `INSERT INTO users (email, first_name, last_name, tier, membership_status, stripe_customer_id, stripe_subscription_id, join_date, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 'active', $5, $6, NOW(), NOW(), NOW())
          ON CONFLICT (email) DO UPDATE SET 
            stripe_customer_id = EXCLUDED.stripe_customer_id,
-           status = 'active',
+           stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+           membership_status = 'active',
            tier = COALESCE(EXCLUDED.tier, users.tier),
            updated_at = NOW()`,
-        [customerEmail, firstName, lastName, tierSlug, customerId]
+        [customerEmail, firstName, lastName, tierSlug, customerId, subscription.id]
       );
       
-      console.log(`[Stripe Webhook] Created user ${customerEmail} with tier ${tierSlug || 'none'} from subscription`);
+      console.log(`[Stripe Webhook] Created user ${customerEmail} with tier ${tierSlug || 'none'}, subscription ${subscription.id}`);
       
       try {
         const { findOrCreateHubSpotContact } = await import('../hubspot/members');
