@@ -730,9 +730,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
             {isMemberRoute && !isAdminRoute && !isProfilePage && user && (
               <>
-                <BottomFadeOverlay isDark={isDarkTheme} />
+                <BottomFadeOverlay isDark={isDarkTheme} variant="colored" />
                 <MemberBottomNav currentPath={location.pathname} isDarkTheme={isDarkTheme} />
               </>
+            )}
+
+            {!isMemberRoute && !isAdminRoute && (
+              <BottomFadeOverlay variant="shadow" />
             )}
 
             <MenuOverlay isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />

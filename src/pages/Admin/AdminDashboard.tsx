@@ -214,7 +214,7 @@ const AdminDashboard: React.FC = () => {
       </main>
 
       <div className="lg:hidden">
-        <BottomFadeOverlay isDark={effectiveTheme === 'dark'} />
+        <BottomFadeOverlay isDark={effectiveTheme === 'dark'} variant="colored" />
         <StaffBottomNav 
           activeTab={activeTab} 
           onTabChange={handleTabChange} 
