@@ -1268,70 +1268,72 @@ html.dark .border-accessible {
 @keyframes pageEnter {
   0% {
     opacity: 0;
-    transform: scale(0.995);
+    transform: translateY(8px);
   }
   100% {
     opacity: 1;
-    transform: scale(1);
+    transform: translateY(0);
   }
 }
 
 .animate-page-enter {
   opacity: 0;
-  animation: pageEnter 0.12s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  animation: pageEnter 0.35s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
 }
 
 .page-fade-in {
   opacity: 0;
-  animation: pageEnter 0.12s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  animation: pageEnter 0.35s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
 }
 
-/* Page Content Animation - Staggered fade for page elements (no vertical offset) */
+/* Page Content Animation - Staggered fade + slide for page elements */
 @keyframes pageContentEnter {
   0% {
     opacity: 0;
+    transform: translateY(16px);
   }
   100% {
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
 .animate-content-enter {
   opacity: 0;
-  animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  animation: pageContentEnter 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
 .animate-content-enter-delay-1 {
   opacity: 0;
-  animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.05s forwards;
+  animation: pageContentEnter 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.1s forwards;
 }
 
 .animate-content-enter-delay-2 {
   opacity: 0;
-  animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.1s forwards;
+  animation: pageContentEnter 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.2s forwards;
 }
 
 .animate-content-enter-delay-3 {
   opacity: 0;
-  animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.15s forwards;
+  animation: pageContentEnter 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.3s forwards;
 }
 
 /* Extended stagger delays for lists (4-12) */
-.animate-content-enter-delay-4 { opacity: 0; animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.2s forwards; }
-.animate-content-enter-delay-5 { opacity: 0; animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.25s forwards; }
-.animate-content-enter-delay-6 { opacity: 0; animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.3s forwards; }
-.animate-content-enter-delay-7 { opacity: 0; animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.35s forwards; }
-.animate-content-enter-delay-8 { opacity: 0; animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.4s forwards; }
-.animate-content-enter-delay-9 { opacity: 0; animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.45s forwards; }
-.animate-content-enter-delay-10 { opacity: 0; animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.5s forwards; }
-.animate-content-enter-delay-11 { opacity: 0; animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.55s forwards; }
-.animate-content-enter-delay-12 { opacity: 0; animation: pageContentEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.6s forwards; }
+.animate-content-enter-delay-4 { opacity: 0; animation: pageContentEnter 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.4s forwards; }
+.animate-content-enter-delay-5 { opacity: 0; animation: pageContentEnter 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.5s forwards; }
+.animate-content-enter-delay-6 { opacity: 0; animation: pageContentEnter 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.6s forwards; }
+.animate-content-enter-delay-7 { opacity: 0; animation: pageContentEnter 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.7s forwards; }
+.animate-content-enter-delay-8 { opacity: 0; animation: pageContentEnter 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.8s forwards; }
+.animate-content-enter-delay-9 { opacity: 0; animation: pageContentEnter 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.9s forwards; }
+.animate-content-enter-delay-10 { opacity: 0; animation: pageContentEnter 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) 1s forwards; }
+.animate-content-enter-delay-11 { opacity: 0; animation: pageContentEnter 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) 1.1s forwards; }
+.animate-content-enter-delay-12 { opacity: 0; animation: pageContentEnter 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) 1.2s forwards; }
 
 /* List item stagger with slide - for lists/cards that need vertical motion */
 @keyframes listItemEnter {
   0% {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(20px);
   }
   100% {
     opacity: 1;
@@ -1341,19 +1343,19 @@ html.dark .border-accessible {
 
 .animate-list-item {
   opacity: 0;
-  animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  animation: listItemEnter 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
-.animate-list-item-delay-1 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.05s forwards; }
-.animate-list-item-delay-2 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.1s forwards; }
-.animate-list-item-delay-3 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.15s forwards; }
-.animate-list-item-delay-4 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.2s forwards; }
-.animate-list-item-delay-5 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.25s forwards; }
-.animate-list-item-delay-6 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.3s forwards; }
-.animate-list-item-delay-7 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.35s forwards; }
-.animate-list-item-delay-8 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.4s forwards; }
-.animate-list-item-delay-9 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.45s forwards; }
-.animate-list-item-delay-10 { opacity: 0; animation: listItemEnter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.5s forwards; }
+.animate-list-item-delay-1 { opacity: 0; animation: listItemEnter 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.08s forwards; }
+.animate-list-item-delay-2 { opacity: 0; animation: listItemEnter 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.16s forwards; }
+.animate-list-item-delay-3 { opacity: 0; animation: listItemEnter 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.24s forwards; }
+.animate-list-item-delay-4 { opacity: 0; animation: listItemEnter 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.32s forwards; }
+.animate-list-item-delay-5 { opacity: 0; animation: listItemEnter 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.4s forwards; }
+.animate-list-item-delay-6 { opacity: 0; animation: listItemEnter 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.48s forwards; }
+.animate-list-item-delay-7 { opacity: 0; animation: listItemEnter 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.56s forwards; }
+.animate-list-item-delay-8 { opacity: 0; animation: listItemEnter 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.64s forwards; }
+.animate-list-item-delay-9 { opacity: 0; animation: listItemEnter 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.72s forwards; }
+.animate-list-item-delay-10 { opacity: 0; animation: listItemEnter 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.8s forwards; }
 
 /* Skeleton crossfade - fades out skeleton while content fades in */
 @keyframes skeletonFadeOut {
