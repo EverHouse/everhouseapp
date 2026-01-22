@@ -116,6 +116,12 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
         error: 'Missing required fields: userId, email, amountCents, purpose, description' 
       });
     }
+    
+    if (typeof amountCents !== 'number' || amountCents < 50 || !Number.isFinite(amountCents)) {
+      return res.status(400).json({ 
+        error: 'Invalid amount. Must be a positive number of at least 50 cents.' 
+      });
+    }
 
     const validPurposes = ['guest_fee', 'overage_fee', 'one_time_purchase'];
     if (!validPurposes.includes(purpose)) {

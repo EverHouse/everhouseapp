@@ -1,18 +1,44 @@
 import { Router } from 'express';
 import { eq, sql, and, lt } from 'drizzle-orm';
 import { db } from '../db';
-import { guestPasses, notifications } from '../../shared/schema';
+import { guestPasses, notifications, staffUsers } from '../../shared/schema';
 import { getTierLimits } from '../core/tierService';
 import { sendPushNotification } from './push';
 import { sendNotificationToUser } from '../core/websocket';
 import { logAndRespond } from '../core/logger';
 import { withRetry } from '../core/retry';
+import { getSessionUser } from '../types/session';
 
 const router = Router();
 
+async function isStaffOrAdminCheck(email: string): Promise<boolean> {
+  const [staff] = await db.select({ id: staffUsers.id })
+    .from(staffUsers)
+    .where(and(
+      eq(staffUsers.email, email.toLowerCase()),
+      eq(staffUsers.isActive, true)
+    ))
+    .limit(1);
+  return !!staff;
+}
+
 router.get('/api/guest-passes/:email', async (req, res) => {
   try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
     const email = decodeURIComponent(req.params.email);
+    const sessionEmail = sessionUser.email?.toLowerCase() || '';
+    const requestedEmail = email.toLowerCase();
+    
+    if (sessionEmail !== requestedEmail) {
+      const hasStaffAccess = await isStaffOrAdminCheck(sessionEmail);
+      if (!hasStaffAccess) {
+        return res.status(403).json({ error: 'You can only view your own guest passes' });
+      }
+    }
     const { tier } = req.query;
     
     const tierLimits = tier ? await getTierLimits(tier as string) : null;
@@ -60,7 +86,22 @@ router.get('/api/guest-passes/:email', async (req, res) => {
 
 router.post('/api/guest-passes/:email/use', async (req, res) => {
   try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
     const email = decodeURIComponent(req.params.email);
+    const sessionEmail = sessionUser.email?.toLowerCase() || '';
+    const requestedEmail = email.toLowerCase();
+    
+    if (sessionEmail !== requestedEmail) {
+      const hasStaffAccess = await isStaffOrAdminCheck(sessionEmail);
+      if (!hasStaffAccess) {
+        return res.status(403).json({ error: 'You can only use your own guest passes' });
+      }
+    }
+    
     const { guest_name } = req.body;
     
     const result = await db.update(guestPasses)
@@ -107,6 +148,17 @@ router.post('/api/guest-passes/:email/use', async (req, res) => {
 
 router.put('/api/guest-passes/:email', async (req, res) => {
   try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    const sessionEmail = sessionUser.email?.toLowerCase() || '';
+    const hasStaffAccess = await isStaffOrAdminCheck(sessionEmail);
+    if (!hasStaffAccess) {
+      return res.status(403).json({ error: 'Staff access required to modify guest passes' });
+    }
+    
     const email = decodeURIComponent(req.params.email);
     const { passes_total } = req.body;
     

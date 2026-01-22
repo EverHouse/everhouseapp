@@ -26,10 +26,13 @@ export function getSession() {
   };
   
   if (!sessionSecret) {
-    console.warn('[Session] SESSION_SECRET is missing');
+    if (isProduction) {
+      throw new Error('[Session] FATAL: SESSION_SECRET is required in production. Set it in your environment variables.');
+    }
+    console.warn('[Session] SESSION_SECRET is missing - using development fallback (NOT SAFE FOR PRODUCTION)');
     console.log('[Session] Using MemoryStore');
     return session({
-      secret: 'temporary-fallback-secret-' + Date.now(),
+      secret: 'dev-only-fallback-secret-' + Date.now(),
       resave: false,
       saveUninitialized: false,
       cookie: cookieConfig,

@@ -506,6 +506,19 @@ router.post('/api/booking-requests', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     
+    const parsedDate = new Date(request_date + 'T00:00:00');
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format' });
+    }
+    
+    const [year, month, day] = request_date.split('-').map((n: string) => parseInt(n, 10));
+    const validatedDate = new Date(year, month - 1, day);
+    if (validatedDate.getFullYear() !== year || 
+        validatedDate.getMonth() !== month - 1 || 
+        validatedDate.getDate() !== day) {
+      return res.status(400).json({ error: 'Invalid date - date does not exist (e.g., Feb 30)' });
+    }
+    
     const sessionEmail = sessionUser.email?.toLowerCase() || '';
     const requestEmail = user_email.toLowerCase();
     
@@ -516,8 +529,8 @@ router.post('/api/booking-requests', async (req, res) => {
       }
     }
     
-    if (typeof duration_minutes !== 'number' || duration_minutes <= 0 || duration_minutes > 480) {
-      return res.status(400).json({ error: 'Invalid duration. Must be between 1 and 480 minutes.' });
+    if (typeof duration_minutes !== 'number' || !Number.isInteger(duration_minutes) || duration_minutes <= 0 || duration_minutes > 480) {
+      return res.status(400).json({ error: 'Invalid duration. Must be a whole number between 1 and 480 minutes.' });
     }
     
     let originalBooking: any = null;
@@ -740,7 +753,7 @@ router.post('/api/booking-requests', async (req, res) => {
 router.get('/api/booking-requests/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const bookingId = parseInt(id);
+    const bookingId = parseInt(id, 10);
     
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
@@ -803,7 +816,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
     
     // If only updating trackman_booking_id (no status change)
     if (trackman_booking_id !== undefined && !status) {
-      const bookingId = parseInt(id);
+      const bookingId = parseInt(id, 10);
       const [updated] = await db.update(bookingRequests)
         .set({ 
           trackmanBookingId: trackman_booking_id || null,
@@ -850,7 +863,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
     });
     
     if (status === 'approved') {
-      const bookingId = parseInt(id);
+      const bookingId = parseInt(id, 10);
       
       const { updated, bayName, approvalMessage } = await db.transaction(async (tx) => {
         const [req_data] = await tx.select().from(bookingRequests).where(eq(bookingRequests.id, bookingId));
@@ -1139,7 +1152,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
           const linkedMembers = await db.select({ userEmail: bookingMembers.userEmail })
             .from(bookingMembers)
             .where(and(
-              eq(bookingMembers.bookingId, parseInt(id)),
+              eq(bookingMembers.bookingId, parseInt(id, 10)),
               sql`${bookingMembers.userEmail} IS NOT NULL`,
               sql`${bookingMembers.isPrimary} IS NOT TRUE`
             ));
@@ -1154,7 +1167,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                 title: 'Booking Confirmed',
                 message: linkedMessage,
                 type: 'booking_approved',
-                relatedId: parseInt(id),
+                relatedId: parseInt(id, 10),
                 relatedType: 'booking_request'
               });
               
@@ -1170,8 +1183,8 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                 type: 'notification',
                 title: 'Booking Confirmed',
                 message: linkedMessage,
-                data: { bookingId: parseInt(id), eventType: 'booking_approved' }
-              }, { action: 'booking_approved_linked', bookingId: parseInt(id), triggerSource: 'bays.ts' });
+                data: { bookingId: parseInt(id, 10), eventType: 'booking_approved' }
+              }, { action: 'booking_approved_linked', bookingId: parseInt(id, 10), triggerSource: 'bays.ts' });
             }
           }
         } catch (err) {
@@ -1181,7 +1194,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
       
       // Publish booking approved event for real-time updates
       bookingEvents.publish('booking_approved', {
-        bookingId: parseInt(id),
+        bookingId: parseInt(id, 10),
         memberEmail: updated.userEmail,
         memberName: updated.userName || undefined,
         resourceId: updated.resourceId || undefined,
@@ -1206,14 +1219,14 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
         type: 'notification',
         title: updated.rescheduleBookingId ? 'Reschedule Approved' : 'Booking Approved',
         message: approvalMessage,
-        data: { bookingId: parseInt(id), eventType: 'booking_approved' }
-      }, { action: 'booking_approved', bookingId: parseInt(id), triggerSource: 'bays.ts' });
+        data: { bookingId: parseInt(id, 10), eventType: 'booking_approved' }
+      }, { action: 'booking_approved', bookingId: parseInt(id, 10), triggerSource: 'bays.ts' });
       
       return res.json(formatRow(updated));
     }
     
     if (status === 'declined') {
-      const bookingId = parseInt(id);
+      const bookingId = parseInt(id, 10);
       
       const { updated, declineMessage, isReschedule } = await db.transaction(async (tx) => {
         const [existing] = await tx.select().from(bookingRequests).where(eq(bookingRequests.id, bookingId));
@@ -1288,7 +1301,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
       
       // Publish booking declined event for real-time updates
       bookingEvents.publish('booking_declined', {
-        bookingId: parseInt(id),
+        bookingId: parseInt(id, 10),
         memberEmail: updated.userEmail,
         memberName: updated.userName || undefined,
         bookingDate: updated.requestDate,
@@ -1302,14 +1315,14 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
         type: 'notification',
         title: isReschedule ? 'Reschedule Declined' : 'Booking Declined',
         message: declineMessage,
-        data: { bookingId: parseInt(id), eventType: 'booking_declined' }
-      }, { action: 'booking_declined', bookingId: parseInt(id), triggerSource: 'bays.ts' });
+        data: { bookingId: parseInt(id, 10), eventType: 'booking_declined' }
+      }, { action: 'booking_declined', bookingId: parseInt(id, 10), triggerSource: 'bays.ts' });
       
       return res.json(formatRow(updated));
     }
     
     if (status === 'cancelled') {
-      const bookingId = parseInt(id);
+      const bookingId = parseInt(id, 10);
       const { cancelled_by } = req.body;
       
       const { updated, bookingData, pushInfo } = await db.transaction(async (tx) => {
@@ -1472,7 +1485,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
       // cleanupNotifications is false to preserve the cancellation notification we just created
       const cancelledBy = pushInfo?.type === 'both' ? 'member' : 'staff';
       bookingEvents.publish('booking_cancelled', {
-        bookingId: parseInt(id),
+        bookingId: parseInt(id, 10),
         memberEmail: bookingData.userEmail,
         memberName: bookingData.userName || undefined,
         resourceId: bookingData.resourceId || undefined,
@@ -1496,8 +1509,8 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
           type: 'notification',
           title: 'Booking Cancelled',
           message: pushInfo.memberMessage || pushInfo.message,
-          data: { bookingId: parseInt(id), eventType: 'booking_cancelled' }
-        }, { action: 'booking_cancelled', bookingId: parseInt(id), triggerSource: 'bays.ts' });
+          data: { bookingId: parseInt(id, 10), eventType: 'booking_cancelled' }
+        }, { action: 'booking_cancelled', bookingId: parseInt(id, 10), triggerSource: 'bays.ts' });
       }
       
       return res.json(formatRow(updated));
@@ -1509,7 +1522,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
         staffNotes: staff_notes || undefined,
         updatedAt: new Date()
       })
-      .where(eq(bookingRequests.id, parseInt(id)))
+      .where(eq(bookingRequests.id, parseInt(id, 10)))
       .returning();
     
     if (result.length === 0) {
@@ -1543,7 +1556,7 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
     
-    const bookingId = parseInt(id);
+    const bookingId = parseInt(id, 10);
     
     const [existing] = await db.select({
       id: bookingRequests.id,
@@ -1664,7 +1677,7 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { status: targetStatus, confirmPayment, skipPaymentCheck } = req.body;
-    const bookingId = parseInt(id);
+    const bookingId = parseInt(id, 10);
     const sessionUser = getSessionUser(req);
     const staffEmail = sessionUser?.email || 'unknown';
     const staffName = sessionUser?.name || null;
