@@ -342,28 +342,24 @@ const Landing: React.FC = () => {
             image="/images/golf-sims-optimized.webp"
             icon="sports_golf"
             title="Golf all year"
-            desc="4 TrackMan bays, putting course, private/group lessons"
             delay="0.1s"
           />
           <FeatureCard 
             image="/images/cowork-optimized.webp"
             icon="work"
             title="Work from the club"
-            desc="Luxury work spaces, conference room, wifi, cafe"
             delay="0.2s"
           />
           <FeatureCard 
             image="/images/wellness-yoga-optimized.webp"
             icon="spa"
             title="Wellness & classes"
-            desc="Med spa, fitness, yoga, recovery options"
             delay="0.3s"
           />
           <FeatureCard 
             image="/images/events-crowd-optimized.webp"
             icon="groups"
             title="Events & community"
-            desc="Member events, watch parties, mixers"
             delay="0.4s"
           />
         </div>
@@ -604,7 +600,7 @@ const Landing: React.FC = () => {
   );
 };
 
-const FeatureCard: React.FC<{image: string; icon: string; title: string; desc: string; delay: string}> = ({ image, icon, title, desc, delay }) => (
+const FeatureCard: React.FC<{image: string; icon: string; title: string; delay: string}> = ({ image, icon, title, delay }) => (
   <div 
     className="relative h-[240px] rounded-[2rem] overflow-hidden group animate-pop-in backdrop-blur-xl bg-black/20 border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.15),inset_0_1px_1px_rgba(255,255,255,0.1)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms]" 
     style={{animationDelay: delay}}
@@ -615,8 +611,7 @@ const FeatureCard: React.FC<{image: string; icon: string; title: string; desc: s
         <div className="mb-2 w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-[0_0_12px_rgba(255,255,255,0.1)]">
             <span className="material-symbols-outlined text-white text-xl">{icon}</span>
         </div>
-        <h3 className="font-bold text-white text-base leading-tight mb-1 drop-shadow-md">{title}</h3>
-        <p className="text-[10px] text-white/80 leading-snug">{desc}</p>
+        <h3 className="font-bold text-white text-base leading-tight drop-shadow-md">{title}</h3>
      </div>
   </div>
 );
