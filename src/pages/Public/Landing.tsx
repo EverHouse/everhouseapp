@@ -391,10 +391,10 @@ const Landing: React.FC = () => {
         
         <EditorialSection
           image="/images/cowork-optimized.webp"
-          title="Work From the Club"
-          description="Blend productivity with pleasure in our dedicated co-working spaces. High-speed wifi, private conference rooms, and a professional yet relaxed atmosphere make Ever House the perfect alternative to your home office or crowded coffee shop."
-          ctaLabel="Learn More"
-          ctaLink="/membership"
+          title="Luxury Workspaces"
+          description="Thoughtfully designed spaces where productivity meets comfort. High-speed wifi, private conference rooms, and an inspiring atmosphere."
+          ctaLabel="View Gallery"
+          ctaLink="/gallery"
           reversed={false}
         />
       </div>
