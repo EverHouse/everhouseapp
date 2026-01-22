@@ -49,7 +49,7 @@ const PrivateHire: React.FC = () => {
            <img 
              src="/images/venue-wide-optimized.webp" 
              alt="Ever House Event Space" 
-             className="absolute inset-0 w-full h-[120%] object-cover object-[center_35%] will-change-transform"
+             className="absolute inset-0 w-full h-[120%] object-cover object-[center_35%] will-change-transform animate-hero-bg"
              loading="eager"
              style={{ 
                transform: `translateY(${parallaxOffset}px) scale(1.05)`,
@@ -57,7 +57,7 @@ const PrivateHire: React.FC = () => {
              }}
            />
            <div 
-             className="absolute inset-0 transition-opacity duration-300"
+             className="absolute inset-0 transition-opacity duration-300 animate-hero-overlay"
              style={{
                background: `linear-gradient(to top, rgba(0,0,0,${0.7 + gradientShift * 0.003}) 0%, rgba(0,0,0,${0.45 + gradientShift * 0.005}) 20%, rgba(0,0,0,0.2) 35%, rgba(0,0,0,0.08) 50%, transparent 60%)`
              }}
@@ -65,14 +65,14 @@ const PrivateHire: React.FC = () => {
          </div>
          
          {/* Hero content - centered like Landing page */}
-         <div className="relative z-10 animate-pop-in flex flex-col items-center text-center">
-           <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] mb-4 text-white text-shadow-sm font-serif">
+         <div className="relative z-10 flex flex-col items-center text-center">
+           <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] mb-4 text-white text-shadow-sm font-serif animate-hero-headline">
              Curated spaces for <br/> unforgettable moments.
            </h1>
-           <p className="text-sm sm:text-base text-white/80 mb-8 sm:mb-10 max-w-md tracking-wide leading-relaxed">
+           <p className="text-sm sm:text-base text-white/80 mb-8 sm:mb-10 max-w-md tracking-wide leading-relaxed animate-hero-tagline">
              From intimate dinners to grand receptions, discover the perfect setting for your next event at our Tustin location. Our team handles every detail so you can focus on your guests.
            </p>
-           <div className="flex flex-col gap-3 w-full max-w-xs">
+           <div className="flex flex-col gap-3 w-full max-w-xs animate-hero-cta">
              <button 
                onClick={openForm}
                className="w-full py-4 rounded-2xl bg-white/30 backdrop-blur-xl text-white font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-white/40 transition-all text-center border border-white/40"

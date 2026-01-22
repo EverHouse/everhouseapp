@@ -1264,6 +1264,63 @@ html.dark .border-accessible {
   animation: modalSlideUp 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
+/* Hero Section Animations - Cinematic entrance for full-bleed hero sections */
+@keyframes heroBackgroundEnter {
+  0% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes heroOverlayEnter {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes heroTextEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-hero-bg {
+  opacity: 0;
+  animation: heroBackgroundEnter 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.animate-hero-overlay {
+  opacity: 0;
+  animation: heroOverlayEnter 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.3s forwards;
+}
+
+.animate-hero-headline {
+  opacity: 0;
+  animation: heroTextEnter 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.4s forwards;
+}
+
+.animate-hero-tagline {
+  opacity: 0;
+  animation: heroTextEnter 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.55s forwards;
+}
+
+.animate-hero-cta {
+  opacity: 0;
+  animation: heroTextEnter 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.7s forwards;
+}
+
 /* Page Enter Animation - Quick fade for smooth navigation */
 @keyframes pageEnter {
   0% {
@@ -1820,7 +1877,12 @@ html.dark .border-accessible {
   .animate-content-enter-delay-3,
   .animate-bounce-tap,
   .animate-backdrop-fade-in,
-  .animate-modal-slide-up {
+  .animate-modal-slide-up,
+  .animate-hero-bg,
+  .animate-hero-overlay,
+  .animate-hero-headline,
+  .animate-hero-tagline,
+  .animate-hero-cta {
     animation: none !important;
     opacity: 1 !important;
   }
