@@ -373,10 +373,10 @@ const Landing: React.FC = () => {
       <div>
         <EditorialSection
           image="/images/golf-sims-optimized.webp"
-          title="World-Class Golf Simulators"
-          description="Experience golf like never before with our four TrackMan 4 bays featuring the industry's most accurate ball-tracking technology. Whether you're perfecting your swing, playing Pebble Beach, or enjoying a round with friends, our simulators bring the world's best courses to you."
-          ctaLabel="Book a Bay"
-          ctaLink="/membership"
+          title="Curated Events & Wellness"
+          description="From intimate tastings to golf socials and wellness workshops, discover experiences designed to inspire and connect."
+          ctaLabel="See What's On"
+          ctaLink="/whats-on"
           reversed={false}
         />
         
