@@ -296,10 +296,15 @@ const TiersTab: React.FC = () => {
             if (res.ok && data.success) {
                 alert(`Synced ${data.synced} products to Stripe`);
             } else {
-                alert('Sync failed: ' + (data.error || 'Unknown error'));
+                const errorMsg = data.message || data.error || 'Unknown error';
+                if (errorMsg.includes('connection not found')) {
+                    alert('Stripe sync failed: Stripe is not configured for this environment. Please set up Stripe live keys in Replit\'s Integrations panel before publishing.');
+                } else {
+                    alert('Sync failed: ' + errorMsg);
+                }
             }
         } catch (err) {
-            alert('Sync failed');
+            alert('Sync failed: Network error');
         } finally {
             setSyncing(false);
         }

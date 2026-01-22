@@ -303,7 +303,7 @@ const DirectoryTab: React.FC = () => {
             });
             if (stripeRes.ok) {
                 const stripeData = await stripeRes.json();
-                stripeCount = stripeData.synced || 0;
+                stripeCount = (stripeData.created || 0) + (stripeData.updated || 0);
             } else {
                 errors.push('Stripe');
             }
@@ -329,7 +329,9 @@ const DirectoryTab: React.FC = () => {
         await refreshMembers();
         
         if (errors.length === 0) {
-            setSyncMessage({ type: 'success', text: `Synced ${stripeCount} from Stripe, ${hubspotCount} from HubSpot` });
+            const stripeMsg = stripeCount > 0 ? `${stripeCount} from Stripe` : 'Stripe up to date';
+            const hubspotMsg = hubspotCount > 0 ? `${hubspotCount} from HubSpot` : 'HubSpot synced (or cooldown active)';
+            setSyncMessage({ type: 'success', text: `${stripeMsg}, ${hubspotMsg}` });
         } else if (errors.length === 2) {
             setSyncMessage({ type: 'error', text: 'Failed to sync with Stripe and HubSpot' });
         } else {
