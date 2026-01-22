@@ -18,6 +18,7 @@ import { SafeAreaBottomOverlay } from './components/layout/SafeAreaBottomOverlay
 import { BottomNavProvider } from './contexts/BottomNavContext';
 import { AnnouncementBadgeProvider } from './contexts/AnnouncementBadgeContext';
 import { BottomSentinel } from './components/layout/BottomSentinel';
+import { BottomFadeOverlay } from './components/layout/BottomFadeOverlay';
 import MemberBottomNav from './components/MemberBottomNav';
 import { NavigationLoadingProvider, useNavigationLoading } from './contexts/NavigationLoadingContext';
 import { PageReadyProvider } from './contexts/PageReadyContext';
@@ -718,7 +719,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </main>
 
             {isMemberRoute && !isAdminRoute && !isProfilePage && user && (
-              <MemberBottomNav currentPath={location.pathname} isDarkTheme={isDarkTheme} />
+              <>
+                <BottomFadeOverlay isDark={isDarkTheme} />
+                <MemberBottomNav currentPath={location.pathname} isDarkTheme={isDarkTheme} />
+              </>
             )}
 
             <MenuOverlay isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
