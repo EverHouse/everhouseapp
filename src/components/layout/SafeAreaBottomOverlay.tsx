@@ -17,12 +17,6 @@ export const SafeAreaBottomOverlay: React.FC<SafeAreaBottomOverlayProps> = ({ ch
       className={`fixed inset-x-0 bottom-0 pointer-events-none transition-transform duration-300 ease-out lg:hidden ${isAtBottom || drawerOpen ? 'translate-y-[calc(100%+env(safe-area-inset-bottom,0px))]' : 'translate-y-0'}`}
       style={{ zIndex: 'var(--z-nav)' }}
     >
-      <div 
-        className="absolute bottom-full left-0 right-0 h-16 pointer-events-none"
-        style={{ 
-          background: 'linear-gradient(to top, var(--nav-fade-color, transparent) 0%, transparent 100%)'
-        }}
-      />
       {children}
       <div 
         className="w-full pointer-events-none dark:bg-[#0f120a] bg-bone"
