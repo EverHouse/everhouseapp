@@ -12,7 +12,9 @@ export const notifications = pgTable("notifications", {
   relatedType: varchar("related_type"),
   isRead: boolean("is_read").default(false),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("notifications_user_email_is_read_idx").on(table.userEmail, table.isRead),
+]);
 
 // Push subscriptions table - web push notification subscriptions
 export const pushSubscriptions = pgTable("push_subscriptions", {

@@ -60,7 +60,11 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
   archivedAt: timestamp("archived_at"),
   archivedBy: varchar("archived_by"),
-});
+}, (table) => [
+  index("users_stripe_customer_id_idx").on(table.stripeCustomerId),
+  index("users_membership_status_idx").on(table.membershipStatus),
+  index("users_billing_group_id_idx").on(table.billingGroupId),
+]);
 
 // Staff users table - emails that get staff or admin access
 // Note: role column distinguishes 'staff' from 'admin' users

@@ -61,7 +61,9 @@ export const guestPasses = pgTable("guest_passes", {
   passesTotal: integer("passes_total").notNull().default(4),
   lastResetDate: date("last_reset_date"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("guest_passes_member_email_idx").on(table.memberEmail),
+]);
 
 // Member notes table - staff notes about members
 export const memberNotes = pgTable("member_notes", {
