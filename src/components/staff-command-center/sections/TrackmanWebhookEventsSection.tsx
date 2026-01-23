@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import WalkingGolferSpinner from '../../WalkingGolferSpinner';
+import TrackmanIcon from '../../icons/TrackmanIcon';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -124,8 +125,8 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
         className="w-full flex items-center justify-between"
       >
         <h2 className="text-base md:text-lg font-bold text-primary dark:text-white flex items-center gap-2">
-          <span aria-hidden="true" className="material-symbols-outlined text-xl">webhook</span>
-          Trackman Webhook Events
+          <TrackmanIcon size={22} />
+          Trackman Bookings Synced
           {webhookStats?.webhookStats?.total_events > 0 && (
             <span className="text-xs md:text-sm font-normal text-primary/60 dark:text-white/60">
               ({webhookStats.webhookStats.total_events} in last 30 days)
