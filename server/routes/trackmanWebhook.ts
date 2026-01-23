@@ -951,6 +951,81 @@ async function saveToUnmatchedBookings(
   }
 }
 
+async function createUnmatchedBookingRequest(
+  trackmanBookingId: string,
+  externalBookingId: string | undefined,
+  slotDate: string,
+  startTime: string,
+  endTime: string,
+  resourceId: number | null,
+  customerEmail?: string,
+  customerName?: string,
+  playerCount?: number,
+  customerNotes?: string
+): Promise<{ created: boolean; bookingId?: number }> {
+  try {
+    const startParts = startTime.split(':').map(Number);
+    const endParts = endTime.split(':').map(Number);
+    const startMinutes = startParts[0] * 60 + startParts[1];
+    const endMinutes = endParts[0] * 60 + endParts[1];
+    const durationMinutes = endMinutes > startMinutes ? endMinutes - startMinutes : 60;
+    
+    const result = await pool.query(
+      `INSERT INTO booking_requests 
+       (slot_date, start_time, end_time, duration_minutes, resource_id,
+        user_email, user_name, status, trackman_booking_id, trackman_external_id,
+        trackman_customer_notes, is_unmatched, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'approved', $8, $9, $10, true, NOW(), NOW())
+       ON CONFLICT DO NOTHING
+       RETURNING id`,
+      [
+        slotDate,
+        startTime,
+        endTime,
+        durationMinutes,
+        resourceId,
+        customerEmail || null,
+        customerName || 'Unknown (Trackman)',
+        trackmanBookingId,
+        externalBookingId || null,
+        customerNotes || null
+      ]
+    );
+    
+    if (result.rows.length > 0) {
+      const bookingId = result.rows[0].id;
+      
+      logger.info('[Trackman Webhook] Created unmatched booking request', {
+        extra: { bookingId, trackmanBookingId, date: slotDate, resourceId }
+      });
+      
+      broadcastToStaff({
+        type: 'trackman_unmatched',
+        bookingId,
+        trackmanBookingId,
+        date: slotDate,
+        startTime,
+        resourceId,
+        message: 'New unmatched Trackman booking requires staff attention'
+      });
+      
+      await notifyAllStaff(
+        'Unmatched Trackman Booking',
+        `A booking in Trackman could not be matched to a member and requires manual assignment.`,
+        '/staff/simulator',
+        'booking'
+      );
+      
+      return { created: true, bookingId };
+    }
+    
+    return { created: false };
+  } catch (e) {
+    logger.error('[Trackman Webhook] Failed to create unmatched booking request', { error: e as Error });
+    return { created: false };
+  }
+}
+
 async function cancelBookingByTrackmanId(trackmanBookingId: string): Promise<{ cancelled: boolean; bookingId?: number }> {
   try {
     const result = await pool.query(
@@ -1669,51 +1744,44 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
             }
           });
           
-          // Save to unmatched bookings for staff review
-          await saveToUnmatchedBookings(
+          // Create unmatched booking request for staff to assign member
+          const unmatchedResult = await createUnmatchedBookingRequest(
             v2Result.normalized.trackmanBookingId!,
+            v2Result.externalBookingId,
             v2Result.normalized.parsedDate!,
             v2Result.normalized.parsedStartTime!,
             v2Result.normalized.parsedEndTime!,
             resourceId,
-            undefined, // No email in V2 format
-            undefined, // No name in V2 format  
-            v2Result.normalized.playerCount,
-            `V2 webhook - externalBookingId ${v2Result.externalBookingId} not found`
+            v2Result.normalized.customerEmail,
+            v2Result.normalized.customerName,
+            v2Result.normalized.playerCount
           );
           
-          // Notify staff about unmatched V2 booking
-          broadcastToStaff({
-            type: 'trackman_unmatched',
-            title: 'Trackman Booking Needs Review',
-            message: `A Trackman booking (ID: ${v2Result.normalized.trackmanBookingId}) for ${v2Result.normalized.parsedDate} at ${v2Result.normalized.parsedStartTime} could not be automatically matched and needs staff review.`,
-            data: {
-              trackmanBookingId: v2Result.normalized.trackmanBookingId,
-              externalBookingId: v2Result.externalBookingId,
-              date: v2Result.normalized.parsedDate,
-              time: v2Result.normalized.parsedStartTime,
-              resourceId,
-              status: v2Result.normalized.status
-            }
-          });
+          if (unmatchedResult.created) {
+            matchedBookingId = unmatchedResult.bookingId;
+          }
         }
       } else {
-        // No externalBookingId - save to unmatched
+        // No externalBookingId - create unmatched booking request
         logger.warn('[Trackman Webhook V2] No externalBookingId in payload', {
           extra: { trackmanBookingId: v2Result.normalized.trackmanBookingId }
         });
         
-        await saveToUnmatchedBookings(
+        const unmatchedResult = await createUnmatchedBookingRequest(
           v2Result.normalized.trackmanBookingId!,
+          undefined,
           v2Result.normalized.parsedDate!,
           v2Result.normalized.parsedStartTime!,
           v2Result.normalized.parsedEndTime!,
           resourceId,
-          undefined,
-          undefined,
-          v2Result.normalized.playerCount,
-          'V2 webhook - no externalBookingId provided'
+          v2Result.normalized.customerEmail,
+          v2Result.normalized.customerName,
+          v2Result.normalized.playerCount
         );
+        
+        if (unmatchedResult.created) {
+          matchedBookingId = unmatchedResult.bookingId;
+        }
       }
       
       await logWebhookEvent(
