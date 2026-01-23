@@ -8,15 +8,15 @@ import { useData } from '../../../contexts/DataContext';
 
 interface AuditLogEntry {
     id: number;
-    staff_email: string;
-    staff_name: string | null;
+    staffEmail: string;
+    staffName: string | null;
     action: string;
-    resource_type: string;
-    resource_id: string | null;
-    resource_name: string | null;
+    resourceType: string;
+    resourceId: string | null;
+    resourceName: string | null;
     details: Record<string, any> | null;
-    ip_address: string | null;
-    created_at: string;
+    ipAddress: string | null;
+    createdAt: string;
 }
 
 const ACTION_LABELS: Record<string, { label: string; icon: string; color: string }> = {
@@ -101,7 +101,7 @@ const ChangelogTab: React.FC = () => {
             setEntries(data.logs || []);
             setHasMore(data.logs?.length >= (reset ? 50 : limit));
             
-            const staffList = [...new Set(data.logs?.map((e: AuditLogEntry) => e.staff_email) || [])].filter(Boolean) as string[];
+            const staffList = [...new Set(data.logs?.map((e: AuditLogEntry) => e.staffEmail) || [])].filter(Boolean) as string[];
             if (staffList.length > uniqueStaff.length) {
                 setUniqueStaff(staffList);
             }
@@ -154,8 +154,8 @@ const ChangelogTab: React.FC = () => {
     const formatDetails = (entry: AuditLogEntry): string => {
         const parts: string[] = [];
         
-        if (entry.resource_name) {
-            parts.push(entry.resource_name);
+        if (entry.resourceName) {
+            parts.push(entry.resourceName);
         }
         
         if (entry.details) {
@@ -315,11 +315,11 @@ const ChangelogTab: React.FC = () => {
                                                     {actionInfo.label}
                                                 </h4>
                                                 <span className="text-[10px] ml-2 shrink-0 text-primary/70 dark:text-white/70">
-                                                    {formatRelativeTime(entry.created_at)}
+                                                    {formatRelativeTime(entry.createdAt)}
                                                 </span>
                                             </div>
                                             <p className="text-xs mt-0.5 text-primary/70 dark:text-white/70">
-                                                by {entry.staff_name || entry.staff_email}
+                                                by {entry.staffName || entry.staffEmail}
                                             </p>
                                             <p className="text-xs mt-1 text-primary/60 dark:text-white/60 truncate">
                                                 {formatDetails(entry)}
