@@ -206,6 +206,11 @@ const DataIntegrityTab: React.FC = () => {
     errors: string[];
   } | null>(null);
 
+  const [isSyncingStripeMetadata, setIsSyncingStripeMetadata] = useState(false);
+  const [stripeMetadataResult, setStripeMetadataResult] = useState<{ success: boolean; message: string; synced?: number; failed?: number } | null>(null);
+  const [isBackfillingStripeCache, setIsBackfillingStripeCache] = useState(false);
+  const [stripeCacheResult, setStripeCacheResult] = useState<{ success: boolean; message: string; stats?: any } | null>(null);
+
   useEffect(() => {
     fetchCachedResults();
     fetchCalendarStatus();
@@ -944,6 +949,57 @@ const DataIntegrityTab: React.FC = () => {
     }
   };
 
+  const handleSyncStripeMetadata = async () => {
+    setIsSyncingStripeMetadata(true);
+    setStripeMetadataResult(null);
+    try {
+      const res = await fetch('/api/data-integrity/sync-stripe-metadata', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setStripeMetadataResult({ success: true, message: data.message, synced: data.synced, failed: data.failed });
+        showToast(data.message, 'success');
+      } else {
+        setStripeMetadataResult({ success: false, message: data.error || 'Failed to sync metadata' });
+        showToast(data.error || 'Failed to sync metadata', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to sync Stripe metadata:', err);
+      setStripeMetadataResult({ success: false, message: 'Network error occurred' });
+      showToast('Failed to sync Stripe metadata', 'error');
+    } finally {
+      setIsSyncingStripeMetadata(false);
+    }
+  };
+
+  const handleBackfillStripeCache = async () => {
+    setIsBackfillingStripeCache(true);
+    setStripeCacheResult(null);
+    try {
+      const res = await fetch('/api/financials/backfill-stripe-cache', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const msg = `Backfilled ${data.stats?.paymentIntents || 0} payments, ${data.stats?.charges || 0} charges, ${data.stats?.invoices || 0} invoices`;
+        setStripeCacheResult({ success: true, message: msg, stats: data.stats });
+        showToast(msg, 'success');
+      } else {
+        setStripeCacheResult({ success: false, message: data.error || 'Failed to backfill cache' });
+        showToast(data.error || 'Failed to backfill cache', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to backfill Stripe cache:', err);
+      setStripeCacheResult({ success: false, message: 'Network error occurred' });
+      showToast('Failed to backfill Stripe cache', 'error');
+    } finally {
+      setIsBackfillingStripeCache(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-pop-in pb-32">
       <div className="mb-6 flex flex-col gap-3">
@@ -1450,6 +1506,56 @@ const DataIntegrityTab: React.FC = () => {
                   {mindbodyResult.message}
                 </p>
               )}
+            </div>
+
+            <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
+              <h4 className="font-semibold text-primary dark:text-white mb-3 flex items-center gap-2">
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">sync</span>
+                Stripe Data Sync
+              </h4>
+              <p className="text-xs text-gray-500 mb-4">
+                Sync member data with Stripe and cache payment history for faster loading.
+              </p>
+              
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                    <strong>Sync Customer Metadata:</strong> Updates all Stripe customers with their userId and current tier.
+                  </p>
+                  <button
+                    onClick={handleSyncStripeMetadata}
+                    disabled={isSyncingStripeMetadata}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {isSyncingStripeMetadata && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                    {isSyncingStripeMetadata ? 'Syncing...' : 'Sync Customer Metadata'}
+                  </button>
+                  {stripeMetadataResult && (
+                    <p className={`text-sm mt-2 ${stripeMetadataResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {stripeMetadataResult.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="border-t border-gray-200 dark:border-white/10 pt-4">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                    <strong>Backfill Transaction Cache:</strong> Loads the last 90 days of payments from Stripe into the local cache for faster POS loading.
+                  </p>
+                  <button
+                    onClick={handleBackfillStripeCache}
+                    disabled={isBackfillingStripeCache}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {isBackfillingStripeCache && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                    {isBackfillingStripeCache ? 'Backfilling...' : 'Backfill Transaction Cache'}
+                  </button>
+                  {stripeCacheResult && (
+                    <p className={`text-sm mt-2 ${stripeCacheResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {stripeCacheResult.message}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
