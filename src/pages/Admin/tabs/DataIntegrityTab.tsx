@@ -1121,10 +1121,11 @@ const DataIntegrityTab: React.FC = () => {
         {showDataTools && (
           <div className="mt-4 space-y-6">
             <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
-              <h4 className="font-semibold text-primary dark:text-white mb-3 flex items-center gap-2">
+              <h4 className="font-semibold text-primary dark:text-white mb-2 flex items-center gap-2">
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">sync</span>
                 Re-sync Member from HubSpot
               </h4>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Pull the latest contact data from HubSpot for a specific member. Use this when a member's profile looks outdated or incorrect.</p>
               <div className="flex gap-2">
                 <input
                   type="email"
@@ -1150,10 +1151,11 @@ const DataIntegrityTab: React.FC = () => {
             </div>
 
             <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
-              <h4 className="font-semibold text-primary dark:text-white mb-3 flex items-center gap-2">
+              <h4 className="font-semibold text-primary dark:text-white mb-2 flex items-center gap-2">
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">link</span>
                 Guest Fee Relinking
               </h4>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Connect guest fee charges to their corresponding booking sessions. Fixes cases where guest fees were charged but not linked to the right visit.</p>
               <div className="flex flex-wrap gap-2 mb-3">
                 <input
                   type="date"
@@ -1231,10 +1233,11 @@ const DataIntegrityTab: React.FC = () => {
             </div>
 
             <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
-              <h4 className="font-semibold text-primary dark:text-white mb-3 flex items-center gap-2">
+              <h4 className="font-semibold text-primary dark:text-white mb-2 flex items-center gap-2">
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">how_to_reg</span>
                 Manual Attendance Correction
               </h4>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Mark bookings as attended or no-show. Use this to fix attendance records that were missed or recorded incorrectly.</p>
               <div className="flex flex-wrap gap-2 mb-3">
                 <input
                   type="date"

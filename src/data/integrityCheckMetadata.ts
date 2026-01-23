@@ -10,6 +10,27 @@ export interface IntegrityCheckMetadata {
 
 export const integrityCheckMetadata: IntegrityCheckMetadata[] = [
   {
+    checkName: 'Deal Stage Drift',
+    title: 'Deal Stage Drift',
+    description: 'Compares each member\'s HubSpot deal stage against their actual membership status in the app.',
+    impact: 'Mismatched deal stages can cause billing problems - members may be charged incorrectly or miss renewal notices if their CRM status doesn\'t match reality.',
+    severity: 'critical'
+  },
+  {
+    checkName: 'Stripe Subscription Sync',
+    title: 'Stripe Subscription Sync',
+    description: 'Verifies that each member\'s subscription status in Stripe matches what the app shows for their membership.',
+    impact: 'Sync issues can cause members to lose access to the club even if they\'re paying, or allow access to members whose payments have lapsed.',
+    severity: 'critical'
+  },
+  {
+    checkName: 'Stuck Transitional Members',
+    title: 'Stuck Transitional Members',
+    description: 'Finds members who have an active Stripe subscription but are stuck in a "pending" or "non-member" status for over 24 hours.',
+    impact: 'These members are paying but can\'t access the club. This usually means a webhook failed to process their payment confirmation.',
+    severity: 'critical'
+  },
+  {
     checkName: 'HubSpot Sync Status',
     title: 'Member Data Sync Issues',
     description: 'Checks for members whose data is out of sync between the local database and HubSpot CRM.',
@@ -63,6 +84,13 @@ export const integrityCheckMetadata: IntegrityCheckMetadata[] = [
     title: 'Member Deals Missing Products',
     description: 'Identifies HubSpot deals that don\'t have proper product line items attached.',
     impact: 'Billing won\'t work correctly for these members as they have no products on their membership deal.',
+    severity: 'high'
+  },
+  {
+    checkName: 'Members Without Email',
+    title: 'Members Without Email',
+    description: 'Finds member accounts that are missing an email address.',
+    impact: 'These members cannot log in, receive booking confirmations, or get club communications. They need an email added to their profile.',
     severity: 'high'
   }
 ];
