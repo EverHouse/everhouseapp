@@ -15,6 +15,63 @@ import { handlePrimarySubscriptionCancelled } from './groupBilling';
 
 const EVENT_DEDUP_WINDOW_HOURS = 24;
 
+interface CacheTransactionParams {
+  stripeId: string;
+  objectType: 'payment_intent' | 'charge' | 'invoice' | 'refund';
+  amountCents: number;
+  currency?: string;
+  status: string;
+  createdAt: Date;
+  customerId?: string | null;
+  customerEmail?: string | null;
+  customerName?: string | null;
+  description?: string | null;
+  metadata?: Record<string, any> | null;
+  source?: 'webhook' | 'backfill';
+  paymentIntentId?: string | null;
+  chargeId?: string | null;
+  invoiceId?: string | null;
+}
+
+export async function upsertTransactionCache(params: CacheTransactionParams): Promise<void> {
+  try {
+    await pool.query(
+      `INSERT INTO stripe_transaction_cache 
+       (stripe_id, object_type, amount_cents, currency, status, created_at, updated_at, 
+        customer_id, customer_email, customer_name, description, metadata, source, 
+        payment_intent_id, charge_id, invoice_id)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, $12, $13, $14, $15)
+       ON CONFLICT (stripe_id) DO UPDATE SET
+         status = EXCLUDED.status,
+         amount_cents = EXCLUDED.amount_cents,
+         customer_email = COALESCE(EXCLUDED.customer_email, stripe_transaction_cache.customer_email),
+         customer_name = COALESCE(EXCLUDED.customer_name, stripe_transaction_cache.customer_name),
+         description = COALESCE(EXCLUDED.description, stripe_transaction_cache.description),
+         metadata = COALESCE(EXCLUDED.metadata, stripe_transaction_cache.metadata),
+         updated_at = NOW()`,
+      [
+        params.stripeId,
+        params.objectType,
+        params.amountCents,
+        params.currency || 'usd',
+        params.status,
+        params.createdAt,
+        params.customerId || null,
+        params.customerEmail || null,
+        params.customerName || null,
+        params.description || null,
+        params.metadata ? JSON.stringify(params.metadata) : null,
+        params.source || 'webhook',
+        params.paymentIntentId || null,
+        params.chargeId || null,
+        params.invoiceId || null,
+      ]
+    );
+  } catch (err) {
+    console.error('[Stripe Cache] Error upserting transaction cache:', err);
+  }
+}
+
 async function isEventAlreadyProcessed(eventId: string): Promise<boolean> {
   try {
     const result = await pool.query(
@@ -104,9 +161,29 @@ export async function processStripeWebhook(
 }
 
 async function handlePaymentIntentSucceeded(paymentIntent: any): Promise<void> {
-  const { id, metadata, amount } = paymentIntent;
+  const { id, metadata, amount, currency, customer, receipt_email, description, created } = paymentIntent;
   
   console.log(`[Stripe Webhook] Payment succeeded: ${id}, amount: $${(amount / 100).toFixed(2)}`);
+
+  const customerEmail = typeof customer === 'object' ? customer?.email : receipt_email || metadata?.email;
+  const customerName = typeof customer === 'object' ? customer?.name : metadata?.memberName;
+  const customerId = typeof customer === 'string' ? customer : customer?.id;
+  
+  upsertTransactionCache({
+    stripeId: id,
+    objectType: 'payment_intent',
+    amountCents: amount,
+    currency: currency || 'usd',
+    status: 'succeeded',
+    createdAt: new Date(created * 1000),
+    customerId,
+    customerEmail,
+    customerName,
+    description: description || metadata?.productName || 'Stripe payment',
+    metadata,
+    source: 'webhook',
+    paymentIntentId: id,
+  }).catch(err => console.error('[Stripe Webhook] Cache upsert failed:', err));
 
   await pool.query(
     `UPDATE stripe_payment_intents 
@@ -444,6 +521,28 @@ async function handlePaymentIntentFailed(paymentIntent: any): Promise<void> {
 
 async function handleInvoicePaymentSucceeded(invoice: any): Promise<void> {
   try {
+    const invoiceEmail = invoice.customer_email;
+    const invoiceAmountPaid = invoice.amount_paid || 0;
+    const invoiceCustomerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
+    const invoiceCustomerName = typeof invoice.customer === 'object' ? invoice.customer?.name : undefined;
+    
+    upsertTransactionCache({
+      stripeId: invoice.id,
+      objectType: 'invoice',
+      amountCents: invoiceAmountPaid,
+      currency: invoice.currency || 'usd',
+      status: 'paid',
+      createdAt: new Date(invoice.created * 1000),
+      customerId: invoiceCustomerId,
+      customerEmail: invoiceEmail,
+      customerName: invoiceCustomerName,
+      description: invoice.lines?.data?.[0]?.description || 'Invoice payment',
+      metadata: invoice.metadata,
+      source: 'webhook',
+      invoiceId: invoice.id,
+      paymentIntentId: invoice.payment_intent,
+    }).catch(err => console.error('[Stripe Webhook] Cache upsert failed:', err));
+    
     if (!invoice.subscription) {
       console.log(`[Stripe Webhook] Skipping one-time invoice ${invoice.id} (no subscription)`);
       return;

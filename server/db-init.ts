@@ -1,5 +1,41 @@
 import { sql } from 'drizzle-orm';
 import { db } from './db';
+import { pool } from './core/db';
+
+export async function createStripeTransactionCache(): Promise<void> {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS stripe_transaction_cache (
+        id SERIAL PRIMARY KEY,
+        stripe_id TEXT UNIQUE NOT NULL,
+        object_type TEXT NOT NULL,
+        amount_cents INTEGER NOT NULL,
+        currency TEXT DEFAULT 'usd',
+        status TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW(),
+        customer_id TEXT,
+        customer_email TEXT,
+        customer_name TEXT,
+        description TEXT,
+        metadata JSONB,
+        source TEXT DEFAULT 'webhook',
+        payment_intent_id TEXT,
+        charge_id TEXT,
+        invoice_id TEXT
+      )
+    `);
+    
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_stripe_cache_created_at ON stripe_transaction_cache(created_at DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_stripe_cache_customer_email ON stripe_transaction_cache(customer_email)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_stripe_cache_status ON stripe_transaction_cache(status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_stripe_cache_object_type ON stripe_transaction_cache(object_type)`);
+    
+    console.log('[DB Init] stripe_transaction_cache table created/verified');
+  } catch (error: any) {
+    console.error('[DB Init] Failed to create stripe_transaction_cache:', error.message);
+  }
+}
 
 export async function seedDefaultNoticeTypes() {
   try {

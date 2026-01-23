@@ -4,6 +4,7 @@ import { pool } from '../core/db';
 import { getStripeClient } from '../core/stripe/client';
 import { sendOutstandingBalanceEmail } from '../emails/paymentEmails';
 import { getPacificMidnightUTC } from '../utils/dateUtils';
+import { upsertTransactionCache } from '../core/stripe/webhooks';
 import Stripe from 'stripe';
 
 const router = Router();
@@ -21,154 +22,95 @@ interface RecentTransaction {
 
 /**
  * GET /api/financials/recent-transactions
- * Returns unified recent transactions from Stripe API AND local offline payments
- * Now queries Stripe directly for authoritative payment data
+ * Returns unified recent transactions from cache AND local offline payments
+ * Uses stripe_transaction_cache for fast queries instead of hitting Stripe API
+ * Supports cursor-based pagination for reliable data loading
  * Requires staff authentication
  */
 router.get('/api/financials/recent-transactions', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const stripe = await getStripeClient();
-    const { date } = req.query;
+    const { date, cursor, limit: limitParam } = req.query;
+    const limit = Math.min(Math.max(parseInt(limitParam as string) || 100, 1), 500);
     
-    // Calculate date range for filtering using Pacific timezone
     let startOfDay: number | undefined;
     let endOfDay: number | undefined;
     
     if (date && typeof date === 'string') {
       startOfDay = Math.floor(getPacificMidnightUTC(date).getTime() / 1000);
-      endOfDay = startOfDay + 86400; // 24 hours later
+      endOfDay = startOfDay + 86400;
     }
     
-    // Fetch all PaymentIntents with pagination
-    const allPaymentIntents: Stripe.PaymentIntent[] = [];
-    let piHasMore = true;
-    let piStartingAfter: string | undefined;
+    const cursorDate = cursor && typeof cursor === 'string' ? new Date(cursor) : null;
     
-    while (piHasMore && allPaymentIntents.length < 500) {
-      const stripeParams: Stripe.PaymentIntentListParams = {
-        limit: 100,
-        expand: ['data.customer'],
-      };
-      
-      if (startOfDay && endOfDay) {
-        stripeParams.created = { gte: startOfDay, lt: endOfDay };
-      }
-      
-      if (piStartingAfter) {
-        stripeParams.starting_after = piStartingAfter;
-      }
-      
-      const page = await stripe.paymentIntents.list(stripeParams);
-      allPaymentIntents.push(...page.data);
-      piHasMore = page.has_more;
-      
-      if (page.data.length > 0) {
-        piStartingAfter = page.data[page.data.length - 1].id;
-      }
-    }
-    
-    console.log(`[Financials] Fetched ${allPaymentIntents.length} PaymentIntents from Stripe`);
-    
-    // Fetch all Charges with pagination (for payments that may not have PaymentIntents)
-    const allCharges: Stripe.Charge[] = [];
-    let chHasMore = true;
-    let chStartingAfter: string | undefined;
-    
-    while (chHasMore && allCharges.length < 500) {
-      const chargesParams: Stripe.ChargeListParams = {
-        limit: 100,
-        expand: ['data.customer'],
-      };
-      
-      if (startOfDay && endOfDay) {
-        chargesParams.created = { gte: startOfDay, lt: endOfDay };
-      }
-      
-      if (chStartingAfter) {
-        chargesParams.starting_after = chStartingAfter;
-      }
-      
-      const page = await stripe.charges.list(chargesParams);
-      allCharges.push(...page.data);
-      chHasMore = page.has_more;
-      
-      if (page.data.length > 0) {
-        chStartingAfter = page.data[page.data.length - 1].id;
-      }
-    }
-    
-    console.log(`[Financials] Fetched ${allCharges.length} Charges from Stripe`);
-    
-    // Convert Stripe PaymentIntents to our transaction format
-    const stripeTransactions: RecentTransaction[] = allPaymentIntents
-      .filter(pi => pi.status === 'succeeded' || pi.status === 'requires_capture')
-      .map(pi => {
-        const customer = pi.customer as Stripe.Customer | null;
-        return {
-          id: pi.id,
-          type: 'stripe' as const,
-          amount_cents: pi.amount,
-          description: pi.description || pi.metadata?.productName || 'Stripe payment',
-          member_email: customer?.email || pi.receipt_email || pi.metadata?.email || 'Unknown',
-          member_name: customer?.name || pi.metadata?.memberName || customer?.email || 'Unknown',
-          created_at: new Date(pi.created * 1000),
-          status: pi.status === 'succeeded' ? 'succeeded' : 'pending',
-        };
-      });
-    
-    // Track PaymentIntent IDs to avoid duplicates from charges
-    const piIds = new Set(allPaymentIntents.map(pi => pi.id));
-    
-    // Add charges that aren't already covered by PaymentIntents
-    const chargeTransactions: RecentTransaction[] = allCharges
-      .filter(ch => ch.paid && !ch.refunded && (!ch.payment_intent || !piIds.has(ch.payment_intent as string)))
-      .map(ch => {
-        const customer = ch.customer as Stripe.Customer | null;
-        return {
-          id: ch.id,
-          type: 'stripe' as const,
-          amount_cents: ch.amount,
-          description: ch.description || 'Stripe charge',
-          member_email: customer?.email || ch.receipt_email || ch.billing_details?.email || 'Unknown',
-          member_name: customer?.name || ch.billing_details?.name || customer?.email || 'Unknown',
-          created_at: new Date(ch.created * 1000),
-          status: 'succeeded',
-        };
-      });
-    
-    // Fetch local offline payments and day passes
     let dateFilter = '';
     const queryParams: any[] = [];
+    let paramIndex = 1;
     
     if (startOfDay && endOfDay) {
-      dateFilter = ' WHERE created_at >= to_timestamp($1) AND created_at < to_timestamp($2)';
+      dateFilter = ` AND created_at >= to_timestamp($${paramIndex}) AND created_at < to_timestamp($${paramIndex + 1})`;
       queryParams.push(startOfDay, endOfDay);
+      paramIndex += 2;
     }
     
-    const offlineQuery = `
-      SELECT 
-        'offline' as type, id::text, amount_cents, description, member_email, 
-        COALESCE(member_name, 'Unknown') as member_name, created_at, 'completed' as status
-      FROM offline_payments${dateFilter}
+    let cursorFilter = '';
+    if (cursorDate) {
+      cursorFilter = ` AND created_at < $${paramIndex}`;
+      queryParams.push(cursorDate);
+      paramIndex++;
+    }
+    
+    const unifiedQuery = `
+      WITH all_transactions AS (
+        SELECT 
+          stripe_id as id,
+          'stripe' as type,
+          amount_cents,
+          COALESCE(description, 'Stripe payment') as description,
+          COALESCE(customer_email, 'Unknown') as member_email,
+          COALESCE(customer_name, customer_email, 'Unknown') as member_name,
+          created_at,
+          status
+        FROM stripe_transaction_cache
+        WHERE status IN ('succeeded', 'paid')${dateFilter}${cursorFilter}
+        
+        UNION ALL
+        
+        SELECT 
+          id::text,
+          'offline' as type,
+          amount_cents,
+          description,
+          member_email,
+          COALESCE(member_name, 'Unknown') as member_name,
+          created_at,
+          'completed' as status
+        FROM offline_payments
+        WHERE 1=1${dateFilter}${cursorFilter}
+        
+        UNION ALL
+        
+        SELECT 
+          id::text,
+          'day_pass' as type,
+          price_cents as amount_cents,
+          'Day Pass' as description,
+          email as member_email,
+          COALESCE(purchaser_first_name || ' ' || purchaser_last_name, email) as member_name,
+          purchased_at as created_at,
+          'completed' as status
+        FROM day_passes
+        WHERE status = 'active'${dateFilter.replace(/created_at/g, 'purchased_at')}${cursorFilter.replace('created_at', 'purchased_at')}
+      )
+      SELECT * FROM all_transactions
       ORDER BY created_at DESC
-      LIMIT 100
+      LIMIT $${paramIndex}
     `;
-    
-    const dayPassQuery = `
-      SELECT 
-        'day_pass' as type, id::text, price_cents as amount_cents, 'Day Pass' as description, email as member_email,
-        COALESCE(purchaser_first_name || ' ' || purchaser_last_name, email) as member_name, purchased_at as created_at, 'completed' as status
-      FROM day_passes WHERE status = 'active'${dateFilter ? ' AND purchased_at >= to_timestamp($1) AND purchased_at < to_timestamp($2)' : ''}
-      ORDER BY purchased_at DESC
-      LIMIT 100
-    `;
+    queryParams.push(limit + 1);
 
-    const [offlineResult, dayPassResult] = await Promise.all([
-      pool.query(offlineQuery, queryParams),
-      pool.query(dayPassQuery, queryParams),
-    ]);
+    const result = await pool.query(unifiedQuery, queryParams);
     
-    const offlineTransactions: RecentTransaction[] = offlineResult.rows.map(row => ({
+    const hasMore = result.rows.length > limit;
+    const transactions: RecentTransaction[] = result.rows.slice(0, limit).map(row => ({
       id: row.id,
       type: row.type,
       amount_cents: parseInt(row.amount_cents),
@@ -179,43 +121,276 @@ router.get('/api/financials/recent-transactions', isStaffOrAdmin, async (req: Re
       status: row.status
     }));
     
-    const dayPassTransactions: RecentTransaction[] = dayPassResult.rows.map(row => ({
-      id: row.id,
-      type: row.type,
-      amount_cents: parseInt(row.amount_cents),
-      description: row.description,
-      member_email: row.member_email,
-      member_name: row.member_name,
-      created_at: new Date(row.created_at),
-      status: row.status
-    }));
-
-    // Merge all transactions and sort by date
-    const allTransactions = [
-      ...stripeTransactions,
-      ...chargeTransactions,
-      ...offlineTransactions,
-      ...dayPassTransactions,
-    ].sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
-    
-    // Deduplicate by ID (in case same transaction appears in multiple sources)
     const seen = new Set<string>();
-    const transactions = allTransactions.filter(t => {
+    const deduplicatedTransactions = transactions.filter(t => {
       if (seen.has(t.id)) return false;
       seen.add(t.id);
       return true;
-    }).slice(0, 100);
+    });
+
+    const nextCursor = hasMore && deduplicatedTransactions.length > 0
+      ? deduplicatedTransactions[deduplicatedTransactions.length - 1].created_at.toISOString()
+      : null;
 
     res.json({
       success: true,
-      count: transactions.length,
-      transactions
+      count: deduplicatedTransactions.length,
+      transactions: deduplicatedTransactions,
+      hasMore,
+      nextCursor
     });
   } catch (error: any) {
     console.error('[Financials] Error fetching recent transactions:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch recent transactions'
+    });
+  }
+});
+
+/**
+ * POST /api/financials/backfill-stripe-cache
+ * Backfills historical transactions from Stripe into the cache
+ * Requires admin authentication
+ */
+router.post('/api/financials/backfill-stripe-cache', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { daysBack = 90, batchSize = 100 } = req.body;
+    const stripe = await getStripeClient();
+    
+    const startDate = Math.floor((Date.now() - (daysBack * 24 * 60 * 60 * 1000)) / 1000);
+    
+    let paymentIntentsProcessed = 0;
+    let chargesProcessed = 0;
+    let invoicesProcessed = 0;
+    let errors: string[] = [];
+    
+    console.log(`[Financials Backfill] Starting backfill for last ${daysBack} days...`);
+    
+    let piHasMore = true;
+    let piStartingAfter: string | undefined;
+    
+    while (piHasMore) {
+      try {
+        const params: Stripe.PaymentIntentListParams = {
+          limit: Math.min(batchSize, 100),
+          created: { gte: startDate },
+          expand: ['data.customer'],
+        };
+        
+        if (piStartingAfter) {
+          params.starting_after = piStartingAfter;
+        }
+        
+        const page = await stripe.paymentIntents.list(params);
+        
+        for (const pi of page.data) {
+          if (pi.status !== 'succeeded' && pi.status !== 'requires_capture') continue;
+          
+          const customer = pi.customer as Stripe.Customer | null;
+          await upsertTransactionCache({
+            stripeId: pi.id,
+            objectType: 'payment_intent',
+            amountCents: pi.amount,
+            currency: pi.currency || 'usd',
+            status: pi.status,
+            createdAt: new Date(pi.created * 1000),
+            customerId: typeof pi.customer === 'string' ? pi.customer : customer?.id,
+            customerEmail: customer?.email || pi.receipt_email || pi.metadata?.email,
+            customerName: customer?.name || pi.metadata?.memberName,
+            description: pi.description || pi.metadata?.productName || 'Stripe payment',
+            metadata: pi.metadata,
+            source: 'backfill',
+            paymentIntentId: pi.id,
+          });
+          paymentIntentsProcessed++;
+        }
+        
+        piHasMore = page.has_more;
+        if (page.data.length > 0) {
+          piStartingAfter = page.data[page.data.length - 1].id;
+        }
+        
+        if (piHasMore) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      } catch (err: any) {
+        errors.push(`PaymentIntents batch error: ${err.message}`);
+        console.error('[Financials Backfill] PaymentIntents error:', err.message);
+        break;
+      }
+    }
+    
+    let chHasMore = true;
+    let chStartingAfter: string | undefined;
+    
+    while (chHasMore) {
+      try {
+        const params: Stripe.ChargeListParams = {
+          limit: Math.min(batchSize, 100),
+          created: { gte: startDate },
+          expand: ['data.customer'],
+        };
+        
+        if (chStartingAfter) {
+          params.starting_after = chStartingAfter;
+        }
+        
+        const page = await stripe.charges.list(params);
+        
+        for (const ch of page.data) {
+          if (!ch.paid || ch.refunded) continue;
+          
+          const customer = ch.customer as Stripe.Customer | null;
+          await upsertTransactionCache({
+            stripeId: ch.id,
+            objectType: 'charge',
+            amountCents: ch.amount,
+            currency: ch.currency || 'usd',
+            status: 'succeeded',
+            createdAt: new Date(ch.created * 1000),
+            customerId: typeof ch.customer === 'string' ? ch.customer : customer?.id,
+            customerEmail: customer?.email || ch.receipt_email || ch.billing_details?.email,
+            customerName: customer?.name || ch.billing_details?.name,
+            description: ch.description || 'Stripe charge',
+            metadata: ch.metadata,
+            source: 'backfill',
+            chargeId: ch.id,
+            paymentIntentId: typeof ch.payment_intent === 'string' ? ch.payment_intent : undefined,
+          });
+          chargesProcessed++;
+        }
+        
+        chHasMore = page.has_more;
+        if (page.data.length > 0) {
+          chStartingAfter = page.data[page.data.length - 1].id;
+        }
+        
+        if (chHasMore) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      } catch (err: any) {
+        errors.push(`Charges batch error: ${err.message}`);
+        console.error('[Financials Backfill] Charges error:', err.message);
+        break;
+      }
+    }
+    
+    let invHasMore = true;
+    let invStartingAfter: string | undefined;
+    
+    while (invHasMore) {
+      try {
+        const params: Stripe.InvoiceListParams = {
+          limit: Math.min(batchSize, 100),
+          created: { gte: startDate },
+          status: 'paid',
+          expand: ['data.customer'],
+        };
+        
+        if (invStartingAfter) {
+          params.starting_after = invStartingAfter;
+        }
+        
+        const page = await stripe.invoices.list(params);
+        
+        for (const inv of page.data) {
+          const customer = inv.customer as Stripe.Customer | null;
+          await upsertTransactionCache({
+            stripeId: inv.id,
+            objectType: 'invoice',
+            amountCents: inv.amount_paid,
+            currency: inv.currency || 'usd',
+            status: 'paid',
+            createdAt: new Date(inv.created * 1000),
+            customerId: typeof inv.customer === 'string' ? inv.customer : customer?.id,
+            customerEmail: customer?.email || inv.customer_email,
+            customerName: customer?.name,
+            description: inv.lines?.data?.[0]?.description || 'Invoice payment',
+            metadata: inv.metadata,
+            source: 'backfill',
+            invoiceId: inv.id,
+            paymentIntentId: typeof inv.payment_intent === 'string' ? inv.payment_intent : undefined,
+          });
+          invoicesProcessed++;
+        }
+        
+        invHasMore = page.has_more;
+        if (page.data.length > 0) {
+          invStartingAfter = page.data[page.data.length - 1].id;
+        }
+        
+        if (invHasMore) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      } catch (err: any) {
+        errors.push(`Invoices batch error: ${err.message}`);
+        console.error('[Financials Backfill] Invoices error:', err.message);
+        break;
+      }
+    }
+    
+    console.log(`[Financials Backfill] Complete: ${paymentIntentsProcessed} payment intents, ${chargesProcessed} charges, ${invoicesProcessed} invoices`);
+    
+    res.json({
+      success: true,
+      processed: {
+        paymentIntents: paymentIntentsProcessed,
+        charges: chargesProcessed,
+        invoices: invoicesProcessed,
+        total: paymentIntentsProcessed + chargesProcessed + invoicesProcessed
+      },
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error: any) {
+    console.error('[Financials Backfill] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to backfill Stripe cache'
+    });
+  }
+});
+
+/**
+ * GET /api/financials/cache-stats
+ * Returns statistics about the stripe_transaction_cache
+ * Requires staff authentication
+ */
+router.get('/api/financials/cache-stats', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const statsResult = await pool.query(`
+      SELECT 
+        COUNT(*) as total_count,
+        COUNT(DISTINCT customer_email) as unique_customers,
+        MIN(created_at) as oldest_transaction,
+        MAX(created_at) as newest_transaction,
+        SUM(amount_cents) as total_amount_cents,
+        object_type,
+        source
+      FROM stripe_transaction_cache
+      GROUP BY object_type, source
+      ORDER BY object_type, source
+    `);
+    
+    const totalResult = await pool.query(`
+      SELECT 
+        COUNT(*) as total_count,
+        COUNT(DISTINCT customer_email) as unique_customers,
+        MIN(created_at) as oldest_transaction,
+        MAX(created_at) as newest_transaction
+      FROM stripe_transaction_cache
+    `);
+    
+    res.json({
+      success: true,
+      overall: totalResult.rows[0],
+      byTypeAndSource: statsResult.rows
+    });
+  } catch (error: any) {
+    console.error('[Financials] Error fetching cache stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch cache stats'
     });
   }
 });
@@ -244,7 +419,6 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
     const stripe = await getStripeClient();
     const { status, limit, starting_after } = req.query;
     
-    // Debug: Log account info to verify we're using the right API key
     try {
       const account = await stripe.accounts.retrieve();
       console.log(`[Financials] Stripe account: ${account.id}`);
@@ -252,8 +426,6 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
       console.log('[Financials] Could not get account info:', e.message);
     }
     
-    // Use 'all' to fetch ALL subscriptions regardless of status (includes incomplete, canceled, etc.)
-    // Without this, Stripe only returns active/trialing/past_due/unpaid by default
     const statusFilter = status && typeof status === 'string' && status !== 'all' 
       ? status as Stripe.Subscription.Status
       : 'all';
@@ -274,18 +446,14 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
     const globalSubscriptions = await stripe.subscriptions.list(listParams);
     console.log(`[Financials] Found ${globalSubscriptions.data.length} subscriptions from global list`);
     
-    // Collect subscription IDs from global list to avoid duplicates
     const seenSubIds = new Set<string>(globalSubscriptions.data.map(s => s.id));
     const allSubs: Stripe.Subscription[] = [...globalSubscriptions.data];
     
-    // Only scan per-customer when global list returns 0 (test clock scenario)
-    // This avoids expensive API calls in production where subscriptions appear in global list
     const additionalSubs: Stripe.Subscription[] = [];
     
     if (globalSubscriptions.data.length === 0) {
       console.log('[Financials] No subscriptions in global list - scanning database customers (for test clock support)...');
       
-      // Get only Stripe-billed customers (not MindBody) to minimize API calls
       const dbResult = await pool.query(`
         SELECT DISTINCT email, stripe_customer_id, first_name, last_name 
         FROM users 
@@ -297,7 +465,6 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
       
       console.log(`[Financials] Found ${dbResult.rows.length} Stripe-billed customers in database`);
       
-      // Deduplicate by stripe_customer_id
       const uniqueCustomers = new Map<string, typeof dbResult.rows[0]>();
       for (const row of dbResult.rows) {
         if (!uniqueCustomers.has(row.stripe_customer_id)) {
@@ -305,7 +472,6 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
         }
       }
       
-      // Parallel fetch with concurrency limit of 5 to avoid Stripe rate limits (25/sec in test mode)
       const CONCURRENCY_LIMIT = 5;
       const customerArray = Array.from(uniqueCustomers.values());
       
@@ -326,11 +492,9 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
         for (const result of batchResults) {
           if (result.status === 'fulfilled') {
             for (const sub of result.value.subs) {
-              // Skip if already in global list
               if (seenSubIds.has(sub.id)) continue;
               seenSubIds.add(sub.id);
               
-              // If customer wasn't expanded, create a minimal customer object
               const row = result.value.row;
               if (typeof sub.customer === 'string') {
                 (sub as any).customer = {
@@ -342,13 +506,11 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
               additionalSubs.push(sub);
             }
           } else {
-            // Log errors but continue processing
             const error = result.reason as Error;
             console.log(`[Financials] Error fetching subs: ${error.message}`);
           }
         }
         
-        // Small delay between batches to stay under Stripe rate limits (25/sec in test mode)
         if (i + CONCURRENCY_LIMIT < customerArray.length) {
           await new Promise(resolve => setTimeout(resolve, 250));
         }

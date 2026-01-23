@@ -63,7 +63,7 @@ import financialsRouter from './routes/financials';
 import accountRouter from './routes/account';
 import dataExportRouter from './routes/dataExport';
 import { registerObjectStorageRoutes } from './replit_integrations/object_storage';
-import { ensureDatabaseConstraints, seedDefaultNoticeTypes } from './db-init';
+import { ensureDatabaseConstraints, seedDefaultNoticeTypes, createStripeTransactionCache } from './db-init';
 import { initWebSocketServer } from './core/websocket';
 import { startIntegrityScheduler } from './schedulers/integrityScheduler';
 import { startWaiverReviewScheduler } from './schedulers/waiverReviewScheduler';
@@ -531,6 +531,12 @@ async function startServer() {
       await seedDefaultNoticeTypes();
     } catch (err) {
       console.error('[Startup] Seeding notice types failed (non-fatal):', err);
+    }
+
+    try {
+      await createStripeTransactionCache();
+    } catch (err) {
+      console.error('[Startup] Creating stripe transaction cache failed (non-fatal):', err);
     }
 
     // Initialize Stripe schema and sync
