@@ -15,6 +15,7 @@ import {
 import { getGuestPassesRemaining } from './guestPasses';
 import { getMemberTierByEmail, getTierLimits, getDailyBookedMinutes, getTotalDailyUsageMinutes } from '../core/tierService';
 import { calculateAndCacheParticipantFees } from '../core/billing/feeCalculator';
+import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
 
@@ -71,6 +72,12 @@ router.post('/api/admin/trackman/import', isStaffOrAdmin, async (req, res) => {
     const csvPath = path.join(process.cwd(), 'attached_assets', safeFilename);
     
     const result = await importTrackmanBookings(csvPath, user);
+    
+    logFromRequest(req, 'import_trackman', 'trackman', undefined, 'Trackman CSV Import', {
+      filename: safeFilename,
+      bookingsImported: result.bookingsCreated || 0,
+      sessionsCreated: result.sessionsCreated || 0
+    });
     
     res.json({
       success: true,
@@ -339,6 +346,12 @@ router.put('/api/admin/trackman/matched/:id/reassign', isStaffOrAdmin, async (re
       );
     }
     
+    logFromRequest(req, 'reassign_booking', 'booking', id, newMemberEmail.toLowerCase(), {
+      oldEmail,
+      newEmail: newMemberEmail.toLowerCase(),
+      placeholderEmail
+    });
+    
     res.json({ 
       success: true, 
       message: 'Booking reassigned successfully',
@@ -421,6 +434,14 @@ router.post('/api/admin/trackman/unmatch-member', isStaffOrAdmin, async (req, re
         ]
       );
       affectedCount++;
+    }
+    
+    if (affectedCount > 0) {
+      logFromRequest(req, 'unmatch_booking', 'booking', undefined, normalizedEmail, {
+        email: normalizedEmail,
+        affectedCount,
+        unmatchedAt: new Date().toISOString()
+      });
     }
     
     res.json({ 
@@ -967,6 +988,12 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
       }
     }
     
+    logFromRequest(req, 'link_member_to_booking', 'booking', bookingId, memberEmail.toLowerCase(), {
+      slotId,
+      memberEmail: memberEmail.toLowerCase(),
+      linkedBy
+    });
+    
     res.json({ 
       success: true, 
       message: `Member ${memberEmail} linked to slot` 
@@ -1021,6 +1048,13 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/unlink', isStaffOrAdmi
           [bookingResult.rows[0].session_id, unlinkedEmail.toLowerCase()]
         );
       }
+    }
+    
+    if (unlinkedEmail) {
+      logFromRequest(req, 'unlink_member_from_booking', 'booking', bookingId, unlinkedEmail.toLowerCase(), {
+        slotId,
+        unlinkedEmail: unlinkedEmail.toLowerCase()
+      });
     }
     
     res.json({ 
@@ -1196,6 +1230,15 @@ router.post('/api/admin/booking/:bookingId/guests', isStaffOrAdmin, async (req, 
       : guestFee > 0 ? `$${guestFee} guest fee applies.` : 'Guest added.';
     
     process.stderr.write(`[Staff Add Guest] Added guest "${guestName}" to booking ${bookingId}. Pass used: ${usedGuestPass}, Fee: $${guestFee}, Remaining passes: ${finalPassesRemaining}\n`);
+    
+    logFromRequest(req, 'add_guest_to_booking', 'booking', bookingId, guestName, {
+      guestName,
+      guestEmail: guestEmail || null,
+      usedGuestPass,
+      guestFee,
+      guestPassesRemaining: finalPassesRemaining,
+      bookingId
+    });
     
     res.json({ 
       success: true, 

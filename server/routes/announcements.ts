@@ -8,6 +8,7 @@ import { formatDatePacific, createPacificDate, CLUB_TIMEZONE } from '../utils/da
 import { getSessionUser } from '../types/session';
 import { sendPushNotificationToAllMembers } from './push';
 import { broadcastAnnouncementUpdate } from '../core/websocket';
+import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
 
@@ -154,6 +155,17 @@ router.post('/api/announcements', isStaffOrAdmin, async (req, res) => {
     // Broadcast real-time update to all connected clients
     broadcastAnnouncementUpdate('created', responseData);
     
+    // Log audit trail
+    logFromRequest(req, 'create_announcement', 'announcement', newAnnouncement.id.toString(), title, {
+      message: description,
+      priority: 'normal',
+      startsAt: startDate,
+      endsAt: endDate,
+      linkType,
+      linkTarget,
+      showAsBanner
+    });
+    
     if (notifyMembers) {
       try {
         await sendPushNotificationToAllMembers({
@@ -224,6 +236,17 @@ router.put('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
     // Broadcast real-time update to all connected clients
     broadcastAnnouncementUpdate('updated', responseData);
     
+    // Log audit trail
+    logFromRequest(req, 'update_announcement', 'announcement', updated.id.toString(), title, {
+      message: description,
+      priority: updated.priority || 'normal',
+      startsAt: startDate,
+      endsAt: endDate,
+      linkType,
+      linkTarget,
+      showAsBanner
+    });
+    
     if (notifyMembers) {
       try {
         await sendPushNotificationToAllMembers({
@@ -258,6 +281,11 @@ router.delete('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
     
     // Broadcast real-time update to all connected clients
     broadcastAnnouncementUpdate('deleted', { id });
+    
+    // Log audit trail
+    logFromRequest(req, 'delete_announcement', 'announcement', deleted.id.toString(), deleted.title, {
+      message: deleted.message
+    });
     
     res.json({ success: true, id });
   } catch (error: any) {

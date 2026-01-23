@@ -11,6 +11,7 @@ import { formatDateDisplayWithDay, getTodayPacific } from '../utils/dateUtils';
 import { getAllActiveBayIds, getConferenceRoomId } from '../core/affectedAreas';
 import { sendNotificationToUser, broadcastToStaff, broadcastWaitlistUpdate } from '../core/websocket';
 import { getSessionUser } from '../types/session';
+import { logFromRequest } from '../core/auditLog';
 
 async function createWellnessAvailabilityBlocks(wellnessClassId: number, classDate: string, startTime: string, endTime: string, createdBy?: string): Promise<void> {
   const bayIds = await getAllActiveBayIds();
@@ -50,6 +51,12 @@ router.post('/api/wellness-classes/sync', isStaffOrAdmin, async (req, res) => {
     if (result.error) {
       return res.status(404).json({ error: result.error });
     }
+    
+    logFromRequest(req, 'sync_wellness', 'wellness', 'all', 'Calendar Sync', {
+      created: result.created,
+      updated: result.updated,
+      total: result.synced
+    });
     
     res.json({
       message: `Synced ${result.synced} wellness classes from Google Calendar`,
@@ -435,6 +442,16 @@ router.post('/api/wellness-classes', isStaffOrAdmin, async (req, res) => {
       }
     }
     
+    logFromRequest(req, 'create_wellness_class', 'wellness', String(createdClass.id), title, {
+      instructor,
+      date,
+      time,
+      duration,
+      category,
+      spots,
+      description
+    });
+    
     res.status(201).json(createdClass);
   } catch (error: any) {
     if (!isProduction) console.error('API error:', error);
@@ -631,6 +648,17 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
     (updated as any).recurringUpdated = recurringUpdated;
     const wellnessClassId = parseInt(id);
     const userEmail = getSessionUser(req)?.email || 'system';
+    
+    logFromRequest(req, 'update_wellness_class', 'wellness', String(wellnessClassId), updated.title, {
+      instructor: updated.instructor,
+      date: updated.date,
+      time: updated.time,
+      duration: updated.duration,
+      category: updated.category,
+      spots: updated.spots,
+      description: updated.description,
+      recurringUpdated
+    });
     
     const convertTo24HourForBlocks = (timeStr: string): string => {
       const match12h = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
@@ -1114,7 +1142,17 @@ router.delete('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Wellness class not found' });
     }
     
-    res.json({ message: 'Wellness class deleted', class: result.rows[0] });
+    const deletedClass = result.rows[0];
+    logFromRequest(req, 'delete_wellness_class', 'wellness', String(deletedClass.id), deletedClass.title, {
+      instructor: deletedClass.instructor,
+      date: deletedClass.date,
+      time: deletedClass.time,
+      duration: deletedClass.duration,
+      category: deletedClass.category,
+      spots: deletedClass.spots
+    });
+    
+    res.json({ message: 'Wellness class deleted', class: deletedClass });
   } catch (error: any) {
     if (!isProduction) console.error('API error:', error);
     res.status(500).json({ error: 'Failed to delete wellness class' });
@@ -1171,10 +1209,22 @@ router.post('/api/wellness-classes/:id/enrollments/manual', isStaffOrAdmin, asyn
       return res.status(400).json({ error: 'This email is already enrolled in this class' });
     }
 
+    // Get the class details for audit logging
+    const classQuery = await pool.query(
+      'SELECT id, title, instructor FROM wellness_classes WHERE id = $1',
+      [parseInt(id)]
+    );
+    const classDetails = classQuery.rows[0];
+
     await db.insert(wellnessEnrollments).values({
       classId: parseInt(id),
       userEmail: email,
       status: 'confirmed',
+    });
+    
+    logFromRequest(req, 'manual_enrollment', 'wellness', String(id), classDetails?.title || 'Wellness Class', {
+      instructor: classDetails?.instructor,
+      memberEnrolled: email
     });
     
     res.json({ success: true });

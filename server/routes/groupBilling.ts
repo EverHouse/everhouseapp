@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { isStaffOrAdmin } from '../core/middleware';
+import { logFromRequest } from '../core/auditLog';
 import {
   syncGroupAddOnProductsToStripe,
   getGroupAddOnProducts,
@@ -339,6 +340,12 @@ router.post('/api/group-billing/groups/:groupId/corporate-members', isStaffOrAdm
     });
     
     if (result.success) {
+      logFromRequest(req, 'add_group_member', 'group', groupId, memberEmail, {
+        memberId: result.memberId,
+        memberEmail,
+        memberTier,
+        groupType: 'corporate',
+      });
       res.json({ success: true, memberId: result.memberId });
     } else {
       res.status(400).json({ error: result.error });
@@ -377,6 +384,10 @@ router.delete('/api/group-billing/members/:memberId', isStaffOrAdmin, async (req
     });
     
     if (result.success) {
+      logFromRequest(req, 'remove_group_member', 'group', memberId, undefined, {
+        memberId,
+        groupType: 'group',
+      });
       res.json({ success: true });
     } else {
       res.status(400).json({ error: result.error });
@@ -398,6 +409,10 @@ router.delete('/api/family-billing/members/:memberId', isStaffOrAdmin, async (re
     });
     
     if (result.success) {
+      logFromRequest(req, 'remove_group_member', 'group', memberId, undefined, {
+        memberId,
+        groupType: 'family',
+      });
       res.json({ success: true });
     } else {
       res.status(400).json({ error: result.error });
@@ -423,6 +438,10 @@ router.post('/api/group-billing/groups/:groupId/link-subscription', isStaffOrAdm
     });
     
     if (result.success) {
+      logFromRequest(req, 'link_group_subscription', 'group', groupId, undefined, {
+        stripeSubscriptionId,
+        groupType: 'group',
+      });
       res.json({ success: true });
     } else {
       res.status(400).json({ error: result.error });
@@ -448,6 +467,10 @@ router.post('/api/family-billing/groups/:groupId/link-subscription', isStaffOrAd
     });
     
     if (result.success) {
+      logFromRequest(req, 'link_group_subscription', 'group', groupId, undefined, {
+        stripeSubscriptionId,
+        groupType: 'family',
+      });
       res.json({ success: true });
     } else {
       res.status(400).json({ error: result.error });

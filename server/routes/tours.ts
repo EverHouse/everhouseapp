@@ -9,6 +9,7 @@ import { CALENDAR_CONFIG, getCalendarIdByName, discoverCalendarIds } from '../co
 import { notifyAllStaff } from '../core/notificationService';
 import { getTodayPacific } from '../utils/dateUtils';
 import { getSessionUser } from '../types/session';
+import { logFromRequest, AuditAction } from '../core/auditLog';
 
 function parseTimeToMinutes(timeStr: string): number {
   const [hours, minutes] = timeStr.split(':').map(Number);
@@ -93,6 +94,14 @@ router.post('/api/tours/:id/checkin', isStaffOrAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Tour not found' });
     }
     
+    logFromRequest(req, 'tour_checkin', 'tour', String(updated.id), updated.guestName || 'Guest', {
+      guest_name: updated.guestName,
+      guest_email: updated.guestEmail,
+      tour_date: updated.tourDate,
+      previous_status: 'scheduled',
+      new_status: 'checked_in'
+    });
+    
     await notifyAllStaff(
       'Tour Checked In',
       `${updated.guestName || 'Guest'} has checked in for their tour`,
@@ -118,6 +127,9 @@ router.patch('/api/tours/:id/status', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
     }
     
+    const [existingTour] = await db.select().from(tours).where(eq(tours.id, parseInt(id)));
+    const previousStatus = existingTour?.status || 'unknown';
+    
     const updateData: any = {
       status,
       updatedAt: new Date(),
@@ -139,6 +151,22 @@ router.patch('/api/tours/:id/status', isStaffOrAdmin, async (req, res) => {
     if (!updated) {
       return res.status(404).json({ error: 'Tour not found' });
     }
+    
+    const statusToAction: Record<string, AuditAction> = {
+      'checked_in': 'tour_checkin',
+      'completed': 'tour_completed',
+      'no-show': 'tour_no_show',
+      'cancelled': 'tour_cancelled',
+    };
+    const auditAction = statusToAction[status] || 'tour_status_changed';
+    
+    logFromRequest(req, auditAction, 'tour', String(updated.id), updated.guestName || 'Guest', {
+      guest_name: updated.guestName,
+      guest_email: updated.guestEmail,
+      tour_date: updated.tourDate,
+      previous_status: previousStatus,
+      new_status: status
+    });
     
     if (status === 'no-show') {
       await notifyAllStaff(

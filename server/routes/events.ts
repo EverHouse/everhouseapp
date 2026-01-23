@@ -11,6 +11,7 @@ import { createPacificDate, parseLocalDate, formatDateDisplayWithDay, getTodayPa
 import { getAllActiveBayIds, getConferenceRoomId } from '../core/affectedAreas';
 import { sendNotificationToUser, broadcastToStaff } from '../core/websocket';
 import { getSessionUser } from '../types/session';
+import { logFromRequest } from '../core/auditLog';
 
 async function createEventAvailabilityBlocks(eventId: number, eventDate: string, startTime: string, endTime: string, createdBy?: string): Promise<void> {
   const bayIds = await getAllActiveBayIds();
@@ -68,6 +69,17 @@ router.post('/api/events/sync', isStaffOrAdmin, async (req, res) => {
     if (eventbriteToken) {
       eventbriteResult = { synced: 0, created: 0, updated: 0, error: undefined as any };
     }
+    
+    logFromRequest(req, 'sync_events', 'event', undefined, 'Event Sync', {
+      google_synced: googleResult.synced,
+      google_created: googleResult.created,
+      google_updated: googleResult.updated,
+      google_error: googleResult.error,
+      eventbrite_synced: eventbriteResult.synced,
+      eventbrite_created: eventbriteResult.created,
+      eventbrite_updated: eventbriteResult.updated,
+      eventbrite_error: eventbriteResult.error
+    });
     
     res.json({
       success: true,
@@ -327,6 +339,16 @@ router.post('/api/events', isStaffOrAdmin, async (req, res) => {
       }
     }
     
+    logFromRequest(req, 'create_event', 'event', String(createdEvent.id), createdEvent.title, {
+      event_date: createdEvent.eventDate,
+      start_time: createdEvent.startTime,
+      end_time: createdEvent.endTime,
+      location: createdEvent.location,
+      category: createdEvent.category,
+      max_attendees: createdEvent.maxAttendees,
+      block_bookings: createdEvent.blockBookings
+    });
+    
     res.status(201).json(createdEvent);
   } catch (error: any) {
     if (!isProduction) console.error('Event creation error:', error);
@@ -456,7 +478,19 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
       if (!isProduction) console.error('Failed to update availability blocks for event:', blockError);
     }
     
-    res.json(result[0]);
+    const updatedEvent = result[0];
+    logFromRequest(req, 'update_event', 'event', String(updatedEvent.id), updatedEvent.title, {
+      event_date: updatedEvent.eventDate,
+      start_time: updatedEvent.startTime,
+      end_time: updatedEvent.endTime,
+      location: updatedEvent.location,
+      category: updatedEvent.category,
+      max_attendees: updatedEvent.maxAttendees,
+      block_bookings: updatedEvent.blockBookings,
+      locally_edited: updatedEvent.locallyEdited
+    });
+    
+    res.json(updatedEvent);
   } catch (error: any) {
     if (!isProduction) console.error('Event update error:', error);
     res.status(500).json({ error: 'Failed to update event' });
@@ -530,12 +564,27 @@ router.delete('/api/events/:id', isStaffOrAdmin, async (req, res) => {
       if (!isProduction) console.error('Failed to remove availability blocks for event:', blockError);
     }
     
+    const eventBeforeDelete = await db.select({
+      title: events.title,
+      eventDate: events.eventDate,
+      startTime: events.startTime,
+      location: events.location
+    }).from(events).where(eq(events.id, eventId));
+    
     await db.update(events)
       .set({
         archivedAt: new Date(),
         archivedBy: archivedBy
       })
       .where(eq(events.id, eventId));
+    
+    const deletedEvent = eventBeforeDelete[0] || { title: 'Unknown', eventDate: '', startTime: '', location: '' };
+    logFromRequest(req, 'delete_event', 'event', String(eventId), deletedEvent.title, {
+      event_date: deletedEvent.eventDate,
+      start_time: deletedEvent.startTime,
+      location: deletedEvent.location,
+      archived_by: archivedBy
+    });
     
     res.json({ success: true, archived: true, archivedBy });
   } catch (error: any) {
@@ -943,8 +992,21 @@ router.delete('/api/events/:eventId/rsvps/:rsvpId', isStaffOrAdmin, async (req, 
       return res.status(404).json({ error: 'RSVP not found' });
     }
     
+    const rsvp = existingRsvp[0];
+    const eventData = await db.select({
+      title: events.title,
+      eventDate: events.eventDate
+    }).from(events).where(eq(events.id, parseInt(eventId)));
+    
     await db.delete(eventRsvps)
       .where(eq(eventRsvps.id, parseInt(rsvpId)));
+    
+    const event = eventData[0] || { title: 'Unknown', eventDate: '' };
+    logFromRequest(req, 'remove_rsvp', 'event', eventId, event.title, {
+      rsvp_email: rsvp.userEmail,
+      attendee_name: rsvp.attendeeName,
+      event_date: event.eventDate
+    });
     
     res.json({ success: true });
   } catch (error: any) {
@@ -980,6 +1042,17 @@ router.post('/api/events/:id/rsvps/manual', isStaffOrAdmin, async (req, res) => 
       userEmail: email,
       status: 'confirmed',
       checkedIn: true,
+    });
+    
+    const eventData = await db.select({
+      title: events.title,
+      eventDate: events.eventDate
+    }).from(events).where(eq(events.id, parseInt(id)));
+    
+    const event = eventData[0] || { title: 'Unknown', eventDate: '' };
+    logFromRequest(req, 'manual_rsvp', 'event', id, event.title, {
+      attendee_email: email,
+      event_date: event.eventDate
     });
     
     res.json({ success: true });

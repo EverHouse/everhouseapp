@@ -10,6 +10,7 @@ import { notifyMember, notifyFeeWaived } from '../core/notificationService';
 import { sendFeeWaivedEmail } from '../emails/paymentEmails';
 import { calculateAndCacheParticipantFees } from '../core/billing/feeCalculator';
 import { consumeGuestPassForParticipant, canUseGuestPass } from '../core/billing/guestPassConsumer';
+import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
 
@@ -340,6 +341,14 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
           previousStatus,
           'waived'
         ]);
+
+        logFromRequest(req, 'update_payment_status', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
+          participantId,
+          participantName: guestName,
+          action: 'guest_pass_used',
+          newStatus: 'waived',
+          passesRemaining: consumeResult.passesRemaining
+        });
         
         return res.json({ 
           success: true, 
@@ -371,6 +380,15 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
         previousStatus,
         newStatus
       ]);
+
+      logFromRequest(req, 'update_payment_status', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
+        participantId,
+        participantName: guestName,
+        action: action === 'confirm' ? 'payment_confirmed' : 'payment_waived',
+        previousStatus,
+        newStatus,
+        reason: reason || null
+      });
 
       if (action === 'waive') {
         try {
@@ -489,6 +507,13 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
           console.error('[StaffCheckin] Failed to send bulk waiver notification:', notifyErr);
         }
       }
+
+      logFromRequest(req, 'update_payment_status', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
+        action: action === 'confirm_all' ? 'confirm_all' : 'waive_all',
+        participantCount: pendingParticipants.rows.length,
+        newStatus: newStatus,
+        reason: reason || null
+      });
 
       return res.json({ 
         success: true, 
@@ -642,6 +667,12 @@ router.post('/api/booking-participants/:id/mark-waiver-reviewed', isStaffOrAdmin
       VALUES ($1, $2, $3, 'payment_waived', $4, $5, 'Staff marked manual waiver as reviewed', 0)
     `, [bookingId, sessionId, participantId, sessionUser.email, sessionUser.name || null]);
 
+    logFromRequest(req, 'review_waiver', 'waiver', participantId.toString(), display_name, {
+      bookingId,
+      sessionId,
+      action: 'waiver_marked_reviewed'
+    });
+
     await client.query('COMMIT');
     client.release();
 
@@ -700,6 +731,13 @@ router.post('/api/bookings/:bookingId/mark-all-waivers-reviewed', isStaffOrAdmin
         VALUES ($1, $2, $3, 'payment_waived', $4, $5, 'Staff marked manual waiver as reviewed', 0)
       `, [bookingId, session_id, row.id, sessionUser.email, sessionUser.name || null]);
     }
+
+    logFromRequest(req, 'review_waiver', 'booking', bookingId.toString(), `Booking #${bookingId}`, {
+      action: 'all_waivers_marked_reviewed',
+      sessionId: session_id,
+      waiverCount: result.rows.length,
+      participantIds: result.rows.map(r => r.id)
+    });
 
     await client.query('COMMIT');
     client.release();
@@ -803,6 +841,13 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
         JSON.stringify({ participantType: 'guest', guestName })
       ]);
 
+      logFromRequest(req, 'direct_add_participant', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
+        participantType: 'guest',
+        guestName,
+        sessionId,
+        reason: overrideReason || 'Staff direct add'
+      });
+
       return res.json({ 
         success: true, 
         message: `Guest "${guestName}" added directly by staff`,
@@ -895,6 +940,16 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
           tierOverrideApplied
         })
       ]);
+
+      logFromRequest(req, 'direct_add_participant', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
+        participantType: 'member',
+        memberName: member.name,
+        memberEmail: member.email,
+        tierName: member.tier_name,
+        tierOverrideApplied,
+        sessionId,
+        reason: overrideReason || 'Staff direct add'
+      });
 
       return res.json({ 
         success: true, 

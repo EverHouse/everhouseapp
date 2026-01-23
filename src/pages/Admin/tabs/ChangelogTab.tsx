@@ -20,6 +20,7 @@ interface AuditLogEntry {
 }
 
 const ACTION_LABELS: Record<string, { label: string; icon: string; color: string }> = {
+    // Booking actions
     approve_booking: { label: 'Approved Booking', icon: 'check_circle', color: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30' },
     decline_booking: { label: 'Declined Booking', icon: 'cancel', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
     cancel_booking: { label: 'Cancelled Booking', icon: 'event_busy', color: 'text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900/30' },
@@ -27,6 +28,12 @@ const ACTION_LABELS: Record<string, { label: string; icon: string; color: string
     reschedule_booking: { label: 'Rescheduled Booking', icon: 'update', color: 'text-indigo-600 bg-indigo-100 dark:text-indigo-400 dark:bg-indigo-900/30' },
     mark_no_show: { label: 'Marked No-Show', icon: 'person_off', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
     mark_attended: { label: 'Marked Attended', icon: 'how_to_reg', color: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30' },
+    add_guest_to_booking: { label: 'Added Guest to Booking', icon: 'person_add', color: 'text-teal-600 bg-teal-100 dark:text-teal-400 dark:bg-teal-900/30' },
+    remove_guest_from_booking: { label: 'Removed Guest', icon: 'person_remove', color: 'text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900/30' },
+    link_member_to_booking: { label: 'Linked Member to Booking', icon: 'link', color: 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30' },
+    unlink_member_from_booking: { label: 'Unlinked Member', icon: 'link_off', color: 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-900/30' },
+    direct_add_participant: { label: 'Added Participant', icon: 'group_add', color: 'text-teal-600 bg-teal-100 dark:text-teal-400 dark:bg-teal-900/30' },
+    // Billing actions
     pause_subscription: { label: 'Paused Subscription', icon: 'pause_circle', color: 'text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30' },
     resume_subscription: { label: 'Resumed Subscription', icon: 'play_circle', color: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30' },
     cancel_subscription: { label: 'Cancelled Subscription', icon: 'cancel', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
@@ -34,6 +41,8 @@ const ACTION_LABELS: Record<string, { label: string; icon: string; color: string
     process_refund: { label: 'Processed Refund', icon: 'currency_exchange', color: 'text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30' },
     send_payment_link: { label: 'Sent Payment Link', icon: 'link', color: 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30' },
     change_tier: { label: 'Changed Tier', icon: 'swap_vert', color: 'text-indigo-600 bg-indigo-100 dark:text-indigo-400 dark:bg-indigo-900/30' },
+    update_payment_status: { label: 'Updated Payment', icon: 'payment', color: 'text-emerald-600 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/30' },
+    // Member actions
     invite_member: { label: 'Invited Member', icon: 'person_add', color: 'text-teal-600 bg-teal-100 dark:text-teal-400 dark:bg-teal-900/30' },
     create_member: { label: 'Created Member', icon: 'person_add', color: 'text-teal-600 bg-teal-100 dark:text-teal-400 dark:bg-teal-900/30' },
     sync_hubspot: { label: 'Synced HubSpot', icon: 'sync', color: 'text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900/30' },
@@ -46,13 +55,55 @@ const ACTION_LABELS: Record<string, { label: string; icon: string; color: string
     update_member: { label: 'Updated Member', icon: 'edit', color: 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30' },
     delete_member: { label: 'Deleted Member', icon: 'delete', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
     archive_member: { label: 'Archived Member', icon: 'archive', color: 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-900/30' },
+    // Tour actions
+    tour_checkin: { label: 'Tour Check-In', icon: 'how_to_reg', color: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30' },
+    tour_completed: { label: 'Tour Completed', icon: 'task_alt', color: 'text-emerald-600 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/30' },
+    tour_no_show: { label: 'Tour No-Show', icon: 'person_off', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
+    tour_cancelled: { label: 'Tour Cancelled', icon: 'event_busy', color: 'text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900/30' },
+    tour_status_changed: { label: 'Tour Status Changed', icon: 'swap_horiz', color: 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30' },
+    // Event actions
+    create_event: { label: 'Created Event', icon: 'event', color: 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30' },
+    update_event: { label: 'Updated Event', icon: 'edit_calendar', color: 'text-indigo-600 bg-indigo-100 dark:text-indigo-400 dark:bg-indigo-900/30' },
+    delete_event: { label: 'Deleted Event', icon: 'event_busy', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
+    sync_events: { label: 'Synced Events', icon: 'sync', color: 'text-cyan-600 bg-cyan-100 dark:text-cyan-400 dark:bg-cyan-900/30' },
+    manual_rsvp: { label: 'Added RSVP', icon: 'person_add', color: 'text-teal-600 bg-teal-100 dark:text-teal-400 dark:bg-teal-900/30' },
+    remove_rsvp: { label: 'Removed RSVP', icon: 'person_remove', color: 'text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900/30' },
+    // Wellness actions
+    create_wellness_class: { label: 'Created Wellness Class', icon: 'fitness_center', color: 'text-pink-600 bg-pink-100 dark:text-pink-400 dark:bg-pink-900/30' },
+    update_wellness_class: { label: 'Updated Wellness Class', icon: 'edit', color: 'text-pink-600 bg-pink-100 dark:text-pink-400 dark:bg-pink-900/30' },
+    delete_wellness_class: { label: 'Deleted Wellness Class', icon: 'delete', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
+    sync_wellness: { label: 'Synced Wellness', icon: 'sync', color: 'text-pink-600 bg-pink-100 dark:text-pink-400 dark:bg-pink-900/30' },
+    manual_enrollment: { label: 'Enrolled Member', icon: 'group_add', color: 'text-teal-600 bg-teal-100 dark:text-teal-400 dark:bg-teal-900/30' },
+    // Announcement actions
+    create_announcement: { label: 'Created Announcement', icon: 'campaign', color: 'text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30' },
+    update_announcement: { label: 'Updated Announcement', icon: 'edit', color: 'text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30' },
+    delete_announcement: { label: 'Deleted Announcement', icon: 'delete', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
+    // Closure actions
+    create_closure: { label: 'Created Closure', icon: 'block', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
+    update_closure: { label: 'Updated Closure', icon: 'edit', color: 'text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900/30' },
+    delete_closure: { label: 'Deleted Closure', icon: 'delete', color: 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-900/30' },
+    sync_closures: { label: 'Synced Closures', icon: 'sync', color: 'text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900/30' },
+    // Trackman/Import actions
+    import_trackman: { label: 'Imported Trackman Data', icon: 'upload_file', color: 'text-cyan-600 bg-cyan-100 dark:text-cyan-400 dark:bg-cyan-900/30' },
+    reassign_booking: { label: 'Reassigned Booking', icon: 'swap_horiz', color: 'text-indigo-600 bg-indigo-100 dark:text-indigo-400 dark:bg-indigo-900/30' },
+    unmatch_booking: { label: 'Unmatched Booking', icon: 'link_off', color: 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-900/30' },
+    reset_trackman_data: { label: 'Reset Trackman Data', icon: 'restart_alt', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
+    // Group billing actions
+    add_group_member: { label: 'Added Group Member', icon: 'group_add', color: 'text-teal-600 bg-teal-100 dark:text-teal-400 dark:bg-teal-900/30' },
+    remove_group_member: { label: 'Removed Group Member', icon: 'group_remove', color: 'text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900/30' },
+    link_group_subscription: { label: 'Linked Group Subscription', icon: 'link', color: 'text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30' },
+    // Waiver actions
+    review_waiver: { label: 'Reviewed Waiver', icon: 'verified', color: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30' },
 };
 
 const FILTER_CATEGORIES = [
     { key: 'all', label: 'All' },
-    { key: 'bookings', label: 'Bookings', actions: ['approve_booking', 'decline_booking', 'cancel_booking', 'create_booking', 'reschedule_booking', 'mark_no_show', 'mark_attended'] },
-    { key: 'billing', label: 'Billing', actions: ['pause_subscription', 'resume_subscription', 'cancel_subscription', 'record_charge', 'process_refund', 'send_payment_link', 'change_tier'] },
-    { key: 'members', label: 'Members', actions: ['invite_member', 'create_member', 'update_member', 'delete_member', 'archive_member', 'sync_hubspot', 'link_stripe_customer', 'update_member_notes'] },
+    { key: 'bookings', label: 'Bookings', actions: ['approve_booking', 'decline_booking', 'cancel_booking', 'create_booking', 'reschedule_booking', 'mark_no_show', 'mark_attended', 'add_guest_to_booking', 'remove_guest_from_booking', 'link_member_to_booking', 'unlink_member_from_booking', 'direct_add_participant', 'reassign_booking', 'unmatch_booking', 'import_trackman'] },
+    { key: 'billing', label: 'Billing', actions: ['pause_subscription', 'resume_subscription', 'cancel_subscription', 'record_charge', 'process_refund', 'send_payment_link', 'change_tier', 'update_payment_status', 'add_group_member', 'remove_group_member', 'link_group_subscription'] },
+    { key: 'members', label: 'Members', actions: ['invite_member', 'create_member', 'update_member', 'delete_member', 'archive_member', 'sync_hubspot', 'link_stripe_customer', 'update_member_notes', 'review_waiver'] },
+    { key: 'tours', label: 'Tours', actions: ['tour_checkin', 'tour_completed', 'tour_no_show', 'tour_cancelled', 'tour_status_changed'] },
+    { key: 'events', label: 'Events', actions: ['create_event', 'update_event', 'delete_event', 'sync_events', 'manual_rsvp', 'remove_rsvp', 'create_wellness_class', 'update_wellness_class', 'delete_wellness_class', 'sync_wellness', 'manual_enrollment'] },
+    { key: 'admin', label: 'Admin', actions: ['create_announcement', 'update_announcement', 'delete_announcement', 'create_closure', 'update_closure', 'delete_closure', 'sync_closures', 'reset_trackman_data'] },
 ];
 
 const ChangelogTab: React.FC = () => {
@@ -153,30 +204,104 @@ const ChangelogTab: React.FC = () => {
 
     const formatDetails = (entry: AuditLogEntry): string => {
         const parts: string[] = [];
+        const d = entry.details || {};
         
+        // Resource name first
         if (entry.resourceName) {
             parts.push(entry.resourceName);
         }
         
-        if (entry.details) {
-            if (entry.details.member_email) {
-                parts.push(entry.details.member_email);
-            }
-            if (entry.details.amount) {
-                const amount = typeof entry.details.amount === 'number' 
-                    ? `$${(entry.details.amount / 100).toFixed(2)}` 
-                    : entry.details.amount;
-                parts.push(amount);
-            }
-            if (entry.details.tier) {
-                parts.push(`Tier: ${entry.details.tier}`);
-            }
-            if (entry.details.reason) {
-                parts.push(`Reason: ${entry.details.reason}`);
-            }
-            if (entry.details.bay) {
-                parts.push(`Bay ${entry.details.bay}`);
-            }
+        // Action-specific details
+        switch (entry.action) {
+            case 'tour_checkin':
+            case 'tour_completed':
+            case 'tour_no_show':
+            case 'tour_cancelled':
+            case 'tour_status_changed':
+                if (d.guest_email) parts.push(d.guest_email);
+                if (d.tour_date) parts.push(d.tour_date);
+                if (d.previous_status && d.new_status) {
+                    parts.push(`${d.previous_status} → ${d.new_status}`);
+                }
+                break;
+            case 'create_event':
+            case 'update_event':
+            case 'delete_event':
+                if (d.event_date || d.date) parts.push(d.event_date || d.date);
+                if (d.location) parts.push(d.location);
+                break;
+            case 'manual_rsvp':
+            case 'remove_rsvp':
+                if (d.attendee_email || d.rsvp_email) parts.push(d.attendee_email || d.rsvp_email);
+                if (d.event_date) parts.push(d.event_date);
+                break;
+            case 'create_wellness_class':
+            case 'update_wellness_class':
+            case 'delete_wellness_class':
+                if (d.instructor) parts.push(`Instructor: ${d.instructor}`);
+                if (d.date) parts.push(d.date);
+                break;
+            case 'manual_enrollment':
+                if (d.memberEnrolled) parts.push(d.memberEnrolled);
+                break;
+            case 'create_announcement':
+            case 'update_announcement':
+            case 'delete_announcement':
+                if (d.priority) parts.push(`Priority: ${d.priority}`);
+                break;
+            case 'create_closure':
+            case 'update_closure':
+            case 'delete_closure':
+                if (d.startDate && d.endDate) parts.push(`${d.startDate} to ${d.endDate}`);
+                else if (d.startDate) parts.push(d.startDate);
+                if (d.affectedAreas) parts.push(d.affectedAreas);
+                if (d.reason) parts.push(d.reason);
+                break;
+            case 'add_guest_to_booking':
+                if (d.guest_name) parts.push(d.guest_name);
+                if (d.guest_email) parts.push(d.guest_email);
+                if (d.fee_amount) parts.push(`Fee: $${(d.fee_amount / 100).toFixed(2)}`);
+                break;
+            case 'link_member_to_booking':
+            case 'unlink_member_from_booking':
+                if (d.memberEmail || d.linkedBy) parts.push(d.memberEmail || d.linkedBy);
+                break;
+            case 'direct_add_participant':
+                if (d.guestName) parts.push(d.guestName);
+                if (d.memberName) parts.push(d.memberName);
+                if (d.participantType) parts.push(d.participantType);
+                if (d.reason) parts.push(d.reason);
+                break;
+            case 'update_payment_status':
+                if (d.participantName) parts.push(d.participantName);
+                if (d.newStatus) parts.push(`Status: ${d.newStatus}`);
+                if (d.action) parts.push(d.action.replace(/_/g, ' '));
+                if (d.participantCount) parts.push(`${d.participantCount} participants`);
+                break;
+            case 'add_group_member':
+            case 'remove_group_member':
+                if (d.memberEmail) parts.push(d.memberEmail);
+                if (d.groupType) parts.push(d.groupType);
+                break;
+            case 'import_trackman':
+                if (d.filename) parts.push(d.filename);
+                if (d.bookingsImported !== undefined) parts.push(`${d.bookingsImported} bookings`);
+                break;
+            case 'reassign_booking':
+                if (d.oldEmail && d.newEmail) parts.push(`${d.oldEmail} → ${d.newEmail}`);
+                break;
+            default:
+                // Generic fallback
+                if (d.member_email) parts.push(d.member_email);
+                if (d.amount) {
+                    const amount = typeof d.amount === 'number' 
+                        ? `$${(d.amount / 100).toFixed(2)}` 
+                        : d.amount;
+                    parts.push(amount);
+                }
+                if (d.tier) parts.push(`Tier: ${d.tier}`);
+                if (d.reason) parts.push(`Reason: ${d.reason}`);
+                if (d.bay) parts.push(`Bay ${d.bay}`);
         }
         
         return parts.join(' • ') || 'No additional details';

@@ -8,6 +8,24 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.2",
+    date: "2026-01-23",
+    title: "Comprehensive Staff Activity Logging",
+    isMajor: true,
+    changes: [
+      "Staff Activity now tracks ALL staff actions across the entire platform",
+      "New categories: Tours, Events, Wellness, Announcements, Closures, and Admin actions",
+      "Tour status changes (check-in, completed, no-show, cancelled) now appear in activity feed",
+      "Event management (create, update, delete, RSVP management) fully logged",
+      "Wellness class management and enrollment tracking added",
+      "Closure and announcement management now tracked",
+      "Trackman imports and booking assignments logged for audit compliance",
+      "Group billing member changes tracked",
+      "Richer detail cards show context like dates, status changes, and member info",
+      "Added new filter tabs: Tours, Events, Admin for focused views"
+    ]
+  },
+  {
     version: "9.1",
     date: "2026-01-23",
     title: "Staff Activity Tracking",

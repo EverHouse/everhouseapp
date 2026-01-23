@@ -10,6 +10,7 @@ import { getGoogleCalendarClient } from '../core/integrations';
 import { createPacificDate, parseLocalDate, addDaysToPacificDate, getPacificISOString, getTodayPacific } from '../utils/dateUtils';
 import { clearClosureCache } from '../core/bookingValidation';
 import { broadcastClosureUpdate } from '../core/websocket';
+import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
 
@@ -713,6 +714,17 @@ router.post('/api/closures', isStaffOrAdmin, async (req, res) => {
     
     broadcastClosureUpdate('created', result.id);
     
+    logFromRequest(req, 'create_closure', 'closure', String(result.id), result.title, {
+      reason: result.reason,
+      startDate: result.startDate,
+      endDate: result.endDate,
+      startTime: result.startTime,
+      endTime: result.endTime,
+      affectedAreas: result.affectedAreas,
+      noticeType: result.noticeType,
+      notifyMembers: result.notifyMembers
+    });
+    
     res.json({ 
       ...result, 
       googleCalendarId: null,
@@ -779,6 +791,14 @@ router.delete('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
     clearClosureCache();
     
     broadcastClosureUpdate('deleted', closureId);
+    
+    logFromRequest(req, 'delete_closure', 'closure', String(closureId), closure?.title, {
+      reason: closure?.reason,
+      startDate: closure?.startDate,
+      endDate: closure?.endDate,
+      affectedAreas: closure?.affectedAreas,
+      notifyMembers: closure?.notifyMembers
+    });
     
     res.json({ success: true });
   } catch (error: any) {
@@ -1045,6 +1065,17 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
     
     broadcastClosureUpdate('updated', closureId);
     
+    logFromRequest(req, 'update_closure', 'closure', String(closureId), updated.title, {
+      reason: updated.reason,
+      startDate: updated.startDate,
+      endDate: updated.endDate,
+      startTime: updated.startTime,
+      endTime: updated.endTime,
+      affectedAreas: updated.affectedAreas,
+      noticeType: updated.noticeType,
+      notifyMembers: updated.notifyMembers
+    });
+    
     res.json(updated);
   } catch (error: any) {
     if (!isProduction) console.error('Closure update error:', error);
@@ -1129,6 +1160,13 @@ router.post('/api/closures/sync', isStaffOrAdmin, async (req, res) => {
     if (result.error) {
       return res.status(400).json(result);
     }
+    
+    logFromRequest(req, 'sync_closures', 'closure', '', 'Internal Calendar Sync', {
+      created: result.created,
+      updated: result.updated,
+      deleted: result.deleted,
+      errors: result.errors
+    });
     
     res.json({
       success: true,
