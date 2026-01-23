@@ -227,10 +227,10 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                 <p className="text-xs text-primary/60 dark:text-white/60">Auto-Approved</p>
               </div>
               <div className="p-2 md:p-3 bg-white/50 dark:bg-white/5 rounded-xl text-center">
-                <p className="text-xl md:text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {webhookStats.webhookStats?.booking_updates || 0}
+                <p className="text-xl md:text-2xl font-bold text-amber-600 dark:text-amber-400">
+                  {webhookStats.webhookStats?.unmatched || 0}
                 </p>
-                <p className="text-xs text-primary/60 dark:text-white/60">Booking Updates</p>
+                <p className="text-xs text-primary/60 dark:text-white/60">Needs Linking</p>
               </div>
               <div className="p-2 md:p-3 bg-white/50 dark:bg-white/5 rounded-xl text-center">
                 <p className="text-xl md:text-2xl font-bold text-red-600 dark:text-red-400">

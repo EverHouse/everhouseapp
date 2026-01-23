@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.4.8",
+    date: "2026-01-23",
+    title: "Accurate Trackman Booking Stats",
+    changes: [
+      "Fixed stats widget to show correct counts for auto-approved vs needs-linking bookings",
+      "Added 'Needs Linking' count in amber to show bookings awaiting member assignment",
+      "Auto-linked bookings (William, Greg) now correctly show blue button instead of green",
+      "Future auto-matched webhooks will properly track was_auto_linked status"
+    ]
+  },
+  {
     version: "9.4.7",
     date: "2026-01-23",
     title: "Streamlined Unmatched Booking Flow",

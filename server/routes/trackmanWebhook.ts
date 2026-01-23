@@ -854,9 +854,9 @@ async function createBookingForMember(
       `INSERT INTO booking_requests 
        (user_id, user_email, user_name, resource_id, request_date, start_time, end_time, 
         duration_minutes, status, trackman_booking_id, trackman_player_count, 
-        reviewed_by, reviewed_at, staff_notes, created_at, updated_at)
+        reviewed_by, reviewed_at, staff_notes, was_auto_linked, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'approved', $9, $10, 'trackman_webhook', NOW(), 
-               '[Auto-created via Trackman webhook - staff booking]', NOW(), NOW())
+               '[Auto-created via Trackman webhook - staff booking]', true, NOW(), NOW())
        RETURNING id`,
       [
         member.id,
@@ -1969,12 +1969,14 @@ router.get('/api/admin/trackman-webhooks/stats', isStaffOrAdmin, async (req: Req
     const stats = await pool.query(`
       SELECT 
         COUNT(*) as total_events,
-        COUNT(*) FILTER (WHERE event_type = 'booking_update') as booking_updates,
-        COUNT(*) FILTER (WHERE matched_booking_id IS NOT NULL) as auto_approved,
-        COUNT(*) FILTER (WHERE processing_error IS NOT NULL) as errors,
-        MAX(created_at) as last_event_at
-      FROM trackman_webhook_events
-      WHERE created_at >= NOW() - INTERVAL '30 days'
+        COUNT(*) FILTER (WHERE twe.event_type = 'booking_update') as booking_updates,
+        COUNT(*) FILTER (WHERE twe.matched_booking_id IS NOT NULL AND (br.is_unmatched IS NULL OR br.is_unmatched = false)) as auto_approved,
+        COUNT(*) FILTER (WHERE twe.matched_booking_id IS NOT NULL AND br.is_unmatched = true) as unmatched,
+        COUNT(*) FILTER (WHERE twe.processing_error IS NOT NULL) as errors,
+        MAX(twe.created_at) as last_event_at
+      FROM trackman_webhook_events twe
+      LEFT JOIN booking_requests br ON twe.matched_booking_id = br.id
+      WHERE twe.created_at >= NOW() - INTERVAL '30 days'
     `);
     
     const slotStats = await pool.query(`
