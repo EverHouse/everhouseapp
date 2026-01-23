@@ -849,6 +849,27 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
         tierOverrideApplied = true;
       }
 
+      // Check if there's a guest entry with matching name that should be converted
+      const matchingGuest = await pool.query(
+        `SELECT bp.id, bp.display_name
+         FROM booking_participants bp
+         LEFT JOIN guests g ON bp.guest_id = g.id
+         WHERE bp.session_id = $1 
+           AND bp.participant_type = 'guest'
+           AND (LOWER(bp.display_name) = LOWER($2) OR LOWER(g.email) = LOWER($3))`,
+        [sessionId, member.name || '', member.email]
+      );
+      
+      if (matchingGuest.rowCount && matchingGuest.rowCount > 0) {
+        // Remove the guest entry since this person is actually a member
+        const guestIds = matchingGuest.rows.map(r => r.id);
+        await pool.query(
+          `DELETE FROM booking_participants WHERE id = ANY($1)`,
+          [guestIds]
+        );
+        console.log(`[Staff Add Member] Removed ${guestIds.length} duplicate guest entries for member ${member.email} in session ${sessionId}`);
+      }
+      
       await pool.query(`
         INSERT INTO booking_participants 
           (session_id, user_id, participant_type, display_name, invite_status, payment_status)

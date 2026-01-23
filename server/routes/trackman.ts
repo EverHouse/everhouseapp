@@ -903,7 +903,29 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
       );
       
       if (existingParticipant.rowCount === 0) {
-        // Add to booking_participants
+        // Check if there's a guest entry with matching name that should be converted
+        // This handles cases where someone was added as guest but is actually a member
+        const matchingGuest = await pool.query(
+          `SELECT bp.id, bp.display_name, g.email as guest_email
+           FROM booking_participants bp
+           LEFT JOIN guests g ON bp.guest_id = g.id
+           WHERE bp.session_id = $1 
+             AND bp.participant_type = 'guest'
+             AND (LOWER(bp.display_name) = LOWER($2) OR LOWER(g.email) = LOWER($3))`,
+          [sessionId, displayName, memberEmail]
+        );
+        
+        if (matchingGuest.rowCount && matchingGuest.rowCount > 0) {
+          // Remove the guest entry since this person is actually a member (no guest fee needed)
+          const guestIds = matchingGuest.rows.map(r => r.id);
+          await pool.query(
+            `DELETE FROM booking_participants WHERE id = ANY($1)`,
+            [guestIds]
+          );
+          console.log(`[Link Member] Removed ${guestIds.length} duplicate guest entries for member ${memberEmail} in session ${sessionId}`);
+        }
+        
+        // Add to booking_participants as member
         await pool.query(
           `INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, invite_status)
            VALUES ($1, $2, 'member', $3, 'pending', 'confirmed')`,
