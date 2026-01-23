@@ -713,6 +713,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
     
     const [calendarDate, setCalendarDate] = useState(() => getTodayPacific());
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
     const [editingTrackmanId, setEditingTrackmanId] = useState(false);
     const [trackmanIdDraft, setTrackmanIdDraft] = useState('');
     const [savingTrackmanId, setSavingTrackmanId] = useState(false);
@@ -1799,8 +1800,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                     
                     <div className={`flex-1 lg:flex lg:flex-col lg:h-full lg:overflow-hidden ${activeView === 'calendar' ? 'block' : 'hidden lg:flex'}`}>
                     <div className="bg-gray-50 dark:bg-white/5 py-3 shrink-0 animate-pop-in" style={{animationDelay: '0.1s'}}>
-                        <div className="flex items-center justify-between px-2">
-                            <div className="w-24 hidden lg:block"></div>
+                        <div className="flex items-center justify-center px-2 relative">
                             <div className="flex items-center gap-2 relative">
                                 <button
                                     onClick={() => {
@@ -1883,11 +1883,42 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                     document.body
                                 )}
                             </div>
+                            <button
+                                onClick={async () => {
+                                    if (isSyncing) return;
+                                    setIsSyncing(true);
+                                    try {
+                                        const csrfToken = getCsrfToken();
+                                        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+                                        if (csrfToken) headers['x-csrf-token'] = csrfToken;
+                                        const res = await fetch('/api/admin/bookings/sync-calendar', {
+                                            method: 'POST',
+                                            headers,
+                                            credentials: 'include'
+                                        });
+                                        const data = await res.json();
+                                        if (res.ok) {
+                                            showToast(`Synced ${data.conference_room?.synced || 0} conference room bookings`, 'success');
+                                            fetchCalendarData();
+                                        } else {
+                                            showToast(data.error || 'Sync failed', 'error');
+                                        }
+                                    } catch (err) {
+                                        showToast('Failed to sync', 'error');
+                                    } finally {
+                                        setIsSyncing(false);
+                                    }
+                                }}
+                                disabled={isSyncing}
+                                className="absolute right-2 p-1.5 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors disabled:opacity-50"
+                                title="Sync conference room bookings"
+                            >
+                                <span className={`material-symbols-outlined text-lg ${isSyncing ? 'animate-spin' : ''}`}>sync</span>
+                            </button>
                         </div>
                     </div>
                     
                     <div className="flex-1 min-h-0 lg:overflow-y-auto scrollbar-hide relative animate-pop-in" style={{animationDelay: '0.15s'}}>
-                        <div className="hidden lg:block absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-white dark:from-[#1e1e1e] to-transparent z-10 pointer-events-none" />
                         <div className="w-full px-1 sm:px-2 pb-4">
                             <div className="w-full">
                             <div className="grid gap-0.5 w-full" style={{ gridTemplateColumns: `minmax(32px, 0.6fr) repeat(${resources.length}, minmax(0, 1fr))` }}>

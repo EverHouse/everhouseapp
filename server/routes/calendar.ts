@@ -206,4 +206,29 @@ router.post('/api/admin/bookings/sync-history', isAdmin, async (req, res) => {
   }
 });
 
+// Quick sync for conference room calendar (used by sync button on bookings page)
+router.post('/api/admin/bookings/sync-calendar', isStaffOrAdmin, async (req, res) => {
+  try {
+    console.log('[Admin] Running conference room calendar sync...');
+    
+    const conferenceResult = await syncConferenceRoomCalendarToBookings();
+    
+    console.log(`[Admin] Conference room sync complete: ${conferenceResult.synced} events`);
+    
+    res.json({
+      success: !conferenceResult.error,
+      conference_room: {
+        synced: conferenceResult.synced,
+        linked: conferenceResult.linked,
+        created: conferenceResult.created,
+        skipped: conferenceResult.skipped,
+        error: conferenceResult.error
+      }
+    });
+  } catch (error: any) {
+    console.error('Calendar sync error:', error);
+    res.status(500).json({ error: 'Failed to sync calendar' });
+  }
+});
+
 export default router;
