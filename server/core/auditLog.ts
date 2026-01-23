@@ -23,7 +23,23 @@ export type AuditAction =
   | 'export_report'
   | 'login_as_staff'
   | 'update_settings'
-  | 'bulk_action';
+  | 'bulk_action'
+  | 'approve_booking'
+  | 'decline_booking'
+  | 'create_booking'
+  | 'reschedule_booking'
+  | 'mark_no_show'
+  | 'mark_attended'
+  | 'create_member'
+  | 'invite_member'
+  | 'cancel_subscription'
+  | 'pause_subscription'
+  | 'resume_subscription'
+  | 'record_charge'
+  | 'send_payment_link'
+  | 'update_member_notes'
+  | 'link_stripe_customer'
+  | 'sync_hubspot';
 
 export type ResourceType = 
   | 'member'
@@ -32,7 +48,8 @@ export type ResourceType =
   | 'report'
   | 'settings'
   | 'directory'
-  | 'billing';
+  | 'billing'
+  | 'subscription';
 
 interface AuditLogParams {
   staffEmail: string;

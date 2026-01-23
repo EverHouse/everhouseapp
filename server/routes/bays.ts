@@ -22,6 +22,7 @@ import { updateHubSpotContactVisitCount } from '../core/memberSync';
 import { createSessionWithUsageTracking } from '../core/bookingService/sessionManager';
 import { calculateAndCacheParticipantFees } from '../core/billing/feeCalculator';
 import { cancelPaymentIntent, getStripeClient } from '../core/stripe';
+import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
 

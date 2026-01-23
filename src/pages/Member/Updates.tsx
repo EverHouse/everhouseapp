@@ -6,21 +6,9 @@ import { usePageReady } from '../../contexts/PageReadyContext';
 import SwipeablePage from '../../components/SwipeablePage';
 import PullToRefresh from '../../components/PullToRefresh';
 import { MotionList, MotionListItem } from '../../components/motion';
-import { SwipeableListItem } from '../../components/SwipeableListItem';
-import { getTodayPacific, formatDateDisplayWithDay, formatDateTimePacific, addDaysToPacificDate, comparePacificDates } from '../../utils/dateUtils';
+import { getTodayPacific, formatDateDisplayWithDay, formatDateTimePacific, addDaysToPacificDate } from '../../utils/dateUtils';
 
 const NOTICE_PREVIEW_DAYS = 7; // Show notices this many days before they start
-
-interface UserNotification {
-  id: number;
-  user_email: string;
-  type: string;
-  title: string;
-  message: string;
-  data?: Record<string, any>;
-  is_read: boolean;
-  created_at: string;
-}
 
 interface Closure {
   id: number;
@@ -157,47 +145,6 @@ const isActiveAnnouncement = (item: Announcement): boolean => {
   return true;
 };
 
-const getNotificationRoute = (notif: UserNotification, isStaffOrAdmin: boolean): string | null => {
-  // Booking notifications
-  if (notif.type === 'booking_approved' || notif.type === 'booking_declined') {
-    return '/book';
-  }
-  if (notif.type === 'booking' || notif.type === 'booking_request') {
-    return isStaffOrAdmin ? '/admin?tab=simulator' : '/book';
-  }
-  if (notif.type === 'booking_cancelled' || notif.type === 'booking_reminder') {
-    return isStaffOrAdmin ? '/admin?tab=simulator' : '/book';
-  }
-  
-  // Event notifications
-  if (notif.type === 'event_reminder' || notif.type === 'event_rsvp' || notif.type === 'event_rsvp_cancelled') {
-    return isStaffOrAdmin ? '/admin?tab=events' : '/member-events';
-  }
-  
-  // Tour notifications
-  if (notif.type === 'tour_scheduled' || notif.type === 'tour_reminder') {
-    return isStaffOrAdmin ? '/admin?tab=tours' : null;
-  }
-  
-  // Wellness notifications
-  if (notif.type === 'wellness_booking' || notif.type === 'wellness_enrollment' || 
-      notif.type === 'wellness_cancellation' || notif.type === 'wellness_reminder') {
-    return isStaffOrAdmin ? '/admin?tab=events&subtab=wellness' : '/member-wellness';
-  }
-  
-  // Notice/Closure notifications
-  if (notif.type === 'closure') {
-    return isStaffOrAdmin ? '/admin?tab=blocks' : '/updates?tab=notices';
-  }
-  
-  // Guest pass notifications
-  if (notif.type === 'guest_pass') {
-    return '/profile';
-  }
-  
-  return null;
-};
-
 const MemberUpdates: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -212,21 +159,18 @@ const MemberUpdates: React.FC = () => {
   const isViewingAsMember = user?.email && actualUser?.email && user.email !== actualUser.email;
   
   const tabParam = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState<'activity' | 'announcements' | 'notices'>(
-    tabParam === 'activity' ? 'activity' : (tabParam === 'notices' || tabParam === 'closures') ? 'notices' : 'announcements'
+  const [activeTab, setActiveTab] = useState<'announcements' | 'notices'>(
+    (tabParam === 'notices' || tabParam === 'closures') ? 'notices' : 'announcements'
   );
   
-  const [notifications, setNotifications] = useState<UserNotification[]>([]);
-  const [notificationsLoading, setNotificationsLoading] = useState(true);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [closures, setClosures] = useState<Closure[]>([]);
   const [closuresLoading, setClosuresLoading] = useState(true);
 
   useEffect(() => {
-    if (!isLoading && !notificationsLoading && !closuresLoading) {
+    if (!isLoading && !closuresLoading) {
       setPageReady(true);
     }
-  }, [isLoading, notificationsLoading, closuresLoading, setPageReady]);
+  }, [isLoading, closuresLoading, setPageReady]);
 
   const fetchClosures = useCallback(async () => {
     try {
@@ -264,131 +208,21 @@ const MemberUpdates: React.FC = () => {
   }, [fetchClosures]);
 
   useEffect(() => {
-    if (tabParam === 'activity' || tabParam === 'announcements') {
-      setActiveTab(tabParam);
+    if (tabParam === 'announcements') {
+      setActiveTab('announcements');
     } else if (tabParam === 'notices' || tabParam === 'closures') {
       setActiveTab('notices');
     }
   }, [tabParam]);
 
-  const handleTabChange = (tab: 'activity' | 'announcements' | 'notices') => {
+  const handleTabChange = (tab: 'announcements' | 'notices') => {
     setActiveTab(tab);
     setSearchParams({ tab });
   };
 
-  const fetchNotifications = useCallback(async () => {
-    if (!user?.email) return;
-    try {
-      const res = await fetch(`/api/notifications?user_email=${encodeURIComponent(user.email)}`, { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setNotifications(data);
-        setUnreadCount(data.filter((n: UserNotification) => !n.is_read).length);
-      }
-    } catch (err) {
-      console.error('Failed to fetch notifications:', err);
-    } finally {
-      setNotificationsLoading(false);
-    }
-  }, [user?.email]);
-
-  useEffect(() => {
-    if (user?.email) {
-      fetchNotifications();
-      const interval = setInterval(fetchNotifications, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [user?.email, fetchNotifications]);
-
   const handleRefresh = useCallback(async () => {
-    await Promise.all([fetchNotifications(), fetchClosures()]);
-  }, [fetchNotifications, fetchClosures]);
-
-  const handleNotificationClick = async (notif: UserNotification) => {
-    if (!notif.is_read) {
-      const snapshot = [...notifications];
-      const prevUnread = unreadCount;
-      
-      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
-      setUnreadCount(prev => Math.max(0, prev - 1));
-      
-      try {
-        const res = await fetch(`/api/notifications/${notif.id}/read`, { method: 'PUT', credentials: 'include' });
-        if (res.ok) {
-          window.dispatchEvent(new CustomEvent('notifications-read'));
-        } else {
-          setNotifications(snapshot);
-          setUnreadCount(prevUnread);
-        }
-      } catch (err) {
-        console.error('Failed to mark notification as read:', err);
-        setNotifications(snapshot);
-        setUnreadCount(prevUnread);
-      }
-    }
-    
-    const route = getNotificationRoute(notif, isStaffOrAdmin);
-    if (route) {
-      navigate(route);
-    }
-  };
-
-  const markAllAsRead = async () => {
-    if (!user?.email) return;
-    
-    const snapshot = [...notifications];
-    const prevUnread = unreadCount;
-    
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-    setUnreadCount(0);
-    
-    try {
-      const res = await fetch('/api/notifications/mark-all-read', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_email: user.email }),
-      });
-      if (res.ok) {
-        window.dispatchEvent(new CustomEvent('notifications-read'));
-      } else {
-        setNotifications(snapshot);
-        setUnreadCount(prevUnread);
-      }
-    } catch (err) {
-      console.error('Failed to mark all as read:', err);
-      setNotifications(snapshot);
-      setUnreadCount(prevUnread);
-    }
-  };
-
-  const dismissAll = async () => {
-    if (!user?.email) return;
-    
-    const snapshot = [...notifications];
-    const prevUnread = unreadCount;
-    
-    setNotifications([]);
-    setUnreadCount(0);
-    
-    try {
-      const res = await fetch('/api/notifications/dismiss-all', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_email: user.email }),
-        credentials: 'include'
-      });
-      if (res.ok) {
-        window.dispatchEvent(new CustomEvent('notifications-read'));
-      } else {
-        setNotifications(snapshot);
-        setUnreadCount(prevUnread);
-      }
-    } catch (err) {
-      console.error('Failed to dismiss all notifications:', err);
-      setNotifications(snapshot);
-      setUnreadCount(prevUnread);
-    }
-  };
+    await fetchClosures();
+  }, [fetchClosures]);
 
   const handleAnnouncementClick = (item: Announcement) => {
     if (item.linkType) {
@@ -547,163 +381,6 @@ const MemberUpdates: React.FC = () => {
           })}
         </MotionList>
       )}
-    </div>
-  );
-
-  const renderActivityTab = () => (
-    <div className="relative z-10 pb-32">
-      {notifications.length > 0 && (
-        <div className="flex justify-end gap-2 mb-4">
-          {unreadCount > 0 && (
-            <button 
-              onClick={markAllAsRead}
-              className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
-                isDark 
-                  ? 'text-white/70 hover:text-white bg-white/5 hover:bg-white/10' 
-                  : 'text-primary/70 hover:text-primary bg-primary/5 hover:bg-primary/10'
-              }`}
-            >
-              Mark all as read
-            </button>
-          )}
-          <button 
-            onClick={dismissAll}
-            className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
-              isDark 
-                ? 'text-red-400/70 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20' 
-                : 'text-red-600/70 hover:text-red-600 bg-red-500/5 hover:bg-red-500/10'
-            }`}
-          >
-            Dismiss all
-          </button>
-        </div>
-      )}
-      
-      {notificationsLoading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className={`p-4 rounded-2xl animate-pulse ${isDark ? 'bg-white/[0.03]' : 'bg-white'}`}>
-              <div className="flex gap-3">
-                <div className={`w-10 h-10 rounded-lg ${isDark ? 'bg-white/10' : 'bg-gray-200'}`} />
-                <div className="flex-1">
-                  <div className={`h-4 w-1/2 rounded mb-2 ${isDark ? 'bg-white/10' : 'bg-gray-200'}`} />
-                  <div className={`h-3 w-3/4 rounded ${isDark ? 'bg-white/5' : 'bg-gray-100'}`} />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (() => {
-        const fourteenDaysAgoStr = addDaysToPacificDate(getTodayPacific(), -14);
-        const recentNotifications = notifications.filter(n => {
-          if (!n.created_at) return false;
-          const notifDate = n.created_at.split('T')[0];
-          return notifDate >= fourteenDaysAgoStr;
-        });
-        
-        return recentNotifications.length === 0 ? (
-          <div className={`text-center py-16 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
-            <span className="material-symbols-outlined text-6xl mb-4 block opacity-30">notifications_off</span>
-            <p className="text-lg font-medium">No recent activity</p>
-            <p className="text-sm mt-1 opacity-70">Your booking updates and alerts will appear here.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {recentNotifications.map((notif) => (
-            <SwipeableListItem
-              key={notif.id}
-              leftActions={!notif.is_read ? [
-                {
-                  id: 'read',
-                  icon: 'mark_email_read',
-                  label: 'Read',
-                  color: 'primary',
-                  onClick: async () => {
-                    try {
-                      await fetch(`/api/notifications/${notif.id}/read`, {
-                        method: 'PUT',
-                        credentials: 'include'
-                      });
-                      setNotifications(prev => prev.map(n => 
-                        n.id === notif.id ? { ...n, is_read: true } : n
-                      ));
-                      setUnreadCount(prev => Math.max(0, prev - 1));
-                      window.dispatchEvent(new CustomEvent('notifications-read'));
-                    } catch (err) {
-                      console.error('Failed to mark as read:', err);
-                    }
-                  }
-                }
-              ] : []}
-              rightActions={[
-                {
-                  id: 'dismiss',
-                  icon: 'close',
-                  label: 'Dismiss',
-                  color: 'gray',
-                  onClick: async () => {
-                    try {
-                      const wasUnread = !notif.is_read;
-                      await fetch(`/api/notifications/${notif.id}`, {
-                        method: 'DELETE',
-                        credentials: 'include'
-                      });
-                      setNotifications(prev => prev.filter(n => n.id !== notif.id));
-                      if (wasUnread) {
-                        setUnreadCount(prev => Math.max(0, prev - 1));
-                        window.dispatchEvent(new CustomEvent('notifications-read'));
-                      }
-                    } catch (err) {
-                      console.error('Failed to dismiss notification:', err);
-                    }
-                  }
-                }
-              ]}
-            >
-              <div 
-                onClick={() => handleNotificationClick(notif)}
-                className={`rounded-2xl transition-all cursor-pointer overflow-hidden ${
-                  notif.is_read 
-                    ? isDark ? 'bg-white/[0.03] hover:bg-white/[0.06]' : 'bg-white hover:bg-gray-50'
-                    : isDark ? 'bg-accent/10 hover:bg-accent/15 border border-accent/20' : 'bg-accent/10 hover:bg-accent/15 border border-accent/30'
-                } ${isDark ? 'shadow-layered-dark' : 'shadow-layered'}`}
-              >
-                <div className="flex gap-3 p-4">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                    notif.type === 'booking_approved' ? 'bg-green-500/20' :
-                    notif.type === 'booking_declined' ? 'bg-red-500/20' :
-                    isDark ? 'bg-accent/20' : 'bg-accent/20'
-                  }`}>
-                    <span className={`material-symbols-outlined text-[20px] ${
-                      notif.type === 'booking_approved' ? 'text-green-500' :
-                      notif.type === 'booking_declined' ? 'text-red-500' :
-                      isDark ? 'text-white' : 'text-primary'
-                    }`}>
-                      {notif.type === 'booking_approved' ? 'check_circle' :
-                       notif.type === 'booking_declined' ? 'cancel' :
-                       'notifications'}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start">
-                      <h4 className={`font-bold text-sm ${notif.is_read ? (isDark ? 'text-white/70' : 'text-primary/70') : (isDark ? 'text-white' : 'text-primary')}`}>
-                        {notif.title}
-                      </h4>
-                      <span className={`text-[10px] ml-2 shrink-0 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
-                        {notif.created_at ? formatDateTimePacific(notif.created_at) : 'Just now'}
-                      </span>
-                    </div>
-                    <p className={`text-xs mt-0.5 ${notif.is_read ? (isDark ? 'text-white/70' : 'text-primary/70') : (isDark ? 'text-white/70' : 'text-primary/70')}`}>
-                      {notif.message}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </SwipeableListItem>
-          ))}
-          </div>
-        );
-      })()}
     </div>
   );
 
@@ -874,21 +551,6 @@ const MemberUpdates: React.FC = () => {
 
       <div className="flex gap-1.5 mb-6">
         <button
-          onClick={() => handleTabChange('activity')}
-          className={`flex-1 py-3 px-2 rounded-xl text-[11px] font-bold uppercase tracking-tight transition-all relative ${
-            activeTab === 'activity'
-              ? 'bg-accent text-primary'
-              : isDark ? 'bg-white/5 text-white/80 hover:bg-white/10' : 'bg-primary/5 text-primary/80 hover:bg-primary/10'
-          }`}
-        >
-          Activity
-          {unreadCount > 0 && activeTab !== 'activity' && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
-        </button>
-        <button
           onClick={() => handleTabChange('announcements')}
           className={`flex-1 py-3 px-2 rounded-xl text-[11px] font-bold uppercase tracking-tight transition-all ${
             activeTab === 'announcements'
@@ -916,7 +578,7 @@ const MemberUpdates: React.FC = () => {
       </div>
 
       <div key={activeTab} className="animate-content-enter">
-        {activeTab === 'activity' ? renderActivityTab() : activeTab === 'announcements' ? renderAnnouncementsTab() : renderNoticesTab()}
+        {activeTab === 'announcements' ? renderAnnouncementsTab() : renderNoticesTab()}
       </div>
     </SwipeablePage>
     </PullToRefresh>
