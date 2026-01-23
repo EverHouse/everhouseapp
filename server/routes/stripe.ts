@@ -3428,4 +3428,45 @@ router.get('/api/stripe/debug-connection', isStaffOrAdmin, async (req: Request, 
   }
 });
 
+/**
+ * GET /api/stripe/customer-sync-status
+ * Get status of MindBody members needing Stripe customer creation
+ */
+router.get('/api/stripe/customer-sync-status', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { getCustomerSyncStatus } = await import('../core/stripe/customerSync');
+    const status = await getCustomerSyncStatus();
+    res.json(status);
+  } catch (error: any) {
+    console.error('[Stripe Customer Sync] Error getting status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/stripe/sync-customers
+ * Create Stripe customers for all MindBody members who don't have one yet
+ * This ONLY creates customer records - no subscriptions or billing
+ */
+router.post('/api/stripe/sync-customers', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    console.log('[Stripe Customer Sync] Manual sync triggered by staff');
+    const { syncStripeCustomersForMindBodyMembers } = await import('../core/stripe/customerSync');
+    const result = await syncStripeCustomersForMindBodyMembers();
+    
+    res.json({
+      success: result.success,
+      created: result.created,
+      linked: result.linked,
+      skipped: result.skipped,
+      errorCount: result.errors.length,
+      errors: result.errors.slice(0, 10),
+      message: `Created ${result.created} new customers, linked ${result.linked} existing customers`,
+    });
+  } catch (error: any) {
+    console.error('[Stripe Customer Sync] Error:', error);
+    res.status(500).json({ error: 'Failed to sync customers' });
+  }
+});
+
 export default router;

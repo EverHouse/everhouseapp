@@ -567,6 +567,17 @@ async function startServer() {
           .then(({ ensureSimulatorOverageProduct }) => ensureSimulatorOverageProduct())
           .then((result) => console.log(`[Stripe] Simulator Overage product ${result.action}`))
           .catch((err: any) => console.error('[Stripe] Simulator Overage setup failed:', err.message));
+        
+        // Pre-create Stripe customers for MindBody members (runs in background)
+        // This ONLY creates customer records - no subscriptions or billing
+        import('./core/stripe/customerSync.js')
+          .then(({ syncStripeCustomersForMindBodyMembers }) => syncStripeCustomersForMindBodyMembers())
+          .then((result) => {
+            if (result.created > 0 || result.linked > 0) {
+              console.log(`[Stripe] Customer sync: created=${result.created}, linked=${result.linked}`);
+            }
+          })
+          .catch((err: any) => console.error('[Stripe] Customer sync failed:', err.message));
       }
     } catch (err: any) {
       console.error('[Stripe] Initialization failed (non-fatal):', err.message);
