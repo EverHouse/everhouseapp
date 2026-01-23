@@ -426,6 +426,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
               onDeny={handleDeny}
               onCheckIn={handleCheckIn}
               onPaymentClick={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
+              onRosterClick={(bookingId) => setRosterModal({ isOpen: true, bookingId })}
               onAssignMember={(booking) => setTrackmanLinkModal({
                 isOpen: true,
                 trackmanBookingId: booking.trackman_booking_id || null,
@@ -471,6 +472,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
               onDeny={handleDeny}
               onCheckIn={handleCheckIn}
               onPaymentClick={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
+              onRosterClick={(bookingId) => setRosterModal({ isOpen: true, bookingId })}
               onAssignMember={(booking) => setTrackmanLinkModal({
                 isOpen: true,
                 trackmanBookingId: booking.trackman_booking_id || null,
@@ -561,6 +563,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
             onDeny={handleDeny}
             onCheckIn={handleCheckIn}
             onPaymentClick={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
+            onRosterClick={(bookingId) => setRosterModal({ isOpen: true, bookingId })}
             onAssignMember={(booking) => setTrackmanLinkModal({
                 isOpen: true,
                 trackmanBookingId: booking.trackman_booking_id || null,

@@ -2392,7 +2392,8 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
         ...b,
         has_unpaid_fees: paymentStatusMap.get(b.id)?.hasUnpaidFees || false,
         total_owed: paymentStatusMap.get(b.id)?.totalOwed || 0,
-        unfilled_slots: unfilledSlots
+        unfilled_slots: unfilledSlots,
+        filled_player_count: filledSlots
       };
     });
     

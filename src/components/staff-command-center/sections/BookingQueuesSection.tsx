@@ -17,6 +17,7 @@ interface BookingQueuesSectionProps {
   onDeny: (request: BookingRequest) => void;
   onCheckIn: (booking: BookingRequest) => void;
   onPaymentClick?: (bookingId: number) => void;
+  onRosterClick?: (bookingId: number) => void;
   onAssignMember?: (booking: BookingRequest) => void;
   onEditBooking?: (booking: BookingRequest) => void;
   variant: 'desktop' | 'desktop-top' | 'desktop-bottom' | 'mobile';
@@ -34,6 +35,7 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
   onDeny,
   onCheckIn,
   onPaymentClick,
+  onRosterClick,
   onAssignMember,
   onEditBooking,
   variant
@@ -158,7 +160,7 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
         <button
           onClick={(e) => { 
             e.stopPropagation(); 
-            onPaymentClick?.(bookingId);
+            onRosterClick?.(bookingId);
           }}
           className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors flex items-center gap-1"
         >
