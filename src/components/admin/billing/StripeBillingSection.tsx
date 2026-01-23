@@ -63,8 +63,24 @@ function formatCurrency(cents: number): string {
   return `$${(Math.abs(cents) / 100).toFixed(2)}`;
 }
 
-function formatDate(timestamp: number): string {
-  return new Date(timestamp * 1000).toLocaleDateString('en-US', {
+function formatDate(timestamp: number | string | undefined): string {
+  if (!timestamp) return 'No date';
+  
+  // Handle both Unix timestamps (seconds) and ISO strings
+  let date: Date;
+  if (typeof timestamp === 'string') {
+    date = new Date(timestamp);
+  } else if (timestamp > 9999999999) {
+    // Milliseconds (13+ digits)
+    date = new Date(timestamp);
+  } else {
+    // Seconds (Unix timestamp)
+    date = new Date(timestamp * 1000);
+  }
+  
+  if (isNaN(date.getTime())) return 'Invalid Date';
+  
+  return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',

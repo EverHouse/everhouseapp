@@ -122,7 +122,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
   const pendingCount = data.pendingRequests.length;
 
   const handleOpenTrackman = () => {
-    window.open('https://booking.trackmanrange.com/', '_blank');
+    window.open('https://login.trackmangolf.com/Account/Login', '_blank');
   };
 
   const handleDeny = async (request: BookingRequest) => {

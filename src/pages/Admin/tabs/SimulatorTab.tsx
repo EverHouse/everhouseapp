@@ -1758,20 +1758,23 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                             <p className="text-sm text-gray-600 dark:text-gray-300 italic mb-3">"{req.notes}"</p>
                                         )}
                                         
+                                        <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-2">
+                                            Book in Trackman to confirm - it will auto-link
+                                        </p>
                                         <div className="flex gap-2">
                                             <button
-                                                onClick={() => { setSelectedRequest(req); setActionModal('approve'); setSelectedBayId(req.resource_id); }}
-                                                className="flex-1 py-2 px-3 bg-green-500 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-1 hover:bg-green-600 transition-colors"
+                                                onClick={() => window.open('https://login.trackmangolf.com/Account/Login', '_blank')}
+                                                className="flex-1 py-2 px-3 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
                                             >
-                                                <span aria-hidden="true" className="material-symbols-outlined text-sm">check</span>
-                                                Approve
+                                                <span aria-hidden="true" className="material-symbols-outlined text-sm">open_in_new</span>
+                                                Open Trackman
                                             </button>
                                             <button
                                                 onClick={() => { setSelectedRequest(req); setActionModal('decline'); }}
-                                                className="flex-1 py-2 px-3 bg-red-500 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-1 hover:bg-red-600 transition-colors"
+                                                className="flex-1 py-2 px-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
                                             >
                                                 <span aria-hidden="true" className="material-symbols-outlined text-sm">close</span>
-                                                Decline
+                                                Deny
                                             </button>
                                         </div>
                                     </div>
