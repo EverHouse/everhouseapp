@@ -194,9 +194,10 @@ const formatJoinDate = (dateStr: string | null | undefined): string => {
     if (!dateStr) return '-';
     try {
         const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return '-';
         return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
     } catch {
-        return dateStr;
+        return '-';
     }
 };
 
