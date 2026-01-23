@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.4.6",
+    date: "2026-01-23",
+    title: "Unified Assign Member Experience",
+    changes: [
+      "Consolidated member assignment into a single modal for consistency across all screens",
+      "Staff Dashboard, Booking Details, and Webhook Events now all use the same assignment flow",
+      "Simplified codebase by removing duplicate modal components"
+    ]
+  },
+  {
     version: "9.4.5",
     date: "2026-01-23",
     title: "Improved Trackman Booking Visibility",

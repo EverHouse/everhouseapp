@@ -4,7 +4,7 @@ import { useData } from '../../contexts/DataContext';
 import { useBottomNav } from '../../contexts/BottomNavContext';
 import PullToRefresh from '../PullToRefresh';
 import { useToast } from '../Toast';
-import { getTodayPacific, formatTime12Hour } from '../../utils/dateUtils';
+import { getTodayPacific, formatTime12Hour, formatDateShort } from '../../utils/dateUtils';
 import { StaffCommandCenterSkeleton } from '../skeletons';
 import { AnimatedPage } from '../motion';
 
@@ -21,7 +21,7 @@ import { CompleteRosterModal } from './modals/CompleteRosterModal';
 import { AddMemberModal } from './modals/AddMemberModal';
 import QrScannerModal from './modals/QrScannerModal';
 import { TrackmanBookingModal } from './modals/TrackmanBookingModal';
-import AssignMemberModal from './modals/AssignMemberModal';
+import { TrackmanLinkModal } from './modals/TrackmanLinkModal';
 import type { StaffCommandCenterProps, BookingRequest, RecentActivity } from './types';
 
 interface OptimisticUpdateRef {
@@ -44,7 +44,15 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
   const [addMemberModalOpen, setAddMemberModalOpen] = useState(false);
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
   const [trackmanModal, setTrackmanModal] = useState<{ isOpen: boolean; booking: BookingRequest | null }>({ isOpen: false, booking: null });
-  const [assignMemberModal, setAssignMemberModal] = useState<{ isOpen: boolean; booking: BookingRequest | null }>({ isOpen: false, booking: null });
+  const [trackmanLinkModal, setTrackmanLinkModal] = useState<{
+    isOpen: boolean;
+    trackmanBookingId: string | null;
+    bayName?: string;
+    bookingDate?: string;
+    timeSlot?: string;
+    matchedBookingId?: number;
+    isRelink?: boolean;
+  }>({ isOpen: false, trackmanBookingId: null });
   
   const optimisticUpdateRef = useRef<OptimisticUpdateRef | null>(null);
 
@@ -178,28 +186,6 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
       throw err;
     }
   };
-
-  const handleAssignMember = useCallback((bookingId: number, memberEmail: string, memberName: string) => {
-    updateTodaysBookings(prev => prev.map(b => 
-      b.id === bookingId 
-        ? { ...b, user_email: memberEmail, user_name: memberName, is_unmatched: false }
-        : b
-    ));
-    
-    const newActivity: RecentActivity = {
-      id: `assign-${bookingId}-${Date.now()}`,
-      type: 'member_assigned',
-      timestamp: new Date().toISOString(),
-      primary_text: memberName,
-      secondary_text: 'Assigned to Trackman booking',
-      icon: 'link'
-    };
-    updateRecentActivity(prev => [newActivity, ...prev]);
-    
-    showToast(`Member ${memberName} assigned to booking`, 'success');
-    window.dispatchEvent(new CustomEvent('booking-action-completed'));
-    refresh();
-  }, [updateTodaysBookings, updateRecentActivity, showToast, refresh]);
 
   const handleApprove = async (request: BookingRequest) => {
     const apiId = typeof request.id === 'string' ? parseInt(String(request.id).replace('cal_', '')) : request.id;
@@ -440,7 +426,15 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
               onDeny={handleDeny}
               onCheckIn={handleCheckIn}
               onPaymentClick={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
-              onAssignMember={(booking) => setAssignMemberModal({ isOpen: true, booking })}
+              onAssignMember={(booking) => setTrackmanLinkModal({
+                isOpen: true,
+                trackmanBookingId: booking.trackman_booking_id || null,
+                bayName: booking.bay_name || `Bay ${booking.resource_id}`,
+                bookingDate: formatDateShort(booking.request_date || booking.slot_date),
+                timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
+                matchedBookingId: Number(booking.id),
+                isRelink: false
+              })}
               variant="desktop-top"
             />
             <TodayScheduleSection
@@ -477,7 +471,15 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
               onDeny={handleDeny}
               onCheckIn={handleCheckIn}
               onPaymentClick={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
-              onAssignMember={(booking) => setAssignMemberModal({ isOpen: true, booking })}
+              onAssignMember={(booking) => setTrackmanLinkModal({
+                isOpen: true,
+                trackmanBookingId: booking.trackman_booking_id || null,
+                bayName: booking.bay_name || `Bay ${booking.resource_id}`,
+                bookingDate: formatDateShort(booking.request_date || booking.slot_date),
+                timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
+                matchedBookingId: Number(booking.id),
+                isRelink: false
+              })}
               variant="desktop-bottom"
             />
             <TodayScheduleSection
@@ -559,7 +561,15 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
             onDeny={handleDeny}
             onCheckIn={handleCheckIn}
             onPaymentClick={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
-            onAssignMember={(booking) => setAssignMemberModal({ isOpen: true, booking })}
+            onAssignMember={(booking) => setTrackmanLinkModal({
+                isOpen: true,
+                trackmanBookingId: booking.trackman_booking_id || null,
+                bayName: booking.bay_name || `Bay ${booking.resource_id}`,
+                bookingDate: formatDateShort(booking.request_date || booking.slot_date),
+                timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
+                matchedBookingId: Number(booking.id),
+                isRelink: false
+              })}
             variant="mobile"
           />
           {/* Upcoming Events & Wellness */}
@@ -598,11 +608,20 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
         onConfirm={handleTrackmanConfirm}
       />
 
-      <AssignMemberModal
-        isOpen={assignMemberModal.isOpen}
-        onClose={() => setAssignMemberModal({ isOpen: false, booking: null })}
-        booking={assignMemberModal.booking}
-        onAssign={handleAssignMember}
+      <TrackmanLinkModal
+        isOpen={trackmanLinkModal.isOpen}
+        onClose={() => setTrackmanLinkModal({ isOpen: false, trackmanBookingId: null })}
+        trackmanBookingId={trackmanLinkModal.trackmanBookingId}
+        bayName={trackmanLinkModal.bayName}
+        bookingDate={trackmanLinkModal.bookingDate}
+        timeSlot={trackmanLinkModal.timeSlot}
+        matchedBookingId={trackmanLinkModal.matchedBookingId}
+        isRelink={trackmanLinkModal.isRelink}
+        onSuccess={() => {
+          showToast('Member assigned to booking', 'success');
+          window.dispatchEvent(new CustomEvent('booking-action-completed'));
+          refresh();
+        }}
       />
 
       {createPortal(

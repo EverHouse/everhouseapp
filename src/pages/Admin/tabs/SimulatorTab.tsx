@@ -16,7 +16,6 @@ import { RosterManager } from '../../../components/booking';
 import { CheckinBillingModal } from '../../../components/staff-command-center/modals/CheckinBillingModal';
 import { CompleteRosterModal } from '../../../components/staff-command-center/modals/CompleteRosterModal';
 import { TrackmanBookingModal } from '../../../components/staff-command-center/modals/TrackmanBookingModal';
-import AssignMemberModal from '../../../components/staff-command-center/modals/AssignMemberModal';
 import { TrackmanLinkModal } from '../../../components/staff-command-center/modals/TrackmanLinkModal';
 import { AnimatedPage } from '../../../components/motion';
 import { TrackmanWebhookEventsSection } from '../../../components/staff-command-center/sections/TrackmanWebhookEventsSection';
@@ -724,7 +723,6 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
     const [billingModal, setBillingModal] = useState<{isOpen: boolean; bookingId: number | null}>({isOpen: false, bookingId: null});
     const [rosterModal, setRosterModal] = useState<{isOpen: boolean; bookingId: number | null}>({isOpen: false, bookingId: null});
     const [trackmanModal, setTrackmanModal] = useState<{ isOpen: boolean; booking: BookingRequest | null }>({ isOpen: false, booking: null });
-    const [assignMemberModal, setAssignMemberModal] = useState<{ isOpen: boolean; booking: BookingRequest | null }>({ isOpen: false, booking: null });
     const [trackmanLinkModal, setTrackmanLinkModal] = useState<{ 
         isOpen: boolean; 
         trackmanBookingId: string | null;
@@ -1009,18 +1007,6 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
             throw err;
         }
     }, [requests, showToast, handleRefresh]);
-
-    const handleAssignMember = useCallback((bookingId: number, memberEmail: string, memberName: string) => {
-        setApprovedBookings(prev => prev.map(b => 
-            b.id === bookingId 
-                ? { ...b, user_email: memberEmail, user_name: memberName, is_unmatched: false }
-                : b
-        ));
-        
-        showToast(`Member ${memberName} assigned to booking`, 'success');
-        window.dispatchEvent(new CustomEvent('booking-action-completed'));
-        handleRefresh();
-    }, [showToast, handleRefresh]);
 
     const handleLinkTrackmanToMember = useCallback((event: {
         trackmanBookingId: string;
@@ -1798,7 +1784,15 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                             )}
                                             
                                             <button
-                                                onClick={() => setAssignMemberModal({ isOpen: true, booking })}
+                                                onClick={() => setTrackmanLinkModal({
+                                                    isOpen: true,
+                                                    trackmanBookingId: booking.trackman_booking_id || null,
+                                                    bayName: bookingResource ? (bookingResource.type === 'conference_room' ? 'Conference Room' : bookingResource.name) : `Bay ${booking.resource_id}`,
+                                                    bookingDate: formatDateShortAdmin(booking.request_date),
+                                                    timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
+                                                    matchedBookingId: Number(booking.id),
+                                                    isRelink: false
+                                                })}
                                                 className="w-full py-2 px-3 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 transition-colors"
                                             >
                                                 <span aria-hidden="true" className="material-symbols-outlined text-sm">person_add</span>
@@ -3080,13 +3074,6 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
               onClose={() => setTrackmanModal({ isOpen: false, booking: null })}
               booking={trackmanModal.booking}
               onConfirm={handleTrackmanConfirm}
-            />
-
-            <AssignMemberModal
-              isOpen={assignMemberModal.isOpen}
-              onClose={() => setAssignMemberModal({ isOpen: false, booking: null })}
-              booking={assignMemberModal.booking}
-              onAssign={handleAssignMember}
             />
 
             <TrackmanLinkModal
