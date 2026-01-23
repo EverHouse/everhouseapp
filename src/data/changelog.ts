@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.4.3",
+    date: "2026-01-23",
+    title: "Trackman Webhook Booking Creation Fixed",
+    changes: [
+      "Fixed critical bug where Trackman webhooks were not creating bookings on the calendar",
+      "All Trackman bookings now appear on the calendar immediately - time slots are blocked automatically",
+      "Fixed 'Link to Member' search - member dropdown now shows results when searching by name",
+      "Staff can now manually link any Trackman booking to a member using the Link to Member button",
+      "Fixed internal references in link-to-member feature so it correctly finds webhook data"
+    ]
+  },
+  {
     version: "9.4.2",
     date: "2026-01-23",
     title: "CSRF Protection Removed",
