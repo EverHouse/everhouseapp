@@ -972,7 +972,7 @@ async function createUnmatchedBookingRequest(
     
     const result = await pool.query(
       `INSERT INTO booking_requests 
-       (slot_date, start_time, end_time, duration_minutes, resource_id,
+       (request_date, start_time, end_time, duration_minutes, resource_id,
         user_email, user_name, status, trackman_booking_id, trackman_external_id,
         trackman_customer_notes, is_unmatched, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'approved', $8, $9, $10, true, NOW(), NOW())

@@ -663,9 +663,10 @@ router.post('/api/bookings/link-trackman-to-member', isStaffOrAdmin, async (req,
     }
     
     const result = await db.transaction(async (tx) => {
+      // Check for existing booking by Trackman's booking ID (stored in trackmanBookingId column)
       const [existingBooking] = await tx.select()
         .from(bookingRequests)
-        .where(eq(bookingRequests.trackmanExternalId, trackman_booking_id));
+        .where(eq(bookingRequests.trackmanBookingId, trackman_booking_id));
       
       if (existingBooking) {
         const [updated] = await tx.update(bookingRequests)
@@ -685,7 +686,7 @@ router.post('/api/bookings/link-trackman-to-member', isStaffOrAdmin, async (req,
       
       const [webhookLog] = await tx.execute(sql`
         SELECT payload, trackman_booking_id 
-        FROM trackman_webhook_log 
+        FROM trackman_webhook_events 
         WHERE trackman_booking_id = ${trackman_booking_id}
         ORDER BY created_at DESC
         LIMIT 1
@@ -737,7 +738,7 @@ router.post('/api/bookings/link-trackman-to-member', isStaffOrAdmin, async (req,
           startTime,
           endTime,
           status: 'approved',
-          trackmanExternalId: trackman_booking_id,
+          trackmanBookingId: trackman_booking_id,
           isUnmatched: false,
           staffNotes: `[Linked from Trackman webhook by staff: ${member_name}]`,
           createdAt: new Date(),
@@ -746,7 +747,7 @@ router.post('/api/bookings/link-trackman-to-member', isStaffOrAdmin, async (req,
         .returning();
       
       await tx.execute(sql`
-        UPDATE trackman_webhook_log 
+        UPDATE trackman_webhook_events 
         SET matched_booking_id = ${newBooking.id}
         WHERE trackman_booking_id = ${trackman_booking_id}
       `);
