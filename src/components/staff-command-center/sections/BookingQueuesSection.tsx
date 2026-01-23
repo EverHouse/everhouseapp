@@ -120,11 +120,7 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
         </span>
       );
     }
-    return (
-      <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 rounded-full">
-        Conf
-      </span>
-    );
+    return null;
   };
 
   const getSmartActionButton = (booking: BookingRequest) => {
@@ -320,15 +316,7 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
         aria-label={hasUnmatchedBookings ? 'Upcoming Bookings - some need member assignment' : 'Upcoming Bookings'}
       >
         <div className="flex items-center justify-between mb-3 lg:mb-4 flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <h3 className="font-bold text-primary dark:text-white">Upcoming Bookings</h3>
-            {hasUnmatchedBookings && (
-              <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs">link_off</span>
-                Unmatched
-              </span>
-            )}
-          </div>
+          <h3 className="font-bold text-primary dark:text-white">Upcoming Bookings</h3>
           <button onClick={() => onTabChange('simulator')} className="text-xs text-primary/80 dark:text-white/80 hover:underline">View all</button>
         </div>
         {mergedUpcomingBookings.length === 0 ? (
