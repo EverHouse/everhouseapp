@@ -215,16 +215,16 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
           {webhookStats && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
               <div className="p-2 md:p-3 bg-white/50 dark:bg-white/5 rounded-xl text-center">
-                <p className="text-xl md:text-2xl font-bold text-primary dark:text-white">
-                  {webhookStats.webhookStats?.total_events || 0}
+                <p className="text-xl md:text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {webhookStats.webhookStats?.auto_confirmed || 0}
                 </p>
-                <p className="text-xs text-primary/60 dark:text-white/60">Total Events</p>
+                <p className="text-xs text-primary/60 dark:text-white/60">Auto Confirmed</p>
               </div>
               <div className="p-2 md:p-3 bg-white/50 dark:bg-white/5 rounded-xl text-center">
                 <p className="text-xl md:text-2xl font-bold text-green-600 dark:text-green-400">
-                  {webhookStats.webhookStats?.auto_approved || 0}
+                  {webhookStats.webhookStats?.manually_linked || 0}
                 </p>
-                <p className="text-xs text-primary/60 dark:text-white/60">Auto-Approved</p>
+                <p className="text-xs text-primary/60 dark:text-white/60">Manually Linked</p>
               </div>
               <div className="p-2 md:p-3 bg-white/50 dark:bg-white/5 rounded-xl text-center">
                 <p className="text-xl md:text-2xl font-bold text-amber-600 dark:text-amber-400">
@@ -234,9 +234,9 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
               </div>
               <div className="p-2 md:p-3 bg-white/50 dark:bg-white/5 rounded-xl text-center">
                 <p className="text-xl md:text-2xl font-bold text-red-600 dark:text-red-400">
-                  {webhookStats.webhookStats?.errors || 0}
+                  {webhookStats.webhookStats?.cancelled || 0}
                 </p>
-                <p className="text-xs text-primary/60 dark:text-white/60">Errors</p>
+                <p className="text-xs text-primary/60 dark:text-white/60">Cancelled</p>
               </div>
             </div>
           )}
