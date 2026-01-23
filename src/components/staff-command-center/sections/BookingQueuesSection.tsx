@@ -18,6 +18,7 @@ interface BookingQueuesSectionProps {
   onCheckIn: (booking: BookingRequest) => void;
   onPaymentClick?: (bookingId: number) => void;
   onAssignMember?: (booking: BookingRequest) => void;
+  onEditBooking?: (booking: BookingRequest) => void;
   variant: 'desktop' | 'desktop-top' | 'desktop-bottom' | 'mobile';
 }
 
@@ -34,6 +35,7 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
   onCheckIn,
   onPaymentClick,
   onAssignMember,
+  onEditBooking,
   variant
 }) => {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
@@ -75,22 +77,132 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
     return loadingAction === actionKey || actionInProgress === actionKey;
   }, [loadingAction, actionInProgress]);
 
-  const upcomingBookings = useMemo(() => {
-    const nowTime = getNowTimePacific(); // Returns "HH:MM" format
-    const todayPacific = getTodayPacific(); // Returns "YYYY-MM-DD" format
-    return todaysBookings.filter(booking => {
-      // Include all future dates
+  const mergedUpcomingBookings = useMemo(() => {
+    const nowTime = getNowTimePacific();
+    const todayPacific = getTodayPacific();
+    
+    const scheduledBookings = todaysBookings.filter(booking => {
       if (booking.request_date > todayPacific) return true;
-      // For today, include if booking hasn't ended yet
       if (booking.request_date === todayPacific && booking.end_time > nowTime) return true;
       return false;
-    }).sort((a, b) => {
+    }).map(b => ({ ...b, is_unmatched: false }));
+    
+    const unmatchedWithFlag = unmatchedBookings.map(b => ({
+      ...b,
+      is_unmatched: true,
+      request_date: b.request_date || b.slot_date || todayPacific
+    }));
+    
+    const allBookings = [...scheduledBookings, ...unmatchedWithFlag];
+    
+    return allBookings.sort((a, b) => {
       if (a.request_date !== b.request_date) return a.request_date.localeCompare(b.request_date);
       return a.start_time.localeCompare(b.start_time);
     });
-  }, [todaysBookings]);
+  }, [todaysBookings, unmatchedBookings]);
 
   const isDesktopGrid = variant === 'desktop-top' || variant === 'desktop-bottom';
+
+  const getStatusBadge = (booking: BookingRequest) => {
+    if (booking.status === 'attended') {
+      return (
+        <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 rounded-full">
+          Checked In
+        </span>
+      );
+    }
+    if (booking.is_unmatched) {
+      return (
+        <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full">
+          Needs Assignment
+        </span>
+      );
+    }
+    return (
+      <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 rounded-full">
+        Conf
+      </span>
+    );
+  };
+
+  const getSmartActionButton = (booking: BookingRequest) => {
+    const isCheckingIn = isActionLoading(`checkin-${booking.id}`);
+    const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
+    
+    if (booking.status === 'attended') {
+      return (
+        <span className="text-xs px-2 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-lg font-medium flex items-center gap-1">
+          <span className="material-symbols-outlined text-sm">check_circle</span>
+          Checked In
+        </span>
+      );
+    }
+    
+    if (booking.is_unmatched) {
+      return (
+        <button
+          onClick={(e) => { e.stopPropagation(); onAssignMember?.(booking); }}
+          className="text-xs px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors flex items-center gap-1"
+        >
+          <span className="material-symbols-outlined text-sm">link</span>
+          Assign Member
+        </button>
+      );
+    }
+    
+    const declaredPlayers = booking.declared_player_count ?? 1;
+    const filledPlayers = booking.filled_player_count ?? 0;
+    
+    if (declaredPlayers > 0 && filledPlayers < declaredPlayers) {
+      return (
+        <button
+          onClick={(e) => { 
+            e.stopPropagation(); 
+            onPaymentClick?.(bookingId);
+          }}
+          className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors flex items-center gap-1"
+        >
+          <span className="material-symbols-outlined text-sm">group</span>
+          {filledPlayers}/{declaredPlayers} Players
+        </button>
+      );
+    }
+    
+    if (booking.has_unpaid_fees && (booking.total_owed ?? 0) > 0) {
+      return (
+        <button
+          onClick={(e) => { 
+            e.stopPropagation(); 
+            onPaymentClick?.(bookingId);
+          }}
+          className="text-xs px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors flex items-center gap-1"
+        >
+          <span className="material-symbols-outlined text-sm">payments</span>
+          Charge ${(booking.total_owed || 0).toFixed(0)}
+        </button>
+      );
+    }
+    
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); executeCheckIn(booking); }}
+        disabled={isCheckingIn}
+        className="text-xs px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 flex items-center gap-1"
+      >
+        {isCheckingIn ? (
+          <>
+            <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+            Checking...
+          </>
+        ) : (
+          <>
+            <span className="material-symbols-outlined text-sm">login</span>
+            Check In
+          </>
+        )}
+      </button>
+    );
+  };
 
   const PendingRequestsCard = () => (
     <div 
@@ -196,119 +308,88 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
     </div>
   );
 
-  const UpcomingBookingsCard = () => (
-    <div className={`${isDesktopGrid ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4`}>
-      <div className="flex items-center justify-between mb-3 lg:mb-4 flex-shrink-0">
-        <h3 className="font-bold text-primary dark:text-white">Upcoming Bookings</h3>
-        <button onClick={() => onTabChange('simulator')} className="text-xs text-primary/80 dark:text-white/80 hover:underline">View all</button>
-      </div>
-      {upcomingBookings.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center py-8">
-          <EmptyState icon="calendar_today" title="No upcoming bookings" variant="compact" />
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {upcomingBookings.map((booking, index) => {
-            const isCheckingIn = isActionLoading(`checkin-${booking.id}`);
-            
-            return (
-              <GlassListRow 
-                key={booking.id} 
-                onClick={() => onTabChange('simulator')}
-                className="animate-slide-in-up"
-                style={{ animationDelay: `${index * 50}ms` }}
-              >
-                <DateBlock dateStr={booking.request_date} today={today} />
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-primary dark:text-white truncate">{booking.user_name}</p>
-                  <p className="text-xs text-primary/80 dark:text-white/80">
-                    {formatTime12Hour(booking.start_time)} - {formatTime12Hour(booking.end_time)} • {booking.bay_name}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {booking.status === 'attended' ? (
-                    <span className="text-xs px-2 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-lg font-medium flex items-center gap-1">
-                      <span className="material-symbols-outlined text-sm">check_circle</span>
-                      Checked In
-                    </span>
-                  ) : booking.has_unpaid_fees ? (
-                    <button
-                      onClick={(e) => { 
-                        e.stopPropagation(); 
-                        const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
-                        onPaymentClick?.(bookingId);
-                      }}
-                      className="text-xs px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors flex items-center gap-1"
-                    >
-                      <span className="material-symbols-outlined text-sm">payments</span>
-                      ${(booking.total_owed || 0).toFixed(0)} Due
-                    </button>
-                  ) : (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); executeCheckIn(booking); }}
-                      disabled={isCheckingIn}
-                      className="text-xs px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 flex items-center gap-1"
-                    >
-                      {isCheckingIn ? (
-                        <>
-                          <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-                          Checking...
-                        </>
-                      ) : 'Check In'}
-                    </button>
-                  )}
-                  <span className="material-symbols-outlined text-base text-primary/70 dark:text-white/70">chevron_right</span>
-                </div>
-              </GlassListRow>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-
-  const UnmatchedBookingsCard = () => (
-    unmatchedBookings.length > 0 ? (
-      <div className={`${isDesktopGrid ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-amber-50/80 dark:bg-amber-500/10 backdrop-blur-lg border border-amber-300 dark:border-amber-500/30 rounded-2xl p-4`}>
+  const UpcomingBookingsCard = () => {
+    const hasUnmatchedBookings = mergedUpcomingBookings.some(b => b.is_unmatched);
+    
+    return (
+      <div 
+        className={`${isDesktopGrid ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4`}
+        role="region"
+        aria-label={hasUnmatchedBookings ? 'Upcoming Bookings - some need member assignment' : 'Upcoming Bookings'}
+      >
         <div className="flex items-center justify-between mb-3 lg:mb-4 flex-shrink-0">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-amber-600 dark:text-amber-400">link_off</span>
-            <h3 className="font-bold text-amber-700 dark:text-amber-400">Unmatched Trackman Bookings</h3>
+            <h3 className="font-bold text-primary dark:text-white">Upcoming Bookings</h3>
+            {hasUnmatchedBookings && (
+              <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full flex items-center gap-1">
+                <span className="material-symbols-outlined text-xs">link_off</span>
+                Unmatched
+              </span>
+            )}
           </div>
-          <span className="text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-500/20 px-2 py-1 rounded-full">
-            {unmatchedBookings.length} need attention
-          </span>
+          <button onClick={() => onTabChange('simulator')} className="text-xs text-primary/80 dark:text-white/80 hover:underline">View all</button>
         </div>
-        <div className="space-y-2 overflow-y-auto flex-1">
-          {unmatchedBookings.map((booking, index) => (
-            <GlassListRow 
-              key={booking.id}
-              onClick={() => onAssignMember?.(booking)}
-              className="animate-slide-in-up border-amber-200 dark:border-amber-500/30"
-              style={{ animationDelay: `${index * 50}ms` }}
-            >
-              <DateBlock dateStr={booking.request_date || booking.slot_date || ''} today={today} />
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm text-amber-700 dark:text-amber-400 truncate">
-                  {booking.user_name || 'Unknown Customer'}
-                </p>
-                <p className="text-xs text-amber-600/80 dark:text-amber-400/80">
-                  {formatTime12Hour(booking.start_time)} - {formatTime12Hour(booking.end_time)} • {booking.bay_name || `Bay ${booking.resource_id}`}
-                </p>
-              </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); onAssignMember?.(booking); }}
-                className="py-1.5 px-3 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1"
-              >
-                <span className="material-symbols-outlined text-sm">link</span>
-                Assign Member
-              </button>
-            </GlassListRow>
-          ))}
-        </div>
+        {mergedUpcomingBookings.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center py-8">
+            <EmptyState icon="calendar_today" title="No upcoming bookings" variant="compact" />
+          </div>
+        ) : (
+          <div className="space-y-2 overflow-y-auto flex-1">
+            {mergedUpcomingBookings.map((booking, index) => {
+              const isUnmatched = booking.is_unmatched;
+              const cardClass = isUnmatched 
+                ? 'bg-amber-50/80 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30' 
+                : '';
+              
+              return (
+                <GlassListRow 
+                  key={`${isUnmatched ? 'unmatched-' : ''}${booking.id}`}
+                  onClick={() => onTabChange('simulator')}
+                  className={`flex-col !items-stretch !gap-2 animate-slide-in-up ${cardClass}`}
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
+                  <div className="flex items-start gap-3">
+                    <DateBlock dateStr={booking.request_date || booking.slot_date || ''} today={today} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className={`font-semibold text-sm truncate ${isUnmatched ? 'text-amber-700 dark:text-amber-400' : 'text-primary dark:text-white'}`}>
+                          {booking.user_name || 'Unknown Customer'}
+                        </p>
+                        {getStatusBadge(booking)}
+                      </div>
+                      <p className={`text-xs ${isUnmatched ? 'text-amber-600/80 dark:text-amber-400/80' : 'text-primary/80 dark:text-white/80'}`}>
+                        {formatTime12Hour(booking.start_time)} - {formatTime12Hour(booking.end_time)}
+                      </p>
+                      <p className={`text-xs ${isUnmatched ? 'text-amber-600/70 dark:text-amber-400/70' : 'text-primary/70 dark:text-white/70'}`}>
+                        {booking.bay_name || `Bay ${booking.resource_id}`}
+                        {booking.trackman_booking_id && (
+                          <span className="ml-2 text-[10px] text-orange-600 dark:text-orange-400">
+                            TM: {booking.trackman_booking_id}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {getSmartActionButton(booking)}
+                      {onEditBooking && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onEditBooking(booking); }}
+                          className="p-1.5 text-primary/60 dark:text-white/60 hover:text-primary dark:hover:text-white hover:bg-primary/10 dark:hover:bg-white/10 rounded-lg transition-colors"
+                          aria-label="Edit booking"
+                        >
+                          <span className="material-symbols-outlined text-base">edit</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </GlassListRow>
+              );
+            })}
+          </div>
+        )}
       </div>
-    ) : null
-  );
+    );
+  };
 
   if (variant === 'desktop-top') {
     return <PendingRequestsCard />;
@@ -322,7 +403,6 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
     return (
       <>
         <PendingRequestsCard />
-        <UnmatchedBookingsCard />
         <UpcomingBookingsCard />
       </>
     );
@@ -331,7 +411,6 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
   return (
     <>
       <PendingRequestsCard />
-      <UnmatchedBookingsCard />
       <UpcomingBookingsCard />
     </>
   );

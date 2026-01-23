@@ -17,6 +17,13 @@ export interface BookingRequest {
   created_at?: string;
   has_conflict?: boolean;
   conflicting_booking_name?: string | null;
+  declared_player_count?: number | null;
+  guest_count?: number | null;
+  is_unmatched?: boolean;
+  trackman_booking_id?: string | null;
+  trackman_player_count?: number | null;
+  filled_player_count?: number;
+  slot_date?: string;
 }
 
 export interface Tour {
