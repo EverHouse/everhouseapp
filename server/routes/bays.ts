@@ -2212,7 +2212,8 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
       resource_name: resources.name,
       trackman_booking_id: bookingRequests.trackmanBookingId,
       declared_player_count: bookingRequests.declaredPlayerCount,
-      member_notes: bookingRequests.memberNotes
+      member_notes: bookingRequests.memberNotes,
+      guest_count: bookingRequests.guestCount
     })
     .from(bookingRequests)
     .leftJoin(resources, eq(bookingRequests.resourceId, resources.id))
@@ -2276,6 +2277,8 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
     // Query unpaid fees for each booking's session
     // Use a subquery to get participant fees without cross-product duplication
     let paymentStatusMap = new Map<number, { hasUnpaidFees: boolean; totalOwed: number }>();
+    let filledSlotsMap = new Map<number, number>();
+    
     if (bookingIds.length > 0) {
       const paymentStatusResult = await pool.query(`
         SELECT 
@@ -2298,14 +2301,42 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
           totalOwed
         });
       }
+      
+      // Query actual filled slots (booking_members + booking_guests counts)
+      const filledSlotsResult = await pool.query(`
+        SELECT 
+          br.id as booking_id,
+          (SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id) as member_count,
+          (SELECT COUNT(*) FROM booking_guests bg WHERE bg.booking_id = br.id) as guest_count
+        FROM booking_requests br
+        WHERE br.id = ANY($1)
+      `, [bookingIds]);
+      
+      for (const row of filledSlotsResult.rows) {
+        const memberCount = parseInt(row.member_count) || 0;
+        const guestCount = parseInt(row.guest_count) || 0;
+        filledSlotsMap.set(row.booking_id, memberCount + guestCount);
+      }
     }
     
-    // Enrich DB results with payment status
-    const enrichedDbResult = dbResult.map(b => ({
-      ...b,
-      has_unpaid_fees: paymentStatusMap.get(b.id)?.hasUnpaidFees || false,
-      total_owed: paymentStatusMap.get(b.id)?.totalOwed || 0
-    }));
+    // Enrich DB results with payment status and unfilled slots
+    const enrichedDbResult = dbResult.map(b => {
+      const declaredPlayers = b.declared_player_count || 1;
+      // Use actual counts from booking_members + booking_guests tables if available
+      // Fall back to legacy guest_count field if no entries in new tables
+      const actualFilledSlots = filledSlotsMap.get(b.id);
+      const filledSlots = actualFilledSlots !== undefined && actualFilledSlots > 0
+        ? actualFilledSlots
+        : 1 + (b.guest_count || 0); // Legacy: booker + guests from old field
+      const unfilledSlots = Math.max(0, declaredPlayers - filledSlots);
+      
+      return {
+        ...b,
+        has_unpaid_fees: paymentStatusMap.get(b.id)?.hasUnpaidFees || false,
+        total_owed: paymentStatusMap.get(b.id)?.totalOwed || 0,
+        unfilled_slots: unfilledSlots
+      };
+    });
     
     // Merge DB results with calendar bookings
     const allBookings = [...enrichedDbResult, ...calendarBookings]
