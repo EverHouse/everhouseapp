@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.4.11",
+    date: "2026-01-23",
+    title: "Unified Booking Queue with Smart Actions",
+    changes: [
+      "Redesigned booking cards in Queue tab with detailed info: name, date/time, bay, and Trackman ID",
+      "Smart action buttons adapt to booking state: Check In, X/Y Players, Charge $X, or Assign Member",
+      "Clicking 'X/Y Players' now opens roster management modal to add players",
+      "Unmatched Trackman bookings merged into scheduled list with amber styling for visibility",
+      "Booking cards show status badges: Checked In (green), Confirmed (blue), Needs Assignment (amber)"
+    ]
+  },
+  {
     version: "9.4.10",
     date: "2026-01-23",
     title: "Member Notifications & Improved Search",
