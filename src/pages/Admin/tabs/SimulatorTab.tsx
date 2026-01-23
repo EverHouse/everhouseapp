@@ -1926,7 +1926,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                         <div className="w-full px-1 sm:px-2 pb-4">
                             <div className="w-full">
                             <div className="grid gap-0.5 w-full" style={{ gridTemplateColumns: `minmax(32px, 0.6fr) repeat(${resources.length}, minmax(0, 1fr))` }}>
-                                <div className="h-8 sm:h-10 sticky top-0 z-20 bg-[#1a1f1a] dark:bg-[#1a1f1a] flex items-center justify-center text-white/70 text-[10px] sm:text-xs font-medium">
+                                <div className="h-8 sm:h-10 sticky top-0 z-20 bg-white dark:bg-[#1a1f1a] flex items-center justify-center text-[10px] sm:text-xs font-bold text-primary dark:text-white rounded-t-lg border border-gray-200 dark:border-white/25">
                                     <span className="hidden sm:inline">Time</span>
                                     <span className="sm:hidden">T</span>
                                 </div>
