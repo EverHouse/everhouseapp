@@ -37,4 +37,6 @@ const Avatar: React.FC<AvatarProps> = ({ name, email, size = 'md', className = '
   );
 };
 
-export default Avatar;
+// ⚡ Bolt: Memoize Avatar to prevent unnecessary re-renders when parent components update.
+// This is a pure component, so it will only re-render if its props change.
+export default React.memo(Avatar);
