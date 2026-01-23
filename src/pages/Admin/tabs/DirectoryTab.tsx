@@ -702,7 +702,7 @@ const DirectoryTab: React.FC = () => {
                 </div>
             )}
 
-            <div className="mb-6 space-y-3 animate-content-enter-delay-1 sticky top-0 z-10 bg-white dark:bg-surface-dark pt-2 pb-3">
+            <div className="mb-6 space-y-3 animate-content-enter-delay-1 sticky top-0 z-10 bg-white dark:bg-surface-dark pt-2 pb-3 rounded-xl">
                 {/* Search - only show for active/former tabs */}
                 {memberTab !== 'visitors' && (
                 <div className="relative">
@@ -1154,7 +1154,7 @@ const DirectoryTab: React.FC = () => {
             {!formerLoading && memberTab !== 'visitors' && filteredList.length > 0 && (
             <div className="hidden md:flex flex-col flex-1 min-h-0 overflow-hidden">
                 {/* Header row - fixed */}
-                <div className="flex bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/20 shrink-0">
+                <div className="flex bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/20 shrink-0 rounded-t-xl overflow-hidden">
                     <SortableHeader field="name" label="Name" width="15%" />
                     <SortableHeader field="tier" label="Tier" width="20%" />
                     <SortableHeader field="visits" label="Visits" width="8%" className="text-center" />
