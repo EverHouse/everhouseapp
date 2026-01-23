@@ -1498,7 +1498,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
 
     return (
             <AnimatedPage className="flex flex-col">
-                <div className="w-full bg-white dark:bg-surface-dark rounded-2xl shadow-lg border border-gray-200 dark:border-white/25 flex flex-col lg:min-h-[600px] lg:max-h-[calc(100vh-220px)]">
+                <div className="w-full bg-white dark:bg-surface-dark rounded-2xl shadow-lg border border-gray-200 dark:border-white/25 flex flex-col lg:h-[calc(100vh-220px)] overflow-hidden">
                 <div className="lg:hidden flex items-center justify-between border-b border-gray-200 dark:border-white/25 mb-0 animate-content-enter-delay-1 px-4 py-3">
                     <div className="flex">
                         <button
