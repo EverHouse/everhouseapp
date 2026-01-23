@@ -33,7 +33,7 @@ The application features a React 19 frontend with Vite, styled using Tailwind CS
 - **Modular Architecture**: Components like AdminDashboard and StaffCommandCenter are modular.
 - **Timezone Handling**: All date/time operations prioritize America/Los_Angeles timezone.
 - **Member Management**: Supports member tiers, tags, comprehensive directory, and unified billing groups (family and corporate) with primary payer and add-on members.
-- **Booking System**: Supports "Request & Hold," conflict detection, staff/member initiated bookings, multi-member bookings, and calendar management. Includes guardian consent for minors.
+- **Booking System**: Supports "Request & Hold," conflict detection, staff/member initiated bookings, multi-member bookings, and calendar management. Includes guardian consent for minors. Booking creation uses database transactions with row-level locking to prevent race conditions when checking daily limits.
 - **Trackman Webhook Integration**: Real-time booking synchronization via webhooks. Secure endpoint (`/api/webhooks/trackman`) with bay serial mapping (24120062→Bay 1, 23510044→Bay 2, 24070104→Bay 3, 24080064→Bay 4). **Simplified Flow**: Member requests → Staff sees request → Staff books in Trackman portal → Webhook auto-confirms (±15 min time tolerance). Features: time matching updates our records to match Trackman's actual times; bay conflict detection warns staff of overlapping bookings; cancelled request handling links Trackman ID but keeps cancelled + refunds guest passes; auto-expiry scheduler (hourly) expires pending requests past their time. Unmatched bookings queue for staff resolution with "Remember Email" feature. Staff get toast notifications when bookings auto-confirm.
 - **Linked Email Addresses**: Supports alternate email addresses for members to facilitate automatic booking creation. Trackman import auto-learns email associations when M: entries are matched by name but have unrecognized emails.
 - **Security**: Role-based access control with `isAdmin` and `isStaffOrAdmin` middleware.
@@ -62,7 +62,8 @@ The application features a React 19 frontend with Vite, styled using Tailwind CS
 - **PWA Gesture Handling**: Edge swipe gestures are disabled in standalone PWA mode.
 - **Corporate Membership**: Supports unified billing groups, volume pricing, corporate checkout, HubSpot company sync, and individual tracking within groups.
 - **Data Integrity Architecture**: Stripe as the source of truth for billing, transaction rollback for group member operations, fail-fast on Stripe errors, webhook idempotency, and automatic status sync between Stripe and database. Dual-source active tracking using HubSpot and Stripe. Tier sync utility for consistency. Database pool client management ensures proper release.
-- **Scheduled Maintenance**: Daily session cleanup (2am Pacific), webhook log cleanup (4am Pacific, 30-day retention), Stripe reconciliation (5am Pacific), and grace period checks (10am Pacific).
+- **Scheduled Maintenance**: Daily session cleanup (2am Pacific), webhook log cleanup (4am Pacific, 30-day retention), Stripe reconciliation (5am Pacific), and grace period checks (10am Pacific). All schedulers are modularized in `server/schedulers/` for maintainability.
+- **Dynamic Resource Lookup**: Conference room and bay IDs are fetched from the database dynamically rather than hardcoded, allowing resource configuration changes without code updates.
 
 ## External Dependencies
 - **Stripe Payments**: For in-app payment collection, subscription management, and webhook processing.
