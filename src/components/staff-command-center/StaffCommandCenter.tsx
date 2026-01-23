@@ -16,7 +16,6 @@ import { TodayScheduleSection } from './sections/TodayScheduleSection';
 import { ResourcesSection, NoticeBoardWidget } from './sections/ResourcesSection';
 import { AlertsCard } from './sections/AlertsCard';
 import { QuickActionsGrid } from './sections/QuickActionsGrid';
-import { TrackmanWebhookEventsSection } from './sections/TrackmanWebhookEventsSection';
 import { CheckinBillingModal } from './modals/CheckinBillingModal';
 import { CompleteRosterModal } from './modals/CompleteRosterModal';
 import { AddMemberModal } from './modals/AddMemberModal';
@@ -423,10 +422,6 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
             />
           </div>
 
-          {/* Row 3: Trackman Webhook Events (full width) */}
-          <div className="col-span-3">
-            <TrackmanWebhookEventsSection compact={false} />
-          </div>
         </div>
 
         {/* Mobile Layout - Order: Next Tour/Event → Notice Board → Alerts → Facility Status → Booking Requests → Upcoming Bookings → Upcoming Events → Upcoming Wellness */}
@@ -486,8 +481,6 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
             onPaymentClick={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
             variant="mobile"
           />
-          {/* Trackman Webhook Events */}
-          <TrackmanWebhookEventsSection compact={true} />
           {/* Upcoming Events & Wellness */}
           <TodayScheduleSection
             upcomingTours={data.upcomingTours}

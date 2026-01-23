@@ -16,6 +16,7 @@ import { RosterManager } from '../../../components/booking';
 import { CheckinBillingModal } from '../../../components/staff-command-center/modals/CheckinBillingModal';
 import { CompleteRosterModal } from '../../../components/staff-command-center/modals/CompleteRosterModal';
 import { AnimatedPage } from '../../../components/motion';
+import { TrackmanWebhookEventsSection } from '../../../components/staff-command-center/sections/TrackmanWebhookEventsSection';
 
 interface BookingRequest {
     id: number | string;
@@ -2965,6 +2966,12 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
               </div>
             </ModalShell>
                 </div>
+                
+                {/* Trackman Webhook Events Section */}
+                <div className="mt-6">
+                  <TrackmanWebhookEventsSection compact={false} />
+                </div>
+                
                 <FloatingActionButton onClick={() => setShowManualBooking(true)} color="brand" label="Create manual booking" />
             </AnimatedPage>
     );
