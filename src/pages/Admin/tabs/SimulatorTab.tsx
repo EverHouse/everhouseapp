@@ -1819,74 +1819,56 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                             }
                                                         ]}
                                                     >
-                                                        <div className={`p-3 rounded-xl animate-pop-in ${
+                                                        <div className={`p-4 rounded-2xl animate-pop-in ${
                                                             isUnmatched 
-                                                                ? 'bg-amber-50/80 dark:bg-amber-500/10 border border-dashed border-amber-300 dark:border-amber-500/30' 
+                                                                ? 'bg-amber-50/80 dark:bg-amber-500/10 border-2 border-dashed border-amber-300 dark:border-amber-500/30' 
                                                                 : 'glass-card border border-primary/10 dark:border-white/25'
                                                         }`} style={{animationDelay: `${0.2 + index * 0.03}s`}}>
-                                                            <div className="flex items-start gap-3">
-                                                                {/* Date Block */}
-                                                                <div className={`flex-shrink-0 w-14 h-14 rounded-xl flex flex-col items-center justify-center ${
-                                                                    isToday 
-                                                                        ? 'bg-primary dark:bg-primary/80 text-white' 
-                                                                        : isUnmatched
-                                                                            ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
-                                                                            : 'bg-primary/10 dark:bg-white/10 text-primary dark:text-white'
-                                                                }`}>
-                                                                    {isToday ? (
-                                                                        <span className="text-[10px] font-bold uppercase tracking-wider">Today</span>
-                                                                    ) : (
-                                                                        <>
-                                                                            <span className="text-[10px] font-medium uppercase tracking-wide opacity-80">
-                                                                                {new Date(booking.request_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' })}
-                                                                            </span>
-                                                                            <span className="text-lg font-bold leading-none">
-                                                                                {new Date(booking.request_date + 'T12:00:00').getDate()}
-                                                                            </span>
-                                                                        </>
-                                                                    )}
-                                                                </div>
-                                                                {/* Booking Details */}
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex items-center gap-2 mb-0.5">
-                                                                        {isUnmatched ? (
-                                                                            <span className="px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full">
-                                                                                Needs Assignment
-                                                                            </span>
-                                                                        ) : (
-                                                                            <>
-                                                                                <p className="font-semibold text-sm truncate text-primary dark:text-white">
-                                                                                    {displayName}
-                                                                                </p>
-                                                                                {(booking as any).tier && <TierBadge tier={(booking as any).tier} size="sm" />}
-                                                                                {booking.status === 'attended' && (
-                                                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400">
-                                                                                        Checked In
-                                                                                    </span>
-                                                                                )}
-                                                                                {isConferenceRoom && (
-                                                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400">
-                                                                                        Conf
-                                                                                    </span>
-                                                                                )}
-                                                                            </>
-                                                                        )}
-                                                                    </div>
-                                                                    <p className={`text-xs ${isUnmatched ? 'text-amber-600/80 dark:text-amber-400/80' : 'text-primary/80 dark:text-white/80'}`}>
-                                                                        {formatTime12Hour(booking.start_time)} - {formatTime12Hour(booking.end_time)}
-                                                                    </p>
-                                                                    <p className={`text-xs ${isUnmatched ? 'text-amber-600/70 dark:text-amber-400/70' : 'text-primary/70 dark:text-white/70'}`}>
-                                                                        {booking.bay_name || `Bay ${booking.resource_id}`}
-                                                                        {booking.trackman_booking_id && (
-                                                                            <span className="ml-2 text-[10px] text-orange-600 dark:text-orange-400">
-                                                                                TM: {booking.trackman_booking_id}
+                                                            {/* Header: Name/Badge + Status */}
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                {isUnmatched ? (
+                                                                    <span className="px-2.5 py-1 text-xs font-semibold bg-amber-200 dark:bg-amber-500/30 text-amber-700 dark:text-amber-400 rounded-lg">
+                                                                        Needs Assignment
+                                                                    </span>
+                                                                ) : (
+                                                                    <>
+                                                                        <p className="font-semibold text-base text-primary dark:text-white">
+                                                                            {displayName}
+                                                                        </p>
+                                                                        {(booking as any).tier && <TierBadge tier={(booking as any).tier} size="sm" />}
+                                                                        {booking.status === 'attended' && (
+                                                                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400">
+                                                                                Checked In
                                                                             </span>
                                                                         )}
-                                                                    </p>
-                                                                </div>
-                                                                {/* Action Buttons */}
-                                                                <div className="flex items-center gap-2 flex-shrink-0">
-                                                            <div className="flex items-center gap-2">
+                                                                        {isConferenceRoom && (
+                                                                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400">
+                                                                                Conf
+                                                                            </span>
+                                                                        )}
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                            
+                                                            {/* Date & Time */}
+                                                            <p className={`text-sm mb-1 ${isUnmatched ? 'text-amber-700 dark:text-amber-400' : 'text-primary/80 dark:text-white/80'}`}>
+                                                                {new Date(booking.request_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} • {formatTime12Hour(booking.start_time)} - {formatTime12Hour(booking.end_time)}
+                                                            </p>
+                                                            
+                                                            {/* Bay */}
+                                                            <p className={`text-sm ${isUnmatched ? 'text-amber-600 dark:text-amber-400/80' : 'text-primary/70 dark:text-white/70'}`}>
+                                                                {booking.bay_name || `Bay ${booking.resource_id}`}
+                                                            </p>
+                                                            
+                                                            {/* Trackman ID */}
+                                                            {booking.trackman_booking_id && (
+                                                                <p className="text-xs text-orange-600 dark:text-orange-400 font-mono mt-2">
+                                                                    Trackman ID: {booking.trackman_booking_id}
+                                                                </p>
+                                                            )}
+                                                            
+                                                            {/* Action Buttons - Full Width */}
+                                                            <div className="flex gap-2 mt-3">
                                                                 {isUnmatched ? (
                                                                     <button
                                                                         onClick={() => setTrackmanLinkModal({
@@ -1898,14 +1880,14 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                                             matchedBookingId: Number(booking.id),
                                                                             isRelink: false
                                                                         })}
-                                                                        className="py-1.5 px-3 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
+                                                                        className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-colors"
                                                                     >
-                                                                        <span aria-hidden="true" className="material-symbols-outlined text-xs">link</span>
+                                                                        <span aria-hidden="true" className="material-symbols-outlined text-lg">person_add</span>
                                                                         Assign Member
                                                                     </button>
                                                                 ) : !isConferenceRoom && isToday && booking.status === 'attended' ? (
-                                                                    <span className="py-1.5 px-3 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 rounded-lg text-xs font-medium flex items-center gap-1">
-                                                                        <span aria-hidden="true" className="material-symbols-outlined text-xs">check_circle</span>
+                                                                    <span className="flex-1 py-2.5 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 rounded-xl text-sm font-medium flex items-center justify-center gap-2">
+                                                                        <span aria-hidden="true" className="material-symbols-outlined text-lg">check_circle</span>
                                                                         Checked In
                                                                     </span>
                                                                 ) : !isConferenceRoom && isToday && booking.has_unpaid_fees ? (
@@ -1914,25 +1896,25 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                                             const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
                                                                             setBillingModal({ isOpen: true, bookingId });
                                                                         }}
-                                                                        className="py-1.5 px-3 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-colors"
+                                                                        className="flex-1 py-2.5 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-colors"
                                                                     >
-                                                                        <span aria-hidden="true" className="material-symbols-outlined text-xs">payments</span>
+                                                                        <span aria-hidden="true" className="material-symbols-outlined text-lg">payments</span>
                                                                         ${(booking.total_owed || 0).toFixed(0)} Due
                                                                     </button>
-                                                                ) : !isConferenceRoom && isToday && (
+                                                                ) : !isConferenceRoom && isToday ? (
                                                                     <button
                                                                         onClick={() => updateBookingStatusOptimistic(booking, 'attended')}
-                                                                        className="py-1.5 px-3 bg-accent text-primary rounded-lg text-xs font-medium flex items-center gap-1 hover:opacity-90 transition-colors"
+                                                                        className="flex-1 py-2.5 bg-accent text-primary rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-colors"
                                                                     >
-                                                                        <span aria-hidden="true" className="material-symbols-outlined text-xs">how_to_reg</span>
+                                                                        <span aria-hidden="true" className="material-symbols-outlined text-lg">how_to_reg</span>
                                                                         Check In
                                                                     </button>
-                                                                )}
+                                                                ) : null}
                                                                 <button
                                                                     onClick={() => setSelectedCalendarBooking(booking)}
-                                                                    className="py-1.5 px-3 glass-button border border-primary/20 dark:border-white/20 text-primary dark:text-white rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-primary/5 dark:hover:bg-white/10 transition-colors"
+                                                                    className="py-2.5 px-4 glass-button border border-primary/20 dark:border-white/20 text-primary dark:text-white rounded-xl text-sm font-medium flex items-center gap-2 hover:bg-primary/5 dark:hover:bg-white/10 transition-colors"
                                                                 >
-                                                                    <span aria-hidden="true" className="material-symbols-outlined text-xs">edit</span>
+                                                                    <span aria-hidden="true" className="material-symbols-outlined text-lg">edit</span>
                                                                     Edit
                                                                 </button>
                                                             </div>
