@@ -4,7 +4,12 @@ import WalkingGolferSpinner from '../../WalkingGolferSpinner';
 const ITEMS_PER_PAGE = 10;
 
 const formatDateTimePacific = (dateStr: string): string => {
-  const date = new Date(dateStr);
+  // Ensure the timestamp is treated as UTC if no timezone indicator present
+  let normalizedDateStr = dateStr;
+  if (dateStr && !dateStr.includes('Z') && !dateStr.includes('+') && !dateStr.includes('-', 10)) {
+    normalizedDateStr = dateStr + 'Z';
+  }
+  const date = new Date(normalizedDateStr);
   return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
