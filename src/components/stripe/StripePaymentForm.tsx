@@ -45,7 +45,19 @@ interface PaymentFormProps {
   onCancel: () => void;
 }
 
-function CheckoutForm({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: () => void }) {
+interface SimpleCheckoutFormProps {
+  onSuccess: () => void;
+  onError?: (message: string) => void;
+  onCancel?: () => void;
+  submitLabel?: string;
+}
+
+export function SimpleCheckoutForm({ 
+  onSuccess, 
+  onError,
+  onCancel, 
+  submitLabel = 'Pay Now' 
+}: SimpleCheckoutFormProps) {
   const stripe = useStripe();
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -70,12 +82,16 @@ function CheckoutForm({ onSuccess, onCancel }: { onSuccess: () => void; onCancel
     });
 
     if (error) {
-      setErrorMessage(error.message || 'Payment failed');
+      const msg = error.message || 'Payment failed';
+      setErrorMessage(msg);
+      onError?.(msg);
       setIsProcessing(false);
     } else if (paymentIntent && paymentIntent.status === 'succeeded') {
       onSuccess();
     } else {
-      setErrorMessage('Payment incomplete. Please try again.');
+      const msg = 'Payment incomplete. Please try again.';
+      setErrorMessage(msg);
+      onError?.(msg);
       setIsProcessing(false);
     }
   };
@@ -110,21 +126,27 @@ function CheckoutForm({ onSuccess, onCancel }: { onSuccess: () => void; onCancel
           ) : (
             <>
               <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 group-hover:text-emerald-700 dark:group-hover:text-emerald-300">credit_card</span>
-              Pay Now
+              {submitLabel}
             </>
           )}
         </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={isProcessing}
-          className="py-3 px-6 rounded-lg font-medium transition-colors text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-white/40 dark:hover:text-white dark:hover:bg-white/5 disabled:opacity-50"
-        >
-          Cancel
-        </button>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isProcessing}
+            className="py-3 px-6 rounded-lg font-medium transition-colors text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-white/40 dark:hover:text-white dark:hover:bg-white/5 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        )}
       </div>
     </form>
   );
+}
+
+function CheckoutForm({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: () => void }) {
+  return <SimpleCheckoutForm onSuccess={onSuccess} onCancel={onCancel} />;
 }
 
 export function StripePaymentForm({

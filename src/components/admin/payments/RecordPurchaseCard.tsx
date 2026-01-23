@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
-import { StripePaymentForm } from '../../stripe/StripePaymentForm';
+import { SimpleCheckoutForm } from '../../stripe/StripePaymentForm';
 import { MemberSearchInput, SelectedMember } from '../../shared/MemberSearchInput';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || '');
@@ -57,10 +57,10 @@ const RecordPurchaseCard: React.FC<SectionProps> = ({ onClose, variant = 'modal'
       const res = await fetch('/api/stripe/products', { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
-        const oneTimeProducts = (data.products || []).filter(
-          (p: StripeProduct) => p.isActive && p.billingInterval === 'one_time'
+        const chargeableProducts = (data.products || []).filter(
+          (p: StripeProduct) => p.isActive && !p.name.toLowerCase().includes('membership')
         );
-        setProducts(oneTimeProducts);
+        setProducts(chargeableProducts);
       }
     } catch (err) {
       console.error('Failed to fetch products:', err);
@@ -254,7 +254,7 @@ const RecordPurchaseCard: React.FC<SectionProps> = ({ onClose, variant = 'modal'
           
           {clientSecret && (
             <Elements stripe={stripePromise} options={{ clientSecret }}>
-              <StripePaymentForm
+              <SimpleCheckoutForm
                 onSuccess={handleCardPaymentSuccess}
                 onError={handleCardPaymentError}
                 submitLabel={`Pay $${amount}`}
