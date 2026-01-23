@@ -980,9 +980,13 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
         ));
         
         try {
+            const csrfToken = document.cookie.match(/csrf_token=([^;]+)/)?.[1];
             const res = await fetch(`/api/bookings/${booking.id}/checkin`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(csrfToken ? { 'x-csrf-token': csrfToken } : {})
+                },
                 credentials: 'include',
                 body: JSON.stringify({ status: newStatus, source: booking.source })
             });
@@ -2046,9 +2050,14 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                                 
                                                                 return (
                                                                     <>
-                                                                        {/* Desktop: show name */}
-                                                                        <span className={`hidden sm:block text-[9px] sm:text-[10px] font-medium truncate ${textColor}`}>
-                                                                            {bookingDisplayName}
+                                                                        {/* Desktop: show name + X/Y inline when there are multiple players */}
+                                                                        <span className={`hidden sm:flex items-center gap-1 text-[9px] sm:text-[10px] font-medium truncate ${textColor}`}>
+                                                                            <span className="truncate">{bookingDisplayName}</span>
+                                                                            {declaredPlayers > 1 && (
+                                                                                <span className="text-[8px] opacity-70" title={`${filledSlots}/${declaredPlayers} slots filled`}>
+                                                                                    {filledSlots}/{declaredPlayers}
+                                                                                </span>
+                                                                            )}
                                                                         </span>
                                                                         
                                                                         {/* Mobile: show X/Y player count when >1 player OR unpaid, else show dot */}
@@ -2060,7 +2069,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                                             <span className={`sm:hidden w-3 h-3 rounded-full ${isConference ? 'bg-purple-500 dark:bg-purple-400' : 'bg-green-500 dark:bg-green-400'}`} title={bookingDisplayName}></span>
                                                                         )}
                                                                         
-                                                                        {/* Desktop: Red badge for unpaid fees */}
+                                                                        {/* Desktop: Red badge for unpaid fees - top right */}
                                                                         {hasUnpaidFees && (
                                                                             <span className="hidden sm:block absolute -top-1 -right-1 group">
                                                                                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 dark:bg-red-400 block cursor-help border border-white dark:border-gray-800"></span>
@@ -2069,26 +2078,14 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                                                 </span>
                                                                             </span>
                                                                         )}
-                                                                        
-                                                                        {/* Desktop: Amber X/Y badge for unfilled slots */}
-                                                                        {unfilledSlots > 0 && (
-                                                                            <span className={`hidden sm:block absolute -top-1 ${hasUnpaidFees ? '-right-5' : '-right-1'} group`}>
-                                                                                <span className={`px-1 py-0.5 text-[8px] font-bold rounded bg-amber-100 dark:bg-amber-900/50 ${textColor} cursor-help leading-none border border-amber-300 dark:border-amber-600`}>
-                                                                                    {filledSlots}/{declaredPlayers}
-                                                                                </span>
-                                                                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs font-medium text-white bg-gray-800 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
-                                                                                    {filledSlots}/{declaredPlayers} slots filled
-                                                                                </span>
-                                                                            </span>
-                                                                        )}
                                                                     </>
                                                                 );
                                                             })()}
-                                                            {/* Desktop: Inactive member badge - positioned bottom-left to avoid collision with other badges */}
+                                                            {/* Desktop: Inactive member badge - top right, shifts left if unpaid badge present */}
                                                             {isInactiveMember && (
-                                                                <span className="hidden sm:block absolute -bottom-0.5 -left-0.5 group">
+                                                                <span className={`hidden sm:block absolute -top-1 ${(booking as any)?.has_unpaid_fees ? '-right-4' : '-right-1'} group`}>
                                                                     <span className="w-2 h-2 rounded-full bg-orange-400 dark:bg-orange-500 block cursor-help"></span>
-                                                                    <span className="absolute top-full left-1/2 -translate-x-1/2 mt-1 px-2 py-1 text-xs font-medium text-white bg-gray-800 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                                                                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs font-medium text-white bg-gray-800 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
                                                                         Non-active member
                                                                     </span>
                                                                 </span>
