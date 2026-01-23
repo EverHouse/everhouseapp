@@ -21,7 +21,7 @@ import { refundGuestPass } from './guestPasses';
 import { updateHubSpotContactVisitCount } from '../core/memberSync';
 import { createSessionWithUsageTracking } from '../core/bookingService/sessionManager';
 import { calculateAndCacheParticipantFees } from '../core/billing/feeCalculator';
-import { cancelPaymentIntent } from '../core/stripe';
+import { cancelPaymentIntent, getStripeClient } from '../core/stripe';
 
 const router = Router();
 
@@ -1468,7 +1468,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
       const bookingId = parseInt(id, 10);
       const { cancelled_by } = req.body;
       
-      const { updated, bookingData, pushInfo } = await db.transaction(async (tx) => {
+      const { updated, bookingData, pushInfo, overageRefundResult } = await db.transaction(async (tx) => {
         const [existing] = await tx.select({
           id: bookingRequests.id,
           calendarEventId: bookingRequests.calendarEventId,
@@ -1478,13 +1478,48 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
           startTime: bookingRequests.startTime,
           status: bookingRequests.status,
           resourceId: bookingRequests.resourceId,
-          trackmanBookingId: bookingRequests.trackmanBookingId
+          trackmanBookingId: bookingRequests.trackmanBookingId,
+          overagePaymentIntentId: bookingRequests.overagePaymentIntentId,
+          overagePaid: bookingRequests.overagePaid,
+          overageFeeCents: bookingRequests.overageFeeCents
         })
           .from(bookingRequests)
           .where(eq(bookingRequests.id, bookingId));
         
         if (!existing) {
           throw { statusCode: 404, error: 'Booking request not found' };
+        }
+        
+        // Handle overage fee cancellation/refund
+        let overageRefundResult: { cancelled?: boolean; refunded?: boolean; amount?: number; error?: string } = {};
+        if (existing.overagePaymentIntentId) {
+          try {
+            if (existing.overagePaid) {
+              // Overage was already paid - need to refund
+              const stripe = await getStripeClient();
+              const paymentIntent = await stripe.paymentIntents.retrieve(existing.overagePaymentIntentId);
+              if (paymentIntent.status === 'succeeded' && paymentIntent.latest_charge) {
+                const refund = await stripe.refunds.create({
+                  charge: paymentIntent.latest_charge as string,
+                  reason: 'requested_by_customer'
+                });
+                console.log(`[Staff Cancel] Refunded overage payment ${existing.overagePaymentIntentId} for booking ${bookingId}, refund: ${refund.id}`);
+                overageRefundResult = { refunded: true, amount: (existing.overageFeeCents || 0) / 100 };
+              }
+            } else {
+              // Overage not yet paid - just cancel the payment intent
+              await cancelPaymentIntent(existing.overagePaymentIntentId);
+              console.log(`[Staff Cancel] Cancelled overage payment intent ${existing.overagePaymentIntentId} for booking ${bookingId}`);
+              overageRefundResult = { cancelled: true };
+            }
+            // Clear the overage fields
+            await tx.update(bookingRequests)
+              .set({ overagePaymentIntentId: null, overageFeeCents: 0, overageMinutes: 0 })
+              .where(eq(bookingRequests.id, bookingId));
+          } catch (paymentErr: any) {
+            console.error('[Staff Cancel] Failed to handle overage payment (non-blocking):', paymentErr);
+            overageRefundResult = { error: paymentErr.message };
+          }
         }
         
         // Build staff_notes - append Trackman cancellation reminder if booking has trackman ID
@@ -1608,7 +1643,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
           });
         }
         
-        return { updated: updatedRow, bookingData: existing, pushInfo };
+        return { updated: updatedRow, bookingData: existing, pushInfo, overageRefundResult };
       });
       
       if (bookingData?.calendarEventId) {
@@ -1807,17 +1842,31 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
       .where(eq(bookingRequests.id, bookingId))
       .returning();
     
-    // Cancel any pending overage payment intent
-    if (existing.overagePaymentIntentId && !existing.overagePaid) {
+    // Handle overage fee cancellation/refund
+    if (existing.overagePaymentIntentId) {
       try {
-        await cancelPaymentIntent(existing.overagePaymentIntentId);
-        // Clear the payment intent from the booking
+        if (existing.overagePaid) {
+          // Overage was already paid - need to refund
+          const stripe = await getStripeClient();
+          const paymentIntent = await stripe.paymentIntents.retrieve(existing.overagePaymentIntentId);
+          if (paymentIntent.status === 'succeeded' && paymentIntent.latest_charge) {
+            const refund = await stripe.refunds.create({
+              charge: paymentIntent.latest_charge as string,
+              reason: 'requested_by_customer'
+            });
+            console.log(`[Member Cancel] Refunded overage payment ${existing.overagePaymentIntentId} for booking ${bookingId}, refund: ${refund.id}`);
+          }
+        } else {
+          // Overage not yet paid - just cancel the payment intent
+          await cancelPaymentIntent(existing.overagePaymentIntentId);
+          console.log(`[Member Cancel] Cancelled overage payment intent ${existing.overagePaymentIntentId} for booking ${bookingId}`);
+        }
+        // Clear the overage fields
         await db.update(bookingRequests)
           .set({ overagePaymentIntentId: null, overageFeeCents: 0, overageMinutes: 0 })
           .where(eq(bookingRequests.id, bookingId));
-        console.log(`[Member Cancel] Cancelled overage payment intent ${existing.overagePaymentIntentId} for booking ${bookingId}`);
       } catch (paymentErr) {
-        console.error('[Member Cancel] Failed to cancel overage payment intent (non-blocking):', paymentErr);
+        console.error('[Member Cancel] Failed to handle overage payment (non-blocking):', paymentErr);
       }
     }
     
@@ -2303,11 +2352,12 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
       }
       
       // Query actual filled slots (booking_members + booking_guests counts)
+      // Only count entries with non-empty emails (empty emails = unfilled placeholder slots)
       const filledSlotsResult = await pool.query(`
         SELECT 
           br.id as booking_id,
-          (SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id) as member_count,
-          (SELECT COUNT(*) FROM booking_guests bg WHERE bg.booking_id = br.id) as guest_count
+          (SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id AND bm.user_email IS NOT NULL AND bm.user_email != '') as member_count,
+          (SELECT COUNT(*) FROM booking_guests bg WHERE bg.booking_id = br.id AND bg.guest_email IS NOT NULL AND bg.guest_email != '') as guest_count
         FROM booking_requests br
         WHERE br.id = ANY($1)
       `, [bookingIds]);

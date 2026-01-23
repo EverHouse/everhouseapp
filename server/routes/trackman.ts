@@ -224,7 +224,7 @@ router.get('/api/admin/trackman/matched', isStaffOrAdmin, async (req, res) => {
                    AND br.user_email NOT LIKE '%unmatched@%'
               THEN 1
               ELSE 0
-            END + COALESCE((SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id AND bm.user_email IS NOT NULL AND bm.is_primary = false), 0)
+            END + COALESCE((SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id AND bm.user_email IS NOT NULL AND bm.user_email != '' AND bm.is_primary = false), 0)
         END as filled_slots
        FROM booking_requests br
        LEFT JOIN users u ON LOWER(br.user_email) = LOWER(u.email)
@@ -1287,9 +1287,9 @@ router.get('/api/admin/trackman/needs-players', isStaffOrAdmin, async (req, res)
                    AND br.user_email NOT LIKE '%unmatched@%'
               THEN 1
               ELSE 0
-            END + COALESCE((SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id AND bm.user_email IS NOT NULL AND bm.is_primary = false), 0)
+            END + COALESCE((SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id AND bm.user_email IS NOT NULL AND bm.user_email != '' AND bm.is_primary = false), 0)
         END as filled_slots,
-        (SELECT COUNT(*) FROM booking_guests bg WHERE bg.booking_id = br.id) as guest_count_actual
+        (SELECT COUNT(*) FROM booking_guests bg WHERE bg.booking_id = br.id AND bg.guest_email IS NOT NULL AND bg.guest_email != '') as guest_count_actual
        FROM booking_requests br
        LEFT JOIN users u ON LOWER(br.user_email) = LOWER(u.email)
        WHERE ${whereClause}
