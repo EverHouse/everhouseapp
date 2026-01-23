@@ -24,10 +24,12 @@ export function csrfTokenMiddleware(req: Request, res: Response, next: NextFunct
     req.session.csrfToken = generateToken();
   }
 
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT === '1';
+  
   res.cookie(CSRF_COOKIE, req.session.csrfToken, {
     httpOnly: false,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    secure: isProduction,
+    sameSite: 'lax',
     path: '/'
   });
 
