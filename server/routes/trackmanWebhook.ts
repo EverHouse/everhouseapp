@@ -1833,7 +1833,7 @@ router.get('/api/admin/trackman-webhooks', isStaffOrAdmin, async (req: Request, 
         matched_user_id,
         processing_error,
         processed_at,
-        created_at,
+        created_at AT TIME ZONE 'UTC' AS created_at,
         payload
        FROM trackman_webhook_events
        ${whereClause}
