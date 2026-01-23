@@ -94,6 +94,14 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
     const stripe = await getStripeClient();
     const { status, limit, starting_after } = req.query;
     
+    // Debug: Log account info to verify we're using the right API key
+    try {
+      const account = await stripe.accounts.retrieve();
+      console.log(`[Financials] Stripe account: ${account.id}`);
+    } catch (e: any) {
+      console.log('[Financials] Could not get account info:', e.message);
+    }
+    
     const statusFilter = status && typeof status === 'string' && status !== 'all' 
       ? status as Stripe.Subscription.Status
       : undefined;
@@ -113,7 +121,9 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
       listParams.starting_after = starting_after;
     }
     
+    console.log(`[Financials] Fetching subscriptions with params:`, listParams);
     const subscriptions = await stripe.subscriptions.list(listParams);
+    console.log(`[Financials] Found ${subscriptions.data.length} subscriptions`);
 
     const subscriptionItems: SubscriptionListItem[] = subscriptions.data.map(sub => {
       const customer = sub.customer as Stripe.Customer;

@@ -44,6 +44,14 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
   try {
     const stripe = await getStripeClient();
     
+    // Debug: Check which Stripe mode we're using by looking at the account
+    try {
+      const account = await stripe.accounts.retrieve();
+      console.log(`[Stripe Sync] Connected to Stripe account: ${account.id}, mode: ${account.settings?.dashboard?.display_name || 'unknown'}`);
+    } catch (e: any) {
+      console.log('[Stripe Sync] Could not retrieve account info:', e.message);
+    }
+    
     console.log('[Stripe Sync] Starting active subscription sync from Stripe...');
     
     const subscriptions: Stripe.Subscription[] = [];

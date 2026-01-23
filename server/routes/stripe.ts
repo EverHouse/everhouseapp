@@ -3374,4 +3374,46 @@ router.post('/api/stripe/sync-subscriptions', isStaffOrAdmin, async (req: Reques
   }
 });
 
+/**
+ * GET /api/stripe/debug-connection
+ * Admin-only endpoint to debug Stripe connection
+ */
+router.get('/api/stripe/debug-connection', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const stripe = await getStripeClient();
+    
+    // Get account info
+    const account = await stripe.accounts.retrieve();
+    
+    // List subscriptions (first 5 only)
+    const subscriptions = await stripe.subscriptions.list({ 
+      limit: 5,
+      expand: ['data.customer']
+    });
+    
+    // List customers (first 5)
+    const customers = await stripe.customers.list({ limit: 5 });
+    
+    res.json({
+      accountId: account.id,
+      environment: process.env.REPLIT_DEPLOYMENT === '1' ? 'production' : 'development',
+      subscriptionCount: subscriptions.data.length,
+      subscriptions: subscriptions.data.map(s => ({
+        id: s.id,
+        status: s.status,
+        customerEmail: (s.customer as any)?.email || 'unknown',
+        testClock: s.test_clock || null,
+      })),
+      customerCount: customers.data.length,
+      customers: customers.data.map(c => ({
+        id: c.id,
+        email: c.email,
+      })),
+    });
+  } catch (error: any) {
+    console.error('[Stripe Debug] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;
