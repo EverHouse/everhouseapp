@@ -2141,8 +2141,16 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                             return (
                                                 <div
                                                     key={`${resource.id}-${slot}`}
-                                                    title={closure ? `CLOSED: ${closure.title}` : eventBlock ? `EVENT BLOCK: ${eventBlock.closureTitle || eventBlock.blockType || 'Blocked'}` : booking ? `${bookingDisplayName}${isUnmatched ? ' (UNMATCHED - Needs member assignment)' : isInactiveMember ? ' (Inactive Member)' : ''} - Click for details` : pendingRequest ? `PENDING: ${pendingRequest.user_name || 'Request'} - Awaiting Trackman sync` : `Click to book ${resource.type === 'conference_room' ? 'Conference Room' : resource.name} at ${formatTime12Hour(slot)}`}
-                                                    onClick={closure || eventBlock ? undefined : booking ? () => setSelectedCalendarBooking(booking) : pendingRequest ? () => { setSelectedRequest(pendingRequest); setActionModal('decline'); } : handleEmptyCellClick}
+                                                    title={closure ? `CLOSED: ${closure.title}` : eventBlock ? `EVENT BLOCK: ${eventBlock.closureTitle || eventBlock.blockType || 'Blocked'}` : booking ? `${bookingDisplayName}${isUnmatched ? ' (UNMATCHED - Click to assign member)' : isInactiveMember ? ' (Inactive Member)' : ''} - Click for details` : pendingRequest ? `PENDING: ${pendingRequest.user_name || 'Request'} - Awaiting Trackman sync` : `Click to book ${resource.type === 'conference_room' ? 'Conference Room' : resource.name} at ${formatTime12Hour(slot)}`}
+                                                    onClick={closure || eventBlock ? undefined : booking ? (isUnmatched ? () => setTrackmanLinkModal({
+                                                        isOpen: true,
+                                                        trackmanBookingId: (booking as any).trackman_booking_id || null,
+                                                        bayName: resource.type === 'conference_room' ? 'Conference Room' : resource.name,
+                                                        bookingDate: formatDateShortAdmin(booking.request_date),
+                                                        timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
+                                                        matchedBookingId: Number(booking.id),
+                                                        isRelink: false
+                                                    }) : () => setSelectedCalendarBooking(booking)) : pendingRequest ? () => { setSelectedRequest(pendingRequest); setActionModal('decline'); } : handleEmptyCellClick}
                                                     className={`h-7 sm:h-8 rounded ${
                                                         closure
                                                             ? 'bg-red-100 dark:bg-red-500/20 border border-red-300 dark:border-red-500/30'

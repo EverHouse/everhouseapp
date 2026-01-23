@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.4.7",
+    date: "2026-01-23",
+    title: "Streamlined Unmatched Booking Flow",
+    changes: [
+      "Clicking amber (unassigned) bookings on the calendar now opens 'Assign Member' directly",
+      "Staff no longer need to go through Booking Details first to assign a member",
+      "After assigning a member, the cell turns green and Booking Details becomes accessible"
+    ]
+  },
+  {
     version: "9.4.6",
     date: "2026-01-23",
     title: "Unified Assign Member Experience",
