@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.4",
+    date: "2026-01-23",
+    title: "Audit Fixes: Payments & Login",
+    changes: [
+      "Fixed production login issue where OTP requests could fail on first visit",
+      "Added refund tracking - when refunds happen in Stripe, they now sync to the app automatically",
+      "Revenue reports now accurately reflect partial and full refunds",
+      "Installed missing payment processing component for server stability"
+    ]
+  },
+  {
     version: "9.3",
     date: "2026-01-23",
     title: "Bug Fixes & Maintenance",
