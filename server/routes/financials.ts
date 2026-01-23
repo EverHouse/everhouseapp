@@ -121,18 +121,36 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
     }
     
     console.log(`[Financials] Fetching subscriptions with params:`, listParams);
-    const subscriptions = await stripe.subscriptions.list(listParams);
-    console.log(`[Financials] Found ${subscriptions.data.length} subscriptions`);
+    let subscriptions = await stripe.subscriptions.list(listParams);
+    console.log(`[Financials] Found ${subscriptions.data.length} subscriptions from global list`);
     
-    // Debug: If no subscriptions found, also check customers and their subscriptions directly
+    // If no subscriptions found globally, fetch per-customer (needed for test clock subscriptions)
+    // Test clock subscriptions don't appear in global list() calls
     if (subscriptions.data.length === 0) {
-      console.log('[Financials] DEBUG: Checking customers for subscriptions...');
-      const customers = await stripe.customers.list({ limit: 10 });
-      console.log(`[Financials] DEBUG: Found ${customers.data.length} customers`);
+      console.log('[Financials] Fetching subscriptions per-customer (for test clock support)...');
+      const allSubs: Stripe.Subscription[] = [];
+      const customers = await stripe.customers.list({ limit: 100 });
+      
       for (const cust of customers.data) {
-        const custSubs = await stripe.subscriptions.list({ customer: cust.id, status: 'all', limit: 10 });
-        console.log(`[Financials] DEBUG: Customer ${cust.email} (${cust.id}) has ${custSubs.data.length} subscriptions: ${custSubs.data.map(s => `${s.id}:${s.status}`).join(', ') || 'none'}`);
+        try {
+          const custSubs = await stripe.subscriptions.list({ 
+            customer: cust.id, 
+            status: statusFilter,
+            limit: 100,
+            expand: ['data.items.data.price']
+          });
+          // Add customer data to each subscription
+          for (const sub of custSubs.data) {
+            (sub as any).customer = cust;
+            allSubs.push(sub);
+          }
+        } catch (e: any) {
+          console.log(`[Financials] Error fetching subs for ${cust.email}: ${e.message}`);
+        }
       }
+      
+      console.log(`[Financials] Found ${allSubs.length} subscriptions via per-customer fetch`);
+      subscriptions = { data: allSubs, has_more: false, object: 'list', url: '' };
     }
 
     const subscriptionItems: SubscriptionListItem[] = subscriptions.data.map(sub => {
