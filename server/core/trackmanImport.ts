@@ -27,7 +27,25 @@ function parseNotesForPlayers(notes: string): ParsedPlayer[] {
   for (const line of lines) {
     const trimmed = line.trim();
     
-    // Match M: format - M: email | Name or M: email
+    // NEW FORMAT: Pipe-separated CSV-style format
+    // M|email|firstname|lastname or G|email|firstname|lastname
+    const pipeSeparatedMatch = trimmed.match(/^([MG])\|([^|]*)\|([^|]*)\|(.*)$/i);
+    if (pipeSeparatedMatch) {
+      const type = pipeSeparatedMatch[1].toUpperCase() === 'M' ? 'member' : 'guest';
+      const email = pipeSeparatedMatch[2].trim().toLowerCase();
+      const firstName = pipeSeparatedMatch[3].trim();
+      const lastName = pipeSeparatedMatch[4].trim();
+      const fullName = [firstName, lastName].filter(Boolean).join(' ') || null;
+      
+      players.push({
+        type,
+        email: email && email !== 'none' ? email : null,
+        name: fullName
+      });
+      continue;
+    }
+    
+    // LEGACY FORMAT: M: email | Name or M: email
     const memberMatch = trimmed.match(/^M:\s*([^\s|]+)(?:\s*\|\s*(.+))?$/i);
     if (memberMatch) {
       players.push({
@@ -38,7 +56,7 @@ function parseNotesForPlayers(notes: string): ParsedPlayer[] {
       continue;
     }
     
-    // Match G: format - G: email | Name or G: none | Name or G: Name
+    // LEGACY FORMAT: G: email | Name or G: none | Name or G: Name
     const guestMatch = trimmed.match(/^G:\s*(?:([^\s|]+)\s*\|\s*)?(.+)$/i);
     if (guestMatch) {
       const emailOrName = guestMatch[1]?.trim().toLowerCase();
