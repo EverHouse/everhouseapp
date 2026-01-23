@@ -6,7 +6,23 @@ export interface ChangelogEntry {
   changes: string[];
 }
 
+export function getLatestVersion(): { version: string; date: string } {
+  const latest = changelog[0];
+  return { version: latest.version, date: latest.date };
+}
+
 export const changelog: ChangelogEntry[] = [
+  {
+    version: "9.3",
+    date: "2026-01-23",
+    title: "Bug Fixes & Maintenance",
+    changes: [
+      "Fixed Trackman webhook crash when receiving unknown event types",
+      "Improved WebSocket reconnection with exponential backoff to reduce network noise",
+      "Added test account cleanup tooling for database hygiene",
+      "Version number now displays dynamically from changelog in sidebar and mobile"
+    ]
+  },
   {
     version: "9.2",
     date: "2026-01-23",

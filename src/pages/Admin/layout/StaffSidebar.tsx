@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { TabType } from './types';
 import { useNavigationLoading } from '../../../contexts/NavigationLoadingContext';
+import { getLatestVersion } from '../../../data/changelog';
 
 interface NavItem {
   id: TabType;
@@ -124,7 +125,7 @@ export const StaffSidebar: React.FC<StaffSidebarProps> = ({
 
       <div className="px-3 py-4 border-t border-white/10 flex-shrink-0">
         <p className="text-white/40 text-[10px] text-center">
-          v2.0 Navigation
+          v{getLatestVersion().version} · Updated {new Date(getLatestVersion().date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
         </p>
       </div>
     </aside>

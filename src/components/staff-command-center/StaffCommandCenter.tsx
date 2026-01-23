@@ -10,6 +10,7 @@ import { AnimatedPage } from '../motion';
 
 import { useCommandCenterData } from './hooks/useCommandCenterData';
 import { formatLastSynced, formatTodayDate } from './helpers';
+import { getLatestVersion } from '../../data/changelog';
 import { BookingQueuesSection } from './sections/BookingQueuesSection';
 import { TodayScheduleSection } from './sections/TodayScheduleSection';
 import { ResourcesSection, NoticeBoardWidget } from './sections/ResourcesSection';
@@ -493,6 +494,12 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
             variant="mobile-cards"
           />
           <QuickActionsGrid onTabChange={onTabChange} isAdmin={isAdmin} variant="mobile" onNewMember={() => setAddMemberModalOpen(true)} onScanQr={() => setQrScannerOpen(true)} />
+          
+          <div className="mt-6 mb-8 text-center">
+            <p className="text-primary/40 dark:text-white/40 text-[10px]">
+              v{getLatestVersion().version} · Updated {new Date(getLatestVersion().date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </p>
+          </div>
         </div>
       </AnimatedPage>
 
