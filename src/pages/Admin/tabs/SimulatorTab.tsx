@@ -1827,23 +1827,33 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                             {/* Header: Name/Badge + Status */}
                                                             <div className="flex items-center gap-2 mb-2">
                                                                 {isUnmatched ? (
-                                                                    <span className="px-2.5 py-1 text-xs font-semibold bg-amber-200 dark:bg-amber-500/30 text-amber-700 dark:text-amber-400 rounded-lg">
-                                                                        Needs Assignment
-                                                                    </span>
+                                                                    <>
+                                                                        <span className="px-2.5 py-1 text-xs font-semibold bg-amber-200 dark:bg-amber-500/30 text-amber-700 dark:text-amber-400 rounded-lg">
+                                                                            Needs Assignment
+                                                                        </span>
+                                                                        {isConferenceRoom ? (
+                                                                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400">
+                                                                                Conf
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                                                                                {booking.bay_name || `Bay ${booking.resource_id}`}
+                                                                            </span>
+                                                                        )}
+                                                                    </>
                                                                 ) : (
                                                                     <>
                                                                         <p className="font-semibold text-base text-primary dark:text-white">
                                                                             {displayName}
                                                                         </p>
                                                                         {(booking as any).tier && <TierBadge tier={(booking as any).tier} size="sm" />}
-                                                                        {booking.status === 'attended' && (
-                                                                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400">
-                                                                                Checked In
-                                                                            </span>
-                                                                        )}
-                                                                        {isConferenceRoom && (
+                                                                        {isConferenceRoom ? (
                                                                             <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400">
                                                                                 Conf
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-primary/10 dark:bg-white/10 text-primary/70 dark:text-white/70">
+                                                                                {booking.bay_name || `Bay ${booking.resource_id}`}
                                                                             </span>
                                                                         )}
                                                                     </>
@@ -1853,11 +1863,6 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                             {/* Date & Time */}
                                                             <p className={`text-sm mb-1 ${isUnmatched ? 'text-amber-700 dark:text-amber-400' : 'text-primary/80 dark:text-white/80'}`}>
                                                                 {new Date(booking.request_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} • {formatTime12Hour(booking.start_time)} - {formatTime12Hour(booking.end_time)}
-                                                            </p>
-                                                            
-                                                            {/* Bay */}
-                                                            <p className={`text-sm ${isUnmatched ? 'text-amber-600 dark:text-amber-400/80' : 'text-primary/70 dark:text-white/70'}`}>
-                                                                {booking.bay_name || `Bay ${booking.resource_id}`}
                                                             </p>
                                                             
                                                             {/* Trackman ID */}

@@ -343,23 +343,39 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
                         {isUnmatched ? (
-                          <span className="px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full">
-                            Needs Assignment
-                          </span>
+                          <>
+                            <span className="px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full">
+                              Needs Assignment
+                            </span>
+                            {booking.resource_type === 'conference_room' ? (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400">
+                                Conf
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                                {booking.bay_name || `Bay ${booking.resource_id}`}
+                              </span>
+                            )}
+                          </>
                         ) : (
                           <>
                             <p className="font-semibold text-sm truncate text-primary dark:text-white">
                               {booking.user_name || 'Unknown Customer'}
                             </p>
-                            {getStatusBadge(booking)}
+                            {booking.resource_type === 'conference_room' ? (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400">
+                                Conf
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 dark:bg-white/10 text-primary/70 dark:text-white/70">
+                                {booking.bay_name || `Bay ${booking.resource_id}`}
+                              </span>
+                            )}
                           </>
                         )}
                       </div>
                       <p className={`text-xs ${isUnmatched ? 'text-amber-600/80 dark:text-amber-400/80' : 'text-primary/80 dark:text-white/80'}`}>
                         {formatTime12Hour(booking.start_time)} - {formatTime12Hour(booking.end_time)}
-                      </p>
-                      <p className={`text-xs ${isUnmatched ? 'text-amber-600/70 dark:text-amber-400/70' : 'text-primary/70 dark:text-white/70'}`}>
-                        {booking.bay_name || `Bay ${booking.resource_id}`}
                         {booking.trackman_booking_id && (
                           <span className="ml-2 text-[10px] text-orange-600 dark:text-orange-400">
                             TM: {booking.trackman_booking_id}
