@@ -41,6 +41,7 @@ const ADMIN_ITEMS: NavItem[] = [
   { id: 'bugs', icon: 'bug_report', label: 'Bug Reports' },
   { id: 'changelog', icon: 'history', label: 'Changelog' },
   { id: 'data-integrity', icon: 'fact_check', label: 'Data Integrity' },
+  { id: 'staff-activity', icon: 'manage_history', label: 'Staff Activity' },
 ];
 
 export const StaffSidebar: React.FC<StaffSidebarProps> = ({ 

@@ -19,6 +19,7 @@ import { getSessionUser } from '../types/session';
 import { notifyMember, notifyAllStaff } from '../core/notificationService';
 import { refundGuestPass } from './guestPasses';
 import { createPacificDate, formatDateDisplayWithDay, formatTime12Hour } from '../utils/dateUtils';
+import { logFromRequest } from '../core/auditLog';
 
 interface CancellationCascadeResult {
   participantsNotified: number;
@@ -537,6 +538,12 @@ router.put('/api/bookings/:id/approve', isStaffOrAdmin, async (req, res) => {
       action: 'booked'
     });
     
+    logFromRequest(req, 'approve_booking', 'booking', id, {
+      member_email: result.userEmail,
+      bay: result.resourceId,
+      time: result.startTime
+    });
+    
     res.json(result);
   } catch (error: any) {
     if (error.statusCode) {
@@ -567,6 +574,11 @@ router.put('/api/bookings/:id/decline', isStaffOrAdmin, async (req, res) => {
         .returning();
       
       return updated;
+    });
+    
+    logFromRequest(req, 'decline_booking', 'booking', id, {
+      member_email: result.userEmail,
+      reason: req.body.reason || 'Not specified'
     });
     
     res.json(result);

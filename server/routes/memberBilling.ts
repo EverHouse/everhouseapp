@@ -6,6 +6,7 @@ import { getStripeClient } from '../core/stripe/client';
 import { getBillingGroupByMemberEmail } from '../core/stripe/groupBilling';
 import { listCustomerInvoices } from '../core/stripe/invoices';
 import { listCustomerSubscriptions } from '../core/stripe/subscriptions';
+import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
 
@@ -267,6 +268,12 @@ router.post('/api/member-billing/:email/pause', isStaffOrAdmin, async (req, res)
     });
 
     console.log(`[MemberBilling] Paused subscription ${subscription.id} for ${email} until ${resumeDate.toISOString()} (${durationDays} days)`);
+    
+    logFromRequest(req, 'pause_subscription', 'subscription', subscription.id, {
+      member_email: email,
+      pause_until: resumeDate.toISOString()
+    });
+    
     res.json({ 
       success: true, 
       subscriptionId: subscription.id, 
@@ -309,6 +316,11 @@ router.post('/api/member-billing/:email/resume', isStaffOrAdmin, async (req, res
     });
 
     console.log(`[MemberBilling] Resumed subscription ${subscription.id} for ${email}`);
+    
+    logFromRequest(req, 'resume_subscription', 'subscription', subscription.id, {
+      member_email: email
+    });
+    
     res.json({ success: true, subscriptionId: subscription.id, status: 'active' });
   } catch (error: any) {
     console.error('[MemberBilling] Error resuming subscription:', error);
@@ -345,6 +357,12 @@ router.post('/api/member-billing/:email/cancel', isStaffOrAdmin, async (req, res
     });
 
     console.log(`[MemberBilling] Set cancel at period end for subscription ${subscription.id}, email ${email}`);
+    
+    logFromRequest(req, 'cancel_subscription', 'subscription', subscription.id, {
+      member_email: email,
+      reason: req.body.reason || 'Not specified'
+    });
+    
     res.json({
       success: true,
       subscriptionId: subscription.id,
@@ -532,6 +550,11 @@ router.post('/api/member-billing/:email/payment-link', isStaffOrAdmin, async (re
     });
 
     console.log(`[MemberBilling] Created billing portal session for ${email}`);
+    
+    logFromRequest(req, 'send_payment_link', 'member', member.id?.toString() || null, {
+      member_email: email
+    });
+    
     res.json({
       success: true,
       url: session.url,

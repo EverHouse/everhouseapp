@@ -1,11 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
 import { pool, isProduction } from '../core/db';
-import { users, bookingRequests, legacyPurchases, billingAuditLog } from '@shared/schema';
-import { eq, sql, and, gte, lte, desc, isNull } from 'drizzle-orm';
+import { users, bookingRequests, legacyPurchases, billingAuditLog, adminAuditLog } from '@shared/schema';
+import { eq, sql, and, gte, lte, desc, isNull, inArray } from 'drizzle-orm';
 import { isAdmin, isStaffOrAdmin } from '../core/middleware';
 import { getHubSpotClient } from '../core/integrations';
 import { retryableHubSpotRequest } from '../core/hubspot/request';
+import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
 
@@ -117,6 +118,11 @@ router.post('/api/data-tools/resync-member', isAdmin, async (req: Request, res: 
     if (!isProduction) {
       console.log(`[DataTools] Re-synced member ${normalizedEmail} from HubSpot by ${staffEmail}`);
     }
+    
+    logFromRequest(req, 'sync_hubspot', 'member', null, {
+      email: normalizedEmail,
+      action: 'manual_sync'
+    });
     
     res.json({
       success: true,
@@ -489,6 +495,40 @@ router.get('/api/data-tools/audit-log', isAdmin, async (req: Request, res: Respo
   } catch (error: any) {
     console.error('[DataTools] Get audit log error:', error);
     res.status(500).json({ error: 'Failed to get audit log', details: error.message });
+  }
+});
+
+router.get('/api/data-tools/staff-activity', isAdmin, async (req: Request, res: Response) => {
+  try {
+    const limitParam = parseInt(req.query.limit as string) || 50;
+    const staffEmail = req.query.staff_email as string;
+    const actionsParam = req.query.actions as string;
+    
+    const conditions = [];
+    
+    if (staffEmail) {
+      conditions.push(eq(adminAuditLog.staffEmail, staffEmail));
+    }
+    
+    if (actionsParam) {
+      const actionsList = actionsParam.split(',').filter(Boolean);
+      if (actionsList.length > 0) {
+        conditions.push(inArray(adminAuditLog.action, actionsList));
+      }
+    }
+    
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    const logs = await db.select()
+      .from(adminAuditLog)
+      .where(whereClause)
+      .orderBy(desc(adminAuditLog.createdAt))
+      .limit(limitParam);
+    
+    res.json({ logs });
+  } catch (error: any) {
+    console.error('[DataTools] Get staff activity error:', error);
+    res.status(500).json({ error: 'Failed to get staff activity', details: error.message });
   }
 });
 

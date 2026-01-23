@@ -1843,6 +1843,10 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
       .where(eq(bookingRequests.id, bookingId))
       .returning();
     
+    logFromRequest(req, 'cancel_booking', 'booking', id, {
+      member_email: existing.userEmail
+    });
+    
     // Handle overage fee cancellation/refund
     if (existing.overagePaymentIntentId) {
       try {

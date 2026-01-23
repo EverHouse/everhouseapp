@@ -49,6 +49,7 @@ import {
   updatePaymentStatusAndAmount
 } from '../core/stripe/paymentRepository';
 import { getBillingClassificationSummary, getMembersNeedingStripeMigration } from '../scripts/classifyMemberBilling';
+import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
 
@@ -242,6 +243,12 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
       );
     }
 
+    logFromRequest(req, 'record_charge', 'payment', result.paymentIntentId, {
+      member_email: email,
+      amount: serverTotal,
+      description: description
+    });
+    
     res.json({
       paymentIntentId: result.paymentIntentId,
       clientSecret: result.clientSecret,
@@ -2926,6 +2933,11 @@ router.post('/api/stripe/staff/send-membership-link', isStaffOrAdmin, async (req
     } catch (emailErr: any) {
       console.error('[Stripe] Failed to send membership invite email:', emailErr.message);
     }
+
+    logFromRequest(req, 'invite_member', 'member', null, {
+      email: email,
+      tier: tier.name
+    });
 
     res.json({ success: true, checkoutUrl });
   } catch (error: any) {
