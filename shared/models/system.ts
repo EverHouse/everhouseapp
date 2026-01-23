@@ -126,3 +126,45 @@ export const accountDeletionRequests = pgTable("account_deletion_requests", {
 }));
 
 export type AccountDeletionRequest = typeof accountDeletionRequests.$inferSelect;
+
+// Admin audit log - tracks staff actions for compliance
+export const adminAuditLog = pgTable("admin_audit_log", {
+  id: serial("id").primaryKey(),
+  staffEmail: varchar("staff_email", { length: 255 }).notNull(),
+  staffName: varchar("staff_name", { length: 255 }),
+  action: varchar("action", { length: 100 }).notNull(), // 'view_member', 'export_data', 'update_member', 'delete_member', 'view_billing', etc.
+  resourceType: varchar("resource_type", { length: 100 }).notNull(), // 'member', 'booking', 'payment', 'report', etc.
+  resourceId: varchar("resource_id", { length: 255 }), // email or ID of the resource
+  resourceName: varchar("resource_name", { length: 255 }), // display name for the resource
+  details: jsonb("details"), // additional context about the action
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  staffEmailIdx: index("admin_audit_log_staff_email_idx").on(table.staffEmail),
+  actionIdx: index("admin_audit_log_action_idx").on(table.action),
+  resourceTypeIdx: index("admin_audit_log_resource_type_idx").on(table.resourceType),
+  resourceIdIdx: index("admin_audit_log_resource_id_idx").on(table.resourceId),
+  createdAtIdx: index("admin_audit_log_created_at_idx").on(table.createdAt),
+}));
+
+export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
+export type InsertAdminAuditLog = typeof adminAuditLog.$inferInsert;
+
+// Data export requests - tracks member data export requests (CCPA)
+export const dataExportRequests = pgTable("data_export_requests", {
+  id: serial("id").primaryKey(),
+  userEmail: varchar("user_email", { length: 255 }).notNull(),
+  requestedAt: timestamp("requested_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  status: varchar("status", { length: 50 }).notNull().default('pending'), // 'pending', 'processing', 'completed', 'failed'
+  downloadUrl: text("download_url"),
+  expiresAt: timestamp("expires_at"),
+  errorMessage: text("error_message"),
+}, (table) => ({
+  userEmailIdx: index("data_export_requests_user_email_idx").on(table.userEmail),
+  statusIdx: index("data_export_requests_status_idx").on(table.status),
+}));
+
+export type DataExportRequest = typeof dataExportRequests.$inferSelect;
+export type InsertDataExportRequest = typeof dataExportRequests.$inferInsert;

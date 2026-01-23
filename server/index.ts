@@ -65,6 +65,7 @@ import checkoutRouter from './routes/checkout';
 import dayPassesRouter from './routes/dayPasses';
 import financialsRouter from './routes/financials';
 import accountRouter from './routes/account';
+import dataExportRouter from './routes/dataExport';
 import { registerObjectStorageRoutes } from './replit_integrations/object_storage';
 import { ensureDatabaseConstraints, seedDefaultNoticeTypes } from './db-init';
 import { initWebSocketServer } from './core/websocket';
@@ -324,6 +325,7 @@ app.use('/api/auth', testAuthRouter);
 app.use(hubspotRouter);
 app.use(hubspotDealsRouter);
 app.use(accountRouter);
+app.use(dataExportRouter);
 app.use(membersRouter);
 app.use(usersRouter);
 app.use(wellnessRouter);
@@ -771,6 +773,9 @@ async function startServer() {
         const { runScheduledCleanup } = await import('./core/databaseCleanup');
         await runScheduledCleanup();
         
+        const { runSessionCleanup } = await import('./core/sessionCleanup');
+        await runSessionCleanup();
+        
         console.log('[Cleanup] Weekly cleanup completed');
       }
     } catch (err) {
@@ -942,6 +947,26 @@ async function startServer() {
   }, 60 * 60 * 1000);
   
   console.log('[Startup] Webhook log cleanup scheduler enabled (runs daily at 4am Pacific, deletes logs older than 30 days)');
+  
+  // Session cleanup scheduler - runs daily at 2am Pacific
+  setInterval(async () => {
+    try {
+      const pacificTime = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        hour: 'numeric',
+        hour12: false
+      }).format(new Date());
+      
+      if (parseInt(pacificTime) === 2) {
+        const { runSessionCleanup } = await import('./core/sessionCleanup');
+        await runSessionCleanup();
+      }
+    } catch (err) {
+      console.error('[Session Cleanup] Scheduler error:', err);
+    }
+  }, 60 * 60 * 1000);
+  
+  console.log('[Startup] Session cleanup scheduler enabled (runs daily at 2am Pacific)');
 }
 
 startServer().catch((err) => {

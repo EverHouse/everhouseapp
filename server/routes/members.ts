@@ -32,6 +32,7 @@ import { staffUsers } from '../../shared/schema';
 import { previewTierChange, commitTierChange, getAvailableTiersForChange } from '../core/stripe/tierChanges';
 import { fetchAllHubSpotContacts } from './hubspot';
 import { cascadeEmailChange, previewEmailChangeImpact } from '../core/memberService/emailChangeService';
+import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
 
@@ -178,6 +179,15 @@ router.get('/api/members/:email/details', isAuthenticated, async (req, res) => {
       .limit(1);
     
     const lastBookingDate = lastBookingResult[0]?.bookingDate || null;
+    
+    const sessionUser = getSessionUser(req);
+    const isStaffViewing = sessionUser?.email?.toLowerCase() !== normalizedEmail && 
+      (sessionUser?.role === 'staff' || sessionUser?.role === 'admin');
+    
+    if (isStaffViewing) {
+      logFromRequest(req, 'view_member_profile', 'member', normalizedEmail, 
+        `${user.firstName} ${user.lastName}`.trim() || undefined);
+    }
     
     res.json({
       id: user.id,
@@ -420,6 +430,12 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
     
     // Total attended visits = sum of all past activities
     const attendedVisitsCount = pastBookingsCount + pastEventsCount + pastWellnessCount;
+    
+    logFromRequest(req, 'view_member', 'member', normalizedEmail, undefined, { 
+      section: 'history',
+      bookingsCount: enrichedBookingHistory.length,
+      eventsCount: eventRsvpHistory.length
+    });
     
     res.json({
       bookingHistory: enrichedBookingHistory,
@@ -1244,6 +1260,10 @@ router.post('/api/members/:email/anonymize', isStaffOrAdmin, async (req, res) =>
     `);
     
     console.log(`[Privacy] Member ${normalizedEmail} anonymized by ${anonymizedBy} at ${now.toISOString()}`);
+    
+    logFromRequest(req, 'archive_member', 'member', normalizedEmail, 
+      `${userResult[0].firstName} ${userResult[0].lastName}`.trim() || undefined,
+      { action: 'anonymize', reason: 'CCPA compliance' });
     
     res.json({ 
       success: true, 
