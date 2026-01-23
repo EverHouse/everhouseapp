@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.4.4",
+    date: "2026-01-23",
+    title: "Change Booking Owner Feature",
+    changes: [
+      "Staff can now change the owner of any booking from the Booking Details modal",
+      "Trackman webhook events show member name on green button - click to reassign to different member",
+      "Unmatched Trackman bookings show amber 'Link to Member' button as before",
+      "All owner changes are logged to staff activity with previous and new owner information",
+      "Booking calendar cells now show amber color for unmatched bookings so staff can spot them easily"
+    ]
+  },
+  {
     version: "9.4.3",
     date: "2026-01-23",
     title: "Trackman Webhook Booking Creation Fixed",
