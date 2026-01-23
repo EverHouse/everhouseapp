@@ -1922,13 +1922,13 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                         <div className="w-full px-1 sm:px-2 pb-4">
                             <div className="w-full">
                             <div className="grid gap-0.5 w-full" style={{ gridTemplateColumns: `minmax(32px, 0.6fr) repeat(${resources.length}, minmax(0, 1fr))` }}>
-                                <div className="h-8 sm:h-10 bg-white dark:bg-surface-dark sticky top-0 z-10"></div>
+                                <div className="h-8 sm:h-10 sticky top-0 z-20 bg-[#1a1f1a] dark:bg-[#1a1f1a]"></div>
                                 {[...resources].sort((a, b) => {
                                     if (a.type === 'conference_room' && b.type !== 'conference_room') return 1;
                                     if (a.type !== 'conference_room' && b.type === 'conference_room') return -1;
                                     return 0;
                                 }).map(resource => (
-                                    <div key={resource.id} className={`h-8 sm:h-10 flex items-center justify-center font-bold text-[10px] sm:text-xs text-primary dark:text-white text-center bg-white dark:bg-surface-dark rounded-t-lg border border-gray-200 dark:border-white/25 px-0.5 sticky top-0 z-10 ${resource.type === 'conference_room' ? 'bg-purple-50 dark:bg-purple-500/10' : ''}`}>
+                                    <div key={resource.id} className={`h-8 sm:h-10 flex items-center justify-center font-bold text-[10px] sm:text-xs text-primary dark:text-white text-center rounded-t-lg border border-gray-200 dark:border-white/25 px-0.5 sticky top-0 z-20 ${resource.type === 'conference_room' ? 'bg-purple-100 dark:bg-purple-900/50' : 'bg-white dark:bg-[#1a1f1a]'}`}>
                                         <span className="hidden sm:inline">{resource.type === 'conference_room' ? 'Conf' : resource.name.replace('Simulator Bay ', 'Bay ')}</span>
                                         <span className="sm:hidden">{resource.type === 'conference_room' ? 'CR' : resource.name.replace('Simulator Bay ', 'B')}</span>
                                     </div>
@@ -2040,19 +2040,36 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                                     </span>
                                                                 </span>
                                                             )}
-                                                            {(booking?.has_unpaid_fees || ((booking as any)?.unfilled_slots && (booking as any).unfilled_slots > 0)) && (
-                                                                <span className={`absolute -top-0.5 ${isInactiveMember ? '-right-3' : '-right-0.5'} group`}>
-                                                                    <span className="w-2 h-2 rounded-full bg-amber-400 dark:bg-amber-500 block cursor-help"></span>
+                                                            {/* Red badge for unpaid fees */}
+                                                            {booking?.has_unpaid_fees && (
+                                                                <span className={`absolute -top-1 -right-1 group`}>
+                                                                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 dark:bg-red-400 block cursor-help border border-white dark:border-gray-800"></span>
                                                                     <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs font-medium text-white bg-gray-800 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
-                                                                        {booking?.has_unpaid_fees && (booking as any)?.unfilled_slots > 0
-                                                                            ? `Pending: $${((booking.total_owed || 0) / 100).toFixed(2)} owed + ${(booking as any).unfilled_slots} unfilled slot${(booking as any).unfilled_slots > 1 ? 's' : ''}`
-                                                                            : booking?.has_unpaid_fees
-                                                                                ? `Pending payment: $${((booking.total_owed || 0) / 100).toFixed(2)} owed`
-                                                                                : `${(booking as any).unfilled_slots} unfilled slot${(booking as any).unfilled_slots > 1 ? 's' : ''}`
-                                                                        }
+                                                                        ${((booking.total_owed || 0)).toFixed(2)} owed
                                                                     </span>
                                                                 </span>
                                                             )}
+                                                            {/* Amber badge for unfilled slots */}
+                                                            {(() => {
+                                                                const unfilledSlots = (booking as any)?.unfilled_slots || 0;
+                                                                const declaredPlayers = (booking as any)?.declared_player_count || 1;
+                                                                const filledSlots = declaredPlayers - unfilledSlots;
+                                                                if (unfilledSlots <= 0) return null;
+                                                                
+                                                                // Position shifts left if there's also a payment badge
+                                                                const rightOffset = booking?.has_unpaid_fees ? '-right-4' : '-right-1';
+                                                                
+                                                                return (
+                                                                    <span className={`absolute -top-1 ${rightOffset} group`}>
+                                                                        <span className="px-1 py-0.5 text-[8px] font-bold rounded bg-amber-400 dark:bg-amber-500 text-white cursor-help leading-none">
+                                                                            {filledSlots}/{declaredPlayers}
+                                                                        </span>
+                                                                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs font-medium text-white bg-gray-800 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                                                                            {filledSlots}/{declaredPlayers} slots filled
+                                                                        </span>
+                                                                    </span>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     ) : pendingRequest && (
                                                         <div className="px-0.5 sm:px-1 h-full flex items-center justify-center sm:justify-start">
