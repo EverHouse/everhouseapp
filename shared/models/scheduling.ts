@@ -95,6 +95,8 @@ export const bookingRequests = pgTable("booking_requests", {
   isUnmatched: boolean("is_unmatched").default(false),
   // Customer notes from Trackman for staff reference when matching unmatched bookings
   trackmanCustomerNotes: text("trackman_customer_notes"),
+  // Flag indicating if booking was auto-linked to existing request (vs manually linked by staff)
+  wasAutoLinked: boolean("was_auto_linked").default(false),
 }, (table) => [
   uniqueIndex("booking_requests_trackman_id_idx").on(table.trackmanBookingId),
   uniqueIndex("booking_requests_trackman_external_id_idx").on(table.trackmanExternalId),

@@ -298,10 +298,14 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                                 Error
                               </span>
                             )}
-                            {event.matched_booking_id && (
-                              <span className="px-1.5 md:px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-400 flex items-center gap-0.5 md:gap-1">
-                                <span className="material-symbols-outlined text-xs">link</span>
-                                Linked
+                            {event.matched_booking_id && !event.linked_booking_unmatched && (
+                              <span className={`px-1.5 md:px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-0.5 md:gap-1 ${
+                                event.was_auto_linked 
+                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-400'
+                                  : 'bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-400'
+                              }`}>
+                                <span className="material-symbols-outlined text-xs">{event.was_auto_linked ? 'auto_awesome' : 'link'}</span>
+                                {event.was_auto_linked ? 'Auto-Linked' : 'Linked'}
                               </span>
                             )}
                           </div>
@@ -363,6 +367,7 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                                 : null;
                               
                               if (isLinkedToMember && memberDisplayName) {
+                                const isAutoLinked = event.was_auto_linked;
                                 return (
                                   <button
                                     onClick={() => onLinkToMember({
@@ -376,8 +381,12 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                                       currentMemberEmail: event.linked_member_email,
                                       isRelink: true
                                     })}
-                                    className="px-2 py-1.5 rounded-lg text-xs font-medium bg-green-100 hover:bg-green-200 text-green-800 dark:bg-green-500/20 dark:hover:bg-green-500/30 dark:text-green-400 transition-colors flex items-center gap-1"
-                                    title="Click to change linked member"
+                                    className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 ${
+                                      isAutoLinked 
+                                        ? 'bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-500/20 dark:hover:bg-blue-500/30 dark:text-blue-400'
+                                        : 'bg-green-100 hover:bg-green-200 text-green-800 dark:bg-green-500/20 dark:hover:bg-green-500/30 dark:text-green-400'
+                                    }`}
+                                    title={isAutoLinked ? "Auto-linked from existing request (click to change)" : "Manually linked (click to change)"}
                                   >
                                     <span className="material-symbols-outlined text-sm">person</span>
                                     <span className="hidden sm:inline truncate max-w-[100px]">{memberDisplayName}</span>

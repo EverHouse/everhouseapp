@@ -651,6 +651,7 @@ async function tryAutoApproveBooking(
            reviewed_at = NOW(),
            reviewed_by = 'trackman_webhook',
            staff_notes = COALESCE(staff_notes, '') || ' [Auto-approved via Trackman webhook - fuzzy time match]',
+           was_auto_linked = true,
            updated_at = NOW()
        WHERE LOWER(user_email) = LOWER($2)
          AND request_date = $3
@@ -791,6 +792,7 @@ async function createBookingForMember(
              end_time = $5,
              duration_minutes = $6,
              status = 'approved',
+             was_auto_linked = true,
              reviewed_by = COALESCE(reviewed_by, 'trackman_webhook'),
              reviewed_at = COALESCE(reviewed_at, NOW()),
              updated_at = NOW()
@@ -1940,7 +1942,8 @@ router.get('/api/admin/trackman-webhooks', isStaffOrAdmin, async (req: Request, 
         twe.payload,
         br.user_name as linked_member_name,
         br.user_email as linked_member_email,
-        br.is_unmatched as linked_booking_unmatched
+        br.is_unmatched as linked_booking_unmatched,
+        br.was_auto_linked as was_auto_linked
        FROM trackman_webhook_events twe
        LEFT JOIN booking_requests br ON twe.matched_booking_id = br.id
        ${whereClause.replace('WHERE 1=1', 'WHERE twe.id IS NOT NULL')}
