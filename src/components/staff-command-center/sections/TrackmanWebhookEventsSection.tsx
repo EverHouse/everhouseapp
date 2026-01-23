@@ -170,6 +170,18 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
     fetchWebhookStats();
   }, [fetchWebhookStats]);
 
+  useEffect(() => {
+    const handleBookingActionCompleted = () => {
+      fetchWebhookStats();
+      if (showSection) {
+        fetchWebhookEvents(webhookPage);
+      }
+    };
+    
+    window.addEventListener('booking-action-completed', handleBookingActionCompleted);
+    return () => window.removeEventListener('booking-action-completed', handleBookingActionCompleted);
+  }, [fetchWebhookStats, fetchWebhookEvents, showSection, webhookPage]);
+
   const handleToggle = () => {
     setShowSection(!showSection);
     if (!showSection && webhookEvents.length === 0) {

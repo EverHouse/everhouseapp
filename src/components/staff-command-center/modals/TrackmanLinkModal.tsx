@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { ModalShell } from '../../ModalShell';
 import { useAsyncAction } from '../../../hooks/useAsyncAction';
 import TrackmanIcon from '../../icons/TrackmanIcon';
+import { MemberSearchInput, SelectedMember } from '../../shared/MemberSearchInput';
 
 interface TrackmanLinkModalProps {
   isOpen: boolean;
@@ -17,13 +18,6 @@ interface TrackmanLinkModalProps {
   onSuccess?: () => void;
 }
 
-interface MemberSearchResult {
-  id: number;
-  email: string;
-  name: string;
-  tier?: string;
-}
-
 export function TrackmanLinkModal({ 
   isOpen, 
   onClose, 
@@ -37,51 +31,14 @@ export function TrackmanLinkModal({
   isRelink,
   onSuccess
 }: TrackmanLinkModalProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<MemberSearchResult[]>([]);
-  const [selectedMember, setSelectedMember] = useState<MemberSearchResult | null>(null);
+  const [selectedMember, setSelectedMember] = useState<SelectedMember | null>(null);
   const { execute: linkToMember, isLoading: linking } = useAsyncAction<void>();
-  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
-      setSearchQuery('');
-      setSearchResults([]);
       setSelectedMember(null);
     }
   }, [isOpen]);
-
-  const searchMembers = useCallback(async (query: string) => {
-    if (query.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-    
-    setSearching(true);
-    try {
-      const res = await fetch(`/api/members/search?query=${encodeURIComponent(query)}&limit=10`);
-      if (res.ok) {
-        const data = await res.json();
-        setSearchResults(data.map((m: any) => ({
-          id: m.id,
-          email: m.email || m.emailRedacted || '',
-          name: m.name || m.firstName ? `${m.firstName || ''} ${m.lastName || ''}`.trim() : 'Unknown',
-          tier: m.tier
-        })));
-      }
-    } catch (e) {
-      console.error('Failed to search members:', e);
-    } finally {
-      setSearching(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      searchMembers(searchQuery);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, searchMembers]);
 
   const handleLink = async () => {
     if (!selectedMember) return;
@@ -190,67 +147,15 @@ export function TrackmanLinkModal({
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-primary dark:text-white mb-2">
-            Search for Member
-          </label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400">
-              search
-            </span>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name or email..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 dark:border-white/20 bg-white dark:bg-white/5 text-primary dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
-            />
-            {searching && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 animate-spin">
-                progress_activity
-              </span>
-            )}
-          </div>
-        </div>
-
-        {searchResults.length > 0 && (
-          <div className="max-h-48 overflow-y-auto border border-gray-200 dark:border-white/20 rounded-lg divide-y divide-gray-100 dark:divide-white/10">
-            {searchResults.map((member) => (
-              <button
-                key={member.id}
-                onClick={() => setSelectedMember(member)}
-                className={`w-full px-4 py-3 flex items-center justify-between text-left transition-colors ${
-                  selectedMember?.id === member.id
-                    ? 'bg-amber-100 dark:bg-amber-500/20'
-                    : 'hover:bg-gray-50 dark:hover:bg-white/5'
-                }`}
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-primary dark:text-white truncate">{member.name}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{member.email}</p>
-                </div>
-                {member.tier && (
-                  <span className="text-xs px-2 py-0.5 bg-primary/10 dark:bg-white/10 text-primary dark:text-white rounded-full">
-                    {member.tier}
-                  </span>
-                )}
-                {selectedMember?.id === member.id && (
-                  <span className="material-symbols-outlined text-amber-600 dark:text-amber-400">check_circle</span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {selectedMember && (
-          <div className="p-3 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/30 rounded-lg flex items-center gap-3">
-            <span className="material-symbols-outlined text-green-600 dark:text-green-400">person</span>
-            <div>
-              <p className="font-medium text-green-800 dark:text-green-300">{selectedMember.name}</p>
-              <p className="text-sm text-green-700 dark:text-green-400">{selectedMember.email}</p>
-            </div>
-          </div>
-        )}
+        <MemberSearchInput
+          label="Search for Member"
+          placeholder="Search by name or email..."
+          selectedMember={selectedMember}
+          onSelect={setSelectedMember}
+          onClear={() => setSelectedMember(null)}
+          showTier={true}
+          autoFocus={true}
+        />
 
         <div className="flex gap-3 pt-2">
           <button
