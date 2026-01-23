@@ -229,6 +229,12 @@ router.put('/api/member-billing/:email/source', isStaffOrAdmin, async (req, res)
 router.post('/api/member-billing/:email/pause', isStaffOrAdmin, async (req, res) => {
   try {
     const { email } = req.params;
+    const { durationDays } = req.body;
+
+    if (!durationDays || (durationDays !== 30 && durationDays !== 60)) {
+      return res.status(400).json({ error: 'Duration must be 30 or 60 days' });
+    }
+
     const member = await getMemberByEmail(email);
 
     if (!member) {
@@ -250,14 +256,24 @@ router.post('/api/member-billing/:email/pause', isStaffOrAdmin, async (req, res)
       return res.status(400).json({ error });
     }
 
+    const resumeDate = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
+    const resumeTimestamp = Math.floor(resumeDate.getTime() / 1000);
+
     await stripe.subscriptions.update(subscription.id, {
       pause_collection: {
         behavior: 'void',
+        resumes_at: resumeTimestamp,
       },
     });
 
-    console.log(`[MemberBilling] Paused subscription ${subscription.id} for ${email}`);
-    res.json({ success: true, subscriptionId: subscription.id, status: 'paused' });
+    console.log(`[MemberBilling] Paused subscription ${subscription.id} for ${email} until ${resumeDate.toISOString()} (${durationDays} days)`);
+    res.json({ 
+      success: true, 
+      subscriptionId: subscription.id, 
+      status: 'paused',
+      resumeDate: resumeDate.toISOString(),
+      durationDays,
+    });
   } catch (error: any) {
     console.error('[MemberBilling] Error pausing subscription:', error);
     res.status(500).json({ error: error.message });

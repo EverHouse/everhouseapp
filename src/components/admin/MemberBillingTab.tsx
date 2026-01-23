@@ -25,7 +25,8 @@ interface Subscription {
   currentPeriodStart?: number;
   currentPeriodEnd?: number;
   cancelAtPeriodEnd?: boolean;
-  pauseCollection?: { behavior: string } | null;
+  isPaused?: boolean;
+  pausedUntil?: string | null;
   discount?: {
     id: string;
     coupon: {
@@ -309,6 +310,119 @@ function ConfirmCancelModal({
   );
 }
 
+function PauseDurationModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  isLoading,
+  isDark,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (durationDays: 30 | 60) => void;
+  isLoading: boolean;
+  isDark: boolean;
+}) {
+  const [selectedDuration, setSelectedDuration] = useState<30 | 60>(30);
+
+  const getResumeDate = (days: number) => {
+    const date = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  };
+
+  return (
+    <ModalShell isOpen={isOpen} onClose={onClose} title="Pause Subscription" size="sm">
+      <div className="p-4 space-y-4">
+        <div className={`p-4 rounded-lg ${isDark ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-yellow-50 border border-yellow-200'}`}>
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-yellow-500 text-xl">pause_circle</span>
+            <div>
+              <p className={`text-sm font-medium ${isDark ? 'text-yellow-400' : 'text-yellow-700'}`}>
+                Choose pause duration
+              </p>
+              <p className={`text-xs mt-1 ${isDark ? 'text-yellow-400/80' : 'text-yellow-600'}`}>
+                Billing will automatically resume after the selected period.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <button
+            onClick={() => setSelectedDuration(30)}
+            className={`w-full p-3 rounded-lg border text-left transition-colors ${
+              selectedDuration === 30
+                ? isDark
+                  ? 'bg-accent/20 border-accent text-white'
+                  : 'bg-primary/10 border-primary text-primary'
+                : isDark
+                  ? 'bg-white/5 border-white/10 text-white hover:bg-white/10'
+                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">30 Days</p>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Resumes on {getResumeDate(30)}
+                </p>
+              </div>
+              {selectedDuration === 30 && (
+                <span className="material-symbols-outlined text-accent">check_circle</span>
+              )}
+            </div>
+          </button>
+
+          <button
+            onClick={() => setSelectedDuration(60)}
+            className={`w-full p-3 rounded-lg border text-left transition-colors ${
+              selectedDuration === 60
+                ? isDark
+                  ? 'bg-accent/20 border-accent text-white'
+                  : 'bg-primary/10 border-primary text-primary'
+                : isDark
+                  ? 'bg-white/5 border-white/10 text-white hover:bg-white/10'
+                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">60 Days</p>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Resumes on {getResumeDate(60)}
+                </p>
+              </div>
+              {selectedDuration === 60 && (
+                <span className="material-symbols-outlined text-accent">check_circle</span>
+              )}
+            </div>
+          </button>
+        </div>
+
+        <div className="flex gap-2 pt-2">
+          <button
+            onClick={onClose}
+            className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              isDark ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(selectedDuration)}
+            disabled={isLoading}
+            className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
+              isDark ? 'bg-yellow-500 text-black hover:bg-yellow-400' : 'bg-yellow-500 text-white hover:bg-yellow-600'
+            }`}
+          >
+            {isLoading ? 'Pausing...' : `Pause for ${selectedDuration} Days`}
+          </button>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
 const MemberBillingTab: React.FC<MemberBillingTabProps> = ({ 
   memberEmail, 
   memberId, 
@@ -340,6 +454,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showPauseModal, setShowPauseModal] = useState(false);
   const [showTierChangeModal, setShowTierChangeModal] = useState(false);
 
   const showSuccess = (message: string) => {
@@ -448,17 +563,22 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
     }
   };
 
-  const handlePauseSubscription = async () => {
+  const handlePauseSubscription = async (durationDays: 30 | 60) => {
     setIsPausing(true);
     setError(null);
     try {
       const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/pause`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify({ durationDays }),
       });
       if (res.ok) {
+        const data = await res.json();
         await fetchBillingInfo();
-        showSuccess('Subscription paused');
+        setShowPauseModal(false);
+        const resumeDate = new Date(data.resumeDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        showSuccess(`Subscription paused for ${durationDays} days. Billing resumes on ${resumeDate}.`);
       } else {
         const errData = await res.json();
         setError(errData.error || 'Failed to pause subscription');
@@ -761,7 +881,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
           isPausing={isPausing}
           isResuming={isResuming}
           isGettingPaymentLink={isGettingPaymentLink}
-          onPause={handlePauseSubscription}
+          onPause={() => setShowPauseModal(true)}
           onResume={handleResumeSubscription}
           onShowCancelModal={() => setShowCancelModal(true)}
           onShowCreditModal={() => setShowCreditModal(true)}
@@ -865,6 +985,14 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         onClose={() => setShowCancelModal(false)}
         onConfirm={handleCancelSubscription}
         isLoading={isCanceling}
+        isDark={isDark}
+      />
+
+      <PauseDurationModal
+        isOpen={showPauseModal}
+        onClose={() => setShowPauseModal(false)}
+        onConfirm={handlePauseSubscription}
+        isLoading={isPausing}
         isDark={isDark}
       />
 
