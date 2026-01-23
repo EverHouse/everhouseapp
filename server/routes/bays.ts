@@ -2148,12 +2148,13 @@ router.get('/api/conference-room-bookings', async (req, res) => {
     const searchEmail = member_email as string || sessionUser.email || undefined;
     
     const bookings = await getConferenceRoomBookingsFromCalendar(searchName, searchEmail);
+    const conferenceRoomId = await getConferenceRoomId();
     
     // Transform to match booking format expected by frontend
     const formattedBookings = bookings.map(booking => ({
       id: `cal_${booking.id}`,
       source: 'calendar',
-      resource_id: CONFERENCE_ROOM_BAY_ID,
+      resource_id: conferenceRoomId,
       resource_name: 'Conference Room',
       request_date: booking.date,
       start_time: booking.startTime + ':00',
@@ -2231,6 +2232,7 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
       );
       
       // Filter and format calendar bookings
+      const confRoomId = await getConferenceRoomId();
       calendarBookings = calendarEvents
         .filter(event => {
           // Exclude events that already exist in DB
@@ -2246,7 +2248,7 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
           id: `cal_${event.id}`,
           user_email: null,
           user_name: event.memberName,
-          resource_id: CONFERENCE_ROOM_BAY_ID,
+          resource_id: confRoomId,
           resource_preference: null,
           request_date: event.date,
           start_time: event.startTime + ':00',
