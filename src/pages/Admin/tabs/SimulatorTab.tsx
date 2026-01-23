@@ -72,16 +72,6 @@ interface CalendarClosure {
     reason: string | null;
 }
 
-interface UnmatchedBooking {
-    id: number;
-    bookingDate: string;
-    startTime: string;
-    endTime: string;
-    bayNumber: string | null;
-    userName: string | null;
-    originalEmail: string | null;
-}
-
 interface AvailabilityBlock {
     id: number;
     resourceId: number;
@@ -722,12 +712,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
     const [markStatusModal, setMarkStatusModal] = useState<{ booking: BookingRequest | null; confirmNoShow: boolean }>({ booking: null, confirmNoShow: false });
     
     const [calendarDate, setCalendarDate] = useState(() => getTodayPacific());
-    const [isSyncingHistory, setIsSyncingHistory] = useState(false);
-    const [unmatchedBookings, setUnmatchedBookings] = useState<UnmatchedBooking[]>([]);
     const [showDatePicker, setShowDatePicker] = useState(false);
-    const [resolveUnmatchedModal, setResolveUnmatchedModal] = useState<{ booking: UnmatchedBooking; memberEmail: string; rememberEmail: boolean } | null>(null);
-    const [resolveMembers, setResolveMembers] = useState<MemberSearchResult[]>([]);
-    const [resolveSearchQuery, setResolveSearchQuery] = useState('');
     const [editingTrackmanId, setEditingTrackmanId] = useState(false);
     const [trackmanIdDraft, setTrackmanIdDraft] = useState('');
     const [savingTrackmanId, setSavingTrackmanId] = useState(false);
@@ -747,61 +732,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
         setSavingTrackmanId(false);
     }, [selectedCalendarBooking]);
 
-    const getCsrfToken = (): string | null => {
-        const match = document.cookie.match(/csrf_token=([^;]+)/);
-        return match ? match[1] : null;
-    };
-
-    const handleSyncHistory = useCallback(async () => {
-        if (isSyncingHistory) return;
-        setIsSyncingHistory(true);
-        try {
-            const csrfToken = getCsrfToken();
-            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-            if (csrfToken) headers['x-csrf-token'] = csrfToken;
-            
-            const res = await fetch('/api/admin/bookings/sync-history', {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ monthsBack: 12 }),
-                credentials: 'include'
-            });
-            const data = await res.json();
-            if (res.ok && data.totals) {
-                showToast(`Synced ${data.totals.synced} bookings (${data.totals.created} new, ${data.totals.linked} linked) from both calendars`, 'success');
-            } else if (res.ok) {
-                showToast('Sync completed', 'success');
-            } else {
-                showToast(data.error || 'Sync failed', 'error');
-            }
-        } catch (err) {
-            showToast('Failed to sync historical bookings', 'error');
-        } finally {
-            setIsSyncingHistory(false);
-        }
-    }, [isSyncingHistory, showToast]);
-
     useEffect(() => {
-        const fetchMembersForResolve = async () => {
-            try {
-                const res = await fetch('/api/hubspot/contacts?status=all', { credentials: 'include' });
-                if (res.ok) {
-                    const rawData = await res.json();
-                    const data = Array.isArray(rawData) ? rawData : (rawData.contacts || []);
-                    const members: MemberSearchResult[] = data.map((m: { email: string; firstName?: string; lastName?: string; tier?: string; status?: string }) => ({
-                        email: m.email,
-                        firstName: m.firstName || null,
-                        lastName: m.lastName || null,
-                        tier: m.tier || null,
-                        status: m.status || null
-                    }));
-                    setResolveMembers(members);
-                }
-            } catch (err) {
-                console.error('Failed to fetch members for resolve:', err);
-            }
-        };
-        
         const fetchAllMemberStatuses = async () => {
             try {
                 // Fetch all members (including inactive) for status and name maps
@@ -840,18 +771,8 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
             }
         };
         
-        fetchMembersForResolve();
         fetchAllMemberStatuses();
     }, []);
-
-    const filteredResolveMembers = useMemo(() => {
-        if (!resolveSearchQuery) return resolveMembers.slice(0, 20);
-        const query = resolveSearchQuery.toLowerCase();
-        return resolveMembers.filter(m => {
-            const fullName = `${m.firstName || ''} ${m.lastName || ''}`.toLowerCase();
-            return m.email.toLowerCase().includes(query) || fullName.includes(query);
-        }).slice(0, 20);
-    }, [resolveMembers, resolveSearchQuery]);
 
     useEffect(() => {
         if (!isLoading) {
@@ -905,7 +826,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
     }, []);
 
     useEffect(() => {
-        if (actionModal || showTrackmanConfirm || selectedCalendarBooking || markStatusModal.booking || resolveUnmatchedModal) {
+        if (actionModal || showTrackmanConfirm || selectedCalendarBooking || markStatusModal.booking) {
             document.body.style.overflow = 'hidden';
         } else {
             document.body.style.overflow = '';
@@ -913,7 +834,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
         return () => {
             document.body.style.overflow = '';
         };
-    }, [actionModal, showTrackmanConfirm, selectedCalendarBooking, markStatusModal.booking, resolveUnmatchedModal]);
+    }, [actionModal, showTrackmanConfirm, selectedCalendarBooking, markStatusModal.booking]);
 
     const fetchData = useCallback(async () => {
         setIsLoading(true);
@@ -980,10 +901,9 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
         const startDate = addDaysToPacificDate(baseDate, -60);
         const endDate = addDaysToPacificDate(baseDate, 30);
         try {
-            const [bookingsRes, closuresRes, unmatchedRes, blocksRes] = await Promise.all([
+            const [bookingsRes, closuresRes, blocksRes] = await Promise.all([
                 fetch(`/api/approved-bookings?start_date=${startDate}&end_date=${endDate}`),
                 fetch('/api/closures'),
-                fetch(`/api/admin/trackman/unmatched-calendar?start_date=${startDate}&end_date=${endDate}`, { credentials: 'include' }),
                 fetch(`/api/availability-blocks?start_date=${startDate}&end_date=${endDate}`)
             ]);
             
@@ -998,11 +918,6 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                     c.startDate <= endDate && c.endDate >= startDate
                 );
                 setClosures(activeClosures);
-            }
-            
-            if (unmatchedRes.ok) {
-                const unmatchedData = await unmatchedRes.json();
-                setUnmatchedBookings(unmatchedData);
             }
             
             if (blocksRes.ok) {
@@ -1023,71 +938,6 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
             console.error('Failed to fetch calendar data:', err);
         }
     }, [activeView, calendarDate]);
-
-    const handleResolveUnmatched = useCallback(async () => {
-        if (!resolveUnmatchedModal) return;
-        const bookingToResolve = resolveUnmatchedModal.booking;
-        const memberEmail = resolveUnmatchedModal.memberEmail;
-        const rememberEmail = resolveUnmatchedModal.rememberEmail;
-        const originalEmail = bookingToResolve.originalEmail;
-        
-        // Optimistic UI: Remove the booking from unmatchedBookings immediately
-        setUnmatchedBookings(prev => prev.filter(ub => ub.id !== bookingToResolve.id));
-        setResolveUnmatchedModal(null);
-        setResolveSearchQuery('');
-        
-        try {
-            const res = await fetch(`/api/admin/trackman/unmatched/${bookingToResolve.id}/resolve`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ memberEmail })
-            });
-            if (res.ok) {
-                const data = await res.json();
-                
-                // Save email link if checkbox was checked and emails differ
-                const shouldRemember = rememberEmail && originalEmail && 
-                    originalEmail.toLowerCase() !== memberEmail.toLowerCase();
-                if (shouldRemember) {
-                    try {
-                        await fetch('/api/admin/linked-emails', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
-                            body: JSON.stringify({
-                                primaryEmail: memberEmail,
-                                linkedEmail: originalEmail
-                            })
-                        });
-                    } catch (linkErr) {
-                        console.warn('Failed to save email link:', linkErr);
-                    }
-                }
-                
-                if (data.autoResolved > 0) {
-                    // Also remove auto-resolved bookings from state
-                    setUnmatchedBookings(prev => prev.filter(ub => 
-                        ub.originalEmail?.toLowerCase() !== bookingToResolve.originalEmail?.toLowerCase()
-                    ));
-                    showToast(`Resolved ${data.resolved} booking(s) (${data.autoResolved} auto-resolved with same email)`, 'success', 5000);
-                } else {
-                    showToast('Booking resolved successfully', 'success');
-                }
-                // Refresh to get updated approved bookings (the resolved booking is now green)
-                await fetchCalendarData();
-            } else {
-                // Rollback: Re-add the booking if resolve failed
-                setUnmatchedBookings(prev => [...prev, bookingToResolve]);
-                showToast('Failed to resolve booking', 'error');
-            }
-        } catch (err) {
-            console.error('Failed to resolve booking:', err);
-            // Rollback on error
-            setUnmatchedBookings(prev => [...prev, bookingToResolve]);
-            showToast('Failed to resolve booking', 'error');
-        }
-    }, [resolveUnmatchedModal, showToast, fetchCalendarData]);
 
     useEffect(() => {
         fetchData();
@@ -1673,28 +1523,14 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                         </button>
                     </div>
                     <div className="flex items-center">
-                        {activeView === 'requests' ? (
-                            <button
-                                onClick={() => onTabChange('trackman')}
-                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary dark:text-white bg-primary/10 dark:bg-white/10 hover:bg-primary/20 dark:hover:bg-white/20 rounded-lg transition-colors shadow-sm"
-                                title="Import bookings from Trackman CSV"
-                            >
-                                <span className="material-symbols-outlined text-sm">upload_file</span>
-                                <span>Import</span>
-                            </button>
-                        ) : (
-                            <button
-                                onClick={handleSyncHistory}
-                                disabled={isSyncingHistory}
-                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-primary dark:bg-lavender hover:bg-primary/90 dark:hover:bg-lavender/90 rounded-lg transition-colors disabled:opacity-50 shadow-sm"
-                                title="Sync conference room bookings from MindBody (last 12 months)"
-                            >
-                                <span className={`material-symbols-outlined text-sm ${isSyncingHistory ? 'animate-spin' : ''}`}>
-                                    {isSyncingHistory ? 'sync' : 'cloud_sync'}
-                                </span>
-                                <span>{isSyncingHistory ? 'Syncing...' : 'Sync'}</span>
-                            </button>
-                        )}
+                        <button
+                            onClick={() => onTabChange('trackman')}
+                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary dark:text-white bg-primary/10 dark:bg-white/10 hover:bg-primary/20 dark:hover:bg-white/20 rounded-lg transition-colors shadow-sm"
+                            title="Import bookings from Trackman CSV"
+                        >
+                            <span className="material-symbols-outlined text-sm">upload_file</span>
+                            <span>Import</span>
+                        </button>
                     </div>
                 </div>
 
@@ -2048,21 +1884,6 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                     document.body
                                 )}
                             </div>
-                            {actualUser?.role === 'admin' ? (
-                                <button
-                                    onClick={handleSyncHistory}
-                                    disabled={isSyncingHistory}
-                                    className="hidden lg:flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-primary dark:bg-lavender hover:bg-primary/90 dark:hover:bg-lavender/90 rounded-lg transition-colors disabled:opacity-50 shadow-sm"
-                                    title="Sync conference room bookings from MindBody (last 12 months)"
-                                >
-                                    <span className={`material-symbols-outlined text-sm ${isSyncingHistory ? 'animate-spin' : ''}`}>
-                                        {isSyncingHistory ? 'sync' : 'cloud_sync'}
-                                    </span>
-                                    <span>{isSyncingHistory ? 'Syncing...' : 'Sync'}</span>
-                                </button>
-                            ) : (
-                                <div className="w-24 hidden lg:block"></div>
-                            )}
                         </div>
                     </div>
                     
@@ -2110,18 +1931,8 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                 return slotStart < bookEnd && slotEnd > bookStart;
                                             });
                                             
-                                            const unmatchedBooking = !booking ? unmatchedBookings.find(ub => {
-                                                const bayNum = ub.bayNumber ? parseInt(ub.bayNumber, 10) : null;
-                                                if (bayNum !== resource.id || ub.bookingDate !== calendarDate) return false;
-                                                const [ubh, ubm] = ub.startTime.split(':').map(Number);
-                                                const [ueh, uem] = ub.endTime.split(':').map(Number);
-                                                const ubStart = ubh * 60 + ubm;
-                                                const ubEnd = ueh * 60 + uem;
-                                                return slotStart < ubEnd && slotEnd > ubStart;
-                                            }) : null;
-                                            
                                             // Check for pending requests (awaiting Trackman webhook sync)
-                                            const pendingRequest = !booking && !unmatchedBooking ? pendingRequests.find(pr => {
+                                            const pendingRequest = !booking ? pendingRequests.find(pr => {
                                                 if (pr.resource_id !== resource.id || pr.request_date !== calendarDate) return false;
                                                 const [prh, prm] = pr.start_time.split(':').map(Number);
                                                 const [preh, prem] = pr.end_time.split(':').map(Number);
@@ -2140,43 +1951,31 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                             const isTrackmanMatched = !!(booking as any)?.trackman_booking_id || (booking?.notes && booking.notes.includes('[Trackman Import ID:'));
                                             const hasKnownInactiveStatus = bookingMemberStatus && bookingMemberStatus.toLowerCase() !== 'active' && bookingMemberStatus.toLowerCase() !== 'unknown';
                                             const isInactiveMember = booking && bookingEmail && isTrackmanMatched && hasKnownInactiveStatus;
-                                            const isUnmatchedPlaceholder = booking && isTrackmanMatched && (
-                                                bookingEmail.includes('unmatched@') ||
-                                                bookingEmail.includes('unmatched-') ||
-                                                bookingEmail.includes('@trackman.local') ||
-                                                bookingEmail.includes('anonymous@') ||
-                                                bookingEmail.includes('booking@evenhouse')
-                                            );
-                                            
                                             const handleEmptyCellClick = () => {
                                                 window.dispatchEvent(new CustomEvent('open-manual-booking', {
                                                     detail: { resourceId: resource.id, date: calendarDate, startTime: slot }
                                                 }));
                                             };
                                             
-                                            const isEmptyCell = !closure && !eventBlock && !booking && !unmatchedBooking && !pendingRequest;
+                                            const isEmptyCell = !closure && !eventBlock && !booking && !pendingRequest;
                                             
                                             return (
                                                 <div
                                                     key={`${resource.id}-${slot}`}
-                                                    title={closure ? `CLOSED: ${closure.title}` : eventBlock ? `EVENT BLOCK: ${eventBlock.closureTitle || eventBlock.blockType || 'Blocked'}` : isUnmatchedPlaceholder ? `UNMATCHED: ${booking?.user_name || 'Unknown'} - Click to resolve` : booking ? `${bookingDisplayName}${isInactiveMember ? ' (Inactive Member)' : ''} - Click for details` : unmatchedBooking ? `UNMATCHED: ${unmatchedBooking.userName || unmatchedBooking.originalEmail || 'Unknown'} - Click to resolve` : pendingRequest ? `PENDING: ${pendingRequest.user_name || 'Request'} - Awaiting Trackman sync` : `Click to book ${resource.type === 'conference_room' ? 'Conference Room' : resource.name} at ${formatTime12Hour(slot)}`}
-                                                    onClick={closure || eventBlock ? undefined : booking ? () => setSelectedCalendarBooking(booking) : unmatchedBooking ? () => { setResolveSearchQuery(''); setResolveUnmatchedModal({ booking: unmatchedBooking, memberEmail: '', rememberEmail: true }); } : pendingRequest ? () => { setSelectedRequest(pendingRequest); setActionModal('decline'); } : handleEmptyCellClick}
+                                                    title={closure ? `CLOSED: ${closure.title}` : eventBlock ? `EVENT BLOCK: ${eventBlock.closureTitle || eventBlock.blockType || 'Blocked'}` : booking ? `${bookingDisplayName}${isInactiveMember ? ' (Inactive Member)' : ''} - Click for details` : pendingRequest ? `PENDING: ${pendingRequest.user_name || 'Request'} - Awaiting Trackman sync` : `Click to book ${resource.type === 'conference_room' ? 'Conference Room' : resource.name} at ${formatTime12Hour(slot)}`}
+                                                    onClick={closure || eventBlock ? undefined : booking ? () => setSelectedCalendarBooking(booking) : pendingRequest ? () => { setSelectedRequest(pendingRequest); setActionModal('decline'); } : handleEmptyCellClick}
                                                     className={`h-7 sm:h-8 rounded ${
                                                         closure
                                                             ? 'bg-red-100 dark:bg-red-500/20 border border-red-300 dark:border-red-500/30'
                                                             : eventBlock
                                                                 ? 'bg-orange-100 dark:bg-orange-500/20 border border-orange-300 dark:border-orange-500/30'
-                                                            : isUnmatchedPlaceholder
-                                                                ? 'bg-amber-100 dark:bg-amber-500/20 border border-amber-300 dark:border-amber-500/30 cursor-pointer hover:bg-amber-200 dark:hover:bg-amber-500/30'
                                                             : booking 
                                                                 ? isConference
                                                                     ? 'bg-purple-100 dark:bg-purple-500/20 border border-purple-300 dark:border-purple-500/30 cursor-pointer hover:bg-purple-200 dark:hover:bg-purple-500/30'
                                                                     : isInactiveMember
                                                                         ? 'bg-green-100/50 dark:bg-green-500/10 border border-dashed border-orange-300 dark:border-orange-500/40 cursor-pointer hover:bg-green-200/50 dark:hover:bg-green-500/20'
                                                                         : 'bg-green-100 dark:bg-green-500/20 border border-green-300 dark:border-green-500/30 cursor-pointer hover:bg-green-200 dark:hover:bg-green-500/30' 
-                                                                : unmatchedBooking
-                                                                    ? 'bg-amber-100 dark:bg-amber-500/20 border border-amber-300 dark:border-amber-500/30 cursor-pointer hover:bg-amber-200 dark:hover:bg-amber-500/30'
-                                                                    : pendingRequest
+                                                                : pendingRequest
                                                                         ? 'bg-blue-50 dark:bg-blue-500/10 border-2 border-dashed border-blue-400 dark:border-blue-400/50 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-500/20'
                                                                         : isConference
                                                                             ? 'bg-purple-50/50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 cursor-pointer hover:bg-purple-100/50 dark:hover:bg-purple-500/15'
@@ -2197,13 +1996,6 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                             </span>
                                                             <span className="sm:hidden text-[8px] font-bold text-orange-600 dark:text-orange-400">E</span>
                                                         </div>
-                                                    ) : isUnmatchedPlaceholder && booking ? (
-                                                        <div className="px-0.5 sm:px-1 h-full flex items-center justify-center sm:justify-start">
-                                                            <span className="hidden sm:block text-[9px] sm:text-[10px] font-medium truncate text-amber-700 dark:text-amber-300">
-                                                                {booking.user_name || 'Unmatched'}
-                                                            </span>
-                                                            <span className="sm:hidden w-3 h-3 rounded-full bg-amber-500 dark:bg-amber-400" title={booking.user_name || 'Unmatched'}></span>
-                                                        </div>
                                                     ) : booking ? (
                                                         <div className="px-0.5 sm:px-1 h-full flex items-center justify-center sm:justify-start relative">
                                                             <span className={`hidden sm:block text-[9px] sm:text-[10px] font-medium truncate ${isConference ? 'text-purple-700 dark:text-purple-300' : isInactiveMember ? 'text-green-600/70 dark:text-green-400/70' : 'text-green-700 dark:text-green-300'}`}>
@@ -2218,13 +2010,6 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                                     </span>
                                                                 </span>
                                                             )}
-                                                        </div>
-                                                    ) : unmatchedBooking ? (
-                                                        <div className="px-0.5 sm:px-1 h-full flex items-center justify-center sm:justify-start">
-                                                            <span className="hidden sm:block text-[9px] sm:text-[10px] font-medium truncate text-amber-700 dark:text-amber-300">
-                                                                {unmatchedBooking.userName || 'Unmatched'}
-                                                            </span>
-                                                            <span className="sm:hidden w-3 h-3 rounded-full bg-amber-500 dark:bg-amber-400" title={unmatchedBooking.userName || 'Unmatched'}></span>
                                                         </div>
                                                     ) : pendingRequest && (
                                                         <div className="px-0.5 sm:px-1 h-full flex items-center justify-center sm:justify-start">
@@ -2486,28 +2271,6 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                         const isTrackmanMatched = !!(selectedCalendarBooking as any)?.trackman_booking_id || (selectedCalendarBooking?.notes && selectedCalendarBooking.notes.includes('[Trackman Import ID:'));
                         const hasKnownInactiveStatus = memberStatus && memberStatus.toLowerCase() !== 'active' && memberStatus.toLowerCase() !== 'unknown';
                         const shouldShowWarning = email && isTrackmanMatched && hasKnownInactiveStatus;
-                        const isUnmatchedPlaceholderBooking = isTrackmanMatched && (
-                            email.includes('unmatched@') ||
-                            email.includes('unmatched-') ||
-                            email.includes('@trackman.local') ||
-                            email.includes('anonymous@') ||
-                            email.includes('booking@evenhouse')
-                        );
-                        
-                        if (isUnmatchedPlaceholderBooking) {
-                            return (
-                                <div className="p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg flex items-start gap-2">
-                                    <span aria-hidden="true" className="material-symbols-outlined text-amber-500 dark:text-amber-400 text-lg flex-shrink-0">person_search</span>
-                                    <div>
-                                        <p className="font-medium text-amber-700 dark:text-amber-300 text-sm">
-                                            Unmatched Trackman Booking
-                                        </p>
-                                        <p className="text-xs text-amber-600 dark:text-amber-400">This booking needs to be matched to a member. Use the resolve dropdown below to assign it.</p>
-                                    </div>
-                                </div>
-                            );
-                        }
-                        
                         return shouldShowWarning ? (
                             <div className="p-3 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 rounded-lg flex items-start gap-2">
                                 <span aria-hidden="true" className="material-symbols-outlined text-orange-500 dark:text-orange-400 text-lg flex-shrink-0">warning</span>
@@ -2989,114 +2752,6 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                     >
                         Cancel
                     </button>
-                </div>
-            </ModalShell>
-
-            <ModalShell isOpen={!!resolveUnmatchedModal} onClose={() => { setResolveUnmatchedModal(null); setResolveSearchQuery(''); }} title="Resolve Unmatched Booking" showCloseButton={true}>
-                <div className="p-6 space-y-4">
-                    <div className="p-3 bg-amber-50 dark:bg-amber-500/10 rounded-lg border border-amber-200 dark:border-amber-500/30">
-                        <p className="font-medium text-amber-700 dark:text-amber-300">Unmatched Trackman Booking</p>
-                        <p className="text-sm text-amber-600 dark:text-amber-400">
-                            {resolveUnmatchedModal?.booking.userName || resolveUnmatchedModal?.booking.originalEmail || 'Unknown'}
-                        </p>
-                        <p className="text-sm text-amber-600 dark:text-amber-400">
-                            {resolveUnmatchedModal?.booking.bookingDate && formatDateShortAdmin(resolveUnmatchedModal.booking.bookingDate)} • {resolveUnmatchedModal?.booking.startTime && formatTime12Hour(resolveUnmatchedModal.booking.startTime)} - {resolveUnmatchedModal?.booking.endTime && formatTime12Hour(resolveUnmatchedModal.booking.endTime)}
-                        </p>
-                        {resolveUnmatchedModal?.booking.bayNumber && (
-                            <p className="text-sm text-amber-600 dark:text-amber-400">Bay {resolveUnmatchedModal.booking.bayNumber}</p>
-                        )}
-                    </div>
-                    
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Search for Member</label>
-                        <input
-                            type="text"
-                            value={resolveSearchQuery}
-                            onChange={(e) => setResolveSearchQuery(e.target.value)}
-                            placeholder="Search by name or email..."
-                            className="w-full p-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white"
-                        />
-                    </div>
-                    
-                    <div className="max-h-48 overflow-y-auto space-y-1">
-                        {filteredResolveMembers.length > 0 ? filteredResolveMembers.map(member => {
-                            const isActive = member.status?.toLowerCase() === 'active';
-                            return (
-                                <button
-                                    key={member.email}
-                                    onClick={() => setResolveUnmatchedModal(prev => prev ? { ...prev, memberEmail: member.email } : null)}
-                                    className={`w-full text-left p-3 rounded-lg transition-colors ${
-                                        resolveUnmatchedModal?.memberEmail === member.email
-                                            ? 'bg-primary/10 dark:bg-white/10 border border-primary dark:border-white/30'
-                                            : isActive 
-                                                ? 'bg-gray-50 dark:bg-white/5 border border-transparent hover:bg-gray-100 dark:hover:bg-white/10'
-                                                : 'bg-orange-50/50 dark:bg-orange-500/5 border border-orange-200/50 dark:border-orange-500/20 hover:bg-orange-100/50 dark:hover:bg-orange-500/10'
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <p className="font-medium text-primary dark:text-white text-sm">
-                                            {member.firstName && member.lastName ? `${member.firstName} ${member.lastName}` : member.email}
-                                        </p>
-                                        {!isActive && member.status && (
-                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 font-medium">
-                                                {member.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">{member.email}</p>
-                                </button>
-                            );
-                        }) : (
-                            <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                                {resolveSearchQuery ? 'No members found' : 'Start typing to search members'}
-                            </p>
-                        )}
-                    </div>
-                    
-                    {resolveUnmatchedModal?.memberEmail && (
-                        <div className="p-3 bg-green-50 dark:bg-green-500/10 rounded-lg border border-green-200 dark:border-green-500/30">
-                            <p className="text-sm text-green-700 dark:text-green-400">
-                                Selected: <span className="font-medium">{resolveUnmatchedModal.memberEmail}</span>
-                            </p>
-                        </div>
-                    )}
-                    
-                    {resolveUnmatchedModal?.memberEmail && resolveUnmatchedModal?.booking?.originalEmail && 
-                      resolveUnmatchedModal.booking.originalEmail.toLowerCase() !== resolveUnmatchedModal.memberEmail.toLowerCase() && (
-                      <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-500/30">
-                        <label className="flex items-start gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={resolveUnmatchedModal.rememberEmail}
-                            onChange={(e) => setResolveUnmatchedModal({ ...resolveUnmatchedModal, rememberEmail: e.target.checked })}
-                            className="mt-0.5 w-4 h-4 rounded border-amber-400 text-amber-500 focus:ring-amber-500/50 focus:ring-offset-0"
-                          />
-                          <div>
-                            <p className="text-sm font-medium text-primary dark:text-white">Remember this email for future bookings</p>
-                            <p className="text-xs text-primary/70 dark:text-white/70 mt-0.5">
-                              Link "{resolveUnmatchedModal.booking.originalEmail}" to this member's account
-                            </p>
-                          </div>
-                        </label>
-                      </div>
-                    )}
-                    
-                    <div className="flex gap-3">
-                        <button
-                            onClick={() => { setResolveUnmatchedModal(null); setResolveSearchQuery(''); }}
-                            className="flex-1 py-3 px-4 rounded-lg border border-gray-200 dark:border-white/25 text-gray-600 dark:text-gray-300 font-medium"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleResolveUnmatched}
-                            disabled={!resolveUnmatchedModal?.memberEmail}
-                            className="flex-1 py-3 px-4 rounded-lg bg-primary text-white font-medium flex items-center justify-center gap-2 hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <span aria-hidden="true" className="material-symbols-outlined text-sm">link</span>
-                            Resolve Booking
-                        </button>
-                    </div>
                 </div>
             </ModalShell>
 
