@@ -171,6 +171,25 @@ async function handleChargeRefunded(charge: any): Promise<void> {
   const customerId = typeof customer === 'string' ? customer : customer?.id;
   const paymentIntentId = typeof payment_intent === 'string' ? payment_intent : payment_intent?.id;
   
+  const latestRefund = charge.refunds?.data?.[0];
+  
+  if (latestRefund?.id && latestRefund?.amount) {
+    upsertTransactionCache({
+      stripeId: latestRefund.id,
+      objectType: 'refund',
+      amountCents: latestRefund.amount,
+      currency: latestRefund.currency || currency || 'usd',
+      status: latestRefund.status || 'succeeded',
+      createdAt: new Date(latestRefund.created ? latestRefund.created * 1000 : Date.now()),
+      customerId,
+      paymentIntentId,
+      chargeId: id,
+      source: 'webhook',
+    }).catch(err => console.error('[Stripe Webhook] Cache insert failed for refund record:', err));
+  } else {
+    console.warn(`[Stripe Webhook] No refund object found in charge.refunded event for charge ${id}`);
+  }
+  
   upsertTransactionCache({
     stripeId: id,
     objectType: 'charge',
@@ -180,8 +199,9 @@ async function handleChargeRefunded(charge: any): Promise<void> {
     createdAt: new Date(created * 1000),
     customerId,
     paymentIntentId,
+    chargeId: id,
     source: 'webhook',
-  }).catch(err => console.error('[Stripe Webhook] Cache update failed for refund:', err));
+  }).catch(err => console.error('[Stripe Webhook] Cache update failed for charge refund status:', err));
   
   if (paymentIntentId) {
     await pool.query(
@@ -198,11 +218,12 @@ async function handleChargeRefunded(charge: any): Promise<void> {
       createdAt: new Date(created * 1000),
       customerId,
       paymentIntentId,
+      chargeId: id,
       source: 'webhook',
     }).catch(err => console.error('[Stripe Webhook] Cache update failed for PI refund:', err));
   }
   
-  broadcastBillingUpdate({ type: 'refund', chargeId: id, status });
+  broadcastBillingUpdate({ type: 'refund', chargeId: id, status, amountRefunded: amount_refunded });
 }
 
 async function handlePaymentIntentSucceeded(paymentIntent: any): Promise<void> {
