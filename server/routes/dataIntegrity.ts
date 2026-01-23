@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { isAdmin } from '../core/middleware';
-import { runAllIntegrityChecks, getIntegritySummary, getIntegrityHistory, resolveIssue, getAuditLog, syncPush, syncPull, createIgnoreRule, removeIgnoreRule, getIgnoredIssues, getCachedIntegrityResults } from '../core/dataIntegrity';
+import { runAllIntegrityChecks, getIntegritySummary, getIntegrityHistory, resolveIssue, getAuditLog, syncPush, syncPull, createIgnoreRule, createBulkIgnoreRules, removeIgnoreRule, getIgnoredIssues, getCachedIntegrityResults } from '../core/dataIntegrity';
 import { isProduction } from '../core/db';
 import { broadcastDataIntegrityUpdate } from '../core/websocket';
 import type { Request } from 'express';
@@ -234,6 +234,47 @@ router.delete('/api/data-integrity/ignore/:issueKey', isAdmin, async (req: Reque
   } catch (error: any) {
     if (!isProduction) console.error('[DataIntegrity] Remove ignore error:', error);
     res.status(500).json({ error: 'Failed to remove ignore rule', details: error.message });
+  }
+});
+
+router.post('/api/data-integrity/ignore-bulk', isAdmin, async (req: Request, res) => {
+  try {
+    const { issue_keys, duration, reason } = req.body;
+    
+    if (!issue_keys || !Array.isArray(issue_keys) || issue_keys.length === 0) {
+      return res.status(400).json({ error: 'issue_keys array is required' });
+    }
+    
+    if (issue_keys.length > 5000) {
+      return res.status(400).json({ error: 'Maximum 5000 issues can be excluded at once' });
+    }
+    
+    if (!duration || !['24h', '1w', '30d'].includes(duration)) {
+      return res.status(400).json({ error: 'Valid duration (24h, 1w, 30d) is required' });
+    }
+    
+    if (!reason || reason.trim().length === 0) {
+      return res.status(400).json({ error: 'reason is required' });
+    }
+    
+    const staffEmail = (req as any).user?.email || 'unknown';
+    
+    const result = await createBulkIgnoreRules({
+      issueKeys: issue_keys,
+      duration,
+      reason: reason.trim(),
+      ignoredBy: staffEmail
+    });
+    
+    res.json({ 
+      success: true, 
+      created: result.created,
+      updated: result.updated,
+      total: result.created + result.updated
+    });
+  } catch (error: any) {
+    if (!isProduction) console.error('[DataIntegrity] Bulk ignore error:', error);
+    res.status(500).json({ error: 'Failed to create bulk ignore rules', details: error.message });
   }
 });
 

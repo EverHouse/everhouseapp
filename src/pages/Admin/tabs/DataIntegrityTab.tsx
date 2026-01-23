@@ -129,6 +129,12 @@ interface IgnoreModalState {
   checkName: string;
 }
 
+interface BulkIgnoreModalState {
+  isOpen: boolean;
+  checkName: string;
+  issues: IntegrityIssue[];
+}
+
 const DataIntegrityTab: React.FC = () => {
   const { showToast } = useToast();
   
@@ -154,9 +160,11 @@ const DataIntegrityTab: React.FC = () => {
   const [syncingIssues, setSyncingIssues] = useState<Set<string>>(new Set());
 
   const [ignoreModal, setIgnoreModal] = useState<IgnoreModalState>({ isOpen: false, issue: null, checkName: '' });
+  const [bulkIgnoreModal, setBulkIgnoreModal] = useState<BulkIgnoreModalState>({ isOpen: false, checkName: '', issues: [] });
   const [ignoreDuration, setIgnoreDuration] = useState<'24h' | '1w' | '30d'>('24h');
   const [ignoreReason, setIgnoreReason] = useState<string>('');
   const [isIgnoring, setIsIgnoring] = useState(false);
+  const [isBulkIgnoring, setIsBulkIgnoring] = useState(false);
   const [ignoredIssues, setIgnoredIssues] = useState<IgnoredIssueEntry[]>([]);
   const [showIgnoredIssues, setShowIgnoredIssues] = useState(false);
   const [isLoadingIgnored, setIsLoadingIgnored] = useState(false);
@@ -379,6 +387,55 @@ const DataIntegrityTab: React.FC = () => {
     } catch (err) {
       console.error('Failed to un-ignore issue:', err);
       showToast('Failed to un-ignore issue', 'error');
+    }
+  };
+
+  const openBulkIgnoreModal = (checkName: string, issues: IntegrityIssue[]) => {
+    const nonIgnoredIssues = issues.filter(i => !i.ignored);
+    setBulkIgnoreModal({ isOpen: true, checkName, issues: nonIgnoredIssues });
+    setIgnoreDuration('30d');
+    setIgnoreReason('');
+  };
+
+  const closeBulkIgnoreModal = () => {
+    setBulkIgnoreModal({ isOpen: false, checkName: '', issues: [] });
+    setIgnoreDuration('24h');
+    setIgnoreReason('');
+  };
+
+  const handleBulkIgnore = async () => {
+    if (bulkIgnoreModal.issues.length === 0 || !ignoreReason.trim()) return;
+    
+    const issueKeys = bulkIgnoreModal.issues.map(issue => `${issue.table}_${issue.recordId}`);
+    
+    setIsBulkIgnoring(true);
+    try {
+      const res = await fetch('/api/data-integrity/ignore-bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          issue_keys: issueKeys,
+          duration: ignoreDuration,
+          reason: ignoreReason.trim()
+        })
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        showToast(`${data.total} issues excluded successfully`, 'success');
+        closeBulkIgnoreModal();
+        fetchIgnoredIssues();
+        runIntegrityChecks();
+      } else {
+        const err = await res.json();
+        showToast(err.error || 'Failed to exclude issues', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to bulk ignore issues:', err);
+      showToast('Failed to exclude issues', 'error');
+    } finally {
+      setIsBulkIgnoring(false);
     }
   };
 
@@ -1524,6 +1581,17 @@ const DataIntegrityTab: React.FC = () => {
                         <p className="text-sm text-primary/70 dark:text-white/70">{impact}</p>
                       </div>
                     )}
+                    {result.issues.filter(i => !i.ignored).length > 1 && (
+                      <div className="flex justify-end mb-2">
+                        <button
+                          onClick={() => openBulkIgnoreModal(result.checkName, result.issues)}
+                          className="text-xs px-3 py-1.5 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded-lg font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center gap-1"
+                        >
+                          <span aria-hidden="true" className="material-symbols-outlined text-[14px]">block</span>
+                          Exclude All ({result.issues.filter(i => !i.ignored).length})
+                        </button>
+                      </div>
+                    )}
                     {Object.entries(groupByCategory(result.issues)).map(([category, issues]) => (
                       <div key={category}>
                         <p className="text-xs text-primary/60 dark:text-white/60 uppercase tracking-wide mb-2">
@@ -1886,6 +1954,95 @@ const DataIntegrityTab: React.FC = () => {
                     <>
                       <span aria-hidden="true" className="material-symbols-outlined text-[18px]">block</span>
                       Exclude Issue
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bulkIgnoreModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-[#1a1a2e] rounded-2xl w-full max-w-md shadow-2xl animate-pop-in">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-primary dark:text-white">Exclude All Issues</h3>
+                <button
+                  onClick={closeBulkIgnoreModal}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <span aria-hidden="true" className="material-symbols-outlined text-gray-500">close</span>
+                </button>
+              </div>
+              
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/30 rounded-xl p-4 mb-4">
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  You are about to exclude <strong>{bulkIgnoreModal.issues.length}</strong> issues from <strong>{bulkIgnoreModal.checkName}</strong>.
+                  These issues will be hidden from future checks until the exclusion expires.
+                </p>
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-primary dark:text-white mb-2">
+                  Exclusion Duration
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: '24h', label: '24 Hours' },
+                    { value: '1w', label: '1 Week' },
+                    { value: '30d', label: '30 Days' }
+                  ].map(option => (
+                    <button
+                      key={option.value}
+                      onClick={() => setIgnoreDuration(option.value as '24h' | '1w' | '30d')}
+                      className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                        ignoreDuration === option.value
+                          ? 'bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515]'
+                          : 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-primary dark:text-white mb-2">
+                  Reason *
+                </label>
+                <textarea
+                  value={ignoreReason}
+                  onChange={(e) => setIgnoreReason(e.target.value)}
+                  placeholder="Explain why these issues are being excluded (e.g., Legacy data from migration, known historical records)"
+                  rows={3}
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-primary dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] resize-none"
+                />
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={closeBulkIgnoreModal}
+                  className="flex-1 py-3 px-4 border-2 border-gray-200 dark:border-white/20 text-primary dark:text-white rounded-xl font-bold hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBulkIgnore}
+                  disabled={!ignoreReason.trim() || isBulkIgnoring}
+                  className="flex-1 py-3 px-4 bg-amber-500 dark:bg-amber-600 text-white rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isBulkIgnoring ? (
+                    <>
+                      <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
+                      Excluding...
+                    </>
+                  ) : (
+                    <>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[18px]">block</span>
+                      Exclude All
                     </>
                   )}
                 </button>

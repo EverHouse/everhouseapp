@@ -1581,6 +1581,82 @@ export async function removeIgnoreRule(issueKey: string): Promise<{ removed: boo
   return { removed: true };
 }
 
+export interface CreateBulkIgnoreParams {
+  issueKeys: string[];
+  duration: '24h' | '1w' | '30d';
+  reason: string;
+  ignoredBy: string;
+}
+
+export async function createBulkIgnoreRules(params: CreateBulkIgnoreParams): Promise<{
+  created: number;
+  updated: number;
+}> {
+  const { issueKeys, duration, reason, ignoredBy } = params;
+  
+  if (issueKeys.length === 0) {
+    return { created: 0, updated: 0 };
+  }
+  
+  const now = new Date();
+  let expiresAt: Date;
+  
+  switch (duration) {
+    case '24h':
+      expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      break;
+    case '1w':
+      expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      break;
+    case '30d':
+      expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      break;
+    default:
+      throw new Error(`Invalid duration: ${duration}`);
+  }
+  
+  let created = 0;
+  let updated = 0;
+  
+  const BATCH_SIZE = 50;
+  for (let i = 0; i < issueKeys.length; i += BATCH_SIZE) {
+    const batch = issueKeys.slice(i, i + BATCH_SIZE);
+    
+    for (const issueKey of batch) {
+      const existing = await db.select()
+        .from(integrityIgnores)
+        .where(eq(integrityIgnores.issueKey, issueKey))
+        .limit(1);
+      
+      if (existing.length > 0) {
+        await db.update(integrityIgnores)
+          .set({
+            ignoredBy,
+            ignoredAt: now,
+            expiresAt,
+            reason,
+            isActive: true
+          })
+          .where(eq(integrityIgnores.issueKey, issueKey));
+        updated++;
+      } else {
+        await db.insert(integrityIgnores)
+          .values({
+            issueKey,
+            ignoredBy,
+            ignoredAt: now,
+            expiresAt,
+            reason,
+            isActive: true
+          });
+        created++;
+      }
+    }
+  }
+  
+  return { created, updated };
+}
+
 export interface IgnoredIssue {
   id: number;
   issueKey: string;
