@@ -3,6 +3,7 @@ import { isAdmin } from '../core/middleware';
 import { runAllIntegrityChecks, getIntegritySummary, getIntegrityHistory, resolveIssue, getAuditLog, syncPush, syncPull, createIgnoreRule, createBulkIgnoreRules, removeIgnoreRule, getIgnoredIssues, getCachedIntegrityResults } from '../core/dataIntegrity';
 import { isProduction } from '../core/db';
 import { broadcastDataIntegrityUpdate } from '../core/websocket';
+import { syncAllCustomerMetadata } from '../core/stripe/customers';
 import type { Request } from 'express';
 
 const router = Router();
@@ -275,6 +276,23 @@ router.post('/api/data-integrity/ignore-bulk', isAdmin, async (req: Request, res
   } catch (error: any) {
     if (!isProduction) console.error('[DataIntegrity] Bulk ignore error:', error);
     res.status(500).json({ error: 'Failed to create bulk ignore rules', details: error.message });
+  }
+});
+
+router.post('/api/data-integrity/sync-stripe-metadata', isAdmin, async (req, res) => {
+  try {
+    console.log('[DataIntegrity] Starting Stripe customer metadata sync...');
+    const result = await syncAllCustomerMetadata();
+    
+    res.json({ 
+      success: true, 
+      message: `Synced ${result.synced} customers to Stripe. ${result.failed} failed.`,
+      synced: result.synced,
+      failed: result.failed
+    });
+  } catch (error: any) {
+    if (!isProduction) console.error('[DataIntegrity] Stripe metadata sync error:', error);
+    res.status(500).json({ error: 'Failed to sync Stripe metadata', details: error.message });
   }
 });
 

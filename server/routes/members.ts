@@ -2162,7 +2162,13 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
         [memberEmails]
       );
       for (const row of lastActivityResult.rows || []) {
-        lastActivityMap[row.email] = row.last_date ? String(row.last_date).split('T')[0] : null;
+        if (row.last_date) {
+          // Handle both Date objects and strings from PostgreSQL
+          const dateVal = row.last_date instanceof Date 
+            ? row.last_date.toISOString().split('T')[0]
+            : String(row.last_date).split('T')[0];
+          lastActivityMap[row.email] = dateVal;
+        }
       }
     }
     

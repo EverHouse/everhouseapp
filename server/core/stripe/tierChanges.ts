@@ -4,6 +4,7 @@ import { membershipTiers, users, memberNotes } from '../../../shared/schema';
 import { eq, ilike } from 'drizzle-orm';
 import { changeSubscriptionTier } from './subscriptions';
 import { pool } from '../db';
+import { syncCustomerMetadataToStripe } from './customers';
 
 export interface TierChangePreview {
   currentTier: string;
@@ -145,6 +146,9 @@ export async function commitTierChange(
         'UPDATE users SET tier = $1, updated_at = NOW() WHERE LOWER(email) = LOWER($2)',
         [tier.name, memberEmail]
       );
+      
+      // Sync the updated tier to Stripe customer metadata
+      await syncCustomerMetadataToStripe(memberEmail);
     }
     
     // Add member note for audit trail using DB tier names for consistency
