@@ -21,6 +21,21 @@ export const changelog: ChangelogEntry[] = [
   },
   {
     version: "9.0",
+    date: "2026-01-22",
+    title: "Stripe Transaction Cache & Sync",
+    isMajor: true,
+    changes: [
+      "Transaction history now loads instantly with local caching instead of slow Stripe API calls",
+      "One-click backfill tool syncs all historical Stripe transactions to the cache",
+      "Subscription pause lets staff temporarily suspend memberships for 1-4 weeks",
+      "Resume subscription restores billing on the original schedule",
+      "Tier changes now properly sync to Stripe customer metadata",
+      "Fixed membership tag display to accurately reflect Stripe billing status",
+      "Fixed last visit date showing invalid dates for some members"
+    ]
+  },
+  {
+    version: "8.12",
     date: "2026-01-21",
     title: "Relative Times & Bug Fixes",
     changes: [
@@ -32,7 +47,57 @@ export const changelog: ChangelogEntry[] = [
     ]
   },
   {
+    version: "8.11",
+    date: "2026-01-20",
+    title: "MindBody-Stripe Integration",
+    changes: [
+      "Staff can now view and charge overage fees for MindBody members through Stripe",
+      "Automatic Stripe customer creation for members without a Stripe account",
+      "One-click manual linking for members who already have Stripe accounts",
+      "Improved duplicate prevention when creating Stripe customers",
+      "Direct charge capability for non-system users from the admin panel"
+    ]
+  },
+  {
+    version: "8.10",
+    date: "2026-01-19",
+    title: "Trackman Booking Sync",
+    isMajor: true,
+    changes: [
+      "Bookings now sync automatically with Trackman when staff creates them in the portal",
+      "Member requests a time, staff sees request, books in Trackman, and our system auto-confirms",
+      "Time matching updates our records to match Trackman's actual booking times",
+      "Bay conflict detection warns staff of overlapping bookings",
+      "Pending requests auto-expire after their scheduled time passes",
+      "Staff receive toast notifications when bookings are auto-confirmed"
+    ]
+  },
+  {
     version: "8.9",
+    date: "2026-01-18",
+    title: "Self-Service Billing Portal",
+    changes: [
+      "Members can now manage their own billing through Stripe's secure portal",
+      "Update payment methods, view invoices, and manage subscription directly",
+      "Pending booking requests show visual indicators on the calendar view",
+      "Calendar improvements with sticky headers for easier navigation",
+      "Security tokens added to payment collection for safer transactions"
+    ]
+  },
+  {
+    version: "8.8.1",
+    date: "2026-01-17",
+    title: "Calendar & Scheduler Improvements",
+    changes: [
+      "Background tasks reorganized into separate scheduler files for better reliability",
+      "Conference room IDs now fetched dynamically instead of hardcoded values",
+      "Booking requests use database transactions to prevent race conditions",
+      "Fixed duplicate guest entries when adding members to bookings",
+      "Improved pending authorization handling for incomplete payments"
+    ]
+  },
+  {
+    version: "8.8",
     date: "2026-01-16",
     title: "Mobile App & Privacy Compliance",
     changes: [
@@ -45,7 +110,7 @@ export const changelog: ChangelogEntry[] = [
     ]
   },
   {
-    version: "8.8",
+    version: "8.7",
     date: "2026-01-13",
     title: "Billing & Payment Tracking",
     changes: [
@@ -57,7 +122,7 @@ export const changelog: ChangelogEntry[] = [
     ]
   },
   {
-    version: "8.7",
+    version: "8.6",
     date: "2026-01-10",
     title: "Reliability & Token Refresh",
     changes: [
@@ -67,7 +132,7 @@ export const changelog: ChangelogEntry[] = [
     ]
   },
   {
-    version: "8.6",
+    version: "8.5.1",
     date: "2026-01-09",
     title: "Smoother Animations & Notifications",
     changes: [
