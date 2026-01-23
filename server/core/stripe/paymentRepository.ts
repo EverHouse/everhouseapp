@@ -109,6 +109,9 @@ export async function getFailedPayments(limit = 50): Promise<FailedPayment[]> {
 }
 
 export async function getPendingAuthorizations(): Promise<PendingAuthorization[]> {
+  // Include requires_capture (pre-authorized) and requires_payment_method/requires_action (incomplete payments like overage fees)
+  const pendingStatuses = ['requires_capture', 'requires_payment_method', 'requires_action', 'requires_confirmation'];
+  
   const results = await db
     .select({
       id: stripePaymentIntents.id,
@@ -123,7 +126,7 @@ export async function getPendingAuthorizations(): Promise<PendingAuthorization[]
     })
     .from(stripePaymentIntents)
     .leftJoin(users, eq(users.id, stripePaymentIntents.userId))
-    .where(eq(stripePaymentIntents.status, 'requires_capture'))
+    .where(inArray(stripePaymentIntents.status, pendingStatuses))
     .orderBy(desc(stripePaymentIntents.createdAt));
 
   return results.map(row => ({
