@@ -342,10 +342,18 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
                     <DateBlock dateStr={booking.request_date || booking.slot_date || ''} today={today} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <p className={`font-semibold text-sm truncate ${isUnmatched ? 'text-amber-700 dark:text-amber-400' : 'text-primary dark:text-white'}`}>
-                          {booking.user_name || 'Unknown Customer'}
-                        </p>
-                        {getStatusBadge(booking)}
+                        {isUnmatched ? (
+                          <span className="px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full">
+                            Needs Assignment
+                          </span>
+                        ) : (
+                          <>
+                            <p className="font-semibold text-sm truncate text-primary dark:text-white">
+                              {booking.user_name || 'Unknown Customer'}
+                            </p>
+                            {getStatusBadge(booking)}
+                          </>
+                        )}
                       </div>
                       <p className={`text-xs ${isUnmatched ? 'text-amber-600/80 dark:text-amber-400/80' : 'text-primary/80 dark:text-white/80'}`}>
                         {formatTime12Hour(booking.start_time)} - {formatTime12Hour(booking.end_time)}

@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.4.12",
+    date: "2026-01-23",
+    title: "Cleaner Booking Queue Layout",
+    changes: [
+      "Unmatched bookings now show clean 'Needs Assignment' badge instead of 'Unknown (Trackman)' text",
+      "Removed redundant 'CONF' badge from regular bookings - bay info already shown below",
+      "Removed 'UNMATCHED' header badge - amber card styling makes them visible enough",
+      "Bookings page now shows unified scheduled list with unmatched bookings mixed in",
+      "Unknown Trackman bookings correctly show 'Assign Member' button instead of 'Check In'"
+    ]
+  },
+  {
     version: "9.4.11",
     date: "2026-01-23",
     title: "Unified Booking Queue with Smart Actions",
