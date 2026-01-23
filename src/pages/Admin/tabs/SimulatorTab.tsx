@@ -1922,7 +1922,10 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                         <div className="w-full px-1 sm:px-2 pb-4">
                             <div className="w-full">
                             <div className="grid gap-0.5 w-full" style={{ gridTemplateColumns: `minmax(32px, 0.6fr) repeat(${resources.length}, minmax(0, 1fr))` }}>
-                                <div className="h-8 sm:h-10 sticky top-0 z-20 bg-[#1a1f1a] dark:bg-[#1a1f1a]"></div>
+                                <div className="h-8 sm:h-10 sticky top-0 z-20 bg-[#1a1f1a] dark:bg-[#1a1f1a] flex items-center justify-center text-white/70 text-[10px] sm:text-xs font-medium">
+                                    <span className="hidden sm:inline">Time</span>
+                                    <span className="sm:hidden">T</span>
+                                </div>
                                 {[...resources].sort((a, b) => {
                                     if (a.type === 'conference_room' && b.type !== 'conference_room') return 1;
                                     if (a.type !== 'conference_room' && b.type === 'conference_room') return -1;
@@ -2028,48 +2031,68 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                         </div>
                                                     ) : booking ? (
                                                         <div className="px-0.5 sm:px-1 h-full flex items-center justify-center sm:justify-start relative">
-                                                            <span className={`hidden sm:block text-[9px] sm:text-[10px] font-medium truncate ${isConference ? 'text-purple-700 dark:text-purple-300' : isInactiveMember ? 'text-green-600/70 dark:text-green-400/70' : 'text-green-700 dark:text-green-300'}`}>
-                                                                {bookingDisplayName}
-                                                            </span>
-                                                            <span className={`sm:hidden w-3 h-3 rounded-full ${isConference ? 'bg-purple-500 dark:bg-purple-400' : 'bg-green-500 dark:bg-green-400'}`} title={bookingDisplayName}></span>
+                                                            {/* Calculate slot data once for both views */}
+                                                            {(() => {
+                                                                const unfilledSlots = (booking as any)?.unfilled_slots ?? 0;
+                                                                const declaredPlayers = (booking as any)?.declared_player_count ?? 1;
+                                                                const filledSlots = Math.max(0, declaredPlayers - unfilledSlots);
+                                                                const hasUnpaidFees = (booking as any)?.has_unpaid_fees ?? false;
+                                                                const totalOwed = (booking as any)?.total_owed ?? 0;
+                                                                const textColor = isConference 
+                                                                    ? 'text-purple-700 dark:text-purple-300' 
+                                                                    : isInactiveMember 
+                                                                        ? 'text-green-600/70 dark:text-green-400/70' 
+                                                                        : 'text-green-700 dark:text-green-300';
+                                                                
+                                                                return (
+                                                                    <>
+                                                                        {/* Desktop: show name */}
+                                                                        <span className={`hidden sm:block text-[9px] sm:text-[10px] font-medium truncate ${textColor}`}>
+                                                                            {bookingDisplayName}
+                                                                        </span>
+                                                                        
+                                                                        {/* Mobile: show X/Y player count when >1 player OR unpaid, else show dot */}
+                                                                        {declaredPlayers > 1 || hasUnpaidFees ? (
+                                                                            <span className={`sm:hidden text-[9px] font-bold ${hasUnpaidFees ? 'text-red-600 dark:text-red-400' : textColor}`} title={`${bookingDisplayName}${hasUnpaidFees ? ` - $${totalOwed.toFixed(2)} owed` : ''}`}>
+                                                                                {filledSlots}/{declaredPlayers}
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className={`sm:hidden w-3 h-3 rounded-full ${isConference ? 'bg-purple-500 dark:bg-purple-400' : 'bg-green-500 dark:bg-green-400'}`} title={bookingDisplayName}></span>
+                                                                        )}
+                                                                        
+                                                                        {/* Desktop: Red badge for unpaid fees */}
+                                                                        {hasUnpaidFees && (
+                                                                            <span className="hidden sm:block absolute -top-1 -right-1 group">
+                                                                                <span className="w-2.5 h-2.5 rounded-full bg-red-500 dark:bg-red-400 block cursor-help border border-white dark:border-gray-800"></span>
+                                                                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs font-medium text-white bg-gray-800 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                                                                                    ${totalOwed.toFixed(2)} owed
+                                                                                </span>
+                                                                            </span>
+                                                                        )}
+                                                                        
+                                                                        {/* Desktop: Amber X/Y badge for unfilled slots */}
+                                                                        {unfilledSlots > 0 && (
+                                                                            <span className={`hidden sm:block absolute -top-1 ${hasUnpaidFees ? '-right-5' : '-right-1'} group`}>
+                                                                                <span className={`px-1 py-0.5 text-[8px] font-bold rounded bg-amber-100 dark:bg-amber-900/50 ${textColor} cursor-help leading-none border border-amber-300 dark:border-amber-600`}>
+                                                                                    {filledSlots}/{declaredPlayers}
+                                                                                </span>
+                                                                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs font-medium text-white bg-gray-800 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                                                                                    {filledSlots}/{declaredPlayers} slots filled
+                                                                                </span>
+                                                                            </span>
+                                                                        )}
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                            {/* Desktop: Inactive member badge - positioned bottom-left to avoid collision with other badges */}
                                                             {isInactiveMember && (
-                                                                <span className="absolute -top-0.5 -right-0.5 group">
+                                                                <span className="hidden sm:block absolute -bottom-0.5 -left-0.5 group">
                                                                     <span className="w-2 h-2 rounded-full bg-orange-400 dark:bg-orange-500 block cursor-help"></span>
-                                                                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs font-medium text-white bg-gray-800 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                                                                    <span className="absolute top-full left-1/2 -translate-x-1/2 mt-1 px-2 py-1 text-xs font-medium text-white bg-gray-800 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
                                                                         Non-active member
                                                                     </span>
                                                                 </span>
                                                             )}
-                                                            {/* Red badge for unpaid fees */}
-                                                            {booking?.has_unpaid_fees && (
-                                                                <span className={`absolute -top-1 -right-1 group`}>
-                                                                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 dark:bg-red-400 block cursor-help border border-white dark:border-gray-800"></span>
-                                                                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs font-medium text-white bg-gray-800 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
-                                                                        ${((booking.total_owed || 0)).toFixed(2)} owed
-                                                                    </span>
-                                                                </span>
-                                                            )}
-                                                            {/* Amber badge for unfilled slots */}
-                                                            {(() => {
-                                                                const unfilledSlots = (booking as any)?.unfilled_slots || 0;
-                                                                const declaredPlayers = (booking as any)?.declared_player_count || 1;
-                                                                const filledSlots = declaredPlayers - unfilledSlots;
-                                                                if (unfilledSlots <= 0) return null;
-                                                                
-                                                                // Position shifts left if there's also a payment badge
-                                                                const rightOffset = booking?.has_unpaid_fees ? '-right-4' : '-right-1';
-                                                                
-                                                                return (
-                                                                    <span className={`absolute -top-1 ${rightOffset} group`}>
-                                                                        <span className="px-1 py-0.5 text-[8px] font-bold rounded bg-amber-400 dark:bg-amber-500 text-white cursor-help leading-none">
-                                                                            {filledSlots}/{declaredPlayers}
-                                                                        </span>
-                                                                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs font-medium text-white bg-gray-800 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
-                                                                            {filledSlots}/{declaredPlayers} slots filled
-                                                                        </span>
-                                                                    </span>
-                                                                );
-                                                            })()}
                                                         </div>
                                                     ) : pendingRequest && (
                                                         <div className="px-0.5 sm:px-1 h-full flex items-center justify-center sm:justify-start">
