@@ -3171,14 +3171,26 @@ router.post('/api/stripe/overage/create-payment-intent', async (req: Request, re
     const { getStripeClient } = await import('../core/stripe/client');
     const stripe = await getStripeClient();
     
-    // Get or create Stripe customer
+    // Get or create Stripe customer (check for existing first to prevent duplicates)
     let customerId = booking.stripe_customer_id;
     if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: booking.user_email,
-        metadata: { source: 'overage_payment' }
+      // Check if customer already exists in Stripe by email
+      const existingCustomers = await stripe.customers.list({
+        email: booking.user_email.toLowerCase(),
+        limit: 1
       });
-      customerId = customer.id;
+      
+      if (existingCustomers.data.length > 0) {
+        customerId = existingCustomers.data[0].id;
+        console.log(`[Stripe] Found existing customer ${customerId} for ${booking.user_email}`);
+      } else {
+        const customer = await stripe.customers.create({
+          email: booking.user_email.toLowerCase(),
+          metadata: { source: 'overage_payment' }
+        });
+        customerId = customer.id;
+        console.log(`[Stripe] Created new customer ${customerId} for ${booking.user_email}`);
+      }
       await pool.query(`UPDATE users SET stripe_customer_id = $1 WHERE LOWER(email) = LOWER($2)`, [customerId, booking.user_email]);
     }
     
