@@ -884,7 +884,7 @@ async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResult> {
         customer: customerId,
         status: 'all',
         limit: 10,
-        expand: ['data.items.data.price.product']
+        expand: ['data.items.data.price']
       });
       
       if (!customerSubs.data || customerSubs.data.length === 0) {

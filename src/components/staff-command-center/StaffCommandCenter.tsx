@@ -106,6 +106,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
     setTrackmanModal(request);
   };
 
+  // Confirm action - links existing Trackman booking (requires Trackman ID)
   const confirmApprove = async () => {
     if (!trackmanModal) return;
     const request = trackmanModal;
@@ -139,22 +140,87 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
         body: JSON.stringify({ status: 'approved', resource_id: request.resource_id, trackman_booking_id: trackmanId })
       });
       if (res.ok) {
-        showToast('Booking approved', 'success');
+        showToast('Booking confirmed and linked', 'success');
         window.dispatchEvent(new CustomEvent('booking-action-completed'));
         refresh();
       } else {
         updatePendingRequests(() => previousPendingRequests);
         updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
         const errorData = await res.json();
-        showToast(errorData.error || 'Failed to approve', 'error');
+        showToast(errorData.error || 'Failed to confirm', 'error');
       }
     } catch (err) {
       updatePendingRequests(() => previousPendingRequests);
       updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
-      showToast('Failed to approve booking', 'error');
+      showToast('Failed to confirm booking', 'error');
     } finally {
       setActionInProgress(null);
     }
+  };
+
+  // Create action - approves booking locally and opens Trackman portal
+  const createAndOpenTrackman = async () => {
+    if (!trackmanModal) return;
+    const request = trackmanModal;
+    const apiId = typeof request.id === 'string' ? parseInt(String(request.id).replace('cal_', '')) : request.id;
+    
+    setActionInProgress(`create-${request.id}`);
+    
+    const previousPendingRequests = [...data.pendingRequests];
+    
+    updatePendingRequests(prev => prev.filter(r => r.id !== request.id));
+    
+    const newActivity: RecentActivity = {
+      id: `create-${apiId}-${Date.now()}`,
+      type: 'booking_approved',
+      timestamp: new Date().toISOString(),
+      primary_text: request.user_name || 'Member',
+      secondary_text: `${request.bay_name || 'Bay'} (pending Trackman sync)`,
+      icon: 'pending'
+    };
+    updateRecentActivity(prev => [newActivity, ...prev]);
+    
+    setTrackmanModal(null);
+    setTrackmanBookingIdInput('');
+    
+    try {
+      const res = await fetch(`/api/booking-requests/${apiId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          status: 'approved', 
+          resource_id: request.resource_id,
+          pending_trackman_sync: true
+        })
+      });
+      if (res.ok) {
+        showToast('Booking created - now create it in Trackman', 'info');
+        window.dispatchEvent(new CustomEvent('booking-action-completed'));
+        // Open Trackman portal in new tab
+        window.open('https://booking.trackmanrange.com/', '_blank');
+        refresh();
+      } else {
+        updatePendingRequests(() => previousPendingRequests);
+        updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
+        const errorData = await res.json();
+        showToast(errorData.error || 'Failed to create', 'error');
+      }
+    } catch (err) {
+      updatePendingRequests(() => previousPendingRequests);
+      updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
+      showToast('Failed to create booking', 'error');
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  // Deny action from within the modal
+  const denyFromModal = async () => {
+    if (!trackmanModal) return;
+    setTrackmanModal(null);
+    setTrackmanBookingIdInput('');
+    await handleDeny(trackmanModal);
   };
 
   const handleDeny = async (request: BookingRequest) => {
@@ -599,14 +665,14 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
       {trackmanModal && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setTrackmanModal(null); setTrackmanBookingIdInput(''); }} />
-          <div className="relative bg-white dark:bg-surface-dark rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="relative bg-white dark:bg-surface-dark rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
             <div className="text-center">
               <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center mx-auto mb-3">
                 <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-2xl">sports_golf</span>
               </div>
-              <h3 className="text-lg font-bold text-primary dark:text-white mb-2">Trackman Confirmation</h3>
+              <h3 className="text-lg font-bold text-primary dark:text-white mb-2">Handle Booking Request</h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Have you created this booking in Trackman?
+                Choose how to process this simulator request
               </p>
             </div>
             
@@ -620,35 +686,75 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
               )}
             </div>
             
-            <div>
-              <label className="block text-sm font-medium text-amber-700 dark:text-amber-400 mb-1">
-                Trackman Booking ID <span className="text-gray-500 dark:text-gray-400 font-normal">(optional)</span>
-              </label>
-              <input
-                type="text"
-                value={trackmanBookingIdInput}
-                onChange={(e) => setTrackmanBookingIdInput(e.target.value)}
-                placeholder="e.g., TM-12345"
-                className="w-full p-3 rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-primary dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Enter the ID from Trackman to link this booking for easier import matching
-              </p>
+            {/* Option 1: Confirm - Link existing Trackman booking */}
+            <div className="space-y-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+              <div className="flex items-start gap-2">
+                <span className="material-symbols-outlined text-green-600 dark:text-green-400 text-lg mt-0.5">link</span>
+                <div className="flex-1">
+                  <p className="font-medium text-green-800 dark:text-green-300 text-sm">Confirm & Link</p>
+                  <p className="text-xs text-green-700 dark:text-green-400">Already created in Trackman? Enter the ID to link it.</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={trackmanBookingIdInput}
+                  onChange={(e) => setTrackmanBookingIdInput(e.target.value)}
+                  placeholder="Trackman Booking ID"
+                  className="flex-1 p-2 text-sm rounded-lg border border-green-200 dark:border-green-700 bg-white dark:bg-green-900/30 text-primary dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                />
+                <button
+                  onClick={confirmApprove}
+                  disabled={actionInProgress === `approve-${trackmanModal.id}` || !trackmanBookingIdInput.trim()}
+                  className="py-2 px-4 bg-green-600 text-white text-sm rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-1"
+                >
+                  {actionInProgress === `approve-${trackmanModal.id}` ? (
+                    <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>...</>
+                  ) : 'Confirm'}
+                </button>
+              </div>
             </div>
             
-            <div className="flex gap-3">
+            {/* Option 2: Create - Approve locally and open Trackman */}
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-start gap-2">
+                <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-lg mt-0.5">open_in_new</span>
+                <div className="flex-1">
+                  <p className="font-medium text-blue-800 dark:text-blue-300 text-sm">Create in Trackman</p>
+                  <p className="text-xs text-blue-700 dark:text-blue-400">Approve now and open Trackman to create the booking. It will auto-link when Trackman syncs.</p>
+                </div>
+                <button
+                  onClick={createAndOpenTrackman}
+                  disabled={actionInProgress === `create-${trackmanModal.id}`}
+                  className="py-2 px-4 bg-blue-600 text-white text-sm rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-1"
+                >
+                  {actionInProgress === `create-${trackmanModal.id}` ? (
+                    <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>...</>
+                  ) : (
+                    <><span className="material-symbols-outlined text-sm">open_in_new</span>Create</>
+                  )}
+                </button>
+              </div>
+            </div>
+            
+            {/* Bottom actions: Cancel and Deny */}
+            <div className="flex gap-3 pt-2 border-t border-gray-200 dark:border-white/10">
               <button
                 onClick={() => { setTrackmanModal(null); setTrackmanBookingIdInput(''); }}
-                className="flex-1 py-2 px-4 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
+                className="flex-1 py-2 px-4 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition-colors text-sm"
               >
                 Cancel
               </button>
               <button
-                onClick={confirmApprove}
-                disabled={actionInProgress === `approve-${trackmanModal.id}`}
-                className="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+                onClick={denyFromModal}
+                disabled={actionInProgress?.startsWith('deny-')}
+                className="flex-1 py-2 px-4 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg font-medium hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors text-sm disabled:opacity-50 flex items-center justify-center gap-1"
               >
-                {actionInProgress === `approve-${trackmanModal.id}` ? 'Approving...' : 'Yes, Approve'}
+                {actionInProgress === `deny-${trackmanModal.id}` ? (
+                  <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>Denying...</>
+                ) : (
+                  <><span className="material-symbols-outlined text-sm">close</span>Deny Request</>
+                )}
               </button>
             </div>
           </div>

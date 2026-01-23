@@ -812,7 +812,7 @@ router.get('/api/booking-requests/:id', async (req, res) => {
 router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, staff_notes, suggested_time, reviewed_by, resource_id, trackman_booking_id } = req.body;
+    const { status, staff_notes, suggested_time, reviewed_by, resource_id, trackman_booking_id, pending_trackman_sync } = req.body;
     
     // If only updating trackman_booking_id (no status change)
     if (trackman_booking_id !== undefined && !status) {
@@ -963,10 +963,17 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
         // Conference room bookings auto check-in (no manual check-in required)
         const finalStatus = isConferenceRoom ? 'attended' : status;
         
+        // If pending_trackman_sync is set, append a marker to staff_notes for webhook auto-linking
+        let finalStaffNotes = staff_notes;
+        if (pending_trackman_sync && !trackman_booking_id) {
+          const syncMarker = '[PENDING_TRACKMAN_SYNC]';
+          finalStaffNotes = staff_notes ? `${staff_notes} ${syncMarker}` : syncMarker;
+        }
+        
         const [updatedRow] = await tx.update(bookingRequests)
           .set({
             status: finalStatus,
-            staffNotes: staff_notes,
+            staffNotes: finalStaffNotes,
             suggestedTime: suggested_time,
             reviewedBy: reviewed_by,
             reviewedAt: new Date(),

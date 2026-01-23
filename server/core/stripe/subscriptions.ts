@@ -111,10 +111,30 @@ export async function listCustomerSubscriptions(customerId: string): Promise<{
       customer: customerId,
       status: 'all',
       expand: [
-        'data.items.data.price.product', 
+        'data.items.data.price', 
         'data.schedule',
       ],
     });
+    
+    // Fetch product details separately to avoid exceeding Stripe's 4-level expand limit
+    const productIds = new Set<string>();
+    for (const sub of subscriptions.data) {
+      const item = sub.items.data[0];
+      if (item?.price?.product && typeof item.price.product === 'string') {
+        productIds.add(item.price.product);
+      }
+    }
+    
+    const productMap = new Map<string, string>();
+    if (productIds.size > 0) {
+      const products = await stripe.products.list({
+        ids: Array.from(productIds).slice(0, 100),
+        limit: 100,
+      });
+      for (const product of products.data) {
+        productMap.set(product.id, product.name);
+      }
+    }
     
     return {
       success: true,
@@ -122,10 +142,13 @@ export async function listCustomerSubscriptions(customerId: string): Promise<{
         const item = sub.items.data[0];
         const price = item?.price;
         const productRef = price?.product;
+        // Get product ID (either from expanded object or string reference)
         const productId = typeof productRef === 'string' 
           ? productRef 
           : (productRef && isExpandedProduct(productRef) ? productRef.id : '');
-        const productName = productRef && isExpandedProduct(productRef) ? productRef.name : '';
+        // Look up product name from our productMap (fetched separately to avoid expand depth limit)
+        const productName = productMap.get(productId) || 
+          (productRef && isExpandedProduct(productRef) ? productRef.name : '');
         
         let pendingUpdate: { newPriceId: string; newProductName: string; effectiveAt: Date } | null = null;
         if (sub.pending_update?.subscription_items && sub.pending_update.subscription_items.data.length > 0) {
@@ -135,9 +158,11 @@ export async function listCustomerSubscriptions(customerId: string): Promise<{
             ? pendingPriceRef 
             : pendingPriceRef?.id || '';
           const pendingProductRef = typeof pendingPriceRef === 'string' ? null : pendingPriceRef?.product;
-          const pendingProductName = pendingProductRef && isExpandedProduct(pendingProductRef) 
-            ? pendingProductRef.name 
-            : '';
+          const pendingProductId = typeof pendingProductRef === 'string' 
+            ? pendingProductRef 
+            : (pendingProductRef && isExpandedProduct(pendingProductRef) ? pendingProductRef.id : '');
+          const pendingProductName = productMap.get(pendingProductId) || 
+            (pendingProductRef && isExpandedProduct(pendingProductRef) ? pendingProductRef.name : '');
           const typedPendingUpdate = sub.pending_update as SubscriptionPendingUpdate | null;
           const effectiveTimestamp = typedPendingUpdate?.billing_cycle_anchor 
             || typedPendingUpdate?.expires_at 

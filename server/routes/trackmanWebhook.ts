@@ -461,6 +461,51 @@ async function createBookingForMember(
       return { success: true, bookingId: existing.rows[0].id };
     }
     
+    // AUTO-LINK CHECK: Look for pending Trackman sync bookings that match by member/date/time
+    // These are bookings created via "Create in Trackman" button, waiting for webhook to link
+    const pendingSync = await pool.query(
+      `SELECT id, staff_notes FROM booking_requests 
+       WHERE LOWER(user_email) = LOWER($1)
+       AND request_date = $2
+       AND start_time = $3
+       AND status = 'approved'
+       AND trackman_booking_id IS NULL
+       AND staff_notes LIKE '%[PENDING_TRACKMAN_SYNC]%'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [member.email, slotDate, startTime]
+    );
+    
+    if (pendingSync.rows.length > 0) {
+      const pendingBookingId = pendingSync.rows[0].id;
+      // Remove the pending sync marker and link the Trackman booking ID
+      const updatedNotes = (pendingSync.rows[0].staff_notes || '')
+        .replace('[PENDING_TRACKMAN_SYNC]', '[Linked via Trackman webhook]')
+        .trim();
+      
+      await pool.query(
+        `UPDATE booking_requests 
+         SET trackman_booking_id = $1, 
+             trackman_player_count = $2,
+             staff_notes = $3,
+             updated_at = NOW()
+         WHERE id = $4`,
+        [trackmanBookingId, playerCount, updatedNotes, pendingBookingId]
+      );
+      
+      logger.info('[Trackman Webhook] Auto-linked existing pending booking', {
+        extra: { 
+          bookingId: pendingBookingId, 
+          trackmanBookingId, 
+          email: member.email, 
+          date: slotDate, 
+          time: startTime 
+        }
+      });
+      
+      return { success: true, bookingId: pendingBookingId };
+    }
+    
     const startParts = startTime.split(':').map(Number);
     const endParts = endTime.split(':').map(Number);
     const startMinutes = startParts[0] * 60 + startParts[1];

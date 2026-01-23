@@ -54,7 +54,7 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
       const listParams: Stripe.SubscriptionListParams = {
         status: 'active',
         limit: 100,
-        expand: ['data.customer', 'data.items.data.price.product'],
+        expand: ['data.customer', 'data.items.data.price'],
       };
       if (startingAfter) {
         listParams.starting_after = startingAfter;
@@ -69,6 +69,30 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
     }
 
     console.log(`[Stripe Sync] Found ${subscriptions.length} active subscriptions`);
+
+    // Collect all product IDs that need fetching (products not expanded)
+    const productIdsToFetch = new Set<string>();
+    for (const sub of subscriptions) {
+      const item = sub.items.data[0];
+      const productRef = item?.price?.product;
+      if (productRef && typeof productRef === 'string') {
+        productIdsToFetch.add(productRef);
+      }
+    }
+    
+    // Fetch product details in batches to avoid Stripe's expand depth limit
+    const productMap = new Map<string, Stripe.Product>();
+    if (productIdsToFetch.size > 0) {
+      const productIds = Array.from(productIdsToFetch);
+      for (let i = 0; i < productIds.length; i += 100) {
+        const batch = productIds.slice(i, i + 100);
+        const products = await stripe.products.list({ ids: batch, limit: 100 });
+        for (const product of products.data) {
+          productMap.set(product.id, product);
+        }
+      }
+      console.log(`[Stripe Sync] Fetched ${productMap.size} product details`);
+    }
 
     const batchSize = 10;
     for (let i = 0; i < subscriptions.length; i += batchSize) {
@@ -100,9 +124,17 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
 
           const item = subscription.items.data[0];
           const price = item?.price;
-          const product = price?.product as Stripe.Product | undefined;
+          const productRef = price?.product;
           
-          if (!product || typeof product === 'string') {
+          // Get product from expanded data or from our productMap
+          let product: Stripe.Product | undefined;
+          if (productRef && typeof productRef === 'string') {
+            product = productMap.get(productRef);
+          } else if (productRef && typeof productRef === 'object' && !('deleted' in productRef)) {
+            product = productRef as Stripe.Product;
+          }
+          
+          if (!product) {
             result.skipped++;
             result.details.push({
               email,

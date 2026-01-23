@@ -372,6 +372,28 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
     fetchBillingInfo();
   }, [fetchBillingInfo]);
 
+  // Listen for WebSocket billing updates and auto-refresh when this member's billing changes
+  useEffect(() => {
+    const handleBillingUpdate = (event: CustomEvent<{
+      action: string;
+      memberEmail?: string;
+      customerId?: string;
+    }>) => {
+      const detail = event.detail;
+      // Check if this update is for the currently viewed member
+      if (detail.memberEmail?.toLowerCase() === memberEmail.toLowerCase() ||
+          (billingInfo?.stripeCustomerId && detail.customerId === billingInfo.stripeCustomerId)) {
+        console.log('[MemberBillingTab] Received billing update for this member, refreshing:', detail.action);
+        fetchBillingInfo();
+      }
+    };
+
+    window.addEventListener('billing-update', handleBillingUpdate as EventListener);
+    return () => {
+      window.removeEventListener('billing-update', handleBillingUpdate as EventListener);
+    };
+  }, [memberEmail, billingInfo?.stripeCustomerId, fetchBillingInfo]);
+
   const handleManualTierSave = async () => {
     if (!memberEmail || !manualTier) return;
     
