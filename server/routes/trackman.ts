@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { importTrackmanBookings, getUnmatchedBookings, resolveUnmatchedBooking, getImportRuns, rescanUnmatchedBookings } from '../core/trackmanImport';
+import { importTrackmanBookings, getImportRuns } from '../core/trackmanImport';
 import path from 'path';
 import multer from 'multer';
 import fs from 'fs';
@@ -46,52 +46,7 @@ const upload = multer({
   }
 });
 
-router.get('/api/admin/trackman/unmatched', isStaffOrAdmin, async (req, res) => {
-  try {
-    const resolved = req.query.resolved === 'true' ? true : req.query.resolved === 'false' ? false : undefined;
-    const limit = parseInt(req.query.limit as string) || 100;
-    const offset = parseInt(req.query.offset as string) || 0;
-    const search = req.query.search as string || '';
-    
-    const result = await getUnmatchedBookings({ resolved, limit, offset, search });
-    res.json(result);
-  } catch (error: any) {
-    console.error('Error fetching unmatched bookings:', error);
-    res.status(500).json({ error: 'Failed to fetch unmatched bookings' });
-  }
-});
-
-router.get('/api/admin/trackman/unmatched-calendar', isStaffOrAdmin, async (req, res) => {
-  try {
-    const { start_date, end_date } = req.query;
-    
-    if (!start_date || !end_date) {
-      return res.status(400).json({ error: 'start_date and end_date are required' });
-    }
-    
-    const result = await pool.query(
-      `SELECT 
-        id,
-        TO_CHAR(booking_date, 'YYYY-MM-DD') as "bookingDate",
-        start_time as "startTime",
-        end_time as "endTime",
-        bay_number as "bayNumber",
-        user_name as "userName",
-        original_email as "originalEmail"
-       FROM trackman_unmatched_bookings
-       WHERE resolved_at IS NULL
-         AND booking_date >= $1
-         AND booking_date <= $2
-       ORDER BY booking_date, start_time`,
-      [start_date, end_date]
-    );
-    
-    res.json(result.rows);
-  } catch (error: any) {
-    console.error('Error fetching unmatched bookings for calendar:', error);
-    res.status(500).json({ error: 'Failed to fetch unmatched bookings' });
-  }
-});
+// NOTE: Unmatched bookings endpoints removed - simulator bookings now use Trackman webhooks only
 
 router.get('/api/admin/trackman/import-runs', isStaffOrAdmin, async (req, res) => {
   try {
@@ -155,59 +110,6 @@ router.post('/api/admin/trackman/upload', isStaffOrAdmin, upload.single('file'),
         console.error('Failed to cleanup uploaded file:', cleanupErr);
       }
     }
-  }
-});
-
-// Re-scan unmatched bookings against current member list (including newly synced former members)
-router.post('/api/admin/trackman/rescan', isStaffOrAdmin, async (req, res) => {
-  try {
-    const performedBy = (req as any).session?.user?.email || 'admin';
-    
-    const result = await rescanUnmatchedBookings(performedBy);
-    
-    res.json({
-      success: true,
-      scanned: result.scanned,
-      matched: result.matched,
-      resolved: result.resolved,
-      errors: result.errors,
-      message: result.matched > 0 
-        ? `Found ${result.matched} new matches out of ${result.scanned} unmatched bookings`
-        : `No new matches found (scanned ${result.scanned} unmatched bookings)`
-    });
-  } catch (error: any) {
-    console.error('Rescan error:', error);
-    res.status(500).json({ error: error.message || 'Failed to rescan unmatched bookings' });
-  }
-});
-
-router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { memberEmail } = req.body;
-    const resolvedBy = (req as any).session?.user?.email || 'admin';
-    
-    if (!memberEmail) {
-      return res.status(400).json({ error: 'memberEmail is required' });
-    }
-    
-    const result = await resolveUnmatchedBooking(parseInt(id), memberEmail, resolvedBy);
-    
-    if (result.success) {
-      res.json({ 
-        success: true, 
-        resolved: result.resolved,
-        autoResolved: result.autoResolved,
-        message: result.autoResolved > 0 
-          ? `Resolved ${result.resolved} booking(s) (${result.autoResolved} auto-resolved with same email)`
-          : 'Booking resolved successfully'
-      });
-    } else {
-      res.status(404).json({ error: 'Unmatched booking not found' });
-    }
-  } catch (error: any) {
-    console.error('Resolve error:', error);
-    res.status(500).json({ error: 'Failed to resolve unmatched booking' });
   }
 });
 
