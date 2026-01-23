@@ -18,6 +18,7 @@ export interface CreatePaymentIntentParams {
   metadata?: Record<string, string>;
   productId?: string;
   productName?: string;
+  stripeCustomerId?: string;
 }
 
 export interface PaymentIntentResult {
@@ -41,10 +42,17 @@ export async function createPaymentIntent(
     description,
     metadata = {},
     productId,
-    productName
+    productName,
+    stripeCustomerId
   } = params;
 
-  const { customerId } = await getOrCreateStripeCustomer(userId, email, memberName);
+  let customerId: string;
+  if (stripeCustomerId) {
+    customerId = stripeCustomerId;
+  } else {
+    const result = await getOrCreateStripeCustomer(userId, email, memberName);
+    customerId = result.customerId;
+  }
 
   const stripe = await getStripeClient();
 

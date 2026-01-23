@@ -1685,7 +1685,7 @@ router.get('/api/billing/members/search', isStaffOrAdmin, async (req: Request, r
 
 router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { memberEmail, memberName, amountCents, description, productId } = req.body;
+    const { memberEmail, memberName, amountCents, description, productId, isNewCustomer, firstName, lastName, phone } = req.body;
     const sessionUser = getSessionUser(req);
 
     if (!memberEmail || !amountCents) {
@@ -1696,24 +1696,53 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, async (req: Reques
       return res.status(400).json({ error: 'Minimum charge amount is $0.50' });
     }
 
-    const memberResult = await pool.query(
-      `SELECT id, email, first_name, last_name, stripe_customer_id 
-       FROM users WHERE LOWER(email) = LOWER($1)`,
-      [memberEmail]
-    );
+    let member: { id: string; email: string; first_name?: string; last_name?: string; stripe_customer_id?: string } | null = null;
+    let resolvedName: string;
+    let stripeCustomerId: string | undefined;
 
-    if (memberResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Member not found in database' });
+    if (isNewCustomer) {
+      if (!firstName || !lastName) {
+        return res.status(400).json({ error: 'First name and last name are required for new customers' });
+      }
+      
+      resolvedName = `${firstName} ${lastName}`.trim();
+      
+      const { getStripeClient } = await import('../core/stripe/client');
+      const stripe = await getStripeClient();
+      const customer = await stripe.customers.create({
+        email: memberEmail,
+        name: resolvedName,
+        phone: phone || undefined,
+        metadata: {
+          source: 'staff_quick_charge',
+          createdBy: sessionUser?.email || 'staff'
+        }
+      });
+      stripeCustomerId = customer.id;
+      console.log(`[Stripe] Created new customer ${customer.id} for quick charge: ${memberEmail}`);
+    } else {
+      const memberResult = await pool.query(
+        `SELECT id, email, first_name, last_name, stripe_customer_id 
+         FROM users WHERE LOWER(email) = LOWER($1)`,
+        [memberEmail]
+      );
+
+      if (memberResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Member not found in database. Use "Charge someone not in the system" to add a new customer.' });
+      }
+
+      member = memberResult.rows[0];
+      resolvedName = memberName || [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email.split('@')[0];
+      stripeCustomerId = member.stripe_customer_id;
     }
-
-    const member = memberResult.rows[0];
-    const resolvedName = memberName || [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email.split('@')[0];
 
     let finalProductName: string | undefined;
     let finalDescription = description || 'Staff quick charge';
 
+    const customerEmail = member?.email || memberEmail;
+    
     if (!productId) {
-      console.warn(`[Stripe] Quick charge for ${member.email} without productId - purchase reporting will be generic. Consider specifying a product for better reporting (e.g., "User bought 2 Gatorades" instead of "User paid $10").`);
+      console.warn(`[Stripe] Quick charge for ${customerEmail} without productId - purchase reporting will be generic. Consider specifying a product for better reporting (e.g., "User bought 2 Gatorades" instead of "User paid $10").`);
       if (!description) {
         finalDescription = 'Staff quick charge (no product specified)';
       }
@@ -1738,21 +1767,23 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, async (req: Reques
     }
 
     const result = await createPaymentIntent({
-      userId: member.id.toString(),
-      email: member.email,
+      userId: member?.id?.toString() || 'guest',
+      email: customerEmail,
       memberName: resolvedName,
       amountCents: Math.round(amountCents),
       purpose: 'one_time_purchase',
       description: finalDescription,
       productId,
       productName: finalProductName,
+      stripeCustomerId,
       metadata: {
         staffInitiated: 'true',
         staffEmail: sessionUser?.email || 'unknown',
         chargeType: 'quick_charge',
-        memberId: member.id.toString(),
-        memberEmail: member.email,
-        memberName: resolvedName
+        memberId: member?.id?.toString() || 'guest',
+        memberEmail: customerEmail,
+        memberName: resolvedName,
+        isNewCustomer: isNewCustomer ? 'true' : 'false'
       }
     });
 

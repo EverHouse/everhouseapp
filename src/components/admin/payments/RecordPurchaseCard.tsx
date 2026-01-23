@@ -26,6 +26,11 @@ interface StripeProduct {
 const RecordPurchaseCard: React.FC<SectionProps> = ({ onClose, variant = 'modal' }) => {
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('card');
   const [selectedMember, setSelectedMember] = useState<SelectedMember | null>(null);
+  const [useNewCustomer, setUseNewCustomer] = useState(false);
+  const [newCustomerFirstName, setNewCustomerFirstName] = useState('');
+  const [newCustomerLastName, setNewCustomerLastName] = useState('');
+  const [newCustomerEmail, setNewCustomerEmail] = useState('');
+  const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   
@@ -96,6 +101,11 @@ const RecordPurchaseCard: React.FC<SectionProps> = ({ onClose, variant = 'modal'
 
   const resetForm = () => {
     setSelectedMember(null);
+    setUseNewCustomer(false);
+    setNewCustomerFirstName('');
+    setNewCustomerLastName('');
+    setNewCustomerEmail('');
+    setNewCustomerPhone('');
     setAmount('');
     setDescription('');
     setSelectedProduct(null);
@@ -110,8 +120,34 @@ const RecordPurchaseCard: React.FC<SectionProps> = ({ onClose, variant = 'modal'
     setSuccess(false);
   };
 
+  const getCustomerInfo = () => {
+    if (useNewCustomer) {
+      return {
+        email: newCustomerEmail,
+        name: `${newCustomerFirstName} ${newCustomerLastName}`.trim(),
+        firstName: newCustomerFirstName,
+        lastName: newCustomerLastName,
+        phone: newCustomerPhone || undefined,
+        isNewCustomer: true
+      };
+    }
+    return selectedMember ? {
+      email: selectedMember.email,
+      name: selectedMember.name,
+      isNewCustomer: false
+    } : null;
+  };
+
+  const isCustomerValid = () => {
+    if (useNewCustomer) {
+      return newCustomerFirstName.trim() && newCustomerLastName.trim() && newCustomerEmail.trim();
+    }
+    return !!selectedMember;
+  };
+
   const handleCreateCardPayment = async () => {
-    if (!selectedMember || !amount || parseFloat(amount) <= 0) return;
+    const customer = getCustomerInfo();
+    if (!customer || !amount || parseFloat(amount) <= 0) return;
     
     setIsProcessing(true);
     setError(null);
@@ -119,14 +155,23 @@ const RecordPurchaseCard: React.FC<SectionProps> = ({ onClose, variant = 'modal'
     try {
       const amountCents = Math.round(parseFloat(amount) * 100);
       const payload: Record<string, any> = {
-        memberEmail: selectedMember.email,
-        memberName: selectedMember.name,
+        memberEmail: customer.email,
+        memberName: customer.name,
         amountCents,
         description: description || 'Quick charge'
       };
       
       if (selectedProduct) {
         payload.productId = selectedProduct.stripeProductId;
+      }
+      
+      if (customer.isNewCustomer) {
+        payload.isNewCustomer = true;
+        payload.firstName = (customer as any).firstName;
+        payload.lastName = (customer as any).lastName;
+        if ((customer as any).phone) {
+          payload.phone = (customer as any).phone;
+        }
       }
       
       const res = await fetch('/api/stripe/staff/quick-charge', {
@@ -289,15 +334,100 @@ const RecordPurchaseCard: React.FC<SectionProps> = ({ onClose, variant = 'modal'
             </button>
           </div>
 
-          <MemberSearchInput
-            label="Search Member"
-            placeholder="Name or email..."
-            selectedMember={selectedMember}
-            onSelect={(member) => setSelectedMember(member)}
-            onClear={() => setSelectedMember(null)}
-          />
+          {!useNewCustomer ? (
+            <>
+              <MemberSearchInput
+                label="Search Member"
+                placeholder="Name or email..."
+                selectedMember={selectedMember}
+                onSelect={(member) => setSelectedMember(member)}
+                onClear={() => setSelectedMember(null)}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setUseNewCustomer(true);
+                  setSelectedMember(null);
+                }}
+                className="text-sm text-primary/60 dark:text-white/60 hover:text-primary dark:hover:text-white flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-base">person_add</span>
+                Charge someone not in the system
+              </button>
+            </>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-primary dark:text-white">New Customer</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUseNewCustomer(false);
+                    setNewCustomerFirstName('');
+                    setNewCustomerLastName('');
+                    setNewCustomerEmail('');
+                    setNewCustomerPhone('');
+                  }}
+                  className="text-sm text-primary/60 dark:text-white/60 hover:text-primary dark:hover:text-white flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-base">search</span>
+                  Search existing member
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-primary/60 dark:text-white/60 mb-1">
+                    First Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newCustomerFirstName}
+                    onChange={(e) => setNewCustomerFirstName(e.target.value)}
+                    placeholder="John"
+                    className="w-full px-3 py-2.5 rounded-xl bg-white/80 dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-primary/60 dark:text-white/60 mb-1">
+                    Last Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newCustomerLastName}
+                    onChange={(e) => setNewCustomerLastName(e.target.value)}
+                    placeholder="Doe"
+                    className="w-full px-3 py-2.5 rounded-xl bg-white/80 dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-primary/60 dark:text-white/60 mb-1">
+                  Email <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={newCustomerEmail}
+                  onChange={(e) => setNewCustomerEmail(e.target.value)}
+                  placeholder="john@example.com"
+                  className="w-full px-3 py-2.5 rounded-xl bg-white/80 dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-primary/60 dark:text-white/60 mb-1">
+                  Phone (optional)
+                </label>
+                <input
+                  type="tel"
+                  value={newCustomerPhone}
+                  onChange={(e) => setNewCustomerPhone(e.target.value)}
+                  placeholder="(555) 123-4567"
+                  className="w-full px-3 py-2.5 rounded-xl bg-white/80 dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm"
+                />
+              </div>
+            </div>
+          )}
 
-          {selectedMember && (
+          {isCustomerValid() && (
             <>
               {paymentMode === 'card' && (
                 <div>
