@@ -12,7 +12,6 @@ import FloatingActionButton from '../../../components/FloatingActionButton';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { TabType } from '../layout/types';
 import BookingMembersEditor from '../../../components/admin/BookingMembersEditor';
-import { RosterManager } from '../../../components/booking';
 import { CheckinBillingModal } from '../../../components/staff-command-center/modals/CheckinBillingModal';
 import { CompleteRosterModal } from '../../../components/staff-command-center/modals/CompleteRosterModal';
 import { TrackmanBookingModal } from '../../../components/staff-command-center/modals/TrackmanBookingModal';
@@ -2850,21 +2849,6 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                             onCollectPayment={(bookingId) => setBillingModal({isOpen: true, bookingId})}
                         />
                     )}
-
-                    {selectedCalendarBooking && (() => {
-                        const resource = resources.find(r => r.id === selectedCalendarBooking.resource_id);
-                        const isSimulatorBooking = resource?.type === 'simulator' || !resource?.type || resource?.type !== 'conference_room';
-                        if (!isSimulatorBooking) return null;
-                        return (
-                            <RosterManager
-                                bookingId={typeof selectedCalendarBooking.id === 'string' ? parseInt(selectedCalendarBooking.id, 10) : selectedCalendarBooking.id}
-                                declaredPlayerCount={(selectedCalendarBooking as any).declared_player_count || 1}
-                                isOwner={false}
-                                isStaff={true}
-                                onUpdate={() => handleRefresh()}
-                            />
-                        );
-                    })()}
                     
                     <div className="flex flex-col gap-2 pt-3">
                         <div className="flex gap-3">
