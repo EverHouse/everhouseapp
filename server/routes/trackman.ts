@@ -47,7 +47,152 @@ const upload = multer({
   }
 });
 
-// NOTE: Unmatched bookings endpoints removed - simulator bookings now use Trackman webhooks only
+// Unmatched bookings - now queries booking_requests with is_unmatched = true
+router.get('/api/admin/trackman/unmatched', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { limit = '50', offset = '0', search = '', resolved = 'false' } = req.query;
+    const limitNum = Math.min(parseInt(limit as string) || 50, 100);
+    const offsetNum = parseInt(offset as string) || 0;
+    
+    // Query booking_requests where is_unmatched = true
+    let whereClause = `WHERE br.is_unmatched = true`;
+    const params: any[] = [];
+    let paramIndex = 1;
+    
+    // If resolved=false, only show unassigned bookings (placeholder emails)
+    if (resolved === 'false') {
+      whereClause += ` AND (br.user_email LIKE 'unmatched-%@%' OR br.user_email LIKE '%@trackman.local')`;
+    }
+    
+    // Search filter
+    if (search) {
+      whereClause += ` AND (
+        br.staff_notes ILIKE $${paramIndex} OR 
+        br.trackman_booking_id::text ILIKE $${paramIndex}
+      )`;
+      params.push(`%${search}%`);
+      paramIndex++;
+    }
+    
+    // Get total count
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM booking_requests br ${whereClause}`,
+      params
+    );
+    const totalCount = parseInt(countResult.rows[0].count);
+    
+    // Get paginated results
+    const result = await pool.query(
+      `SELECT 
+        br.id,
+        br.trackman_booking_id,
+        br.request_date as booking_date,
+        br.start_time,
+        br.end_time,
+        br.resource_id,
+        r.name as bay_name,
+        br.staff_notes,
+        br.trackman_customer_notes as notes,
+        br.trackman_player_count as player_count,
+        br.created_at,
+        br.updated_at
+      FROM booking_requests br
+      LEFT JOIN resources r ON br.resource_id = r.id
+      ${whereClause}
+      ORDER BY br.request_date DESC, br.start_time DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+      [...params, limitNum, offsetNum]
+    );
+    
+    res.json({
+      data: result.rows,
+      totalCount,
+      page: Math.floor(offsetNum / limitNum) + 1,
+      totalPages: Math.ceil(totalCount / limitNum)
+    });
+  } catch (error: any) {
+    console.error('Error fetching unmatched bookings:', error);
+    res.status(500).json({ error: 'Failed to fetch unmatched bookings' });
+  }
+});
+
+// Resolve unmatched booking - link to a member
+router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { email, rememberEmail } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+    
+    // Find the member
+    const memberResult = await pool.query(
+      `SELECT id, email, first_name, last_name FROM users WHERE email = $1`,
+      [email]
+    );
+    
+    if (memberResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Member not found with that email' });
+    }
+    
+    const member = memberResult.rows[0];
+    
+    // Get the booking to check the trackman_booking_id
+    const bookingResult = await pool.query(
+      `SELECT trackman_booking_id, staff_notes FROM booking_requests WHERE id = $1`,
+      [id]
+    );
+    
+    if (bookingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    
+    const booking = bookingResult.rows[0];
+    const staffEmail = (req as any).session?.user?.email || 'admin';
+    
+    // Update the booking to link it to the member
+    await pool.query(
+      `UPDATE booking_requests 
+       SET user_id = $1, 
+           user_email = $2, 
+           is_unmatched = false,
+           staff_notes = COALESCE(staff_notes, '') || $3,
+           updated_at = NOW()
+       WHERE id = $4`,
+      [
+        member.id, 
+        member.email, 
+        ` [Resolved by ${staffEmail} on ${new Date().toISOString()}]`,
+        id
+      ]
+    );
+    
+    // If rememberEmail is true and there's a trackman_booking_id, we could save this association
+    // (This would be for future imports to auto-match)
+    
+    // Log the action
+    await logFromRequest(req, {
+      action: 'link_trackman_to_member',
+      resourceType: 'booking',
+      resourceId: id,
+      resourceName: `Trackman ${booking.trackman_booking_id || id}`,
+      details: { 
+        linkedEmail: member.email, 
+        memberName: `${member.first_name} ${member.last_name}`,
+        trackmanId: booking.trackman_booking_id
+      }
+    });
+    
+    res.json({ 
+      success: true, 
+      message: `Booking linked to ${member.first_name} ${member.last_name}` 
+    });
+  } catch (error: any) {
+    console.error('Error resolving unmatched booking:', error);
+    res.status(500).json({ error: 'Failed to resolve booking' });
+  }
+});
 
 router.get('/api/admin/trackman/import-runs', isStaffOrAdmin, async (req, res) => {
   try {

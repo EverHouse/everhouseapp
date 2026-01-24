@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.5.2",
+    date: "2026-01-24",
+    title: "Unmatched Bookings List Restored",
+    changes: [
+      "Fixed unmatched bookings list showing 0 - now correctly displays CSV import bookings needing member assignment",
+      "Unmatched bookings can be resolved directly from the import screen"
+    ]
+  },
+  {
     version: "9.5.1",
     date: "2026-01-24",
     title: "Tappable Booking Cards & Timezone Fix",
