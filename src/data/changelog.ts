@@ -13,14 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "9.6.3",
+    version: "9.7.0",
     date: "2026-01-24",
-    title: "Invoice Lifecycle Sync",
+    title: "Stripe & Trackman Billing Harmony",
+    isMajor: true,
     changes: [
-      "New: Invoice created/finalized/updated events now sync to transaction cache",
-      "New: Voided and uncollectible invoices are properly tracked",
-      "Overdue invoices broadcast real-time updates to staff dashboard",
-      "Foundation for showing invoices before they're paid"
+      "Critical: Suspended/inactive members are now blocked from booking (membership_status enforcement)",
+      "Critical: Trackman webhooks now use the billing engine - fees calculated correctly for all bookings",
+      "Critical: Booking time changes from Trackman now trigger automatic fee recalculation",
+      "New: Invoice lifecycle webhooks (created, finalized, voided, uncollectible) sync to transaction cache",
+      "New: Cached payment history endpoint for faster member billing lookups",
+      "Fixed: Failed payment intents and invoices now cached in transaction history",
+      "Fixed: Stripe webhook errors now properly throw for retry handling"
     ]
   },
   {

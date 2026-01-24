@@ -4,11 +4,13 @@ import { pool } from '../core/db';
 import { logger } from '../core/logger';
 import { isStaffOrAdmin, isAdmin } from '../core/middleware';
 import { sendNotificationToUser, broadcastToStaff } from '../core/websocket';
-// Removed sendBookingConfirmationEmail import - email notifications disabled per user preference, push only for now
 import { notifyAllStaff } from '../core/staffNotifications';
 import { notifyMember } from '../core/notificationService';
 import { formatDatePacific, formatTimePacific } from '../utils/dateUtils';
 import { refundGuestPass } from './guestPasses';
+import { calculateFullSessionBilling, recalculateSessionFees } from '../core/bookingService/usageCalculator';
+import { recordUsage } from '../core/bookingService/sessionManager';
+import { getMemberTierByEmail } from '../core/tierService';
 
 const router = Router();
 
@@ -354,7 +356,7 @@ async function linkByExternalBookingId(
     // Find booking request by external booking ID (stored as UUID in calendar_event_id or similar)
     // The externalBookingId is our system's UUID that was sent to Trackman
     const result = await pool.query(
-      `SELECT id, user_email, user_name, user_id, status as current_status, resource_id
+      `SELECT id, user_email, user_name, user_id, status as current_status, resource_id, session_id, duration_minutes
        FROM booking_requests 
        WHERE calendar_event_id = $1
          OR id::text = $1
@@ -365,7 +367,7 @@ async function linkByExternalBookingId(
     if (result.rows.length === 0) {
       // Try matching by UUID pattern in staff_notes (for pending trackman sync)
       const pendingResult = await pool.query(
-        `SELECT id, user_email, user_name, user_id, status as current_status, resource_id
+        `SELECT id, user_email, user_name, user_id, status as current_status, resource_id, session_id, duration_minutes
          FROM booking_requests 
          WHERE staff_notes LIKE $1
            AND trackman_booking_id IS NULL
@@ -406,6 +408,10 @@ async function linkByExternalBookingId(
     const endMinutes = endParts[0] * 60 + endParts[1];
     const durationMinutes = endMinutes > startMinutes ? endMinutes - startMinutes : 60;
     
+    // Check if times/duration changed before updating
+    const originalDuration = booking.duration_minutes;
+    const timeChanged = originalDuration !== durationMinutes;
+    
     // Update booking with Trackman info and sync tracking
     await pool.query(
       `UPDATE booking_requests 
@@ -434,6 +440,24 @@ async function linkByExternalBookingId(
         bookingId
       ]
     );
+    
+    // Recalculate fees if times changed
+    if (timeChanged && booking.session_id) {
+      try {
+        await pool.query(
+          'UPDATE booking_sessions SET start_time = $1, end_time = $2 WHERE id = $3',
+          [startTime, endTime, booking.session_id]
+        );
+        await recalculateSessionFees(booking.session_id);
+        logger.info('[Trackman Webhook] Recalculated fees after externalBookingId link', {
+          extra: { bookingId, sessionId: booking.session_id, originalDuration, newDuration: durationMinutes }
+        });
+      } catch (recalcErr) {
+        logger.warn('[Trackman Webhook] Failed to recalculate fees for externalBookingId link', { 
+          extra: { bookingId, error: recalcErr } 
+        });
+      }
+    }
     
     logger.info('[Trackman Webhook] Linked booking via externalBookingId', {
       extra: { 
@@ -808,6 +832,30 @@ async function createBookingForMember(
         [trackmanBookingId, playerCount, updatedNotes, startTime, endTime, newDurationMinutes, pendingBookingId]
       );
       
+      // Recalculate fees if duration/times changed
+      if (wasTimeTolerance) {
+        const sessionCheck = await pool.query(
+          'SELECT session_id FROM booking_requests WHERE id = $1',
+          [pendingBookingId]
+        );
+        if (sessionCheck.rows[0]?.session_id) {
+          try {
+            // Update session times first
+            await pool.query(
+              'UPDATE booking_sessions SET start_time = $1, end_time = $2 WHERE id = $3',
+              [startTime, endTime, sessionCheck.rows[0].session_id]
+            );
+            // Recalculate fees
+            await recalculateSessionFees(sessionCheck.rows[0].session_id);
+            logger.info('[Trackman Webhook] Recalculated fees after time change', {
+              extra: { bookingId: pendingBookingId, sessionId: sessionCheck.rows[0].session_id }
+            });
+          } catch (recalcErr) {
+            logger.warn('[Trackman Webhook] Failed to recalculate fees', { extra: { bookingId: pendingBookingId, error: recalcErr } });
+          }
+        }
+      }
+      
       const memberName = customerName || 
         [member.firstName, member.lastName].filter(Boolean).join(' ') || 
         member.email;
@@ -904,7 +952,7 @@ async function createBookingForMember(
     if (result.rows.length > 0) {
       const bookingId = result.rows[0].id;
       
-      // Create billing session for this Trackman booking
+      // Create billing session for this Trackman booking WITH usage tracking
       try {
         const sessionResult = await pool.query(`
           INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
@@ -913,7 +961,74 @@ async function createBookingForMember(
         `, [resourceId, slotDate, startTime, endTime, trackmanBookingId]);
         
         if (sessionResult.rows.length > 0) {
-          await pool.query(`UPDATE booking_requests SET session_id = $1 WHERE id = $2`, [sessionResult.rows[0].id, bookingId]);
+          const sessionId = sessionResult.rows[0].id;
+          await pool.query(`UPDATE booking_requests SET session_id = $1 WHERE id = $2`, [sessionId, bookingId]);
+          
+          // Calculate and record billing for this Trackman booking
+          try {
+            const ownerTier = await getMemberTierByEmail(member.email, { allowInactive: true });
+            
+            // Build participants array - owner + guests
+            const participants = [
+              { email: member.email, participantType: 'owner' as const, displayName: memberName }
+            ];
+            
+            // Add guest slots based on playerCount
+            for (let i = 1; i < playerCount; i++) {
+              participants.push({
+                email: undefined as any,
+                participantType: 'guest' as const,
+                displayName: `Guest ${i + 1}`
+              });
+            }
+            
+            // Calculate fees using the billing engine
+            const billingResult = await calculateFullSessionBilling(
+              slotDate,
+              durationMinutes,
+              participants,
+              member.email
+            );
+            
+            // Record usage ledger entries
+            for (const billing of billingResult.billingBreakdown) {
+              if (billing.participantType === 'guest') {
+                if (billing.guestFee > 0) {
+                  await recordUsage(sessionId, {
+                    memberId: member.email,
+                    minutesCharged: 0,
+                    overageFee: 0,
+                    guestFee: billing.guestFee,
+                    tierAtBooking: ownerTier || undefined,
+                    paymentMethod: 'unpaid'
+                  }, 'trackman_webhook');
+                }
+              } else {
+                await recordUsage(sessionId, {
+                  memberId: billing.email || member.email,
+                  minutesCharged: billing.minutesAllocated,
+                  overageFee: billing.overageFee,
+                  guestFee: 0,
+                  tierAtBooking: billing.tierName || ownerTier || undefined,
+                  paymentMethod: 'unpaid'
+                }, 'trackman_webhook');
+              }
+            }
+            
+            logger.info('[Trackman Webhook] Billing calculated for Trackman booking', {
+              extra: {
+                bookingId,
+                sessionId,
+                totalOverageFees: billingResult.totalOverageFees,
+                totalGuestFees: billingResult.totalGuestFees,
+                playerCount
+              }
+            });
+          } catch (billingErr) {
+            logger.warn('[Trackman Webhook] Failed to calculate billing (session created)', { 
+              extra: { bookingId, sessionId, error: billingErr } 
+            });
+          }
         }
       } catch (sessionErr) {
         logger.warn('[Trackman Webhook] Failed to create billing session', { extra: { bookingId, error: sessionErr } });

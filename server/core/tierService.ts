@@ -87,10 +87,10 @@ export function invalidateTierCache(tierName: string): void {
   tierCache.delete(tierName.toLowerCase());
 }
 
-export async function getMemberTierByEmail(email: string): Promise<string | null> {
+export async function getMemberTierByEmail(email: string, options?: { allowInactive?: boolean }): Promise<string | null> {
   try {
     const result = await pool.query(
-      `SELECT u.tier, mt.name as tier_name
+      `SELECT u.tier, mt.name as tier_name, u.membership_status
        FROM users u
        LEFT JOIN membership_tiers mt ON u.tier_id = mt.id
        WHERE LOWER(u.email) = LOWER($1)
@@ -102,7 +102,17 @@ export async function getMemberTierByEmail(email: string): Promise<string | null
       return null;
     }
     
-    return result.rows[0].tier_name || result.rows[0].tier || null;
+    const user = result.rows[0];
+    
+    if (!options?.allowInactive) {
+      const validStatuses = ['active', 'trial', 'past_due'];
+      if (!user.membership_status || !validStatuses.includes(user.membership_status)) {
+        console.warn(`[TierService] Denying tier access for ${email} (Status: ${user.membership_status || 'none'})`);
+        return null;
+      }
+    }
+    
+    return user.tier_name || user.tier || null;
   } catch (error) {
     console.error('[getMemberTierByEmail] Error:', error);
     return null;
