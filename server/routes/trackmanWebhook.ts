@@ -2027,7 +2027,7 @@ router.get('/api/admin/trackman-webhooks/stats', isStaffOrAdmin, async (req: Req
         COUNT(*) FILTER (WHERE twe.matched_booking_id IS NOT NULL AND br.was_auto_linked = true AND (br.is_unmatched IS NULL OR br.is_unmatched = false)) as auto_confirmed,
         COUNT(*) FILTER (WHERE twe.matched_booking_id IS NOT NULL AND (br.was_auto_linked IS NULL OR br.was_auto_linked = false) AND (br.is_unmatched IS NULL OR br.is_unmatched = false)) as manually_linked,
         COUNT(*) FILTER (WHERE twe.matched_booking_id IS NOT NULL AND br.is_unmatched = true) as unmatched,
-        COUNT(*) FILTER (WHERE twe.event_type = 'cancelled' OR br.status = 'cancelled') as cancelled,
+        COUNT(*) FILTER (WHERE br.status = 'cancelled') as cancelled,
         MAX(twe.created_at) as last_event_at
       FROM trackman_webhook_events twe
       LEFT JOIN booking_requests br ON twe.matched_booking_id = br.id
