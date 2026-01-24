@@ -2656,6 +2656,256 @@ router.post('/api/admin/trackman-webhook/:eventId/retry', isStaffOrAdmin, async 
   }
 });
 
+// Auto-match an unlinked webhook event to existing booking_requests by bay + date + time overlap
+router.post('/api/admin/trackman-webhook/:eventId/auto-match', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const eventId = parseInt(req.params.eventId);
+    
+    if (isNaN(eventId)) {
+      return res.status(400).json({ error: 'Invalid event ID' });
+    }
+    
+    // Fetch the webhook event
+    const eventResult = await pool.query(
+      `SELECT id, event_type, payload, trackman_booking_id, matched_booking_id
+       FROM trackman_webhook_events 
+       WHERE id = $1`,
+      [eventId]
+    );
+    
+    if (eventResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    
+    const event = eventResult.rows[0];
+    
+    // Check if already matched
+    if (event.matched_booking_id) {
+      // Check if the matched booking is actually linked to a member (not unmatched)
+      const matchedBooking = await pool.query(
+        `SELECT id, user_email, is_unmatched FROM booking_requests WHERE id = $1`,
+        [event.matched_booking_id]
+      );
+      
+      if (matchedBooking.rows.length > 0 && !matchedBooking.rows[0].is_unmatched) {
+        return res.json({ 
+          success: false, 
+          message: 'This event is already linked to a member booking',
+          alreadyLinked: true
+        });
+      }
+    }
+    
+    const payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
+    const trackmanBookingId = event.trackman_booking_id;
+    
+    // Validate trackman_booking_id exists
+    if (!trackmanBookingId) {
+      return res.status(400).json({ error: 'Event has no Trackman booking ID to link' });
+    }
+    
+    // Extract booking data from payload
+    const bookingData = payload?.data || payload?.booking || {};
+    const bookingStart = bookingData?.start;
+    const bookingEnd = bookingData?.end;
+    
+    if (!bookingStart) {
+      return res.status(400).json({ error: 'Cannot determine booking date/time from event' });
+    }
+    
+    // Parse the booking time
+    const startDate = new Date(bookingStart);
+    const endDate = bookingEnd ? new Date(bookingEnd) : startDate;
+    
+    // Get Pacific date and times
+    const pacificDate = startDate.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+    const pacificStartTime = startDate.toLocaleTimeString('en-US', { 
+      timeZone: 'America/Los_Angeles', 
+      hour12: false, 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+    const pacificEndTime = endDate.toLocaleTimeString('en-US', { 
+      timeZone: 'America/Los_Angeles', 
+      hour12: false, 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+    
+    // Determine bay/resource from payload
+    let resourceId: number | null = null;
+    const bayRef = bookingData?.bay?.ref;
+    if (bayRef) {
+      const refNum = parseInt(String(bayRef).trim(), 10);
+      if (refNum >= 1 && refNum <= 4) {
+        resourceId = refNum;
+      }
+    }
+    
+    if (!resourceId) {
+      return res.status(400).json({ error: 'Cannot determine bay from event' });
+    }
+    
+    logger.info('[Trackman Auto-Match] Searching for matching booking requests', {
+      extra: { eventId, trackmanBookingId, date: pacificDate, start: pacificStartTime, end: pacificEndTime, bay: resourceId }
+    });
+    
+    // Search for matching pending booking requests by bay + date + time overlap
+    // Allow 30 minute tolerance for start time
+    const matchResult = await pool.query(
+      `SELECT 
+        id, user_email, status, start_time, end_time, request_date, resource_id,
+        (SELECT CONCAT(first_name, ' ', last_name) FROM users WHERE LOWER(email) = LOWER(br.user_email) LIMIT 1) as member_name
+       FROM booking_requests br
+       WHERE resource_id = $1
+         AND request_date = $2
+         AND trackman_booking_id IS NULL
+         AND status = 'pending'
+         AND ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) <= 1800
+       ORDER BY ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) ASC
+       LIMIT 5`,
+      [resourceId, pacificDate, pacificStartTime]
+    );
+    
+    if (matchResult.rows.length === 0) {
+      // Also try to find approved bookings without trackman_booking_id
+      const approvedMatchResult = await pool.query(
+        `SELECT 
+          id, user_email, status, start_time, end_time, request_date, resource_id,
+          (SELECT CONCAT(first_name, ' ', last_name) FROM users WHERE LOWER(email) = LOWER(br.user_email) LIMIT 1) as member_name
+         FROM booking_requests br
+         WHERE resource_id = $1
+           AND request_date = $2
+           AND trackman_booking_id IS NULL
+           AND status = 'approved'
+           AND ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) <= 1800
+         ORDER BY ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) ASC
+         LIMIT 5`,
+        [resourceId, pacificDate, pacificStartTime]
+      );
+      
+      if (approvedMatchResult.rows.length === 0) {
+        return res.json({
+          success: false,
+          message: 'No matching booking requests found for this bay, date, and time',
+          searched: { date: pacificDate, startTime: pacificStartTime, bay: resourceId }
+        });
+      }
+      
+      // Found an approved booking match
+      const match = approvedMatchResult.rows[0];
+      
+      // Link the trackman booking ID to the existing booking with race condition guard
+      const updateResult = await pool.query(
+        `UPDATE booking_requests 
+         SET trackman_booking_id = $1,
+             last_sync_source = 'staff_auto_match',
+             last_trackman_sync_at = NOW(),
+             was_auto_linked = true,
+             staff_notes = COALESCE(staff_notes, '') || ' [Linked via Auto-Match]',
+             updated_at = NOW()
+         WHERE id = $2 AND trackman_booking_id IS NULL
+         RETURNING id`,
+        [trackmanBookingId, match.id]
+      );
+      
+      if (updateResult.rowCount === 0) {
+        return res.json({
+          success: false,
+          message: 'Booking was already linked by another process',
+          conflict: true
+        });
+      }
+      
+      // Update the webhook event to reference this booking with race condition guard
+      await pool.query(
+        `UPDATE trackman_webhook_events 
+         SET matched_booking_id = $1
+         WHERE id = $2 AND (matched_booking_id IS NULL OR matched_booking_id = $3)`,
+        [match.id, eventId, event.matched_booking_id]
+      );
+      
+      logger.info('[Trackman Auto-Match] Successfully linked to approved booking', {
+        extra: { eventId, trackmanBookingId, bookingId: match.id, memberEmail: match.user_email }
+      });
+      
+      return res.json({
+        success: true,
+        message: `Linked to ${match.member_name || match.user_email}'s approved booking`,
+        bookingId: match.id,
+        memberEmail: match.user_email,
+        memberName: match.member_name
+      });
+    }
+    
+    // Found a pending booking match - approve it
+    const match = matchResult.rows[0];
+    
+    // Auto-approve the pending request and link the trackman booking ID with race condition guard
+    const pendingUpdateResult = await pool.query(
+      `UPDATE booking_requests 
+       SET status = 'approved',
+           trackman_booking_id = $1,
+           reviewed_at = NOW(),
+           reviewed_by = 'staff_auto_match',
+           last_sync_source = 'staff_auto_match',
+           last_trackman_sync_at = NOW(),
+           was_auto_linked = true,
+           staff_notes = COALESCE(staff_notes, '') || ' [Auto-approved via Staff Auto-Match]',
+           updated_at = NOW()
+       WHERE id = $2 AND trackman_booking_id IS NULL AND status = 'pending'
+       RETURNING id`,
+      [trackmanBookingId, match.id]
+    );
+    
+    if (pendingUpdateResult.rowCount === 0) {
+      return res.json({
+        success: false,
+        message: 'Booking was already linked or approved by another process',
+        conflict: true
+      });
+    }
+    
+    // Update the webhook event to reference this booking with race condition guard
+    await pool.query(
+      `UPDATE trackman_webhook_events 
+       SET matched_booking_id = $1
+       WHERE id = $2 AND (matched_booking_id IS NULL OR matched_booking_id = $3)`,
+      [match.id, eventId, event.matched_booking_id]
+    );
+    
+    // Notify member their booking is confirmed
+    try {
+      await notifyMemberBookingConfirmed(
+        match.user_email,
+        match.id,
+        pacificDate,
+        pacificStartTime,
+        `Bay ${resourceId}`
+      );
+    } catch (notifyErr) {
+      logger.warn('[Trackman Auto-Match] Failed to notify member', { error: notifyErr as Error });
+    }
+    
+    logger.info('[Trackman Auto-Match] Successfully matched and approved booking', {
+      extra: { eventId, trackmanBookingId, bookingId: match.id, memberEmail: match.user_email }
+    });
+    
+    return res.json({
+      success: true,
+      message: `Matched and approved ${match.member_name || match.user_email}'s pending request`,
+      bookingId: match.id,
+      memberEmail: match.user_email,
+      memberName: match.member_name,
+      wasApproved: true
+    });
+    
+  } catch (error: any) {
+    logger.error('[Trackman Auto-Match] Failed to auto-match event', { error });
+    res.status(500).json({ error: 'Failed to auto-match event' });
+  }
+});
+
 // Cleanup old webhook logs (called by scheduler)
 export async function cleanupOldWebhookLogs(): Promise<{ deleted: number }> {
   try {

@@ -133,6 +133,8 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
   const [webhookTotalCount, setWebhookTotalCount] = useState(0);
   const [webhookLoading, setWebhookLoading] = useState(false);
   const [expandedEventId, setExpandedEventId] = useState<number | null>(null);
+  const [autoMatchingEventId, setAutoMatchingEventId] = useState<number | null>(null);
+  const [autoMatchResult, setAutoMatchResult] = useState<{ eventId: number; success: boolean; message: string } | null>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
 
   const fetchWebhookEvents = useCallback(async (page: number) => {
@@ -195,6 +197,55 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
     if (type.includes('cancelled') || type.includes('cancel') || type.includes('deleted')) return 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400';
     return 'bg-gray-100 text-gray-800 dark:bg-white/10 dark:text-white/80';
   };
+
+  const handleAutoMatch = useCallback(async (eventId: number) => {
+    setAutoMatchingEventId(eventId);
+    setAutoMatchResult(null);
+    
+    try {
+      const res = await fetch(`/api/admin/trackman-webhook/${eventId}/auto-match`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      // Handle non-OK responses
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Request failed' }));
+        setAutoMatchResult({
+          eventId,
+          success: false,
+          message: errorData.error || `Failed (${res.status})`
+        });
+        setTimeout(() => setAutoMatchResult(null), 5000);
+        return;
+      }
+      
+      const result = await res.json();
+      
+      setAutoMatchResult({
+        eventId,
+        success: result.success,
+        message: result.message || (result.success ? 'Matched!' : 'No match found')
+      });
+      
+      if (result.success) {
+        fetchWebhookEvents(webhookPage);
+        fetchWebhookStats();
+        window.dispatchEvent(new CustomEvent('booking-action-completed'));
+      }
+      
+      setTimeout(() => setAutoMatchResult(null), 5000);
+    } catch (err) {
+      setAutoMatchResult({
+        eventId,
+        success: false,
+        message: 'Network error - try again'
+      });
+      setTimeout(() => setAutoMatchResult(null), 5000);
+    } finally {
+      setAutoMatchingEventId(null);
+    }
+  }, [fetchWebhookEvents, fetchWebhookStats, webhookPage]);
 
   const totalPages = Math.ceil(webhookTotalCount / ITEMS_PER_PAGE);
 
@@ -405,40 +456,76 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                                   </button>
                                 );
                               } else if (isLinkedButUnmatched) {
+                                const isAutoMatching = autoMatchingEventId === event.id;
+                                const matchResult = autoMatchResult?.eventId === event.id ? autoMatchResult : null;
                                 return (
-                                  <button
-                                    onClick={() => onLinkToMember({
-                                      trackmanBookingId: event.trackman_booking_id,
-                                      bayName,
-                                      bookingDate,
-                                      timeSlot,
-                                      duration,
-                                      matchedBookingId: event.matched_booking_id,
-                                      isRelink: true
-                                    })}
-                                    className="px-2 py-1.5 rounded-lg text-xs font-medium bg-amber-100 hover:bg-amber-200 text-amber-800 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 dark:text-amber-400 transition-colors flex items-center gap-1"
-                                    title="Link this Trackman booking to a member"
-                                  >
-                                    <span className="material-symbols-outlined text-sm">person_add</span>
-                                    <span className="hidden sm:inline">Link to Member</span>
-                                  </button>
+                                  <div className="flex items-center gap-1">
+                                    {matchResult && (
+                                      <span className={`text-xs ${matchResult.success ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                                        {matchResult.message}
+                                      </span>
+                                    )}
+                                    <button
+                                      onClick={() => handleAutoMatch(event.id)}
+                                      disabled={isAutoMatching}
+                                      className="px-2 py-1.5 rounded-lg text-xs font-medium bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-500/20 dark:hover:bg-blue-500/30 dark:text-blue-400 transition-colors flex items-center gap-1 disabled:opacity-50"
+                                      title="Try to auto-match this booking to an existing request by bay, date, and time"
+                                    >
+                                      <span className="material-symbols-outlined text-sm">{isAutoMatching ? 'sync' : 'auto_awesome'}</span>
+                                      <span className="hidden sm:inline">{isAutoMatching ? 'Matching...' : 'Auto Match'}</span>
+                                    </button>
+                                    <button
+                                      onClick={() => onLinkToMember({
+                                        trackmanBookingId: event.trackman_booking_id,
+                                        bayName,
+                                        bookingDate,
+                                        timeSlot,
+                                        duration,
+                                        matchedBookingId: event.matched_booking_id,
+                                        isRelink: true
+                                      })}
+                                      className="px-2 py-1.5 rounded-lg text-xs font-medium bg-amber-100 hover:bg-amber-200 text-amber-800 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 dark:text-amber-400 transition-colors flex items-center gap-1"
+                                      title="Manually link this Trackman booking to a member"
+                                    >
+                                      <span className="material-symbols-outlined text-sm">person_add</span>
+                                      <span className="hidden sm:inline">Link</span>
+                                    </button>
+                                  </div>
                                 );
                               } else if (!event.matched_booking_id) {
+                                const isAutoMatching = autoMatchingEventId === event.id;
+                                const matchResult = autoMatchResult?.eventId === event.id ? autoMatchResult : null;
                                 return (
-                                  <button
-                                    onClick={() => onLinkToMember({
-                                      trackmanBookingId: event.trackman_booking_id,
-                                      bayName,
-                                      bookingDate,
-                                      timeSlot,
-                                      duration
-                                    })}
-                                    className="px-2 py-1.5 rounded-lg text-xs font-medium bg-amber-100 hover:bg-amber-200 text-amber-800 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 dark:text-amber-400 transition-colors flex items-center gap-1"
-                                    title="Link this Trackman booking to a member"
-                                  >
-                                    <span className="material-symbols-outlined text-sm">person_add</span>
-                                    <span className="hidden sm:inline">Link to Member</span>
-                                  </button>
+                                  <div className="flex items-center gap-1">
+                                    {matchResult && (
+                                      <span className={`text-xs ${matchResult.success ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                                        {matchResult.message}
+                                      </span>
+                                    )}
+                                    <button
+                                      onClick={() => handleAutoMatch(event.id)}
+                                      disabled={isAutoMatching}
+                                      className="px-2 py-1.5 rounded-lg text-xs font-medium bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-500/20 dark:hover:bg-blue-500/30 dark:text-blue-400 transition-colors flex items-center gap-1 disabled:opacity-50"
+                                      title="Try to auto-match this booking to an existing request by bay, date, and time"
+                                    >
+                                      <span className="material-symbols-outlined text-sm">{isAutoMatching ? 'sync' : 'auto_awesome'}</span>
+                                      <span className="hidden sm:inline">{isAutoMatching ? 'Matching...' : 'Auto Match'}</span>
+                                    </button>
+                                    <button
+                                      onClick={() => onLinkToMember({
+                                        trackmanBookingId: event.trackman_booking_id,
+                                        bayName,
+                                        bookingDate,
+                                        timeSlot,
+                                        duration
+                                      })}
+                                      className="px-2 py-1.5 rounded-lg text-xs font-medium bg-amber-100 hover:bg-amber-200 text-amber-800 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 dark:text-amber-400 transition-colors flex items-center gap-1"
+                                      title="Manually link this Trackman booking to a member"
+                                    >
+                                      <span className="material-symbols-outlined text-sm">person_add</span>
+                                      <span className="hidden sm:inline">Link</span>
+                                    </button>
+                                  </div>
                                 );
                               }
                               return null;

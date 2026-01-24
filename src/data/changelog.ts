@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.17.0",
+    date: "2026-01-24",
+    title: "Trackman Auto-Match Feature",
+    changes: [
+      "New: Auto Match button on unlinked Trackman webhook events",
+      "New: Staff can now try to automatically match Trackman bookings to existing member requests by bay, date, and time",
+      "New: Works for both pending requests (auto-approves) and already-approved bookings without Trackman ID",
+      "Improved: Auto-match searches for bookings within 30 minutes of the Trackman booking time"
+    ]
+  },
+  {
     version: "9.16.0",
     date: "2026-01-24",
     title: "Booking Management Improvements",
