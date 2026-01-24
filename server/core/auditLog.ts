@@ -32,6 +32,9 @@ export type AuditAction =
   | 'remove_guest_from_booking'
   | 'link_member_to_booking'
   | 'unlink_member_from_booking'
+  | 'change_booking_owner'
+  | 'assign_member_to_booking'
+  | 'link_trackman_to_member'
   // Billing actions
   | 'view_payment'
   | 'process_refund'

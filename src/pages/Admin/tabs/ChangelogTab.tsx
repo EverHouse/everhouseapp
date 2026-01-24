@@ -33,6 +33,9 @@ const ACTION_LABELS: Record<string, { label: string; icon: string; color: string
     link_member_to_booking: { label: 'Linked Member to Booking', icon: 'link', color: 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30' },
     unlink_member_from_booking: { label: 'Unlinked Member', icon: 'link_off', color: 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-900/30' },
     direct_add_participant: { label: 'Added Participant', icon: 'group_add', color: 'text-teal-600 bg-teal-100 dark:text-teal-400 dark:bg-teal-900/30' },
+    change_booking_owner: { label: 'Change Booking Owner', icon: 'swap_horiz', color: 'text-indigo-600 bg-indigo-100 dark:text-indigo-400 dark:bg-indigo-900/30' },
+    assign_member_to_booking: { label: 'Assigned Member to Booking', icon: 'person_add', color: 'text-teal-600 bg-teal-100 dark:text-teal-400 dark:bg-teal-900/30' },
+    link_trackman_to_member: { label: 'Linked Trackman to Member', icon: 'link', color: 'text-cyan-600 bg-cyan-100 dark:text-cyan-400 dark:bg-cyan-900/30' },
     // Billing actions
     pause_subscription: { label: 'Paused Subscription', icon: 'pause_circle', color: 'text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30' },
     resume_subscription: { label: 'Resumed Subscription', icon: 'play_circle', color: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30' },
@@ -98,7 +101,7 @@ const ACTION_LABELS: Record<string, { label: string; icon: string; color: string
 
 const FILTER_CATEGORIES = [
     { key: 'all', label: 'All' },
-    { key: 'bookings', label: 'Bookings', actions: ['approve_booking', 'decline_booking', 'cancel_booking', 'create_booking', 'reschedule_booking', 'mark_no_show', 'mark_attended', 'add_guest_to_booking', 'remove_guest_from_booking', 'link_member_to_booking', 'unlink_member_from_booking', 'direct_add_participant', 'reassign_booking', 'unmatch_booking', 'import_trackman'] },
+    { key: 'bookings', label: 'Bookings', actions: ['approve_booking', 'decline_booking', 'cancel_booking', 'create_booking', 'reschedule_booking', 'mark_no_show', 'mark_attended', 'add_guest_to_booking', 'remove_guest_from_booking', 'link_member_to_booking', 'unlink_member_from_booking', 'direct_add_participant', 'reassign_booking', 'unmatch_booking', 'import_trackman', 'change_booking_owner', 'assign_member_to_booking', 'link_trackman_to_member'] },
     { key: 'billing', label: 'Billing', actions: ['pause_subscription', 'resume_subscription', 'cancel_subscription', 'record_charge', 'process_refund', 'send_payment_link', 'change_tier', 'update_payment_status', 'add_group_member', 'remove_group_member', 'link_group_subscription'] },
     { key: 'members', label: 'Members', actions: ['invite_member', 'create_member', 'update_member', 'delete_member', 'archive_member', 'sync_hubspot', 'link_stripe_customer', 'update_member_notes', 'review_waiver'] },
     { key: 'tours', label: 'Tours', actions: ['tour_checkin', 'tour_completed', 'tour_no_show', 'tour_cancelled', 'tour_status_changed'] },

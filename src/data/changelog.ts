@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.4.14",
+    date: "2026-01-24",
+    title: "Staff Activity Filters & Player Roster",
+    changes: [
+      "Fixed staff activity filters - Bookings, Billing, Members and other category filters now work correctly",
+      "Added missing audit actions: Change Booking Owner, Assign Member to Booking, Link Trackman to Member",
+      "X/Y Players button now shows for all future bookings, not just today - staff can prep rosters in advance"
+    ]
+  },
+  {
     version: "9.4.13",
     date: "2026-01-24",
     title: "Fixed Assign Member Button",
