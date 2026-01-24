@@ -313,14 +313,14 @@ async function handlePaymentIntentSucceeded(paymentIntent: any): Promise<void> {
       }
       
       await pool.query(
-        `UPDATE booking_fee_snapshots SET status = 'used', used_at = NOW() WHERE id = $1`,
+        `UPDATE booking_fee_snapshots SET status = 'completed', used_at = NOW() WHERE id = $1`,
         [feeSnapshotId]
       );
       
       console.log(`[Stripe Webhook] Validated ${validatedParticipantIds.length} participants from snapshot ${feeSnapshotId}`);
     } catch (err) {
       console.error('[Stripe Webhook] Failed to validate from snapshot:', err);
-      return;
+      throw err; // Throw so Stripe retries the webhook
     }
   } else if (metadata?.participantFees && !isNaN(bookingId) && bookingId > 0) {
     console.warn(`[Stripe Webhook] No snapshot ID - falling back to DB cached fee validation`);
@@ -975,7 +975,7 @@ async function handleCheckoutSessionCompleted(session: any): Promise<void> {
 
     if (!result.success) {
       console.error(`[Stripe Webhook] Failed to record day pass purchase:`, result.error);
-      return;
+      throw new Error(`Failed to record day pass: ${result.error}`); // Throw so Stripe retries
     }
 
     console.log(`[Stripe Webhook] Day pass purchase recorded: ${result.purchaseId}`);

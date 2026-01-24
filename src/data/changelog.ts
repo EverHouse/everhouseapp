@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.6.2",
+    date: "2026-01-24",
+    title: "Stripe Webhook Reliability Fixes",
+    changes: [
+      "Fixed: Payment status now consistent between API and webhooks (was 'used' vs 'completed')",
+      "Fixed: Failed webhook operations now trigger Stripe retry (was silently failing)",
+      "Payments are now more reliable and won't get stuck in 'processing' state"
+    ]
+  },
+  {
     version: "9.6.1",
     date: "2026-01-24",
     title: "Fix Trackman Resolve Booking",
