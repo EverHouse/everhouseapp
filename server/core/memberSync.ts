@@ -110,7 +110,23 @@ interface HubSpotContact {
     total_visit_count?: string;
     membership_notes?: string;
     message?: string;
+    // Address fields (synced from Mindbody via HubSpot)
+    address?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
   };
+}
+
+// Simple hash function to detect notes changes
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return hash.toString(16);
 }
 
 let syncInProgress = false;
@@ -156,7 +172,12 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
       'interest_in_workspace',
       'total_visit_count',
       'membership_notes',
-      'message'
+      'message',
+      // Address fields (synced from Mindbody via HubSpot)
+      'address',
+      'city',
+      'state',
+      'zip'
     ];
     
     let allContacts: HubSpotContact[] = [];
@@ -260,11 +281,21 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           const smsOptIn = parseOptIn(contact.properties.eh_sms_updates_opt_in);
           const { firstName, lastName } = getNameFromContact(contact);
           
-          const existingUser = await db.select({ membershipStatus: users.membershipStatus })
+          const existingUser = await db.select({ 
+            membershipStatus: users.membershipStatus,
+            lastHubspotNotesHash: users.lastHubspotNotesHash
+          })
             .from(users)
             .where(eq(users.email, email))
             .limit(1);
           const oldStatus = existingUser[0]?.membershipStatus || null;
+          const oldNotesHash = existingUser[0]?.lastHubspotNotesHash || null;
+          
+          // Extract address fields from HubSpot (synced from Mindbody)
+          const streetAddress = contact.properties.address?.trim() || null;
+          const city = contact.properties.city?.trim() || null;
+          const state = contact.properties.state?.trim() || null;
+          const zipCode = contact.properties.zip?.trim() || null;
           
           await db.insert(users)
             .values({
@@ -282,6 +313,10 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
               joinDate,
               emailOptIn,
               smsOptIn,
+              streetAddress,
+              city,
+              state,
+              zipCode,
               lastSyncedAt: new Date(),
               role: 'member'
             })
@@ -300,6 +335,10 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
                 joinDate: joinDate ? joinDate : sql`${users.joinDate}`,
                 emailOptIn: emailOptIn !== null ? emailOptIn : sql`${users.emailOptIn}`,
                 smsOptIn: smsOptIn !== null ? smsOptIn : sql`${users.smsOptIn}`,
+                streetAddress: sql`COALESCE(${streetAddress}, ${users.streetAddress})`,
+                city: sql`COALESCE(${city}, ${users.city})`,
+                state: sql`COALESCE(${state}, ${users.state})`,
+                zipCode: sql`COALESCE(${zipCode}, ${users.zipCode})`,
                 lastSyncedAt: new Date(),
                 updatedAt: new Date()
               }
@@ -311,70 +350,61 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
             });
           }
           
-          // Sync HubSpot notes to member_notes table (one-way sync, no push back to HubSpot)
+          // Sync HubSpot notes to member_notes table with change detection
+          // When notes change in HubSpot, create a NEW dated note (don't overwrite old ones)
           const hubspotNotes = contact.properties.membership_notes?.trim();
           const hubspotMessage = contact.properties.message?.trim();
           
           // Helper to sanitize HTML and limit length
           const sanitizeNoteContent = (content: string): string => {
-            // Remove HTML tags but keep line breaks
             return content
               .replace(/<br\s*\/?>/gi, '\n')
               .replace(/<\/?[^>]+(>|$)/g, '')
               .trim()
-              .substring(0, 5000); // Limit to 5000 chars
+              .substring(0, 5000);
           };
           
-          // Sync membership_notes from HubSpot
-          if (hubspotNotes) {
-            const noteContent = `[HubSpot Notes]: ${sanitizeNoteContent(hubspotNotes)}`;
-            const notePrefix = '[HubSpot Notes]:';
+          // Combine notes and message for hash comparison
+          const combinedNotesContent = [hubspotNotes || '', hubspotMessage || ''].join('||');
+          const currentNotesHash = combinedNotesContent ? simpleHash(combinedNotesContent) : null;
+          
+          // Only create new notes if the content has changed
+          if (currentNotesHash && currentNotesHash !== oldNotesHash) {
+            const today = new Date().toLocaleDateString('en-US', { 
+              year: 'numeric', 
+              month: 'short', 
+              day: 'numeric',
+              timeZone: 'America/Los_Angeles'
+            });
             
-            // Check if this note already exists (by prefix match to avoid duplicates)
-            const existingNote = await db.select({ id: memberNotes.id })
-              .from(memberNotes)
-              .where(and(
-                eq(memberNotes.memberEmail, email),
-                sql`${memberNotes.content} LIKE ${notePrefix + '%'}`
-              ))
-              .limit(1);
-            
-            if (existingNote.length === 0) {
-              // Create new note synced from HubSpot
+            // Create note for membership_notes if present
+            if (hubspotNotes) {
+              const noteContent = `[Mindbody Notes - ${today}]:\n${sanitizeNoteContent(hubspotNotes)}`;
               await db.insert(memberNotes).values({
                 memberEmail: email,
                 content: noteContent,
                 createdBy: 'system',
-                createdByName: 'HubSpot Sync',
+                createdByName: 'HubSpot Sync (Mindbody)',
                 isPinned: false
               });
             }
-          }
-          
-          // Sync message from HubSpot
-          if (hubspotMessage) {
-            const msgContent = `[HubSpot Message]: ${sanitizeNoteContent(hubspotMessage)}`;
-            const msgPrefix = '[HubSpot Message]:';
             
-            // Check if this message already exists
-            const existingMsg = await db.select({ id: memberNotes.id })
-              .from(memberNotes)
-              .where(and(
-                eq(memberNotes.memberEmail, email),
-                sql`${memberNotes.content} LIKE ${msgPrefix + '%'}`
-              ))
-              .limit(1);
-            
-            if (existingMsg.length === 0) {
-              // Create new note synced from HubSpot message
+            // Create note for message if present
+            if (hubspotMessage) {
+              const msgContent = `[Mindbody Message - ${today}]:\n${sanitizeNoteContent(hubspotMessage)}`;
               await db.insert(memberNotes).values({
                 memberEmail: email,
                 content: msgContent,
                 createdBy: 'system',
-                createdByName: 'HubSpot Sync',
+                createdByName: 'HubSpot Sync (Mindbody)',
                 isPinned: false
               });
             }
+            
+            // Update the hash to track this version
+            await db.update(users)
+              .set({ lastHubspotNotesHash: currentNotesHash })
+              .where(eq(users.email, email));
           }
           
           return { email, statusChanged: oldStatus !== null && oldStatus !== status };

@@ -51,6 +51,13 @@ export const users = pgTable("users", {
   companyName: text("company_name"),
   jobTitle: text("job_title"),
   hubspotCompanyId: text("hubspot_company_id"),
+  // Address fields (synced from HubSpot/Mindbody)
+  streetAddress: text("street_address"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: varchar("zip_code", { length: 20 }),
+  // Track last HubSpot notes hash to detect changes
+  lastHubspotNotesHash: varchar("last_hubspot_notes_hash", { length: 64 }),
   billingGroupId: integer("billing_group_id"),
   billingMigrationRequestedAt: timestamp("billing_migration_requested_at"),
   lastTier: varchar("last_tier"),

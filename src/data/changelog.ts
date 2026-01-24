@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.14.0",
+    date: "2026-01-24",
+    title: "HubSpot → App Sync Improvements",
+    isMajor: true,
+    changes: [
+      "New: Member addresses now sync from HubSpot (street, city, state, zip) - populated from Mindbody",
+      "New: Notes from Mindbody now create dated entries when changed - preserves history instead of overwriting",
+      "Improved: Billing source now respects billing_provider field first - fixes incorrect 'Stripe' labels for Mindbody members",
+      "Improved: Active status for Mindbody members automatically syncs from HubSpot",
+      "Improved: Contact info (phone, address) now flows from Mindbody → HubSpot → App consistently"
+    ]
+  },
+  {
     version: "9.13.1",
     date: "2026-01-24",
     title: "Visitors Directory Improvements",
