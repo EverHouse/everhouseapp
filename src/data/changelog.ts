@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.7.6",
+    date: "2026-01-24",
+    title: "Booking Information Consistency",
+    changes: [
+      "New: Assign Member modal now shows the imported name from Trackman at the top",
+      "New: Notes from Trackman imports are now displayed in the Assign Member modal",
+      "New: Resolve Booking modal also shows notes from imports for staff context",
+      "Consistent information display: the same booking details now appear everywhere",
+      "Staff can now see important context like 'walk in client - don't charge' across all modals"
+    ]
+  },
+  {
     version: "9.7.5",
     date: "2026-01-24",
     title: "Streamlined Walk-In Visitor Flow",

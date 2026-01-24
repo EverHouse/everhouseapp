@@ -16,6 +16,8 @@ interface TrackmanLinkModalProps {
   currentMemberEmail?: string;
   isRelink?: boolean;
   onSuccess?: () => void;
+  importedName?: string;
+  notes?: string;
 }
 
 interface VisitorSearchResult {
@@ -37,7 +39,9 @@ export function TrackmanLinkModal({
   currentMemberName,
   currentMemberEmail,
   isRelink,
-  onSuccess
+  onSuccess,
+  importedName,
+  notes
 }: TrackmanLinkModalProps) {
   const [selectedMember, setSelectedMember] = useState<SelectedMember | null>(null);
   const [linking, setLinking] = useState(false);
@@ -270,6 +274,12 @@ export function TrackmanLinkModal({
             Trackman Booking Details
           </p>
           <div className="space-y-1 text-sm text-amber-700 dark:text-amber-400">
+            {importedName && (
+              <p className="flex items-center gap-1 font-semibold">
+                <span className="material-symbols-outlined text-sm">person</span>
+                {importedName}
+              </p>
+            )}
             {bayName && (
               <p className="flex items-center gap-1">
                 <span className="material-symbols-outlined text-sm">sports_golf</span>
@@ -294,6 +304,16 @@ export function TrackmanLinkModal({
             </p>
           </div>
         </div>
+
+        {notes && (
+          <div className="p-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-lg">
+            <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-1 flex items-center gap-1">
+              <span className="material-symbols-outlined text-sm">notes</span>
+              Notes from Import
+            </p>
+            <p className="text-sm text-blue-700 dark:text-blue-400 whitespace-pre-wrap">{notes}</p>
+          </div>
+        )}
 
         {!showAddVisitor ? (
           <>

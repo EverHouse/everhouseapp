@@ -1838,6 +1838,17 @@ const TrackmanTab: React.FC = () => {
                 {formatDateDisplayWithDay(resolveModal?.booking?.bookingDate || resolveModal?.booking?.booking_date)} • Bay {resolveModal?.booking?.bayNumber || resolveModal?.booking?.bay_number}
               </p>
             </div>
+            {(resolveModal?.booking?.notes || resolveModal?.booking?.note) && (
+              <div className="mt-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30">
+                <p className="text-xs font-medium text-blue-800 dark:text-blue-300 mb-1 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs">notes</span>
+                  Notes from Import
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-400 whitespace-pre-wrap">
+                  {resolveModal?.booking?.notes || resolveModal?.booking?.note}
+                </p>
+              </div>
+            )}
           </div>
           <div className="p-6 pt-0 space-y-4">
             <div>

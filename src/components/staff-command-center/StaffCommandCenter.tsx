@@ -52,6 +52,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
     timeSlot?: string;
     matchedBookingId?: number;
     isRelink?: boolean;
+    importedName?: string;
+    notes?: string;
   }>({ isOpen: false, trackmanBookingId: null });
   
   const optimisticUpdateRef = useRef<OptimisticUpdateRef | null>(null);
@@ -434,7 +436,9 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
                 bookingDate: formatDateShort(booking.request_date || booking.slot_date),
                 timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
                 matchedBookingId: Number(booking.id),
-                isRelink: false
+                isRelink: false,
+                importedName: (booking as any).user_name,
+                notes: (booking as any).notes
               })}
               variant="desktop-top"
             />
@@ -480,7 +484,9 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
                 bookingDate: formatDateShort(booking.request_date || booking.slot_date),
                 timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
                 matchedBookingId: Number(booking.id),
-                isRelink: false
+                isRelink: false,
+                importedName: (booking as any).user_name,
+                notes: (booking as any).notes
               })}
               variant="desktop-bottom"
             />
@@ -571,7 +577,9 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
                 bookingDate: formatDateShort(booking.request_date || booking.slot_date),
                 timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
                 matchedBookingId: Number(booking.id),
-                isRelink: false
+                isRelink: false,
+                importedName: (booking as any).user_name,
+                notes: (booking as any).notes
               })}
             variant="mobile"
           />
@@ -620,6 +628,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
         timeSlot={trackmanLinkModal.timeSlot}
         matchedBookingId={trackmanLinkModal.matchedBookingId}
         isRelink={trackmanLinkModal.isRelink}
+        importedName={trackmanLinkModal.importedName}
+        notes={trackmanLinkModal.notes}
         onSuccess={() => {
           showToast('Member assigned to booking', 'success');
           window.dispatchEvent(new CustomEvent('booking-action-completed'));

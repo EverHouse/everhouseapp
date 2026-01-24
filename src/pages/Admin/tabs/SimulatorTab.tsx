@@ -733,6 +733,8 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
         currentMemberName?: string;
         currentMemberEmail?: string;
         isRelink?: boolean;
+        importedName?: string;
+        notes?: string;
     }>({ isOpen: false, trackmanBookingId: null });
     const [cancelConfirmModal, setCancelConfirmModal] = useState<{
         isOpen: boolean;
@@ -1909,7 +1911,9 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                                             bookingDate: formatDateShortAdmin(booking.request_date),
                                                                             timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
                                                                             matchedBookingId: Number(booking.id),
-                                                                            isRelink: false
+                                                                            isRelink: false,
+                                                                            importedName: (booking as any).user_name,
+                                                                            notes: (booking as any).notes
                                                                         })}
                                                                         className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-colors"
                                                                     >
@@ -2174,7 +2178,9 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                         bookingDate: formatDateShortAdmin(booking.request_date),
                                                         timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
                                                         matchedBookingId: Number(booking.id),
-                                                        isRelink: false
+                                                        isRelink: false,
+                                                        importedName: (booking as any).user_name,
+                                                        notes: (booking as any).notes
                                                     }) : () => setSelectedCalendarBooking(booking)) : pendingRequest ? () => { setSelectedRequest(pendingRequest); setActionModal('decline'); } : handleEmptyCellClick}
                                                     className={`h-7 sm:h-8 rounded ${
                                                         closure
@@ -2602,7 +2608,9 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                         matchedBookingId: bookingId,
                                         currentMemberName: isUnmatched ? undefined : currentName,
                                         currentMemberEmail: isUnmatched ? undefined : selectedCalendarBooking.user_email,
-                                        isRelink: true
+                                        isRelink: true,
+                                        importedName: (selectedCalendarBooking as any)?.user_name,
+                                        notes: (selectedCalendarBooking as any)?.notes
                                     });
                                     setSelectedCalendarBooking(null);
                                 }}
@@ -3125,6 +3133,8 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
               currentMemberName={trackmanLinkModal.currentMemberName}
               currentMemberEmail={trackmanLinkModal.currentMemberEmail}
               isRelink={trackmanLinkModal.isRelink}
+              importedName={trackmanLinkModal.importedName}
+              notes={trackmanLinkModal.notes}
               onSuccess={() => {
                 showToast(trackmanLinkModal.isRelink ? 'Booking owner changed' : 'Trackman booking linked to member', 'success');
                 handleRefresh();
