@@ -340,8 +340,9 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
               [member.id, amountCents, paymentIntentId, bookingDateStr, paymentStatus, booking.trackman_booking_id]
             );
             
-            // Update visitor type to day_pass in real-time
-            await updateVisitorTypeByUserId(member.id, 'day_pass', 'day_pass_purchase', new Date());
+            // Update visitor type to day_pass in real-time (fire-and-forget, don't block billing)
+            updateVisitorTypeByUserId(member.id, 'day_pass', 'day_pass_purchase', new Date(bookingDateStr))
+              .catch(err => console.error('[VisitorType] Failed to update day_pass type:', err));
           }
         } else {
           billingMessage = ' (Day pass already purchased for this date)';
@@ -1606,14 +1607,14 @@ router.post('/api/admin/booking/:bookingId/guests', isStaffOrAdmin, async (req, 
       client.release();
     }
     
-    // Update visitor type to guest in real-time (if they have a user record)
+    // Update visitor type to guest in real-time (fire-and-forget, don't block main flow)
     if (guestEmail) {
-      await updateVisitorType({ 
+      updateVisitorType({ 
         email: guestEmail, 
         type: 'guest', 
         activitySource: 'guest_booking',
         activityDate: new Date(booking.request_date + 'T' + booking.start_time)
-      });
+      }).catch(err => console.error('[VisitorType] Failed to update guest type:', err));
     }
     
     const feeMessage = usedGuestPass 
