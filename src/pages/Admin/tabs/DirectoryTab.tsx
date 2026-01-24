@@ -165,7 +165,7 @@ type SortField = 'name' | 'tier' | 'visits' | 'joinDate' | 'lastVisit';
 type SortDirection = 'asc' | 'desc';
 type MemberTab = 'active' | 'former' | 'visitors';
 
-type VisitorType = 'all' | 'day_pass' | 'guest' | 'lead';
+type VisitorType = 'all' | 'classpass' | 'sim_walkin' | 'private_lesson' | 'day_pass' | 'guest' | 'lead';
 type VisitorSource = 'all' | 'mindbody' | 'hubspot' | 'stripe';
 type VisitorSortField = 'name' | 'type' | 'source' | 'lastActivity' | 'createdAt';
 
@@ -189,7 +189,7 @@ interface Visitor {
     lastActivitySource: string | null;
     createdAt: string | null;
     source: 'mindbody' | 'hubspot' | 'stripe' | 'app';
-    type: 'day_pass' | 'guest' | 'lead';
+    type: 'classpass' | 'sim_walkin' | 'private_lesson' | 'day_pass' | 'guest' | 'lead';
 }
 
 interface VisitorPurchase {
@@ -1102,7 +1102,10 @@ const DirectoryTab: React.FC = () => {
                                 aria-label="Filter by type"
                             >
                                 <option value="all">All Types</option>
-                                <option value="day_pass">Day Pass Buyers</option>
+                                <option value="classpass">ClassPass</option>
+                                <option value="sim_walkin">Sim Walk-In</option>
+                                <option value="private_lesson">Private Lesson</option>
+                                <option value="day_pass">Day Pass</option>
                                 <option value="guest">Guests</option>
                                 <option value="lead">Leads</option>
                             </select>
@@ -1192,13 +1195,24 @@ const DirectoryTab: React.FC = () => {
                                         <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-gray-50 dark:border-white/20">
                                             <div className="flex items-center gap-1.5 flex-wrap">
                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                                    v.type === 'day_pass' 
+                                                    v.type === 'classpass' 
+                                                        ? 'bg-[#e8ecd8] dark:bg-[#6b7a3d]/20 text-[#5a6a2c] dark:text-[#a8b87a]'
+                                                        : v.type === 'sim_walkin'
+                                                        ? 'bg-[#e8ecd8] dark:bg-[#6b7a3d]/20 text-[#5a6a2c] dark:text-[#a8b87a]'
+                                                        : v.type === 'private_lesson'
+                                                        ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400'
+                                                        : v.type === 'day_pass' 
                                                         ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400'
                                                         : v.type === 'guest'
                                                         ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400'
                                                         : 'bg-gray-100 dark:bg-gray-500/20 text-gray-600 dark:text-gray-400'
                                                 }`}>
-                                                    {v.type === 'day_pass' ? 'Day Pass' : v.type === 'guest' ? 'Guest' : 'Lead'}
+                                                    {v.type === 'classpass' ? 'ClassPass' 
+                                                        : v.type === 'sim_walkin' ? 'Sim Walk-In' 
+                                                        : v.type === 'private_lesson' ? 'Private Lesson'
+                                                        : v.type === 'day_pass' ? 'Day Pass' 
+                                                        : v.type === 'guest' ? 'Guest' 
+                                                        : 'Lead'}
                                                 </span>
                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                                     v.source === 'hubspot' ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400' :
@@ -1348,13 +1362,24 @@ const DirectoryTab: React.FC = () => {
                                         </div>
                                         <div style={{ width: '12%' }} className="p-4">
                                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                                v.type === 'day_pass' 
+                                                v.type === 'classpass' 
+                                                    ? 'bg-[#e8ecd8] dark:bg-[#6b7a3d]/20 text-[#5a6a2c] dark:text-[#a8b87a]'
+                                                    : v.type === 'sim_walkin'
+                                                    ? 'bg-[#e8ecd8] dark:bg-[#6b7a3d]/20 text-[#5a6a2c] dark:text-[#a8b87a]'
+                                                    : v.type === 'private_lesson'
+                                                    ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400'
+                                                    : v.type === 'day_pass' 
                                                     ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400'
                                                     : v.type === 'guest'
                                                     ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400'
                                                     : 'bg-gray-100 dark:bg-gray-500/20 text-gray-600 dark:text-gray-400'
                                             }`}>
-                                                {v.type === 'day_pass' ? 'Day Pass' : v.type === 'guest' ? 'Guest' : 'Lead'}
+                                                {v.type === 'classpass' ? 'ClassPass' 
+                                                    : v.type === 'sim_walkin' ? 'Sim Walk-In' 
+                                                    : v.type === 'private_lesson' ? 'Private Lesson'
+                                                    : v.type === 'day_pass' ? 'Day Pass' 
+                                                    : v.type === 'guest' ? 'Guest' 
+                                                    : 'Lead'}
                                             </span>
                                         </div>
                                         <div style={{ width: '12%' }} className="p-4">

@@ -1,7 +1,7 @@
 import { pool } from '../db';
 
-export type VisitorType = 'day_pass' | 'guest' | 'lead';
-export type ActivitySource = 'day_pass_purchase' | 'guest_booking' | 'booking_participant';
+export type VisitorType = 'classpass' | 'sim_walkin' | 'private_lesson' | 'guest' | 'day_pass' | 'lead';
+export type ActivitySource = 'day_pass_purchase' | 'guest_booking' | 'booking_participant' | 'legacy_purchase';
 
 interface UpdateVisitorTypeParams {
   email: string;
@@ -153,5 +153,90 @@ export async function updateVisitorTypeByUserId(
   } catch (error) {
     console.error('[VisitorType] Error updating visitor type by ID:', error);
     return false;
+  }
+}
+
+export async function calculateVisitorTypeFromHistory(email: string): Promise<VisitorType | null> {
+  if (!email) return null;
+  
+  const normalizedEmail = email.toLowerCase().trim();
+  
+  try {
+    const purchaseQuery = `
+      SELECT 
+        item_name,
+        sale_date as activity_date
+      FROM legacy_purchases
+      WHERE LOWER(member_email) = $1
+      ORDER BY sale_date DESC
+      LIMIT 1
+    `;
+    
+    const guestQuery = `
+      SELECT 
+        bs.session_date::timestamp as activity_date
+      FROM booking_participants bp
+      JOIN guests g ON bp.guest_id = g.id
+      JOIN booking_sessions bs ON bp.session_id = bs.id
+      WHERE LOWER(g.email) = $1
+        AND bp.participant_type = 'guest'
+      ORDER BY bs.session_date DESC
+      LIMIT 1
+    `;
+    
+    const [purchaseResult, guestResult] = await Promise.all([
+      pool.query(purchaseQuery, [normalizedEmail]),
+      pool.query(guestQuery, [normalizedEmail])
+    ]);
+    
+    const lastPurchase = purchaseResult.rows[0];
+    const lastGuestAppearance = guestResult.rows[0];
+    
+    let purchaseType: VisitorType | null = null;
+    let purchaseDate: Date | null = null;
+    
+    if (lastPurchase) {
+      const itemName = (lastPurchase.item_name || '').toLowerCase();
+      purchaseDate = new Date(lastPurchase.activity_date);
+      
+      if (itemName.includes('classpass')) {
+        purchaseType = 'classpass';
+      } else if (itemName.includes('simulator walk-in') || itemName.includes('sim walk-in')) {
+        purchaseType = 'sim_walkin';
+      } else if (itemName.includes('private lesson')) {
+        purchaseType = 'private_lesson';
+      } else if (itemName.includes('day pass')) {
+        purchaseType = 'day_pass';
+      }
+    }
+    
+    let guestDate: Date | null = null;
+    if (lastGuestAppearance) {
+      guestDate = new Date(lastGuestAppearance.activity_date);
+    }
+    
+    if (!purchaseType && !guestDate) {
+      return null;
+    }
+    
+    if (purchaseType && !guestDate) {
+      return purchaseType;
+    }
+    
+    if (!purchaseType && guestDate) {
+      return 'guest';
+    }
+    
+    if (purchaseDate && guestDate) {
+      if (guestDate > purchaseDate) {
+        return 'guest';
+      }
+      return purchaseType;
+    }
+    
+    return purchaseType || null;
+  } catch (error) {
+    console.error('[VisitorType] Error calculating visitor type from history:', error);
+    return null;
   }
 }

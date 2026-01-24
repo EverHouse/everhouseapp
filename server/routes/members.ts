@@ -2042,6 +2042,7 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
     }
     
     // Build type filter - filter by stored visitor_type or computed from activity
+    // Supports new types: classpass, sim_walkin, private_lesson in addition to day_pass, guest, lead
     let typeCondition = '';
     if (typeFilter === 'day_pass') {
       typeCondition = "AND (u.visitor_type = 'day_pass' OR u.visitor_type = 'day_pass_buyer')";
@@ -2049,6 +2050,12 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
       typeCondition = "AND u.visitor_type = 'guest'";
     } else if (typeFilter === 'lead') {
       typeCondition = "AND (u.visitor_type = 'lead' OR u.visitor_type IS NULL)";
+    } else if (typeFilter === 'classpass') {
+      typeCondition = "AND u.visitor_type = 'classpass'";
+    } else if (typeFilter === 'sim_walkin') {
+      typeCondition = "AND u.visitor_type = 'sim_walkin'";
+    } else if (typeFilter === 'private_lesson') {
+      typeCondition = "AND u.visitor_type = 'private_lesson'";
     }
     
     // Build search condition
@@ -2101,7 +2108,26 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
         u.last_activity_source,
         u.created_at,
         COALESCE(guest_agg.guest_count, 0)::int as guest_count,
-        guest_agg.last_guest_date
+        guest_agg.last_guest_date,
+        COALESCE(
+          u.visitor_type,
+          (SELECT CASE 
+            WHEN lp.item_name ILIKE '%classpass%' THEN 'classpass'
+            WHEN lp.item_name ILIKE '%sim%walk%' OR lp.item_name ILIKE '%simulator walk%' THEN 'sim_walkin'
+            WHEN lp.item_name ILIKE '%private lesson%' THEN 'private_lesson'
+            WHEN lp.item_name ILIKE '%day pass%' THEN 'day_pass'
+            ELSE NULL
+          END
+          FROM legacy_purchases lp 
+          WHERE LOWER(lp.member_email) = LOWER(u.email)
+          ORDER BY lp.sale_date DESC NULLS LAST
+          LIMIT 1),
+          (SELECT 'guest' FROM booking_participants bp
+           JOIN guests g ON bp.guest_id = g.id
+           WHERE LOWER(g.email) = LOWER(u.email)
+           LIMIT 1),
+          'lead'
+        ) as effective_type
       FROM users u
       LEFT JOIN (
         SELECT LOWER(purchaser_email) as email, COUNT(*)::int as purchase_count, SUM(amount_cents) as total_spent_cents, MAX(purchased_at) as last_purchase_date
@@ -2161,16 +2187,30 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
       return 'app';
     };
     
-    // Determine type based on stored visitor_type or compute from activity
-    // Types: day_pass, guest, lead
-    const getType = (row: any): 'day_pass' | 'guest' | 'lead' => {
-      // If we have a stored visitor_type, use it (normalize old values)
+    // Determine type based on effective_type computed in SQL (includes classpass, sim_walkin, private_lesson)
+    // Types: classpass, sim_walkin, private_lesson, day_pass, guest, lead
+    type VisitorTypeValue = 'classpass' | 'sim_walkin' | 'private_lesson' | 'day_pass' | 'guest' | 'lead';
+    const getType = (row: any): VisitorTypeValue => {
+      // Use the computed effective_type from SQL which handles all logic including legacy purchase detection
+      if (row.effective_type) {
+        const et = row.effective_type as string;
+        if (et === 'classpass') return 'classpass';
+        if (et === 'sim_walkin') return 'sim_walkin';
+        if (et === 'private_lesson') return 'private_lesson';
+        if (et === 'day_pass_buyer' || et === 'day_pass') return 'day_pass';
+        if (et === 'guest') return 'guest';
+        if (et === 'lead') return 'lead';
+      }
+      // Fallback to stored visitor_type (normalize old values)
       if (row.visitor_type) {
+        if (row.visitor_type === 'classpass') return 'classpass';
+        if (row.visitor_type === 'sim_walkin') return 'sim_walkin';
+        if (row.visitor_type === 'private_lesson') return 'private_lesson';
         if (row.visitor_type === 'day_pass_buyer' || row.visitor_type === 'day_pass') return 'day_pass';
         if (row.visitor_type === 'guest') return 'guest';
         if (row.visitor_type === 'lead') return 'lead';
       }
-      // Otherwise compute from activity data
+      // Otherwise compute from activity data (fallback)
       const purchaseCount = parseInt(row.purchase_count) || 0;
       const guestCount = parseInt(row.guest_count) || 0;
       // Day pass buyer takes precedence (paid activity)
