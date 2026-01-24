@@ -2133,15 +2133,24 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
     `);
     
     // Determine source based on database fields
-    // Priority: STRIPE > MINDBODY > HUBSPOT > APP
-    // Stripe always takes precedence as the main billing engine
+    // Priority: billing_provider takes precedence when explicitly set
+    // Then: STRIPE > MINDBODY > HUBSPOT > APP
     const getSource = (row: any): 'mindbody' | 'hubspot' | 'stripe' | 'app' => {
-      // STRIPE: has a Stripe customer record (always takes priority)
-      if (row.stripe_customer_id) return 'stripe';
+      // If billing_provider is explicitly set, respect it
+      if (row.billing_provider === 'mindbody') return 'mindbody';
+      if (row.billing_provider === 'stripe') return 'stripe';
+      
+      // STRIPE: has a Stripe customer record AND no mindbody indicators
+      // (some records have stale stripe_customer_id that don't exist in Stripe)
+      if (row.stripe_customer_id && !row.mindbody_client_id && row.legacy_source !== 'mindbody_import') {
+        return 'stripe';
+      }
       // MINDBODY: has mindbody_client_id or legacy mindbody markers
-      if (row.mindbody_client_id || row.legacy_source === 'mindbody_import' || row.billing_provider === 'mindbody') {
+      if (row.mindbody_client_id || row.legacy_source === 'mindbody_import') {
         return 'mindbody';
       }
+      // STRIPE: has stripe_customer_id (fallback)
+      if (row.stripe_customer_id) return 'stripe';
       // HUBSPOT: has HubSpot ID
       if (row.hubspot_id) return 'hubspot';
       return 'app';
