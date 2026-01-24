@@ -38,7 +38,7 @@ import inquiriesRouter from './routes/inquiries';
 import imageUploadRouter from './routes/imageUpload';
 import closuresRouter from './routes/closures';
 import membershipTiersRouter from './routes/membershipTiers';
-import trainingRouter from './routes/training';
+import trainingRouter, { seedTrainingSections } from './routes/training';
 import toursRouter from './routes/tours';
 import bugReportsRouter from './routes/bugReports';
 import trackmanRouter from './routes/trackman';
@@ -531,6 +531,13 @@ async function startServer() {
       await seedDefaultNoticeTypes();
     } catch (err) {
       console.error('[Startup] Seeding notice types failed (non-fatal):', err);
+    }
+
+    try {
+      await seedTrainingSections();
+      console.log('[Startup] Training sections synced');
+    } catch (err) {
+      console.error('[Startup] Seeding training sections failed (non-fatal):', err);
     }
 
     try {
