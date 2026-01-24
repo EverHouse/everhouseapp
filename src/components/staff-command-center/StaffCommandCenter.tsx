@@ -625,6 +625,11 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
           window.dispatchEvent(new CustomEvent('booking-action-completed'));
           refresh();
         }}
+        onVisitorAssigned={(bookingId) => {
+          setTimeout(() => {
+            setBillingModal({ isOpen: true, bookingId });
+          }, 300);
+        }}
       />
 
       {createPortal(

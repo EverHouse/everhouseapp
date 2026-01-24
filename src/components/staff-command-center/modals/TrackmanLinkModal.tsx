@@ -16,6 +16,7 @@ interface TrackmanLinkModalProps {
   currentMemberEmail?: string;
   isRelink?: boolean;
   onSuccess?: () => void;
+  onVisitorAssigned?: (bookingId: number) => void;
 }
 
 interface VisitorSearchResult {
@@ -37,7 +38,8 @@ export function TrackmanLinkModal({
   currentMemberName,
   currentMemberEmail,
   isRelink,
-  onSuccess
+  onSuccess,
+  onVisitorAssigned
 }: TrackmanLinkModalProps) {
   const [selectedMember, setSelectedMember] = useState<SelectedMember | null>(null);
   const [linking, setLinking] = useState(false);
@@ -182,6 +184,8 @@ export function TrackmanLinkModal({
       }
       
       // Now assign the booking to this visitor
+      let assignedBookingId: number | null = null;
+      
       if (matchedBookingId) {
         const res = await fetch(`/api/bookings/${matchedBookingId}/change-owner`, {
           method: 'PUT',
@@ -198,6 +202,7 @@ export function TrackmanLinkModal({
           setIsCreatingVisitor(false);
           return;
         }
+        assignedBookingId = matchedBookingId;
       } else if (trackmanBookingId) {
         const res = await fetch('/api/bookings/link-trackman-to-member', {
           method: 'POST',
@@ -215,11 +220,18 @@ export function TrackmanLinkModal({
           setIsCreatingVisitor(false);
           return;
         }
+        const linkData = await res.json();
+        assignedBookingId = linkData.booking?.id || null;
       }
       
       showToast('Visitor created and booking assigned', 'success');
       onSuccess?.();
       onClose();
+      
+      // Open check-in modal for visitor fee handling
+      if (assignedBookingId && onVisitorAssigned) {
+        onVisitorAssigned(assignedBookingId);
+      }
     } catch (err: any) {
       showToast(err.message || 'Failed to create visitor', 'error');
     } finally {
