@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.5.0",
+    date: "2026-01-24",
+    title: "Trackman Data Sync Architecture",
+    isMajor: true,
+    changes: [
+      "New: CSV import and webhook now work together seamlessly with 1:1 data sync using Trackman booking ID as unique key",
+      "New: Unmatched CSV bookings now block time slots to prevent double-booking (same as webhook behavior)",
+      "New: Origin tracking - each booking shows whether it came from member request, staff creation, webhook, or import",
+      "New: Last sync tracking - timestamps and source for when Trackman data was last synced",
+      "Improved: CSV import updates existing bookings instead of duplicating them",
+      "Improved: Field-level merge - import enriches missing data but preserves member linkage and staff edits"
+    ]
+  },
+  {
     version: "9.4.14",
     date: "2026-01-24",
     title: "Staff Activity Filters & Player Roster",

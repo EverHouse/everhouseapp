@@ -1396,9 +1396,13 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
           changes.push('notes: added from Trackman');
         }
         
+        // Always update sync tracking fields
+        updateFields.lastSyncSource = 'trackman_import';
+        updateFields.lastTrackmanSyncAt = new Date();
+        updateFields.updatedAt = new Date();
+        
         // If there are changes, update the booking
-        if (Object.keys(updateFields).length > 0) {
-          updateFields.updatedAt = new Date();
+        if (changes.length > 0) {
           await db.update(bookingRequests)
             .set(updateFields)
             .where(eq(bookingRequests.id, existing.id));
@@ -1406,7 +1410,10 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
           process.stderr.write(`[Trackman Import] Updated booking #${existing.id} (Trackman ID: ${row.bookingId}): ${changes.join(', ')}\n`);
           updatedRows++;
         } else {
-          // No changes needed, count as matched
+          // No field changes, but still update sync tracking
+          await db.update(bookingRequests)
+            .set(updateFields)
+            .where(eq(bookingRequests.id, existing.id));
           matchedRows++;
         }
         continue;
@@ -1441,9 +1448,14 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
             if (existingAppBooking.length > 0) {
               const existing = existingAppBooking[0];
               if (!existing.trackmanBookingId) {
-                // Link Trackman ID to existing app booking
+                // Link Trackman ID to existing app booking with sync tracking
                 await db.update(bookingRequests)
-                  .set({ trackmanBookingId: row.bookingId })
+                  .set({ 
+                    trackmanBookingId: row.bookingId,
+                    lastSyncSource: 'trackman_import',
+                    lastTrackmanSyncAt: new Date(),
+                    updatedAt: new Date()
+                  })
                   .where(eq(bookingRequests.id, existing.id));
                 
                 // Create player slots for this linked booking
@@ -1560,10 +1572,15 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
             );
             
             if (matchesWithinTolerance.length === 1) {
-              // Exactly one match within tolerance - auto-link
+              // Exactly one match within tolerance - auto-link with sync tracking
               const existing = matchesWithinTolerance[0];
               await db.update(bookingRequests)
-                .set({ trackmanBookingId: row.bookingId })
+                .set({ 
+                  trackmanBookingId: row.bookingId,
+                  lastSyncSource: 'trackman_import',
+                  lastTrackmanSyncAt: new Date(),
+                  updatedAt: new Date()
+                })
                 .where(eq(bookingRequests.id, existing.id));
               
               // Create player slots for this linked booking
@@ -1645,6 +1662,9 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
             guestCount: actualGuestCount,
             trackmanPlayerCount: row.playerCount,
             declaredPlayerCount: row.playerCount,
+            origin: 'trackman_import',
+            lastSyncSource: 'trackman_import',
+            lastTrackmanSyncAt: new Date(),
           }).returning({ id: bookingRequests.id });
 
           // Create booking_members entries based on player count
@@ -1933,6 +1953,41 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
           matchAttemptReason += ` | Additional players need review: ${reviewItems}`;
         }
         
+        // CRITICAL: Create booking_request to block the time slot even for unmatched bookings
+        // This ensures no double-booking regardless of member matching
+        const unmatchedPlaceholderEmail = `unmatched-${row.bookingId}@trackman.local`;
+        
+        try {
+          const unmatchedInsertResult = await db.insert(bookingRequests).values({
+            userEmail: unmatchedPlaceholderEmail,
+            userName: row.userName,
+            resourceId: parsedBayId,
+            requestDate: bookingDate,
+            startTime: startTime,
+            durationMinutes: row.durationMins,
+            endTime: endTime,
+            notes: `[Trackman Import ID:${row.bookingId}] [UNMATCHED - requires staff resolution] ${row.notes}`,
+            status: normalizedStatus,
+            createdAt: row.bookedDate ? new Date(row.bookedDate.replace(' ', 'T') + ':00') : new Date(),
+            trackmanBookingId: row.bookingId,
+            trackmanPlayerCount: row.playerCount,
+            declaredPlayerCount: row.playerCount,
+            isUnmatched: true,
+            trackmanCustomerNotes: `Original name: ${row.userName}, Original email: ${row.userEmail}`,
+            origin: 'trackman_import',
+            lastSyncSource: 'trackman_import',
+            lastTrackmanSyncAt: new Date(),
+          }).returning({ id: bookingRequests.id });
+          
+          process.stderr.write(`[Trackman Import] Created unmatched booking #${unmatchedInsertResult[0]?.id} to block slot (Trackman ID: ${row.bookingId})\n`);
+        } catch (unmatchedErr: any) {
+          // If booking already exists (unique constraint), just continue
+          if (!unmatchedErr.message?.includes('duplicate key')) {
+            process.stderr.write(`[Trackman Import] Error creating unmatched booking for ${row.bookingId}: ${unmatchedErr.message}\n`);
+          }
+        }
+        
+        // Also insert into trackmanUnmatchedBookings for staff resolution UI
         await db.insert(trackmanUnmatchedBookings).values({
           trackmanBookingId: row.bookingId,
           userName: row.userName,

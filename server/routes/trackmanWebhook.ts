@@ -406,7 +406,7 @@ async function linkByExternalBookingId(
     const endMinutes = endParts[0] * 60 + endParts[1];
     const durationMinutes = endMinutes > startMinutes ? endMinutes - startMinutes : 60;
     
-    // Update booking with Trackman info
+    // Update booking with Trackman info and sync tracking
     await pool.query(
       `UPDATE booking_requests 
        SET trackman_booking_id = $1,
@@ -419,6 +419,8 @@ async function linkByExternalBookingId(
            reviewed_by = COALESCE(reviewed_by, 'trackman_webhook'),
            reviewed_at = COALESCE(reviewed_at, NOW()),
            staff_notes = COALESCE(staff_notes, '') || ' [Linked via Trackman webhook - externalBookingId match]',
+           last_sync_source = 'trackman_webhook',
+           last_trackman_sync_at = NOW(),
            updated_at = NOW()
        WHERE id = $8`,
       [
@@ -628,6 +630,8 @@ async function tryAutoApproveBooking(
            reviewed_at = NOW(),
            reviewed_by = 'trackman_webhook',
            staff_notes = COALESCE(staff_notes, '') || ' [Auto-approved via Trackman webhook]',
+           last_sync_source = 'trackman_webhook',
+           last_trackman_sync_at = NOW(),
            updated_at = NOW()
        WHERE LOWER(user_email) = LOWER($2)
          AND request_date = $3
@@ -652,6 +656,8 @@ async function tryAutoApproveBooking(
            reviewed_by = 'trackman_webhook',
            staff_notes = COALESCE(staff_notes, '') || ' [Auto-approved via Trackman webhook - fuzzy time match]',
            was_auto_linked = true,
+           last_sync_source = 'trackman_webhook',
+           last_trackman_sync_at = NOW(),
            updated_at = NOW()
        WHERE LOWER(user_email) = LOWER($2)
          AND request_date = $3
@@ -795,6 +801,8 @@ async function createBookingForMember(
              was_auto_linked = true,
              reviewed_by = COALESCE(reviewed_by, 'trackman_webhook'),
              reviewed_at = COALESCE(reviewed_at, NOW()),
+             last_sync_source = 'trackman_webhook',
+             last_trackman_sync_at = NOW(),
              updated_at = NOW()
          WHERE id = $7`,
         [trackmanBookingId, playerCount, updatedNotes, startTime, endTime, newDurationMinutes, pendingBookingId]
@@ -873,9 +881,11 @@ async function createBookingForMember(
       `INSERT INTO booking_requests 
        (user_id, user_email, user_name, resource_id, request_date, start_time, end_time, 
         duration_minutes, status, trackman_booking_id, trackman_player_count, 
-        reviewed_by, reviewed_at, staff_notes, was_auto_linked, created_at, updated_at)
+        reviewed_by, reviewed_at, staff_notes, was_auto_linked, 
+        origin, last_sync_source, last_trackman_sync_at, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'approved', $9, $10, 'trackman_webhook', NOW(), 
-               '[Auto-created via Trackman webhook - staff booking]', true, NOW(), NOW())
+               '[Auto-created via Trackman webhook - staff booking]', true,
+               'trackman_webhook', 'trackman_webhook', NOW(), NOW(), NOW())
        RETURNING id`,
       [
         member.id,
@@ -1047,8 +1057,10 @@ async function createUnmatchedBookingRequest(
       `INSERT INTO booking_requests 
        (request_date, start_time, end_time, duration_minutes, resource_id,
         user_email, user_name, status, trackman_booking_id, trackman_external_id,
-        trackman_customer_notes, is_unmatched, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'approved', $8, $9, $10, true, NOW(), NOW())
+        trackman_customer_notes, is_unmatched, 
+        origin, last_sync_source, last_trackman_sync_at, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'approved', $8, $9, $10, true,
+               'trackman_webhook', 'trackman_webhook', NOW(), NOW(), NOW())
        ON CONFLICT DO NOTHING
        RETURNING id`,
       [
@@ -2589,6 +2601,8 @@ router.post('/api/admin/trackman-webhooks/backfill', isAdmin, async (req, res) =
                 trackman_external_id = $3,
                 is_unmatched = false,
                 staff_notes = COALESCE(staff_notes, '') || ' [Linked via backfill]',
+                last_sync_source = 'trackman_webhook',
+                last_trackman_sync_at = NOW(),
                 updated_at = NOW()
             WHERE id = $4
           `, [event.trackman_booking_id, playerCount, externalBookingId, existingBooking.id]);
@@ -2612,8 +2626,10 @@ router.post('/api/admin/trackman-webhooks/backfill', isAdmin, async (req, res) =
             INSERT INTO booking_requests 
             (request_date, start_time, end_time, duration_minutes, resource_id,
              user_email, user_name, status, trackman_booking_id, trackman_external_id,
-             trackman_player_count, is_unmatched, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, 'approved', $8, $9, $10, true, NOW(), NOW())
+             trackman_player_count, is_unmatched, 
+             origin, last_sync_source, last_trackman_sync_at, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, 'approved', $8, $9, $10, true,
+                    'trackman_webhook', 'trackman_webhook', NOW(), NOW(), NOW())
             RETURNING id
           `, [
             requestDate,
