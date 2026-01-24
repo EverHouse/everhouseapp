@@ -534,6 +534,27 @@ async function handlePaymentIntentFailed(paymentIntent: any): Promise<void> {
     console.error('[Stripe Webhook] Error updating payment intent status to failed:', error);
   }
 
+  const customer = paymentIntent.customer;
+  const customerId = typeof customer === 'string' ? customer : customer?.id;
+  const customerEmail = typeof customer === 'object' ? customer?.email : metadata?.email;
+  const customerName = typeof customer === 'object' ? customer?.name : metadata?.memberName;
+  
+  upsertTransactionCache({
+    stripeId: id,
+    objectType: 'payment_intent',
+    amountCents: amount,
+    currency: paymentIntent.currency || 'usd',
+    status: 'failed',
+    createdAt: new Date(paymentIntent.created * 1000),
+    customerId,
+    customerEmail,
+    customerName,
+    description: metadata?.description || `Failed payment - ${reason}`,
+    metadata,
+    source: 'webhook',
+    paymentIntentId: id,
+  }).catch(err => console.error('[Stripe Webhook] Cache insert failed for failed payment:', err));
+
   const email = metadata?.email;
   if (!email) {
     console.warn('[Stripe Webhook] No email in metadata for failed payment - cannot send notifications');
@@ -725,6 +746,26 @@ async function handleInvoicePaymentSucceeded(invoice: any): Promise<void> {
 
 async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
   try {
+    const invoiceCustomerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
+    const invoiceCustomerName = typeof invoice.customer === 'object' ? invoice.customer?.name : undefined;
+    
+    upsertTransactionCache({
+      stripeId: invoice.id,
+      objectType: 'invoice',
+      amountCents: invoice.amount_due || 0,
+      currency: invoice.currency || 'usd',
+      status: 'payment_failed',
+      createdAt: new Date(invoice.created * 1000),
+      customerId: invoiceCustomerId,
+      customerEmail: invoice.customer_email,
+      customerName: invoiceCustomerName,
+      description: invoice.lines?.data?.[0]?.description || 'Invoice payment failed',
+      metadata: invoice.metadata,
+      source: 'webhook',
+      invoiceId: invoice.id,
+      paymentIntentId: invoice.payment_intent,
+    }).catch(err => console.error('[Stripe Webhook] Cache insert failed for failed invoice:', err));
+    
     if (!invoice.subscription) {
       console.log(`[Stripe Webhook] Skipping one-time invoice ${invoice.id} (no subscription)`);
       return;
