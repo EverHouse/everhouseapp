@@ -42,7 +42,6 @@ const Profile: React.FC = () => {
   const isDark = effectiveTheme === 'dark';
   const [isCardOpen, setIsCardOpen] = useState(false);
   const [showGuestCheckin, setShowGuestCheckin] = useState(false);
-  const [guestPasses, setGuestPasses] = useState<{ passes_used: number; passes_total: number; passes_remaining: number } | null>(null);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
@@ -89,23 +88,12 @@ const Profile: React.FC = () => {
   }, [isProfileLoading, setPageReady]);
 
   useEffect(() => {
-    if (user?.email) {
-      fetch(`/api/guest-passes/${encodeURIComponent(user.email)}?tier=${encodeURIComponent(user.tier || 'Social')}`, { credentials: 'include' })
-        .then(res => {
-          if (!res.ok) throw new Error('Failed to fetch guest passes');
-          return res.json();
-        })
-        .then(data => setGuestPasses(data))
-        .catch(err => console.error('Error fetching guest passes:', err))
-        .finally(() => setIsProfileLoading(false));
-    } else {
-      setIsProfileLoading(false);
-    }
-  }, [user?.email, user?.tier]);
+    setIsProfileLoading(false);
+  }, [user?.email]);
 
   useEffect(() => {
     if (user?.email && !isStaffOrAdminProfile) {
-      fetch('/api/my/balance', { credentials: 'include' })
+      fetch('/api/my-billing/account-balance', { credentials: 'include' })
         .then(res => res.ok ? res.json() : null)
         .then(data => data && setAccountBalance({ balanceDollars: data.balanceDollars || 0, isCredit: data.isCredit || false }))
         .catch(err => console.error('Error fetching balance:', err));
@@ -723,15 +711,8 @@ const Profile: React.FC = () => {
           member_name: user.name,
           member_email: user.email
         }}
-        onSuccess={async () => {
-          try {
-            const res = await fetch(`/api/guest-passes/${encodeURIComponent(user.email)}?tier=${encodeURIComponent(user.tier || 'Social')}`, { credentials: 'include' });
-            if (!res.ok) throw new Error('Failed to refresh guest passes');
-            const data = await res.json();
-            setGuestPasses(data);
-          } catch (err) {
-            console.error('Error refreshing guest passes:', err);
-          }
+        onSuccess={() => {
+          showToast('Guest checked in successfully!', 'success');
         }}
       />
 
@@ -1080,18 +1061,6 @@ const Profile: React.FC = () => {
                        </div>
                      )}
                      
-                     {guestPasses && (
-                       <div className="flex items-center justify-between">
-                         <div className="flex items-center gap-3">
-                           <span className="material-symbols-outlined text-base opacity-70" style={{ color: cardTextColor }}>group_add</span>
-                           <span className="text-sm opacity-80" style={{ color: cardTextColor }}>Guest Passes</span>
-                         </div>
-                         <span className="text-sm font-semibold" style={{ color: cardTextColor }}>
-                           {guestPasses.passes_remaining} / {guestPasses.passes_total}
-                         </span>
-                       </div>
-                     )}
-
                      {user.mindbodyClientId && (
                        <div className="flex items-center justify-between pt-2 mt-2" style={{ borderTop: `1px solid ${cardTextColor}20` }}>
                          <div className="flex items-center gap-3">

@@ -1034,12 +1034,16 @@ async function handleCheckoutSessionCompleted(session: any): Promise<void> {
         const stripe = await getStripeClient();
         
         // Credit the customer's balance (negative amount = credit)
+        // Use session ID as idempotency key to prevent double-credit on retries
         const transaction = await stripe.customers.createBalanceTransaction(
           customerId,
           {
             amount: -amountCents,
             currency: 'usd',
-            description: `Account balance top-up via checkout`
+            description: `Account balance top-up via checkout (${session.id})`
+          },
+          {
+            idempotencyKey: `add_funds_${session.id}`
           }
         );
         

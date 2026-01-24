@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.7.4",
+    date: "2026-01-24",
+    title: "Account Balance & Instant Credits",
+    changes: [
+      "New: Account Balance section on Profile - add funds to your account for instant credits",
+      "Members can add $25, $50, or $100 via Stripe checkout",
+      "Balance is credited instantly upon successful payment",
+      "Future: Account balance can be used for guest fees, day passes, and service overages",
+      "Removed: Guest Passes section (balance-based system replaces per-pass tracking)"
+    ]
+  },
+  {
     version: "9.7.3",
     date: "2026-01-24",
     title: "Billing Integrity & Payment Protection",
