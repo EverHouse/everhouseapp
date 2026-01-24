@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useData } from '../../contexts/DataContext';
 
 export interface SelectedMember {
-  id: number;
+  id: string;
   email: string;
   name: string;
   tier: string | null;

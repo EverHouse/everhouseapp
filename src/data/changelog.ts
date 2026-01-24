@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.4.13",
+    date: "2026-01-24",
+    title: "Fixed Assign Member Button",
+    changes: [
+      "Fixed 'Assign Member' button not responding when clicked - now properly saves member to booking",
+      "Member search input shows green border and checkmark when member is selected",
+      "Success toast notification displayed after successfully assigning a member",
+      "Partial roster bookings now show 'X/Y Players' button on queue list instead of 'Check In'",
+      "Calendar shows dotted green outline for bookings that need more players",
+      "Conference rooms now display lavender 'Conf' badge correctly in all views"
+    ]
+  },
+  {
     version: "9.4.12",
     date: "2026-01-23",
     title: "Cleaner Booking Queue Layout",
