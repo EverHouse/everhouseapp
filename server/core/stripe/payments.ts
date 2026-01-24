@@ -102,7 +102,8 @@ export async function createPaymentIntent(
 export async function confirmPaymentSuccess(
   paymentIntentId: string,
   performedBy: string,
-  performedByName?: string
+  performedByName?: string,
+  txClient?: any
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const stripe = await getStripeClient();
@@ -112,14 +113,16 @@ export async function confirmPaymentSuccess(
       return { success: false, error: `Payment status is ${paymentIntent.status}, not succeeded` };
     }
 
-    await pool.query(
+    const queryClient = txClient || pool;
+
+    await queryClient.query(
       `UPDATE stripe_payment_intents 
        SET status = 'succeeded', updated_at = NOW() 
        WHERE stripe_payment_intent_id = $1`,
       [paymentIntentId]
     );
 
-    const localRecord = await pool.query(
+    const localRecord = await queryClient.query(
       'SELECT * FROM stripe_payment_intents WHERE stripe_payment_intent_id = $1',
       [paymentIntentId]
     );

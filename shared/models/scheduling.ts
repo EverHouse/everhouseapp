@@ -104,7 +104,7 @@ export const bookingRequests = pgTable("booking_requests", {
   // Timestamp of last Trackman data sync (from webhook or import)
   lastTrackmanSyncAt: timestamp("last_trackman_sync_at"),
 }, (table) => [
-  uniqueIndex("booking_requests_trackman_id_idx").on(table.trackmanBookingId),
+  index("idx_booking_requests_trackman_booking_id").on(table.trackmanBookingId),
   uniqueIndex("booking_requests_trackman_external_id_idx").on(table.trackmanExternalId),
   index("booking_requests_session_idx").on(table.sessionId),
   index("booking_requests_date_resource_idx").on(table.requestDate, table.resourceId),

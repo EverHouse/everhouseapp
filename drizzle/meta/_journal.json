@@ -155,6 +155,13 @@
       "when": 1768925989000,
       "tag": "0021_add_billing_migration_requested_at",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1769255159856,
+      "tag": "0022_wooden_longshot",
+      "breakpoints": true
     }
   ]
 }

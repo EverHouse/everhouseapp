@@ -953,7 +953,7 @@ router.post('/api/member/bookings/:id/confirm-payment', async (req: Request, res
     }
 
     const bookingResult = await pool.query(
-      `SELECT br.id, br.session_id, br.user_email
+      `SELECT br.id, br.session_id, br.user_email, br.user_name
        FROM booking_requests br
        WHERE br.id = $1`,
       [bookingId]
@@ -986,34 +986,53 @@ router.post('/api/member/bookings/:id/confirm-payment', async (req: Request, res
       return res.json({ success: true, message: 'Payment already confirmed' });
     }
 
-    const confirmResult = await confirmPaymentSuccess(
-      paymentIntentId,
-      sessionEmail,
-      booking.user_name || 'Member'
-    );
+    // Use a database transaction to ensure atomicity of all payment confirmation updates
+    // This prevents race conditions where a user could be charged but not marked as paid
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    if (!confirmResult.success) {
-      return res.status(400).json({ error: confirmResult.error || 'Payment verification failed' });
-    }
-
-    const participantFees = JSON.parse(snapshot.participant_fees || '[]');
-    const participantIds = participantFees.map((pf: any) => pf.id);
-
-    if (participantIds.length > 0) {
-      await pool.query(
-        `UPDATE booking_participants 
-         SET payment_status = 'paid', updated_at = NOW()
-         WHERE id = ANY($1::int[])`,
-        [participantIds]
+      // Confirm payment with Stripe and update stripe_payment_intents within the transaction
+      const confirmResult = await confirmPaymentSuccess(
+        paymentIntentId,
+        sessionEmail,
+        booking.user_name || 'Member',
+        client
       );
+
+      if (!confirmResult.success) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: confirmResult.error || 'Payment verification failed' });
+      }
+
+      const participantFees = JSON.parse(snapshot.participant_fees || '[]');
+      const participantIds = participantFees.map((pf: any) => pf.id);
+
+      // Update booking_participants within the transaction
+      if (participantIds.length > 0) {
+        await client.query(
+          `UPDATE booking_participants 
+           SET payment_status = 'paid', updated_at = NOW()
+           WHERE id = ANY($1::int[])`,
+          [participantIds]
+        );
+      }
+
+      // Update booking_fee_snapshots within the transaction
+      await client.query(
+        `UPDATE booking_fee_snapshots SET status = 'completed' WHERE id = $1`,
+        [snapshot.id]
+      );
+
+      await client.query('COMMIT');
+      console.log(`[Stripe] Member payment confirmed for booking ${bookingId}, ${participantIds.length} participants marked as paid (transaction committed)`);
+    } catch (txError) {
+      await client.query('ROLLBACK');
+      console.error('[Stripe] Transaction rolled back for member payment confirmation:', txError);
+      throw txError;
+    } finally {
+      client.release();
     }
-
-    await pool.query(
-      `UPDATE booking_fee_snapshots SET status = 'completed' WHERE id = $1`,
-      [snapshot.id]
-    );
-
-    console.log(`[Stripe] Member payment confirmed for booking ${bookingId}, ${participantIds.length} participants marked as paid`);
 
     res.json({ success: true });
   } catch (error: any) {
