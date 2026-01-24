@@ -83,12 +83,13 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
     const nowTime = getNowTimePacific();
     const todayPacific = getTodayPacific();
     
+    // Convert to strings for reliable Set comparison (avoids number vs string mismatch)
     const unmatchedTrackmanIds = new Set(
       unmatchedBookings
         .filter(b => b.trackman_booking_id)
-        .map(b => b.trackman_booking_id)
+        .map(b => String(b.trackman_booking_id))
     );
-    const unmatchedBookingIds = new Set(unmatchedBookings.map(b => b.id));
+    const unmatchedBookingIds = new Set(unmatchedBookings.map(b => String(b.id)));
     
     const isUnmatchedBooking = (b: BookingRequest) => {
       return b.is_unmatched === true ||
@@ -101,8 +102,9 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
       if (booking.request_date === todayPacific && booking.end_time > nowTime) return true;
       return false;
     }).filter(booking => {
-      if (booking.trackman_booking_id && unmatchedTrackmanIds.has(booking.trackman_booking_id)) return false;
-      if (unmatchedBookingIds.has(booking.id)) return false;
+      // Use String() for reliable comparison
+      if (booking.trackman_booking_id && unmatchedTrackmanIds.has(String(booking.trackman_booking_id))) return false;
+      if (unmatchedBookingIds.has(String(booking.id))) return false;
       return true;
     }).map(b => ({ ...b, is_unmatched: isUnmatchedBooking(b) }));
     
