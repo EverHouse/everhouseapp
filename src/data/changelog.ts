@@ -21,7 +21,7 @@ export const changelog: ChangelogEntry[] = [
       "Member search input shows green border and checkmark when member is selected",
       "Success message displayed after successfully assigning a member to a booking",
       "Partial roster bookings now show 'X/Y Players' button on queue list instead of 'Check In'",
-      "Calendar shows dotted green outline for bookings that need more players",
+      "Calendar shows blue styling for bookings that need more players (dotted blue outline, blue background, blue text) to match Add Player button",
       "Conference rooms now display lavender 'Conf' badge correctly in all views"
     ]
   },

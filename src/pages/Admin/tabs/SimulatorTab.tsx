@@ -2170,7 +2170,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                                     : isInactiveMember
                                                                         ? 'bg-green-100/50 dark:bg-green-500/10 border border-dashed border-orange-300 dark:border-orange-500/40 cursor-pointer hover:bg-green-200/50 dark:hover:bg-green-500/20'
                                                                         : hasPartialRoster
-                                                                            ? 'bg-green-200 dark:bg-green-600/30 border-2 border-dashed border-green-500 dark:border-green-400/60 cursor-pointer hover:bg-green-300 dark:hover:bg-green-600/40'
+                                                                            ? 'bg-blue-100 dark:bg-blue-600/20 border-2 border-dashed border-blue-400 dark:border-blue-400/50 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-600/30'
                                                                             : 'bg-green-100 dark:bg-green-500/20 border border-green-300 dark:border-green-500/30 cursor-pointer hover:bg-green-200 dark:hover:bg-green-500/30' 
                                                                 : pendingRequest
                                                                         ? 'bg-blue-50 dark:bg-blue-500/10 border-2 border-dashed border-blue-400 dark:border-blue-400/50 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-500/20'
@@ -2202,12 +2202,15 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                                 const filledSlots = Math.max(0, declaredPlayers - unfilledSlots);
                                                                 const hasUnpaidFees = (booking as any)?.has_unpaid_fees ?? false;
                                                                 const totalOwed = (booking as any)?.total_owed ?? 0;
+                                                                const isPartialRoster = !isConference && declaredPlayers > 1 && filledSlots < declaredPlayers;
                                                                 const textColor = isConference 
                                                                     ? 'text-purple-700 dark:text-purple-300' 
                                                                     : isUnmatched
                                                                         ? 'text-amber-700 dark:text-amber-300'
                                                                     : isInactiveMember 
                                                                         ? 'text-green-600/70 dark:text-green-400/70' 
+                                                                    : isPartialRoster
+                                                                        ? 'text-blue-700 dark:text-blue-300'
                                                                         : 'text-green-700 dark:text-green-300';
                                                                 
                                                                 return (
