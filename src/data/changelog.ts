@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.7.2",
+    date: "2026-01-24",
+    title: "Facility Status Display Fix",
+    changes: [
+      "Fixed: Facility Status was incorrectly showing future bookings (e.g., Jan 28) as currently occupied",
+      "Bays now only show as 'Booked' when there is an active booking for TODAY at the current time",
+      "This was a display-only issue - member booking availability was not affected"
+    ]
+  },
+  {
     version: "9.7.1",
     date: "2026-01-24",
     title: "Visitor Day Pass Billing & Payment Sync",

@@ -162,7 +162,11 @@ export function useCommandCenterData(userEmail?: string) {
         setTodaysBookings(enhancedBookings);
         
         enhancedBookings.forEach((b: BookingRequest) => {
-          if (b.resource_id && b.start_time <= nowTime + ':00' && b.end_time > nowTime + ':00') {
+          // Only show bookings for TODAY that are currently active (not future dates)
+          const bookingDate = b.request_date?.split('T')[0];
+          const isToday = bookingDate === today;
+          
+          if (isToday && b.resource_id && b.start_time <= nowTime + ':00' && b.end_time > nowTime + ':00') {
             bayMap.set(b.resource_id, {
               id: b.resource_id,
               name: b.bay_name || `Bay ${b.resource_id}`,
