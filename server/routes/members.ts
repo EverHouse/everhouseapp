@@ -2110,17 +2110,16 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
     `);
     
     // Determine source based on database fields
-    // Priority: MINDBODY (non-member with mindbody_client_id) > STRIPE > HUBSPOT > APP
+    // Priority: MINDBODY > STRIPE > HUBSPOT > APP
     const getSource = (row: any): 'mindbody' | 'hubspot' | 'stripe' | 'app' => {
-      // MINDBODY: non-member with mindbody_client_id
-      const isNonMember = row.membership_status?.toLowerCase() === 'non-member';
-      if (isNonMember && row.mindbody_client_id) return 'mindbody';
+      // MINDBODY: has mindbody_client_id OR legacy mindbody indicators (highest priority)
+      if (row.mindbody_client_id || row.legacy_source === 'mindbody_import' || row.billing_provider === 'mindbody') {
+        return 'mindbody';
+      }
       // STRIPE: has a Stripe customer record
       if (row.stripe_customer_id) return 'stripe';
       // HUBSPOT: has HubSpot ID
       if (row.hubspot_id) return 'hubspot';
-      // Legacy mindbody imports
-      if (row.legacy_source === 'mindbody_import' || row.billing_provider === 'mindbody') return 'mindbody';
       return 'app';
     };
     
