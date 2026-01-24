@@ -2,6 +2,7 @@ import { db } from "../../db";
 import { users, dayPassPurchases } from "../../../shared/schema";
 import { User } from "../../../shared/schema";
 import { eq, ilike, and } from "drizzle-orm";
+import { getOrCreateStripeCustomer } from "../stripe/customers";
 
 /**
  * Criteria for matching existing users
@@ -108,8 +109,9 @@ export async function findMatchingUser(criteria: MatchCriteria): Promise<User | 
 /**
  * Creates a new visitor or updates an existing user if found via matching
  * New users are created with role='visitor' and membershipStatus='visitor'
+ * Also ensures a Stripe customer is created for billing purposes
  */
-export async function upsertVisitor(data: VisitorData): Promise<User> {
+export async function upsertVisitor(data: VisitorData, createStripeCustomer: boolean = true): Promise<User> {
   // Try to find existing user
   const existingUser = await findMatchingUser(data);
 
@@ -129,6 +131,18 @@ export async function upsertVisitor(data: VisitorData): Promise<User> {
       .where(eq(users.id, existingUser.id))
       .returning();
 
+    // Ensure Stripe customer exists for existing visitor
+    // getOrCreateStripeCustomer handles both lookup and DB update internally
+    if (createStripeCustomer && data.email && !existingUser.stripeCustomerId) {
+      try {
+        const fullName = [data.firstName ?? existingUser.firstName, data.lastName ?? existingUser.lastName]
+          .filter(Boolean).join(' ') || undefined;
+        await getOrCreateStripeCustomer(existingUser.id, data.email, fullName, 'visitor');
+      } catch (stripeError) {
+        console.error('[upsertVisitor] Failed to create Stripe customer for existing visitor:', stripeError);
+      }
+    }
+
     return updated[0];
   }
 
@@ -147,7 +161,20 @@ export async function upsertVisitor(data: VisitorData): Promise<User> {
     })
     .returning();
 
-  return newUser[0];
+  const createdUser = newUser[0];
+
+  // Create Stripe customer for new visitor
+  // getOrCreateStripeCustomer handles both creation and DB update internally
+  if (createStripeCustomer && data.email) {
+    try {
+      const fullName = [data.firstName, data.lastName].filter(Boolean).join(' ') || undefined;
+      await getOrCreateStripeCustomer(createdUser.id, data.email, fullName, 'visitor');
+    } catch (stripeError) {
+      console.error('[upsertVisitor] Failed to create Stripe customer for new visitor:', stripeError);
+    }
+  }
+
+  return createdUser;
 }
 
 /**

@@ -578,9 +578,9 @@ export async function recalculateSessionFees(
   sessionId: number
 ): Promise<RecalculationResult> {
   try {
+    // Query raw start_time and end_time as TIME strings to handle cross-midnight sessions properly
     const sessionResult = await pool.query(
-      `SELECT bs.id, bs.session_date, bs.start_time, bs.end_time,
-              EXTRACT(EPOCH FROM (bs.end_time::time - bs.start_time::time)) / 60 as duration_minutes,
+      `SELECT bs.id, bs.session_date, bs.start_time::text, bs.end_time::text,
               br.user_email as host_email
        FROM booking_sessions bs
        LEFT JOIN booking_requests br ON br.session_id = bs.id
@@ -594,7 +594,20 @@ export async function recalculateSessionFees(
     
     const session = sessionResult.rows[0];
     const sessionDate = session.session_date;
-    const sessionDuration = Math.round(parseFloat(session.duration_minutes) || 60);
+    
+    // Calculate duration manually to handle cross-midnight sessions
+    // start_time and end_time are TIME types stored as 'HH:MM:SS'
+    const startTimeParts = session.start_time.split(':').map(Number);
+    const endTimeParts = session.end_time.split(':').map(Number);
+    const startMinutes = startTimeParts[0] * 60 + startTimeParts[1];
+    let endMinutes = endTimeParts[0] * 60 + endTimeParts[1];
+    
+    // Handle cross-midnight: if end_time < start_time, add 24 hours to end
+    if (endMinutes < startMinutes) {
+      endMinutes += 24 * 60; // Add 24 hours worth of minutes
+    }
+    
+    const sessionDuration = Math.round(endMinutes - startMinutes) || 60;
     const hostEmail = session.host_email;
     
     const participantsResult = await pool.query(

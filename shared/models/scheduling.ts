@@ -285,10 +285,12 @@ export const usageLedger = pgTable("usage_ledger", {
   tierAtBooking: varchar("tier_at_booking"),
   paymentMethod: paymentMethodEnum("payment_method").default("unpaid"),
   source: bookingSourceEnum("source").default("member_request"),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("usage_ledger_session_idx").on(table.sessionId),
   index("usage_ledger_member_idx").on(table.memberId),
+  index("usage_ledger_stripe_payment_intent_idx").on(table.stripePaymentIntentId),
 ]);
 
 // Booking participants table - unified table for all participants (replaces booking_members/booking_guests)

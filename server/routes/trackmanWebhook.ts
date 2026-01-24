@@ -16,6 +16,35 @@ const router = Router();
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+/**
+ * Calculate duration in minutes between start and end times, handling cross-midnight sessions.
+ * If end_time < start_time, it assumes the session spans midnight and adds 24 hours.
+ * @param startTime - Time string in HH:MM or HH:MM:SS format
+ * @param endTime - Time string in HH:MM or HH:MM:SS format
+ * @returns Duration in minutes
+ */
+function calculateDurationMinutes(startTime: string, endTime: string): number {
+  const startParts = startTime.split(':').map(Number);
+  const endParts = endTime.split(':').map(Number);
+  const startMinutes = startParts[0] * 60 + startParts[1];
+  let endMinutes = endParts[0] * 60 + endParts[1];
+  
+  // Handle equal start/end times - return reasonable default and log warning
+  if (endMinutes === startMinutes) {
+    logger.warn('[Trackman Webhook] Equal start and end times detected, defaulting to 60 minutes', {
+      extra: { startTime, endTime }
+    });
+    return 60;
+  }
+  
+  // Handle cross-midnight: if end_time < start_time, add 24 hours to end
+  if (endMinutes < startMinutes) {
+    endMinutes += 24 * 60; // Add 24 hours worth of minutes
+  }
+  
+  return endMinutes - startMinutes;
+}
+
 interface TrackmanBookingPayload {
   id?: string;
   booking_id?: string;
@@ -401,12 +430,8 @@ async function linkByExternalBookingId(
       newStatus = 'cancelled';
     }
     
-    // Calculate duration
-    const startParts = startTime.split(':').map(Number);
-    const endParts = endTime.split(':').map(Number);
-    const startMinutes = startParts[0] * 60 + startParts[1];
-    const endMinutes = endParts[0] * 60 + endParts[1];
-    const durationMinutes = endMinutes > startMinutes ? endMinutes - startMinutes : 60;
+    // Calculate duration (handles cross-midnight sessions)
+    const durationMinutes = calculateDurationMinutes(startTime, endTime);
     
     // Check if times/duration changed before updating
     const originalDuration = booking.duration_minutes;
@@ -734,15 +759,209 @@ async function createBookingForMember(
     }
     
     const existing = await pool.query(
-      `SELECT id FROM booking_requests WHERE trackman_booking_id = $1`,
+      `SELECT id, duration_minutes, session_id, start_time, end_time FROM booking_requests WHERE trackman_booking_id = $1`,
       [trackmanBookingId]
     );
     
     if (existing.rows.length > 0) {
-      logger.info('[Trackman Webhook] Booking already exists, skipping creation (idempotency)', { 
-        extra: { trackmanBookingId, existingBookingId: existing.rows[0].id } 
+      const existingBooking = existing.rows[0];
+      
+      // Calculate new duration from the webhook payload (handles cross-midnight sessions)
+      const newDurationMinutes = calculateDurationMinutes(startTime, endTime);
+      
+      // Check if duration changed significantly (>5 min tolerance to avoid noise)
+      const oldDuration = existingBooking.duration_minutes || 60;
+      if (Math.abs(oldDuration - newDurationMinutes) > 5) {
+        logger.info('[Trackman Webhook] Duration changed for existing booking, updating billing...', { 
+          extra: { trackmanBookingId, oldDuration, newDuration: newDurationMinutes, bookingId: existingBooking.id } 
+        });
+        
+        // Update booking request with new end time and duration
+        await pool.query(
+          `UPDATE booking_requests 
+           SET end_time = $1, duration_minutes = $2, updated_at = NOW() 
+           WHERE id = $3`,
+          [endTime, newDurationMinutes, existingBooking.id]
+        );
+        
+        // Update session and recalculate fees if session exists
+        if (existingBooking.session_id) {
+          await pool.query(
+            `UPDATE booking_sessions SET end_time = $1 WHERE id = $2`,
+            [endTime, existingBooking.session_id]
+          );
+          
+          // Recalculate session fees for the extended duration
+          try {
+            const { recalculateSessionFees } = await import('../core/bookingService/usageCalculator');
+            const recalcResult = await recalculateSessionFees(existingBooking.session_id);
+            logger.info('[Trackman Webhook] Session fees recalculated for extension', {
+              extra: { sessionId: existingBooking.session_id, newDuration: newDurationMinutes, totalFees: recalcResult.billingResult.totalFees }
+            });
+            
+            // Calculate DELTA billing: only charge the difference between new total and previously billed amounts
+            // This prevents double-billing on session extensions
+            if (recalcResult.billingResult.totalFees > 0) {
+              try {
+                // Query for previously billed/paid amounts for this session from stripe_payment_intents
+                const previousBilledResult = await pool.query(
+                  `SELECT COALESCE(SUM(amount_cents), 0) as total_billed_cents
+                   FROM stripe_payment_intents
+                   WHERE session_id = $1
+                     AND status IN ('succeeded', 'pending', 'processing', 'requires_capture')
+                     AND purpose IN ('overage_fee', 'session_fee')`,
+                  [existingBooking.session_id]
+                );
+                
+                const previouslyBilledCents = parseInt(previousBilledResult.rows[0]?.total_billed_cents || '0', 10);
+                const newTotalFeeCents = Math.round(recalcResult.billingResult.totalFees * 100);
+                const deltaFeeCents = newTotalFeeCents - previouslyBilledCents;
+                
+                logger.info('[Trackman Webhook] Delta billing calculation for extension', {
+                  extra: {
+                    sessionId: existingBooking.session_id,
+                    bookingId: existingBooking.id,
+                    newTotalFeeCents,
+                    previouslyBilledCents,
+                    deltaFeeCents,
+                    extensionMinutes: newDurationMinutes - oldDuration
+                  }
+                });
+                
+                // Explicit delta guard: Only create payment intent if there's a strictly positive delta to charge
+                if (deltaFeeCents <= 0) {
+                  logger.info('[Trackman Webhook] Skipping payment intent creation - delta is not positive', {
+                    extra: {
+                      sessionId: existingBooking.session_id,
+                      bookingId: existingBooking.id,
+                      deltaFeeCents,
+                      previouslyBilledCents,
+                      newTotalFeeCents,
+                      reason: deltaFeeCents === 0 ? 'zero_delta' : 'negative_delta'
+                    }
+                  });
+                } else {
+                  // deltaFeeCents > 0: Proceed to create payment intent
+                  // Idempotency check: Prevent duplicate charges from webhook retries
+                  // Look for a recent payment intent for this session with this extension source
+                  const existingPaymentCheck = await pool.query(
+                    `SELECT id, stripe_payment_intent_id, status, amount_cents
+                     FROM stripe_payment_intents
+                     WHERE session_id = $1
+                       AND purpose = 'overage_fee'
+                       AND description LIKE '%extension%'
+                       AND created_at > NOW() - INTERVAL '5 minutes'
+                       AND status NOT IN ('failed', 'canceled')
+                     ORDER BY created_at DESC
+                     LIMIT 1`,
+                    [existingBooking.session_id]
+                  );
+                  
+                  if (existingPaymentCheck.rows.length > 0) {
+                    const recentPayment = existingPaymentCheck.rows[0];
+                    logger.info('[Trackman Webhook] Duplicate webhook detected - payment intent already exists for this extension', {
+                      extra: {
+                        sessionId: existingBooking.session_id,
+                        existingPaymentIntentId: recentPayment.stripe_payment_intent_id,
+                        existingAmountCents: recentPayment.amount_cents,
+                        requestedDeltaCents: deltaFeeCents
+                      }
+                    });
+                  } else {
+                    // Get the member email and Stripe customer ID from the booking
+                    const memberResult = await pool.query(
+                      `SELECT br.user_email, br.user_id, u.stripe_customer_id, u.first_name, u.last_name
+                       FROM booking_requests br
+                       LEFT JOIN users u ON LOWER(br.user_email) = LOWER(u.email)
+                       WHERE br.id = $1`,
+                      [existingBooking.id]
+                    );
+                    
+                    if (memberResult.rows.length > 0) {
+                      const memberData = memberResult.rows[0];
+                      const memberEmail = memberData.user_email;
+                      const stripeCustomerId = memberData.stripe_customer_id;
+                      const memberName = [memberData.first_name, memberData.last_name].filter(Boolean).join(' ') || memberEmail.split('@')[0];
+                      
+                      if (stripeCustomerId) {
+                        const { createPaymentIntent } = await import('../core/stripe/payments');
+                        
+                        const paymentResult = await createPaymentIntent({
+                          userId: memberData.user_id || memberEmail,
+                          email: memberEmail,
+                          memberName: memberName,
+                          amountCents: deltaFeeCents,
+                          purpose: 'overage_fee',
+                          bookingId: existingBooking.id,
+                          sessionId: existingBooking.session_id,
+                          description: `Simulator extension overage fee - ${newDurationMinutes - oldDuration} additional minutes (delta: $${(deltaFeeCents / 100).toFixed(2)})`,
+                          stripeCustomerId: stripeCustomerId,
+                          metadata: {
+                            bookingId: existingBooking.id.toString(),
+                            sessionId: existingBooking.session_id.toString(),
+                            extensionMinutes: (newDurationMinutes - oldDuration).toString(),
+                            previouslyBilledCents: previouslyBilledCents.toString(),
+                            newTotalCents: newTotalFeeCents.toString(),
+                            deltaCents: deltaFeeCents.toString(),
+                            source: 'trackman_extension_webhook'
+                          }
+                        });
+                        
+                        // Update ledger entries to link payment intent and mark as pending
+                        // This links the ledger rows to the payment intent for proper tracking
+                        await pool.query(
+                          `UPDATE usage_ledger 
+                           SET stripe_payment_intent_id = $1,
+                               payment_method = 'pending'
+                           WHERE session_id = $2 
+                             AND payment_method IN ('pending', 'unpaid')
+                             AND stripe_payment_intent_id IS NULL
+                             AND (overage_fee > 0 OR guest_fee > 0)`,
+                          [paymentResult.paymentIntentId, existingBooking.session_id]
+                        );
+                        
+                        logger.info('[Trackman Webhook] Created payment intent for extension delta', {
+                          extra: {
+                            sessionId: existingBooking.session_id,
+                            bookingId: existingBooking.id,
+                            paymentIntentId: paymentResult.paymentIntentId,
+                            deltaAmountCents: deltaFeeCents,
+                            previouslyBilledCents,
+                            newTotalCents: newTotalFeeCents,
+                            memberEmail: memberEmail
+                          }
+                        });
+                      } else {
+                        logger.warn('[Trackman Webhook] Member has no Stripe customer ID, cannot charge for extension', {
+                          extra: { memberEmail, bookingId: existingBooking.id }
+                        });
+                      }
+                    }
+                  }
+                }
+              } catch (paymentError) {
+                // Log but don't fail the webhook - the fees are recorded in ledger as unpaid
+                logger.error('[Trackman Webhook] Failed to create payment intent for extension (non-blocking)', {
+                  error: paymentError as Error,
+                  extra: { sessionId: existingBooking.session_id, bookingId: existingBooking.id }
+                });
+              }
+            }
+          } catch (feeError) {
+            logger.error('[Trackman Webhook] Failed to recalculate fees for extension', {
+              error: feeError as Error,
+              extra: { sessionId: existingBooking.session_id }
+            });
+          }
+        }
+        
+        return { success: true, bookingId: existingBooking.id, updated: true };
+      }
+      
+      logger.info('[Trackman Webhook] Booking already exists and duration unchanged, skipping', { 
+        extra: { trackmanBookingId, existingBookingId: existingBooking.id, duration: oldDuration } 
       });
-      return { success: true, bookingId: existing.rows[0].id };
+      return { success: true, bookingId: existingBooking.id };
     }
     
     // AUTO-LINK CHECK: Look for pending Trackman sync bookings that match by member/date/time
@@ -915,11 +1134,8 @@ async function createBookingForMember(
     // Note: Cancelled booking check is handled in handleBookingUpdate before calling this function
     // The main flow checks for cancelled bookings after tryAutoApproveBooking fails
     
-    const startParts = startTime.split(':').map(Number);
-    const endParts = endTime.split(':').map(Number);
-    const startMinutes = startParts[0] * 60 + startParts[1];
-    const endMinutes = endParts[0] * 60 + endParts[1];
-    const durationMinutes = endMinutes > startMinutes ? endMinutes - startMinutes : 60;
+    // Calculate duration (handles cross-midnight sessions)
+    const durationMinutes = calculateDurationMinutes(startTime, endTime);
     
     const memberName = customerName || 
       [member.firstName, member.lastName].filter(Boolean).join(' ') || 
@@ -1103,11 +1319,8 @@ async function saveToUnmatchedBookings(
   reason?: string
 ): Promise<void> {
   try {
-    const startParts = startTime.split(':').map(Number);
-    const endParts = endTime.split(':').map(Number);
-    const startMinutes = startParts[0] * 60 + startParts[1];
-    const endMinutes = endParts[0] * 60 + endParts[1];
-    const durationMinutes = endMinutes > startMinutes ? endMinutes - startMinutes : 60;
+    // Calculate duration (handles cross-midnight sessions)
+    const durationMinutes = calculateDurationMinutes(startTime, endTime);
     
     // Determine the match attempt reason
     let matchAttemptReason = reason;
@@ -1162,11 +1375,8 @@ async function createUnmatchedBookingRequest(
   customerNotes?: string
 ): Promise<{ created: boolean; bookingId?: number }> {
   try {
-    const startParts = startTime.split(':').map(Number);
-    const endParts = endTime.split(':').map(Number);
-    const startMinutes = startParts[0] * 60 + startParts[1];
-    const endMinutes = endParts[0] * 60 + endParts[1];
-    const durationMinutes = endMinutes > startMinutes ? endMinutes - startMinutes : 60;
+    // Calculate duration (handles cross-midnight sessions)
+    const durationMinutes = calculateDurationMinutes(startTime, endTime);
     
     const result = await pool.query(
       `INSERT INTO booking_requests 
@@ -2665,12 +2875,8 @@ router.post('/api/admin/trackman-webhooks/backfill', isAdmin, async (req, res) =
           }
         }
         
-        // Calculate duration
-        const startParts = startTime.split(':').map(Number);
-        const endParts = endTime.split(':').map(Number);
-        const startMinutes = startParts[0] * 60 + startParts[1];
-        const endMinutes = endParts[0] * 60 + endParts[1];
-        const durationMinutes = endMinutes > startMinutes ? endMinutes - startMinutes : 60;
+        // Calculate duration (handles cross-midnight sessions)
+        const durationMinutes = calculateDurationMinutes(startTime, endTime);
         
         // First, check if a booking_request already exists with this trackman_booking_id
         const existingByTrackman = await pool.query(
