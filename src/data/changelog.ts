@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.13.0",
+    date: "2026-01-24",
+    title: "Mindbody CSV Import",
+    isMajor: true,
+    changes: [
+      "New: Staff can upload Mindbody CSV exports directly in Data Integrity page",
+      "New: First Visit Report helps match customers by email and phone before importing sales",
+      "New: Enhanced matching logic - tries Mindbody ID, then email, then phone, then name",
+      "New: Imported purchases appear in member billing history with Mindbody badge",
+      "New: Import results show detailed stats on matched/unmatched records",
+      "Improved: Duplicate detection prevents re-importing the same sales"
+    ]
+  },
+  {
     version: "9.12.1",
     date: "2026-01-24",
     title: "Visitors Directory Pagination",

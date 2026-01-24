@@ -4,7 +4,7 @@ import { pool } from "../core/db";
 import { legacyPurchases, users, legacyImportJobs, hubspotDeals, hubspotProductMappings, hubspotLineItems } from "@shared/schema";
 import { eq, desc, and, sql, gte, lte } from "drizzle-orm";
 import { isStaffOrAdmin, isAdmin } from "../core/middleware";
-import { importMembersFromCSV, importSalesFromCSV, importAttendanceFromCSV } from "../core/mindbody/import";
+import { importMembersFromCSV, importSalesFromCSV, importAttendanceFromCSV, importFirstVisitReport, importSalesFromContent, parseFirstVisitReport } from "../core/mindbody/import";
 import { createDealForLegacyMember } from "../core/hubspotDeals";
 import { getHubSpotClient } from "../core/integrations";
 import { retryableHubSpotRequest } from "../core/hubspot/request";
@@ -12,6 +12,21 @@ import { listCustomerInvoices } from "../core/stripe/invoices";
 import { getSessionUser } from "../types/session";
 import path from "path";
 import { normalizeTierName as normalizeTierNameUtil, normalizeTierSlug } from '../utils/tierUtils';
+import multer from 'multer';
+import { logFromRequest } from '../core/auditLog';
+
+// Configure multer for memory storage (CSV files are small)
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only CSV files are allowed'));
+    }
+  }
+});
 
 interface UnifiedPurchase {
   id: string;
@@ -367,6 +382,111 @@ router.get("/api/legacy-purchases/admin/import-jobs", isAdmin, async (req: Reque
     res.status(500).json({ error: "Failed to fetch import jobs" });
   }
 });
+
+// Admin: Upload and import MindBody CSV files
+// Accepts: firstVisitFile (optional), salesFile (required)
+// The First Visit file helps link MindBody clients to existing users by email/phone
+router.post("/api/legacy-purchases/admin/upload-csv", 
+  isAdmin, 
+  upload.fields([
+    { name: 'firstVisitFile', maxCount: 1 },
+    { name: 'salesFile', maxCount: 1 }
+  ]),
+  async (req: Request, res: Response) => {
+    try {
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+      
+      if (!files) {
+        return res.status(400).json({ error: "No files uploaded" });
+      }
+      
+      // Server-side validation: salesFile is required
+      if (!files.salesFile || !files.salesFile[0]) {
+        return res.status(400).json({ error: "Sales Report file is required" });
+      }
+      
+      const sessionUser = getSessionUser(req);
+      const batchId = `csv_upload_${Date.now()}`;
+      
+      // Create import job record - include batchId in fileName for reliable lookup
+      const jobFileName = `${batchId}|${Object.keys(files).map(k => files[k][0]?.originalname).filter(Boolean).join(', ')}`;
+      
+      const [job] = await db.insert(legacyImportJobs).values({
+        jobType: 'csv_upload',
+        fileName: jobFileName,
+        status: 'running',
+        startedAt: new Date(),
+      }).returning({ id: legacyImportJobs.id });
+      
+      const results: any = {
+        batchId,
+        firstVisit: null,
+        sales: null,
+      };
+      
+      // Step 1: Process First Visit Report first (if provided) to link clients
+      let clientLookup: Map<string, any> | undefined;
+      
+      if (files.firstVisitFile && files.firstVisitFile[0]) {
+        const firstVisitContent = files.firstVisitFile[0].buffer.toString('utf-8');
+        console.log(`[CSVUpload] Processing First Visit Report: ${files.firstVisitFile[0].originalname}`);
+        
+        // Parse to build lookup map
+        clientLookup = parseFirstVisitReport(firstVisitContent);
+        
+        // Also import to link users
+        const firstVisitResult = await importFirstVisitReport(firstVisitContent);
+        results.firstVisit = firstVisitResult;
+        
+        console.log(`[CSVUpload] First Visit result: ${JSON.stringify(firstVisitResult)}`);
+      }
+      
+      // Step 2: Process Sales Report with enhanced matching
+      if (files.salesFile && files.salesFile[0]) {
+        const salesContent = files.salesFile[0].buffer.toString('utf-8');
+        console.log(`[CSVUpload] Processing Sales Report: ${files.salesFile[0].originalname}`);
+        
+        const salesResult = await importSalesFromContent(salesContent, clientLookup, batchId);
+        results.sales = salesResult;
+        
+        console.log(`[CSVUpload] Sales result: ${JSON.stringify(salesResult)}`);
+      }
+      
+      // Log the action
+      await logFromRequest(req, {
+        actionType: 'mindbody_csv_import',
+        resourceType: 'legacy_purchase',
+        resourceName: batchId,
+        details: {
+          firstVisitFile: files.firstVisitFile?.[0]?.originalname,
+          salesFile: files.salesFile?.[0]?.originalname,
+          results,
+        },
+      });
+      
+      // Update job status using the job ID
+      await db.update(legacyImportJobs)
+        .set({
+          status: 'completed',
+          completedAt: new Date(),
+          results: results,
+        })
+        .where(eq(legacyImportJobs.id, job.id));
+      
+      res.json({
+        success: true,
+        message: 'CSV import completed successfully',
+        results,
+      });
+    } catch (error) {
+      console.error("[CSVUpload] Import error:", error);
+      res.status(500).json({ 
+        error: "CSV import failed",
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+);
 
 // Admin: Get unmatched purchases (purchases without a linked user)
 router.get("/api/legacy-purchases/admin/unmatched", isAdmin, async (req: Request, res: Response) => {

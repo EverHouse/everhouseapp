@@ -195,6 +195,17 @@ const DataIntegrityTab: React.FC = () => {
   const [isRunningMindbodyImport, setIsRunningMindbodyImport] = useState(false);
   const [mindbodyResult, setMindbodyResult] = useState<{ success: boolean; message: string } | null>(null);
 
+  // CSV Upload state
+  const [firstVisitFile, setFirstVisitFile] = useState<File | null>(null);
+  const [salesFile, setSalesFile] = useState<File | null>(null);
+  const [isUploadingCSV, setIsUploadingCSV] = useState(false);
+  const [csvUploadResult, setCsvUploadResult] = useState<{
+    success: boolean;
+    message: string;
+    firstVisit?: { total: number; linked: number; alreadyLinked: number; skipped: number };
+    sales?: { total: number; imported: number; skipped: number; matchedByEmail: number; matchedByPhone: number; matchedByName: number; unmatched: number };
+  } | null>(null);
+
   const [isReconciling, setIsReconciling] = useState(false);
   const [reconcileResult, setReconcileResult] = useState<{
     success: boolean;
@@ -949,6 +960,56 @@ const DataIntegrityTab: React.FC = () => {
     }
   };
 
+  const handleCSVUpload = async () => {
+    if (!salesFile) {
+      showToast('Please select a Sales Report CSV file', 'error');
+      return;
+    }
+    
+    setIsUploadingCSV(true);
+    setCsvUploadResult(null);
+    
+    try {
+      const formData = new FormData();
+      if (firstVisitFile) {
+        formData.append('firstVisitFile', firstVisitFile);
+      }
+      formData.append('salesFile', salesFile);
+      
+      const res = await fetch('/api/legacy-purchases/admin/upload-csv', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok) {
+        const importedCount = data.results?.sales?.imported || 0;
+        const linkedCount = data.results?.firstVisit?.linked || 0;
+        setCsvUploadResult({
+          success: true,
+          message: `Import complete! ${importedCount} sales imported, ${linkedCount} clients linked.`,
+          firstVisit: data.results?.firstVisit,
+          sales: data.results?.sales,
+        });
+        showToast(`Successfully imported ${importedCount} sales records`, 'success');
+        // Clear file inputs
+        setFirstVisitFile(null);
+        setSalesFile(null);
+      } else {
+        setCsvUploadResult({ success: false, message: data.error || 'Import failed' });
+        showToast(data.error || 'Import failed', 'error');
+      }
+    } catch (err) {
+      console.error('CSV upload error:', err);
+      setCsvUploadResult({ success: false, message: 'Network error occurred' });
+      showToast('Failed to upload CSV files', 'error');
+    } finally {
+      setIsUploadingCSV(false);
+    }
+  };
+
   const handleSyncStripeMetadata = async () => {
     setIsSyncingStripeMetadata(true);
     setStripeMetadataResult(null);
@@ -1470,6 +1531,92 @@ const DataIntegrityTab: React.FC = () => {
                   )}
                 </div>
               )}
+            </div>
+
+            <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
+              <h4 className="font-semibold text-primary dark:text-white mb-3 flex items-center gap-2">
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">upload_file</span>
+                Mindbody CSV Import
+              </h4>
+              <p className="text-xs text-gray-500 mb-3">
+                Upload Mindbody CSV exports to import purchase history. The First Visit Report helps link customers to existing members by email/phone.
+              </p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                    First Visit Report (optional - helps match customers)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => setFirstVisitFile(e.target.files?.[0] || null)}
+                      className="flex-1 text-sm text-gray-600 dark:text-gray-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 dark:file:bg-blue-900/30 dark:file:text-blue-400 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/50 cursor-pointer"
+                    />
+                    {firstVisitFile && (
+                      <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                        {firstVisitFile.name}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                    Sales Report (required)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => setSalesFile(e.target.files?.[0] || null)}
+                      className="flex-1 text-sm text-gray-600 dark:text-gray-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-teal-50 file:text-teal-700 dark:file:bg-teal-900/30 dark:file:text-teal-400 hover:file:bg-teal-100 dark:hover:file:bg-teal-900/50 cursor-pointer"
+                    />
+                    {salesFile && (
+                      <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                        {salesFile.name}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                <button
+                  onClick={handleCSVUpload}
+                  disabled={!salesFile || isUploadingCSV}
+                  className="px-4 py-2 bg-teal-600 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isUploadingCSV && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                  {isUploadingCSV ? 'Importing...' : 'Import CSV Data'}
+                </button>
+                
+                {csvUploadResult && (
+                  <div className={`p-3 rounded-lg ${csvUploadResult.success ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700' : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700'}`}>
+                    <p className={`text-sm font-medium ${csvUploadResult.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
+                      {csvUploadResult.message}
+                    </p>
+                    {csvUploadResult.success && csvUploadResult.sales && (
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          <strong>Sales:</strong> {csvUploadResult.sales.imported} imported, {csvUploadResult.sales.skipped} skipped (duplicates), {csvUploadResult.sales.unmatched} unmatched
+                        </p>
+                        {(csvUploadResult.sales.matchedByEmail > 0 || csvUploadResult.sales.matchedByPhone > 0 || csvUploadResult.sales.matchedByName > 0) && (
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            <strong>Matched by:</strong> Email ({csvUploadResult.sales.matchedByEmail}), Phone ({csvUploadResult.sales.matchedByPhone}), Name ({csvUploadResult.sales.matchedByName})
+                          </p>
+                        )}
+                        {csvUploadResult.firstVisit && (
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            <strong>Clients:</strong> {csvUploadResult.firstVisit.linked} linked to members, {csvUploadResult.firstVisit.alreadyLinked} already linked
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">

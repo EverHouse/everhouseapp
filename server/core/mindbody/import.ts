@@ -1,9 +1,10 @@
 import { db } from "../../db";
 import { users, legacyPurchases, legacyImportJobs } from "@shared/schema";
-import { eq, sql, and } from "drizzle-orm";
+import { eq, sql, and, ilike } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
 import { alertOnImportFailure, alertOnLowMatchRate } from "../dataAlerts";
+import { findMatchingUser, normalizePhone } from "../visitors/matchingService";
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -150,6 +151,363 @@ interface AttendanceImportRow {
   client: string;
   id: string;
   totalVisits: string;
+}
+
+interface FirstVisitRow {
+  clientId: string;
+  client: string;
+  phone: string;
+  email: string;
+  firstVisit: string;
+}
+
+// Client lookup map: mindbodyClientId -> { email, phone, firstName, lastName }
+export interface ClientLookup {
+  email?: string;
+  phone?: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+/**
+ * Parse First Visit Report CSV to build a client lookup map.
+ * This links MindBody Client IDs to email/phone for enhanced matching.
+ */
+export function parseFirstVisitReport(content: string): Map<string, ClientLookup> {
+  const clientMap = new Map<string, ClientLookup>();
+  const lines = content.split('\n').filter(l => l.trim());
+  
+  if (lines.length === 0) return clientMap;
+  
+  // Parse header
+  const header = parseCSVLine(lines[0]);
+  const headerMap: Record<string, number> = {};
+  header.forEach((h, i) => headerMap[h.toLowerCase().replace(/\s+/g, '')] = i);
+  
+  for (let i = 1; i < lines.length; i++) {
+    const fields = parseCSVLine(lines[i]);
+    
+    const clientId = fields[headerMap['clientid']] || '';
+    const clientName = fields[headerMap['client']] || '';
+    const phone = fields[headerMap['phone']] || '';
+    const email = fields[headerMap['email']] || '';
+    
+    if (!clientId) continue;
+    
+    // Parse name: "Last, First" format
+    let firstName = '';
+    let lastName = '';
+    if (clientName.includes(',')) {
+      const [last, first] = clientName.split(',').map(s => s.trim());
+      lastName = last;
+      firstName = first;
+    } else {
+      const parts = clientName.split(' ');
+      firstName = parts[0] || '';
+      lastName = parts.slice(1).join(' ') || '';
+    }
+    
+    // Normalize phone (strip non-digits)
+    const normalizedPhone = phone ? normalizePhone(phone) : '';
+    
+    // Skip placeholder phones like "1000000000"
+    const validPhone = normalizedPhone && normalizedPhone !== '1000000000' ? normalizedPhone : undefined;
+    
+    clientMap.set(clientId, {
+      email: email && !email.includes('privaterelay.appleid.com') ? email.toLowerCase() : undefined,
+      phone: validPhone,
+      firstName,
+      lastName,
+    });
+  }
+  
+  console.log(`[MindbodyImport] Parsed ${clientMap.size} clients from First Visit Report`);
+  return clientMap;
+}
+
+/**
+ * Import First Visit Report to link MindBody clients to existing users.
+ * This should be run BEFORE importing sales to ensure better matching.
+ */
+export async function importFirstVisitReport(content: string): Promise<{
+  total: number;
+  linked: number;
+  alreadyLinked: number;
+  newUsers: number;
+  skipped: number;
+  errors: string[];
+}> {
+  const result = { total: 0, linked: 0, alreadyLinked: 0, newUsers: 0, skipped: 0, errors: [] as string[] };
+  const clientMap = parseFirstVisitReport(content);
+  
+  for (const [clientId, clientData] of clientMap) {
+    result.total++;
+    
+    try {
+      // Check if user already has this mindbodyClientId
+      const existingByMbId = await db.select({ id: users.id })
+        .from(users)
+        .where(eq(users.mindbodyClientId, clientId))
+        .limit(1);
+      
+      if (existingByMbId.length > 0) {
+        result.alreadyLinked++;
+        continue;
+      }
+      
+      // Try to find matching user by email, phone, or name
+      const matchedUser = await findMatchingUser({
+        email: clientData.email,
+        phone: clientData.phone,
+        firstName: clientData.firstName,
+        lastName: clientData.lastName,
+      });
+      
+      if (matchedUser) {
+        // Link the MindBody client ID to this user
+        await db.update(users)
+          .set({
+            mindbodyClientId: clientId,
+            legacySource: 'mindbody_import',
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, matchedUser.id));
+        
+        result.linked++;
+        console.log(`[MindbodyImport] Linked client ${clientId} to user ${matchedUser.email}`);
+      } else {
+        result.skipped++;
+      }
+    } catch (error) {
+      result.errors.push(`Client ${clientId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+  
+  console.log(`[MindbodyImport] First Visit import: ${result.linked} linked, ${result.alreadyLinked} already linked, ${result.skipped} skipped`);
+  return result;
+}
+
+/**
+ * Import sales from CSV content string (not file path).
+ * Uses enhanced matching: mindbody_id -> email -> phone -> name
+ */
+export async function importSalesFromContent(content: string, clientLookup?: Map<string, ClientLookup>, batchId?: string): Promise<{
+  total: number;
+  imported: number;
+  skipped: number;
+  linked: number;
+  matchedByEmail: number;
+  matchedByPhone: number;
+  matchedByName: number;
+  unmatched: number;
+  errors: string[];
+}> {
+  const result = { 
+    total: 0, imported: 0, skipped: 0, linked: 0, 
+    matchedByEmail: 0, matchedByPhone: 0, matchedByName: 0, unmatched: 0,
+    errors: [] as string[] 
+  };
+  const importBatchId = batchId || `import_${Date.now()}`;
+  
+  const lines = content.split('\n').filter(l => l.trim());
+  
+  if (lines.length === 0) return result;
+  
+  // Parse header
+  const header = parseCSVLine(lines[0]);
+  const headerMap: Record<string, number> = {};
+  header.forEach((h, i) => headerMap[h.toLowerCase().replace(/\s+/g, '')] = i);
+  
+  // Track line numbers per sale_id for unique constraint
+  const saleLineNumbers: Map<string, number> = new Map();
+  
+  for (let i = 1; i < lines.length; i++) {
+    const fields = parseCSVLine(lines[i]);
+    result.total++;
+    
+    try {
+      const saleId = fields[headerMap['saleid']] || '';
+      const clientId = fields[headerMap['clientid']] || '';
+      const clientName = fields[headerMap['client']] || '';
+      const itemName = fields[headerMap['itemname']] || '';
+      
+      if (!saleId || !clientId || !itemName) {
+        result.skipped++;
+        continue;
+      }
+      
+      // Get next line number for this sale
+      const currentLineNum = (saleLineNumbers.get(saleId) || 0) + 1;
+      saleLineNumbers.set(saleId, currentLineNum);
+      
+      // Check for duplicate
+      const existing = await db.select({ id: legacyPurchases.id })
+        .from(legacyPurchases)
+        .where(and(
+          eq(legacyPurchases.mindbodySaleId, saleId),
+          eq(legacyPurchases.lineNumber, currentLineNum)
+        ))
+        .limit(1);
+      
+      if (existing.length > 0) {
+        result.skipped++;
+        continue;
+      }
+      
+      // Enhanced matching: try mindbody_id first
+      let member = await db.select({ id: users.id, email: users.email })
+        .from(users)
+        .where(eq(users.mindbodyClientId, clientId))
+        .limit(1);
+      
+      let matchMethod = 'mindbody_id';
+      
+      // If not found by mindbody_id, try other methods
+      // Note: Sales CSV only contains: clientId, client name, and sale details
+      // Email/phone are NOT in the Sales CSV - they come from First Visit Report
+      // Matching order: mindbody_id → email (First Visit) → phone (First Visit) → name+phone → name-only
+      if (member.length === 0) {
+        // Get client info from First Visit lookup map if available
+        // Contains email/phone that aren't in the Sales CSV
+        const clientInfo = clientLookup?.get(clientId);
+        
+        // Parse name from sales record (format: "Last, First")
+        let firstName = '';
+        let lastName = '';
+        if (clientName.includes(',')) {
+          const [last, first] = clientName.split(',').map(s => s.trim());
+          lastName = last;
+          firstName = first;
+        } else if (clientName.trim()) {
+          // Handle "First Last" format
+          const parts = clientName.trim().split(/\s+/);
+          if (parts.length >= 2) {
+            firstName = parts[0];
+            lastName = parts.slice(1).join(' ');
+          }
+        }
+        
+        // Get email from First Visit lookup if available
+        const emailToMatch = clientInfo?.email;
+        
+        // Try email match from First Visit lookup
+        if (member.length === 0 && emailToMatch) {
+          const emailMatch = await db.select({ id: users.id, email: users.email })
+            .from(users)
+            .where(ilike(users.email, emailToMatch))
+            .limit(1);
+          if (emailMatch.length > 0) {
+            member = emailMatch;
+            matchMethod = 'email';
+            result.matchedByEmail++;
+          }
+        }
+        
+        // Try phone match from First Visit lookup
+        const phoneToMatch = clientInfo?.phone;
+        if (member.length === 0 && phoneToMatch) {
+          const phoneMatch = await db.select({ id: users.id, email: users.email })
+            .from(users)
+            .where(eq(users.phone, phoneToMatch))
+            .limit(1);
+          if (phoneMatch.length > 0) {
+            member = phoneMatch;
+            matchMethod = 'phone';
+            result.matchedByPhone++;
+          }
+        }
+        
+        // Try name + phone match
+        if (member.length === 0 && firstName && lastName && phoneToMatch) {
+          const namePhoneMatch = await db.select({ id: users.id, email: users.email })
+            .from(users)
+            .where(and(
+              ilike(users.firstName, firstName),
+              ilike(users.lastName, lastName),
+              eq(users.phone, phoneToMatch)
+            ))
+            .limit(1);
+          if (namePhoneMatch.length > 0) {
+            member = namePhoneMatch;
+            matchMethod = 'name_phone';
+            result.matchedByName++;
+          }
+        }
+        
+        // Try name-only match as final fallback (when we have first and last name but no phone)
+        if (member.length === 0 && firstName && lastName) {
+          const nameOnlyMatch = await db.select({ id: users.id, email: users.email })
+            .from(users)
+            .where(and(
+              ilike(users.firstName, firstName),
+              ilike(users.lastName, lastName)
+            ))
+            .limit(1);
+          if (nameOnlyMatch.length > 0) {
+            member = nameOnlyMatch;
+            matchMethod = 'name';
+            result.matchedByName++;
+          }
+        }
+        
+        if (member.length === 0) {
+          result.unmatched++;
+        }
+      }
+      
+      const itemPriceCents = dollarsToCents(fields[headerMap['itemprice']]);
+      const quantity = parseInt(fields[headerMap['quantity']] || '1') || 1;
+      const subtotalCents = dollarsToCents(fields[headerMap['subtotal']]);
+      const discountPercent = parseFloat(fields[headerMap['discount%']] || '0') || 0;
+      const discountAmountCents = dollarsToCents(fields[headerMap['discountamount']]);
+      const taxCents = dollarsToCents(fields[headerMap['tax']]);
+      const itemTotalCents = dollarsToCents(fields[headerMap['itemtotal']]);
+      const saleDate = parseDate(fields[headerMap['saledate']]);
+      const paymentMethod = normalizePaymentMethod(fields[headerMap['paymentmethod']]);
+      
+      if (!saleDate) {
+        result.skipped++;
+        result.errors.push(`Row ${i}: Invalid sale date`);
+        continue;
+      }
+      
+      // Insert purchase
+      await db.insert(legacyPurchases).values({
+        userId: member[0]?.id || null,
+        mindbodyClientId: clientId,
+        memberEmail: member[0]?.email || null,
+        mindbodySaleId: saleId,
+        lineNumber: currentLineNum,
+        itemName,
+        itemCategory: getItemCategory(itemName),
+        itemPriceCents,
+        quantity,
+        subtotalCents,
+        discountPercent: discountPercent.toString(),
+        discountAmountCents,
+        taxCents,
+        itemTotalCents,
+        paymentMethod,
+        saleDate,
+        isComp: itemTotalCents === 0,
+        importBatchId,
+      });
+      
+      result.imported++;
+      
+      // Track guest-related charges
+      const category = getItemCategory(itemName);
+      if (['guest_pass', 'guest_sim_fee'].includes(category) && member[0]?.id) {
+        result.linked++;
+      }
+    } catch (error) {
+      result.errors.push(`Row ${i}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+  
+  console.log(`[MindbodyImport] Sales import: ${result.imported} imported, ${result.skipped} skipped, ${result.unmatched} unmatched`);
+  console.log(`[MindbodyImport] Matching: ${result.matchedByEmail} by email, ${result.matchedByPhone} by phone, ${result.matchedByName} by name`);
+  return result;
 }
 
 // Import members from CSV
