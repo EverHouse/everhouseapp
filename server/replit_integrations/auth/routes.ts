@@ -38,17 +38,31 @@ export function registerAuthRoutes(app: Express): void {
       );
       const dbUser = userResult.rows[0];
       
-      // Count past bookings (date < today, excluding cancelled/declined)
-      // Include bookings where user is primary booker OR linked via booking_members
+      // Count past bookings using UNION for deduplication
+      // Include: host (owner), player (booking_members), guest (booking_guests)
       const bookingsResult = await pool.query(
-        `SELECT COUNT(DISTINCT br.id) as count FROM booking_requests br
-         LEFT JOIN booking_members bm ON br.id = bm.booking_id
-         WHERE br.request_date < CURRENT_DATE
-         AND br.status NOT IN ('cancelled', 'declined')
-         AND (
-           LOWER(br.user_email) = LOWER($1)
-           OR LOWER(bm.user_email) = LOWER($1)
-         )`,
+        `SELECT COUNT(*) as count FROM (
+           -- As host
+           SELECT br.id FROM booking_requests br
+           WHERE LOWER(br.user_email) = LOWER($1)
+             AND br.request_date < CURRENT_DATE
+             AND br.status NOT IN ('cancelled', 'declined')
+           UNION
+           -- As added player
+           SELECT br.id FROM booking_requests br
+           JOIN booking_members bm ON br.id = bm.booking_id
+           WHERE LOWER(bm.user_email) = LOWER($1)
+             AND bm.is_primary IS NOT TRUE
+             AND br.request_date < CURRENT_DATE
+             AND br.status NOT IN ('cancelled', 'declined')
+           UNION
+           -- As guest
+           SELECT br.id FROM booking_requests br
+           JOIN booking_guests bg ON br.id = bg.booking_id
+           WHERE LOWER(bg.guest_email) = LOWER($1)
+             AND br.request_date < CURRENT_DATE
+             AND br.status NOT IN ('cancelled', 'declined')
+         ) unified_bookings`,
         [user.email]
       );
       const pastBookingsCount = parseInt(bookingsResult.rows[0]?.count || '0', 10);

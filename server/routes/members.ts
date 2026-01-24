@@ -1481,6 +1481,157 @@ router.get('/api/members/me/preferences', isAuthenticated, async (req, res) => {
   }
 });
 
+// Get unified visits for the current authenticated user
+// Returns all past visits (bookings, wellness, events) with role information
+router.get('/api/my-visits', isAuthenticated, async (req, res) => {
+  try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser?.email) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    const requestedEmail = req.query.user_email as string | undefined;
+    let targetEmail = sessionUser.email.toLowerCase();
+    
+    if (requestedEmail && requestedEmail.toLowerCase() !== sessionUser.email.toLowerCase()) {
+      if (sessionUser.role === 'admin' || sessionUser.role === 'staff') {
+        targetEmail = decodeURIComponent(requestedEmail).toLowerCase();
+      }
+    }
+    
+    const unifiedVisitsResult = await db.execute(sql`
+      SELECT DISTINCT ON (visit_type, visit_id) * FROM (
+        -- Bookings as host
+        SELECT 
+          br.id as visit_id,
+          'booking' as visit_type,
+          'Host' as role,
+          br.request_date::text as date,
+          br.start_time::text as start_time,
+          br.end_time::text as end_time,
+          COALESCE(r.name, br.resource_preference, 'Simulator') as resource_name,
+          NULL as location,
+          CASE WHEN r.type = 'conference_room' OR LOWER(r.name) LIKE '%conference%' THEN 'Conference Room' ELSE 'Golf Simulator' END as category,
+          NULL as invited_by
+        FROM booking_requests br
+        LEFT JOIN resources r ON br.resource_id = r.id
+        WHERE LOWER(br.user_email) = ${targetEmail}
+          AND br.request_date < CURRENT_DATE
+          AND br.status NOT IN ('cancelled', 'declined')
+        
+        UNION ALL
+        
+        -- Bookings as player (via booking_members, non-primary)
+        SELECT 
+          br.id as visit_id,
+          'booking' as visit_type,
+          'Player' as role,
+          br.request_date::text as date,
+          br.start_time::text as start_time,
+          br.end_time::text as end_time,
+          COALESCE(r.name, br.resource_preference, 'Simulator') as resource_name,
+          NULL as location,
+          CASE WHEN r.type = 'conference_room' OR LOWER(r.name) LIKE '%conference%' THEN 'Conference Room' ELSE 'Golf Simulator' END as category,
+          COALESCE(host_user.first_name || ' ' || host_user.last_name, br.user_name) as invited_by
+        FROM booking_requests br
+        JOIN booking_members bm ON br.id = bm.booking_id
+        LEFT JOIN resources r ON br.resource_id = r.id
+        LEFT JOIN users host_user ON LOWER(br.user_email) = LOWER(host_user.email)
+        WHERE LOWER(bm.user_email) = ${targetEmail}
+          AND (bm.is_primary IS NOT TRUE OR bm.is_primary IS NULL)
+          AND LOWER(br.user_email) != ${targetEmail}
+          AND br.request_date < CURRENT_DATE
+          AND br.status NOT IN ('cancelled', 'declined')
+        
+        UNION ALL
+        
+        -- Bookings as guest (via booking_guests)
+        SELECT 
+          br.id as visit_id,
+          'booking' as visit_type,
+          'Guest' as role,
+          br.request_date::text as date,
+          br.start_time::text as start_time,
+          br.end_time::text as end_time,
+          COALESCE(r.name, br.resource_preference, 'Simulator') as resource_name,
+          NULL as location,
+          CASE WHEN r.type = 'conference_room' OR LOWER(r.name) LIKE '%conference%' THEN 'Conference Room' ELSE 'Golf Simulator' END as category,
+          COALESCE(host_user.first_name || ' ' || host_user.last_name, br.user_name) as invited_by
+        FROM booking_requests br
+        JOIN booking_guests bg ON br.id = bg.booking_id
+        LEFT JOIN resources r ON br.resource_id = r.id
+        LEFT JOIN users host_user ON LOWER(br.user_email) = LOWER(host_user.email)
+        WHERE LOWER(bg.guest_email) = ${targetEmail}
+          AND br.request_date < CURRENT_DATE
+          AND br.status NOT IN ('cancelled', 'declined')
+        
+        UNION ALL
+        
+        -- Wellness enrollments
+        SELECT 
+          we.id as visit_id,
+          'wellness' as visit_type,
+          'Wellness' as role,
+          wc.date::text as date,
+          wc.time::text as start_time,
+          NULL as end_time,
+          wc.title as resource_name,
+          NULL as location,
+          wc.category as category,
+          wc.instructor as invited_by
+        FROM wellness_enrollments we
+        JOIN wellness_classes wc ON we.class_id = wc.id
+        WHERE LOWER(we.user_email) = ${targetEmail}
+          AND wc.date < CURRENT_DATE
+          AND we.status NOT IN ('cancelled')
+        
+        UNION ALL
+        
+        -- Event RSVPs
+        SELECT 
+          er.id as visit_id,
+          'event' as visit_type,
+          'Event' as role,
+          e.event_date::text as date,
+          e.start_time::text as start_time,
+          e.end_time::text as end_time,
+          e.title as resource_name,
+          e.location as location,
+          e.category as category,
+          NULL as invited_by
+        FROM event_rsvps er
+        JOIN events e ON er.event_id = e.id
+        WHERE LOWER(er.user_email) = ${targetEmail}
+          AND e.event_date < CURRENT_DATE
+          AND er.status NOT IN ('cancelled')
+      ) all_visits
+      ORDER BY visit_type, visit_id, date DESC
+    `);
+    
+    const rows = (unifiedVisitsResult as any).rows || [];
+    
+    const visits = rows
+      .map((row: any) => ({
+        id: row.visit_id,
+        type: row.visit_type,
+        role: row.role,
+        date: row.date,
+        startTime: row.start_time,
+        endTime: row.end_time,
+        resourceName: row.resource_name,
+        location: row.location || undefined,
+        category: row.category || undefined,
+        invitedBy: row.invited_by || undefined,
+      }))
+      .sort((a: any, b: any) => b.date.localeCompare(a.date));
+    
+    res.json(visits);
+  } catch (error: any) {
+    if (!isProduction) console.error('API error fetching my-visits:', error);
+    res.status(500).json({ error: 'Failed to fetch visits' });
+  }
+});
+
 // Request data export (CCPA/CPRA compliance)
 // Records the request timestamp and sends email notification to staff
 router.post('/api/members/me/data-export-request', isAuthenticated, async (req, res) => {

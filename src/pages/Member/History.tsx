@@ -8,56 +8,21 @@ import SwipeablePage from '../../components/SwipeablePage';
 import PullToRefresh from '../../components/PullToRefresh';
 import MemberBottomNav from '../../components/MemberBottomNav';
 import { BottomSentinel } from '../../components/layout/BottomSentinel';
-import { formatDateShort, getTodayString, formatTime12Hour, getNowTimePacific, getRelativeDateLabel } from '../../utils/dateUtils';
-import { getStatusColor, formatStatusLabel } from '../../utils/statusColors';
+import { formatTime12Hour, getRelativeDateLabel } from '../../utils/dateUtils';
 import InvoicePaymentModal from '../../components/billing/InvoicePaymentModal';
 import { AnimatedPage } from '../../components/motion';
 
-interface Participant {
-  name: string;
-  type: 'member' | 'guest';
-}
-
-interface BookingRecord {
+interface UnifiedVisit {
   id: number;
-  resource_id: number;
-  bay_name?: string;
-  resource_name?: string;
-  resource_preference?: string;
-  user_email: string;
-  request_date: string;
-  start_time: string;
-  end_time: string;
-  duration_minutes?: number;
-  status: string;
-  notes: string;
-  participants?: Participant[];
-}
-
-interface RSVPRecord {
-  id: number;
-  event_id: number;
-  status: string;
-  title: string;
-  event_date: string;
-  start_time: string;
-  location: string;
-  category: string;
-  order_date?: string;
-  created_at?: string;
-}
-
-interface WellnessEnrollmentRecord {
-  id: number;
-  class_id: number;
-  user_email: string;
-  status: string;
-  title: string;
+  type: 'booking' | 'wellness' | 'event';
+  role: 'Host' | 'Player' | 'Guest' | 'Wellness' | 'Event';
   date: string;
-  time: string;
-  instructor: string;
-  duration: string;
-  category: string;
+  startTime: string | null;
+  endTime: string | null;
+  resourceName: string;
+  location?: string;
+  category?: string;
+  invitedBy?: string;
 }
 
 interface UnifiedPurchase {
@@ -74,141 +39,29 @@ interface UnifiedPurchase {
   stripeInvoiceId?: string;
 }
 
-interface Invoice {
-  id: string;
-  status: string;
-  amountDue: number;
-  amountPaid: number;
-  currency: string;
-  customerEmail: string | null;
-  description: string | null;
-  hostedInvoiceUrl: string | null;
-  invoicePdf: string | null;
-  created: string;
-  dueDate: string | null;
-  paidAt: string | null;
-  lines: Array<{
-    description: string | null;
-    amount: number;
-    quantity: number | null;
-  }>;
-}
-
-const normalizeTime = (time: string | null | undefined): string => {
-  if (!time) return '00:00';
-  const parts = time.split(':');
-  if (parts.length < 2) return '00:00';
-  const hours = parts[0].padStart(2, '0');
-  const minutes = parts[1].slice(0, 2).padStart(2, '0');
-  return `${hours}:${minutes}`;
-};
-
 const History: React.FC = () => {
   const { user } = useData();
   const { effectiveTheme } = useTheme();
   const { setPageReady } = usePageReady();
   const isDark = effectiveTheme === 'dark';
   
-  const [activeTab, setActiveTab] = useState<'bookings' | 'experiences' | 'payments'>('bookings');
-  const [bookings, setBookings] = useState<BookingRecord[]>([]);
-  const [rsvps, setRSVPs] = useState<RSVPRecord[]>([]);
-  const [wellnessEnrollments, setWellnessEnrollments] = useState<WellnessEnrollmentRecord[]>([]);
+  const [activeTab, setActiveTab] = useState<'visits' | 'payments'>('visits');
+  const [visits, setVisits] = useState<UnifiedVisit[]>([]);
   const [purchases, setPurchases] = useState<UnifiedPurchase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [payingInvoice, setPayingInvoice] = useState<UnifiedPurchase | null>(null);
 
-  const fetchBookings = useCallback(async () => {
+  const fetchVisits = useCallback(async () => {
     if (!user?.email) return;
     try {
-      const { ok, data } = await apiRequest<BookingRecord[]>(
-        `/api/booking-requests?user_email=${encodeURIComponent(user.email)}`
+      const { ok, data } = await apiRequest<UnifiedVisit[]>(
+        `/api/my-visits?user_email=${encodeURIComponent(user.email)}`
       );
       if (ok && data) {
-        const today = getTodayString();
-        const nowTime = getNowTimePacific();
-        
-        const pastBookings = data.filter(b => {
-          const bookingDate = b.request_date?.split('T')[0] || b.request_date;
-          const isPast = bookingDate < today;
-          const isToday = bookingDate === today;
-          const status = b.status?.toLowerCase() || '';
-          
-          // Exclude cancelled and declined - only show actual bookings
-          if (status === 'cancelled' || status === 'declined') return false;
-          
-          const terminalStatuses = ['attended', 'no_show'];
-          const isTerminalStatus = terminalStatuses.includes(status);
-          
-          if (isPast) return true;
-          if (isToday && isTerminalStatus) return true;
-          if (isToday && b.end_time && normalizeTime(b.end_time) <= nowTime) return true;
-          return false;
-        });
-        pastBookings.sort((a, b) => {
-          const dateA = a.request_date?.split('T')[0] || a.request_date;
-          const dateB = b.request_date?.split('T')[0] || b.request_date;
-          return dateB.localeCompare(dateA);
-        });
-        setBookings(pastBookings);
+        setVisits(data);
       }
     } catch (err) {
-      console.error('[History] Failed to fetch bookings:', err);
-    }
-  }, [user?.email]);
-
-  const fetchRSVPs = useCallback(async () => {
-    if (!user?.email) return;
-    try {
-      const { ok, data } = await apiRequest<RSVPRecord[]>(
-        `/api/rsvps?user_email=${encodeURIComponent(user.email)}&include_past=true`
-      );
-      if (ok && data) {
-        const today = getTodayString();
-        const nowTime = getNowTimePacific();
-        
-        const pastRsvps = data.filter(r => {
-          const eventDate = r.event_date?.split('T')[0] || r.event_date;
-          const isPast = eventDate < today;
-          const isToday = eventDate === today;
-          if (isPast) return true;
-          if (isToday && r.start_time && normalizeTime(r.start_time) <= nowTime) return true;
-          return false;
-        });
-        pastRsvps.sort((a, b) => b.event_date.localeCompare(a.event_date));
-        setRSVPs(pastRsvps);
-      }
-    } catch (err) {
-      console.error('[History] Failed to fetch RSVPs:', err);
-    }
-  }, [user?.email]);
-
-  const fetchWellnessEnrollments = useCallback(async () => {
-    if (!user?.email) return;
-    try {
-      const { ok, data } = await apiRequest<WellnessEnrollmentRecord[]>(
-        `/api/wellness-enrollments?user_email=${encodeURIComponent(user.email)}&include_past=true`
-      );
-      if (ok && data) {
-        const today = getTodayString();
-        const nowTime = getNowTimePacific();
-        
-        const pastEnrollments = data.filter(e => {
-          const enrollmentDate = e.date?.split('T')[0] || e.date;
-          const isPast = enrollmentDate < today;
-          const isToday = enrollmentDate === today;
-          if (isPast) return true;
-          if (isToday && e.time && normalizeTime(e.time) <= nowTime) return true;
-          return false;
-        });
-        pastEnrollments.sort((a, b) => {
-          const dateA = a.date?.split('T')[0] || a.date;
-          const dateB = b.date?.split('T')[0] || b.date;
-          return dateB.localeCompare(dateA);
-        });
-        setWellnessEnrollments(pastEnrollments);
-      }
-    } catch (err) {
-      console.error('[History] Failed to fetch wellness enrollments:', err);
+      console.error('[History] Failed to fetch visits:', err);
     }
   }, [user?.email]);
 
@@ -228,9 +81,9 @@ const History: React.FC = () => {
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
-    await Promise.all([fetchBookings(), fetchRSVPs(), fetchWellnessEnrollments(), fetchPurchases()]);
+    await Promise.all([fetchVisits(), fetchPurchases()]);
     setIsLoading(false);
-  }, [fetchBookings, fetchRSVPs, fetchWellnessEnrollments, fetchPurchases]);
+  }, [fetchVisits, fetchPurchases]);
 
   useEffect(() => {
     loadData();
@@ -246,28 +99,37 @@ const History: React.FC = () => {
     await loadData();
   }, [loadData]);
 
-  const experiencesCount = rsvps.length + wellnessEnrollments.length;
+  const getRoleBadgeStyle = (role: string): string => {
+    switch (role) {
+      case 'Host':
+        return isDark ? 'bg-accent/20 text-accent' : 'bg-accent/20 text-brand-green';
+      case 'Player':
+        return isDark ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-100 text-blue-700';
+      case 'Guest':
+        return isDark ? 'bg-orange-500/20 text-orange-300' : 'bg-orange-100 text-orange-700';
+      case 'Wellness':
+        return isDark ? 'bg-purple-500/20 text-purple-300' : 'bg-purple-100 text-purple-700';
+      case 'Event':
+        return isDark ? 'bg-pink-500/20 text-pink-300' : 'bg-pink-100 text-pink-700';
+      default:
+        return isDark ? 'bg-white/10 text-white/70' : 'bg-gray-100 text-gray-700';
+    }
+  };
 
-  const combinedExperiences = [
-    ...rsvps.map(r => ({
-      id: `rsvp-${r.id}`,
-      title: r.title,
-      date: r.event_date?.split('T')[0] || r.event_date,
-      time: r.start_time,
-      type: 'Event' as const,
-      category: r.category,
-      location: r.location
-    })),
-    ...wellnessEnrollments.map(w => ({
-      id: `wellness-${w.id}`,
-      title: w.title,
-      date: w.date?.split('T')[0] || w.date,
-      time: w.time,
-      type: 'Wellness' as const,
-      category: w.category,
-      instructor: w.instructor
-    }))
-  ].sort((a, b) => b.date.localeCompare(a.date));
+  const getRoleIcon = (role: string, type: string): string => {
+    if (type === 'wellness') return 'spa';
+    if (type === 'event') return 'celebration';
+    switch (role) {
+      case 'Host':
+        return 'person';
+      case 'Player':
+        return 'group';
+      case 'Guest':
+        return 'person_add';
+      default:
+        return 'golf_course';
+    }
+  };
 
   return (
     <AnimatedPage>
@@ -275,13 +137,12 @@ const History: React.FC = () => {
       <SwipeablePage className="px-6 relative overflow-hidden">
         <section className="mb-4 pt-4 md:pt-2 animate-content-enter-delay-1">
           <h1 className={`text-3xl font-bold leading-tight drop-shadow-md ${isDark ? 'text-white' : 'text-primary'}`}>History</h1>
-          <p className={`text-sm font-medium mt-1 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>Your past bookings and experiences.</p>
+          <p className={`text-sm font-medium mt-1 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>Your past visits</p>
         </section>
 
         <section className={`mb-6 border-b -mx-6 px-6 animate-content-enter-delay-2 ${isDark ? 'border-white/25' : 'border-black/10'}`}>
           <div className="flex gap-6 overflow-x-auto pb-0 scrollbar-hide scroll-fade-right">
-            <TabButton label="Bookings" active={activeTab === 'bookings'} onClick={() => setActiveTab('bookings')} isDark={isDark} />
-            <TabButton label="Experiences" active={activeTab === 'experiences'} onClick={() => setActiveTab('experiences')} isDark={isDark} />
+            <TabButton label="Visits" active={activeTab === 'visits'} onClick={() => setActiveTab('visits')} isDark={isDark} />
             <TabButton label="Payments" icon="payments" active={activeTab === 'payments'} onClick={() => setActiveTab('payments')} isDark={isDark} />
           </div>
         </section>
@@ -293,146 +154,86 @@ const History: React.FC = () => {
                 <div key={i} className={`h-24 rounded-2xl ${isDark ? 'bg-white/5' : 'bg-black/5'}`} />
               ))}
             </div>
-          ) : activeTab === 'bookings' ? (
+          ) : activeTab === 'visits' ? (
             <div className="space-y-4">
               <div className={`text-sm font-medium ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
-                {bookings.length} past booking{bookings.length !== 1 ? 's' : ''}
+                {visits.length} past visit{visits.length !== 1 ? 's' : ''}
               </div>
-              {bookings.length === 0 ? (
+              {visits.length === 0 ? (
                 <div className={`text-center py-12 rounded-2xl border glass-card animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`}>
                   <span className={`material-symbols-outlined text-5xl mb-4 ${isDark ? 'text-white/30' : 'text-primary/30'}`}>history</span>
-                  <p className={`${isDark ? 'text-white/80' : 'text-primary/80'}`}>No past bookings yet</p>
+                  <p className={`${isDark ? 'text-white/80' : 'text-primary/80'}`}>No past visits yet</p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {bookings.map((booking, index) => {
-                    const isConferenceRoom = booking.resource_id === 11 || 
-                      (booking.resource_name?.toLowerCase()?.includes('conference') ?? false) ||
-                      (booking.bay_name?.toLowerCase()?.includes('conference') ?? false) ||
-                      (booking.notes?.toLowerCase()?.includes('conference') ?? false);
-                    const resourceTypeLabel = isConferenceRoom ? 'Conference Room' : 'Golf Sim';
-                    const resourceIcon = isConferenceRoom ? 'meeting_room' : 'golf_course';
-                    const resourceDetail = booking.bay_name || booking.resource_name || booking.resource_preference;
+                  {visits.map((visit, index) => {
+                    const isConferenceRoom = visit.category === 'Conference Room';
                     
                     return (
                     <div 
-                      key={booking.id} 
+                      key={`${visit.type}-${visit.id}`} 
                       className={`rounded-xl p-4 border glass-card animate-list-item-delay-${Math.min(index, 10)} ${isDark ? 'border-white/25' : 'border-black/10'}`}
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 ${
-                              isConferenceRoom
-                                ? (isDark ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-100 text-blue-700')
-                                : (isDark ? 'bg-accent/20 text-accent' : 'bg-accent/20 text-brand-green')
-                            }`}>
-                              <span className="material-symbols-outlined text-xs">{resourceIcon}</span>
-                              {resourceTypeLabel}
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 ${getRoleBadgeStyle(visit.role)}`}>
+                              <span className="material-symbols-outlined text-xs">{getRoleIcon(visit.role, visit.type)}</span>
+                              {visit.role}
                             </span>
-                          </div>
-                          <p className={`font-bold ${isDark ? 'text-white' : 'text-primary'}`}>
-                            {getRelativeDateLabel(booking.request_date?.split('T')[0] || booking.request_date)}
-                          </p>
-                          <p className={`text-sm ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
-                            {formatTime12Hour(booking.start_time)} - {formatTime12Hour(booking.end_time)}
-                          </p>
-                        </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(booking.status, isDark)}`}>
-                          {formatStatusLabel(booking.status)}
-                        </span>
-                      </div>
-                      {resourceDetail && !isConferenceRoom && (
-                        <p className={`text-sm flex items-center gap-1 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
-                          <span className="material-symbols-outlined text-sm">golf_course</span>
-                          {resourceDetail}
-                        </p>
-                      )}
-                      {booking.participants && booking.participants.length > 0 && (
-                        <div className={`mt-2 pt-2 border-t ${isDark ? 'border-white/10' : 'border-black/5'}`}>
-                          <p className={`text-xs font-medium mb-1 flex items-center gap-1 ${isDark ? 'text-white/60' : 'text-primary/60'}`}>
-                            <span className="material-symbols-outlined text-xs">group</span>
-                            Played with
-                          </p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {booking.participants.map((p, idx) => (
-                              <span 
-                                key={idx} 
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
-                                  p.type === 'member'
-                                    ? (isDark ? 'bg-accent/15 text-accent' : 'bg-accent/15 text-brand-green')
-                                    : (isDark ? 'bg-orange-500/15 text-orange-300' : 'bg-orange-100 text-orange-700')
-                                }`}
-                              >
-                                {p.name}
-                                <span className={`text-[10px] font-medium ${
-                                  p.type === 'member' 
-                                    ? (isDark ? 'text-accent/70' : 'text-brand-green/70')
-                                    : (isDark ? 'text-orange-300/70' : 'text-orange-600/70')
-                                }`}>
-                                  {p.type === 'member' ? 'Member' : 'Guest'}
-                                </span>
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );})}
-                </div>
-              )}
-            </div>
-          ) : activeTab === 'experiences' ? (
-            <div className="space-y-4">
-              <div className={`text-sm font-medium ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
-                {experiencesCount} past experience{experiencesCount !== 1 ? 's' : ''}
-              </div>
-              {combinedExperiences.length === 0 ? (
-                <div className={`text-center py-12 rounded-2xl border glass-card animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`}>
-                  <span className={`material-symbols-outlined text-5xl mb-4 ${isDark ? 'text-white/30' : 'text-primary/30'}`}>celebration</span>
-                  <p className={`${isDark ? 'text-white/80' : 'text-primary/80'}`}>No past experiences yet</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {combinedExperiences.map((exp, index) => (
-                    <div 
-                      key={exp.id} 
-                      className={`rounded-xl p-4 border glass-card animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`}
-                      style={{animationDelay: `${0.05 * index}s`}}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${
-                              exp.type === 'Event' 
-                                ? (isDark ? 'bg-accent/20 text-accent' : 'bg-accent/20 text-brand-green')
-                                : (isDark ? 'bg-lavender/20 text-lavender' : 'bg-lavender/30 text-purple-700')
-                            }`}>
-                              {exp.type}
-                            </span>
-                            {exp.category && (
-                              <span className={`text-xs ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
-                                {exp.category}
+                            {visit.category && visit.type === 'booking' && (
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                                isConferenceRoom
+                                  ? (isDark ? 'bg-blue-500/15 text-blue-300' : 'bg-blue-100 text-blue-700')
+                                  : (isDark ? 'bg-white/10 text-white/70' : 'bg-gray-100 text-gray-700')
+                              }`}>
+                                {visit.category}
                               </span>
                             )}
                           </div>
                           <p className={`font-bold ${isDark ? 'text-white' : 'text-primary'}`}>
-                            {exp.title}
+                            {getRelativeDateLabel(visit.date?.split('T')[0] || visit.date)}
                           </p>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className={`text-sm font-bold ${isDark ? 'text-accent' : 'text-primary'}`}>
-                            {getRelativeDateLabel(exp.date)}
-                          </p>
-                          {exp.time && (
-                            <p className={`text-xs ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
-                              {formatTime12Hour(exp.time)}
+                          {visit.startTime && (
+                            <p className={`text-sm ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
+                              {formatTime12Hour(visit.startTime)}
+                              {visit.endTime && ` - ${formatTime12Hour(visit.endTime)}`}
                             </p>
                           )}
                         </div>
                       </div>
+                      <p className={`text-sm flex items-center gap-1 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
+                        <span className="material-symbols-outlined text-sm">
+                          {visit.type === 'wellness' ? 'spa' : visit.type === 'event' ? 'location_on' : isConferenceRoom ? 'meeting_room' : 'golf_course'}
+                        </span>
+                        {visit.resourceName}
+                      </p>
+                      {visit.location && visit.type === 'event' && (
+                        <p className={`text-xs mt-1 flex items-center gap-1 ${isDark ? 'text-white/50' : 'text-primary/50'}`}>
+                          <span className="material-symbols-outlined text-xs">pin_drop</span>
+                          {visit.location}
+                        </p>
+                      )}
+                      {visit.role === 'Guest' && visit.invitedBy && (
+                        <p className={`text-xs mt-2 flex items-center gap-1 ${isDark ? 'text-orange-300/80' : 'text-orange-600'}`}>
+                          <span className="material-symbols-outlined text-xs">person</span>
+                          Invited by {visit.invitedBy}
+                        </p>
+                      )}
+                      {visit.role === 'Player' && visit.invitedBy && (
+                        <p className={`text-xs mt-2 flex items-center gap-1 ${isDark ? 'text-blue-300/80' : 'text-blue-600'}`}>
+                          <span className="material-symbols-outlined text-xs">person</span>
+                          Played with {visit.invitedBy}
+                        </p>
+                      )}
+                      {visit.role === 'Wellness' && visit.invitedBy && (
+                        <p className={`text-xs mt-1 flex items-center gap-1 ${isDark ? 'text-purple-300/80' : 'text-purple-600'}`}>
+                          <span className="material-symbols-outlined text-xs">person</span>
+                          Instructor: {visit.invitedBy}
+                        </p>
+                      )}
                     </div>
-                  ))}
+                  );})}
                 </div>
               )}
             </div>
