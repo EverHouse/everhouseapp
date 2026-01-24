@@ -83,11 +83,28 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
     const nowTime = getNowTimePacific();
     const todayPacific = getTodayPacific();
     
+    const unmatchedTrackmanIds = new Set(
+      unmatchedBookings
+        .filter(b => b.trackman_booking_id)
+        .map(b => b.trackman_booking_id)
+    );
+    const unmatchedBookingIds = new Set(unmatchedBookings.map(b => b.id));
+    
+    const isUnmatchedBooking = (b: BookingRequest) => {
+      return b.is_unmatched === true ||
+        b.user_email === 'unmatched@trackman.import' ||
+        (b.user_name || '').includes('Unknown (Trackman)');
+    };
+    
     const scheduledBookings = todaysBookings.filter(booking => {
       if (booking.request_date > todayPacific) return true;
       if (booking.request_date === todayPacific && booking.end_time > nowTime) return true;
       return false;
-    }).map(b => ({ ...b, is_unmatched: false }));
+    }).filter(booking => {
+      if (booking.trackman_booking_id && unmatchedTrackmanIds.has(booking.trackman_booking_id)) return false;
+      if (unmatchedBookingIds.has(booking.id)) return false;
+      return true;
+    }).map(b => ({ ...b, is_unmatched: isUnmatchedBooking(b) }));
     
     const unmatchedWithFlag = unmatchedBookings.map(b => ({
       ...b,
