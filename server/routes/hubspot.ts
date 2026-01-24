@@ -1064,57 +1064,25 @@ router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) =>
   try {
     const hubspot = await getHubSpotClient();
     
-    // Check if the ID is a UUID (database ID) or numeric (HubSpot ID)
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-    let hubspotContactId: string | null = null;
-    let localUser: { id: string; email: string; hubspotId: string | null; firstName: string | null; lastName: string | null } | null = null;
+    // Look up user by ID (UUID) first to get their email - the universal identifier
+    const userResult = await db.select({
+      id: users.id,
+      email: users.email,
+      hubspotId: users.hubspotId,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      tier: users.tier,
+    }).from(users).where(eq(users.id, id)).limit(1);
     
-    if (isUUID) {
-      // ID is a database UUID - look up the user first
-      const userResult = await db.select({
-        id: users.id,
-        email: users.email,
-        hubspotId: users.hubspotId,
-        firstName: users.firstName,
-        lastName: users.lastName,
-      }).from(users).where(eq(users.id, id)).limit(1);
-      
-      if (userResult.length === 0) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      
-      localUser = userResult[0];
-      hubspotContactId = localUser.hubspotId;
-    } else {
-      // ID is numeric - treat as HubSpot contact ID
-      hubspotContactId = id;
+    if (userResult.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
     }
     
-    let oldTier = '(empty)';
-    let contactName = '';
-    let contactEmail = '';
-    
-    // If we have a HubSpot contact ID, fetch the contact
-    if (hubspotContactId) {
-      try {
-        const contact = await retryableHubSpotRequest(() =>
-          hubspot.crm.contacts.basicApi.getById(hubspotContactId!, ['membership_tier', 'firstname', 'lastname', 'email'])
-        );
-        oldTier = contact.properties.membership_tier || '(empty)';
-        contactName = [contact.properties.firstname, contact.properties.lastname].filter(Boolean).join(' ');
-        contactEmail = contact.properties.email || '';
-      } catch (hubspotError: any) {
-        // HubSpot contact not found - continue with local update only
-        console.log(`[Tier Update] HubSpot contact ${hubspotContactId} not found, will update locally only`);
-        hubspotContactId = null;
-      }
-    }
-    
-    // Use local user data if available
-    if (localUser && !contactName) {
-      contactName = [localUser.firstName, localUser.lastName].filter(Boolean).join(' ');
-      contactEmail = localUser.email;
-    }
+    const localUser = userResult[0];
+    const contactEmail = localUser.email;
+    const contactName = [localUser.firstName, localUser.lastName].filter(Boolean).join(' ');
+    const oldTier = localUser.tier || '(empty)';
+    let hubspotContactId = localUser.hubspotId;
     
     // Map tier name to tier_id and membership_tier format
     const tierMapping: Record<string, { tier_id: number | null; membership_tier: string; tier: string }> = {
@@ -1132,58 +1100,17 @@ router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) =>
       return res.status(400).json({ error: `Invalid tier: ${tier}` });
     }
     
-    // Update local database FIRST to prevent background sync overwriting
-    let updateResult: { id: string; email: string }[] = [];
+    // Update local database - we already have the user from our lookup
+    await db.update(users)
+      .set({
+        tier: tierData.tier,
+        tier_id: tierData.tier_id,
+        membership_tier: tierData.membership_tier,
+        membership_status: 'active', // Set status to active when assigning a tier
+      })
+      .where(eq(users.id, localUser.id));
     
-    if (localUser) {
-      // We already have the user from our UUID lookup - update by ID
-      updateResult = await db.update(users)
-        .set({
-          tier: tierData.tier,
-          tier_id: tierData.tier_id,
-          membership_tier: tierData.membership_tier,
-          membership_status: 'active', // Set status to active when assigning a tier
-        })
-        .where(eq(users.id, localUser.id))
-        .returning({ id: users.id, email: users.email });
-      console.log(`[Tier Update] Updated local database for user ${updateResult[0]?.email || id}`);
-    } else if (hubspotContactId) {
-      // Try to find by hubspot_id
-      updateResult = await db.update(users)
-        .set({
-          tier: tierData.tier,
-          tier_id: tierData.tier_id,
-          membership_tier: tierData.membership_tier,
-          membership_status: 'active',
-        })
-        .where(eq(users.hubspot_id, hubspotContactId))
-        .returning({ id: users.id, email: users.email });
-      
-      // If no user found by hubspot_id, try to find by email and link the hubspot_id
-      if (updateResult.length === 0 && contactEmail) {
-        console.log(`[Tier Update] No user found with hubspot_id ${hubspotContactId}, trying email: ${contactEmail}`);
-        updateResult = await db.update(users)
-          .set({
-            tier: tierData.tier,
-            tier_id: tierData.tier_id,
-            membership_tier: tierData.membership_tier,
-            membership_status: 'active',
-            hubspot_id: hubspotContactId, // Link the HubSpot ID for future updates
-          })
-          .where(eq(users.email, contactEmail))
-          .returning({ id: users.id, email: users.email });
-        
-        if (updateResult.length > 0) {
-          console.log(`[Tier Update] Found and updated user by email ${contactEmail}, linked hubspot_id ${hubspotContactId}`);
-        }
-      }
-    }
-    
-    if (updateResult.length === 0) {
-      console.warn(`[Tier Update] No local user found with id ${id}`);
-    } else {
-      console.log(`[Tier Update] Updated local database for user ${updateResult[0].email}`);
-    }
+    console.log(`[Tier Update] Updated local database for ${contactEmail}`);
     
     // Update the tier in HubSpot only if we have a valid HubSpot contact ID
     if (hubspotContactId) {
