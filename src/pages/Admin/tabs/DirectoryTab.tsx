@@ -984,7 +984,6 @@ const DirectoryTab: React.FC = () => {
                 {/* Visitors List - Mobile view */}
                 {!visitorsLoading && !visitorsError && memberTab === 'visitors' && visitors.length > 0 && (
                     <div className="md:hidden flex-1 min-h-0 relative">
-                        <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-white dark:from-[#1e1e1e] to-transparent z-10 pointer-events-none" />
                         <div className="h-full overflow-y-auto pt-2 pb-24">
                             <div className="space-y-3 px-1">
                                 {visitors.map((v, index) => (
@@ -1024,7 +1023,6 @@ const DirectoryTab: React.FC = () => {
                                 ))}
                             </div>
                         </div>
-                        <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-white dark:from-[#1e1e1e] to-transparent z-10 pointer-events-none" />
                     </div>
                 )}
 
@@ -1040,7 +1038,6 @@ const DirectoryTab: React.FC = () => {
                             <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '15%' }}>Last Visit</div>
                         </div>
                         <div className="relative flex-1 min-h-0">
-                            <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-white dark:from-[#1e1e1e] to-transparent z-10 pointer-events-none" />
                             <div className="h-full overflow-y-auto pt-2">
                                 {visitors.map((v, index) => (
                                     <div 
@@ -1070,7 +1067,6 @@ const DirectoryTab: React.FC = () => {
                                     </div>
                                 ))}
                             </div>
-                            <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-white dark:from-[#1e1e1e] to-transparent z-10 pointer-events-none" />
                         </div>
                     </div>
                 )}
@@ -1078,10 +1074,6 @@ const DirectoryTab: React.FC = () => {
                 {/* Mobile view - Virtualized only for large lists (members only) */}
                 {!formerLoading && memberTab !== 'visitors' && filteredList.length > 0 && (
                 <div className="md:hidden flex-1 min-h-0 relative">
-                    {/* Top fade gradient */}
-                    <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-white dark:from-[#1e1e1e] to-transparent z-10 pointer-events-none" />
-                    
-                    {/* Scrollable list content */}
                     <div className="h-full overflow-y-auto pt-2 pb-24">
                         {/* Non-virtualized rendering for small lists */}
                         {filteredList.length < VIRTUALIZATION_THRESHOLD ? (
@@ -1152,9 +1144,6 @@ const DirectoryTab: React.FC = () => {
                             />
                         )}
                     </div>
-                    
-                    {/* Bottom fade gradient */}
-                    <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-white dark:from-[#1e1e1e] to-transparent z-10 pointer-events-none" />
                 </div>
             )}
 
@@ -1181,12 +1170,8 @@ const DirectoryTab: React.FC = () => {
                     )}
                 </div>
                 
-                {/* Scrollable list body with fade gradients */}
+                {/* Scrollable list body */}
                 <div className="relative flex-1 min-h-0">
-                    {/* Top fade gradient */}
-                    <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-white dark:from-[#1e1e1e] to-transparent z-10 pointer-events-none" />
-                    
-                    {/* Scrollable content */}
                     <div className="h-full overflow-y-auto">
                         {/* Non-virtualized body for small lists */}
                         {filteredList.length < VIRTUALIZATION_THRESHOLD ? (
@@ -1254,9 +1239,6 @@ const DirectoryTab: React.FC = () => {
                             />
                         )}
                     </div>
-                    
-                    {/* Bottom fade gradient */}
-                    <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-white dark:from-[#1e1e1e] to-transparent z-10 pointer-events-none" />
                 </div>
             </div>
             )}

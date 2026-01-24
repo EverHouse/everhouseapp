@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.7.8",
+    date: "2026-01-24",
+    title: "Directory List Cleanup",
+    changes: [
+      "Removed the fade gradients at the top and bottom of the directory list",
+      "The member list now scrolls cleanly without visual obstructions"
+    ]
+  },
+  {
     version: "9.7.7",
     date: "2026-01-24",
     title: "Queue Card Border Fix",
