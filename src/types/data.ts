@@ -65,6 +65,7 @@ export interface MemberProfile {
   manuallyLinkedEmails?: string[];
   dateOfBirth?: string | null;
   billingGroupId?: number | null;
+  billingProvider?: string | null;
 }
 
 export interface Booking {

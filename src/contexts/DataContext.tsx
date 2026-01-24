@@ -362,7 +362,8 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             lastBookingDate: contact.lastBookingDate || null,
             joinDate: contact.joinDate || null,
             mindbodyClientId: contact.mindbodyClientId || null,
-            manuallyLinkedEmails: contact.manuallyLinkedEmails || []
+            manuallyLinkedEmails: contact.manuallyLinkedEmails || [],
+            billingProvider: contact.billingProvider || null
           }));
           setMembers(formatted);
           
@@ -420,7 +421,8 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           lastBookingDate: contact.lastBookingDate || null,
           joinDate: contact.joinDate || null,
           mindbodyClientId: contact.mindbodyClientId || null,
-          manuallyLinkedEmails: contact.manuallyLinkedEmails || []
+          manuallyLinkedEmails: contact.manuallyLinkedEmails || [],
+          billingProvider: contact.billingProvider || null
         }));
         setFormerMembers(formatted);
         formerMembersFetched.current = true;
@@ -457,7 +459,8 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           lastBookingDate: contact.lastBookingDate || null,
           joinDate: contact.joinDate || null,
           mindbodyClientId: contact.mindbodyClientId || null,
-          manuallyLinkedEmails: contact.manuallyLinkedEmails || []
+          manuallyLinkedEmails: contact.manuallyLinkedEmails || [],
+          billingProvider: contact.billingProvider || null
         }));
         setMembers(formatted);
         formerMembersFetched.current = false;
@@ -511,7 +514,8 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           lastBookingDate: contact.lastBookingDate || null,
           joinDate: contact.joinDate || null,
           mindbodyClientId: contact.mindbodyClientId || null,
-          manuallyLinkedEmails: contact.manuallyLinkedEmails || []
+          manuallyLinkedEmails: contact.manuallyLinkedEmails || [],
+          billingProvider: contact.billingProvider || null
         }));
         
         // Update pagination info
