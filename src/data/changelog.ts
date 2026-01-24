@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.12.1",
+    date: "2026-01-24",
+    title: "Visitors Directory Pagination",
+    changes: [
+      "Improved: Visitors tab now shows total count of all visitors in the system",
+      "Improved: Load More button to fetch additional visitors in batches of 100",
+      "Improved: Better performance when browsing large visitor lists"
+    ]
+  },
+  {
     version: "9.12.0",
     date: "2026-01-24",
     title: "Member Visits Tab",

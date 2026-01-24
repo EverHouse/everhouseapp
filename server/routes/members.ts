@@ -2002,8 +2002,9 @@ router.post('/api/members/admin/bulk-tier-update', isStaffOrAdmin, async (req, r
 
 router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
   try {
-    const { sortBy = 'lastPurchase', order = 'desc', limit = '500', typeFilter = 'all', sourceFilter = 'all' } = req.query;
-    const maxResults = Math.min(parseInt(limit as string) || 500, 2000);
+    const { sortBy = 'lastPurchase', order = 'desc', limit = '100', offset = '0', typeFilter = 'all', sourceFilter = 'all' } = req.query;
+    const pageLimit = Math.min(parseInt(limit as string) || 100, 500);
+    const pageOffset = Math.max(parseInt(offset as string) || 0, 0);
     const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
     
     // Determine sort column based on sortBy parameter
@@ -2037,6 +2038,18 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
     } else if (typeFilter === 'lead') {
       typeCondition = "AND (u.visitor_type = 'lead' OR u.visitor_type IS NULL)";
     }
+    
+    // Get total count first for pagination
+    const countResult = await db.execute(sql`
+      SELECT COUNT(DISTINCT u.id)::int as total
+      FROM users u
+      WHERE (u.role = 'visitor' OR u.membership_status = 'visitor' OR u.membership_status = 'non-member')
+      AND u.role NOT IN ('admin', 'staff')
+      AND u.archived_at IS NULL
+      ${sql.raw(sourceCondition)}
+      ${sql.raw(typeCondition)}
+    `);
+    const totalCount = (countResult.rows[0] as any)?.total || 0;
     
     // Get all non-member contacts (visitors, non-members, leads) with aggregated purchase stats
     // Also get guest count and latest activity
@@ -2074,7 +2087,8 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
       ${sql.raw(typeCondition)}
       GROUP BY u.id, u.email, u.first_name, u.last_name, u.phone, u.membership_status, u.role, u.stripe_customer_id, u.hubspot_id, u.mindbody_client_id, u.legacy_source, u.billing_provider, u.visitor_type, u.last_activity_at, u.last_activity_source, u.created_at
       ORDER BY ${sql.raw(orderByClause)}
-      LIMIT ${maxResults}
+      LIMIT ${pageLimit}
+      OFFSET ${pageOffset}
     `);
     
     // Determine source based on database fields
@@ -2137,7 +2151,10 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
     
     res.json({
       success: true,
-      total: visitors.length,
+      total: totalCount,
+      limit: pageLimit,
+      offset: pageOffset,
+      hasMore: pageOffset + visitors.length < totalCount,
       visitors
     });
   } catch (error: any) {

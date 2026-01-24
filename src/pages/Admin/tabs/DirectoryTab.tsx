@@ -269,6 +269,11 @@ const DirectoryTab: React.FC = () => {
     const [visitorSourceFilter, setVisitorSourceFilter] = useState<VisitorSource>('all');
     const [visitorSortField, setVisitorSortField] = useState<VisitorSortField>('lastActivity');
     const [visitorSortDirection, setVisitorSortDirection] = useState<SortDirection>('desc');
+    const [visitorsTotal, setVisitorsTotal] = useState(0);
+    const [visitorsOffset, setVisitorsOffset] = useState(0);
+    const [visitorsHasMore, setVisitorsHasMore] = useState(false);
+    const [visitorsLoadingMore, setVisitorsLoadingMore] = useState(false);
+    const VISITORS_PAGE_SIZE = 100;
     
     const isAdmin = actualUser?.role === 'admin';
     
@@ -397,26 +402,42 @@ const DirectoryTab: React.FC = () => {
     }, [isViewingDetails, selectedMember]);
 
     // Fetch visitors - defined before handleTabChange to avoid circular reference
-    const fetchVisitors = useCallback(async (typeFilter?: VisitorType, sourceFilter?: VisitorSource) => {
-        setVisitorsLoading(true);
+    const fetchVisitors = useCallback(async (typeFilter?: VisitorType, sourceFilter?: VisitorSource, loadMore = false) => {
+        if (loadMore) {
+            setVisitorsLoadingMore(true);
+        } else {
+            setVisitorsLoading(true);
+            setVisitorsOffset(0);
+        }
         setVisitorsError(false);
         try {
             const params = new URLSearchParams();
-            params.set('limit', '1000');
+            params.set('limit', VISITORS_PAGE_SIZE.toString());
+            params.set('offset', loadMore ? (visitorsOffset + VISITORS_PAGE_SIZE).toString() : '0');
             if (typeFilter && typeFilter !== 'all') params.set('typeFilter', typeFilter);
             if (sourceFilter && sourceFilter !== 'all') params.set('sourceFilter', sourceFilter);
             
             const res = await fetch(`/api/visitors?${params.toString()}`, { credentials: 'include' });
             if (!res.ok) throw new Error('Failed to fetch visitors');
             const data = await res.json();
-            setVisitors(data.visitors || []);
+            
+            if (loadMore) {
+                setVisitors(prev => [...prev, ...(data.visitors || [])]);
+                setVisitorsOffset(data.offset);
+            } else {
+                setVisitors(data.visitors || []);
+                setVisitorsOffset(0);
+            }
+            setVisitorsTotal(data.total || 0);
+            setVisitorsHasMore(data.hasMore || false);
         } catch (err) {
             console.error('Error loading visitors:', err);
             setVisitorsError(true);
         } finally {
             setVisitorsLoading(false);
+            setVisitorsLoadingMore(false);
         }
-    }, []);
+    }, [visitorsOffset]);
 
     // Fetch former members or visitors when switching to that tab
     const handleTabChange = useCallback(async (tab: MemberTab) => {
@@ -990,7 +1011,7 @@ const DirectoryTab: React.FC = () => {
                 
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                     {memberTab === 'visitors' 
-                        ? `${visitors.length} visitor${visitors.length !== 1 ? 's' : ''} found`
+                        ? `Showing ${visitors.length} of ${visitorsTotal.toLocaleString()} visitor${visitorsTotal !== 1 ? 's' : ''}`
                         : `${filteredList.length} ${memberTab === 'former' ? 'former ' : ''}member${filteredList.length !== 1 ? 's' : ''} found`
                     }
                 </p>
@@ -1180,6 +1201,28 @@ const DirectoryTab: React.FC = () => {
                                         </div>
                                     </div>
                                 ))}
+                                {/* Load More button for mobile */}
+                                {visitorsHasMore && (
+                                    <div className="py-4 text-center">
+                                        <button
+                                            onClick={() => fetchVisitors(visitorTypeFilter, visitorSourceFilter, true)}
+                                            disabled={visitorsLoadingMore}
+                                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary/10 hover:bg-primary/20 dark:bg-white/10 dark:hover:bg-white/20 text-primary dark:text-white font-bold transition-colors disabled:opacity-50"
+                                        >
+                                            {visitorsLoadingMore ? (
+                                                <>
+                                                    <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
+                                                    Loading...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="material-symbols-outlined text-[18px]">expand_more</span>
+                                                    Load More ({visitorsTotal - visitors.length} remaining)
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -1316,6 +1359,28 @@ const DirectoryTab: React.FC = () => {
                                         </div>
                                     </div>
                                 ))}
+                                {/* Load More button for desktop */}
+                                {visitorsHasMore && (
+                                    <div className="p-4 text-center">
+                                        <button
+                                            onClick={() => fetchVisitors(visitorTypeFilter, visitorSourceFilter, true)}
+                                            disabled={visitorsLoadingMore}
+                                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary/10 hover:bg-primary/20 dark:bg-white/10 dark:hover:bg-white/20 text-primary dark:text-white font-bold transition-colors disabled:opacity-50"
+                                        >
+                                            {visitorsLoadingMore ? (
+                                                <>
+                                                    <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
+                                                    Loading...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="material-symbols-outlined text-[18px]">expand_more</span>
+                                                    Load More ({visitorsTotal - visitors.length} remaining)
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
