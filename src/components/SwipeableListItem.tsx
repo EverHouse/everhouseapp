@@ -163,8 +163,11 @@ export function SwipeableListItem({
   const showLeftActions = isSwipingRight && leftActions.length > 0;
   const showRightActions = isSwipingLeft && rightActions.length > 0;
 
+  // Use a wrapper div that doesn't clip the border, with the action containers inside
+  // The action containers use their own overflow-hidden to clip themselves
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-bone dark:bg-[#1a1f12]">
+    <div className="relative">
+      {/* Action containers positioned behind the card, clipped independently */}
       {leftActions.length > 0 && (
         <div 
           className={`absolute inset-0 flex items-stretch rounded-2xl overflow-hidden transition-opacity duration-100 ${showLeftActions ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
@@ -225,8 +228,9 @@ export function SwipeableListItem({
         </div>
       )}
 
+      {/* Card container - no overflow-hidden so border shows fully */}
       <div
-        className={`relative rounded-2xl bg-bone dark:bg-[#1a1f12] ${isTransitioning ? 'transition-transform duration-200 ease-out' : ''}`}
+        className={`relative ${isTransitioning ? 'transition-transform duration-200 ease-out' : ''}`}
         style={{ transform: `translateX(${translateX}px)`, zIndex: 2 }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}

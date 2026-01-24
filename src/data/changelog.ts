@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.7.7",
+    date: "2026-01-24",
+    title: "Queue Card Border Fix",
+    changes: [
+      "Fixed: Booking queue card borders no longer get cut off at the corners",
+      "The swipe gesture container now properly shows the full rounded border outline"
+    ]
+  },
+  {
     version: "9.7.6",
     date: "2026-01-24",
     title: "Booking Information Consistency",
