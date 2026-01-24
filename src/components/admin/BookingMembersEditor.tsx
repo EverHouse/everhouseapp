@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import TierBadge from '../TierBadge';
 import { MemberSearchInput, SelectedMember } from '../shared/MemberSearchInput';
+import { useData } from '../../contexts/DataContext';
 
 interface BookingMember {
   id: number;
@@ -49,13 +50,104 @@ interface FinancialSummary {
   }>;
 }
 
+interface BookingContext {
+  requestDate?: string;
+  startTime?: string;
+  endTime?: string;
+  resourceId?: number;
+  resourceName?: string;
+  durationMinutes?: number;
+  notes?: string;
+  ownerName?: string;
+}
+
 interface BookingMembersEditorProps {
   bookingId: number | string;
   onMemberLinked?: () => void;
   onCollectPayment?: (bookingId: number) => void;
+  bookingContext?: BookingContext;
+  showHeader?: boolean;
 }
 
-const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ bookingId, onMemberLinked, onCollectPayment }) => {
+function parseNamesFromNotes(notes: string): string[] {
+  if (!notes) return [];
+  const names: string[] = [];
+  
+  const withMatch = notes.match(/\bwith\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi);
+  if (withMatch) {
+    withMatch.forEach(m => {
+      const name = m.replace(/^with\s+/i, '').trim();
+      if (name && name.length > 2) names.push(name);
+    });
+  }
+  
+  const andMatch = notes.match(/([A-Z][a-z]+)\s+and\s+([A-Z][a-z]+)/gi);
+  if (andMatch) {
+    andMatch.forEach(m => {
+      const parts = m.split(/\s+and\s+/i);
+      parts.forEach(p => {
+        const name = p.trim();
+        if (name && name.length > 2 && !names.includes(name)) names.push(name);
+      });
+    });
+  }
+  
+  const commaMatch = notes.match(/(?:players?|members?|guests?)[:\s]+([A-Z][a-z]+(?:,\s*[A-Z][a-z]+)+)/i);
+  if (commaMatch) {
+    const nameList = commaMatch[1].split(',');
+    nameList.forEach(n => {
+      const name = n.trim();
+      if (name && name.length > 2 && !names.includes(name)) names.push(name);
+    });
+  }
+  
+  return [...new Set(names)].slice(0, 5);
+}
+
+function hasAllMembersKeyword(notes: string): boolean {
+  if (!notes) return false;
+  return /all\s+members?/i.test(notes) || /full\s+group/i.test(notes);
+}
+
+function formatBookingDate(dateStr: string): string {
+  try {
+    const date = new Date(dateStr + 'T00:00:00');
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}`;
+  } catch {
+    return dateStr;
+  }
+}
+
+function formatTime12(time: string): string {
+  if (!time) return '';
+  const [hours, minutes] = time.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const displayHours = hours % 12 || 12;
+  return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+}
+
+function getBayName(resourceId: number): string {
+  const bayMap: Record<number, string> = {
+    1: 'Bay 1',
+    2: 'Bay 2', 
+    3: 'Bay 3',
+    4: 'Bay 4',
+    5: 'Bay 5',
+    6: 'Bay 6'
+  };
+  return bayMap[resourceId] || `Bay ${resourceId}`;
+}
+
+const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ 
+  bookingId, 
+  onMemberLinked, 
+  onCollectPayment,
+  bookingContext,
+  showHeader = false
+}) => {
+  const { members: allMembersList } = useData();
   const [members, setMembers] = useState<BookingMember[]>([]);
   const [guests, setGuests] = useState<BookingGuest[]>([]);
   const [validation, setValidation] = useState<ValidationInfo | null>(null);
@@ -88,7 +180,16 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ bookingId, 
         setGuests(data.guests || []);
         setValidation(data.validation || null);
         setGuestPassesRemaining(data.ownerGuestPassesRemaining || 0);
-        setGuestPassesTotal(data.tierLimits?.guest_passes_per_month || data.ownerGuestPassesRemaining || 0);
+        // Use tier limits for total, or guestPassContext.passesBeforeBooking + used passes for accurate total
+        const tierTotal = data.tierLimits?.guest_passes_per_month;
+        if (tierTotal !== undefined && tierTotal !== null) {
+          setGuestPassesTotal(tierTotal);
+        } else if (data.guestPassContext) {
+          // Calculate total from remaining + used this month (passesBeforeBooking is remaining before this booking)
+          setGuestPassesTotal(data.guestPassContext.passesBeforeBooking + data.guestPassContext.passesUsedThisBooking);
+        } else {
+          setGuestPassesTotal(4); // Default fallback for display purposes
+        }
         setFinancialSummary(data.financialSummary || null);
       } else {
         setError('Failed to load booking members');
@@ -244,6 +345,49 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ bookingId, 
     [members]
   );
 
+  const filledSlotCount = useMemo(() => 
+    members.filter(m => m.userEmail).length + guests.length,
+    [members, guests]
+  );
+
+  const expectedCount = validation?.expectedPlayerCount || members.length;
+  const isRosterComplete = filledSlotCount >= expectedCount;
+
+  const suggestedNames = useMemo(() => 
+    parseNamesFromNotes(bookingContext?.notes || ''),
+    [bookingContext?.notes]
+  );
+
+  const showAllMembersHint = useMemo(() => 
+    hasAllMembersKeyword(bookingContext?.notes || ''),
+    [bookingContext?.notes]
+  );
+
+  const timeAllocationPerPlayer = useMemo(() => {
+    const duration = bookingContext?.durationMinutes || 60;
+    const playerCount = expectedCount || 1;
+    return Math.round(duration / playerCount);
+  }, [bookingContext?.durationMinutes, expectedCount]);
+
+  const handleQuickAdd = (name: string) => {
+    const query = name.toLowerCase();
+    const match = allMembersList.find(m => {
+      return m.name?.toLowerCase().includes(query);
+    });
+    
+    if (match) {
+      const emptySlot = members.find(m => !m.userEmail && !m.isPrimary);
+      if (emptySlot) {
+        handleLinkMember(emptySlot.id, match.email);
+      }
+    } else {
+      const emptySlot = members.find(m => !m.userEmail && !m.isPrimary);
+      if (emptySlot) {
+        setActiveSearchSlot(emptySlot.id);
+      }
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
@@ -261,10 +405,125 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ bookingId, 
 
   return (
     <div className="space-y-3">
+      {/* Booking Context Header - Only shown when showHeader is true */}
+      {showHeader && bookingContext && (
+        <div className="p-3 bg-primary/5 dark:bg-white/5 rounded-lg border border-primary/10 dark:border-white/10">
+          {bookingContext.ownerName && (
+            <h3 className="text-base font-semibold text-primary dark:text-white mb-2">
+              {bookingContext.ownerName}
+            </h3>
+          )}
+          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+            {bookingContext.requestDate && (
+              <span className="flex items-center gap-1">
+                <span className="material-symbols-outlined text-base">calendar_today</span>
+                {formatBookingDate(bookingContext.requestDate)}
+              </span>
+            )}
+            {(bookingContext.resourceName || bookingContext.resourceId) && (
+              <span className="flex items-center gap-1">
+                <span className="material-symbols-outlined text-base">sports_golf</span>
+                {bookingContext.resourceName || (bookingContext.resourceId && getBayName(bookingContext.resourceId))}
+              </span>
+            )}
+            {bookingContext.startTime && (
+              <span className="flex items-center gap-1">
+                <span className="material-symbols-outlined text-base">schedule</span>
+                {formatTime12(bookingContext.startTime)}
+                {bookingContext.endTime && ` - ${formatTime12(bookingContext.endTime)}`}
+              </span>
+            )}
+            {bookingContext.durationMinutes && (
+              <span className="flex items-center gap-1">
+                <span className="material-symbols-outlined text-base">timer</span>
+                {bookingContext.durationMinutes} min
+              </span>
+            )}
+          </div>
+          {bookingContext.notes && (
+            <div className="mt-2 pt-2 border-t border-primary/10 dark:border-white/10">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                <span className="font-medium">Notes:</span> {bookingContext.notes}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Player Count Summary Banner */}
+      {showHeader && (
+        <div className={`flex items-center justify-between p-3 rounded-lg ${
+          isRosterComplete 
+            ? 'bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/30' 
+            : 'bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30'
+        }`}>
+          <div className="flex items-center gap-2">
+            <span className={`material-symbols-outlined text-lg ${
+              isRosterComplete ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'
+            }`}>groups</span>
+            <div>
+              <span className={`text-sm font-medium ${
+                isRosterComplete ? 'text-green-700 dark:text-green-300' : 'text-amber-700 dark:text-amber-300'
+              }`}>
+                {expectedCount} Player{expectedCount !== 1 ? 's' : ''} Expected
+              </span>
+              {bookingContext?.durationMinutes && expectedCount > 0 && (
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                  ({timeAllocationPerPlayer} min each)
+                </span>
+              )}
+            </div>
+          </div>
+          <span className={`px-2.5 py-1 text-xs font-bold rounded-full ${
+            isRosterComplete 
+              ? 'bg-green-600 text-white' 
+              : 'bg-amber-500 text-white'
+          }`}>
+            {filledSlotCount}/{expectedCount} Assigned
+          </span>
+        </div>
+      )}
+
+      {/* Suggested Names from Notes (Quick Add) */}
+      {showHeader && (suggestedNames.length > 0 || showAllMembersHint) && emptySlots.length > 0 && (
+        <div className="p-2 bg-amber-50/50 dark:bg-amber-500/5 rounded-lg border border-amber-100 dark:border-amber-500/20">
+          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium mb-2">
+            <span className="material-symbols-outlined text-sm text-amber-500">lightbulb</span>
+            Quick Add from Notes
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {suggestedNames.map((name, idx) => (
+              <button
+                key={idx}
+                onClick={() => handleQuickAdd(name)}
+                className="px-2.5 py-1 bg-white dark:bg-black/20 text-amber-700 dark:text-amber-300 rounded-full text-xs font-medium hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors flex items-center gap-1 border border-amber-200 dark:border-amber-500/30"
+              >
+                <span className="material-symbols-outlined text-xs">person_add</span>
+                {name}
+              </button>
+            ))}
+            {showAllMembersHint && (
+              <span className="px-2.5 py-1 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium border border-blue-200 dark:border-blue-500/30">
+                All Members
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
         <div className="flex items-center gap-2 mb-3">
           <span className="material-symbols-outlined text-primary dark:text-white text-lg">group</span>
           <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">Players</p>
+          {!showHeader && validation && (
+            <span className={`ml-auto px-2 py-0.5 text-[10px] font-bold rounded-full ${
+              isRosterComplete 
+                ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' 
+                : 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400'
+            }`}>
+              {filledSlotCount}/{expectedCount}
+            </span>
+          )}
         </div>
 
         {error && (
@@ -273,7 +532,7 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ bookingId, 
           </div>
         )}
 
-        {validation?.emptySlots > 0 && (
+        {validation?.emptySlots > 0 && !showHeader && (
           <div className="mb-3 p-2 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg flex items-center gap-2">
             <span className="material-symbols-outlined text-amber-500 text-base">warning</span>
             <p className="text-xs text-amber-600 dark:text-amber-400">

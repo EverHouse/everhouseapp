@@ -493,91 +493,100 @@ router.post('/api/auth/request-otp', async (req, res) => {
       expiresAt
     });
     
-    const { client: resendClient, fromEmail } = await getResendClient();
+    // Respond immediately - email sending happens in background for faster UX
+    res.json({ success: true, message: 'Login code sent to your email' });
+    
+    // Send email asynchronously (non-blocking) after response
     const logoUrl = 'https://everhouse.app/assets/logos/monogram-dark.webp';
     
-    const emailResult = await withResendRetry(() => resendClient.emails.send({
-      from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
-      to: normalizedEmail,
-      subject: 'Your Ever House Login Code',
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="margin: 0; padding: 0; background-color: #F2F2EC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #F2F2EC;">
-            <tr>
-              <td align="center" style="padding: 40px 20px;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(41, 53, 21, 0.08);">
-                  <tr>
-                    <td style="padding: 48px 40px 32px 40px; text-align: center;">
-                      <!--[if mso]>
-                      <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" style="height:72px;width:72px;v-text-anchor:middle;" arcsize="50%" fillcolor="#293515">
-                        <w:anchorlock/>
-                        <center style="color:#ffffff;font-size:28px;font-weight:600;font-family:Georgia,serif;">EH</center>
-                      </v:roundrect>
-                      <![endif]-->
-                      <!--[if !mso]><!-->
-                      <img src="${logoUrl}" alt="EH" width="72" height="72" style="display: block; margin: 0 auto 24px auto; border-radius: 50%; border: 0;">
-                      <!--<![endif]-->
-                      <h1 style="margin: 0 0 8px 0; font-size: 28px; font-weight: 600; color: #293515; font-family: 'Georgia', serif;">Hi ${firstName},</h1>
-                      <p style="margin: 0; font-size: 16px; color: #666666; line-height: 1.5;">
-                        Enter this code in the Ever House app to sign in:
-                      </p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 0 40px 12px 40px; text-align: center;">
-                      <div style="background: linear-gradient(135deg, #293515 0%, #3d4f22 100%); padding: 24px 32px; border-radius: 12px; display: inline-block; cursor: pointer;">
-                        <span style="font-size: 36px; font-weight: 700; letter-spacing: 10px; color: #ffffff; font-family: 'SF Mono', 'Monaco', 'Consolas', monospace; user-select: all;">${code}</span>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 0 40px 8px 40px; text-align: center;">
-                      <p style="margin: 0; font-size: 13px; color: #888888;">
-                        Tap the code above to select, then copy
-                      </p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 0 40px 40px 40px; text-align: center;">
-                      <p style="margin: 0 0 24px 0; font-size: 14px; color: #888888;">
-                        This code expires in <strong style="color: #293515;">15 minutes</strong>
-                      </p>
-                      <p style="margin: 0; font-size: 13px; color: #aaaaaa; line-height: 1.5;">
-                        If you didn't request this code, you can safely ignore this email.
-                      </p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 24px 40px; background-color: #f8f8f6; border-radius: 0 0 16px 16px; text-align: center;">
-                      <p style="margin: 0; font-size: 12px; color: #999999;">
-                        Ever House Members Club<br>
-                        <span style="color: #CCB8E4;">Golf & Wellness</span>
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-        </html>
-      `
-    }));
+    (async () => {
+      try {
+        const { client: resendClient, fromEmail } = await getResendClient();
+        const emailResult = await withResendRetry(() => resendClient.emails.send({
+          from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
+          to: normalizedEmail,
+          subject: 'Your Ever House Login Code',
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="margin: 0; padding: 0; background-color: #F2F2EC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #F2F2EC;">
+                <tr>
+                  <td align="center" style="padding: 40px 20px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(41, 53, 21, 0.08);">
+                      <tr>
+                        <td style="padding: 48px 40px 32px 40px; text-align: center;">
+                          <!--[if mso]>
+                          <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" style="height:72px;width:72px;v-text-anchor:middle;" arcsize="50%" fillcolor="#293515">
+                            <w:anchorlock/>
+                            <center style="color:#ffffff;font-size:28px;font-weight:600;font-family:Georgia,serif;">EH</center>
+                          </v:roundrect>
+                          <![endif]-->
+                          <!--[if !mso]><!-->
+                          <img src="${logoUrl}" alt="EH" width="72" height="72" style="display: block; margin: 0 auto 24px auto; border-radius: 50%; border: 0;">
+                          <!--<![endif]-->
+                          <h1 style="margin: 0 0 8px 0; font-size: 28px; font-weight: 600; color: #293515; font-family: 'Georgia', serif;">Hi ${firstName},</h1>
+                          <p style="margin: 0; font-size: 16px; color: #666666; line-height: 1.5;">
+                            Enter this code in the Ever House app to sign in:
+                          </p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 0 40px 12px 40px; text-align: center;">
+                          <div style="background: linear-gradient(135deg, #293515 0%, #3d4f22 100%); padding: 24px 32px; border-radius: 12px; display: inline-block; cursor: pointer;">
+                            <span style="font-size: 36px; font-weight: 700; letter-spacing: 10px; color: #ffffff; font-family: 'SF Mono', 'Monaco', 'Consolas', monospace; user-select: all;">${code}</span>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 0 40px 8px 40px; text-align: center;">
+                          <p style="margin: 0; font-size: 13px; color: #888888;">
+                            Tap the code above to select, then copy
+                          </p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 0 40px 40px 40px; text-align: center;">
+                          <p style="margin: 0 0 24px 0; font-size: 14px; color: #888888;">
+                            This code expires in <strong style="color: #293515;">15 minutes</strong>
+                          </p>
+                          <p style="margin: 0; font-size: 13px; color: #aaaaaa; line-height: 1.5;">
+                            If you didn't request this code, you can safely ignore this email.
+                          </p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 24px 40px; background-color: #f8f8f6; border-radius: 0 0 16px 16px; text-align: center;">
+                          <p style="margin: 0; font-size: 12px; color: #999999;">
+                            Ever House Members Club<br>
+                            <span style="color: #CCB8E4;">Golf & Wellness</span>
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+          `
+        }));
+        
+        if (!isProduction) console.log('Resend OTP email result:', JSON.stringify(emailResult));
+        
+        if (emailResult.error) {
+          console.error('[OTP Email] Failed to send:', emailResult.error);
+        }
+      } catch (emailError: any) {
+        console.error('[OTP Email] Error sending email:', emailError?.message || emailError);
+      }
+    })();
     
-    if (!isProduction) console.log('Resend OTP email result:', JSON.stringify(emailResult));
-    
-    if (emailResult.error) {
-      if (!isProduction) console.error('Resend OTP error:', emailResult.error);
-      return res.status(500).json({ error: 'Failed to send code: ' + emailResult.error.message });
-    }
-    
-    res.json({ success: true, message: 'Login code sent to your email' });
+    return;
   } catch (error: any) {
     if (!isProduction) console.error('OTP request error:', error?.message || error);
     

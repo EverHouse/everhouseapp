@@ -1168,7 +1168,10 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
         className={`fixed inset-y-0 right-0 w-full max-w-xl ${isDark ? 'bg-[#1a1d15]' : 'bg-white'} shadow-2xl transform transition-transform duration-300 ease-out flex flex-col`}
         style={{ animation: 'slideInRight 0.3s ease-out' }}
       >
-        <div className={`flex-shrink-0 p-4 sm:p-6 border-b ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+        <div 
+          className={`flex-shrink-0 px-4 pb-4 sm:px-6 sm:pb-6 border-b ${isDark ? 'border-white/10' : 'border-gray-200'}`}
+          style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))' }}
+        >
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <h2 className={`text-xl sm:text-2xl font-bold truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>{member.name}</h2>

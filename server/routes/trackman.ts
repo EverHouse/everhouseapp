@@ -171,30 +171,97 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
     // Find the member or visitor with role info
     const memberResult = await pool.query(
       `SELECT id, email, first_name, last_name, role, stripe_customer_id, tier FROM users WHERE email = $1`,
-      [resolveEmail]
+      [resolveEmail.toLowerCase()]
     );
     
     if (memberResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Member not found with that email' });
+      return res.status(404).json({ error: 'Member not found with that email. Make sure they exist in the member directory.' });
     }
     
     const member = memberResult.rows[0];
     const isVisitor = member.role === 'visitor';
+    const staffEmail = (req as any).session?.user?.email || 'admin';
     
-    // Get the booking details including date and duration
-    const bookingResult = await pool.query(
+    // First try to find in booking_requests table
+    let bookingResult = await pool.query(
       `SELECT id, trackman_booking_id, staff_notes, request_date, start_time, end_time, 
               duration_minutes, resource_id, session_id
        FROM booking_requests WHERE id = $1`,
       [id]
     );
     
-    if (bookingResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Booking not found' });
-    }
+    let booking = bookingResult.rows[0];
+    let fromLegacyTable = false;
     
-    const booking = bookingResult.rows[0];
-    const staffEmail = (req as any).session?.user?.email || 'admin';
+    // If not found in booking_requests, check the legacy trackman_unmatched_bookings table
+    if (!booking) {
+      const legacyResult = await pool.query(
+        `SELECT id, trackman_booking_id, user_name, original_email, booking_date, 
+                start_time, end_time, duration_minutes, bay_number, notes
+         FROM trackman_unmatched_bookings WHERE id = $1 AND resolved_at IS NULL`,
+        [id]
+      );
+      
+      if (legacyResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Booking not found in either booking requests or unmatched bookings' });
+      }
+      
+      const legacy = legacyResult.rows[0];
+      fromLegacyTable = true;
+      
+      // Convert bay number to resource_id (Bay 1 = resource 1, etc)
+      let resourceId = 1;
+      if (legacy.bay_number) {
+        const bayNum = parseInt(legacy.bay_number.replace(/\D/g, ''));
+        if (bayNum >= 1 && bayNum <= 4) resourceId = bayNum;
+      }
+      
+      // Create a booking_request from the legacy data
+      const createResult = await pool.query(
+        `INSERT INTO booking_requests (
+          user_id, user_email, user_name, resource_id, request_date, start_time, end_time,
+          duration_minutes, status, trackman_booking_id, is_unmatched, staff_notes, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'approved', $9, false, $10, NOW(), NOW())
+        RETURNING id, trackman_booking_id, staff_notes, request_date, start_time, end_time, duration_minutes, resource_id`,
+        [
+          member.id,
+          member.email,
+          `${member.first_name} ${member.last_name}`,
+          resourceId,
+          legacy.booking_date,
+          legacy.start_time,
+          legacy.end_time,
+          legacy.duration_minutes || 60,
+          legacy.trackman_booking_id,
+          `[Resolved from legacy unmatched by ${staffEmail}] ${legacy.notes || ''}`
+        ]
+      );
+      
+      booking = createResult.rows[0];
+      
+      // Mark the legacy record as resolved
+      await pool.query(
+        `UPDATE trackman_unmatched_bookings SET resolved_at = NOW(), resolved_email = $1 WHERE id = $2`,
+        [member.email, id]
+      );
+    } else {
+      // Update the existing booking_request to link it to the member/visitor
+      await pool.query(
+        `UPDATE booking_requests 
+         SET user_id = $1, 
+             user_email = $2, 
+             is_unmatched = false,
+             staff_notes = COALESCE(staff_notes, '') || $3,
+             updated_at = NOW()
+         WHERE id = $4`,
+        [
+          member.id, 
+          member.email, 
+          ` [Resolved by ${staffEmail} on ${new Date().toISOString()}]`,
+          id
+        ]
+      );
+    }
     
     // Update the booking to link it to the member/visitor
     await pool.query(
@@ -402,7 +469,14 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
     });
   } catch (error: any) {
     console.error('Error resolving unmatched booking:', error);
-    res.status(500).json({ error: 'Failed to resolve booking' });
+    const errorMessage = error?.message || 'Unknown error';
+    if (errorMessage.includes('Stripe') || errorMessage.includes('stripe')) {
+      return res.status(500).json({ error: `Billing error: ${errorMessage}` });
+    }
+    if (errorMessage.includes('constraint') || errorMessage.includes('duplicate')) {
+      return res.status(400).json({ error: 'This booking may already be assigned to a member' });
+    }
+    res.status(500).json({ error: `Failed to resolve booking: ${errorMessage}` });
   }
 });
 

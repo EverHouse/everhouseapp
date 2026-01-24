@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.16.0",
+    date: "2026-01-24",
+    title: "Booking Management Improvements",
+    changes: [
+      "Improved: OTP code delivery is now faster - emails sent in the background after validation",
+      "Fixed: Directory drawer close button no longer blocked by iOS status bar/notch",
+      "Fixed: Booking resolution now works for legacy unmatched Trackman entries - creates proper booking records when resolving",
+      "Fixed: Guest pass count display now shows accurate tier totals instead of confusing fallbacks",
+      "Improved: Unified player management UI - Manage Players modal now shows booking context header with date, bay, duration and expected vs assigned player counts in one place"
+    ]
+  },
+  {
     version: "9.15.0",
     date: "2026-01-24",
     title: "Enhanced Visitor Types",

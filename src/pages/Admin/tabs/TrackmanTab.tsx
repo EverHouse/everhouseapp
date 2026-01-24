@@ -6,7 +6,7 @@ import { formatDateTimePacific, formatDateDisplayWithDay } from '../../../utils/
 import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 import ModalShell from '../../../components/ModalShell';
 import PullToRefresh from '../../../components/PullToRefresh';
-import ManagePlayersModal from '../../../components/admin/ManagePlayersModal';
+import BookingMembersEditor from '../../../components/admin/BookingMembersEditor';
 import RosterManager from '../../../components/booking/RosterManager';
 
 const formatTime12Hour = (time: string | null | undefined): string => {
@@ -88,7 +88,19 @@ const TrackmanTab: React.FC = () => {
   const [importResult, setImportResult] = useState<any>(null);
   const [resolveModal, setResolveModal] = useState<{ booking: any; memberEmail: string; rememberEmail: boolean } | null>(null);
   const [editMatchedModal, setEditMatchedModal] = useState<{ booking: any; newMemberEmail: string } | null>(null);
-  const [managePlayersModal, setManagePlayersModal] = useState<{ booking: any } | null>(null);
+  const [managePlayersModal, setManagePlayersModal] = useState<{ 
+    bookingId: number;
+    bookingContext: {
+      requestDate?: string;
+      startTime?: string;
+      endTime?: string;
+      resourceId?: number;
+      resourceName?: string;
+      durationMinutes?: number;
+      notes?: string;
+      ownerName?: string;
+    };
+  } | null>(null);
   const [members, setMembers] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -1231,15 +1243,15 @@ const TrackmanTab: React.FC = () => {
                   </div>
                   <button
                     onClick={() => setManagePlayersModal({ 
-                      booking: {
-                        id: booking.id,
-                        userEmail: booking.userEmail || booking.user_email,
-                        userName: booking.userName || booking.user_name || 'Unknown',
+                      bookingId: booking.id,
+                      bookingContext: {
+                        ownerName: booking.userName || booking.user_name || 'Unknown',
                         resourceId: booking.resourceId || booking.resource_id,
                         requestDate: booking.requestDate || booking.request_date,
                         startTime: booking.startTime || booking.start_time || '',
-                        notes: booking.notes || '',
-                        playerCount: expectedCount
+                        endTime: booking.endTime || booking.end_time || '',
+                        durationMinutes: booking.durationMinutes || booking.duration_minutes || 60,
+                        notes: booking.notes || ''
                       }
                     })}
                     className="px-3 py-1.5 bg-accent text-primary rounded-lg text-xs font-bold hover:opacity-90 transition-opacity shrink-0 flex items-center gap-1"
@@ -2083,14 +2095,33 @@ const TrackmanTab: React.FC = () => {
       </ModalShell>
 
       {managePlayersModal && (
-        <ManagePlayersModal
+        <ModalShell
           isOpen={!!managePlayersModal}
           onClose={() => setManagePlayersModal(null)}
-          booking={managePlayersModal.booking}
-          onSaved={() => {
-            fetchData();
-          }}
-        />
+          title="Manage Players"
+          size="lg"
+          showCloseButton={true}
+        >
+          <div className="p-4">
+            <BookingMembersEditor
+              bookingId={managePlayersModal.bookingId}
+              bookingContext={managePlayersModal.bookingContext}
+              showHeader={true}
+              onMemberLinked={() => {
+                fetchData();
+              }}
+            />
+          </div>
+          <div className="sticky bottom-0 p-4 border-t border-gray-200 dark:border-white/10 bg-white dark:bg-[#1a1d15]">
+            <button
+              onClick={() => setManagePlayersModal(null)}
+              className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-sm">check</span>
+              Done
+            </button>
+          </div>
+        </ModalShell>
       )}
 
       <ModalShell isOpen={!!viewDetailBooking} onClose={() => setViewDetailBooking(null)} title="Booking Details">
