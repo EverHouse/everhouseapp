@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.11.0",
+    date: "2026-01-24",
+    title: "Unified Visits System",
+    isMajor: true,
+    changes: [
+      "New: Visits tab now shows ALL club visits - as host, guest, added player, wellness classes, and events",
+      "New: Each visit shows a role badge (Host, Player, Guest, Wellness, Event) for easy identification",
+      "New: Guest visits show who invited them to the booking",
+      "Improved: Lifetime visits count now includes all visit types, not just bookings you created",
+      "Improved: Last visit date in directory now reflects most recent activity across all visit types",
+      "Improved: Directory now counts wellness class attendance toward lifetime visits"
+    ]
+  },
+  {
     version: "9.10.2",
     date: "2026-01-24",
     title: "Visitor Deletion with External Data Cleanup",

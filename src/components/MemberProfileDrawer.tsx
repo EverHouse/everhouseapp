@@ -627,21 +627,60 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
         );
 
       case 'visits':
-        if (!history?.visitHistory?.length) {
+        const visits = history?.unifiedVisits || history?.visitHistory || [];
+        if (!visits.length) {
           return <EmptyState icon="check_circle" message="No attended visits found" />;
         }
+        const getRoleIcon = (role: string) => {
+          switch (role) {
+            case 'Host': return 'star';
+            case 'Player': return 'group';
+            case 'Guest': return 'person_add';
+            case 'Wellness': return 'spa';
+            case 'Event': return 'event';
+            default: return 'check_circle';
+          }
+        };
+        const getRoleBadgeColor = (role: string) => {
+          switch (role) {
+            case 'Host': return 'bg-brand-green text-white';
+            case 'Player': return 'bg-blue-500 text-white';
+            case 'Guest': return 'bg-orange-500 text-white';
+            case 'Wellness': return 'bg-purple-500 text-white';
+            case 'Event': return 'bg-pink-500 text-white';
+            default: return 'bg-gray-500 text-white';
+          }
+        };
         return (
           <div className="space-y-3">
-            {history.visitHistory.map((visit: any) => (
-              <div key={visit.id} className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+            {visits.map((visit: any, idx: number) => (
+              <div key={`${visit.type}-${visit.id}-${idx}`} className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="material-symbols-outlined text-green-500 text-lg">check_circle</span>
+                  <span className="material-symbols-outlined text-green-500 text-lg">{getRoleIcon(visit.role)}</span>
                   <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{visit.resourceName || 'Visit'}</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${getRoleBadgeColor(visit.role)}`}>
+                    {visit.role}
+                  </span>
                 </div>
                 <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                  {formatDatePacific(visit.bookingDate)} · {formatTime12Hour(visit.startTime)} - {formatTime12Hour(visit.endTime)}
+                  {formatDatePacific(visit.date || visit.bookingDate)}
+                  {visit.startTime && <> · {formatTime12Hour(visit.startTime)}{visit.endTime && ` - ${formatTime12Hour(visit.endTime)}`}</>}
                 </p>
-                {visit.guestCount > 0 && <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>+{visit.guestCount} guest(s)</p>}
+                {visit.hostName && visit.role === 'Guest' && (
+                  <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                    Invited by {visit.hostName}
+                  </p>
+                )}
+                {visit.instructor && (
+                  <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                    Instructor: {visit.instructor}
+                  </p>
+                )}
+                {visit.location && (
+                  <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                    {visit.location}
+                  </p>
+                )}
               </div>
             ))}
           </div>

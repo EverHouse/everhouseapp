@@ -143,17 +143,30 @@ router.get('/api/members/:email/details', isAuthenticated, async (req, res) => {
     
     const user = userResult[0];
     
-    // Count past bookings (excluding cancelled/declined)
-    // Include bookings where user is primary booker OR linked via booking_members
+    // Count past bookings where user participated (host, player via booking_members, or guest via booking_guests)
+    // Uses UNION to deduplicate across all roles
     const pastBookingsResult = await db.execute(sql`
-      SELECT COUNT(DISTINCT br.id) as count FROM booking_requests br
-      LEFT JOIN booking_members bm ON br.id = bm.booking_id
-      WHERE br.request_date < CURRENT_DATE
-      AND br.status NOT IN ('cancelled', 'declined')
-      AND (
-        LOWER(br.user_email) = ${normalizedEmail}
-        OR LOWER(bm.user_email) = ${normalizedEmail}
-      )
+      SELECT COUNT(DISTINCT booking_id) as count FROM (
+        -- Bookings as host
+        SELECT id as booking_id FROM booking_requests
+        WHERE LOWER(user_email) = ${normalizedEmail}
+          AND request_date < CURRENT_DATE
+          AND status NOT IN ('cancelled', 'declined')
+        UNION
+        -- Bookings as added player (via booking_members)
+        SELECT br.id as booking_id FROM booking_requests br
+        JOIN booking_members bm ON br.id = bm.booking_id
+        WHERE LOWER(bm.user_email) = ${normalizedEmail}
+          AND br.request_date < CURRENT_DATE
+          AND br.status NOT IN ('cancelled', 'declined')
+        UNION
+        -- Bookings as guest (via booking_guests)
+        SELECT br.id as booking_id FROM booking_requests br
+        JOIN booking_guests bg ON br.id = bg.booking_id
+        WHERE LOWER(bg.guest_email) = ${normalizedEmail}
+          AND br.request_date < CURRENT_DATE
+          AND br.status NOT IN ('cancelled', 'declined')
+      ) all_bookings
     `);
     const pastBookingsCount = Number((pastBookingsResult as any).rows?.[0]?.count || 0);
     
@@ -185,17 +198,50 @@ router.get('/api/members/:email/details', isAuthenticated, async (req, res) => {
     // Total lifetime visits = past bookings + past event RSVPs + past wellness enrollments
     const totalLifetimeVisits = pastBookingsCount + pastEventsCount + pastWellnessCount;
     
-    const lastBookingResult = await db.select({ bookingDate: bookingRequests.requestDate })
-      .from(bookingRequests)
-      .where(and(
-        sql`LOWER(${bookingRequests.userEmail}) = ${normalizedEmail}`,
-        sql`${bookingRequests.requestDate} < CURRENT_DATE`,
-        sql`${bookingRequests.status} NOT IN ('cancelled', 'declined')`
-      ))
-      .orderBy(desc(bookingRequests.requestDate))
-      .limit(1);
-    
-    const lastBookingDate = lastBookingResult[0]?.bookingDate || null;
+    // Get last activity date from all sources (bookings as host/player/guest, events, wellness)
+    // Filter to past dates only to reflect actual visits, not future scheduled items
+    const lastActivityResult = await db.execute(sql`
+      SELECT MAX(last_date) as last_date FROM (
+        -- Bookings as host (past only)
+        SELECT MAX(request_date) as last_date FROM booking_requests
+        WHERE LOWER(user_email) = ${normalizedEmail} 
+          AND status NOT IN ('cancelled', 'declined')
+          AND request_date < CURRENT_DATE
+        UNION ALL
+        -- Bookings as guest (past only)
+        SELECT MAX(br.request_date) as last_date FROM booking_guests bg
+        JOIN booking_requests br ON bg.booking_id = br.id
+        WHERE LOWER(bg.guest_email) = ${normalizedEmail} 
+          AND br.status NOT IN ('cancelled', 'declined')
+          AND br.request_date < CURRENT_DATE
+        UNION ALL
+        -- Bookings as added player (past only)
+        SELECT MAX(br.request_date) as last_date FROM booking_members bm
+        JOIN booking_requests br ON bm.booking_id = br.id
+        WHERE LOWER(bm.user_email) = ${normalizedEmail} 
+          AND bm.is_primary IS NOT TRUE 
+          AND br.status NOT IN ('cancelled', 'declined')
+          AND br.request_date < CURRENT_DATE
+        UNION ALL
+        -- Events (past only)
+        SELECT MAX(e.event_date) as last_date FROM event_rsvps er
+        JOIN events e ON er.event_id = e.id
+        WHERE LOWER(er.user_email) = ${normalizedEmail} 
+          AND er.status != 'cancelled'
+          AND e.event_date < CURRENT_DATE
+        UNION ALL
+        -- Wellness (past only)
+        SELECT MAX(wc.date) as last_date FROM wellness_enrollments we
+        JOIN wellness_classes wc ON we.class_id = wc.id
+        WHERE LOWER(we.user_email) = ${normalizedEmail} 
+          AND we.status != 'cancelled'
+          AND wc.date < CURRENT_DATE
+      ) combined
+    `);
+    const lastBookingDateRaw = (lastActivityResult as any).rows?.[0]?.last_date;
+    const lastBookingDate = lastBookingDateRaw 
+      ? (lastBookingDateRaw instanceof Date ? lastBookingDateRaw.toISOString().split('T')[0] : String(lastBookingDateRaw).split('T')[0])
+      : null;
     
     res.json({
       id: user.id,
@@ -375,7 +421,7 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       .where(sql`LOWER(${guestCheckIns.memberEmail}) = ${normalizedEmail}`)
       .orderBy(desc(guestCheckIns.checkInDate), desc(guestCheckIns.createdAt));
     
-    // Visit history: include bookings where member is primary OR linked
+    // Visit history: include bookings where member is primary OR linked OR was a guest
     const visitHistory = await db.select({
       id: bookingRequests.id,
       bookingDate: bookingRequests.requestDate,
@@ -390,7 +436,8 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       .where(and(
         or(
           sql`LOWER(${bookingRequests.userEmail}) = ${normalizedEmail}`,
-          sql`${bookingRequests.id} IN (SELECT booking_id FROM booking_members WHERE LOWER(user_email) = ${normalizedEmail})`
+          sql`${bookingRequests.id} IN (SELECT booking_id FROM booking_members WHERE LOWER(user_email) = ${normalizedEmail})`,
+          sql`${bookingRequests.id} IN (SELECT booking_id FROM booking_guests WHERE LOWER(guest_email) = ${normalizedEmail})`
         ),
         or(
           eq(bookingRequests.status, 'attended'),
@@ -403,42 +450,153 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       ))
       .orderBy(desc(bookingRequests.requestDate));
     
-    // Calculate past counts for attended visits
+    // Get bookings where user was a guest (non-member on someone else's booking)
+    const guestAppearances = await db.select({
+      id: bookingRequests.id,
+      bookingDate: bookingRequests.requestDate,
+      startTime: bookingRequests.startTime,
+      endTime: bookingRequests.endTime,
+      status: bookingRequests.status,
+      resourceName: resources.name,
+      resourceType: resources.type,
+      hostName: bookingRequests.userName,
+      hostEmail: bookingRequests.userEmail,
+    })
+      .from(bookingRequests)
+      .innerJoin(bookingGuests, eq(bookingRequests.id, bookingGuests.bookingId))
+      .leftJoin(resources, eq(bookingRequests.resourceId, resources.id))
+      .where(sql`LOWER(${bookingGuests.guestEmail}) = ${normalizedEmail}`)
+      .orderBy(desc(bookingRequests.requestDate));
+    
+    // Create unified visits list combining all sources with role indicators
     const today = new Date().toISOString().split('T')[0];
     
-    // Past bookings: all bookings where date < today (excluding cancelled/declined)
-    const pastBookingsCount = enrichedBookingHistory.filter(b => {
-      const dateValue = b.bookingDate as string | Date | null;
-      const bookingDate = typeof dateValue === 'string' 
+    // Helper to parse date strings
+    const parseDate = (dateValue: string | Date | null): string => {
+      if (!dateValue) return '';
+      return typeof dateValue === 'string' 
         ? dateValue.split('T')[0] 
-        : (dateValue as Date | null)?.toISOString?.()?.split('T')[0] || '';
-      const status = (b.status || '').toLowerCase();
-      return bookingDate < today && status !== 'cancelled' && status !== 'declined';
-    }).length;
+        : (dateValue as Date)?.toISOString?.()?.split('T')[0] || '';
+    };
     
-    // Past events: RSVPs where event date < today (excluding cancelled)
-    const pastEventsCount = eventRsvpHistory.filter(r => {
-      const dateValue = r.eventDate as string | Date | null;
-      const eventDate = typeof dateValue === 'string'
-        ? dateValue.split('T')[0]
-        : (dateValue as Date | null)?.toISOString?.()?.split('T')[0] || '';
-      const status = (r.status || '').toLowerCase();
-      return eventDate < today && status !== 'cancelled';
-    }).length;
+    // Build a set of booking IDs where user is a guest (from booking_guests)
+    const guestBookingIds = new Set(guestAppearances.map(g => g.id));
     
-    // Past wellness: enrollments where class date < today (excluding cancelled)
-    const pastWellnessCount = wellnessHistory.filter(w => {
-      const dateValue = w.classDate as string | Date | null;
-      const classDate = typeof dateValue === 'string'
-        ? dateValue.split('T')[0]
-        : (dateValue as Date | null)?.toISOString?.()?.split('T')[0] || '';
-      const status = (w.status || '').toLowerCase();
-      return classDate < today && status !== 'cancelled';
-    }).length;
+    // Unified visits from bookings (as host or player via booking_members)
+    // Filter to past bookings only (attended) and exclude cancelled/declined
+    // Also exclude bookings that are in guestAppearances to avoid duplicates
+    const bookingVisits = visitHistory
+      .filter(v => {
+        const dateStr = parseDate(v.bookingDate);
+        // Skip if this is a guest booking (will be handled in guestVisits)
+        if (guestBookingIds.has(v.id)) return false;
+        return dateStr <= today; // visitHistory already filters by attended status in the query
+      })
+      .map(v => {
+        const dateStr = parseDate(v.bookingDate);
+        // Determine role: host if they're the primary booker in enrichedBookingHistory
+        const enrichedEntry = enrichedBookingHistory.find(b => b.id === v.id);
+        const isHost = enrichedEntry?.role === 'owner';
+        return {
+          type: 'booking' as const,
+          role: isHost ? 'Host' : 'Player',
+          date: dateStr,
+          sortDate: new Date(dateStr + 'T' + (v.startTime || '00:00')).getTime(),
+          resourceName: v.resourceName,
+          startTime: v.startTime,
+          endTime: v.endTime,
+          id: v.id,
+        };
+      });
     
-    // Total attended visits = sum of all past activities
-    const attendedVisitsCount = pastBookingsCount + pastEventsCount + pastWellnessCount;
+    // Unified visits from guest appearances (booking_guests)
+    const guestVisits = guestAppearances
+      .filter(g => {
+        const dateStr = parseDate(g.bookingDate);
+        const status = (g.status || '').toLowerCase();
+        return dateStr <= today && status !== 'cancelled' && status !== 'declined';
+      })
+      .map(g => {
+        const dateStr = parseDate(g.bookingDate);
+        return {
+          type: 'booking' as const,
+          role: 'Guest',
+          date: dateStr,
+          sortDate: new Date(dateStr + 'T' + (g.startTime || '00:00')).getTime(),
+          resourceName: g.resourceName,
+          startTime: g.startTime,
+          endTime: g.endTime,
+          id: g.id,
+          hostName: g.hostName || g.hostEmail,
+        };
+      });
     
+    // Unified visits from wellness
+    const wellnessVisits = wellnessHistory
+      .filter(w => {
+        const dateStr = parseDate(w.classDate);
+        const status = (w.status || '').toLowerCase();
+        return dateStr <= today && status !== 'cancelled';
+      })
+      .map(w => {
+        const dateStr = parseDate(w.classDate);
+        return {
+          type: 'wellness' as const,
+          role: 'Wellness',
+          date: dateStr,
+          sortDate: new Date(dateStr + 'T' + (w.classTime || '00:00')).getTime(),
+          resourceName: w.classTitle,
+          startTime: w.classTime,
+          endTime: null,
+          id: w.id,
+          instructor: w.instructor,
+          category: w.category,
+        };
+      });
+    
+    // Unified visits from events
+    const eventVisits = eventRsvpHistory
+      .filter(e => {
+        const dateStr = parseDate(e.eventDate);
+        const status = (e.status || '').toLowerCase();
+        return dateStr <= today && status !== 'cancelled';
+      })
+      .map(e => {
+        const dateStr = parseDate(e.eventDate);
+        return {
+          type: 'event' as const,
+          role: 'Event',
+          date: dateStr,
+          sortDate: new Date(dateStr).getTime(),
+          resourceName: e.eventTitle,
+          startTime: null,
+          endTime: null,
+          id: e.id,
+          location: e.eventLocation,
+          category: e.eventCategory,
+        };
+      });
+    
+    // Combine and sort all visits by date (most recent first)
+    // Deduplicate booking visits (in case same booking appears as both visitHistory and guestAppearances)
+    const seenBookingIds = new Set<number>();
+    const allBookingVisits = [...bookingVisits, ...guestVisits].filter(v => {
+      if (seenBookingIds.has(v.id)) return false;
+      seenBookingIds.add(v.id);
+      return true;
+    });
+    
+    const unifiedVisits = [...allBookingVisits, ...wellnessVisits, ...eventVisits]
+      .sort((a, b) => b.sortDate - a.sortDate);
+    
+    // Calculate counts from unified visits (past visits only)
+    const pastBookingsCount = allBookingVisits.length;
+    const pastEventsCount = eventVisits.length;
+    const pastWellnessCount = wellnessVisits.length;
+    const attendedVisitsCount = unifiedVisits.length;
+    
+    // Get most recent visit date
+    const lastVisitDate = unifiedVisits.length > 0 ? unifiedVisits[0].date : null;
     
     res.json({
       bookingHistory: enrichedBookingHistory,
@@ -448,10 +606,13 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       guestPassInfo: guestPassInfo,
       guestCheckInsHistory,
       visitHistory,
+      guestAppearances,
+      unifiedVisits,
       pastBookingsCount,
       pastEventsCount,
       pastWellnessCount,
       attendedVisitsCount,
+      lastVisitDate,
     });
   } catch (error: any) {
     if (!isProduction) console.error('Member history error:', error);
@@ -2143,22 +2304,46 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
     
     let bookingCounts: Record<string, number> = {};
     let eventCounts: Record<string, number> = {};
+    let wellnessCounts: Record<string, number> = {};
     let lastActivityMap: Record<string, string | null> = {};
     
     if (memberEmails.length > 0) {
+      // Count ALL bookings where user participated (as host, player, or guest)
+      // Uses UNION to deduplicate across all roles for the same booking
       const bookingsResult = await pool.query(
-        `SELECT LOWER(user_email) as email, COUNT(*) as count
-        FROM booking_requests
-        WHERE LOWER(user_email) = ANY($1)
-          AND status NOT IN ('cancelled', 'declined')
-          AND request_date < CURRENT_DATE
-        GROUP BY LOWER(user_email)`,
+        `SELECT email, COUNT(DISTINCT booking_id) as count FROM (
+          -- Bookings as host
+          SELECT LOWER(user_email) as email, id as booking_id
+          FROM booking_requests
+          WHERE LOWER(user_email) = ANY($1)
+            AND status NOT IN ('cancelled', 'declined')
+            AND request_date < CURRENT_DATE
+          UNION
+          -- Bookings as guest
+          SELECT LOWER(bg.guest_email) as email, br.id as booking_id
+          FROM booking_guests bg
+          JOIN booking_requests br ON bg.booking_id = br.id
+          WHERE LOWER(bg.guest_email) = ANY($1)
+            AND br.status NOT IN ('cancelled', 'declined')
+            AND br.request_date < CURRENT_DATE
+          UNION
+          -- Bookings as added player (non-primary)
+          SELECT LOWER(bm.user_email) as email, br.id as booking_id
+          FROM booking_members bm
+          JOIN booking_requests br ON bm.booking_id = br.id
+          WHERE LOWER(bm.user_email) = ANY($1)
+            AND bm.is_primary IS NOT TRUE
+            AND br.status NOT IN ('cancelled', 'declined')
+            AND br.request_date < CURRENT_DATE
+        ) all_bookings
+        GROUP BY email`,
         [memberEmails]
       );
       for (const row of bookingsResult.rows || []) {
         bookingCounts[row.email] = Number(row.count);
       }
       
+      // Count event RSVPs
       const eventsResult = await pool.query(
         `SELECT LOWER(user_email) as email, COUNT(*) as count
         FROM event_rsvps er
@@ -2173,18 +2358,68 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
         eventCounts[row.email] = Number(row.count);
       }
       
+      // Count wellness class enrollments
+      const wellnessResult = await pool.query(
+        `SELECT LOWER(we.user_email) as email, COUNT(*) as count
+        FROM wellness_enrollments we
+        JOIN wellness_classes wc ON we.class_id = wc.id
+        WHERE LOWER(we.user_email) = ANY($1)
+          AND we.status != 'cancelled'
+          AND wc.date < CURRENT_DATE
+        GROUP BY LOWER(we.user_email)`,
+        [memberEmails]
+      );
+      for (const row of wellnessResult.rows || []) {
+        wellnessCounts[row.email] = Number(row.count);
+      }
+      
+      // Get last activity date from all sources (past only)
       const lastActivityResult = await pool.query(
         `SELECT email, MAX(last_date) as last_date FROM (
+          -- Bookings as host (past only)
           SELECT LOWER(user_email) as email, MAX(request_date) as last_date
           FROM booking_requests
-          WHERE LOWER(user_email) = ANY($1) AND status NOT IN ('cancelled', 'declined')
+          WHERE LOWER(user_email) = ANY($1) 
+            AND status NOT IN ('cancelled', 'declined')
+            AND request_date < CURRENT_DATE
           GROUP BY LOWER(user_email)
           UNION ALL
+          -- Bookings as guest (past only)
+          SELECT LOWER(bg.guest_email) as email, MAX(br.request_date) as last_date
+          FROM booking_guests bg
+          JOIN booking_requests br ON bg.booking_id = br.id
+          WHERE LOWER(bg.guest_email) = ANY($1) 
+            AND br.status NOT IN ('cancelled', 'declined')
+            AND br.request_date < CURRENT_DATE
+          GROUP BY LOWER(bg.guest_email)
+          UNION ALL
+          -- Bookings as added player (past only)
+          SELECT LOWER(bm.user_email) as email, MAX(br.request_date) as last_date
+          FROM booking_members bm
+          JOIN booking_requests br ON bm.booking_id = br.id
+          WHERE LOWER(bm.user_email) = ANY($1) 
+            AND bm.is_primary IS NOT TRUE 
+            AND br.status NOT IN ('cancelled', 'declined')
+            AND br.request_date < CURRENT_DATE
+          GROUP BY LOWER(bm.user_email)
+          UNION ALL
+          -- Events (past only)
           SELECT LOWER(er.user_email) as email, MAX(e.event_date) as last_date
           FROM event_rsvps er
           JOIN events e ON er.event_id = e.id
-          WHERE LOWER(er.user_email) = ANY($1) AND er.status != 'cancelled'
+          WHERE LOWER(er.user_email) = ANY($1) 
+            AND er.status != 'cancelled'
+            AND e.event_date < CURRENT_DATE
           GROUP BY LOWER(er.user_email)
+          UNION ALL
+          -- Wellness (past only)
+          SELECT LOWER(we.user_email) as email, MAX(wc.date) as last_date
+          FROM wellness_enrollments we
+          JOIN wellness_classes wc ON we.class_id = wc.id
+          WHERE LOWER(we.user_email) = ANY($1) 
+            AND we.status != 'cancelled'
+            AND wc.date < CURRENT_DATE
+          GROUP BY LOWER(we.user_email)
         ) combined
         GROUP BY email`,
         [memberEmails]
@@ -2204,6 +2439,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
       const emailLower = member.email?.toLowerCase() || '';
       const bookings = bookingCounts[emailLower] || 0;
       const events = eventCounts[emailLower] || 0;
+      const wellness = wellnessCounts[emailLower] || 0;
       const status = member.membershipStatus || 'active';
       const isActive = status === 'active' || !status;
       
@@ -2220,7 +2456,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
         status: isActive ? 'Active' : status,
         isActiveMember: isActive,
         isFormerMember: !isActive,
-        lifetimeVisits: bookings + events,
+        lifetimeVisits: bookings + events + wellness,
         joinDate: member.joinDate,
         lastBookingDate: lastActivityMap[emailLower] || null,
         mindbodyClientId: member.mindbodyClientId,
