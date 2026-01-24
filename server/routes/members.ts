@@ -2009,13 +2009,14 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
     const searchTerm = (search as string || '').trim().toLowerCase();
     
     // Determine sort column based on sortBy parameter
-    let orderByClause = `MAX(dpp.purchased_at) ${sortOrder} NULLS LAST`;
+    // Uses pre-aggregated subquery aliases (dpp_agg, lp_agg)
+    let orderByClause = `GREATEST(dpp_agg.last_purchase_date, lp_agg.last_purchase_date) ${sortOrder} NULLS LAST`;
     if (sortBy === 'name') {
       orderByClause = `u.first_name || ' ' || u.last_name ${sortOrder}`;
     } else if (sortBy === 'totalSpent') {
-      orderByClause = `COALESCE(SUM(dpp.amount_cents), 0) ${sortOrder}`;
+      orderByClause = `(COALESCE(dpp_agg.total_spent_cents, 0) + COALESCE(lp_agg.total_spent_cents, 0)) ${sortOrder}`;
     } else if (sortBy === 'purchaseCount') {
-      orderByClause = `COUNT(dpp.id) ${sortOrder}`;
+      orderByClause = `(COALESCE(dpp_agg.purchase_count, 0) + COALESCE(lp_agg.purchase_count, 0)) ${sortOrder}`;
     } else if (sortBy === 'createdAt') {
       orderByClause = `u.created_at ${sortOrder} NULLS LAST`;
     }
