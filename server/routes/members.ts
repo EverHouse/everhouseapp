@@ -2078,53 +2078,53 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
       )`;
     }
     
-    // Helper SQL for computing effective_type - used in both count and main query
-    const effectiveTypeSql = `
-      COALESCE(
-        u.visitor_type,
-        (SELECT 
-          CASE 
-            WHEN lp_sub.lp_type IS NOT NULL AND bp_sub.bp_date IS NOT NULL THEN
-              CASE WHEN lp_sub.lp_date >= bp_sub.bp_date THEN lp_sub.lp_type ELSE 'guest' END
-            WHEN lp_sub.lp_type IS NOT NULL THEN lp_sub.lp_type
-            WHEN bp_sub.bp_date IS NOT NULL THEN 'guest'
-            ELSE 'lead'
-          END
-        FROM (SELECT 1) dummy
-        LEFT JOIN LATERAL (
-          SELECT 
-            CASE 
-              WHEN lp.item_name ILIKE '%classpass%' THEN 'classpass'
-              WHEN lp.item_name ILIKE '%sim%walk%' OR lp.item_name ILIKE '%simulator walk%' THEN 'sim_walkin'
-              WHEN lp.item_name ILIKE '%private lesson%' THEN 'private_lesson'
-              WHEN lp.item_name ILIKE '%day pass%' THEN 'day_pass'
-              ELSE NULL
-            END as lp_type,
-            lp.sale_date as lp_date
-          FROM legacy_purchases lp 
-          WHERE LOWER(lp.member_email) = LOWER(u.email)
-          ORDER BY lp.sale_date DESC NULLS LAST
-          LIMIT 1
-        ) lp_sub ON true
-        LEFT JOIN LATERAL (
-          SELECT bs.session_date::timestamp as bp_date
-          FROM booking_participants bp
-          JOIN guests g ON bp.guest_id = g.id
-          JOIN booking_sessions bs ON bp.session_id = bs.id
-          WHERE LOWER(g.email) = LOWER(u.email)
-            AND bp.participant_type = 'guest'
-          ORDER BY bs.session_date DESC
-          LIMIT 1
-        ) bp_sub ON true
-        )
-      )
-    `;
+    // Pre-aggregate visitor type data using CTEs for performance
+    // This avoids LATERAL joins that execute per-row subqueries
     
-    // Get total count first for pagination using CTE with computed type
+    // Get total count first for pagination using optimized CTEs
     const countResult = await db.execute(sql`
-      WITH visitor_data AS (
-        SELECT u.id, ${sql.raw(effectiveTypeSql)} as computed_type
+      WITH 
+      -- Pre-aggregate latest purchase type per email from legacy_purchases
+      purchase_types AS (
+        SELECT DISTINCT ON (LOWER(member_email))
+          LOWER(member_email) as email,
+          CASE 
+            WHEN item_name ILIKE '%classpass%' THEN 'classpass'
+            WHEN item_name ILIKE '%sim%walk%' OR item_name ILIKE '%simulator walk%' THEN 'sim_walkin'
+            WHEN item_name ILIKE '%private lesson%' THEN 'private_lesson'
+            WHEN item_name ILIKE '%day pass%' THEN 'day_pass'
+            ELSE NULL
+          END as lp_type,
+          sale_date as lp_date
+        FROM legacy_purchases
+        ORDER BY LOWER(member_email), sale_date DESC NULLS LAST
+      ),
+      -- Pre-aggregate latest guest appearance per email
+      guest_appearances AS (
+        SELECT DISTINCT ON (LOWER(g.email))
+          LOWER(g.email) as email,
+          bs.session_date::timestamp as bp_date
+        FROM booking_participants bp
+        JOIN guests g ON bp.guest_id = g.id
+        JOIN booking_sessions bs ON bp.session_id = bs.id
+        WHERE bp.participant_type = 'guest'
+        ORDER BY LOWER(g.email), bs.session_date DESC
+      ),
+      visitor_data AS (
+        SELECT u.id,
+          COALESCE(
+            u.visitor_type,
+            CASE 
+              WHEN pt.lp_type IS NOT NULL AND ga.bp_date IS NOT NULL THEN
+                CASE WHEN pt.lp_date >= ga.bp_date THEN pt.lp_type ELSE 'guest' END
+              WHEN pt.lp_type IS NOT NULL THEN pt.lp_type
+              WHEN ga.bp_date IS NOT NULL THEN 'guest'
+              ELSE 'lead'
+            END
+          ) as computed_type
         FROM users u
+        LEFT JOIN purchase_types pt ON LOWER(u.email) = pt.email
+        LEFT JOIN guest_appearances ga ON LOWER(u.email) = ga.email
         WHERE (u.role = 'visitor' OR u.membership_status = 'visitor' OR u.membership_status = 'non-member')
         AND u.role NOT IN ('admin', 'staff')
         AND u.archived_at IS NULL
@@ -2139,10 +2139,37 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
     
     // Get all non-member contacts (visitors, non-members, leads) with aggregated purchase stats
     // Combines purchases from both day_pass_purchases (Stripe) and legacy_purchases (MindBody)
-    // Uses CTE to compute effective_type first, then filter on it
+    // Uses CTEs to pre-aggregate visitor types for performance (avoids per-row subqueries)
     // Also get guest count and latest activity
     const visitorsWithPurchases = await db.execute(sql`
-      WITH visitor_base AS (
+      WITH 
+      -- Pre-aggregate latest purchase type per email from legacy_purchases
+      purchase_types AS (
+        SELECT DISTINCT ON (LOWER(member_email))
+          LOWER(member_email) as email,
+          CASE 
+            WHEN item_name ILIKE '%classpass%' THEN 'classpass'
+            WHEN item_name ILIKE '%sim%walk%' OR item_name ILIKE '%simulator walk%' THEN 'sim_walkin'
+            WHEN item_name ILIKE '%private lesson%' THEN 'private_lesson'
+            WHEN item_name ILIKE '%day pass%' THEN 'day_pass'
+            ELSE NULL
+          END as lp_type,
+          sale_date as lp_date
+        FROM legacy_purchases
+        ORDER BY LOWER(member_email), sale_date DESC NULLS LAST
+      ),
+      -- Pre-aggregate latest guest appearance per email
+      guest_appearances AS (
+        SELECT DISTINCT ON (LOWER(g.email))
+          LOWER(g.email) as email,
+          bs.session_date::timestamp as bp_date
+        FROM booking_participants bp
+        JOIN guests g ON bp.guest_id = g.id
+        JOIN booking_sessions bs ON bp.session_id = bs.id
+        WHERE bp.participant_type = 'guest'
+        ORDER BY LOWER(g.email), bs.session_date DESC
+      ),
+      visitor_base AS (
         SELECT 
           u.id,
           u.email,
@@ -2165,8 +2192,19 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
           u.created_at,
           COALESCE(guest_agg.guest_count, 0)::int as guest_count,
           guest_agg.last_guest_date,
-          ${sql.raw(effectiveTypeSql)} as effective_type
+          COALESCE(
+            u.visitor_type,
+            CASE 
+              WHEN pt.lp_type IS NOT NULL AND ga.bp_date IS NOT NULL THEN
+                CASE WHEN pt.lp_date >= ga.bp_date THEN pt.lp_type ELSE 'guest' END
+              WHEN pt.lp_type IS NOT NULL THEN pt.lp_type
+              WHEN ga.bp_date IS NOT NULL THEN 'guest'
+              ELSE 'lead'
+            END
+          ) as effective_type
         FROM users u
+        LEFT JOIN purchase_types pt ON LOWER(u.email) = pt.email
+        LEFT JOIN guest_appearances ga ON LOWER(u.email) = ga.email
         LEFT JOIN (
           SELECT LOWER(purchaser_email) as email, COUNT(*)::int as purchase_count, SUM(amount_cents) as total_spent_cents, MAX(purchased_at) as last_purchase_date
           FROM day_pass_purchases
