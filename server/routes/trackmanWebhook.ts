@@ -1421,6 +1421,20 @@ async function createUnmatchedBookingRequest(
   customerNotes?: string
 ): Promise<{ created: boolean; bookingId?: number }> {
   try {
+    // DEDUPLICATION: Check if a booking with this trackman_booking_id already exists
+    const existingBooking = await pool.query(
+      `SELECT id FROM booking_requests WHERE trackman_booking_id = $1 LIMIT 1`,
+      [trackmanBookingId]
+    );
+    
+    if (existingBooking.rows.length > 0) {
+      // Booking already exists, return the existing ID without creating a duplicate
+      logger.info('[Trackman Webhook] Booking already exists for trackman_booking_id, skipping duplicate', {
+        extra: { trackmanBookingId, existingBookingId: existingBooking.rows[0].id }
+      });
+      return { created: false, bookingId: existingBooking.rows[0].id };
+    }
+    
     // Calculate duration (handles cross-midnight sessions)
     const durationMinutes = calculateDurationMinutes(startTime, endTime);
     
@@ -1432,7 +1446,6 @@ async function createUnmatchedBookingRequest(
         origin, last_sync_source, last_trackman_sync_at, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'approved', $8, $9, $10, true,
                'trackman_webhook', 'trackman_webhook', NOW(), NOW(), NOW())
-       ON CONFLICT DO NOTHING
        RETURNING id`,
       [
         slotDate,
