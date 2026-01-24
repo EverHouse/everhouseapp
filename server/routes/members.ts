@@ -2022,25 +2022,37 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
     }
     
     // Build source filter condition
-    // Priority: STRIPE > MINDBODY > HUBSPOT > APP
-    // Stripe always takes precedence as the main billing engine
+    // Must match the getSource() logic exactly to avoid filter/display mismatch
+    // Priority order in getSource: billing_provider > mindbody_client_id/legacy_source > stripe_customer_id > hubspot_id
     let sourceCondition = '';
     if (sourceFilter === 'stripe') {
-      // Stripe: has stripe_customer_id (always takes priority)
-      sourceCondition = `AND u.stripe_customer_id IS NOT NULL`;
+      // Stripe: billing_provider is 'stripe' OR (has stripe_customer_id AND no mindbody indicators)
+      sourceCondition = `AND (
+        u.billing_provider = 'stripe'
+        OR (
+          u.billing_provider IS DISTINCT FROM 'mindbody'
+          AND u.stripe_customer_id IS NOT NULL 
+          AND u.mindbody_client_id IS NULL 
+          AND u.legacy_source IS DISTINCT FROM 'mindbody_import'
+        )
+      )`;
     } else if (sourceFilter === 'mindbody') {
-      // MindBody: has mindbody indicators but NO stripe_customer_id
-      sourceCondition = `AND u.stripe_customer_id IS NULL 
-        AND (u.mindbody_client_id IS NOT NULL 
-          OR u.legacy_source = 'mindbody_import' 
-          OR u.billing_provider = 'mindbody')`;
+      // MindBody: billing_provider is 'mindbody' OR has mindbody_client_id/legacy_source (regardless of stripe_customer_id)
+      sourceCondition = `AND (
+        u.billing_provider = 'mindbody'
+        OR (
+          u.billing_provider IS DISTINCT FROM 'stripe'
+          AND (u.mindbody_client_id IS NOT NULL OR u.legacy_source = 'mindbody_import')
+        )
+      )`;
     } else if (sourceFilter === 'hubspot') {
-      // HubSpot: has hubspot_id but NOT stripe, and NOT mindbody
+      // HubSpot: has hubspot_id but NOT stripe and NOT mindbody
       sourceCondition = `AND u.hubspot_id IS NOT NULL 
+        AND u.billing_provider IS DISTINCT FROM 'stripe'
+        AND u.billing_provider IS DISTINCT FROM 'mindbody'
         AND u.stripe_customer_id IS NULL 
         AND u.mindbody_client_id IS NULL
-        AND u.legacy_source IS DISTINCT FROM 'mindbody_import' 
-        AND u.billing_provider IS DISTINCT FROM 'mindbody'`;
+        AND u.legacy_source IS DISTINCT FROM 'mindbody_import'`;
     }
     
     // Build type filter - filter by stored visitor_type or computed from activity
