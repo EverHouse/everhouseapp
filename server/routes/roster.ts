@@ -216,8 +216,11 @@ router.get('/api/bookings/:bookingId/participants', async (req: Request, res: Re
     let remainingMinutes = 0;
     
     if (ownerTier) {
-      guestPassesRemaining = await getGuestPassesRemaining(booking.owner_email);
-      remainingMinutes = await getRemainingMinutes(booking.owner_email, ownerTier, booking.request_date);
+      // ⚡ Bolt: Fetch guest passes and remaining minutes in parallel to reduce latency.
+      [guestPassesRemaining, remainingMinutes] = await Promise.all([
+        getGuestPassesRemaining(booking.owner_email),
+        getRemainingMinutes(booking.owner_email, ownerTier, booking.request_date)
+      ]);
     }
 
     const guestCount = participants.filter(p => p.participantType === 'guest').length;
