@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { index, uniqueIndex, jsonb, pgTable, timestamp, varchar, serial, boolean, text, date, time, integer, numeric, pgEnum } from "drizzle-orm/pg-core";
 import { users } from "./auth-session";
 
-export const bookingSourceEnum = pgEnum("booking_source", ["member_request", "staff_manual", "trackman_import"]);
+export const bookingSourceEnum = pgEnum("booking_source", ["member_request", "staff_manual", "trackman_import", "trackman_webhook"]);
 export const paymentMethodEnum = pgEnum("payment_method", ["guest_pass", "credit_card", "unpaid", "waived"]);
 export const participantTypeEnum = pgEnum("participant_type", ["owner", "member", "guest"]);
 export const participantPaymentStatusEnum = pgEnum("participant_payment_status", ["pending", "paid", "waived"]);
@@ -97,6 +97,12 @@ export const bookingRequests = pgTable("booking_requests", {
   trackmanCustomerNotes: text("trackman_customer_notes"),
   // Flag indicating if booking was auto-linked to existing request (vs manually linked by staff)
   wasAutoLinked: boolean("was_auto_linked").default(false),
+  // Origin tracking - who originally created this booking
+  origin: varchar("origin"), // 'member_request' | 'staff_manual' | 'trackman_webhook' | 'trackman_import'
+  // Last sync source - which system last updated this booking
+  lastSyncSource: varchar("last_sync_source"), // 'trackman_webhook' | 'trackman_import' | 'staff' | 'member'
+  // Timestamp of last Trackman data sync (from webhook or import)
+  lastTrackmanSyncAt: timestamp("last_trackman_sync_at"),
 }, (table) => [
   uniqueIndex("booking_requests_trackman_id_idx").on(table.trackmanBookingId),
   uniqueIndex("booking_requests_trackman_external_id_idx").on(table.trackmanExternalId),
