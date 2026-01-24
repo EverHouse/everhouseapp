@@ -68,6 +68,7 @@ router.get('/api/admin/trackman/unmatched', isStaffOrAdmin, async (req, res) => 
     if (search) {
       whereClause += ` AND (
         br.staff_notes ILIKE $${paramIndex} OR 
+        br.trackman_customer_notes ILIKE $${paramIndex} OR
         br.trackman_booking_id::text ILIKE $${paramIndex}
       )`;
       params.push(`%${search}%`);
@@ -104,8 +105,43 @@ router.get('/api/admin/trackman/unmatched', isStaffOrAdmin, async (req, res) => 
       [...params, limitNum, offsetNum]
     );
     
+    // Parse the notes to extract original name and email
+    const parsedResults = result.rows.map(row => {
+      let userName = 'Unknown';
+      let originalEmail = '';
+      let matchAttemptReason = '';
+      
+      // Parse notes like "Original name: John Doe, Original email: john@example.com"
+      if (row.notes) {
+        const nameMatch = row.notes.match(/Original name:\s*([^,]+)/i);
+        const emailMatch = row.notes.match(/Original email:\s*([^,\s]+)/i);
+        if (nameMatch) userName = nameMatch[1].trim();
+        if (emailMatch) originalEmail = emailMatch[1].trim();
+        matchAttemptReason = 'No matching member found in system';
+      }
+      
+      // Extract bay number from bay_name or resource_id
+      const bayNumber = row.bay_name ? row.bay_name.replace(/Bay\s*/i, '') : row.resource_id;
+      
+      return {
+        id: row.id,
+        trackman_booking_id: row.trackman_booking_id,
+        booking_date: row.booking_date,
+        start_time: row.start_time,
+        end_time: row.end_time,
+        bay_number: bayNumber,
+        bay_name: row.bay_name,
+        user_name: userName,
+        original_email: originalEmail,
+        match_attempt_reason: matchAttemptReason,
+        notes: row.notes,
+        player_count: row.player_count,
+        created_at: row.created_at
+      };
+    });
+    
     res.json({
-      data: result.rows,
+      data: parsedResults,
       totalCount,
       page: Math.floor(offsetNum / limitNum) + 1,
       totalPages: Math.ceil(totalCount / limitNum)
