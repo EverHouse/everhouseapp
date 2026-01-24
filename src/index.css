@@ -1515,14 +1515,30 @@ html.dark .border-accessible {
   100% { transform: scale(1); }
 }
 
-/* Shimmer Animation - Loading skeleton effect */
+/* Shimmer Animation - Loading skeleton effect (seamless loop)
+   Uses repeating-linear-gradient for guaranteed seamless tiling */
 @keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
+  from {
+    background-position: 0 0;
   }
-  100% {
-    transform: translateX(100%);
+  to {
+    background-position: 100% 0;
   }
+}
+
+/* Shimmer utility class for consistent shimmer effect */
+.shimmer-effect {
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 30%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 70%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: repeat;
+  animation: shimmer 2s linear infinite;
 }
 
 /* GPU Acceleration Hints for Animations */

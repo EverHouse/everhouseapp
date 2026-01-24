@@ -377,8 +377,7 @@ const GalleryItem: React.FC<{img: string; onClick: () => void; index: number}> =
     >
       {!loaded && !error && (
         <div className={`w-full ${skeletonHeight} bg-gradient-to-br from-gray-200 via-gray-100 to-gray-200 rounded-2xl overflow-hidden`}>
-          <div className="w-full h-full animate-shimmer bg-gradient-to-r from-transparent via-white/40 to-transparent" 
-               style={{ backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+          <div className="w-full h-full shimmer-effect" />
         </div>
       )}
       <img 
