@@ -20,6 +20,8 @@ export const changelog: ChangelogEntry[] = [
       "New: Account Balance section on Profile - add funds to your account for instant credits",
       "Members can add $25, $50, or $100 via Stripe checkout",
       "Balance is credited instantly upon successful payment",
+      "Staff can view member account balance and apply credits in the Billing tab (e.g., for service recovery)",
+      "All staff credit applications are now logged in the Staff Activity feed",
       "Future: Account balance can be used for guest fees, day passes, and service overages",
       "Removed: Guest Passes section (balance-based system replaces per-pass tracking)"
     ]

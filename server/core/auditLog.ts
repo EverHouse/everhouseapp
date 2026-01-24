@@ -44,6 +44,7 @@ export type AuditAction =
   | 'record_charge'
   | 'send_payment_link'
   | 'update_payment_status'
+  | 'apply_credit'
   // Tour actions
   | 'tour_checkin'
   | 'tour_completed'

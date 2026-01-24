@@ -414,6 +414,16 @@ router.post('/api/member-billing/:email/credit', isStaffOrAdmin, async (req, res
     );
 
     console.log(`[MemberBilling] Applied credit of ${amountCents} cents to ${email}`);
+    
+    // Audit log the credit application
+    await logFromRequest(req, 'apply_credit', 'member', email, email, {
+      amountCents,
+      amountDollars: (amountCents / 100).toFixed(2),
+      description,
+      transactionId: transaction.id,
+      endingBalance: transaction.ending_balance,
+    });
+    
     res.json({
       success: true,
       transactionId: transaction.id,
