@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.5.1",
+    date: "2026-01-24",
+    title: "Tappable Booking Cards & Timezone Fix",
+    changes: [
+      "Booking cards are now tappable - tap anywhere on the card to open booking details (no more separate Edit button)",
+      "Fixed 'Last event' timestamp in Trackman sync section - now shows correct Pacific timezone"
+    ]
+  },
+  {
     version: "9.5.0",
     date: "2026-01-24",
     title: "Trackman Data Sync Architecture",

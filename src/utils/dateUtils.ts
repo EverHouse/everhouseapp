@@ -153,12 +153,18 @@ export function formatTime12Hour(timeStr: string): string {
 export function formatDateTimePacific(isoString: string | null | undefined): string {
   if (!isoString) return 'Unknown date';
   const date = new Date(isoString);
-  return date.toLocaleDateString('en-US', { 
+  const dateStr = date.toLocaleDateString('en-US', { 
     month: 'short', 
     day: 'numeric', 
     year: 'numeric',
     timeZone: CLUB_TIMEZONE 
   });
+  const timeStr = date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: CLUB_TIMEZONE
+  });
+  return `${dateStr} at ${timeStr}`;
 }
 
 /**

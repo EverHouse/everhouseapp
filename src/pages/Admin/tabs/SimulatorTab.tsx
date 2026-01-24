@@ -1841,11 +1841,15 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                             }
                                                         ]}
                                                     >
-                                                        <div className={`p-4 rounded-2xl animate-pop-in ${
+                                                        <div 
+                                                            className={`p-4 rounded-2xl animate-pop-in cursor-pointer hover:opacity-90 transition-opacity ${
                                                             isUnmatched 
                                                                 ? 'bg-amber-50/80 dark:bg-amber-500/10 border-2 border-dashed border-amber-300 dark:border-amber-500/30' 
                                                                 : 'glass-card border border-primary/10 dark:border-white/25'
-                                                        }`} style={{animationDelay: `${0.2 + index * 0.03}s`}}>
+                                                        }`} 
+                                                            style={{animationDelay: `${0.2 + index * 0.03}s`}}
+                                                            onClick={() => setSelectedCalendarBooking(booking)}
+                                                        >
                                                             {/* Header: Name/Badge + Status */}
                                                             <div className="flex items-center gap-2 mb-2">
                                                                 {isUnmatched ? (
@@ -1895,7 +1899,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                             )}
                                                             
                                                             {/* Action Buttons - Full Width */}
-                                                            <div className="flex gap-2 mt-3">
+                                                            <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
                                                                 {isUnmatched ? (
                                                                     <button
                                                                         onClick={() => setTrackmanLinkModal({
@@ -1948,13 +1952,6 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                                         Check In
                                                                     </button>
                                                                 ) : null}
-                                                                <button
-                                                                    onClick={() => setSelectedCalendarBooking(booking)}
-                                                                    className="py-2.5 px-4 glass-button border border-primary/20 dark:border-white/20 text-primary dark:text-white rounded-xl text-sm font-medium flex items-center gap-2 hover:bg-primary/5 dark:hover:bg-white/10 transition-colors"
-                                                                >
-                                                                    <span aria-hidden="true" className="material-symbols-outlined text-lg">edit</span>
-                                                                    Edit
-                                                                </button>
                                                             </div>
                                                         </div>
                                                     </SwipeableListItem>
