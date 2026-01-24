@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.7.1",
+    date: "2026-01-24",
+    title: "Visitor Day Pass Billing & Payment Sync",
+    changes: [
+      "New: Day pass visitors are now automatically charged when linked to Trackman bookings",
+      "Checks for existing day pass purchases to avoid double-charging",
+      "New: Manual payment sync endpoint for staff to refresh a member's Stripe history",
+      "Creates billing session and records usage when visitors are assigned to bookings"
+    ]
+  },
+  {
     version: "9.7.0",
     date: "2026-01-24",
     title: "Stripe & Trackman Billing Harmony",

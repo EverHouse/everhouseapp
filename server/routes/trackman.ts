@@ -16,6 +16,9 @@ import { getGuestPassesRemaining } from './guestPasses';
 import { getMemberTierByEmail, getTierLimits, getDailyBookedMinutes, getTotalDailyUsageMinutes } from '../core/tierService';
 import { calculateAndCacheParticipantFees } from '../core/billing/feeCalculator';
 import { logFromRequest } from '../core/auditLog';
+import { getStripeClient } from '../core/stripe/client';
+import { getOrCreateStripeCustomer } from '../core/stripe/customers';
+import { recordUsage } from '../core/bookingService/sessionManager';
 
 const router = Router();
 
@@ -152,7 +155,7 @@ router.get('/api/admin/trackman/unmatched', isStaffOrAdmin, async (req, res) => 
   }
 });
 
-// Resolve unmatched booking - link to a member
+// Resolve unmatched booking - link to a member or visitor
 router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -164,9 +167,9 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
       return res.status(400).json({ error: 'Email is required (memberEmail or email)' });
     }
     
-    // Find the member or visitor
+    // Find the member or visitor with role info
     const memberResult = await pool.query(
-      `SELECT id, email, first_name, last_name FROM users WHERE email = $1`,
+      `SELECT id, email, first_name, last_name, role, stripe_customer_id, tier FROM users WHERE email = $1`,
       [resolveEmail]
     );
     
@@ -175,10 +178,13 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
     }
     
     const member = memberResult.rows[0];
+    const isVisitor = member.role === 'visitor';
     
-    // Get the booking to check the trackman_booking_id
+    // Get the booking details including date and duration
     const bookingResult = await pool.query(
-      `SELECT trackman_booking_id, staff_notes FROM booking_requests WHERE id = $1`,
+      `SELECT id, trackman_booking_id, staff_notes, request_date, start_time, end_time, 
+              duration_minutes, resource_id, session_id
+       FROM booking_requests WHERE id = $1`,
       [id]
     );
     
@@ -189,7 +195,7 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
     const booking = bookingResult.rows[0];
     const staffEmail = (req as any).session?.user?.email || 'admin';
     
-    // Update the booking to link it to the member
+    // Update the booking to link it to the member/visitor
     await pool.query(
       `UPDATE booking_requests 
        SET user_id = $1, 
@@ -206,8 +212,165 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
       ]
     );
     
-    // If rememberEmail is true and there's a trackman_booking_id, we could save this association
-    // (This would be for future imports to auto-match)
+    let billingMessage = '';
+    
+    // Handle billing for visitors (day pass holders)
+    if (isVisitor) {
+      try {
+        const bookingDate = booking.request_date;
+        const bookingDateStr = typeof bookingDate === 'string' ? bookingDate : 
+          new Date(bookingDate).toISOString().split('T')[0];
+        
+        // Check if visitor already has a day pass purchase for the BOOKING date
+        // Use booking_date column for reliable duplicate detection
+        // Fallback: also check created_at for legacy rows without booking_date
+        const existingDayPass = await pool.query(
+          `SELECT id, stripe_payment_intent_id FROM day_pass_purchases 
+           WHERE user_id = $1 
+           AND product_type = 'day-pass-golf-sim'
+           AND (booking_date = $2::date OR (booking_date IS NULL AND DATE(created_at AT TIME ZONE 'America/Los_Angeles') = $2::date))
+           AND (status IS NULL OR status != 'cancelled')`,
+          [member.id, bookingDateStr]
+        );
+        
+        if (existingDayPass.rows.length === 0) {
+          // Get day pass price
+          const dayPassResult = await pool.query(
+            `SELECT price_cents, stripe_price_id, name FROM membership_tiers 
+             WHERE slug = 'day-pass-golf-sim' AND is_active = true`
+          );
+          
+          if (dayPassResult.rows.length > 0) {
+            const dayPass = dayPassResult.rows[0];
+            const amountCents = dayPass.price_cents || 5000;
+            
+            // Ensure visitor has a Stripe customer
+            const { customerId } = await getOrCreateStripeCustomer(
+              member.id,
+              member.email,
+              `${member.first_name} ${member.last_name}`.trim()
+            );
+            
+            const stripe = await getStripeClient();
+            
+            // Check if visitor has a saved payment method
+            const paymentMethods = await stripe.paymentMethods.list({
+              customer: customerId,
+              type: 'card',
+              limit: 1
+            });
+            
+            let paymentStatus = 'pending';
+            let paymentIntentId = '';
+            
+            if (paymentMethods.data.length > 0) {
+              // Charge immediately using saved payment method
+              const paymentIntent = await stripe.paymentIntents.create({
+                amount: amountCents,
+                currency: 'usd',
+                customer: customerId,
+                payment_method: paymentMethods.data[0].id,
+                confirm: true,
+                off_session: true,
+                description: `Day Pass - Golf Simulator (${bookingDateStr})`,
+                metadata: {
+                  type: 'day_pass',
+                  product_slug: 'day-pass-golf-sim',
+                  booking_id: booking.id.toString(),
+                  booking_date: bookingDateStr,
+                  visitor_email: member.email,
+                  created_via: 'trackman_resolve'
+                }
+              });
+              
+              paymentIntentId = paymentIntent.id;
+              paymentStatus = paymentIntent.status === 'succeeded' ? 'paid' : 'pending';
+              
+              if (paymentIntent.status === 'succeeded') {
+                billingMessage = ` Day pass charged: $${(amountCents / 100).toFixed(2)}.`;
+                console.log(`[Trackman Resolve] Day pass charged for visitor ${member.email}: $${(amountCents / 100).toFixed(2)}`);
+              } else {
+                billingMessage = ` Day pass payment initiated ($${(amountCents / 100).toFixed(2)}).`;
+              }
+            } else {
+              // No saved payment method - create invoice for manual payment
+              const invoice = await stripe.invoices.create({
+                customer: customerId,
+                auto_advance: true,
+                collection_method: 'send_invoice',
+                days_until_due: 1,
+                metadata: {
+                  type: 'day_pass',
+                  product_slug: 'day-pass-golf-sim',
+                  booking_id: booking.id.toString(),
+                  booking_date: bookingDateStr,
+                  visitor_email: member.email,
+                  created_via: 'trackman_resolve'
+                }
+              });
+              
+              // Add line item
+              await stripe.invoiceItems.create({
+                customer: customerId,
+                invoice: invoice.id,
+                amount: amountCents,
+                currency: 'usd',
+                description: `Day Pass - Golf Simulator (${bookingDateStr})`
+              });
+              
+              // Finalize and send
+              await stripe.invoices.finalizeInvoice(invoice.id);
+              await stripe.invoices.sendInvoice(invoice.id);
+              
+              paymentIntentId = invoice.id;
+              billingMessage = ` Day pass invoice sent ($${(amountCents / 100).toFixed(2)}).`;
+              console.log(`[Trackman Resolve] Day pass invoice sent for visitor ${member.email}: $${(amountCents / 100).toFixed(2)}`);
+            }
+            
+            // Record the day pass purchase with booking_date for reliable duplicate detection
+            await pool.query(
+              `INSERT INTO day_pass_purchases 
+               (user_id, product_type, quantity, amount_cents, stripe_payment_intent_id, booking_date, status, created_at)
+               VALUES ($1, 'day-pass-golf-sim', 1, $2, $3, $4, $5, NOW())`,
+              [member.id, amountCents, paymentIntentId, bookingDateStr, paymentStatus]
+            );
+          }
+        } else {
+          billingMessage = ' (Day pass already purchased for this date)';
+        }
+        
+        // Create/update billing session for this booking
+        let sessionId = booking.session_id;
+        if (!sessionId) {
+          const sessionResult = await pool.query(`
+            INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
+            VALUES ($1, $2, $3, $4, $5, 'trackman', 'staff_resolve')
+            RETURNING id
+          `, [booking.resource_id, bookingDateStr, booking.start_time, booking.end_time, booking.trackman_booking_id]);
+          
+          if (sessionResult.rows.length > 0) {
+            sessionId = sessionResult.rows[0].id;
+            await pool.query(
+              `UPDATE booking_requests SET session_id = $1 WHERE id = $2`,
+              [sessionId, booking.id]
+            );
+          }
+        }
+        
+        // Record usage for the visitor (use user ID, not email)
+        if (sessionId) {
+          await recordUsage(sessionId, {
+            memberId: member.id,
+            minutesCharged: booking.duration_minutes || 60,
+            overageMinutes: 0,
+            overageFeeCents: 0
+          });
+        }
+      } catch (billingError: any) {
+        console.error('[Trackman Resolve] Billing error for visitor:', billingError);
+        billingMessage = ' (Billing setup failed - manual follow-up needed)';
+      }
+    }
     
     // Log the action
     await logFromRequest(req, {
@@ -218,13 +381,15 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
       details: { 
         linkedEmail: member.email, 
         memberName: `${member.first_name} ${member.last_name}`,
-        trackmanId: booking.trackman_booking_id
+        trackmanId: booking.trackman_booking_id,
+        isVisitor,
+        billingApplied: billingMessage.length > 0
       }
     });
     
     res.json({ 
       success: true, 
-      message: `Booking linked to ${member.first_name} ${member.last_name}` 
+      message: `Booking linked to ${member.first_name} ${member.last_name}${billingMessage}` 
     });
   } catch (error: any) {
     console.error('Error resolving unmatched booking:', error);

@@ -352,6 +352,163 @@ router.post('/api/financials/backfill-stripe-cache', isStaffOrAdmin, async (req:
 });
 
 /**
+ * POST /api/financials/sync-member-payments
+ * Manually sync a specific member's payments from Stripe to the cache
+ * Staff can use this to refresh payment history for a member
+ * Requires staff authentication
+ */
+router.post('/api/financials/sync-member-payments', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { email, daysBack = 365 } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Email is required' });
+    }
+    
+    // Find the user's Stripe customer ID
+    const userResult = await pool.query(
+      `SELECT id, stripe_customer_id, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)`,
+      [email]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    
+    const user = userResult.rows[0];
+    if (!user.stripe_customer_id) {
+      return res.status(400).json({ success: false, error: 'User has no Stripe customer linked' });
+    }
+    
+    const stripe = await getStripeClient();
+    const startDate = Math.floor((Date.now() - (daysBack * 24 * 60 * 60 * 1000)) / 1000);
+    
+    let paymentsProcessed = 0;
+    let invoicesProcessed = 0;
+    const errors: string[] = [];
+    
+    console.log(`[Financials Sync] Syncing payments for ${email} (customer: ${user.stripe_customer_id})...`);
+    
+    // Fetch all payment intents for this customer (with pagination)
+    try {
+      let hasMore = true;
+      let startingAfter: string | undefined;
+      
+      while (hasMore) {
+        const params: Stripe.PaymentIntentListParams = {
+          customer: user.stripe_customer_id,
+          limit: 100,
+          created: { gte: startDate },
+          expand: ['data.customer']
+        };
+        if (startingAfter) params.starting_after = startingAfter;
+        
+        const page = await stripe.paymentIntents.list(params);
+        
+        for (const pi of page.data) {
+          if (pi.status === 'succeeded' || pi.status === 'requires_payment_method') {
+            const customer = pi.customer && typeof pi.customer === 'object' ? pi.customer as Stripe.Customer : null;
+            await upsertTransactionCache({
+              stripeId: pi.id,
+              objectType: 'payment_intent',
+              status: pi.status,
+              amountCents: pi.amount,
+              currency: pi.currency || 'usd',
+              createdAt: new Date(pi.created * 1000),
+              customerId: user.stripe_customer_id,
+              customerEmail: email.toLowerCase(),
+              customerName: customer?.name || `${user.first_name} ${user.last_name}`.trim(),
+              description: pi.description || pi.metadata?.productName || 'Stripe payment',
+              metadata: pi.metadata,
+              source: 'backfill',
+              paymentIntentId: pi.id,
+            });
+            paymentsProcessed++;
+          }
+        }
+        
+        hasMore = page.has_more;
+        if (page.data.length > 0) {
+          startingAfter = page.data[page.data.length - 1].id;
+        }
+      }
+    } catch (err: any) {
+      errors.push(`PaymentIntents error: ${err.message}`);
+    }
+    
+    // Fetch all invoices for this customer (with pagination)
+    try {
+      let hasMore = true;
+      let startingAfter: string | undefined;
+      
+      while (hasMore) {
+        const params: Stripe.InvoiceListParams = {
+          customer: user.stripe_customer_id,
+          limit: 100,
+          created: { gte: startDate },
+          expand: ['data.customer']
+        };
+        if (startingAfter) params.starting_after = startingAfter;
+        
+        const page = await stripe.invoices.list(params);
+        
+        for (const inv of page.data) {
+          if (inv.status === 'paid' || inv.status === 'open' || inv.status === 'uncollectible') {
+            const customer = inv.customer && typeof inv.customer === 'object' ? inv.customer as Stripe.Customer : null;
+            await upsertTransactionCache({
+              stripeId: inv.id,
+              objectType: 'invoice',
+              status: inv.status || 'unknown',
+              amountCents: inv.amount_paid || inv.amount_due || 0,
+              currency: inv.currency || 'usd',
+              createdAt: new Date(inv.created * 1000),
+              customerId: user.stripe_customer_id,
+              customerEmail: email.toLowerCase(),
+              customerName: customer?.name || `${user.first_name} ${user.last_name}`.trim(),
+              description: inv.lines?.data?.[0]?.description || 'Invoice payment',
+              metadata: inv.metadata,
+              source: 'backfill',
+              invoiceId: inv.id,
+            });
+            invoicesProcessed++;
+          }
+        }
+        
+        hasMore = page.has_more;
+        if (page.data.length > 0) {
+          startingAfter = page.data[page.data.length - 1].id;
+        }
+      }
+    } catch (err: any) {
+      errors.push(`Invoices error: ${err.message}`);
+    }
+    
+    console.log(`[Financials Sync] Complete for ${email}: ${paymentsProcessed} payments, ${invoicesProcessed} invoices`);
+    
+    res.json({
+      success: true,
+      member: { 
+        email, 
+        name: `${user.first_name} ${user.last_name}`.trim(),
+        stripeCustomerId: user.stripe_customer_id
+      },
+      synced: {
+        payments: paymentsProcessed,
+        invoices: invoicesProcessed,
+        total: paymentsProcessed + invoicesProcessed
+      },
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error: any) {
+    console.error('[Financials Sync] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to sync member payments'
+    });
+  }
+});
+
+/**
  * GET /api/financials/cache-stats
  * Returns statistics about the stripe_transaction_cache
  * Requires staff authentication
