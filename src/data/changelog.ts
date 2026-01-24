@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.6.1",
+    date: "2026-01-24",
+    title: "Fix Trackman Resolve Booking",
+    changes: [
+      "Fixed: Resolve booking now works - was looking for wrong parameter name",
+      "Staff can now successfully assign unmatched Trackman bookings to members or visitors"
+    ]
+  },
+  {
     version: "9.6.0",
     date: "2026-01-24",
     title: "Create Visitor from Trackman Bookings",

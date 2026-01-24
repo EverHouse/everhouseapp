@@ -156,16 +156,18 @@ router.get('/api/admin/trackman/unmatched', isStaffOrAdmin, async (req, res) => 
 router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { email, rememberEmail } = req.body;
+    // Accept both 'email' and 'memberEmail' for backwards compatibility
+    const { email, memberEmail, rememberEmail } = req.body;
+    const resolveEmail = memberEmail || email;
     
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
+    if (!resolveEmail) {
+      return res.status(400).json({ error: 'Email is required (memberEmail or email)' });
     }
     
-    // Find the member
+    // Find the member or visitor
     const memberResult = await pool.query(
       `SELECT id, email, first_name, last_name FROM users WHERE email = $1`,
-      [email]
+      [resolveEmail]
     );
     
     if (memberResult.rows.length === 0) {
