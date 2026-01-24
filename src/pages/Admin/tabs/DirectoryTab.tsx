@@ -545,21 +545,48 @@ const DirectoryTab: React.FC = () => {
                 case 'name':
                     const nameA = [a.firstName, a.lastName].filter(Boolean).join(' ').toLowerCase();
                     const nameB = [b.firstName, b.lastName].filter(Boolean).join(' ').toLowerCase();
-                    comparison = nameA.localeCompare(nameB);
+                    if (!nameA && !nameB) comparison = 0;
+                    else if (!nameA) comparison = 1;
+                    else if (!nameB) comparison = -1;
+                    else comparison = nameA.localeCompare(nameB);
                     break;
                 case 'type':
-                    comparison = (a.type || '').localeCompare(b.type || '');
+                    const typeA = a.type || '';
+                    const typeB = b.type || '';
+                    if (!typeA && !typeB) comparison = 0;
+                    else if (!typeA) comparison = 1;
+                    else if (!typeB) comparison = -1;
+                    else comparison = typeA.localeCompare(typeB);
                     break;
                 case 'source':
-                    comparison = (a.source || '').localeCompare(b.source || '');
+                    const sourceA = a.source || '';
+                    const sourceB = b.source || '';
+                    if (!sourceA && !sourceB) comparison = 0;
+                    else if (!sourceA) comparison = 1;
+                    else if (!sourceB) comparison = -1;
+                    else comparison = sourceA.localeCompare(sourceB);
                     break;
                 case 'lastActivity':
-                    const dateA = a.lastActivityAt || a.lastPurchaseDate || a.lastGuestDate || '';
-                    const dateB = b.lastActivityAt || b.lastPurchaseDate || b.lastGuestDate || '';
-                    comparison = dateA.localeCompare(dateB);
+                    const dateStrA = a.lastActivityAt || a.lastPurchaseDate || a.lastGuestDate;
+                    const dateStrB = b.lastActivityAt || b.lastPurchaseDate || b.lastGuestDate;
+                    const timestampA = dateStrA ? Date.parse(dateStrA) : NaN;
+                    const timestampB = dateStrB ? Date.parse(dateStrB) : NaN;
+                    const validA = !isNaN(timestampA);
+                    const validB = !isNaN(timestampB);
+                    if (!validA && !validB) comparison = 0;
+                    else if (!validA) comparison = 1;
+                    else if (!validB) comparison = -1;
+                    else comparison = timestampA - timestampB;
                     break;
                 case 'createdAt':
-                    comparison = (a.createdAt || '').localeCompare(b.createdAt || '');
+                    const createdA = a.createdAt ? Date.parse(a.createdAt) : NaN;
+                    const createdB = b.createdAt ? Date.parse(b.createdAt) : NaN;
+                    const createdValidA = !isNaN(createdA);
+                    const createdValidB = !isNaN(createdB);
+                    if (!createdValidA && !createdValidB) comparison = 0;
+                    else if (!createdValidA) comparison = 1;
+                    else if (!createdValidB) comparison = -1;
+                    else comparison = createdA - createdB;
                     break;
             }
             return visitorSortDirection === 'asc' ? comparison : -comparison;
