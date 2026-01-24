@@ -135,7 +135,54 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
   const [expandedEventId, setExpandedEventId] = useState<number | null>(null);
   const [autoMatchingEventId, setAutoMatchingEventId] = useState<number | null>(null);
   const [autoMatchResult, setAutoMatchResult] = useState<{ eventId: number; success: boolean; message: string } | null>(null);
+  const [showReplayModal, setShowReplayModal] = useState(false);
+  const [replayDevUrl, setReplayDevUrl] = useState('');
+  const [replayLimit, setReplayLimit] = useState(100);
+  const [isReplaying, setIsReplaying] = useState(false);
+  const [replayResult, setReplayResult] = useState<{ success: boolean; message: string; sent?: number; failed?: number } | null>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
+
+  const handleReplayToDev = async () => {
+    if (!replayDevUrl) return;
+    
+    setIsReplaying(true);
+    setReplayResult(null);
+    
+    try {
+      const res = await fetch('/api/trackman/replay-webhooks-to-dev', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          dev_url: replayDevUrl,
+          limit: replayLimit
+        })
+      });
+      
+      const result = await res.json();
+      
+      if (res.ok) {
+        setReplayResult({
+          success: true,
+          message: result.message,
+          sent: result.sent,
+          failed: result.failed
+        });
+      } else {
+        setReplayResult({
+          success: false,
+          message: result.error || 'Failed to replay webhooks'
+        });
+      }
+    } catch (err: any) {
+      setReplayResult({
+        success: false,
+        message: err.message || 'Network error'
+      });
+    } finally {
+      setIsReplaying(false);
+    }
+  };
 
   const fetchWebhookEvents = useCallback(async (page: number) => {
     setWebhookLoading(true);
@@ -271,9 +318,18 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
 
       {showSection && (
         <div className="mt-4 space-y-4">
-          <p className="text-xs md:text-sm text-primary/70 dark:text-white/70">
-            Real-time webhook events received from Trackman. These events automatically update bay availability and booking status.
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs md:text-sm text-primary/70 dark:text-white/70">
+              Real-time webhook events received from Trackman. These events automatically update bay availability and booking status.
+            </p>
+            <button
+              onClick={() => setShowReplayModal(true)}
+              className="shrink-0 px-3 py-1.5 text-xs font-medium bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-500/30 transition-colors flex items-center gap-1"
+            >
+              <span className="material-symbols-outlined text-sm">send</span>
+              Replay to Dev
+            </button>
+          </div>
 
           {webhookStats && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
@@ -590,6 +646,87 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {showReplayModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowReplayModal(false)}>
+          <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-primary dark:text-white">Replay Webhooks to Dev</h3>
+              <button onClick={() => setShowReplayModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full">
+                <span className="material-symbols-outlined text-gray-500">close</span>
+              </button>
+            </div>
+            
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              Send all stored Trackman webhook events to your development environment for testing.
+            </p>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Dev Webhook URL
+                </label>
+                <input
+                  type="url"
+                  value={replayDevUrl}
+                  onChange={e => setReplayDevUrl(e.target.value)}
+                  placeholder="https://your-dev-app.replit.app/api/webhooks/trackman"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-primary dark:text-white placeholder:text-gray-400 text-sm"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Limit (max events to send)
+                </label>
+                <input
+                  type="number"
+                  value={replayLimit}
+                  onChange={e => setReplayLimit(parseInt(e.target.value) || 100)}
+                  min={1}
+                  max={500}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-primary dark:text-white text-sm"
+                />
+              </div>
+            </div>
+            
+            {replayResult && (
+              <div className={`p-3 rounded-lg text-sm ${replayResult.success ? 'bg-green-100 dark:bg-green-500/20 text-green-800 dark:text-green-300' : 'bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-300'}`}>
+                <p className="font-medium">{replayResult.message}</p>
+                {replayResult.sent !== undefined && (
+                  <p className="text-xs mt-1">Sent: {replayResult.sent} | Failed: {replayResult.failed}</p>
+                )}
+              </div>
+            )}
+            
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setShowReplayModal(false)}
+                className="flex-1 py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-white/5"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReplayToDev}
+                disabled={!replayDevUrl || isReplaying}
+                className="flex-1 py-2 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-lg font-medium flex items-center justify-center gap-2"
+              >
+                {isReplaying ? (
+                  <>
+                    <span className="animate-spin material-symbols-outlined text-sm">refresh</span>
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-sm">send</span>
+                    Replay All
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
