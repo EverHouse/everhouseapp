@@ -2185,7 +2185,8 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
       const isActive = status === 'active' || !status;
       
       return {
-        id: member.hubspotId || member.id,
+        id: member.id,
+        hubspotId: member.hubspotId,
         firstName: member.firstName,
         lastName: member.lastName,
         email: member.email,

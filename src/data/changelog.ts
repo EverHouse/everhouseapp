@@ -17,9 +17,9 @@ export const changelog: ChangelogEntry[] = [
     date: "2026-01-24",
     title: "Fixed Assign Member Button",
     changes: [
-      "Fixed 'Assign Member' button not responding when clicked - now properly saves member to booking",
+      "Fixed 'Assign Member' button not working - was incorrectly using HubSpot IDs instead of user IDs",
       "Member search input shows green border and checkmark when member is selected",
-      "Success toast notification displayed after successfully assigning a member",
+      "Success message displayed after successfully assigning a member to a booking",
       "Partial roster bookings now show 'X/Y Players' button on queue list instead of 'Check In'",
       "Calendar shows dotted green outline for bookings that need more players",
       "Conference rooms now display lavender 'Conf' badge correctly in all views"
