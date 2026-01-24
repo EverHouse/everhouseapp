@@ -493,16 +493,15 @@ router.post('/api/auth/request-otp', async (req, res) => {
       expiresAt
     });
     
-    // Respond immediately - email sending happens in background for faster UX
-    res.json({ success: true, message: 'Login code sent to your email' });
-    
-    // Send email asynchronously (non-blocking) after response
+    // Send email synchronously to ensure delivery before responding
     const logoUrl = 'https://everhouse.app/assets/logos/monogram-dark.webp';
+    const startTime = Date.now();
+    console.log(`[OTP Email] Starting send to ${normalizedEmail.substring(0, 5)}***`);
     
-    (async () => {
-      try {
-        const { client: resendClient, fromEmail } = await getResendClient();
-        const emailResult = await withResendRetry(() => resendClient.emails.send({
+    try {
+      const { client: resendClient, fromEmail } = await getResendClient();
+      console.log(`[OTP Email] Resend client ready in ${Date.now() - startTime}ms`);
+      const emailResult = await withResendRetry(() => resendClient.emails.send({
           from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
           to: normalizedEmail,
           subject: 'Your Ever House Login Code',
@@ -576,17 +575,18 @@ router.post('/api/auth/request-otp', async (req, res) => {
           `
         }));
         
-        if (!isProduction) console.log('Resend OTP email result:', JSON.stringify(emailResult));
-        
-        if (emailResult.error) {
-          console.error('[OTP Email] Failed to send:', emailResult.error);
-        }
-      } catch (emailError: any) {
-        console.error('[OTP Email] Error sending email:', emailError?.message || emailError);
+      console.log(`[OTP Email] Sent successfully in ${Date.now() - startTime}ms`, emailResult.data?.id);
+      
+      if (emailResult.error) {
+        console.error('[OTP Email] Resend API error:', emailResult.error);
+        return res.status(500).json({ error: 'Failed to send login code. Please try again.' });
       }
-    })();
-    
-    return;
+      
+      return res.json({ success: true, message: 'Login code sent to your email' });
+    } catch (emailError: any) {
+      console.error('[OTP Email] Error sending email:', emailError?.message || emailError);
+      return res.status(500).json({ error: 'Failed to send login code. Please try again.' });
+    }
   } catch (error: any) {
     if (!isProduction) console.error('OTP request error:', error?.message || error);
     
