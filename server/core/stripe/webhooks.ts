@@ -230,6 +230,44 @@ async function handleChargeRefunded(charge: any): Promise<void> {
       chargeId: id,
       source: 'webhook',
     }).catch(err => console.error('[Stripe Webhook] Cache update failed for PI refund:', err));
+    
+    // Update booking_participants to 'refunded' status for this payment intent
+    try {
+      const participantUpdate = await pool.query(
+        `UPDATE booking_participants 
+         SET payment_status = 'refunded', refunded_at = NOW()
+         WHERE stripe_payment_intent_id = $1 AND payment_status = 'paid'
+         RETURNING id, session_id, user_email`,
+        [paymentIntentId]
+      );
+      
+      if (participantUpdate.rowCount && participantUpdate.rowCount > 0) {
+        console.log(`[Stripe Webhook] Marked ${participantUpdate.rowCount} participant(s) as refunded for PI ${paymentIntentId}`);
+        
+        // Also update usage_ledger payment_method to 'refunded' for tracking
+        const sessionIds = [...new Set(participantUpdate.rows.map(r => r.session_id).filter(Boolean))];
+        const memberIds = [...new Set(participantUpdate.rows.map(r => r.user_email).filter(Boolean))];
+        
+        for (const sessionId of sessionIds) {
+          // Get user IDs from the participants
+          for (const memberEmail of memberIds) {
+            const userResult = await pool.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [memberEmail]);
+            const userId = userResult.rows[0]?.id;
+            if (userId) {
+              await pool.query(
+                `UPDATE usage_ledger 
+                 SET payment_method = 'refunded'
+                 WHERE session_id = $1 AND member_id = $2`,
+                [sessionId, userId]
+              );
+            }
+          }
+        }
+        console.log(`[Stripe Webhook] Updated usage_ledger for ${sessionIds.length} session(s)`);
+      }
+    } catch (err) {
+      console.error('[Stripe Webhook] Error updating booking participants/usage for refund:', err);
+    }
   }
   
   broadcastBillingUpdate({ type: 'refund', chargeId: id, status, amountRefunded: amount_refunded });
@@ -277,23 +315,30 @@ async function handlePaymentIntentSucceeded(paymentIntent: any): Promise<void> {
   const feeSnapshotId = metadata?.feeSnapshotId ? parseInt(metadata.feeSnapshotId, 10) : NaN;
   
   if (!isNaN(feeSnapshotId)) {
+    const client = await pool.connect();
     try {
-      const snapshotResult = await pool.query(
+      await client.query('BEGIN');
+      
+      // Lock the snapshot row to prevent concurrent processing
+      const snapshotResult = await client.query(
         `SELECT bfs.*, bs.booking_id as verified_booking_id
          FROM booking_fee_snapshots bfs
          JOIN booking_sessions bs ON bfs.session_id = bs.id
-         WHERE bfs.id = $1 AND bfs.stripe_payment_intent_id = $2 AND bfs.status = 'pending'`,
+         WHERE bfs.id = $1 AND bfs.stripe_payment_intent_id = $2 AND bfs.status = 'pending'
+         FOR UPDATE OF bfs SKIP LOCKED`,
         [feeSnapshotId, id]
       );
       
       if (snapshotResult.rows.length === 0) {
-        console.error(`[Stripe Webhook] Fee snapshot ${feeSnapshotId} not found or already used for intent ${id}`);
+        await client.query('ROLLBACK');
+        console.error(`[Stripe Webhook] Fee snapshot ${feeSnapshotId} not found, already used, or locked by another process`);
         return;
       }
       
       const snapshot = snapshotResult.rows[0];
       
       if (Math.abs(snapshot.total_cents - amount) > 1) {
+        await client.query('ROLLBACK');
         console.error(`[Stripe Webhook] Amount mismatch: snapshot=${snapshot.total_cents}, payment=${amount} - rejecting`);
         return;
       }
@@ -301,8 +346,9 @@ async function handlePaymentIntentSucceeded(paymentIntent: any): Promise<void> {
       const snapshotFees: ParticipantFee[] = snapshot.participant_fees;
       const participantIds = snapshotFees.map(pf => pf.id);
       
-      const statusCheck = await pool.query(
-        `SELECT id, payment_status FROM booking_participants WHERE id = ANY($1::int[])`,
+      // Lock participant rows to prevent concurrent updates
+      const statusCheck = await client.query(
+        `SELECT id, payment_status FROM booking_participants WHERE id = ANY($1::int[]) FOR UPDATE`,
         [participantIds]
       );
       
@@ -321,15 +367,19 @@ async function handlePaymentIntentSucceeded(paymentIntent: any): Promise<void> {
         validatedParticipantIds.push(pf.id);
       }
       
-      await pool.query(
+      await client.query(
         `UPDATE booking_fee_snapshots SET status = 'completed', used_at = NOW() WHERE id = $1`,
         [feeSnapshotId]
       );
       
-      console.log(`[Stripe Webhook] Validated ${validatedParticipantIds.length} participants from snapshot ${feeSnapshotId}`);
+      await client.query('COMMIT');
+      console.log(`[Stripe Webhook] Validated ${validatedParticipantIds.length} participants from snapshot ${feeSnapshotId} (transaction committed)`);
     } catch (err) {
+      await client.query('ROLLBACK');
       console.error('[Stripe Webhook] Failed to validate from snapshot:', err);
       throw err; // Throw so Stripe retries the webhook
+    } finally {
+      client.release();
     }
   } else if (metadata?.participantFees && !isNaN(bookingId) && bookingId > 0) {
     console.warn(`[Stripe Webhook] No snapshot ID - falling back to DB cached fee validation`);

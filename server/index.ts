@@ -78,6 +78,7 @@ import { startInviteExpiryScheduler } from './schedulers/inviteExpiryScheduler';
 import { startCommunicationLogsScheduler } from './schedulers/communicationLogsScheduler';
 import { startWebhookLogCleanupScheduler } from './schedulers/webhookLogCleanupScheduler';
 import { startSessionCleanupScheduler } from './schedulers/sessionCleanupScheduler';
+import { startUnresolvedTrackmanScheduler } from './schedulers/unresolvedTrackmanScheduler';
 import { processStripeWebhook, getStripeSync } from './core/stripe';
 import { runMigrations } from 'stripe-replit-sync';
 import { enableRealtimeForTable } from './core/supabase/client';
@@ -632,6 +633,7 @@ async function startServer() {
   startCommunicationLogsScheduler();
   startWebhookLogCleanupScheduler();
   startSessionCleanupScheduler();
+  startUnresolvedTrackmanScheduler();
 }
 
 startServer().catch((err) => {

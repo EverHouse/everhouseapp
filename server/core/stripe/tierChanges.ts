@@ -104,7 +104,7 @@ export async function commitTierChange(
   newPriceId: string,
   immediate: boolean,
   staffEmail: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; warning?: string }> {
   try {
     const stripe = await getStripeClient();
     
@@ -165,7 +165,23 @@ export async function commitTierChange(
     
     console.log(`[Tier Change] Staff ${staffEmail} changed ${memberEmail} from ${currentTierName} to ${tier.name} (${changeType})`);
     
-    return { success: true };
+    // Verification: Check if DB tier was properly updated
+    let warning: string | undefined;
+    if (immediate) {
+      const userResult = await pool.query(
+        'SELECT tier FROM users WHERE LOWER(email) = LOWER($1)',
+        [memberEmail]
+      );
+      if (userResult.rows.length > 0) {
+        const actualTier = userResult.rows[0].tier;
+        if (actualTier !== tier.name) {
+          warning = `Expected ${tier.name} but DB shows ${actualTier}`;
+          console.log(`[Tier Change] VERIFICATION FAILED: ${warning}`);
+        }
+      }
+    }
+    
+    return { success: true, ...(warning && { warning }) };
   } catch (error: any) {
     console.error('[Tier Change] Commit error:', error);
     return { success: false, error: error.message };
