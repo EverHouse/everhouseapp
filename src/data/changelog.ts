@@ -13,15 +13,29 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "9.11.0",
+    version: "9.12.0",
     date: "2026-01-24",
-    title: "Unified Visits System",
+    title: "Member Visits Tab",
     isMajor: true,
     changes: [
-      "New: Visits tab now shows ALL club visits - as host, guest, added player, wellness classes, and events",
+      "New: History page now shows a unified Visits tab combining all your club activity",
+      "New: See every booking you attended - whether as host, added player, or guest",
+      "New: Guest visits show who invited you; player visits show who you played with",
+      "New: Digital card lifetime visits now includes all visit types, not just bookings you created",
+      "Improved: Simplified navigation - just Visits and Payments tabs",
+      "Improved: Each visit shows a colored role badge for easy identification"
+    ]
+  },
+  {
+    version: "9.11.0",
+    date: "2026-01-24",
+    title: "Unified Visits System (Staff)",
+    isMajor: false,
+    changes: [
+      "New: Staff profile drawer Visits tab shows ALL member visits - as host, guest, player, wellness, events",
       "New: Each visit shows a role badge (Host, Player, Guest, Wellness, Event) for easy identification",
       "New: Guest visits show who invited them to the booking",
-      "Improved: Lifetime visits count now includes all visit types, not just bookings you created",
+      "Improved: Lifetime visits count in directory now includes all visit types",
       "Improved: Last visit date in directory now reflects most recent activity across all visit types",
       "Improved: Directory now counts wellness class attendance toward lifetime visits"
     ]
