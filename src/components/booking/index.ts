@@ -9,4 +9,5 @@ export { default as AddMemberModal } from './AddMemberModal';
 export { default as GuestEntryModal } from './GuestEntryModal';
 export { default as MemberPaymentModal } from './MemberPaymentModal';
 export type { MemberPaymentModalProps } from './MemberPaymentModal';
+export { default as GuestPaymentChoiceModal } from './GuestPaymentChoiceModal';
 export { default as GuardianConsentForm, type GuardianConsentData } from './GuardianConsentForm';

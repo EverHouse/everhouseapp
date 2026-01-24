@@ -7,6 +7,7 @@ import ModalShell from '../ModalShell';
 import Avatar from '../Avatar';
 import Input from '../Input';
 import MemberPaymentModal from './MemberPaymentModal';
+import GuestPaymentChoiceModal from './GuestPaymentChoiceModal';
 
 export interface RosterParticipant {
   id: number;
@@ -153,6 +154,9 @@ const RosterManager: React.FC<RosterManagerProps> = ({
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [conflictDetails, setConflictDetails] = useState<BookingConflictDetails | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showGuestPaymentChoiceModal, setShowGuestPaymentChoiceModal] = useState(false);
+  const [pendingGuestName, setPendingGuestName] = useState('');
+  const [pendingGuestEmail, setPendingGuestEmail] = useState('');
 
   const canManage = isOwner || isStaff;
 
@@ -338,7 +342,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
     }
   };
 
-  const handleAddGuest = async () => {
+  const handleAddGuest = () => {
     if (!guestName.trim()) {
       showToast('Please enter the guest name', 'error');
       return;
@@ -350,44 +354,15 @@ const RosterManager: React.FC<RosterManagerProps> = ({
       return;
     }
     
-    setAddingGuest(true);
     haptic.light();
     
-    try {
-      const { ok, error } = await apiRequest(
-        `/api/bookings/${bookingId}/participants`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'guest',
-            guest: {
-              name: guestName.trim(),
-              email: guestEmail.trim() || undefined
-            }
-          })
-        }
-      );
-      
-      if (ok) {
-        haptic.success();
-        showToast(`${guestName} added as guest`, 'success');
-        setShowGuestModal(false);
-        setGuestName('');
-        setGuestEmail('');
-        setGuestEmailError(undefined);
-        await fetchParticipants();
-        onUpdate?.();
-      } else {
-        haptic.error();
-        showToast(error || 'Failed to add guest', 'error');
-      }
-    } catch (err) {
-      haptic.error();
-      showToast('Failed to add guest', 'error');
-    } finally {
-      setAddingGuest(false);
-    }
+    setPendingGuestName(guestName.trim());
+    setPendingGuestEmail(guestEmail.trim());
+    setShowGuestModal(false);
+    setShowGuestPaymentChoiceModal(true);
+    setGuestName('');
+    setGuestEmail('');
+    setGuestEmailError(undefined);
   };
 
   const handleRemoveParticipant = async (participantId: number, displayName: string) => {
@@ -565,29 +540,18 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                 </button>
                 <button
                   onClick={() => setShowGuestModal(true)}
-                  disabled={guestPassesRemaining <= 0}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-semibold text-sm transition-all active:scale-[0.98] ${
-                    guestPassesRemaining > 0
-                      ? 'bg-[#CCB8E4] text-[#293515] hover:bg-[#baa6d6]'
-                      : isDark
-                        ? 'bg-white/10 text-white/40 cursor-not-allowed'
-                        : 'bg-black/5 text-black/30 cursor-not-allowed'
-                  }`}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-semibold text-sm transition-all active:scale-[0.98] bg-[#CCB8E4] text-[#293515] hover:bg-[#baa6d6]"
                 >
                   <span className="material-symbols-outlined text-lg">group_add</span>
                   Add Guest
                 </button>
               </div>
-              {guestPassesRemaining > 0 && (
-                <p className={`text-xs text-center ${isDark ? 'text-white/40' : 'text-[#293515]/40'}`}>
-                  {guestPassesRemaining} guest pass{guestPassesRemaining > 1 ? 'es' : ''} remaining this month
-                </p>
-              )}
-              {guestPassesRemaining <= 0 && (
-                <p className={`text-xs text-center ${isDark ? 'text-amber-400/70' : 'text-amber-600'}`}>
-                  No guest passes remaining this month
-                </p>
-              )}
+              <p className={`text-xs text-center ${guestPassesRemaining > 0 ? (isDark ? 'text-white/40' : 'text-[#293515]/40') : (isDark ? 'text-amber-400/70' : 'text-amber-600')}`}>
+                {guestPassesRemaining > 0
+                  ? `${guestPassesRemaining} guest pass${guestPassesRemaining > 1 ? 'es' : ''} remaining this month`
+                  : 'No passes left — $25 guest fee applies'
+                }
+              </p>
             </div>
           )}
 
@@ -822,34 +786,28 @@ const RosterManager: React.FC<RosterManagerProps> = ({
             required
           />
           
-          <div className={`p-3 rounded-xl ${isDark ? 'bg-[#CCB8E4]/10' : 'bg-[#CCB8E4]/20'}`}>
-            <p className={`text-sm ${isDark ? 'text-[#CCB8E4]' : 'text-[#5a4a6d]'}`}>
-              <span className="font-semibold">{guestPassesRemaining}</span> guest pass{guestPassesRemaining !== 1 ? 'es' : ''} remaining this month
+          <div className={`p-3 rounded-xl ${guestPassesRemaining > 0 ? (isDark ? 'bg-[#CCB8E4]/10' : 'bg-[#CCB8E4]/20') : (isDark ? 'bg-amber-500/10' : 'bg-amber-50')}`}>
+            <p className={`text-sm ${guestPassesRemaining > 0 ? (isDark ? 'text-[#CCB8E4]' : 'text-[#5a4a6d]') : (isDark ? 'text-amber-400' : 'text-amber-700')}`}>
+              {guestPassesRemaining > 0
+                ? <>You have <span className="font-semibold">{guestPassesRemaining}</span> guest pass{guestPassesRemaining !== 1 ? 'es' : ''} remaining</>
+                : 'No passes left — a $25 fee will apply'
+              }
             </p>
           </div>
           
           <button
             onClick={handleAddGuest}
-            disabled={addingGuest || !guestName.trim() || !guestEmail.trim()}
+            disabled={!guestName.trim() || !guestEmail.trim()}
             className={`w-full py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              guestName.trim() && guestEmail.trim() && !addingGuest
+              guestName.trim() && guestEmail.trim()
                 ? 'bg-[#293515] text-white hover:bg-[#3a4a20] active:scale-[0.98]'
                 : isDark
                   ? 'bg-white/10 text-white/40 cursor-not-allowed'
                   : 'bg-black/5 text-black/30 cursor-not-allowed'
             }`}
           >
-            {addingGuest ? (
-              <>
-                <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                Adding...
-              </>
-            ) : (
-              <>
-                <span className="material-symbols-outlined text-lg">group_add</span>
-                Add Guest
-              </>
-            )}
+            <span className="material-symbols-outlined text-lg">arrow_forward</span>
+            Continue
           </button>
         </div>
       </ModalShell>
@@ -936,6 +894,32 @@ const RosterManager: React.FC<RosterManagerProps> = ({
           ownerName={booking.ownerName}
           onSuccess={handlePaymentSuccess}
           onClose={() => setShowPaymentModal(false)}
+        />
+      )}
+
+      {showGuestPaymentChoiceModal && booking && (
+        <GuestPaymentChoiceModal
+          bookingId={bookingId}
+          sessionId={booking.sessionId}
+          guestName={pendingGuestName}
+          guestEmail={pendingGuestEmail}
+          ownerEmail={booking.ownerEmail}
+          ownerName={booking.ownerName}
+          guestPassesRemaining={guestPassesRemaining}
+          onSuccess={() => {
+            haptic.success();
+            showToast(`${pendingGuestName} added as guest`, 'success');
+            setShowGuestPaymentChoiceModal(false);
+            setPendingGuestName('');
+            setPendingGuestEmail('');
+            fetchParticipants();
+            onUpdate?.();
+          }}
+          onClose={() => {
+            setShowGuestPaymentChoiceModal(false);
+            setPendingGuestName('');
+            setPendingGuestEmail('');
+          }}
         />
       )}
     </>

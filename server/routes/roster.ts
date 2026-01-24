@@ -42,6 +42,8 @@ import {
   type ConflictingBooking 
 } from '../core/bookingService/conflictDetection';
 import { notifyMember } from '../core/notificationService';
+import { getStripeClient } from '../core/stripe/client';
+import { getOrCreateStripeCustomer } from '../core/stripe/customers';
 
 const router = Router();
 
@@ -1240,6 +1242,369 @@ router.post('/api/bookings/:id/invite/decline', async (req: Request, res: Respon
     res.json({ success: true, message: 'Invite declined successfully' });
   } catch (error: any) {
     logAndRespond(req, res, 500, 'Failed to decline invite', error);
+  }
+});
+
+router.post('/api/bookings/:bookingId/guest-fee-checkout', async (req: Request, res: Response) => {
+  try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const bookingId = parseInt(req.params.bookingId);
+    if (isNaN(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
+
+    const { guestName, guestEmail } = req.body;
+
+    if (!guestName?.trim()) {
+      return res.status(400).json({ error: 'Guest name is required' });
+    }
+
+    if (!guestEmail?.trim()) {
+      return res.status(400).json({ error: 'Guest email is required' });
+    }
+
+    const booking = await getBookingWithSession(bookingId);
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const userEmail = sessionUser.email?.toLowerCase() || '';
+    const isOwner = booking.owner_email?.toLowerCase() === userEmail;
+    const isStaff = await isStaffOrAdminCheck(userEmail);
+
+    if (!isOwner && !isStaff) {
+      return res.status(403).json({ error: 'Only the booking owner or staff can add guests' });
+    }
+
+    let sessionId = booking.session_id;
+
+    if (!sessionId) {
+      logger.info('[roster] Creating session for guest fee checkout', {
+        extra: { bookingId, ownerEmail: booking.owner_email }
+      });
+
+      const { session } = await createSession(
+        {
+          resourceId: booking.resource_id,
+          sessionDate: booking.request_date,
+          startTime: booking.start_time,
+          endTime: booking.end_time,
+          createdBy: userEmail
+        },
+        [],
+        'staff_manual'
+      );
+
+      await linkBookingRequestToSession(bookingId, session.id);
+      sessionId = session.id;
+    }
+
+    const existingParticipants = await getSessionParticipants(sessionId);
+    const declaredCount = booking.declared_player_count || 1;
+    const ownerInParticipants = existingParticipants.some(p => p.participantType === 'owner');
+    const effectiveCount = ownerInParticipants ? existingParticipants.length : (1 + existingParticipants.length);
+
+    if (effectiveCount >= declaredCount) {
+      return res.status(400).json({
+        error: 'Cannot add more participants. Maximum slot limit reached.',
+        declaredPlayerCount: declaredCount,
+        currentCount: effectiveCount
+      });
+    }
+
+    const ownerTier = booking.owner_tier || await getMemberTierByEmail(booking.owner_email);
+
+    if (ownerTier) {
+      const participantsForValidation: ParticipantForValidation[] = [
+        ...existingParticipants.map(p => ({
+          type: p.participantType as 'owner' | 'member' | 'guest',
+          displayName: p.displayName
+        })),
+        { type: 'guest', displayName: guestName.trim() }
+      ];
+
+      const socialCheck = await enforceSocialTierRules(ownerTier, participantsForValidation);
+
+      if (!socialCheck.allowed) {
+        return res.status(403).json({
+          error: socialCheck.reason || 'Social tier members cannot bring guests',
+          errorType: 'social_tier_blocked'
+        });
+      }
+    }
+
+    const guestId = await createOrFindGuest(
+      guestName.trim(),
+      guestEmail.trim(),
+      undefined,
+      sessionUser.id || userEmail
+    );
+
+    const participantInput: ParticipantInput = {
+      guestId,
+      participantType: 'guest',
+      displayName: guestName.trim(),
+    };
+
+    const [newParticipant] = await linkParticipants(sessionId, [participantInput]);
+
+    if (!newParticipant) {
+      return res.status(500).json({ error: 'Failed to add guest participant' });
+    }
+
+    const guestFeeCents = 2500;
+
+    await db.update(bookingParticipants)
+      .set({ 
+        paymentStatus: 'pending',
+        cachedFeeCents: guestFeeCents
+      })
+      .where(eq(bookingParticipants.id, newParticipant.id));
+
+    const stripe = getStripeClient();
+    const customer = await getOrCreateStripeCustomer(
+      booking.owner_email,
+      booking.owner_name || undefined
+    );
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: guestFeeCents,
+      currency: 'usd',
+      customer: customer.id,
+      metadata: {
+        purpose: 'guest_fee',
+        bookingId: bookingId.toString(),
+        sessionId: sessionId.toString(),
+        participantId: newParticipant.id.toString(),
+        guestName: guestName.trim(),
+        guestEmail: guestEmail.trim(),
+        ownerEmail: booking.owner_email
+      },
+      description: `Guest fee for ${guestName.trim()} - Booking #${bookingId}`,
+      automatic_payment_methods: { enabled: true }
+    });
+
+    logger.info('[roster] Guest fee checkout initiated', {
+      extra: {
+        bookingId,
+        sessionId,
+        participantId: newParticipant.id,
+        guestName: guestName.trim(),
+        amount: guestFeeCents,
+        paymentIntentId: paymentIntent.id
+      }
+    });
+
+    res.json({
+      success: true,
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      amount: guestFeeCents,
+      participantId: newParticipant.id
+    });
+  } catch (error: any) {
+    logAndRespond(req, res, 500, 'Failed to initiate guest fee checkout', error);
+  }
+});
+
+router.post('/api/bookings/:bookingId/confirm-guest-payment', async (req: Request, res: Response) => {
+  try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const bookingId = parseInt(req.params.bookingId);
+    if (isNaN(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
+
+    const { paymentIntentId, participantId } = req.body;
+
+    if (!paymentIntentId) {
+      return res.status(400).json({ error: 'Payment intent ID is required' });
+    }
+
+    if (!participantId) {
+      return res.status(400).json({ error: 'Participant ID is required' });
+    }
+
+    const booking = await getBookingWithSession(bookingId);
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const userEmail = sessionUser.email?.toLowerCase() || '';
+    const isOwner = booking.owner_email?.toLowerCase() === userEmail;
+    const isStaff = await isStaffOrAdminCheck(userEmail);
+
+    if (!isOwner && !isStaff) {
+      return res.status(403).json({ error: 'Only the booking owner or staff can confirm payment' });
+    }
+
+    const participantCheck = await pool.query(
+      `SELECT bp.id, bp.session_id FROM booking_participants bp WHERE bp.id = $1`,
+      [participantId]
+    );
+
+    if (participantCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Participant not found' });
+    }
+
+    if (booking.session_id && participantCheck.rows[0].session_id !== booking.session_id) {
+      return res.status(403).json({ error: 'Participant does not belong to this booking' });
+    }
+
+    const stripe = getStripeClient();
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+    if (paymentIntent.status !== 'succeeded') {
+      return res.status(400).json({ 
+        error: 'Payment not yet confirmed',
+        status: paymentIntent.status
+      });
+    }
+
+    const piBookingId = paymentIntent.metadata?.bookingId;
+    const piParticipantId = paymentIntent.metadata?.participantId;
+    const piOwnerEmail = paymentIntent.metadata?.ownerEmail;
+
+    if (piBookingId !== bookingId.toString() || piParticipantId !== participantId.toString()) {
+      return res.status(400).json({ error: 'Payment intent does not match this booking/participant' });
+    }
+
+    if (piOwnerEmail && piOwnerEmail.toLowerCase() !== booking.owner_email?.toLowerCase()) {
+      return res.status(403).json({ error: 'Payment intent owner does not match booking owner' });
+    }
+
+    await db.update(bookingParticipants)
+      .set({
+        paymentStatus: 'paid'
+      })
+      .where(eq(bookingParticipants.id, participantId));
+
+    await pool.query(
+      `INSERT INTO legacy_purchases 
+        (user_id, member_email, item_name, item_category, item_price_cents, quantity, subtotal_cents, 
+         discount_percent, discount_amount_cents, tax_cents, item_total_cents, 
+         payment_method, sale_date, linked_booking_session_id, is_comp, is_synced, stripe_payment_intent_id, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW())`,
+      [
+        null,
+        booking?.owner_email?.toLowerCase(),
+        `Guest Fee - ${paymentIntent.metadata?.guestName || 'Guest'}`,
+        'guest_fee',
+        2500,
+        1,
+        2500,
+        0,
+        0,
+        0,
+        2500,
+        'stripe',
+        new Date(),
+        booking?.session_id,
+        false,
+        false,
+        paymentIntentId
+      ]
+    );
+
+    logger.info('[roster] Guest fee payment confirmed', {
+      extra: {
+        bookingId,
+        participantId,
+        paymentIntentId,
+        guestName: paymentIntent.metadata?.guestName
+      }
+    });
+
+    res.json({ success: true, message: 'Guest fee payment confirmed' });
+  } catch (error: any) {
+    logAndRespond(req, res, 500, 'Failed to confirm guest payment', error);
+  }
+});
+
+router.post('/api/bookings/:bookingId/cancel-guest-payment', async (req: Request, res: Response) => {
+  try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const bookingId = parseInt(req.params.bookingId);
+    if (isNaN(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
+
+    const { participantId, paymentIntentId } = req.body;
+
+    if (!participantId) {
+      return res.status(400).json({ error: 'Participant ID is required' });
+    }
+
+    const booking = await getBookingWithSession(bookingId);
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const userEmail = sessionUser.email?.toLowerCase() || '';
+    const isOwner = booking.owner_email?.toLowerCase() === userEmail;
+    const isStaff = await isStaffOrAdminCheck(userEmail);
+
+    if (!isOwner && !isStaff) {
+      return res.status(403).json({ error: 'Only the booking owner or staff can cancel guest payment' });
+    }
+
+    const participantResult = await pool.query(
+      `SELECT bp.id, bp.session_id, bp.payment_status, bp.guest_id, bp.display_name
+       FROM booking_participants bp WHERE bp.id = $1`,
+      [participantId]
+    );
+
+    if (participantResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Participant not found' });
+    }
+
+    const participant = participantResult.rows[0];
+
+    if (booking.session_id && participant.session_id !== booking.session_id) {
+      return res.status(403).json({ error: 'Participant does not belong to this booking' });
+    }
+
+    if (participant.payment_status === 'paid') {
+      return res.status(400).json({ error: 'Cannot cancel a paid participant' });
+    }
+
+    await db.delete(bookingParticipants)
+      .where(eq(bookingParticipants.id, participantId));
+
+    if (paymentIntentId) {
+      try {
+        const stripe = getStripeClient();
+        await stripe.paymentIntents.cancel(paymentIntentId);
+      } catch (stripeErr: any) {
+        logger.warn('[roster] Failed to cancel Stripe payment intent', {
+          extra: { paymentIntentId, error: stripeErr.message }
+        });
+      }
+    }
+
+    logger.info('[roster] Guest fee payment cancelled, participant removed', {
+      extra: {
+        bookingId,
+        participantId,
+        guestName: participant.display_name
+      }
+    });
+
+    res.json({ success: true, message: 'Guest payment cancelled' });
+  } catch (error: any) {
+    logAndRespond(req, res, 500, 'Failed to cancel guest payment', error);
   }
 });
 

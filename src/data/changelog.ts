@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.9.0",
+    date: "2026-01-24",
+    title: "Guest Pass Checkout Flow",
+    isMajor: true,
+    changes: [
+      "New: Members can now choose to use a guest pass (free) or pay the $25 fee when adding guests",
+      "New: 'Add Guest' button is always enabled - no more blocked access when passes run out",
+      "New: Payment choice modal shows clear options with guest pass balance and fee amount",
+      "New: Stripe checkout integrated directly into the booking flow for instant payment",
+      "Improved: Guest info modal now shows pass status and continues to payment choice",
+      "Improved: Clear messaging when no passes remain ('No passes left — $25 guest fee applies')"
+    ]
+  },
+  {
     version: "9.8.1",
     date: "2026-01-24",
     title: "Unified Visitor Profile Drawer",
