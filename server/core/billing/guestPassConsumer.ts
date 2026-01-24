@@ -21,6 +21,20 @@ export async function consumeGuestPassForParticipant(
   try {
     await client.query('BEGIN');
     
+    const alreadyUsed = await client.query(
+      `SELECT id, used_guest_pass FROM booking_participants WHERE id = $1`,
+      [participantId]
+    );
+    
+    if (alreadyUsed.rows[0]?.used_guest_pass === true) {
+      await client.query('ROLLBACK');
+      console.log(`[GuestPassConsumer] Guest pass already consumed for participant ${participantId}, skipping (idempotency)`);
+      return {
+        success: true,
+        passesRemaining: undefined
+      };
+    }
+    
     const ownerResult = await client.query(
       `SELECT id FROM users WHERE LOWER(email) = $1`,
       [ownerEmailLower]
@@ -211,6 +225,17 @@ export async function refundGuestPassForParticipant(
   try {
     await client.query('BEGIN');
     
+    const participantCheck = await client.query(
+      `SELECT id, used_guest_pass FROM booking_participants WHERE id = $1`,
+      [participantId]
+    );
+    
+    if (participantCheck.rows[0]?.used_guest_pass !== true) {
+      await client.query('ROLLBACK');
+      console.log(`[GuestPassConsumer] Guest pass not used for participant ${participantId}, nothing to refund`);
+      return { success: true, passesRemaining: undefined };
+    }
+    
     await client.query(
       `UPDATE guest_passes 
        SET passes_used = GREATEST(0, passes_used - 1)
@@ -223,13 +248,22 @@ export async function refundGuestPassForParticipant(
       [ownerEmailLower]
     );
     
+    const tierFeeResult = await client.query(
+      `SELECT mt.guest_fee_cents 
+       FROM users u 
+       JOIN membership_tiers mt ON LOWER(u.tier) = LOWER(mt.name)
+       WHERE LOWER(u.email) = $1`,
+      [ownerEmailLower]
+    );
+    const guestFeeCents = tierFeeResult.rows[0]?.guest_fee_cents ?? 2500;
+    
     await client.query(
       `UPDATE booking_participants 
        SET payment_status = 'pending', 
-           cached_fee_cents = 2500,
+           cached_fee_cents = $2,
            used_guest_pass = FALSE
        WHERE id = $1`,
-      [participantId]
+      [participantId, guestFeeCents]
     );
     
     await client.query(

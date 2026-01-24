@@ -13,7 +13,7 @@ import { broadcastBillingUpdate } from '../websocket';
 import { recordDayPassPurchaseFromWebhook } from '../../routes/dayPasses';
 import { handlePrimarySubscriptionCancelled } from './groupBilling';
 
-const EVENT_DEDUP_WINDOW_HOURS = 24;
+const EVENT_DEDUP_WINDOW_DAYS = 7;
 
 interface CacheTransactionParams {
   stripeId: string;
@@ -99,10 +99,10 @@ async function markEventProcessed(eventId: string, eventType: string): Promise<v
 async function cleanupOldProcessedEvents(): Promise<void> {
   try {
     const result = await pool.query(
-      'DELETE FROM webhook_processed_events WHERE processed_at < NOW() - INTERVAL \'24 hours\' RETURNING id'
+      `DELETE FROM webhook_processed_events WHERE processed_at < NOW() - INTERVAL '${EVENT_DEDUP_WINDOW_DAYS} days' RETURNING id`
     );
     if (result.rowCount && result.rowCount > 0) {
-      console.log(`[Stripe Webhook] Cleaned up ${result.rowCount} old processed events`);
+      console.log(`[Stripe Webhook] Cleaned up ${result.rowCount} old processed events (>${EVENT_DEDUP_WINDOW_DAYS} days)`);
     }
   } catch (err) {
     console.error('[Stripe Webhook] Error cleaning up old events:', err);
@@ -175,23 +175,28 @@ async function handleChargeRefunded(charge: any): Promise<void> {
   const customerId = typeof customer === 'string' ? customer : customer?.id;
   const paymentIntentId = typeof payment_intent === 'string' ? payment_intent : payment_intent?.id;
   
-  const latestRefund = charge.refunds?.data?.[0];
+  const refunds = charge.refunds?.data || [];
   
-  if (latestRefund?.id && latestRefund?.amount) {
-    upsertTransactionCache({
-      stripeId: latestRefund.id,
-      objectType: 'refund',
-      amountCents: latestRefund.amount,
-      currency: latestRefund.currency || currency || 'usd',
-      status: latestRefund.status || 'succeeded',
-      createdAt: new Date(latestRefund.created ? latestRefund.created * 1000 : Date.now()),
-      customerId,
-      paymentIntentId,
-      chargeId: id,
-      source: 'webhook',
-    }).catch(err => console.error('[Stripe Webhook] Cache insert failed for refund record:', err));
+  if (refunds.length > 0) {
+    for (const refund of refunds) {
+      if (refund?.id && refund?.amount) {
+        upsertTransactionCache({
+          stripeId: refund.id,
+          objectType: 'refund',
+          amountCents: refund.amount,
+          currency: refund.currency || currency || 'usd',
+          status: refund.status || 'succeeded',
+          createdAt: new Date(refund.created ? refund.created * 1000 : Date.now()),
+          customerId,
+          paymentIntentId,
+          chargeId: id,
+          source: 'webhook',
+        }).catch(err => console.error(`[Stripe Webhook] Cache insert failed for refund ${refund.id}:`, err));
+      }
+    }
+    console.log(`[Stripe Webhook] Cached ${refunds.length} refund(s) for charge ${id}`);
   } else {
-    console.warn(`[Stripe Webhook] No refund object found in charge.refunded event for charge ${id}`);
+    console.warn(`[Stripe Webhook] No refund objects found in charge.refunded event for charge ${id}`);
   }
   
   upsertTransactionCache({
