@@ -2041,22 +2041,30 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
         AND u.legacy_source IS DISTINCT FROM 'mindbody_import'`;
     }
     
-    // Build type filter - filter by computed effective_type (not stored visitor_type)
-    // The effective_type is computed dynamically from legacy_purchases and booking_participants
-    // We filter on effective_type (the CTE column name)
-    let typeCondition = '';
+    // Build type filter - filter by computed type
+    // For count query: uses computed_type alias
+    // For main query: uses effective_type alias
+    // We use separate conditions for each query
+    let typeConditionCount = '';
+    let typeConditionMain = '';
     if (typeFilter === 'day_pass') {
-      typeCondition = "AND effective_type = 'day_pass'";
+      typeConditionCount = "AND computed_type = 'day_pass'";
+      typeConditionMain = "AND effective_type = 'day_pass'";
     } else if (typeFilter === 'guest') {
-      typeCondition = "AND effective_type = 'guest'";
+      typeConditionCount = "AND computed_type = 'guest'";
+      typeConditionMain = "AND effective_type = 'guest'";
     } else if (typeFilter === 'lead') {
-      typeCondition = "AND effective_type = 'lead'";
+      typeConditionCount = "AND computed_type = 'lead'";
+      typeConditionMain = "AND effective_type = 'lead'";
     } else if (typeFilter === 'classpass') {
-      typeCondition = "AND effective_type = 'classpass'";
+      typeConditionCount = "AND computed_type = 'classpass'";
+      typeConditionMain = "AND effective_type = 'classpass'";
     } else if (typeFilter === 'sim_walkin') {
-      typeCondition = "AND effective_type = 'sim_walkin'";
+      typeConditionCount = "AND computed_type = 'sim_walkin'";
+      typeConditionMain = "AND effective_type = 'sim_walkin'";
     } else if (typeFilter === 'private_lesson') {
-      typeCondition = "AND effective_type = 'private_lesson'";
+      typeConditionCount = "AND computed_type = 'private_lesson'";
+      typeConditionMain = "AND effective_type = 'private_lesson'";
     }
     
     // Build search condition
@@ -2125,7 +2133,7 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
       )
       SELECT COUNT(*)::int as total
       FROM visitor_data
-      WHERE 1=1 ${sql.raw(typeCondition)}
+      WHERE 1=1 ${sql.raw(typeConditionCount)}
     `);
     const totalCount = (countResult.rows[0] as any)?.total || 0;
     
@@ -2183,7 +2191,7 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
       )
       SELECT *, effective_type as computed_type
       FROM visitor_base
-      WHERE 1=1 ${sql.raw(typeCondition)}
+      WHERE 1=1 ${sql.raw(typeConditionMain)}
       ORDER BY ${sql.raw(orderByClause)}
       LIMIT ${pageLimit}
       OFFSET ${pageOffset}
