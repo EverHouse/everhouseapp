@@ -253,6 +253,89 @@ export async function voidInvoice(invoiceId: string): Promise<{
   }
 }
 
+/**
+ * Charge a one-time fee via invoice with auto-pay.
+ * This automatically applies customer balance credits before charging the card.
+ */
+export async function chargeOneTimeFee(params: {
+  customerId: string;
+  amountCents: number;
+  description: string;
+  metadata?: Record<string, string>;
+}): Promise<{
+  success: boolean;
+  invoice?: InvoiceResult;
+  amountFromBalance?: number;
+  amountCharged?: number;
+  error?: string;
+}> {
+  try {
+    const stripe = await getStripeClient();
+    const { customerId, amountCents, description, metadata = {} } = params;
+
+    // Create invoice first (in draft state)
+    const invoice = await stripe.invoices.create({
+      customer: customerId,
+      collection_method: 'charge_automatically',
+      auto_advance: true,
+      pending_invoice_items_behavior: 'exclude',
+      metadata: {
+        ...metadata,
+        source: 'ever_house_app',
+        fee_type: 'one_time',
+      },
+    });
+
+    // Create invoice item attached to this specific invoice
+    await stripe.invoiceItems.create({
+      customer: customerId,
+      invoice: invoice.id,
+      amount: amountCents,
+      currency: 'usd',
+      description,
+    });
+
+    // Finalize the invoice - this applies customer balance automatically
+    const finalizedInvoice = await stripe.invoices.finalizeInvoice(invoice.id);
+
+    // If there's still an amount due after balance is applied, pay it
+    if (finalizedInvoice.amount_due > 0 && finalizedInvoice.status === 'open') {
+      try {
+        await stripe.invoices.pay(invoice.id);
+      } catch (payError: any) {
+        // Payment might fail if no card on file - invoice remains open
+        console.warn(`[Stripe Invoices] Auto-pay failed for invoice ${invoice.id}: ${payError.message}`);
+      }
+    }
+
+    // Retrieve final state
+    const paidInvoice = await stripe.invoices.retrieve(invoice.id, {
+      expand: ['lines.data'],
+    });
+
+    // Calculate how much came from balance vs card
+    const startingBalance = paidInvoice.starting_balance || 0;
+    const endingBalance = paidInvoice.ending_balance || 0;
+    const amountFromBalance = Math.max(0, Math.abs(startingBalance) - Math.abs(endingBalance));
+    const amountCharged = paidInvoice.amount_paid - amountFromBalance;
+
+    console.log(`[Stripe Invoices] Charged one-time fee ${invoice.id}: $${(amountCents / 100).toFixed(2)} (balance: $${(amountFromBalance / 100).toFixed(2)}, card: $${(amountCharged / 100).toFixed(2)})`);
+
+    return {
+      success: true,
+      invoice: mapInvoice(paidInvoice),
+      amountFromBalance,
+      amountCharged: Math.max(0, amountCharged),
+    };
+  } catch (error: any) {
+    console.error('[Stripe Invoices] Error charging one-time fee:', error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
 function mapInvoice(invoice: Stripe.Invoice): InvoiceResult {
   return {
     id: invoice.id,

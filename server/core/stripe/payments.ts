@@ -196,3 +196,105 @@ export async function cancelPaymentIntent(
     return { success: false, error: error.message };
   }
 }
+
+/**
+ * Charge a fee using invoice (applies customer balance automatically).
+ * Use this for backend-initiated charges like overage fees and guest fees.
+ * Customer balance is applied first before charging the card.
+ */
+export async function chargeWithBalance(params: {
+  stripeCustomerId: string;
+  email: string;
+  amountCents: number;
+  purpose: PaymentPurpose;
+  description: string;
+  bookingId?: number;
+  sessionId?: number;
+  metadata?: Record<string, string>;
+}): Promise<{
+  success: boolean;
+  invoiceId?: string;
+  amountFromBalance: number;
+  amountCharged: number;
+  error?: string;
+}> {
+  const { stripeCustomerId, email, amountCents, purpose, description, bookingId, sessionId, metadata = {} } = params;
+
+  try {
+    const stripe = await getStripeClient();
+
+    // Create invoice first (in draft state)
+    const invoice = await stripe.invoices.create({
+      customer: stripeCustomerId,
+      collection_method: 'charge_automatically',
+      auto_advance: true,
+      pending_invoice_items_behavior: 'exclude',
+      metadata: {
+        ...metadata,
+        email,
+        purpose,
+        source: 'ever_house_app',
+        ...(bookingId ? { bookingId: bookingId.toString() } : {}),
+        ...(sessionId ? { sessionId: sessionId.toString() } : {}),
+      },
+    });
+
+    // Create invoice item attached to this specific invoice
+    await stripe.invoiceItems.create({
+      customer: stripeCustomerId,
+      invoice: invoice.id,
+      amount: amountCents,
+      currency: 'usd',
+      description,
+    });
+
+    // Finalize - this applies customer balance credits automatically
+    const finalizedInvoice = await stripe.invoices.finalizeInvoice(invoice.id);
+
+    // Attempt to pay any remaining balance
+    if (finalizedInvoice.amount_due > 0 && finalizedInvoice.status === 'open') {
+      try {
+        await stripe.invoices.pay(invoice.id);
+      } catch (payError: any) {
+        console.warn(`[Stripe] Auto-pay failed for invoice ${invoice.id}: ${payError.message}`);
+      }
+    }
+
+    // Get final state
+    const paidInvoice = await stripe.invoices.retrieve(invoice.id);
+
+    // Calculate balance usage
+    const startingBalance = paidInvoice.starting_balance || 0;
+    const endingBalance = paidInvoice.ending_balance || 0;
+    // Starting balance is negative (credit), ending is also negative
+    // Amount from balance = how much the credit decreased
+    const amountFromBalance = Math.max(0, Math.abs(startingBalance) - Math.abs(endingBalance));
+    const amountCharged = Math.max(0, (paidInvoice.amount_paid || 0) - amountFromBalance);
+
+    // Log to database
+    await pool.query(
+      `INSERT INTO stripe_payment_intents 
+       (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [email, `invoice-${invoice.id}`, stripeCustomerId, amountCents, purpose, bookingId || null, sessionId || null, description, paidInvoice.status === 'paid' ? 'succeeded' : paidInvoice.status]
+    );
+
+    console.log(`[Stripe] Charged ${purpose} via invoice ${invoice.id}: $${(amountCents / 100).toFixed(2)} (balance: $${(amountFromBalance / 100).toFixed(2)}, card: $${(amountCharged / 100).toFixed(2)})`);
+
+    return {
+      success: paidInvoice.status === 'paid',
+      invoiceId: invoice.id,
+      amountFromBalance,
+      amountCharged,
+      error: paidInvoice.status !== 'paid' ? `Invoice status: ${paidInvoice.status}` : undefined,
+    };
+  } catch (error: any) {
+    console.error(`[Stripe] Error charging ${purpose} with balance:`, error);
+    return {
+      success: false,
+      amountFromBalance: 0,
+      amountCharged: 0,
+      error: error.message,
+    };
+  }
+}

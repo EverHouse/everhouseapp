@@ -930,18 +930,17 @@ async function createBookingForMember(
                       const memberName = [memberData.first_name, memberData.last_name].filter(Boolean).join(' ') || memberEmail.split('@')[0];
                       
                       if (stripeCustomerId) {
-                        const { createPaymentIntent } = await import('../core/stripe/payments');
+                        const { chargeWithBalance } = await import('../core/stripe/payments');
                         
-                        const paymentResult = await createPaymentIntent({
-                          userId: memberData.user_id || memberEmail,
+                        // Use invoice-based charging to automatically apply customer balance
+                        const paymentResult = await chargeWithBalance({
+                          stripeCustomerId: stripeCustomerId,
                           email: memberEmail,
-                          memberName: memberName,
                           amountCents: deltaFeeCents,
                           purpose: 'overage_fee',
                           bookingId: existingBooking.id,
                           sessionId: existingBooking.session_id,
                           description: `Simulator extension overage fee - ${newDurationMinutes - oldDuration} additional minutes (delta: $${(deltaFeeCents / 100).toFixed(2)})`,
-                          stripeCustomerId: stripeCustomerId,
                           metadata: {
                             bookingId: existingBooking.id.toString(),
                             sessionId: existingBooking.session_id.toString(),
@@ -953,25 +952,26 @@ async function createBookingForMember(
                           }
                         });
                         
-                        // Update ledger entries to link payment intent and mark as pending
-                        // This links the ledger rows to the payment intent for proper tracking
+                        // Update ledger entries to link invoice and mark as paid
                         await pool.query(
                           `UPDATE usage_ledger 
                            SET stripe_payment_intent_id = $1,
-                               payment_method = 'pending'
-                           WHERE session_id = $2 
+                               payment_method = $2
+                           WHERE session_id = $3 
                              AND payment_method IN ('pending', 'unpaid')
                              AND stripe_payment_intent_id IS NULL
                              AND (overage_fee > 0 OR guest_fee > 0)`,
-                          [paymentResult.paymentIntentId, existingBooking.session_id]
+                          [paymentResult.invoiceId ? `invoice-${paymentResult.invoiceId}` : null, paymentResult.success ? 'stripe' : 'pending', existingBooking.session_id]
                         );
                         
-                        logger.info('[Trackman Webhook] Created payment intent for extension delta', {
+                        logger.info('[Trackman Webhook] Charged extension delta via invoice (uses customer balance)', {
                           extra: {
                             sessionId: existingBooking.session_id,
                             bookingId: existingBooking.id,
-                            paymentIntentId: paymentResult.paymentIntentId,
+                            invoiceId: paymentResult.invoiceId,
                             deltaAmountCents: deltaFeeCents,
+                            amountFromBalance: paymentResult.amountFromBalance,
+                            amountCharged: paymentResult.amountCharged,
                             previouslyBilledCents,
                             newTotalCents: newTotalFeeCents,
                             memberEmail: memberEmail
@@ -3063,14 +3063,13 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
       [fakeTrackmanId, bookingId]
     );
 
-    // Create payment intent for overage fee if applicable
+    // Charge overage fee using invoice (applies customer balance automatically)
     if (booking.overage_fee_cents > 0 && booking.stripe_customer_id) {
       try {
-        const { createPaymentIntent } = await import('../core/stripe/payments');
-        const paymentResult = await createPaymentIntent({
-          userId: booking.user_id || booking.user_email,
+        const { chargeWithBalance } = await import('../core/stripe/payments');
+        const paymentResult = await chargeWithBalance({
+          stripeCustomerId: booking.stripe_customer_id,
           email: booking.user_email,
-          memberName: booking.user_name,
           amountCents: booking.overage_fee_cents,
           purpose: 'overage_fee',
           bookingId: bookingId,
@@ -3082,19 +3081,20 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
           }
         });
         
-        if (paymentResult.success) {
-          await pool.query(
-            `UPDATE booking_requests SET overage_paid = false WHERE id = $1`,
-            [bookingId]
-          );
-          logger.info('[Simulate Confirm] Created overage payment intent', {
-            bookingId,
-            paymentIntentId: paymentResult.paymentIntentId,
-            amount: booking.overage_fee_cents
-          });
-        }
+        await pool.query(
+          `UPDATE booking_requests SET overage_paid = $1 WHERE id = $2`,
+          [paymentResult.success, bookingId]
+        );
+        logger.info('[Simulate Confirm] Charged overage fee via invoice (uses customer balance)', {
+          bookingId,
+          invoiceId: paymentResult.invoiceId,
+          amount: booking.overage_fee_cents,
+          amountFromBalance: paymentResult.amountFromBalance,
+          amountCharged: paymentResult.amountCharged,
+          success: paymentResult.success
+        });
       } catch (paymentError: any) {
-        logger.error('[Simulate Confirm] Failed to create payment intent', { error: paymentError });
+        logger.error('[Simulate Confirm] Failed to charge overage fee', { error: paymentError });
       }
     }
 
