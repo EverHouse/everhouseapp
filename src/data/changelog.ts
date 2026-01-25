@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.23.1",
+    date: "2026-01-25",
+    title: "Membership Payment Labels",
+    changes: [
+      "Improved: Payment history now shows specific membership tier (e.g., 'Ace Membership' instead of generic 'Membership Payment')",
+      "Fixed: Tier names are extracted from Stripe invoice descriptions for clearer billing history"
+    ]
+  },
+  {
     version: "9.23.0",
     date: "2026-01-25",
     title: "Member Profile Drawer Redesign",

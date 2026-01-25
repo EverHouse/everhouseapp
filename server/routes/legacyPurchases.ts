@@ -169,6 +169,26 @@ function cleanStripeDescription(description: string | null | undefined, purpose?
     return 'Simulator Overage Fee';
   }
   if (lowerDesc.includes('subscription') || lowerDesc.includes('membership')) {
+    // Try to extract tier name from description (e.g., "1 × Ace Membership", "Core Membership (at $180)")
+    const tierPatterns = [
+      /(\w+)\s*membership/i,         // "Ace Membership", "Core Membership"
+      /membership[:\s-]+(\w+)/i,     // "Membership: Ace", "Membership - Core"
+      /(\w+)\s*subscription/i,       // "Ace Subscription"
+    ];
+    
+    for (const pattern of tierPatterns) {
+      const match = description.match(pattern);
+      if (match) {
+        const tierWord = match[1].trim();
+        // Skip generic words
+        const skipWords = ['ever', 'house', 'the', 'a', 'an', '×', 'x', '1', '2', '3', '4', '5'];
+        if (!skipWords.includes(tierWord.toLowerCase())) {
+          // Capitalize first letter
+          const formattedTier = tierWord.charAt(0).toUpperCase() + tierWord.slice(1).toLowerCase();
+          return `${formattedTier} Membership`;
+        }
+      }
+    }
     return 'Membership Payment';
   }
   
