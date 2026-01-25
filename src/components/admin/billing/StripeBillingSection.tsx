@@ -61,6 +61,8 @@ interface StripeBillingSectionProps {
   isOpeningBillingPortal?: boolean;
   isDark: boolean;
   isWalletOnly?: boolean;
+  onSyncStripeData?: () => void;
+  isSyncingStripeData?: boolean;
 }
 
 function formatCurrency(cents: number): string {
@@ -110,6 +112,8 @@ export const StripeBillingSection: React.FC<StripeBillingSectionProps> = ({
   isOpeningBillingPortal,
   isDark,
   isWalletOnly = false,
+  onSyncStripeData,
+  isSyncingStripeData = false,
 }) => {
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -148,11 +152,8 @@ export const StripeBillingSection: React.FC<StripeBillingSectionProps> = ({
         <div className="flex items-center gap-2 mb-4">
           <span className={`material-symbols-outlined ${isDark ? 'text-accent' : 'text-primary'}`}>subscriptions</span>
           <h3 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-primary'}`}>Subscription</h3>
-        </div>
-
-        {activeSubscription ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 flex-wrap">
+          {activeSubscription && (
+            <>
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(isPaused ? 'paused' : activeSubscription.status)}`}>
                 {isPaused ? 'Paused' : activeSubscription.status.replace('_', ' ')}
               </span>
@@ -161,7 +162,12 @@ export const StripeBillingSection: React.FC<StripeBillingSectionProps> = ({
                   Cancels at period end
                 </span>
               )}
-            </div>
+            </>
+          )}
+        </div>
+
+        {activeSubscription ? (
+          <div className="space-y-3">
 
             <div className={`grid grid-cols-2 gap-3 text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
               {activeSubscription.planName && (
@@ -217,6 +223,23 @@ export const StripeBillingSection: React.FC<StripeBillingSectionProps> = ({
                 <span className="material-symbols-outlined text-base">swap_vert</span>
                 Change Tier
               </button>
+              {onSyncStripeData && (
+                <button
+                  onClick={onSyncStripeData}
+                  disabled={isSyncingStripeData}
+                  title="Sync membership tier, metadata, and transaction cache from Stripe."
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isDark ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                  } disabled:opacity-50`}
+                >
+                  {isSyncingStripeData ? (
+                    <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+                  ) : (
+                    <span className="material-symbols-outlined text-base">sync</span>
+                  )}
+                  Sync
+                </button>
+              )}
               {isPaused ? (
                 <button
                   onClick={onResume}

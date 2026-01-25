@@ -953,14 +953,14 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         </div>
       </div>
 
-      {/* Stripe Sync Actions */}
-      <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-        <div className="flex items-center gap-2 mb-3">
-          <span className={`material-symbols-outlined ${isDark ? 'text-accent' : 'text-primary'}`}>sync</span>
-          <h3 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-primary'}`}>Stripe Data Sync</h3>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {!billingInfo?.stripeCustomerId ? (
+      {/* Stripe Sync Actions - Only show separate section when no Stripe customer yet */}
+      {!billingInfo?.stripeCustomerId && (
+        <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+          <div className="flex items-center gap-2 mb-3">
+            <span className={`material-symbols-outlined ${isDark ? 'text-accent' : 'text-primary'}`}>sync</span>
+            <h3 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-primary'}`}>Stripe Setup</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={handleSyncToStripe}
               disabled={isSyncingToStripe}
@@ -975,29 +975,12 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
               )}
               Sync to Stripe
             </button>
-          ) : (
-            <button
-              onClick={handleSyncStripeData}
-              disabled={isSyncingStripeData}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isDark ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-              } disabled:opacity-50`}
-            >
-              {isSyncingStripeData ? (
-                <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
-              ) : (
-                <span className="material-symbols-outlined text-base">sync</span>
-              )}
-              Sync Stripe Data
-            </button>
-          )}
+          </div>
+          <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+            Create or link a Stripe customer for this member to enable wallet features.
+          </p>
         </div>
-        <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-          {!billingInfo?.stripeCustomerId 
-            ? 'Create or link a Stripe customer for this member to enable wallet features.'
-            : 'Sync membership tier, metadata, and transaction cache from Stripe.'}
-        </p>
-      </div>
+      )}
 
       {/* Always show Stripe section when member has stripeCustomerId - allows wallet features for all members */}
       {billingInfo?.stripeCustomerId && (
@@ -1020,6 +1003,8 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
           isOpeningBillingPortal={isOpeningBillingPortal}
           isDark={isDark}
           isWalletOnly={billingInfo.billingProvider !== 'stripe'}
+          onSyncStripeData={handleSyncStripeData}
+          isSyncingStripeData={isSyncingStripeData}
         />
       )}
 
