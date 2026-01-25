@@ -153,8 +153,17 @@ function cleanStripeDescription(description: string | null | undefined, purpose?
       lowerDesc.includes('add funds') || lowerDesc.includes('account balance')) {
     return 'Account Balance Top-Up';
   }
-  if (lowerDesc.includes('guest fee') || lowerDesc.includes('guest pass')) {
+  if (lowerDesc.includes('guest fee')) {
     return 'Guest Fee';
+  }
+  // Preserve guest pass quantity info (e.g., "3 Guest Passes")
+  if (lowerDesc.includes('guest pass')) {
+    const match = description.match(/^(\d+)\s*guest\s*pass/i);
+    if (match) {
+      const qty = parseInt(match[1]);
+      return qty > 1 ? `${qty} Guest Passes` : 'Guest Pass';
+    }
+    return 'Guest Pass';
   }
   if (lowerDesc.includes('overage') || lowerDesc.includes('simulator')) {
     return 'Simulator Overage Fee';
