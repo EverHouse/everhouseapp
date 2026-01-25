@@ -170,7 +170,21 @@ const BookGolf: React.FC = () => {
   const [expandedHour, setExpandedHour] = useState<string | null>(null);
   const [hasUserSelectedDuration, setHasUserSelectedDuration] = useState(false);
   const [showPlayerTooltip, setShowPlayerTooltip] = useState(false);
-  const [playerSlots, setPlayerSlots] = useState<Array<{email: string, type: 'member' | 'guest'}>>([]);
+  const [playerSlots, setPlayerSlots] = useState<Array<{
+    email: string;
+    type: 'member' | 'guest';
+    searchQuery: string;
+    selectedId?: string;
+    selectedName?: string;
+  }>>([]);
+  const [playerSearchResults, setPlayerSearchResults] = useState<Record<number, Array<{
+    id: string;
+    name: string;
+    emailRedacted: string;
+    visitorType?: string;
+  }>>>({});
+  const [activeSearchIndex, setActiveSearchIndex] = useState<number | null>(null);
+  const searchTimeoutRef = useRef<Record<number, NodeJS.Timeout>>({});;
   
   const [rescheduleBookingId, setRescheduleBookingId] = useState<number | null>(null);
   const [originalBooking, setOriginalBooking] = useState<BookingRequest | null>(null);
@@ -435,13 +449,80 @@ const BookGolf: React.FC = () => {
     const slotsNeeded = Math.max(0, playerCount - 1);
     setPlayerSlots(prev => {
       if (prev.length === slotsNeeded) return prev;
-      const newSlots: Array<{email: string, type: 'member' | 'guest'}> = [];
+      const newSlots: Array<{email: string, type: 'member' | 'guest', searchQuery: string, selectedId?: string, selectedName?: string}> = [];
       for (let i = 0; i < slotsNeeded; i++) {
-        newSlots.push(prev[i] || { email: '', type: 'guest' });
+        newSlots.push(prev[i] || { email: '', type: 'guest', searchQuery: '' });
       }
       return newSlots;
     });
+    setPlayerSearchResults({});
+    setActiveSearchIndex(null);
   }, [playerCount]);
+
+  // Search for members or guests based on player slot type
+  const handlePlayerSearch = useCallback(async (index: number, query: string, type: 'member' | 'guest') => {
+    if (searchTimeoutRef.current[index]) {
+      clearTimeout(searchTimeoutRef.current[index]);
+    }
+    
+    if (query.length < 2) {
+      setPlayerSearchResults(prev => ({ ...prev, [index]: [] }));
+      return;
+    }
+    
+    searchTimeoutRef.current[index] = setTimeout(async () => {
+      try {
+        const endpoint = type === 'member' 
+          ? `/api/members/search?query=${encodeURIComponent(query)}&limit=8`
+          : `/api/guests/search?query=${encodeURIComponent(query)}&limit=8`;
+        
+        const { ok, data } = await apiRequest<Array<{
+          id: string;
+          name: string;
+          emailRedacted: string;
+          visitorType?: string;
+        }>>(endpoint);
+        
+        if (ok && data) {
+          setPlayerSearchResults(prev => ({ ...prev, [index]: data }));
+        }
+      } catch (err) {
+        console.error('Player search error:', err);
+      }
+    }, 300);
+  }, []);
+  
+  // Select a player from search results
+  const handleSelectPlayer = useCallback((index: number, result: { id: string; name: string; emailRedacted: string }) => {
+    setPlayerSlots(prev => {
+      const newSlots = [...prev];
+      newSlots[index] = {
+        ...newSlots[index],
+        selectedId: result.id,
+        selectedName: result.name,
+        searchQuery: result.name,
+        email: result.emailRedacted, // Store redacted email for display
+      };
+      return newSlots;
+    });
+    setPlayerSearchResults(prev => ({ ...prev, [index]: [] }));
+    setActiveSearchIndex(null);
+  }, []);
+  
+  // Clear selection and allow manual entry (for new guests)
+  const handleClearSelection = useCallback((index: number) => {
+    setPlayerSlots(prev => {
+      const newSlots = [...prev];
+      newSlots[index] = {
+        ...newSlots[index],
+        selectedId: undefined,
+        selectedName: undefined,
+        searchQuery: '',
+        email: '',
+      };
+      return newSlots;
+    });
+  }, []);
 
   const fetchMyRequests = useCallback(async () => {
     if (!effectiveUser?.email) return;
@@ -731,8 +812,29 @@ const BookGolf: React.FC = () => {
     const consent = consentData || guardianConsentData;
     
     try {
+      // Validate guest slots have valid email if not selected from directory
+      const invalidGuestSlot = playerSlots.find(slot => 
+        slot.type === 'guest' && 
+        !slot.selectedId && 
+        slot.email && 
+        !slot.email.includes('@')
+      );
+      if (invalidGuestSlot) {
+        setError('Please enter a valid email address for each guest.');
+        haptic.error();
+        return;
+      }
+      
       const requestParticipants = activeTab === 'simulator' && playerSlots.length > 0
-        ? playerSlots.map(slot => ({ email: slot.email, type: slot.type }))
+        ? playerSlots
+            .filter(slot => slot.selectedId || (slot.email && slot.email.includes('@')))
+            .map(slot => ({ 
+              // Only include email for new guests (not selected from directory)
+              email: slot.selectedId ? undefined : slot.email, 
+              type: slot.type,
+              userId: slot.selectedId,
+              name: slot.selectedName,
+            }))
         : undefined;
 
       const { ok, data, error } = await apiRequest('/api/booking-requests', {
@@ -862,14 +964,16 @@ const BookGolf: React.FC = () => {
     const overageBlocks = Math.ceil(overageMinutes / 30);
     const overageFee = overageBlocks * 25;
     
-    // Guest fees: $25 per guest
-    const guestCount = Math.max(0, playerCount - 1);
+    // Guest fees: $25 per guest - only count filled guest slots (has selectedId or valid email)
+    const guestCount = playerSlots.filter(slot => 
+      slot.type === 'guest' && (slot.selectedId || (slot.email && slot.email.includes('@')))
+    ).length;
     const guestFees = guestCount * 25;
     
     const totalFee = overageFee + guestFees;
     
     return { overageFee, guestFees, totalFee, guestCount, overageMinutes };
-  }, [activeTab, duration, playerCount, effectiveUser?.tier, tierPermissions.dailySimulatorMinutes, usedMinutesForDay]);
+  }, [activeTab, duration, playerCount, playerSlots, effectiveUser?.tier, tierPermissions.dailySimulatorMinutes, usedMinutesForDay]);
 
   const activeClosures = useMemo(() => {
     if (!selectedDateObj?.date) return [];
@@ -1077,38 +1181,24 @@ const BookGolf: React.FC = () => {
               <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-white/80' : 'text-primary/80'}`}>Additional Players</span>
               <span className={`text-xs ${isDark ? 'text-white/50' : 'text-primary/50'}`}>(Optional)</span>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {playerSlots.map((slot, index) => (
                 <div key={index} className="space-y-2">
-                  <label className={`text-sm font-medium ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
-                    Player {index + 2}
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="email"
-                      placeholder={`player${index + 2}@email.com`}
-                      value={slot.email}
-                      onChange={(e) => {
-                        const newSlots = [...playerSlots];
-                        newSlots[index] = { ...newSlots[index], email: e.target.value };
-                        setPlayerSlots(newSlots);
-                      }}
-                      className={`flex-1 px-3 py-2.5 rounded-lg border text-sm transition-all focus:ring-2 focus:ring-accent focus:outline-none ${
-                        isDark 
-                          ? 'bg-white/5 border-white/20 text-white placeholder:text-white/40' 
-                          : 'bg-black/5 border-black/10 text-primary placeholder:text-primary/40'
-                      }`}
-                    />
+                  <div className="flex items-center justify-between">
+                    <label className={`text-sm font-medium ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
+                      Player {index + 2}
+                    </label>
                     <div className={`flex rounded-lg border overflow-hidden ${isDark ? 'border-white/20' : 'border-black/10'}`}>
                       <button
                         type="button"
                         onClick={() => {
                           haptic.selection();
                           const newSlots = [...playerSlots];
-                          newSlots[index] = { ...newSlots[index], type: 'member' };
+                          newSlots[index] = { ...newSlots[index], type: 'member', searchQuery: '', selectedId: undefined, selectedName: undefined, email: '' };
                           setPlayerSlots(newSlots);
+                          setPlayerSearchResults(prev => ({ ...prev, [index]: [] }));
                         }}
-                        className={`px-3 py-2 text-xs font-medium transition-all ${
+                        className={`px-3 py-1.5 text-xs font-medium transition-all ${
                           slot.type === 'member'
                             ? 'bg-accent text-[#293515]'
                             : (isDark ? 'bg-white/5 text-white/60 hover:bg-white/10' : 'bg-black/5 text-primary/60 hover:bg-black/10')
@@ -1121,10 +1211,11 @@ const BookGolf: React.FC = () => {
                         onClick={() => {
                           haptic.selection();
                           const newSlots = [...playerSlots];
-                          newSlots[index] = { ...newSlots[index], type: 'guest' };
+                          newSlots[index] = { ...newSlots[index], type: 'guest', searchQuery: '', selectedId: undefined, selectedName: undefined, email: '' };
                           setPlayerSlots(newSlots);
+                          setPlayerSearchResults(prev => ({ ...prev, [index]: [] }));
                         }}
-                        className={`px-3 py-2 text-xs font-medium transition-all ${
+                        className={`px-3 py-1.5 text-xs font-medium transition-all ${
                           slot.type === 'guest'
                             ? 'bg-accent text-[#293515]'
                             : (isDark ? 'bg-white/5 text-white/60 hover:bg-white/10' : 'bg-black/5 text-primary/60 hover:bg-black/10')
@@ -1133,6 +1224,101 @@ const BookGolf: React.FC = () => {
                         Guest
                       </button>
                     </div>
+                  </div>
+                  
+                  <div className="relative">
+                    {slot.selectedId ? (
+                      <div className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border ${
+                        isDark 
+                          ? 'bg-accent/10 border-accent/30' 
+                          : 'bg-accent/10 border-accent/30'
+                      }`}>
+                        <span className="material-symbols-outlined text-accent text-lg">
+                          {slot.type === 'member' ? 'person' : 'person_add'}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-sm font-medium truncate ${isDark ? 'text-white' : 'text-primary'}`}>
+                            {slot.selectedName}
+                          </div>
+                          <div className={`text-xs truncate ${isDark ? 'text-white/50' : 'text-primary/50'}`}>
+                            {slot.email}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleClearSelection(index)}
+                          className={`p-1 rounded-full transition-colors ${
+                            isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-lg opacity-60">close</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          type={slot.type === 'guest' ? 'email' : 'text'}
+                          placeholder={slot.type === 'member' ? 'Search members by name...' : 'Search guests or enter their email...'}
+                          value={slot.searchQuery}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            const newSlots = [...playerSlots];
+                            newSlots[index] = { ...newSlots[index], searchQuery: value, email: value };
+                            setPlayerSlots(newSlots);
+                            handlePlayerSearch(index, value, slot.type);
+                          }}
+                          onFocus={() => setActiveSearchIndex(index)}
+                          onBlur={() => setTimeout(() => setActiveSearchIndex(null), 200)}
+                          className={`w-full px-3 py-2.5 rounded-lg border text-sm transition-all focus:ring-2 focus:ring-accent focus:outline-none ${
+                            isDark 
+                              ? 'bg-white/5 border-white/20 text-white placeholder:text-white/40' 
+                              : 'bg-black/5 border-black/10 text-primary placeholder:text-primary/40'
+                          }`}
+                        />
+                        {activeSearchIndex === index && playerSearchResults[index]?.length > 0 && (
+                          <div className={`absolute z-20 left-0 right-0 mt-1 rounded-lg border shadow-lg overflow-hidden max-h-48 overflow-y-auto ${
+                            isDark ? 'bg-[#1a1f0e] border-white/20' : 'bg-white border-black/10'
+                          }`}>
+                            {playerSearchResults[index].map((result) => (
+                              <button
+                                key={result.id}
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => handleSelectPlayer(index, result)}
+                                className={`w-full px-3 py-2.5 flex items-center gap-2 text-left transition-colors ${
+                                  isDark ? 'hover:bg-white/10' : 'hover:bg-black/5'
+                                }`}
+                              >
+                                <span className={`material-symbols-outlined text-lg ${isDark ? 'text-white/50' : 'text-primary/50'}`}>
+                                  {slot.type === 'member' ? 'person' : 'person_add'}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <div className={`text-sm font-medium truncate ${isDark ? 'text-white' : 'text-primary'}`}>
+                                    {result.name}
+                                  </div>
+                                  <div className={`text-xs truncate ${isDark ? 'text-white/50' : 'text-primary/50'}`}>
+                                    {result.emailRedacted}
+                                  </div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {slot.searchQuery.length >= 2 && (playerSearchResults[index]?.length ?? 0) === 0 && activeSearchIndex === index && (
+                          <div className={`absolute z-20 left-0 right-0 mt-1 rounded-lg border shadow-lg overflow-hidden ${
+                            isDark ? 'bg-[#1a1f0e] border-white/20' : 'bg-white border-black/10'
+                          }`}>
+                            <div className={`px-3 py-2.5 text-sm ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
+                              {slot.type === 'member' 
+                                ? "No member found with that name."
+                                : slot.searchQuery.includes('@') 
+                                  ? "No guest found. They'll be added as a new guest."
+                                  : "Enter their email address to add as a new guest."}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
               ))}

@@ -344,4 +344,49 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
   }
 });
 
+router.get('/api/guests/search', isAuthenticated, async (req, res) => {
+  try {
+    const { query, limit = '10' } = req.query;
+    
+    if (!query || typeof query !== 'string' || query.trim().length < 2) {
+      return res.json([]);
+    }
+    
+    const searchTerm = `%${query.trim().toLowerCase()}%`;
+    const maxResults = Math.min(parseInt(limit as string) || 10, 30);
+    
+    const results = await db.select({
+      id: users.id,
+      email: users.email,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      visitorType: sql<string>`COALESCE(${users.visitorType}, 'guest')`,
+    })
+      .from(users)
+      .where(and(
+        sql`${users.archivedAt} IS NULL`,
+        sql`(${users.membershipStatus} IN ('visitor', 'non-member') OR ${users.role} = 'visitor')`,
+        sql`(
+          LOWER(COALESCE(${users.firstName}, '') || ' ' || COALESCE(${users.lastName}, '')) LIKE ${searchTerm}
+          OR LOWER(COALESCE(${users.firstName}, '')) LIKE ${searchTerm}
+          OR LOWER(COALESCE(${users.lastName}, '')) LIKE ${searchTerm}
+          OR LOWER(COALESCE(${users.email}, '')) LIKE ${searchTerm}
+        )`
+      ))
+      .limit(maxResults);
+    
+    const formattedResults = results.map(visitor => ({
+      id: visitor.id,
+      name: [visitor.firstName, visitor.lastName].filter(Boolean).join(' ') || 'Unknown',
+      emailRedacted: redactEmail(visitor.email || ''),
+      visitorType: visitor.visitorType,
+    }));
+    
+    res.json(formattedResults);
+  } catch (error: any) {
+    if (!isProduction) console.error('Guest search error:', error);
+    res.status(500).json({ error: 'Failed to search guests' });
+  }
+});
+
 export default router;
