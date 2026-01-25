@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.18.1",
+    date: "2026-01-25",
+    title: "Trackman-Only Booking Workflow",
+    changes: [
+      "Changed: Removed manual booking button from staff Bookings page - all simulator bookings must now go through Trackman",
+      "Changed: Empty calendar slots are no longer clickable - bookings are created via member requests and confirmed by Trackman webhooks",
+      "Note: Staff can still reschedule existing bookings using the Reschedule button on each booking"
+    ]
+  },
+  {
     version: "9.18.0",
     date: "2026-01-25",
     title: "Trackman Webhook Backfill",

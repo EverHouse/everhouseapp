@@ -8,7 +8,6 @@ import TierBadge from '../../../components/TierBadge';
 import { SwipeableListItem } from '../../../components/SwipeableListItem';
 import ModalShell from '../../../components/ModalShell';
 import { useToast } from '../../../components/Toast';
-import FloatingActionButton from '../../../components/FloatingActionButton';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { TabType } from '../layout/types';
 import BookingMembersEditor from '../../../components/admin/BookingMembersEditor';
@@ -797,17 +796,6 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
         }
     }, [isLoading, setPageReady]);
 
-    useEffect(() => {
-        const handleOpenManualBooking = (e: Event) => {
-            const detail = (e as CustomEvent).detail;
-            if (detail?.resourceId) setPrefillResourceId(detail.resourceId);
-            if (detail?.date) setPrefillDate(detail.date);
-            if (detail?.startTime) setPrefillStartTime(detail.startTime);
-            setShowManualBooking(true);
-        };
-        window.addEventListener('open-manual-booking', handleOpenManualBooking);
-        return () => window.removeEventListener('open-manual-booking', handleOpenManualBooking);
-    }, []);
 
     useEffect(() => {
         const openBookingById = async (bookingId: number | string) => {
@@ -2158,19 +2146,13 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                             const unfilledSlots = (booking as any)?.unfilled_slots ?? 0;
                                             const filledSlots = Math.max(0, declaredPlayers - unfilledSlots);
                                             const hasPartialRoster = !isConference && booking && declaredPlayers > 1 && filledSlots < declaredPlayers;
-                                            const handleEmptyCellClick = () => {
-                                                window.dispatchEvent(new CustomEvent('open-manual-booking', {
-                                                    detail: { resourceId: resource.id, date: calendarDate, startTime: slot }
-                                                }));
-                                            };
-                                            
                                             const isEmptyCell = !closure && !eventBlock && !booking && !pendingRequest;
                                             
                                             return (
                                                 <div
                                                     key={`${resource.id}-${slot}`}
-                                                    title={closure ? `CLOSED: ${closure.title}` : eventBlock ? `EVENT BLOCK: ${eventBlock.closureTitle || eventBlock.blockType || 'Blocked'}` : booking ? `${bookingDisplayName}${isUnmatched ? ' (UNMATCHED - Click to assign member)' : isInactiveMember ? ' (Inactive Member)' : ''} - Click for details` : pendingRequest ? `PENDING: ${pendingRequest.user_name || 'Request'} - Awaiting Trackman sync` : `Click to book ${resource.type === 'conference_room' ? 'Conference Room' : resource.name} at ${formatTime12Hour(slot)}`}
-                                                    onClick={closure || eventBlock ? undefined : booking ? (isUnmatched ? () => setTrackmanLinkModal({
+                                                    title={closure ? `CLOSED: ${closure.title}` : eventBlock ? `EVENT BLOCK: ${eventBlock.closureTitle || eventBlock.blockType || 'Blocked'}` : booking ? `${bookingDisplayName}${isUnmatched ? ' (UNMATCHED - Click to assign member)' : isInactiveMember ? ' (Inactive Member)' : ''} - Click for details` : pendingRequest ? `PENDING: ${pendingRequest.user_name || 'Request'} - Awaiting Trackman sync` : `${resource.type === 'conference_room' ? 'Conference Room' : resource.name} - ${formatTime12Hour(slot)} (Available)`}
+                                                    onClick={closure || eventBlock || isEmptyCell ? undefined : booking ? (isUnmatched ? () => setTrackmanLinkModal({
                                                         isOpen: true,
                                                         trackmanBookingId: (booking as any).trackman_booking_id || null,
                                                         bayName: resource.type === 'conference_room' ? 'Conference Room' : resource.name,
@@ -2180,7 +2162,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                         isRelink: false,
                                                         importedName: (booking as any).user_name || (booking as any).userName,
                                                         notes: (booking as any).notes || (booking as any).note
-                                                    }) : () => setSelectedCalendarBooking(booking)) : pendingRequest ? () => { setSelectedRequest(pendingRequest); setActionModal('decline'); } : handleEmptyCellClick}
+                                                    }) : () => setSelectedCalendarBooking(booking)) : pendingRequest ? () => { setSelectedRequest(pendingRequest); setActionModal('decline'); } : undefined}
                                                     className={`h-7 sm:h-8 rounded ${
                                                         closure
                                                             ? 'bg-red-100 dark:bg-red-500/20 border border-red-300 dark:border-red-500/30'
@@ -2198,9 +2180,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                                             : 'bg-green-100 dark:bg-green-500/20 border border-green-300 dark:border-green-500/30 cursor-pointer hover:bg-green-200 dark:hover:bg-green-500/30' 
                                                                 : pendingRequest
                                                                         ? 'bg-blue-50 dark:bg-blue-500/10 border-2 border-dashed border-blue-400 dark:border-blue-400/50 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-500/20'
-                                                                        : isConference
-                                                                            ? 'bg-purple-50/50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 cursor-pointer hover:bg-purple-100/50 dark:hover:bg-purple-500/15'
-                                                                            : 'bg-white dark:bg-white/5 border border-gray-200 dark:border-white/15 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/10'
+                                                                        : 'bg-white dark:bg-white/5 border border-gray-200 dark:border-white/15'
                                                     } transition-colors`}
                                                 >
                                                     {closure ? (
@@ -3244,8 +3224,6 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                     onLinkToMember={handleLinkTrackmanToMember}
                   />
                 </div>
-                
-                <FloatingActionButton onClick={() => setShowManualBooking(true)} color="brand" label="Create manual booking" />
             </AnimatedPage>
     );
 };
