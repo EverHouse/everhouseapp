@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.18.0",
+    date: "2026-01-25",
+    title: "Trackman Webhook Backfill",
+    changes: [
+      "New: CSV imports now backfill webhook-created bookings with missing data",
+      "New: Player counts from import files update webhook bookings that have incomplete data",
+      "New: Missing player slots are automatically created when importing Trackman files",
+      "New: Notes from Trackman import are added to webhook bookings that were missing notes",
+      "New: Sessions and billing records are backfilled for webhook bookings missing them",
+      "Improved: Duplicate booking prevention - matching now strictly uses Trackman booking ID",
+      "Fixed: Unmatched webhook bookings can now be linked to members during CSV import"
+    ]
+  },
+  {
     version: "9.17.0",
     date: "2026-01-24",
     title: "Trackman Auto-Match Feature",
