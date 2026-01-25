@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.24.2",
+    date: "2026-01-25",
+    title: "Transaction Safety & Data Integrity Improvements",
+    changes: [
+      "Fixed: Booking sessions, participants, and usage records are now saved together as one atomic operation - if any part fails, nothing is saved (prevents partial data)",
+      "Fixed: Calendar sync now consistently uses Pacific timezone midnight to avoid potential date mismatches",
+      "Improved: Email comparisons are now case-insensitive throughout the system for more reliable member matching",
+      "Improved: Server error logging is now more consistent for easier troubleshooting"
+    ]
+  },
+  {
     version: "9.24.1",
     date: "2026-01-25",
     title: "Booking Details Fee Calculation Fix",
