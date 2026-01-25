@@ -575,7 +575,15 @@ async function handlePaymentIntentSucceeded(paymentIntent: any): Promise<void> {
         amount: amount / 100
       });
 
-      console.log(`[Stripe Webhook] Payment notifications sent to ${email}`);
+      // Notify all staff about the successful payment
+      await notifyAllStaff(
+        'Payment Received',
+        `${memberName} (${email}) made a payment of $${(amount / 100).toFixed(2)} for: ${description}`,
+        'payment_success',
+        { sendPush: true }
+      );
+
+      console.log(`[Stripe Webhook] Payment notifications sent to ${email} and staff`);
     } catch (error) {
       console.error('[Stripe Webhook] Error sending payment notifications:', error);
     }
@@ -786,6 +794,14 @@ async function handleInvoicePaymentSucceeded(invoice: any): Promise<void> {
       planName,
       nextBillingDate,
     });
+
+    // Notify all staff about the successful membership renewal
+    await notifyAllStaff(
+      'Membership Renewed',
+      `${memberName} (${email}) membership renewed: ${planName} - $${(amountPaid / 100).toFixed(2)}`,
+      'membership_renewed',
+      { sendPush: true }
+    );
 
     broadcastBillingUpdate({
       action: 'invoice_paid',
@@ -1027,10 +1043,26 @@ async function handleCheckoutSessionCompleted(session: any): Promise<void> {
       const customerId = session.customer as string;
       const amountCents = parseInt(session.metadata.amountCents || '0', 10);
       const memberEmail = session.metadata.memberEmail;
+      const amountDollars = amountCents / 100;
       
-      if (customerId && amountCents > 0) {
-        console.log(`[Stripe Webhook] Processing add_funds checkout: ${amountCents} cents for ${memberEmail}`);
-        
+      console.log(`[Stripe Webhook] Processing add_funds checkout: $${amountDollars.toFixed(2)} for ${memberEmail} (session: ${session.id})`);
+      
+      if (!customerId) {
+        console.error(`[Stripe Webhook] add_funds failed: No customer ID in session ${session.id}`);
+        return;
+      }
+      
+      if (amountCents <= 0) {
+        console.error(`[Stripe Webhook] add_funds failed: Invalid amount ${amountCents} in session ${session.id}`);
+        return;
+      }
+      
+      if (!memberEmail) {
+        console.error(`[Stripe Webhook] add_funds failed: No memberEmail in session ${session.id}`);
+        return;
+      }
+      
+      try {
         const stripe = await getStripeClient();
         
         // Credit the customer's balance (negative amount = credit)
@@ -1047,16 +1079,67 @@ async function handleCheckoutSessionCompleted(session: any): Promise<void> {
           }
         );
         
-        console.log(`[Stripe Webhook] Added ${amountCents} cents to balance for ${memberEmail}. New balance: ${transaction.ending_balance}`);
+        const newBalanceDollars = Math.abs(transaction.ending_balance) / 100;
+        console.log(`[Stripe Webhook] Successfully added $${amountDollars.toFixed(2)} to balance for ${memberEmail}. New balance: $${newBalanceDollars.toFixed(2)}`);
         
-        // Broadcast update
+        // Get member name for notifications
+        const userResult = await pool.query(
+          'SELECT first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)',
+          [memberEmail]
+        );
+        const memberName = userResult.rows[0]
+          ? `${userResult.rows[0].first_name || ''} ${userResult.rows[0].last_name || ''}`.trim() || memberEmail
+          : memberEmail;
+        
+        // 1. Send in-app + push notification to member
+        await notifyMember({
+          userEmail: memberEmail,
+          title: 'Funds Added Successfully',
+          message: `$${amountDollars.toFixed(2)} has been added to your account balance. New balance: $${newBalanceDollars.toFixed(2)}`,
+          type: 'funds_added',
+        }, { sendPush: true });
+        
+        // 2. Send in-app + push notification to all staff
+        await notifyAllStaff(
+          'Member Added Funds',
+          `${memberName} (${memberEmail}) added $${amountDollars.toFixed(2)} to their account balance.`,
+          'funds_added',
+          { sendPush: true }
+        );
+        
+        // 3. Send email receipt to member
+        await sendPaymentReceiptEmail(memberEmail, {
+          memberName,
+          amount: amountDollars,
+          description: 'Account Balance Top-Up',
+          date: new Date(),
+          transactionId: session.id
+        });
+        
+        console.log(`[Stripe Webhook] All notifications sent for add_funds: ${memberEmail}`);
+        
+        // Broadcast update for real-time UI updates
         broadcastBillingUpdate({
           action: 'balance_updated',
           email: memberEmail,
           amountCents,
           newBalance: transaction.ending_balance
         });
+        
+      } catch (balanceError: any) {
+        console.error(`[Stripe Webhook] Failed to credit balance for ${memberEmail}:`, balanceError.message);
+        
+        // Notify staff of the failure so they can manually resolve
+        await notifyAllStaff(
+          'Payment Processing Error',
+          `Failed to add $${amountDollars.toFixed(2)} to balance for ${memberEmail}. Error: ${balanceError.message}. Manual intervention required.`,
+          'payment_error',
+          { sendPush: true }
+        );
+        
+        throw balanceError; // Re-throw so Stripe will retry the webhook
       }
+      
       return;
     }
     
