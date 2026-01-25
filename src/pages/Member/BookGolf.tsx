@@ -724,14 +724,13 @@ const BookGolf: React.FC = () => {
     
     const remaining = Math.max(0, dailyLimit - usedMinutes);
     
-    // Social tier (0 daily minutes) can always book - they just pay overage for all time
-    // Only block if they have some included time and have used it all
-    const atLimit = dailyLimit > 0 && remaining <= 0;
+    // Members can always book - they just pay overage fees for time beyond their included minutes
+    // Never block booking based on daily limit (isAtDailyLimit is only used for display, not blocking)
     
     return { 
       usedMinutesForDay: usedMinutes, 
       remainingMinutes: remaining, 
-      isAtDailyLimit: atLimit 
+      isAtDailyLimit: false  // Never block - show fees instead
     };
   }, [selectedDateObj?.date, myRequests, activeTab, tierPermissions, rescheduleBookingId]);
 
