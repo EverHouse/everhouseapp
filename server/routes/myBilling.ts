@@ -15,6 +15,16 @@ function requireAuth(req: any, res: any, next: any) {
   next();
 }
 
+function requireStaffAuth(req: any, res: any, next: any) {
+  if (!req.session?.user?.email) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (req.session.user.role !== 'admin' && req.session.user.role !== 'staff') {
+    return res.status(403).json({ error: 'Staff access required' });
+  }
+  next();
+}
+
 router.get('/api/my/billing', requireAuth, async (req, res) => {
   try {
     const sessionUser = req.session.user;
@@ -23,7 +33,7 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
     const email = targetEmail;
     
     const result = await pool.query(
-      `SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, tier, billing_migration_requested_at
+      `SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, hubspot_id, mindbody_client_id, tier, billing_migration_requested_at
        FROM users WHERE LOWER(email) = $1`,
       [email.toLowerCase()]
     );
@@ -35,48 +45,56 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
     
     const billingInfo: any = {
       billingProvider: member.billing_provider,
+      stripeCustomerId: member.stripe_customer_id,
+      hubspotId: member.hubspot_id,
+      mindbodyClientId: member.mindbody_client_id,
       tier: member.tier,
       billingMigrationRequestedAt: member.billing_migration_requested_at,
     };
     
-    if (member.billing_provider === 'stripe' && member.stripe_customer_id) {
+    // Always fetch Stripe wallet data when member has stripe_customer_id
+    if (member.stripe_customer_id) {
       try {
         const stripe = await getStripeClient();
         
-        const subsResult = await listCustomerSubscriptions(member.stripe_customer_id);
-        if (subsResult.success && subsResult.subscriptions) {
-          const activeSub = subsResult.subscriptions.find(
-            s => s.status === 'active' || s.status === 'trialing' || s.status === 'past_due'
-          );
-          if (activeSub) {
-            billingInfo.subscription = {
-              status: activeSub.status,
-              currentPeriodEnd: Math.floor(activeSub.currentPeriodEnd.getTime() / 1000),
-              cancelAtPeriodEnd: activeSub.cancelAtPeriodEnd,
-              isPaused: activeSub.isPaused,
-            };
-            
-            const hasUpcomingChanges = activeSub.cancelAtPeriodEnd || activeSub.pausedUntil || activeSub.pendingUpdate;
-            if (hasUpcomingChanges) {
-              billingInfo.upcomingChanges = {
+        // Only fetch subscription data if billing_provider is stripe
+        if (member.billing_provider === 'stripe') {
+          const subsResult = await listCustomerSubscriptions(member.stripe_customer_id);
+          if (subsResult.success && subsResult.subscriptions) {
+            const activeSub = subsResult.subscriptions.find(
+              s => s.status === 'active' || s.status === 'trialing' || s.status === 'past_due'
+            );
+            if (activeSub) {
+              billingInfo.subscription = {
+                status: activeSub.status,
+                currentPeriodEnd: Math.floor(activeSub.currentPeriodEnd.getTime() / 1000),
                 cancelAtPeriodEnd: activeSub.cancelAtPeriodEnd,
-                cancelAt: activeSub.cancelAtPeriodEnd 
-                  ? Math.floor(activeSub.currentPeriodEnd.getTime() / 1000)
-                  : null,
-                pausedUntil: activeSub.pausedUntil 
-                  ? Math.floor(activeSub.pausedUntil.getTime() / 1000)
-                  : null,
-                pendingTierChange: activeSub.pendingUpdate
-                  ? {
-                      newPlanName: activeSub.pendingUpdate.newProductName || 'New Plan',
-                      effectiveDate: Math.floor(activeSub.pendingUpdate.effectiveAt.getTime() / 1000),
-                    }
-                  : null,
+                isPaused: activeSub.isPaused,
               };
+              
+              const hasUpcomingChanges = activeSub.cancelAtPeriodEnd || activeSub.pausedUntil || activeSub.pendingUpdate;
+              if (hasUpcomingChanges) {
+                billingInfo.upcomingChanges = {
+                  cancelAtPeriodEnd: activeSub.cancelAtPeriodEnd,
+                  cancelAt: activeSub.cancelAtPeriodEnd 
+                    ? Math.floor(activeSub.currentPeriodEnd.getTime() / 1000)
+                    : null,
+                  pausedUntil: activeSub.pausedUntil 
+                    ? Math.floor(activeSub.pausedUntil.getTime() / 1000)
+                    : null,
+                  pendingTierChange: activeSub.pendingUpdate
+                    ? {
+                        newPlanName: activeSub.pendingUpdate.newProductName || 'New Plan',
+                        effectiveDate: Math.floor(activeSub.pendingUpdate.effectiveAt.getTime() / 1000),
+                      }
+                    : null,
+                };
+              }
             }
           }
         }
         
+        // Always fetch payment methods and balance for any member with Stripe customer
         const paymentMethods = await stripe.paymentMethods.list({
           customer: member.stripe_customer_id,
           type: 'card',
@@ -97,35 +115,9 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
         console.error('[MyBilling] Stripe error:', stripeError.message);
         billingInfo.stripeError = 'Unable to load billing details';
       }
-    } else if (member.billing_provider === 'mindbody' && member.stripe_customer_id) {
-      // MindBody members with Stripe customer - show payment methods and balance for one-off charges
-      try {
-        const stripe = await getStripeClient();
-        
-        // Get payment methods on file
-        const paymentMethods = await stripe.paymentMethods.list({
-          customer: member.stripe_customer_id,
-          type: 'card',
-        });
-        if (paymentMethods.data.length > 0) {
-          billingInfo.paymentMethods = paymentMethods.data.map(pm => ({
-            id: pm.id,
-            brand: pm.card?.brand,
-            last4: pm.card?.last4,
-            expMonth: pm.card?.exp_month,
-            expYear: pm.card?.exp_year,
-          }));
-        }
-        
-        // Get customer balance
-        const customer = await stripe.customers.retrieve(member.stripe_customer_id);
-        if (customer && !customer.deleted) {
-          billingInfo.customerBalanceDollars = ((customer as any).balance || 0) / 100;
-        }
-      } catch (e) {
-        // Don't fail if Stripe lookup fails for MindBody member
-      }
-    } else if (member.billing_provider === 'family_addon') {
+    }
+    
+    if (member.billing_provider === 'family_addon') {
       try {
         const familyGroup = await getBillingGroupByMemberEmail(email);
         if (familyGroup) {
@@ -581,6 +573,176 @@ router.get('/api/my-billing/account-balance', requireAuth, async (req, res) => {
   } catch (error: any) {
     console.error('[MyBilling] Account balance fetch error:', error);
     res.status(500).json({ error: 'Failed to fetch balance' });
+  }
+});
+
+// Sync member to Stripe - create or find customer by email
+router.post('/api/member-billing/:email/sync-stripe', requireStaffAuth, async (req, res) => {
+  try {
+    const targetEmail = decodeURIComponent(req.params.email);
+    
+    const result = await pool.query(
+      `SELECT id, email, first_name, last_name, stripe_customer_id, tier FROM users WHERE LOWER(email) = $1`,
+      [targetEmail.toLowerCase()]
+    );
+    
+    const member = result.rows[0];
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    if (member.stripe_customer_id) {
+      return res.json({ success: true, created: false, customerId: member.stripe_customer_id });
+    }
+    
+    const stripe = await getStripeClient();
+    
+    // Search for existing customer by email
+    const existingCustomers = await stripe.customers.search({
+      query: `email:'${targetEmail}'`,
+    });
+    
+    let customerId: string;
+    let created = false;
+    
+    if (existingCustomers.data.length > 0) {
+      customerId = existingCustomers.data[0].id;
+      console.log(`[SyncStripe] Found existing Stripe customer ${customerId} for ${targetEmail}`);
+    } else {
+      const newCustomer = await stripe.customers.create({
+        email: targetEmail,
+        name: [member.first_name, member.last_name].filter(Boolean).join(' ') || undefined,
+        metadata: {
+          userId: member.id.toString(),
+          tier: member.tier || '',
+          source: 'member_portal_sync',
+        },
+      });
+      customerId = newCustomer.id;
+      created = true;
+      console.log(`[SyncStripe] Created new Stripe customer ${customerId} for ${targetEmail}`);
+    }
+    
+    await pool.query(
+      `UPDATE users SET stripe_customer_id = $1, updated_at = NOW() WHERE id = $2`,
+      [customerId, member.id]
+    );
+    
+    res.json({ success: true, created, customerId });
+  } catch (error: any) {
+    console.error('[SyncStripe] Error:', error);
+    res.status(500).json({ error: 'Failed to sync to Stripe' });
+  }
+});
+
+// Sync customer metadata to Stripe
+router.post('/api/member-billing/:email/sync-metadata', requireStaffAuth, async (req, res) => {
+  try {
+    const targetEmail = decodeURIComponent(req.params.email);
+    
+    const result = await pool.query(
+      `SELECT id, email, first_name, last_name, stripe_customer_id, tier FROM users WHERE LOWER(email) = $1`,
+      [targetEmail.toLowerCase()]
+    );
+    
+    const member = result.rows[0];
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    if (!member.stripe_customer_id) {
+      return res.status(400).json({ error: 'Member does not have a Stripe customer ID' });
+    }
+    
+    const stripe = await getStripeClient();
+    
+    await stripe.customers.update(member.stripe_customer_id, {
+      name: [member.first_name, member.last_name].filter(Boolean).join(' ') || undefined,
+      metadata: {
+        userId: member.id.toString(),
+        tier: member.tier || '',
+        lastSyncAt: new Date().toISOString(),
+      },
+    });
+    
+    console.log(`[SyncMetadata] Updated Stripe customer ${member.stripe_customer_id} metadata for ${targetEmail}`);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[SyncMetadata] Error:', error);
+    res.status(500).json({ error: 'Failed to sync metadata' });
+  }
+});
+
+// Backfill transaction cache for individual member
+router.post('/api/member-billing/:email/backfill-cache', requireStaffAuth, async (req, res) => {
+  try {
+    const targetEmail = decodeURIComponent(req.params.email);
+    
+    const result = await pool.query(
+      `SELECT id, email, stripe_customer_id FROM users WHERE LOWER(email) = $1`,
+      [targetEmail.toLowerCase()]
+    );
+    
+    const member = result.rows[0];
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    if (!member.stripe_customer_id) {
+      return res.status(400).json({ error: 'Member does not have a Stripe customer ID' });
+    }
+    
+    const stripe = await getStripeClient();
+    
+    // Get last 90 days of charges
+    const ninetyDaysAgo = Math.floor((Date.now() - 90 * 24 * 60 * 60 * 1000) / 1000);
+    
+    const charges = await stripe.charges.list({
+      customer: member.stripe_customer_id,
+      created: { gte: ninetyDaysAgo },
+      limit: 100,
+    });
+    
+    let transactionCount = 0;
+    
+    for (const charge of charges.data) {
+      if (charge.status !== 'succeeded') continue;
+      
+      // Insert or update in stripe_transaction_cache
+      await pool.query(
+        `INSERT INTO stripe_transaction_cache (
+          stripe_id, object_type, customer_id, customer_email,
+          amount_cents, currency, status, description, 
+          payment_intent_id, charge_id, created_at, updated_at, source
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, to_timestamp($11), NOW(), $12)
+        ON CONFLICT (stripe_id) DO UPDATE SET
+          amount_cents = EXCLUDED.amount_cents,
+          status = EXCLUDED.status,
+          description = EXCLUDED.description,
+          updated_at = NOW()`,
+        [
+          charge.id,
+          'charge',
+          member.stripe_customer_id,
+          targetEmail,
+          charge.amount,
+          charge.currency,
+          charge.status,
+          charge.description || null,
+          charge.payment_intent || null,
+          charge.id,
+          charge.created,
+          'backfill',
+        ]
+      );
+      transactionCount++;
+    }
+    
+    console.log(`[BackfillCache] Cached ${transactionCount} transactions for ${targetEmail}`);
+    res.json({ success: true, transactionCount });
+  } catch (error: any) {
+    console.error('[BackfillCache] Error:', error);
+    res.status(500).json({ error: 'Failed to backfill cache' });
   }
 });
 

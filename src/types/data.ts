@@ -60,6 +60,8 @@ export interface MemberProfile {
   avatar?: string;
   role?: 'member' | 'staff' | 'admin';
   mindbodyClientId?: string;
+  stripeCustomerId?: string;
+  hubspotId?: string;
   lifetimeVisits?: number;
   lastBookingDate?: string;
   manuallyLinkedEmails?: string[];

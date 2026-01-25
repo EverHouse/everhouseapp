@@ -77,6 +77,7 @@ interface BillingInfo {
   billingProvider: 'stripe' | 'mindbody' | 'family_addon' | 'comped' | null;
   stripeCustomerId?: string;
   mindbodyClientId?: string;
+  hubspotId?: string;
   tier?: string;
   subscriptions?: Subscription[];
   activeSubscription?: Subscription | null;
@@ -450,6 +451,9 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
   const [isApplyingDiscount, setIsApplyingDiscount] = useState(false);
   const [isGettingPaymentLink, setIsGettingPaymentLink] = useState(false);
   const [isOpeningBillingPortal, setIsOpeningBillingPortal] = useState(false);
+  const [isSyncingToStripe, setIsSyncingToStripe] = useState(false);
+  const [isSyncingMetadata, setIsSyncingMetadata] = useState(false);
+  const [isBackfillingCache, setIsBackfillingCache] = useState(false);
 
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -735,6 +739,73 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
     }
   };
 
+  const handleSyncToStripe = async () => {
+    setIsSyncingToStripe(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/sync-stripe`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        await fetchBillingInfo();
+        showSuccess(data.created ? 'Created new Stripe customer' : 'Linked existing Stripe customer');
+      } else {
+        const errData = await res.json();
+        setError(errData.error || 'Failed to sync to Stripe');
+      }
+    } catch (err) {
+      setError('Failed to sync to Stripe');
+    } finally {
+      setIsSyncingToStripe(false);
+    }
+  };
+
+  const handleSyncMetadata = async () => {
+    setIsSyncingMetadata(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/sync-metadata`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        await fetchBillingInfo();
+        showSuccess('Customer metadata updated in Stripe');
+      } else {
+        const errData = await res.json();
+        setError(errData.error || 'Failed to sync metadata');
+      }
+    } catch (err) {
+      setError('Failed to sync metadata');
+    } finally {
+      setIsSyncingMetadata(false);
+    }
+  };
+
+  const handleBackfillCache = async () => {
+    setIsBackfillingCache(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/backfill-cache`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        showSuccess(`Cached ${data.transactionCount || 0} transactions from Stripe`);
+      } else {
+        const errData = await res.json();
+        setError(errData.error || 'Failed to backfill cache');
+      }
+    } catch (err) {
+      setError('Failed to backfill cache');
+    } finally {
+      setIsBackfillingCache(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
@@ -868,25 +939,89 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         </div>
       </div>
 
-      {billingInfo?.billingProvider === 'stripe' && (
+      {/* Stripe Sync Actions */}
+      <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+        <div className="flex items-center gap-2 mb-3">
+          <span className={`material-symbols-outlined ${isDark ? 'text-accent' : 'text-primary'}`}>sync</span>
+          <h3 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-primary'}`}>Stripe Data Sync</h3>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {!billingInfo?.stripeCustomerId ? (
+            <button
+              onClick={handleSyncToStripe}
+              disabled={isSyncingToStripe}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                isDark ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+              } disabled:opacity-50`}
+            >
+              {isSyncingToStripe ? (
+                <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+              ) : (
+                <span className="material-symbols-outlined text-base">person_add</span>
+              )}
+              Sync to Stripe
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={handleSyncMetadata}
+                disabled={isSyncingMetadata}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isDark ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                } disabled:opacity-50`}
+              >
+                {isSyncingMetadata ? (
+                  <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+                ) : (
+                  <span className="material-symbols-outlined text-base">cloud_sync</span>
+                )}
+                Sync Metadata
+              </button>
+              <button
+                onClick={handleBackfillCache}
+                disabled={isBackfillingCache}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isDark ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                } disabled:opacity-50`}
+              >
+                {isBackfillingCache ? (
+                  <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+                ) : (
+                  <span className="material-symbols-outlined text-base">cached</span>
+                )}
+                Backfill Transaction Cache
+              </button>
+            </>
+          )}
+        </div>
+        <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+          {!billingInfo?.stripeCustomerId 
+            ? 'Create or link a Stripe customer for this member to enable wallet features.'
+            : 'Update Stripe customer metadata or refresh local transaction cache.'}
+        </p>
+      </div>
+
+      {/* Always show Stripe section when member has stripeCustomerId - allows wallet features for all members */}
+      {billingInfo?.stripeCustomerId && (
         <StripeBillingSection
-          activeSubscription={billingInfo.activeSubscription || null}
+          activeSubscription={billingInfo.billingProvider === 'stripe' ? (billingInfo.activeSubscription || null) : null}
           paymentMethods={billingInfo.paymentMethods}
           recentInvoices={billingInfo.recentInvoices}
           customerBalance={billingInfo.customerBalance}
           isPausing={isPausing}
           isResuming={isResuming}
           isGettingPaymentLink={isGettingPaymentLink}
-          onPause={() => setShowPauseModal(true)}
-          onResume={handleResumeSubscription}
-          onShowCancelModal={() => setShowCancelModal(true)}
+          onPause={billingInfo.billingProvider === 'stripe' ? () => setShowPauseModal(true) : undefined}
+          onResume={billingInfo.billingProvider === 'stripe' ? handleResumeSubscription : undefined}
+          onShowCancelModal={billingInfo.billingProvider === 'stripe' ? () => setShowCancelModal(true) : undefined}
           onShowCreditModal={() => setShowCreditModal(true)}
-          onShowDiscountModal={() => setShowDiscountModal(true)}
-          onShowTierChangeModal={() => setShowTierChangeModal(true)}
+          onShowDiscountModal={billingInfo.billingProvider === 'stripe' ? () => setShowDiscountModal(true) : undefined}
+          onShowTierChangeModal={billingInfo.billingProvider === 'stripe' ? () => setShowTierChangeModal(true) : undefined}
           onGetPaymentLink={handleGetPaymentLink}
           onOpenBillingPortal={handleOpenBillingPortal}
           isOpeningBillingPortal={isOpeningBillingPortal}
           isDark={isDark}
+          isWalletOnly={billingInfo.billingProvider !== 'stripe'}
         />
       )}
 
@@ -921,14 +1056,17 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
               </div>
             </div>
           )}
-          <MindbodyBillingSection
-            mindbodyClientId={billingInfo.mindbodyClientId}
-            stripeCustomerId={billingInfo.stripeCustomerId}
-            paymentMethods={billingInfo.paymentMethods}
-            recentInvoices={billingInfo.recentInvoices}
-            customerBalance={billingInfo.customerBalance}
-            isDark={isDark}
-          />
+          {/* Only show MindbodyBillingSection if no Stripe customer (otherwise Stripe section above shows wallet) */}
+          {!billingInfo.stripeCustomerId && (
+            <MindbodyBillingSection
+              mindbodyClientId={billingInfo.mindbodyClientId}
+              stripeCustomerId={billingInfo.stripeCustomerId}
+              paymentMethods={billingInfo.paymentMethods}
+              recentInvoices={billingInfo.recentInvoices}
+              customerBalance={billingInfo.customerBalance}
+              isDark={isDark}
+            />
+          )}
         </>
       )}
 

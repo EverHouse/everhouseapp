@@ -50,16 +50,17 @@ interface StripeBillingSectionProps {
   isPausing: boolean;
   isResuming: boolean;
   isGettingPaymentLink: boolean;
-  onPause: () => void;
-  onResume: () => void;
-  onShowCancelModal: () => void;
+  onPause?: () => void;
+  onResume?: () => void;
+  onShowCancelModal?: () => void;
   onShowCreditModal: () => void;
-  onShowDiscountModal: () => void;
-  onShowTierChangeModal: () => void;
+  onShowDiscountModal?: () => void;
+  onShowTierChangeModal?: () => void;
   onGetPaymentLink: () => void;
   onOpenBillingPortal?: () => void;
   isOpeningBillingPortal?: boolean;
   isDark: boolean;
+  isWalletOnly?: boolean;
 }
 
 function formatCurrency(cents: number): string {
@@ -108,6 +109,7 @@ export const StripeBillingSection: React.FC<StripeBillingSectionProps> = ({
   onOpenBillingPortal,
   isOpeningBillingPortal,
   isDark,
+  isWalletOnly = false,
 }) => {
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -128,6 +130,20 @@ export const StripeBillingSection: React.FC<StripeBillingSectionProps> = ({
 
   return (
     <>
+      {/* Wallet-only mode header for MindBody members with Stripe wallet */}
+      {isWalletOnly && (
+        <div className={`p-3 rounded-xl mb-4 ${isDark ? 'bg-purple-500/10 border border-purple-500/30' : 'bg-purple-50 border border-purple-200'}`}>
+          <div className="flex items-center gap-2">
+            <span className={`material-symbols-outlined ${isDark ? 'text-purple-400' : 'text-purple-600'} text-lg`}>account_balance_wallet</span>
+            <span className={`text-sm font-medium ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>
+              Stripe Wallet (Subscription managed elsewhere)
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Only show subscription section if not in wallet-only mode */}
+      {!isWalletOnly && (
       <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
         <div className="flex items-center gap-2 mb-4">
           <span className={`material-symbols-outlined ${isDark ? 'text-accent' : 'text-primary'}`}>subscriptions</span>
@@ -255,6 +271,7 @@ export const StripeBillingSection: React.FC<StripeBillingSectionProps> = ({
           </div>
         )}
       </div>
+      )}
 
       <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
         <div className="flex items-center gap-2 mb-4">

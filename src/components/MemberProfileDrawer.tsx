@@ -1252,17 +1252,30 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
               </a>
             )}
             <div className="flex items-center gap-4 flex-wrap text-xs">
-              {member.mindbodyClientId && (
-                <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>
-                  MindBody: {member.mindbodyClientId}
-                </span>
-              )}
               <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>
                 {visitsCount} lifetime visits
               </span>
               {member.joinDate && (
                 <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>
                   Joined {formatDatePacific(member.joinDate)}
+                </span>
+              )}
+            </div>
+            {/* System IDs section */}
+            <div className="flex items-center gap-3 flex-wrap text-xs mt-1">
+              {member.mindbodyClientId && (
+                <span className={isDark ? 'text-gray-500' : 'text-gray-400'}>
+                  MB: {member.mindbodyClientId}
+                </span>
+              )}
+              {member.stripeCustomerId && (
+                <span className={isDark ? 'text-gray-500' : 'text-gray-400'}>
+                  Stripe: {member.stripeCustomerId.substring(0, 14)}...
+                </span>
+              )}
+              {member.hubspotId && (
+                <span className={isDark ? 'text-gray-500' : 'text-gray-400'}>
+                  HS: {member.hubspotId}
                 </span>
               )}
             </div>
