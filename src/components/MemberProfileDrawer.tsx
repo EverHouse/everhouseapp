@@ -191,7 +191,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
         fetch(`/api/members/${encodeURIComponent(member.email)}/notes`, { credentials: 'include' }),
         fetch(`/api/members/${encodeURIComponent(member.email)}/communications`, { credentials: 'include' }),
         fetch(`/api/members/${encodeURIComponent(member.email)}/guests`, { credentials: 'include' }),
-        fetch(`/api/legacy-purchases/member/${encodeURIComponent(member.email)}`, { credentials: 'include' }),
+        fetch(`/api/members/${encodeURIComponent(member.email)}/unified-purchases`, { credentials: 'include' }),
       ]);
 
       if (historyRes.ok) {
@@ -839,6 +839,10 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
           membership: 'Membership',
           cafe: 'Cafe',
           retail: 'Retail',
+          add_funds: 'Account Top-Up',
+          subscription: 'Subscription',
+          payment: 'Payment',
+          invoice: 'Invoice',
           other: 'Other',
         };
         
@@ -848,6 +852,10 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
           membership: isDark ? 'bg-green-500/20 text-green-300' : 'bg-green-100 text-green-700',
           cafe: isDark ? 'bg-orange-500/20 text-orange-300' : 'bg-orange-100 text-orange-700',
           retail: isDark ? 'bg-pink-500/20 text-pink-300' : 'bg-pink-100 text-pink-700',
+          add_funds: isDark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700',
+          subscription: isDark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-700',
+          payment: isDark ? 'bg-cyan-500/20 text-cyan-300' : 'bg-cyan-100 text-cyan-700',
+          invoice: isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-700',
           other: isDark ? 'bg-gray-500/20 text-gray-300' : 'bg-gray-100 text-gray-700',
         };
         
@@ -857,10 +865,14 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
           membership: 'card_membership',
           cafe: 'local_cafe',
           retail: 'shopping_bag',
+          add_funds: 'account_balance_wallet',
+          subscription: 'autorenew',
+          payment: 'payments',
+          invoice: 'receipt_long',
           other: 'receipt',
         };
         
-        const categoryOrder = ['membership', 'sim_walk_in', 'guest_pass', 'cafe', 'retail', 'other'];
+        const categoryOrder = ['add_funds', 'subscription', 'membership', 'sim_walk_in', 'guest_pass', 'payment', 'invoice', 'cafe', 'retail', 'other'];
         const groupedPurchases = purchases.reduce((acc: Record<string, any[]>, purchase: any) => {
           const category = purchase.itemCategory || 'other';
           if (!acc[category]) {
@@ -893,36 +905,47 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                     </span>
                   </h4>
                   <div className="space-y-4">
-                    {categoryPurchases.map((purchase: any) => (
-                      <div key={purchase.id} className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                              <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                                {purchase.itemName}
-                              </span>
-                              {purchase.quantity > 1 && (
-                                <span className={`text-xs px-1.5 py-0.5 rounded ${isDark ? 'bg-white/10 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
-                                  x{purchase.quantity}
+                    {categoryPurchases.map((purchase: any) => {
+                      const displayDate = purchase.saleDate || purchase.date;
+                      const displayAmount = purchase.salePriceCents || purchase.amountCents || 0;
+                      const displaySource = purchase.source || (purchase.type === 'stripe' ? 'Stripe' : '');
+                      
+                      return (
+                        <div key={purchase.id} className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                  {purchase.itemName}
                                 </span>
+                                {purchase.quantity > 1 && (
+                                  <span className={`text-xs px-1.5 py-0.5 rounded ${isDark ? 'bg-white/10 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
+                                    x{purchase.quantity}
+                                  </span>
+                                )}
+                                {displaySource && (
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-white/10 text-gray-400' : 'bg-gray-200 text-gray-500'}`}>
+                                    {displaySource}
+                                  </span>
+                                )}
+                              </div>
+                              <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                                {formatDatePacific(displayDate)}
+                                {purchase.staffName && ` · ${purchase.staffName}`}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className={`text-base font-bold ${isDark ? 'text-accent' : 'text-brand-green'}`}>
+                                {formatCurrency(displayAmount)}
+                              </span>
+                              {purchase.isComp && (
+                                <span className="block text-[10px] text-green-500 font-medium mt-0.5">COMP</span>
                               )}
                             </div>
-                            <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                              {formatDatePacific(purchase.saleDate)}
-                              {purchase.staffName && ` · ${purchase.staffName}`}
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <span className={`text-base font-bold ${isDark ? 'text-accent' : 'text-brand-green'}`}>
-                              {formatCurrency(purchase.salePriceCents)}
-                            </span>
-                            {purchase.isComp && (
-                              <span className="block text-[10px] text-green-500 font-medium mt-0.5">COMP</span>
-                            )}
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
