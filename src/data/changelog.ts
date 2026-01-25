@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.25.0",
+    date: "2026-01-25",
+    title: "Codebase Modernization & Maintainability",
+    isMajor: true,
+    changes: [
+      "Improved: Major backend code reorganization - large files split into focused modules for easier maintenance",
+      "Improved: Stripe payment handling now organized by function (payments, subscriptions, invoices, coupons)",
+      "Improved: Member management code organized by area (search, profiles, admin actions, notes)",
+      "Improved: Booking system organized by function (resources, bookings, approvals, calendar)",
+      "Improved: Trackman integration organized by function (webhooks, validation, billing, imports)",
+      "Technical: Total of 15,535 lines of code reorganized into 34 focused modules"
+    ]
+  },
+  {
     version: "9.24.2",
     date: "2026-01-25",
     title: "Transaction Safety & Data Integrity Improvements",
