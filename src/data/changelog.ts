@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.24.1",
+    date: "2026-01-25",
+    title: "Booking Details Fee Calculation Fix",
+    changes: [
+      "Fixed: Empty player slots in Booking Details now show $25 pending fee until a member is assigned",
+      "Fixed: Financial summary correctly calculates Total Due including all empty/pending slots",
+      "Improved: Empty slots display 'Pending assignment - $25' fee note for staff clarity"
+    ]
+  },
+  {
     version: "9.24.0",
     date: "2026-01-25",
     title: "Trackman Booking Assignment Overhaul",
