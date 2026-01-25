@@ -13,6 +13,21 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.23.0",
+    date: "2026-01-25",
+    title: "Member Profile Drawer Redesign",
+    isMajor: true,
+    changes: [
+      "New: Consolidated member profile tabs from 11 down to 5 for improved usability",
+      "New: Activity tab combines Bookings, Events, Wellness, and Visits in a unified timeline view",
+      "New: Billing tab now includes guest passes, group billing, and purchase history",
+      "New: Activity tab filter navigation lets you quickly filter by activity type",
+      "Improved: Billing tab moved to 2nd position for faster staff access",
+      "Improved: Notes tab moved earlier in tab order for quick access",
+      "Improved: Cleaner navigation with fewer tabs and better information hierarchy"
+    ]
+  },
+  {
     version: "9.22.0",
     date: "2026-01-25",
     title: "Billing UI Consolidation",
