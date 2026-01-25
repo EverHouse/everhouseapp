@@ -50,7 +50,7 @@ The application features a React 19 frontend with Vite, styled using Tailwind CS
 - **Waiver Management**: Tracks waiver versions and requires signing on login.
 - **Member Lookup**: Centralized `MemberService` with caching.
 - **Billing Management**: Staff Payments Dashboard for POS, unified payment history, member billing management, self-service portal, tier change wizard with proration, dunning for failed payments, and refund processing.
-- **Add Member Workflow**: Staff can invite new members via payment links for automated account creation.
+- **Add User Workflow**: Staff can add new users via the "New User" modal (creates visitor with type='NEW', source='APP'). Payment links with tier selection are sent from the visitor profile drawer. When visitors pay, they automatically become active members with Stripe billing and sync to HubSpot.
 - **Closed-Loop Activation**: Automated member activation upon Stripe subscription confirmation.
 - **Payment Recovery (Dunning)**: Tracks failed payments with retry attempts and notifies members to update payment methods.
 - **Grace Period System**: Automated 3-day grace period for billing failures. Daily scheduler (10am Pacific) sends reminder emails with Stripe billing portal links. After 3 days, membership terminates (tier=NULL, last_tier preserved). Staff can manually send reactivation links via MemberProfileDrawer. TierBadge displays "No Active Membership" with grayed-out last tier for terminated members.
