@@ -1696,9 +1696,9 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                             </div>
                                         </div>
                                         
-                                        {req.resource_preference && (
+                                        {(req.bay_name || req.resource_preference) && (
                                             <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-                                                <span className="font-medium">Bay preference:</span> {req.resource_preference}
+                                                <span className="font-medium">Bay preference:</span> {req.bay_name || req.resource_preference}
                                             </p>
                                         )}
                                         {req.notes && (

@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.18.2",
+    date: "2026-01-25",
+    title: "Bay Preference Display Fix",
+    changes: [
+      "Fixed: Pending booking requests now correctly show the member's selected bay instead of 'any bay available'",
+      "Fixed: Simulate-confirm endpoint now creates proper session and participant records for testing"
+    ]
+  },
+  {
     version: "9.18.1",
     date: "2026-01-25",
     title: "Trackman-Only Booking Workflow",
