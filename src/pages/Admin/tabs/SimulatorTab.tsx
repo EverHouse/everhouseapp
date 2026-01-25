@@ -2162,7 +2162,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                         isRelink: false,
                                                         importedName: (booking as any).user_name || (booking as any).userName,
                                                         notes: (booking as any).notes || (booking as any).note
-                                                    }) : () => setSelectedCalendarBooking(booking)) : pendingRequest ? () => { setSelectedRequest(pendingRequest); setActionModal('decline'); } : undefined}
+                                                    }) : () => setSelectedCalendarBooking(booking)) : pendingRequest ? () => setTrackmanModal({ isOpen: true, booking: pendingRequest }) : undefined}
                                                     className={`h-7 sm:h-8 rounded ${
                                                         closure
                                                             ? 'bg-red-100 dark:bg-red-500/20 border border-red-300 dark:border-red-500/30'

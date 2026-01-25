@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.18.3",
+    date: "2026-01-25",
+    title: "Trackman Modal Fixes",
+    changes: [
+      "Fixed: 'Book on Trackman' modal now correctly shows declared player count instead of always showing 1 player",
+      "Fixed: Clicking pending request cells in calendar now opens the Trackman booking modal instead of the decline modal",
+      "Improved: Trackman notes now include placeholder lines for all declared players (e.g., G|none|Guest|2)"
+    ]
+  },
+  {
     version: "9.18.2",
     date: "2026-01-25",
     title: "Bay Preference Display Fix",

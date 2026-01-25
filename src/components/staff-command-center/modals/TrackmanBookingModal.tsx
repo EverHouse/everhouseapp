@@ -24,6 +24,7 @@ function generateNotesText(booking: BookingRequest | null, guests: Guest[] = [])
   
   const lines: string[] = [];
   
+  // Add the member (host) line
   if (booking.user_email && booking.user_name) {
     const nameParts = booking.user_name.trim().split(/\s+/);
     const firstName = nameParts[0] || '';
@@ -31,12 +32,25 @@ function generateNotesText(booking: BookingRequest | null, guests: Guest[] = [])
     lines.push(`M|${booking.user_email}|${firstName}|${lastName}`);
   }
   
+  // Add known guests
   for (const guest of guests) {
     const email = guest.email || 'none';
     const nameParts = (guest.name || 'Guest').trim().split(/\s+/);
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
     lines.push(`G|${email}|${firstName}|${lastName}`);
+  }
+  
+  // Add placeholder lines for remaining players based on declared_player_count
+  // Format: G|none|Guest|N where N is the player number
+  // The parser treats "none" as a recognized placeholder (email becomes null)
+  const declaredCount = booking.declared_player_count ?? 1;
+  const filledCount = 1 + guests.length; // 1 for host + guests
+  const remainingSlots = declaredCount - filledCount;
+  
+  for (let i = 0; i < remainingSlots; i++) {
+    const playerNum = filledCount + i + 1;
+    lines.push(`G|none|Guest|${playerNum}`);
   }
   
   return lines.join('\n');
@@ -55,7 +69,9 @@ export function TrackmanBookingModal({
   const [error, setError] = useState<string | null>(null);
 
   const notesText = generateNotesText(booking, guests);
-  const totalPlayers = 1 + guests.length;
+  // Use declared_player_count from booking, fallback to 1 + guests if not set
+  // Use nullish coalescing to preserve 0 as a valid value (though unlikely)
+  const totalPlayers = booking?.declared_player_count ?? Math.max(1, 1 + guests.length);
 
   const handleCopy = useCallback(async () => {
     try {
