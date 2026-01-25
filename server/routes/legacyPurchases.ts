@@ -260,16 +260,33 @@ async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurcha
       // Only show credit transactions (negative amounts = credits in Stripe)
       unifiedBalanceTransactions = balanceTransactions.data
         .filter(txn => txn.amount < 0) // Credits have negative amounts
-        .map(txn => ({
-          id: `balance-${txn.id}`,
-          type: 'stripe' as const,
-          itemName: txn.description || 'Account Balance Top-Up',
-          itemCategory: 'add_funds',
-          amountCents: Math.abs(txn.amount), // Convert to positive for display
-          date: new Date(txn.created * 1000).toISOString(),
-          status: 'paid',
-          source: 'Stripe',
-        }));
+        .map(txn => {
+          // Clean up the description - Stripe often includes checkout session IDs
+          let cleanName = 'Account Balance Top-Up';
+          if (txn.description) {
+            // Check for common patterns and clean them up
+            if (txn.description.toLowerCase().includes('top-up') || 
+                txn.description.toLowerCase().includes('topup') ||
+                txn.description.toLowerCase().includes('add funds') ||
+                txn.description.toLowerCase().includes('balance')) {
+              cleanName = 'Account Balance Top-Up';
+            } else if (!txn.description.startsWith('cs_') && !txn.description.startsWith('pi_')) {
+              // Only use description if it's not a raw Stripe ID
+              cleanName = txn.description;
+            }
+          }
+          
+          return {
+            id: `balance-${txn.id}`,
+            type: 'stripe' as const,
+            itemName: cleanName,
+            itemCategory: 'add_funds',
+            amountCents: Math.abs(txn.amount),
+            date: new Date(txn.created * 1000).toISOString(),
+            status: 'paid',
+            source: 'Stripe',
+          };
+        });
     } catch (balanceError) {
       console.error('[UnifiedPurchases] Error fetching balance transactions:', balanceError);
     }
