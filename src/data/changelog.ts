@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.19.0",
+    date: "2026-01-25",
+    title: "Pre-Declare Players & Participant Notifications",
+    isMajor: true,
+    changes: [
+      "New: Members can now specify player emails when submitting a booking request (before staff approval)",
+      "New: Player slot input fields appear when booking for 2+ players, with member/guest type toggles",
+      "New: When a booking is confirmed, all declared participants are automatically added to the roster and notified",
+      "New: Bookings now appear on each participant's dashboard when they're linked to the booking",
+      "Improved: Pre-declared participant emails appear in Trackman notes with their type (M or G prefix)"
+    ]
+  },
+  {
     version: "9.18.3",
     date: "2026-01-25",
     title: "Trackman Modal Fixes",

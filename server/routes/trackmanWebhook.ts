@@ -11,6 +11,7 @@ import { refundGuestPass } from './guestPasses';
 import { calculateFullSessionBilling, recalculateSessionFees } from '../core/bookingService/usageCalculator';
 import { recordUsage } from '../core/bookingService/sessionManager';
 import { getMemberTierByEmail } from '../core/tierService';
+import { linkAndNotifyParticipants } from '../core/bookingEvents';
 
 const router = Router();
 
@@ -1174,6 +1175,14 @@ async function createBookingForMember(
         data: { bookingId: pendingBookingId },
       });
       
+      linkAndNotifyParticipants(pendingBookingId, {
+        trackmanBookingId,
+        linkedBy: 'trackman_webhook',
+        bayName: bayNameForNotification
+      }).catch(err => {
+        logger.warn('[Trackman Webhook] Failed to link request participants', { extra: { bookingId: pendingBookingId, error: err } });
+      });
+      
       return { success: true, bookingId: pendingBookingId };
     }
     
@@ -1950,6 +1959,14 @@ async function handleBookingUpdate(payload: TrackmanWebhookPayload): Promise<{ s
       normalized.bayName,
       autoApproveResult.bookingId
     );
+    
+    linkAndNotifyParticipants(autoApproveResult.bookingId, {
+      trackmanBookingId: normalized.trackmanBookingId,
+      linkedBy: 'trackman_webhook',
+      bayName: normalized.bayName
+    }).catch(err => {
+      logger.warn('[Trackman Webhook] Failed to link request participants', { extra: { bookingId: autoApproveResult.bookingId, error: err } });
+    });
     
     logger.info('[Trackman Webhook] Auto-approved pending booking request', {
       extra: { bookingId: matchedBookingId, email: emailForLookup }
@@ -2969,6 +2986,14 @@ router.post('/api/admin/trackman-webhook/:eventId/auto-match', isStaffOrAdmin, a
       logger.warn('[Trackman Auto-Match] Failed to notify member', { error: notifyErr as Error });
     }
     
+    linkAndNotifyParticipants(match.id, {
+      trackmanBookingId,
+      linkedBy: 'staff_auto_match',
+      bayName: `Bay ${resourceId}`
+    }).catch(err => {
+      logger.warn('[Trackman Auto-Match] Failed to link request participants', { extra: { bookingId: match.id, error: err } });
+    });
+    
     logger.info('[Trackman Auto-Match] Successfully matched and approved booking', {
       extra: { eventId, trackmanBookingId, bookingId: match.id, memberEmail: match.user_email }
     });
@@ -3164,6 +3189,14 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
     } catch (notifyError) {
       logger.error('[Simulate Confirm] Notification error (non-blocking)', { error: notifyError });
     }
+    
+    linkAndNotifyParticipants(bookingId, {
+      trackmanBookingId: fakeTrackmanId,
+      linkedBy: 'simulate_confirm',
+      bayName: booking.resource_id ? `Bay ${booking.resource_id}` : 'Bay'
+    }).catch(err => {
+      logger.warn('[Simulate Confirm] Failed to link request participants', { extra: { bookingId, error: err } });
+    });
 
     logger.info('[Simulate Confirm] Booking manually confirmed', {
       bookingId,

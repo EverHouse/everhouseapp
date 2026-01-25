@@ -32,7 +32,7 @@ function generateNotesText(booking: BookingRequest | null, guests: Guest[] = [])
     lines.push(`M|${booking.user_email}|${firstName}|${lastName}`);
   }
   
-  // Add known guests
+  // Add known guests from booking_participants (filled post-approval)
   for (const guest of guests) {
     const email = guest.email || 'none';
     const nameParts = (guest.name || 'Guest').trim().split(/\s+/);
@@ -41,11 +41,30 @@ function generateNotesText(booking: BookingRequest | null, guests: Guest[] = [])
     lines.push(`G|${email}|${firstName}|${lastName}`);
   }
   
+  // Calculate filled count so far (host + guests)
+  let filledCount = 1 + guests.length;
+  
+  // Add pre-declared participants from request (if not already covered by guests)
+  const requestParticipants = booking.request_participants || [];
+  const guestEmails = new Set(guests.map(g => g.email?.toLowerCase()).filter(Boolean));
+  
+  for (const participant of requestParticipants) {
+    // Skip if this email is already in guests list
+    if (participant.email && guestEmails.has(participant.email.toLowerCase())) {
+      continue;
+    }
+    
+    const prefix = participant.type === 'member' ? 'M' : 'G';
+    const email = participant.email || 'none';
+    // Pre-declared participants only have email, not names yet
+    lines.push(`${prefix}|${email}|Pending|Info`);
+    filledCount++;
+  }
+  
   // Add placeholder lines for remaining players based on declared_player_count
   // Format: G|none|Guest|N where N is the player number
   // The parser treats "none" as a recognized placeholder (email becomes null)
   const declaredCount = booking.declared_player_count ?? 1;
-  const filledCount = 1 + guests.length; // 1 for host + guests
   const remainingSlots = declaredCount - filledCount;
   
   for (let i = 0; i < remainingSlots; i++) {

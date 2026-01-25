@@ -1,9 +1,14 @@
 import { db } from '../db';
-import { notifications, staffUsers, bookingRequests } from '../../shared/schema';
-import { eq, and, or } from 'drizzle-orm';
+import { notifications, staffUsers, bookingRequests, bookingMembers, bookingGuests, users } from '../../shared/schema';
+import { eq, and, or, sql } from 'drizzle-orm';
 import { sendNotificationToUser, broadcastToStaff, broadcastBookingEvent } from './websocket';
 import { sendPushNotification, sendPushNotificationToStaff } from '../routes/push';
 import { formatTime12Hour, formatDateDisplayWithDay } from '../utils/dateUtils';
+
+interface RequestParticipant {
+  email: string;
+  type: 'member' | 'guest';
+}
 
 export type BookingEventType = 
   | 'booking_created'
@@ -239,11 +244,154 @@ async function getStaffEmails(): Promise<string[]> {
   }
 }
 
+export async function linkAndNotifyParticipants(
+  bookingId: number,
+  options?: {
+    skipPrimaryMember?: boolean;
+    trackmanBookingId?: string;
+    linkedBy?: string;
+    bayName?: string;
+  }
+): Promise<{ linkedMembers: number; linkedGuests: number; notified: number }> {
+  const result = { linkedMembers: 0, linkedGuests: 0, notified: 0 };
+  
+  try {
+    const [booking] = await db.select({
+      id: bookingRequests.id,
+      userEmail: bookingRequests.userEmail,
+      userName: bookingRequests.userName,
+      requestDate: bookingRequests.requestDate,
+      startTime: bookingRequests.startTime,
+      requestParticipants: bookingRequests.requestParticipants,
+      declaredPlayerCount: bookingRequests.declaredPlayerCount,
+      trackmanBookingId: bookingRequests.trackmanBookingId
+    })
+    .from(bookingRequests)
+    .where(eq(bookingRequests.id, bookingId));
+    
+    if (!booking) {
+      console.warn(`[BookingEvents] Booking ${bookingId} not found`);
+      return result;
+    }
+    
+    const participants = (booking.requestParticipants || []) as RequestParticipant[];
+    if (participants.length === 0) {
+      return result;
+    }
+    
+    const ownerEmail = booking.userEmail?.toLowerCase()?.trim();
+    
+    const existingMembers = await db.select({ userEmail: bookingMembers.userEmail })
+      .from(bookingMembers)
+      .where(eq(bookingMembers.bookingId, bookingId));
+    const existingEmails = new Set(existingMembers.map(m => m.userEmail?.toLowerCase()).filter(Boolean));
+    
+    const existingGuestsQuery = await db.select({ guestEmail: bookingGuests.guestEmail })
+      .from(bookingGuests)
+      .where(eq(bookingGuests.bookingId, bookingId));
+    const existingGuestEmails = new Set(existingGuestsQuery.map(g => g.guestEmail?.toLowerCase()).filter(Boolean));
+    
+    const processedEmails = new Set<string>([...existingEmails, ...existingGuestEmails]);
+    if (ownerEmail) {
+      processedEmails.add(ownerEmail);
+    }
+    
+    const highestSlotResult = await db.select({ maxSlot: sql<number>`COALESCE(MAX(${bookingMembers.slotNumber}), 1)` })
+      .from(bookingMembers)
+      .where(eq(bookingMembers.bookingId, bookingId));
+    let nextSlot = (highestSlotResult[0]?.maxSlot || 1) + 1;
+    
+    const highestGuestSlotResult = await db.select({ maxSlot: sql<number>`COALESCE(MAX(${bookingGuests.slotNumber}), 0)` })
+      .from(bookingGuests)
+      .where(eq(bookingGuests.bookingId, bookingId));
+    let nextGuestSlot = (highestGuestSlotResult[0]?.maxSlot || 0) + 1;
+    
+    const trackmanId = options?.trackmanBookingId || booking.trackmanBookingId;
+    const linkedBy = options?.linkedBy || 'auto_link';
+    const bayName = options?.bayName || 'Bay';
+    const bookingDateStr = typeof booking.requestDate === 'string' 
+      ? booking.requestDate 
+      : (booking.requestDate as Date).toISOString().split('T')[0];
+    const startTimeStr = booking.startTime?.substring(0, 5) || '';
+    
+    for (const participant of participants) {
+      const email = participant.email?.toLowerCase()?.trim();
+      if (!email) continue;
+      
+      if (processedEmails.has(email)) continue;
+      processedEmails.add(email);
+      
+      if (participant.type === 'member') {
+        if (existingEmails.has(email)) continue;
+        
+        const [member] = await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName })
+          .from(users)
+          .where(sql`LOWER(${users.email}) = ${email}`);
+        
+        await db.insert(bookingMembers).values({
+          bookingId: bookingId,
+          userEmail: email,
+          slotNumber: nextSlot++,
+          isPrimary: false,
+          trackmanBookingId: trackmanId,
+          linkedAt: new Date(),
+          linkedBy: linkedBy
+        });
+        existingEmails.add(email);
+        result.linkedMembers++;
+        
+        try {
+          const notificationMsg = `You have been added to a simulator booking on ${bookingDateStr} at ${startTimeStr} (${bayName}).`;
+          await db.insert(notifications).values({
+            userId: member?.id || null,
+            userEmail: email,
+            title: 'Added to Booking',
+            message: notificationMsg,
+            type: 'booking',
+            relatedId: bookingId,
+            relatedType: 'booking'
+          });
+          
+          sendNotificationToUser(email, {
+            type: 'booking_participant_added',
+            title: 'Added to Booking',
+            message: notificationMsg,
+            data: { bookingId }
+          });
+          
+          result.notified++;
+        } catch (notifErr) {
+          console.error(`[BookingEvents] Failed to notify participant ${email}:`, notifErr);
+        }
+      } else if (participant.type === 'guest') {
+        if (existingGuestEmails.has(email)) continue;
+        
+        await db.insert(bookingGuests).values({
+          bookingId: bookingId,
+          guestEmail: email,
+          guestName: null,
+          slotNumber: nextGuestSlot++,
+          trackmanBookingId: trackmanId
+        });
+        existingGuestEmails.add(email);
+        result.linkedGuests++;
+      }
+    }
+    
+    console.log(`[BookingEvents] Linked ${result.linkedMembers} members and ${result.linkedGuests} guests to booking ${bookingId}, notified ${result.notified}`);
+    return result;
+  } catch (error) {
+    console.error(`[BookingEvents] Failed to link participants for booking ${bookingId}:`, error);
+    return result;
+  }
+}
+
 export const bookingEvents = {
   publish,
   cleanupNotificationsForBooking,
   validateBookingStatus,
-  formatBookingDateTime
+  formatBookingDateTime,
+  linkAndNotifyParticipants
 };
 
 export default bookingEvents;

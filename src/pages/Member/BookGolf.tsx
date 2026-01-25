@@ -170,6 +170,7 @@ const BookGolf: React.FC = () => {
   const [expandedHour, setExpandedHour] = useState<string | null>(null);
   const [hasUserSelectedDuration, setHasUserSelectedDuration] = useState(false);
   const [showPlayerTooltip, setShowPlayerTooltip] = useState(false);
+  const [playerSlots, setPlayerSlots] = useState<Array<{email: string, type: 'member' | 'guest'}>>([]);
   
   const [rescheduleBookingId, setRescheduleBookingId] = useState<number | null>(null);
   const [originalBooking, setOriginalBooking] = useState<BookingRequest | null>(null);
@@ -428,6 +429,19 @@ const BookGolf: React.FC = () => {
   useEffect(() => {
     fetchAvailability();
   }, [fetchAvailability, effectiveUser?.email, effectiveUser?.tier]);
+
+  // Reset playerSlots when playerCount changes
+  useEffect(() => {
+    const slotsNeeded = Math.max(0, playerCount - 1);
+    setPlayerSlots(prev => {
+      if (prev.length === slotsNeeded) return prev;
+      const newSlots: Array<{email: string, type: 'member' | 'guest'}> = [];
+      for (let i = 0; i < slotsNeeded; i++) {
+        newSlots.push(prev[i] || { email: '', type: 'guest' });
+      }
+      return newSlots;
+    });
+  }, [playerCount]);
 
   const fetchMyRequests = useCallback(async () => {
     if (!effectiveUser?.email) return;
@@ -717,6 +731,10 @@ const BookGolf: React.FC = () => {
     const consent = consentData || guardianConsentData;
     
     try {
+      const requestParticipants = activeTab === 'simulator' && playerSlots.length > 0
+        ? playerSlots.map(slot => ({ email: slot.email, type: slot.type }))
+        : undefined;
+
       const { ok, data, error } = await apiRequest('/api/booking-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -731,6 +749,7 @@ const BookGolf: React.FC = () => {
           notes: activeTab === 'conference' ? 'Conference room booking' : null,
           declared_player_count: activeTab === 'simulator' ? playerCount : undefined,
           member_notes: memberNotes.trim() || undefined,
+          request_participants: requestParticipants,
           ...(rescheduleBookingId ? { reschedule_booking_id: rescheduleBookingId } : {}),
           ...(consent ? {
             guardian_name: consent.guardianName,
@@ -1047,6 +1066,75 @@ const BookGolf: React.FC = () => {
                   <div className="text-lg font-bold">{count}</div>
                   <div className="text-[10px] opacity-70">{count === 1 ? 'Solo' : count === 2 ? 'Duo' : count === 3 ? 'Trio' : 'Four'}</div>
                 </button>
+              ))}
+            </div>
+          </section>
+          )}
+
+          {activeTab === 'simulator' && playerCount > 1 && (
+          <section className={`rounded-2xl p-4 border glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}>
+            <div className="flex items-center gap-2 mb-3">
+              <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-white/80' : 'text-primary/80'}`}>Additional Players</span>
+              <span className={`text-xs ${isDark ? 'text-white/50' : 'text-primary/50'}`}>(Optional)</span>
+            </div>
+            <div className="space-y-3">
+              {playerSlots.map((slot, index) => (
+                <div key={index} className="space-y-2">
+                  <label className={`text-sm font-medium ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
+                    Player {index + 2}
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      placeholder={`player${index + 2}@email.com`}
+                      value={slot.email}
+                      onChange={(e) => {
+                        const newSlots = [...playerSlots];
+                        newSlots[index] = { ...newSlots[index], email: e.target.value };
+                        setPlayerSlots(newSlots);
+                      }}
+                      className={`flex-1 px-3 py-2.5 rounded-lg border text-sm transition-all focus:ring-2 focus:ring-accent focus:outline-none ${
+                        isDark 
+                          ? 'bg-white/5 border-white/20 text-white placeholder:text-white/40' 
+                          : 'bg-black/5 border-black/10 text-primary placeholder:text-primary/40'
+                      }`}
+                    />
+                    <div className={`flex rounded-lg border overflow-hidden ${isDark ? 'border-white/20' : 'border-black/10'}`}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          haptic.selection();
+                          const newSlots = [...playerSlots];
+                          newSlots[index] = { ...newSlots[index], type: 'member' };
+                          setPlayerSlots(newSlots);
+                        }}
+                        className={`px-3 py-2 text-xs font-medium transition-all ${
+                          slot.type === 'member'
+                            ? 'bg-accent text-[#293515]'
+                            : (isDark ? 'bg-white/5 text-white/60 hover:bg-white/10' : 'bg-black/5 text-primary/60 hover:bg-black/10')
+                        }`}
+                      >
+                        Member
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          haptic.selection();
+                          const newSlots = [...playerSlots];
+                          newSlots[index] = { ...newSlots[index], type: 'guest' };
+                          setPlayerSlots(newSlots);
+                        }}
+                        className={`px-3 py-2 text-xs font-medium transition-all ${
+                          slot.type === 'guest'
+                            ? 'bg-accent text-[#293515]'
+                            : (isDark ? 'bg-white/5 text-white/60 hover:bg-white/10' : 'bg-black/5 text-primary/60 hover:bg-black/10')
+                        }`}
+                      >
+                        Guest
+                      </button>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           </section>

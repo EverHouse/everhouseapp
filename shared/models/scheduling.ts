@@ -95,6 +95,8 @@ export const bookingRequests = pgTable("booking_requests", {
   isUnmatched: boolean("is_unmatched").default(false),
   // Customer notes from Trackman for staff reference when matching unmatched bookings
   trackmanCustomerNotes: text("trackman_customer_notes"),
+  // Pre-declared participant info from member during booking request
+  requestParticipants: jsonb("request_participants"),
   // Flag indicating if booking was auto-linked to existing request (vs manually linked by staff)
   wasAutoLinked: boolean("was_auto_linked").default(false),
   // Origin tracking - who originally created this booking

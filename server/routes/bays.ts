@@ -271,7 +271,8 @@ router.get('/api/booking-requests', async (req, res) => {
       overage_minutes: bookingRequests.overageMinutes,
       overage_fee_cents: bookingRequests.overageFeeCents,
       overage_paid: bookingRequests.overagePaid,
-      is_unmatched: bookingRequests.isUnmatched
+      is_unmatched: bookingRequests.isUnmatched,
+      request_participants: bookingRequests.requestParticipants
     })
     .from(bookingRequests)
     .leftJoin(resources, eq(bookingRequests.resourceId, resources.id))
@@ -555,7 +556,7 @@ router.post('/api/booking-requests', async (req, res) => {
     const { 
       user_email, user_name, resource_id, resource_preference, request_date, start_time, 
       duration_minutes, notes, user_tier, reschedule_booking_id, declared_player_count, member_notes,
-      guardian_name, guardian_relationship, guardian_phone, guardian_consent
+      guardian_name, guardian_relationship, guardian_phone, guardian_consent, request_participants
     } = req.body;
     
     if (!user_email || !request_date || !start_time || !duration_minutes) {
@@ -703,6 +704,18 @@ router.post('/api/booking-requests', async (req, res) => {
         }
       }
       
+      // Validate and sanitize request_participants if provided
+      let sanitizedParticipants: any[] = [];
+      if (request_participants && Array.isArray(request_participants)) {
+        sanitizedParticipants = request_participants
+          .slice(0, 3) // Max 3 additional players
+          .map((p: any) => ({
+            email: typeof p.email === 'string' ? p.email.toLowerCase().trim() : '',
+            type: p.type === 'member' ? 'member' : 'guest'
+          }))
+          .filter((p: any) => p.email); // Only keep entries with valid emails
+      }
+      
       // Insert the booking within the transaction
       const insertResult = await client.query(
         `INSERT INTO booking_requests (
@@ -710,8 +723,8 @@ router.post('/api/booking-requests', async (req, res) => {
           request_date, start_time, duration_minutes, end_time, notes,
           reschedule_booking_id, declared_player_count, member_notes,
           guardian_name, guardian_relationship, guardian_phone, guardian_consent_at,
-          status, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'pending', NOW(), NOW())
+          request_participants, status, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'pending', NOW(), NOW())
         RETURNING *`,
         [
           user_email.toLowerCase(),
@@ -729,7 +742,8 @@ router.post('/api/booking-requests', async (req, res) => {
           guardian_consent && guardian_name ? guardian_name : null,
           guardian_consent && guardian_relationship ? guardian_relationship : null,
           guardian_consent && guardian_phone ? guardian_phone : null,
-          guardian_consent ? new Date() : null
+          guardian_consent ? new Date() : null,
+          sanitizedParticipants.length > 0 ? JSON.stringify(sanitizedParticipants) : '[]'
         ]
       );
       
@@ -756,6 +770,7 @@ router.post('/api/booking-requests', async (req, res) => {
         guardianRelationship: dbRow.guardian_relationship,
         guardianPhone: dbRow.guardian_phone,
         guardianConsentAt: dbRow.guardian_consent_at,
+        requestParticipants: dbRow.request_participants || [],
         createdAt: dbRow.created_at,
         updatedAt: dbRow.updated_at
       };
