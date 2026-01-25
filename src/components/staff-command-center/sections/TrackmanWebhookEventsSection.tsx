@@ -171,7 +171,7 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
       } else {
         setReplayResult({
           success: false,
-          message: result.error || 'Failed to replay webhooks'
+          message: result.details ? `${result.error}: ${result.details}` : (result.error || 'Failed to replay webhooks')
         });
       }
     } catch (err: any) {
