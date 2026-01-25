@@ -452,9 +452,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
   const [isGettingPaymentLink, setIsGettingPaymentLink] = useState(false);
   const [isOpeningBillingPortal, setIsOpeningBillingPortal] = useState(false);
   const [isSyncingToStripe, setIsSyncingToStripe] = useState(false);
-  const [isSyncingMetadata, setIsSyncingMetadata] = useState(false);
-  const [isBackfillingCache, setIsBackfillingCache] = useState(false);
-  const [isSyncingTierFromStripe, setIsSyncingTierFromStripe] = useState(false);
+  const [isSyncingStripeData, setIsSyncingStripeData] = useState(false);
 
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -763,74 +761,62 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
     }
   };
 
-  const handleSyncMetadata = async () => {
-    setIsSyncingMetadata(true);
+  const handleSyncStripeData = async () => {
+    setIsSyncingStripeData(true);
     setError(null);
+    const results: string[] = [];
+    
     try {
-      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/sync-metadata`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (res.ok) {
-        await fetchBillingInfo();
-        showSuccess('Customer metadata updated in Stripe');
-      } else {
-        const errData = await res.json();
-        setError(errData.error || 'Failed to sync metadata');
-      }
-    } catch (err) {
-      setError('Failed to sync metadata');
-    } finally {
-      setIsSyncingMetadata(false);
-    }
-  };
-
-  const handleBackfillCache = async () => {
-    setIsBackfillingCache(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/backfill-cache`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (res.ok) {
-        const data = await res.json();
-        showSuccess(`Cached ${data.transactionCount || 0} transactions from Stripe`);
-      } else {
-        const errData = await res.json();
-        setError(errData.error || 'Failed to backfill cache');
-      }
-    } catch (err) {
-      setError('Failed to backfill cache');
-    } finally {
-      setIsBackfillingCache(false);
-    }
-  };
-
-  const handleSyncTierFromStripe = async () => {
-    setIsSyncingTierFromStripe(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/sync-tier-from-stripe`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (res.ok) {
-        const data = await res.json();
-        await fetchBillingInfo();
-        if (data.previousTier === data.newTier) {
-          showSuccess(`Tier already matches Stripe (${data.newTier})`);
-        } else {
-          showSuccess(`Tier updated: ${data.previousTier || 'none'} → ${data.newTier}`);
+      // 1. Sync metadata
+      try {
+        const metaRes = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/sync-metadata`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        if (metaRes.ok) {
+          results.push('Metadata synced');
         }
+      } catch (e) { /* continue */ }
+      
+      // 2. Sync tier from Stripe
+      try {
+        const tierRes = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/sync-tier-from-stripe`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        if (tierRes.ok) {
+          const data = await tierRes.json();
+          if (data.previousTier !== data.newTier) {
+            results.push(`Tier: ${data.previousTier || 'none'} → ${data.newTier}`);
+          } else {
+            results.push(`Tier: ${data.newTier}`);
+          }
+        }
+      } catch (e) { /* continue */ }
+      
+      // 3. Backfill transaction cache
+      try {
+        const cacheRes = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/backfill-cache`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        if (cacheRes.ok) {
+          const data = await cacheRes.json();
+          results.push(`${data.transactionCount || 0} transactions cached`);
+        }
+      } catch (e) { /* continue */ }
+      
+      await fetchBillingInfo();
+      
+      if (results.length > 0) {
+        showSuccess(`Stripe sync complete: ${results.join(', ')}`);
       } else {
-        const errData = await res.json();
-        setError(errData.error || 'Failed to sync tier from Stripe');
+        setError('Sync completed but no changes were made');
       }
     } catch (err) {
-      setError('Failed to sync tier from Stripe');
+      setError('Failed to sync Stripe data');
     } finally {
-      setIsSyncingTierFromStripe(false);
+      setIsSyncingStripeData(false);
     }
   };
 
@@ -990,56 +976,26 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
               Sync to Stripe
             </button>
           ) : (
-            <>
-              <button
-                onClick={handleSyncMetadata}
-                disabled={isSyncingMetadata}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isDark ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                } disabled:opacity-50`}
-              >
-                {isSyncingMetadata ? (
-                  <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
-                ) : (
-                  <span className="material-symbols-outlined text-base">cloud_sync</span>
-                )}
-                Sync Metadata
-              </button>
-              <button
-                onClick={handleBackfillCache}
-                disabled={isBackfillingCache}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isDark ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                } disabled:opacity-50`}
-              >
-                {isBackfillingCache ? (
-                  <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
-                ) : (
-                  <span className="material-symbols-outlined text-base">cached</span>
-                )}
-                Backfill Transaction Cache
-              </button>
-              <button
-                onClick={handleSyncTierFromStripe}
-                disabled={isSyncingTierFromStripe}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isDark ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-500/30' : 'bg-purple-100 text-purple-700 hover:bg-purple-200 border border-purple-200'
-                } disabled:opacity-50`}
-              >
-                {isSyncingTierFromStripe ? (
-                  <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
-                ) : (
-                  <span className="material-symbols-outlined text-base">sync</span>
-                )}
-                Sync Tier from Stripe
-              </button>
-            </>
+            <button
+              onClick={handleSyncStripeData}
+              disabled={isSyncingStripeData}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                isDark ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+              } disabled:opacity-50`}
+            >
+              {isSyncingStripeData ? (
+                <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+              ) : (
+                <span className="material-symbols-outlined text-base">sync</span>
+              )}
+              Sync Stripe Data
+            </button>
           )}
         </div>
         <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
           {!billingInfo?.stripeCustomerId 
             ? 'Create or link a Stripe customer for this member to enable wallet features.'
-            : 'Update Stripe customer metadata or refresh local transaction cache.'}
+            : 'Sync membership tier, metadata, and transaction cache from Stripe.'}
         </p>
       </div>
 

@@ -770,7 +770,8 @@ router.post('/api/member-billing/:email/sync-tier-from-stripe', requireStaffAuth
       return res.json({ 
         success: true, 
         message: 'Tier already matches',
-        tier: newTier,
+        previousTier,
+        newTier,
         matchMethod
       });
     }

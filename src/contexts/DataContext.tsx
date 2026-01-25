@@ -362,6 +362,8 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             lastBookingDate: contact.lastBookingDate || null,
             joinDate: contact.joinDate || null,
             mindbodyClientId: contact.mindbodyClientId || null,
+            stripeCustomerId: contact.stripeCustomerId || null,
+            hubspotId: contact.hubspotId || null,
             manuallyLinkedEmails: contact.manuallyLinkedEmails || [],
             billingProvider: contact.billingProvider || contact.billing_provider || null
           }));
@@ -421,6 +423,8 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           lastBookingDate: contact.lastBookingDate || null,
           joinDate: contact.joinDate || null,
           mindbodyClientId: contact.mindbodyClientId || null,
+          stripeCustomerId: contact.stripeCustomerId || null,
+          hubspotId: contact.hubspotId || null,
           manuallyLinkedEmails: contact.manuallyLinkedEmails || [],
           billingProvider: contact.billingProvider || contact.billing_provider || null
         }));
@@ -459,6 +463,8 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           lastBookingDate: contact.lastBookingDate || null,
           joinDate: contact.joinDate || null,
           mindbodyClientId: contact.mindbodyClientId || null,
+          stripeCustomerId: contact.stripeCustomerId || null,
+          hubspotId: contact.hubspotId || null,
           manuallyLinkedEmails: contact.manuallyLinkedEmails || [],
           billingProvider: contact.billingProvider || contact.billing_provider || null
         }));
@@ -514,6 +520,8 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           lastBookingDate: contact.lastBookingDate || null,
           joinDate: contact.joinDate || null,
           mindbodyClientId: contact.mindbodyClientId || null,
+          stripeCustomerId: contact.stripeCustomerId || null,
+          hubspotId: contact.hubspotId || null,
           manuallyLinkedEmails: contact.manuallyLinkedEmails || [],
           billingProvider: contact.billingProvider || contact.billing_provider || null
         }));

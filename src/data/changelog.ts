@@ -15,12 +15,13 @@ export const changelog: ChangelogEntry[] = [
   {
     version: "9.22.0",
     date: "2026-01-25",
-    title: "Stripe Tier Synchronization",
+    title: "Stripe Data Sync Improvements",
     changes: [
-      "New: 'Sync Tier from Stripe' button in member billing section for manual tier updates",
-      "New: Tier sync endpoint matches Stripe subscription product names to membership tiers",
-      "Improved: Webhook handlers now fallback to product name matching when price ID lookup fails",
-      "Improved: Tier sync supports VIP, Premium, Corporate, Core, and Social tier keywords"
+      "New: Consolidated 'Sync Stripe Data' button replaces three separate sync buttons",
+      "New: Single button now syncs metadata, tier, and transaction cache in one click",
+      "Fixed: Stripe Customer ID and HubSpot ID now display in member profile header",
+      "Fixed: Tier sync now correctly returns tier data for already-matching tiers",
+      "Improved: Member data now includes all external system IDs from directory API"
     ]
   },
   {
