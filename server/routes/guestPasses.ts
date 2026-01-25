@@ -33,15 +33,31 @@ router.get('/api/guest-passes/:email', async (req, res) => {
     const sessionEmail = sessionUser.email?.toLowerCase() || '';
     const requestedEmail = email.toLowerCase();
     
+    const isStaff = await isStaffOrAdminCheck(sessionEmail);
+    
     if (sessionEmail !== requestedEmail) {
-      const hasStaffAccess = await isStaffOrAdminCheck(sessionEmail);
-      if (!hasStaffAccess) {
+      if (!isStaff) {
         return res.status(403).json({ error: 'You can only view your own guest passes' });
       }
     }
-    const { tier } = req.query;
     
-    const tierLimits = tier ? await getTierLimits(tier as string) : null;
+    // Get the member's actual tier from the database - don't trust client-provided tier
+    // Staff can optionally override with query param, but members must use their actual tier
+    let actualTier: string | null = null;
+    const { tier: clientTier } = req.query;
+    
+    if (isStaff && clientTier) {
+      // Staff can specify a tier for testing/override purposes
+      actualTier = clientTier as string;
+    } else {
+      // Look up the member's actual tier from the users table - don't trust client input
+      const userResult = await withRetry(() =>
+        db.execute(sql`SELECT tier FROM users WHERE LOWER(email) = LOWER(${requestedEmail}) LIMIT 1`)
+      );
+      actualTier = (userResult as any).rows?.[0]?.tier || null;
+    }
+    
+    const tierLimits = actualTier ? await getTierLimits(actualTier) : null;
     const passesTotal = tierLimits?.guest_passes_per_month ?? 0;
     
     let result = await withRetry(() => 
