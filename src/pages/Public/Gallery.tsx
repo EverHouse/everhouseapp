@@ -403,7 +403,7 @@ const GalleryItem: React.FC<GalleryItemProps> = React.memo(({ img, index, onItem
       {loaded && <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300"></div>}
     </div>
   );
-};
+});
 
 interface ImageViewerProps {
   images: string[];
