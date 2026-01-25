@@ -8,8 +8,8 @@ import { formatPhoneNumber } from '../utils/formatting';
 import { getMemberStatusColor, getMemberStatusLabel } from '../utils/statusColors';
 import { useScrollLock } from '../hooks/useScrollLock';
 import type { MemberProfile } from '../types/data';
-import GroupBillingManager from './admin/GroupBillingManager';
 import MemberBillingTab from './admin/MemberBillingTab';
+import MemberActivityTab from './admin/MemberActivityTab';
 
 const stripHtml = (html: string) => html?.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() || '';
 
@@ -72,20 +72,14 @@ interface CommunicationLog {
   createdAt: string;
 }
 
-type TabType = 'overview' | 'bookings' | 'events' | 'wellness' | 'visits' | 'guest-passes' | 'billing' | 'purchases' | 'communications' | 'notes' | 'family';
+type TabType = 'overview' | 'billing' | 'activity' | 'notes' | 'communications';
 
 const TABS: { id: TabType; label: string; icon: string }[] = [
   { id: 'overview', label: 'Overview', icon: 'dashboard' },
-  { id: 'bookings', label: 'Bookings', icon: 'event_note' },
-  { id: 'events', label: 'Events', icon: 'celebration' },
-  { id: 'wellness', label: 'Wellness', icon: 'spa' },
-  { id: 'visits', label: 'Visits', icon: 'check_circle' },
-  { id: 'guest-passes', label: 'Guests', icon: 'group_add' },
   { id: 'billing', label: 'Billing', icon: 'payments' },
-  { id: 'family', label: 'Group', icon: 'groups' },
-  { id: 'purchases', label: 'Purchases', icon: 'receipt_long' },
-  { id: 'communications', label: 'Comms', icon: 'chat' },
+  { id: 'activity', label: 'Activity', icon: 'history' },
   { id: 'notes', label: 'Notes', icon: 'sticky_note_2' },
+  { id: 'communications', label: 'Comms', icon: 'chat' },
 ];
 
 const formatDatePacific = (dateStr: string | null | undefined): string => {
@@ -118,7 +112,7 @@ const formatTime12Hour = (timeStr: string): string => {
   return `${hour12}:${String(minutes).padStart(2, '0')} ${period}`;
 };
 
-const VISITOR_TABS: TabType[] = ['bookings', 'visits', 'billing', 'purchases', 'communications', 'notes'];
+const VISITOR_TABS: TabType[] = ['billing', 'activity', 'communications', 'notes'];
 
 const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, member, isAdmin, onClose, onViewAs, onMemberDeleted, visitorMode = false }) => {
   const { effectiveTheme } = useTheme();
@@ -590,388 +584,6 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
           </div>
         );
 
-      case 'bookings':
-        const allBookings = [
-          ...filteredBookingHistory.map((b: any) => ({ ...b, source: 'confirmed' })),
-          ...filteredBookingRequestsHistory.map((b: any) => ({ ...b, source: 'request' }))
-        ].sort((a, b) => new Date(b.bookingDate || b.requestDate).getTime() - new Date(a.bookingDate || a.requestDate).getTime());
-        
-        if (allBookings.length === 0) {
-          return <EmptyState icon="event_note" message="No booking history found" />;
-        }
-        return (
-          <div className="space-y-3">
-            {allBookings.map((booking: any, idx: number) => {
-              const canUpdateStatus = booking.status === 'approved' || booking.status === 'confirmed';
-              const isUpdating = updatingBookingId === booking.id;
-              
-              return (
-                <div key={`${booking.source}-${booking.id}-${idx}`} className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                          {booking.resourceName || booking.resourceType || 'Booking'}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
-                          booking.status === 'attended' ? 'bg-green-100 text-green-700' :
-                          booking.status === 'approved' || booking.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
-                          booking.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                          booking.status === 'no_show' ? 'bg-orange-100 text-orange-700' :
-                          booking.status === 'cancelled' || booking.status === 'declined' ? 'bg-red-100 text-red-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {booking.status === 'no_show' ? 'No Show' : booking.status}
-                        </span>
-                      </div>
-                      <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {formatDatePacific(booking.bookingDate || booking.requestDate)} · {formatTime12Hour(booking.startTime)} - {formatTime12Hour(booking.endTime)}
-                      </p>
-                      {booking.notes && <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'} line-clamp-1`}>{booking.notes}</p>}
-                    </div>
-                    {canUpdateStatus && (
-                      <div className="flex gap-1.5 shrink-0">
-                        <button
-                          onClick={() => handleUpdateBookingStatus(booking.id, 'attended')}
-                          disabled={isUpdating}
-                          className={`px-2 py-1 rounded-lg text-[10px] font-medium transition-colors ${
-                            isUpdating
-                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                              : 'bg-green-100 text-green-700 hover:bg-green-200'
-                          }`}
-                          title="Mark as Attended"
-                        >
-                          {isUpdating ? (
-                            <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span>
-                          ) : (
-                            'Attended'
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleUpdateBookingStatus(booking.id, 'no_show')}
-                          disabled={isUpdating}
-                          className={`px-2 py-1 rounded-lg text-[10px] font-medium transition-colors ${
-                            isUpdating
-                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                              : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                          }`}
-                          title="Mark as No Show"
-                        >
-                          No Show
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        );
-
-      case 'events':
-        if (!history?.eventRsvpHistory?.length) {
-          return <EmptyState icon="celebration" message="No event RSVPs found" />;
-        }
-        return (
-          <div className="space-y-3">
-            {history.eventRsvpHistory.map((rsvp: any) => (
-              <div key={rsvp.id} className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{rsvp.eventTitle}</span>
-                      {rsvp.checkedIn && <span className="material-symbols-outlined text-green-500 text-sm">check_circle</span>}
-                    </div>
-                    <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                      {formatDatePacific(rsvp.eventDate)} · {rsvp.eventLocation}
-                    </p>
-                    {rsvp.ticketClass && <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>Ticket: {rsvp.ticketClass}</p>}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-
-      case 'wellness':
-        if (!history?.wellnessHistory?.length) {
-          return <EmptyState icon="spa" message="No wellness class enrollments found" />;
-        }
-        return (
-          <div className="space-y-3">
-            {history.wellnessHistory.map((enrollment: any) => (
-              <div key={enrollment.id} className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{enrollment.classTitle}</span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
-                      enrollment.status === 'enrolled' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
-                    }`}>
-                      {enrollment.status}
-                    </span>
-                  </div>
-                  <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                    {formatDatePacific(enrollment.classDate)} · {enrollment.classTime}
-                  </p>
-                  {enrollment.instructor && <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>Instructor: {enrollment.instructor}</p>}
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-
-      case 'visits':
-        const visits = history?.unifiedVisits || history?.visitHistory || [];
-        if (!visits.length) {
-          return <EmptyState icon="check_circle" message="No attended visits found" />;
-        }
-        const getRoleIcon = (role: string) => {
-          switch (role) {
-            case 'Host': return 'star';
-            case 'Player': return 'group';
-            case 'Guest': return 'person_add';
-            case 'Wellness': return 'spa';
-            case 'Event': return 'event';
-            default: return 'check_circle';
-          }
-        };
-        const getRoleBadgeColor = (role: string) => {
-          switch (role) {
-            case 'Host': return 'bg-brand-green text-white';
-            case 'Player': return 'bg-blue-500 text-white';
-            case 'Guest': return 'bg-orange-500 text-white';
-            case 'Wellness': return 'bg-purple-500 text-white';
-            case 'Event': return 'bg-pink-500 text-white';
-            default: return 'bg-gray-500 text-white';
-          }
-        };
-        return (
-          <div className="space-y-3">
-            {visits.map((visit: any, idx: number) => (
-              <div key={`${visit.type}-${visit.id}-${idx}`} className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="material-symbols-outlined text-green-500 text-lg">{getRoleIcon(visit.role)}</span>
-                  <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{visit.resourceName || 'Visit'}</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${getRoleBadgeColor(visit.role)}`}>
-                    {visit.role}
-                  </span>
-                </div>
-                <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                  {formatDatePacific(visit.date || visit.bookingDate)}
-                  {visit.startTime && <> · {formatTime12Hour(visit.startTime)}{visit.endTime && ` - ${formatTime12Hour(visit.endTime)}`}</>}
-                </p>
-                {visit.hostName && visit.role === 'Guest' && (
-                  <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                    Invited by {visit.hostName}
-                  </p>
-                )}
-                {visit.instructor && (
-                  <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                    Instructor: {visit.instructor}
-                  </p>
-                )}
-                {visit.location && (
-                  <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                    {visit.location}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        );
-
-      case 'guest-passes':
-        return (
-          <div className="space-y-4">
-            {history?.guestPassInfo && (
-              <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                <h4 className={`text-sm font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>Guest Pass Balance</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{history.guestPassInfo.remainingPasses || 0}</p>
-                    <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Remaining</p>
-                  </div>
-                  <div>
-                    <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{history.guestPassInfo.totalUsed || 0}</p>
-                    <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Used</p>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {guestHistory.length > 0 && (
-              <div>
-                <h4 className={`text-sm font-semibold mb-3 ${isDark ? 'text-white' : 'text-gray-900'}`}>Guests Brought to Bookings</h4>
-                <div className="space-y-3">
-                  {guestHistory.map((guest) => (
-                    <div key={guest.id} className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="material-symbols-outlined text-brand-green text-lg">person</span>
-                        <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{guest.guestName || 'Guest'}</span>
-                      </div>
-                      <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {formatDatePacific(guest.visitDate)} · {formatTime12Hour(guest.startTime)}
-                        {guest.resourceName && ` · ${guest.resourceName}`}
-                      </p>
-                      {guest.guestEmail && (
-                        <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{guest.guestEmail}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {history?.guestCheckInsHistory?.length ? (
-              <div>
-                <h4 className={`text-sm font-semibold mb-3 ${isDark ? 'text-white' : 'text-gray-900'}`}>Guest Check-In History</h4>
-                <div className="space-y-3">
-                  {history.guestCheckInsHistory.map((checkIn: any) => (
-                    <div key={checkIn.id} className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="material-symbols-outlined text-purple-500 text-lg">person</span>
-                        <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{checkIn.guestName || 'Guest'}</span>
-                      </div>
-                      <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {formatDatePacific(checkIn.checkInDate)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            
-            {!history?.guestPassInfo && guestHistory.length === 0 && !history?.guestCheckInsHistory?.length && (
-              <EmptyState icon="group_add" message="No guests recorded yet" />
-            )}
-          </div>
-        );
-
-      case 'purchases':
-        if (purchases.length === 0) {
-          return <EmptyState icon="receipt_long" message="No purchase history found" />;
-        }
-        
-        const categoryLabels: Record<string, string> = {
-          sim_walk_in: 'Sim Walk-In',
-          guest_pass: 'Guest Pass',
-          membership: 'Membership',
-          cafe: 'Cafe',
-          retail: 'Retail',
-          add_funds: 'Account Top-Up',
-          subscription: 'Subscription',
-          payment: 'Payment',
-          invoice: 'Invoice',
-          other: 'Other',
-        };
-        
-        const categoryColors: Record<string, string> = {
-          sim_walk_in: isDark ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-100 text-blue-700',
-          guest_pass: isDark ? 'bg-purple-500/20 text-purple-300' : 'bg-purple-100 text-purple-700',
-          membership: isDark ? 'bg-green-500/20 text-green-300' : 'bg-green-100 text-green-700',
-          cafe: isDark ? 'bg-orange-500/20 text-orange-300' : 'bg-orange-100 text-orange-700',
-          retail: isDark ? 'bg-pink-500/20 text-pink-300' : 'bg-pink-100 text-pink-700',
-          add_funds: isDark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700',
-          subscription: isDark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-700',
-          payment: isDark ? 'bg-cyan-500/20 text-cyan-300' : 'bg-cyan-100 text-cyan-700',
-          invoice: isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-700',
-          other: isDark ? 'bg-gray-500/20 text-gray-300' : 'bg-gray-100 text-gray-700',
-        };
-        
-        const categoryIcons: Record<string, string> = {
-          sim_walk_in: 'golf_course',
-          guest_pass: 'badge',
-          membership: 'card_membership',
-          cafe: 'local_cafe',
-          retail: 'shopping_bag',
-          add_funds: 'account_balance_wallet',
-          subscription: 'autorenew',
-          payment: 'payments',
-          invoice: 'receipt_long',
-          other: 'receipt',
-        };
-        
-        const categoryOrder = ['add_funds', 'subscription', 'membership', 'sim_walk_in', 'guest_pass', 'payment', 'invoice', 'cafe', 'retail', 'other'];
-        const groupedPurchases = purchases.reduce((acc: Record<string, any[]>, purchase: any) => {
-          const category = purchase.itemCategory || 'other';
-          if (!acc[category]) {
-            acc[category] = [];
-          }
-          acc[category].push(purchase);
-          return acc;
-        }, {});
-        
-        const formatCurrency = (cents: number | undefined | null): string => {
-          if (cents == null || isNaN(cents)) return '$0.00';
-          return `$${(cents / 100).toFixed(2)}`;
-        };
-        
-        return (
-          <div className="space-y-6">
-            {categoryOrder.map(category => {
-              const categoryPurchases = groupedPurchases[category];
-              if (!categoryPurchases || categoryPurchases.length === 0) return null;
-              
-              return (
-                <div key={category}>
-                  <h4 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium flex items-center gap-1 ${categoryColors[category] || categoryColors.other}`}>
-                      <span className="material-symbols-outlined text-xs">{categoryIcons[category] || 'receipt'}</span>
-                      {categoryLabels[category] || category}
-                    </span>
-                    <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                      ({categoryPurchases.length})
-                    </span>
-                  </h4>
-                  <div className="space-y-4">
-                    {categoryPurchases.map((purchase: any) => {
-                      const displayDate = purchase.saleDate || purchase.date;
-                      const displayAmount = purchase.salePriceCents || purchase.amountCents || 0;
-                      const displaySource = purchase.source || (purchase.type === 'stripe' ? 'Stripe' : '');
-                      
-                      return (
-                        <div key={purchase.id} className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                                  {purchase.itemName}
-                                </span>
-                                {purchase.quantity > 1 && (
-                                  <span className={`text-xs px-1.5 py-0.5 rounded ${isDark ? 'bg-white/10 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
-                                    x{purchase.quantity}
-                                  </span>
-                                )}
-                                {displaySource && (
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-white/10 text-gray-400' : 'bg-gray-200 text-gray-500'}`}>
-                                    {displaySource}
-                                  </span>
-                                )}
-                              </div>
-                              <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                                {formatDatePacific(displayDate)}
-                                {purchase.staffName && ` · ${purchase.staffName}`}
-                              </p>
-                            </div>
-                            <div className="text-right shrink-0">
-                              <span className={`text-base font-bold ${isDark ? 'text-accent' : 'text-brand-green'}`}>
-                                {formatCurrency(displayAmount)}
-                              </span>
-                              {purchase.isComp && (
-                                <span className="block text-[10px] text-green-500 font-medium mt-0.5">COMP</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        );
-
       case 'communications':
         return (
           <div className="space-y-4">
@@ -1203,11 +815,16 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
           </div>
         );
 
-      case 'family':
+      case 'activity':
         return (
-          <div className="space-y-4">
-            <GroupBillingManager memberEmail={member.email} />
-          </div>
+          <MemberActivityTab
+            memberEmail={member.email}
+            bookingHistory={filteredBookingHistory}
+            bookingRequestsHistory={filteredBookingRequestsHistory}
+            eventRsvpHistory={history?.eventRsvpHistory || []}
+            wellnessHistory={history?.wellnessHistory || []}
+            visitHistory={history?.visitHistory || []}
+          />
         );
 
       default:
