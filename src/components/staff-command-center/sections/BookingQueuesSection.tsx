@@ -245,7 +245,6 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
       ) : (
         <div className="space-y-2">
           {pendingRequests.map((request, index) => {
-            const isApproving = isActionLoading(`approve-${request.id}`);
             const isDenying = isActionLoading(`deny-${request.id}`);
             
             return (
@@ -281,25 +280,15 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
                 )}
                 <div className="flex gap-2 ml-[56px]">
                   <button
-                    onClick={(e) => { e.stopPropagation(); executeApprove(request); }}
-                    disabled={isApproving || isDenying}
-                    className="flex-1 py-1.5 px-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    onClick={(e) => { e.stopPropagation(); onOpenTrackman(request); }}
+                    className="flex-1 py-1.5 px-3 bg-[#E55A22]/10 text-[#E55A22] dark:bg-[#E55A22]/20 dark:text-[#FF7A44] text-xs font-medium rounded-lg hover:bg-[#E55A22]/20 dark:hover:bg-[#E55A22]/30 transition-colors flex items-center justify-center gap-1.5"
                   >
-                    {isApproving ? (
-                      <>
-                        <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-                        Approving...
-                      </>
-                    ) : (
-                      <>
-                        <span className="material-symbols-outlined text-sm">check_circle</span>
-                        Approve
-                      </>
-                    )}
+                    <span className="material-symbols-outlined text-sm">sports_golf</span>
+                    Book on Trackman
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); executeDeny(request); }}
-                    disabled={isDenying || isApproving}
+                    disabled={isDenying}
                     className="flex-1 py-1.5 px-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-medium rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
                   >
                     {isDenying ? (
@@ -307,16 +296,14 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
                         <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
                         Denying...
                       </>
-                    ) : 'Deny'}
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-sm">close</span>
+                        Deny
+                      </>
+                    )}
                   </button>
                 </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); onOpenTrackman(request); }}
-                  className="ml-[56px] py-1 px-3 bg-[#E55A22]/10 text-[#E55A22] dark:bg-[#E55A22]/20 dark:text-[#FF7A44] text-[10px] font-medium rounded-lg hover:bg-[#E55A22]/20 dark:hover:bg-[#E55A22]/30 transition-colors flex items-center justify-center gap-1"
-                >
-                  <span className="material-symbols-outlined text-xs">sports_golf</span>
-                  Book on Trackman
-                </button>
               </GlassListRow>
             );
           })}

@@ -164,6 +164,7 @@ const BookGolf: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isBooking, setIsBooking] = useState(false);
+  const isSubmittingRef = useRef(false); // Ref for immediate double-tap prevention
   const [showViewAsConfirm, setShowViewAsConfirm] = useState(false);
   const [myRequests, setMyRequests] = useState<BookingRequest[]>([]);
   const [closures, setClosures] = useState<Closure[]>([]);
@@ -807,6 +808,10 @@ const BookGolf: React.FC = () => {
   const submitBooking = async (consentData?: GuardianConsentData) => {
     if (!selectedSlot || !selectedResource || !effectiveUser || !selectedDateObj) return;
     
+    // Double-check ref to prevent duplicate submissions
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    
     setIsBooking(true);
     setError(null);
     setShowViewAsConfirm(false);
@@ -910,11 +915,15 @@ const BookGolf: React.FC = () => {
       setError(err.message || 'Booking failed. Please try again.');
     } finally {
       setIsBooking(false);
+      isSubmittingRef.current = false;
     }
   };
 
   const handleConfirm = async () => {
     if (!selectedSlot || !selectedResource || !effectiveUser || !selectedDateObj) return;
+    
+    // Prevent double-taps with ref (immediate check before React re-render)
+    if (isSubmittingRef.current || isBooking) return;
     
     // If admin is viewing as member, show confirmation popup first
     if (isAdminViewingAs) {
