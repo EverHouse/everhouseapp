@@ -454,6 +454,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
   const [isSyncingToStripe, setIsSyncingToStripe] = useState(false);
   const [isSyncingMetadata, setIsSyncingMetadata] = useState(false);
   const [isBackfillingCache, setIsBackfillingCache] = useState(false);
+  const [isSyncingTierFromStripe, setIsSyncingTierFromStripe] = useState(false);
 
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -806,6 +807,33 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
     }
   };
 
+  const handleSyncTierFromStripe = async () => {
+    setIsSyncingTierFromStripe(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/sync-tier-from-stripe`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        await fetchBillingInfo();
+        if (data.previousTier === data.newTier) {
+          showSuccess(`Tier already matches Stripe (${data.newTier})`);
+        } else {
+          showSuccess(`Tier updated: ${data.previousTier || 'none'} → ${data.newTier}`);
+        }
+      } else {
+        const errData = await res.json();
+        setError(errData.error || 'Failed to sync tier from Stripe');
+      }
+    } catch (err) {
+      setError('Failed to sync tier from Stripe');
+    } finally {
+      setIsSyncingTierFromStripe(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
@@ -990,6 +1018,20 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
                   <span className="material-symbols-outlined text-base">cached</span>
                 )}
                 Backfill Transaction Cache
+              </button>
+              <button
+                onClick={handleSyncTierFromStripe}
+                disabled={isSyncingTierFromStripe}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isDark ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-500/30' : 'bg-purple-100 text-purple-700 hover:bg-purple-200 border border-purple-200'
+                } disabled:opacity-50`}
+              >
+                {isSyncingTierFromStripe ? (
+                  <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+                ) : (
+                  <span className="material-symbols-outlined text-base">sync</span>
+                )}
+                Sync Tier from Stripe
               </button>
             </>
           )}

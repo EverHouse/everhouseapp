@@ -674,6 +674,128 @@ router.post('/api/member-billing/:email/sync-metadata', requireStaffAuth, async 
   }
 });
 
+// Sync tier from Stripe subscription - fetches active subscription and updates tier based on product name
+router.post('/api/member-billing/:email/sync-tier-from-stripe', requireStaffAuth, async (req, res) => {
+  try {
+    const targetEmail = decodeURIComponent(req.params.email);
+    
+    const result = await pool.query(
+      `SELECT id, email, first_name, last_name, stripe_customer_id, tier FROM users WHERE LOWER(email) = $1`,
+      [targetEmail.toLowerCase()]
+    );
+    
+    const member = result.rows[0];
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    if (!member.stripe_customer_id) {
+      return res.status(400).json({ error: 'Member does not have a Stripe customer ID' });
+    }
+    
+    const stripe = await getStripeClient();
+    
+    // Fetch active subscriptions
+    const subscriptions = await stripe.subscriptions.list({
+      customer: member.stripe_customer_id,
+      status: 'active',
+      limit: 10,
+    });
+    
+    if (subscriptions.data.length === 0) {
+      // Also check for trialing/past_due
+      const allSubs = await stripe.subscriptions.list({
+        customer: member.stripe_customer_id,
+        limit: 10,
+      });
+      const activeSub = allSubs.data.find(s => 
+        s.status === 'active' || s.status === 'trialing' || s.status === 'past_due'
+      );
+      if (!activeSub) {
+        return res.status(400).json({ error: 'No active subscription found in Stripe' });
+      }
+      subscriptions.data = [activeSub];
+    }
+    
+    const activeSub = subscriptions.data[0];
+    const priceId = activeSub.items?.data?.[0]?.price?.id;
+    const productId = activeSub.items?.data?.[0]?.price?.product;
+    
+    // First try to match by price ID
+    let tierResult = await pool.query(
+      'SELECT slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
+      [priceId]
+    );
+    
+    let newTier: string | null = null;
+    let matchMethod = '';
+    
+    if (tierResult.rows.length > 0) {
+      newTier = tierResult.rows[0].name;
+      matchMethod = 'price_id';
+    } else if (productId) {
+      // Fallback: fetch product and match by name
+      const product = await stripe.products.retrieve(productId as string);
+      const productName = product.name?.toLowerCase() || '';
+      
+      // Match product name to tier - look for tier keywords
+      const tierKeywords = ['vip', 'premium', 'corporate', 'core', 'social'];
+      for (const keyword of tierKeywords) {
+        if (productName.includes(keyword)) {
+          tierResult = await pool.query(
+            'SELECT slug, name FROM membership_tiers WHERE LOWER(slug) = $1 OR LOWER(name) = $1',
+            [keyword]
+          );
+          if (tierResult.rows.length > 0) {
+            newTier = tierResult.rows[0].name;
+            matchMethod = 'product_name';
+            break;
+          }
+        }
+      }
+    }
+    
+    if (!newTier) {
+      return res.status(400).json({ 
+        error: 'Could not match Stripe subscription to a tier',
+        priceId,
+        productId,
+        hint: 'The Stripe price or product may not be linked to a tier in the database'
+      });
+    }
+    
+    const previousTier = member.tier;
+    
+    if (newTier === previousTier) {
+      return res.json({ 
+        success: true, 
+        message: 'Tier already matches',
+        tier: newTier,
+        matchMethod
+      });
+    }
+    
+    // Update the user's tier
+    await pool.query(
+      `UPDATE users SET tier = $1, billing_provider = 'stripe', membership_status = 'active', updated_at = NOW() WHERE id = $2`,
+      [newTier, member.id]
+    );
+    
+    console.log(`[SyncTierFromStripe] Updated tier for ${targetEmail}: ${previousTier} -> ${newTier} (matched by ${matchMethod})`);
+    
+    res.json({ 
+      success: true, 
+      previousTier,
+      newTier,
+      matchMethod,
+      message: `Tier updated from ${previousTier || 'none'} to ${newTier}`
+    });
+  } catch (error: any) {
+    console.error('[SyncTierFromStripe] Error:', error);
+    res.status(500).json({ error: 'Failed to sync tier from Stripe' });
+  }
+});
+
 // Backfill transaction cache for individual member
 router.post('/api/member-billing/:email/backfill-cache', requireStaffAuth, async (req, res) => {
   try {

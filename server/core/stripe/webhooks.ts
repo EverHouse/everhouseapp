@@ -1528,7 +1528,52 @@ async function handleSubscriptionCreated(subscription: any): Promise<void> {
             console.error('[Stripe Webhook] Error updating HubSpot deal:', hubspotError);
           }
         } else {
-          console.warn(`[Stripe Webhook] No tier found for price ID ${priceId}`);
+          // Fallback: try to match by product name
+          const productId = subscription.items?.data?.[0]?.price?.product;
+          if (productId) {
+            try {
+              const stripe = await getStripeClient();
+              const product = await stripe.products.retrieve(productId as string);
+              const productName = product.name?.toLowerCase() || '';
+              
+              // Match product name to tier - look for tier keywords
+              const tierKeywords = ['vip', 'premium', 'corporate', 'core', 'social'];
+              for (const keyword of tierKeywords) {
+                if (productName.includes(keyword)) {
+                  const keywordTierResult = await pool.query(
+                    'SELECT slug, name FROM membership_tiers WHERE LOWER(slug) = $1 OR LOWER(name) = $1',
+                    [keyword]
+                  );
+                  if (keywordTierResult.rows.length > 0) {
+                    const { name: tierName } = keywordTierResult.rows[0];
+                    
+                    const updateResult = await pool.query(
+                      `UPDATE users SET 
+                        tier = $1, 
+                        membership_status = CASE 
+                          WHEN membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member') THEN 'active' 
+                          ELSE membership_status 
+                        END,
+                        billing_provider = 'stripe',
+                        updated_at = NOW() 
+                      WHERE email = $2 
+                      RETURNING id`,
+                      [tierName, email]
+                    );
+                    
+                    if (updateResult.rowCount && updateResult.rowCount > 0) {
+                      console.log(`[Stripe Webhook] User activation (product name match): ${email} tier updated to ${tierName} from product "${product.name}"`);
+                    }
+                    break;
+                  }
+                }
+              }
+            } catch (productError) {
+              console.error('[Stripe Webhook] Error fetching product for name match:', productError);
+            }
+          } else {
+            console.warn(`[Stripe Webhook] No tier found for price ID ${priceId}`);
+          }
         }
       } catch (tierError) {
         console.error('[Stripe Webhook] Error with closed-loop activation:', tierError);
@@ -1608,30 +1653,61 @@ async function handleSubscriptionUpdated(subscription: any, previousAttributes?:
     const memberName = `${first_name || ''} ${last_name || ''}`.trim() || email;
 
     if (currentPriceId) {
-      const tierResult = await pool.query(
+      let tierResult = await pool.query(
         'SELECT slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
         [currentPriceId]
       );
       
+      let newTierName: string | null = null;
+      let matchMethod = 'price_id';
+      
       if (tierResult.rows.length > 0) {
-        const newTierName = tierResult.rows[0].name;
-        
-        // Compare names (users.tier stores the display name like 'Social', not slug)
-        if (newTierName && newTierName !== currentTier) {
-          await pool.query(
-            'UPDATE users SET tier = $1, billing_provider = $3, updated_at = NOW() WHERE id = $2',
-            [newTierName, userId, 'stripe']
-          );
-          
-          console.log(`[Stripe Webhook] Tier updated via Stripe for ${email}: ${currentTier} -> ${newTierName}`);
-          
-          await notifyMember({
-            userEmail: email,
-            title: 'Membership Updated',
-            message: `Your membership has been changed to ${newTierName}.`,
-            type: 'system',
-          });
+        newTierName = tierResult.rows[0].name;
+      } else {
+        // Fallback: try to match by product name
+        const productId = subscription.items?.data?.[0]?.price?.product;
+        if (productId) {
+          try {
+            const stripe = await getStripeClient();
+            const product = await stripe.products.retrieve(productId as string);
+            const productName = product.name?.toLowerCase() || '';
+            
+            const tierKeywords = ['vip', 'premium', 'corporate', 'core', 'social'];
+            for (const keyword of tierKeywords) {
+              if (productName.includes(keyword)) {
+                const keywordTierResult = await pool.query(
+                  'SELECT slug, name FROM membership_tiers WHERE LOWER(slug) = $1 OR LOWER(name) = $1',
+                  [keyword]
+                );
+                if (keywordTierResult.rows.length > 0) {
+                  newTierName = keywordTierResult.rows[0].name;
+                  matchMethod = 'product_name';
+                  console.log(`[Stripe Webhook] Tier matched by product name "${product.name}" -> ${newTierName}`);
+                  break;
+                }
+              }
+            }
+          } catch (productError) {
+            console.error('[Stripe Webhook] Error fetching product for name match:', productError);
+          }
         }
+      }
+      
+      // Compare names (users.tier stores the display name like 'Social', not slug)
+      if (newTierName && newTierName !== currentTier) {
+        await pool.query(
+          'UPDATE users SET tier = $1, billing_provider = $3, updated_at = NOW() WHERE id = $2',
+          [newTierName, userId, 'stripe']
+        );
+        
+        console.log(`[Stripe Webhook] Tier updated via Stripe for ${email}: ${currentTier} -> ${newTierName} (matched by ${matchMethod})`);
+        
+        await notifyMember({
+          userEmail: email,
+          title: 'Membership Updated',
+          message: `Your membership has been changed to ${newTierName}.`,
+          type: 'system',
+        });
       }
     }
 
