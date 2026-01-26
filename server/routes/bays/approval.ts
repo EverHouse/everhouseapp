@@ -1018,6 +1018,52 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
           lifetimeVisits: updatedUser.lifetime_visits
         });
       }
+      
+      // Send check-in confirmation notification to member
+      const formattedDate = formatDateDisplayWithDay(booking.requestDate.toISOString().split('T')[0]);
+      const formattedTime = formatTime12Hour(booking.startTime);
+      
+      const memberResult = await pool.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`, [booking.userEmail]);
+      const memberId = memberResult.rows[0]?.id;
+      
+      if (memberId) {
+        await pool.query(
+          `INSERT INTO notifications (user_id, title, message, type, link, created_at)
+           VALUES ($1, $2, $3, $4, $5, NOW())`,
+          [memberId, 'Check-In Complete', `Thanks for visiting! Your session on ${formattedDate} at ${formattedTime} has been checked in.`, 'booking', '/bookings']
+        );
+      }
+      
+      sendNotificationToUser(booking.userEmail, {
+        type: 'notification',
+        title: 'Check-In Complete',
+        message: `Thanks for visiting! Your session on ${formattedDate} at ${formattedTime} has been checked in.`,
+        data: { bookingId, eventType: 'booking_attended' }
+      }, { action: 'booking_attended', bookingId, triggerSource: 'approval.ts' });
+    }
+    
+    // Send no-show notification to member
+    if (newStatus === 'no_show' && booking.userEmail) {
+      const formattedDate = formatDateDisplayWithDay(booking.requestDate.toISOString().split('T')[0]);
+      const formattedTime = formatTime12Hour(booking.startTime);
+      
+      const memberResult = await pool.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`, [booking.userEmail]);
+      const memberId = memberResult.rows[0]?.id;
+      
+      if (memberId) {
+        await pool.query(
+          `INSERT INTO notifications (user_id, title, message, type, link, created_at)
+           VALUES ($1, $2, $3, $4, $5, NOW())`,
+          [memberId, 'Missed Booking', `You were marked as a no-show for your booking on ${formattedDate} at ${formattedTime}. If this was in error, please contact staff.`, 'booking', '/bookings']
+        );
+      }
+      
+      sendNotificationToUser(booking.userEmail, {
+        type: 'notification',
+        title: 'Missed Booking',
+        message: `You were marked as a no-show for your booking on ${formattedDate} at ${formattedTime}. If this was in error, please contact staff.`,
+        data: { bookingId, eventType: 'booking_no_show' }
+      }, { action: 'booking_no_show', bookingId, triggerSource: 'approval.ts' });
     }
     
     res.json({ success: true, booking: result[0] });

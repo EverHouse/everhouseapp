@@ -95,6 +95,48 @@ export async function ensureDatabaseConstraints() {
       END $$;
     `);
     
+    // Add trigger to prevent double-bookings on the same resource (prevents new overlaps while preserving historical data)
+    try {
+      await db.execute(sql`
+        CREATE OR REPLACE FUNCTION prevent_booking_session_overlap()
+        RETURNS TRIGGER AS $$
+        DECLARE
+          conflict_count INTEGER;
+        BEGIN
+          SELECT COUNT(*) INTO conflict_count
+          FROM booking_sessions
+          WHERE resource_id = NEW.resource_id
+            AND session_date = NEW.session_date
+            AND id != COALESCE(NEW.id, 0)
+            AND tsrange(
+              (session_date + start_time)::timestamp,
+              (session_date + end_time)::timestamp,
+              '[)'
+            ) && tsrange(
+              (NEW.session_date + NEW.start_time)::timestamp,
+              (NEW.session_date + NEW.end_time)::timestamp,
+              '[)'
+            );
+          
+          IF conflict_count > 0 THEN
+            RAISE EXCEPTION 'Double-booking not allowed: This time slot on this bay already has a session';
+          END IF;
+          
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+
+        DROP TRIGGER IF EXISTS check_booking_session_overlap ON booking_sessions;
+        CREATE TRIGGER check_booking_session_overlap
+        BEFORE INSERT OR UPDATE OF resource_id, session_date, start_time, end_time ON booking_sessions
+        FOR EACH ROW
+        EXECUTE FUNCTION prevent_booking_session_overlap();
+      `);
+      console.log('[DB Init] Double-booking prevention trigger created/verified');
+    } catch (err: any) {
+      console.warn(`[DB Init] Skipping overlap trigger: ${err.message}`);
+    }
+    
     // Create performance indexes for common queries (execute each separately, with error handling)
     const indexQueries = [
       { name: 'idx_booking_requests_status', query: sql`CREATE INDEX IF NOT EXISTS idx_booking_requests_status ON booking_requests(status)` },

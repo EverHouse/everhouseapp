@@ -8,7 +8,7 @@ import { notifyPaymentSuccess, notifyPaymentFailed, notifyStaffPaymentFailed, no
 import { sendPaymentReceiptEmail, sendPaymentFailedEmail } from '../../emails/paymentEmails';
 import { sendMembershipRenewalEmail, sendMembershipFailedEmail } from '../../emails/membershipEmails';
 import { sendPassWithQrEmail } from '../../emails/passEmails';
-import { broadcastBillingUpdate, broadcastDayPassUpdate } from '../websocket';
+import { broadcastBillingUpdate, broadcastDayPassUpdate, sendNotificationToUser } from '../websocket';
 import { recordDayPassPurchaseFromWebhook } from '../../routes/dayPasses';
 import { handlePrimarySubscriptionCancelled } from './groupBilling';
 import { computeFeeBreakdown } from '../billing/unifiedFeeService';
@@ -360,6 +360,29 @@ async function handleChargeRefunded(client: PoolClient, charge: any): Promise<De
            FROM booking_sessions bs WHERE bs.id = $1`,
           [row.session_id, row.id, JSON.stringify({ stripePaymentIntentId: paymentIntentId })]
         );
+        
+        // Send refund notification to member
+        if (row.user_email) {
+          const userResult = await client.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`, [row.user_email]);
+          const userId = userResult.rows[0]?.id;
+          
+          if (userId) {
+            await client.query(
+              `INSERT INTO notifications (user_id, title, message, type, link, created_at)
+               VALUES ($1, $2, $3, $4, $5, NOW())`,
+              [userId, 'Payment Refunded', `Your booking payment of $${(amount_refunded / 100).toFixed(2)} has been refunded. It may take 5-10 business days to appear on your statement.`, 'billing', '/billing']
+            );
+          }
+          
+          deferredActions.push(async () => {
+            sendNotificationToUser(row.user_email, {
+              type: 'notification',
+              title: 'Payment Refunded',
+              message: `Your booking payment of $${(amount_refunded / 100).toFixed(2)} has been refunded. It may take 5-10 business days to appear on your statement.`,
+              data: { sessionId: row.session_id, eventType: 'payment_refunded' }
+            }, { action: 'payment_refunded', sessionId: row.session_id, triggerSource: 'webhooks.ts' });
+          });
+        }
       }
     }
   }

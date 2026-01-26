@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.29.5",
+    date: "2026-01-26",
+    title: "Check-In & Refund Notifications",
+    changes: [
+      "Added: Members now receive notifications when checked in ('Check-In Complete')",
+      "Added: Members receive notification if marked as no-show with instructions to contact staff",
+      "Added: Automatic notification when booking payments are refunded",
+      "Added: Database-level trigger prevents double-booking the same bay on new sessions",
+      "Reliability: All notifications sent via both in-app and real-time WebSocket channels"
+    ]
+  },
+  {
     version: "9.29.4",
     date: "2026-01-26",
     title: "Booking Cancellation Refunds",
