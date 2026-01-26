@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.28.1",
+    date: "2026-01-26",
+    title: "Trackman Sync Improvements",
+    changes: [
+      "Fixed: Trackman Bookings Synced accordion now shows booking details and webhook data when expanded",
+      "Fixed: Trackman webhook processing now supports all booking event types (created, updated, cancelled)",
+      "Added: Linked member name and auto-link status now shown in Trackman sync cards"
+    ]
+  },
+  {
     version: "9.28.0",
     date: "2026-01-26",
     title: "Performance & Safety Improvements",
