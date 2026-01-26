@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.29.4",
+    date: "2026-01-26",
+    title: "Booking Cancellation Refunds",
+    changes: [
+      "Added: Guest fee payments are now automatically refunded when bookings are canceled",
+      "Added: Works for both member-initiated and staff-initiated cancellations",
+      "Added: Refund metadata tracks booking ID and participant for reconciliation",
+      "Reliability: Non-blocking refund processing with error logging for manual follow-up"
+    ]
+  },
+  {
     version: "9.29.3",
     date: "2026-01-26",
     title: "Safe Account Credit Integration",

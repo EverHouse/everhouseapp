@@ -585,6 +585,41 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
           if (guestParticipants.length > 0) {
             console.log(`[bays] Refunded ${guestParticipants.length} guest pass(es) for cancelled booking ${bookingId}`);
           }
+          
+          // Refund participant payments (guest fees paid via Stripe)
+          const paidParticipants = await pool.query(
+            `SELECT id, stripe_payment_intent_id, cached_fee_cents, display_name
+             FROM booking_participants 
+             WHERE session_id = $1 
+             AND payment_status = 'paid' 
+             AND stripe_payment_intent_id IS NOT NULL 
+             AND stripe_payment_intent_id != ''
+             AND stripe_payment_intent_id NOT LIKE 'balance-%'`,
+            [sessionResult[0].sessionId]
+          );
+          
+          if (paidParticipants.rows.length > 0) {
+            const stripe = await getStripeClient();
+            for (const participant of paidParticipants.rows) {
+              try {
+                const pi = await stripe.paymentIntents.retrieve(participant.stripe_payment_intent_id);
+                if (pi.status === 'succeeded' && pi.latest_charge) {
+                  const refund = await stripe.refunds.create({
+                    charge: pi.latest_charge as string,
+                    reason: 'requested_by_customer',
+                    metadata: {
+                      type: 'booking_cancelled_by_staff',
+                      bookingId: bookingId.toString(),
+                      participantId: participant.id.toString()
+                    }
+                  });
+                  console.log(`[Staff Cancel] Refunded guest fee for ${participant.display_name}: $${(participant.cached_fee_cents / 100).toFixed(2)}, refund: ${refund.id}`);
+                }
+              } catch (refundErr: any) {
+                console.error(`[Staff Cancel] Failed to refund participant ${participant.id}:`, refundErr.message);
+              }
+            }
+          }
         }
         
         let pushInfo: { type: 'staff' | 'member' | 'both'; email?: string; staffMessage?: string; memberMessage?: string; message: string } | null = null;

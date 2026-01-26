@@ -886,6 +886,54 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
       }
     }
     
+    // Refund participant payments (guest fees paid via Stripe)
+    try {
+      const sessionResult = await pool.query(
+        `SELECT bs.id as session_id FROM booking_sessions bs 
+         JOIN booking_requests br ON bs.booking_id = br.id
+         WHERE br.id = $1`,
+        [bookingId]
+      );
+      
+      if (sessionResult.rows[0]?.session_id) {
+        const paidParticipants = await pool.query(
+          `SELECT id, stripe_payment_intent_id, cached_fee_cents, display_name
+           FROM booking_participants 
+           WHERE session_id = $1 
+           AND payment_status = 'paid' 
+           AND stripe_payment_intent_id IS NOT NULL 
+           AND stripe_payment_intent_id != ''
+           AND stripe_payment_intent_id NOT LIKE 'balance-%'`,
+          [sessionResult.rows[0].session_id]
+        );
+        
+        if (paidParticipants.rows.length > 0) {
+          const stripe = await getStripeClient();
+          for (const participant of paidParticipants.rows) {
+            try {
+              const pi = await stripe.paymentIntents.retrieve(participant.stripe_payment_intent_id);
+              if (pi.status === 'succeeded' && pi.latest_charge) {
+                const refund = await stripe.refunds.create({
+                  charge: pi.latest_charge as string,
+                  reason: 'requested_by_customer',
+                  metadata: {
+                    type: 'booking_cancelled',
+                    bookingId: bookingId.toString(),
+                    participantId: participant.id.toString()
+                  }
+                });
+                console.log(`[Member Cancel] Refunded guest fee for ${participant.display_name}: $${(participant.cached_fee_cents / 100).toFixed(2)}, refund: ${refund.id}`);
+              }
+            } catch (refundErr: any) {
+              console.error(`[Member Cancel] Failed to refund participant ${participant.id}:`, refundErr.message);
+            }
+          }
+        }
+      }
+    } catch (participantRefundErr) {
+      console.error('[Member Cancel] Failed to process participant refunds (non-blocking):', participantRefundErr);
+    }
+    
     if (wasApproved) {
       const memberName = existing.userName || existing.userEmail;
       const bookingDate = existing.requestDate;
