@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.26.1",
+    date: "2026-01-26",
+    title: "Booking Request Error Fix",
+    changes: [
+      "Fixed: Booking requests now succeed without showing false error message",
+      "Fixed: Date formatting for notifications now handles database Date objects correctly"
+    ]
+  },
+  {
     version: "9.26.0",
     date: "2026-01-26",
     title: "Architecture & Performance Improvements",

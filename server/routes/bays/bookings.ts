@@ -597,7 +597,11 @@ router.post('/api/booking-requests', async (req, res) => {
       }
     }
     
-    const formattedDate = formatDateDisplayWithDay(row.requestDate);
+    // Use the original request_date string (row.requestDate is a Date object from Postgres)
+    const dateStr = typeof row.requestDate === 'string' 
+      ? row.requestDate 
+      : request_date;
+    const formattedDate = formatDateDisplayWithDay(dateStr);
     const formattedTime12h = formatTime12Hour(row.startTime?.substring(0, 5) || start_time.substring(0, 5));
     
     const durationMins = row.durationMinutes || duration_minutes;
