@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.25.6",
+    date: "2026-01-26",
+    title: "Critical Booking Participant Data Fix",
+    changes: [
+      "Fixed: Directory-selected guests are now properly saved with booking requests (were previously lost)",
+      "Fixed: Guest pass counting now correctly includes guests selected from visitor directory",
+      "Fixed: Booking response now sent before notifications to prevent false error messages",
+      "Improved: Participant data includes userId and name for visitors selected from directory"
+    ]
+  },
+  {
     version: "9.25.5",
     date: "2026-01-26",
     title: "Guest Pass Pending Request Calculation",

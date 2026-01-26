@@ -511,10 +511,16 @@ router.post('/api/booking-requests', async (req, res) => {
         sanitizedParticipants = request_participants
           .slice(0, 3)
           .map((p: any) => ({
+            // Keep email if provided (for new guests entered by email)
             email: typeof p.email === 'string' ? p.email.toLowerCase().trim() : '',
-            type: p.type === 'member' ? 'member' : 'guest'
+            type: p.type === 'member' ? 'member' : 'guest',
+            // CRITICAL: Also store userId and name for directory-selected participants
+            // Without this, guests selected from directory were being lost entirely
+            userId: typeof p.userId === 'string' ? p.userId : undefined,
+            name: typeof p.name === 'string' ? p.name.trim() : undefined
           }))
-          .filter((p: any) => p.email);
+          // Keep participant if they have email OR userId (directory selection)
+          .filter((p: any) => p.email || p.userId);
       }
       
       const insertResult = await client.query(

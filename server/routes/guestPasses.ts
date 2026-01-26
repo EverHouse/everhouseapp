@@ -107,7 +107,10 @@ router.get('/api/guest-passes/:email', async (req, res) => {
       for (const booking of pendingBookings) {
         const participants = booking.requestParticipants;
         if (Array.isArray(participants)) {
-          pendingGuestCount += participants.filter((p: any) => p.type === 'guest').length;
+          // Count guests that have either email OR userId (directory-selected guests)
+          pendingGuestCount += participants.filter((p: any) => 
+            p.type === 'guest' && (p.email || p.userId)
+          ).length;
         }
       }
     } catch (err) {
