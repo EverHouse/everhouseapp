@@ -19,7 +19,9 @@ export const changelog: ChangelogEntry[] = [
     changes: [
       "Added: Staff can now create new membership subscriptions directly from the member billing tab",
       "Added: 'Create Subscription' button appears when a member has Stripe set up but no active subscription",
-      "Added: Modal to select membership tier when creating a new subscription"
+      "Added: Modal to select membership tier when creating a new subscription",
+      "Added: Stripe ID now displays in member header alongside Mindbody ID and HubSpot ID",
+      "Improved: Create Subscription option now shows for Mindbody members to enable migration to Stripe billing"
     ]
   },
   {

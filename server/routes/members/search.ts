@@ -309,6 +309,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
         joinDate: member.joinDate,
         lastBookingDate: lastActivityMap[emailLower] || null,
         mindbodyClientId: member.mindbodyClientId,
+        stripeCustomerId: member.stripeCustomerId,
         manuallyLinkedEmails: member.manuallyLinkedEmails || [],
         dataSource: member.dataSource,
         billingProvider: member.billingProvider,

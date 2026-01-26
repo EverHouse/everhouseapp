@@ -1067,7 +1067,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
       )}
 
       {/* Create Subscription option - when Stripe customer exists but no active subscription */}
-      {(billingInfo?.billingProvider === 'stripe' || !billingInfo?.billingProvider) && billingInfo?.stripeCustomerId && !billingInfo?.activeSubscription && (
+      {billingInfo?.stripeCustomerId && !billingInfo?.activeSubscription && (
         <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isDark ? 'bg-green-500/20' : 'bg-green-100'}`}>
@@ -1076,7 +1076,9 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
             <div className="flex-1">
               <p className={`text-sm font-medium ${isDark ? 'text-white' : 'text-primary'}`}>No Active Subscription</p>
               <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                This member has Stripe set up but doesn't have an active membership subscription.
+                {billingInfo?.billingProvider === 'mindbody'
+                  ? 'Create a Stripe subscription to migrate this member from Mindbody billing.'
+                  : 'This member has Stripe set up but no active membership subscription.'}
               </p>
             </div>
             <button
