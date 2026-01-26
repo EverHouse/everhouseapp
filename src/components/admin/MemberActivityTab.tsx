@@ -167,15 +167,9 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
       });
     });
 
-    (visitHistory || []).forEach((visit: any, idx: number) => {
-      const dateStr = visit.date || visit.bookingDate;
-      activities.push({
-        id: `visit-${visit.id || idx}`,
-        type: 'visit',
-        date: new Date(dateStr?.includes('T') ? dateStr : `${dateStr}T12:00:00`),
-        data: visit,
-      });
-    });
+    // Note: visitHistory is NOT added here because attended bookings are already 
+    // included in bookingHistory. Adding visitHistory would create duplicates.
+    // The visitHistory data is still used for the "Visits" filter tab count.
 
     activities.sort((a, b) => b.date.getTime() - a.date.getTime());
 
@@ -184,12 +178,31 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
 
   const filteredActivities = useMemo(() => {
     if (activeFilter === 'all') return allActivities;
+    
+    // For "visits" filter, show attended activities:
+    // - Simulator bookings that are in visitHistory (status='attended' or past approved lounge)
+    // - Past event RSVPs
+    // - Wellness classes with status='attended'
+    if (activeFilter === 'visits') {
+      const now = new Date();
+      const visitHistoryIds = new Set((visitHistory || []).map((v: any) => v.id));
+      return allActivities.filter(a => {
+        if (a.type === 'booking' && visitHistoryIds.has(a.data?.id)) return true;
+        if (a.type === 'event') {
+          const eventDate = new Date(a.data?.eventDate);
+          return eventDate < now; // Past events count as attended
+        }
+        if (a.type === 'wellness' && a.data?.status === 'attended') return true;
+        return false;
+      });
+    }
+    
     const filterMap: Record<ActivityFilter, string> = {
       all: 'all',
       bookings: 'booking',
       events: 'event',
       wellness: 'wellness',
-      visits: 'visit',
+      visits: 'visit', // This won't match anything now, handled above
     };
     return allActivities.filter(a => a.type === filterMap[activeFilter]);
   }, [allActivities, activeFilter]);
@@ -379,12 +392,22 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
   const getCounts = () => {
     const filteredBookingHistory = (bookingHistory || []).filter((b: any) => b.status !== 'cancelled' && b.status !== 'declined');
     const filteredBookingRequestsHistory = (bookingRequestsHistory || []).filter((b: any) => b.status !== 'cancelled' && b.status !== 'declined');
+    
+    // Count visits: use visitHistory (attended simulator bookings) + past events + attended wellness
+    // This matches the backend attendedVisitsCount calculation
+    const attendedBookingsCount = visitHistory?.length || 0;
+    const pastEventsCount = (eventRsvpHistory || []).filter((e: any) => {
+      const eventDate = new Date(e.eventDate);
+      return eventDate < new Date(); // Past events count as attended
+    }).length;
+    const attendedWellnessCount = (wellnessHistory || []).filter((w: any) => w.status === 'attended').length;
+    
     return {
       all: allActivities.length,
       bookings: filteredBookingHistory.length + filteredBookingRequestsHistory.length,
       events: eventRsvpHistory?.length || 0,
       wellness: wellnessHistory?.length || 0,
-      visits: visitHistory?.length || 0,
+      visits: attendedBookingsCount + pastEventsCount + attendedWellnessCount,
     };
   };
 

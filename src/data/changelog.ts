@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.25.3",
+    date: "2026-01-25",
+    title: "Activity Tab & Lifetime Visits Improvements",
+    changes: [
+      "Fixed: Duplicate simulator bookings no longer appear in member Activity tab",
+      "Fixed: Lifetime visits count now includes attended events and wellness classes (not just simulator bookings)",
+      "Fixed: Member activity history displays correctly in staff directory profile drawer"
+    ]
+  },
+  {
     version: "9.25.2",
     date: "2026-01-25",
     title: "Staff Directory Activity Tab Fix",

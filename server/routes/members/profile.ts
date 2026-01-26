@@ -353,6 +353,19 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       .where(sql`LOWER(${bookingGuests.guestEmail}) = ${normalizedEmail}`)
       .orderBy(desc(bookingRequests.requestDate));
     
+    // Calculate total attended visits including bookings, events, and wellness
+    // - Simulator bookings with status='attended' (already in visitHistory)
+    // - Past event RSVPs count as attended visits
+    // - Wellness classes with status='attended'
+    const attendedBookingsCount = visitHistory.length;
+    const now = new Date();
+    const attendedEventsCount = eventRsvpHistory.filter((e: any) => {
+      const eventDate = new Date(e.eventDate);
+      return eventDate < now; // Past events count as attended
+    }).length;
+    const attendedWellnessCount = wellnessHistory.filter((w: any) => w.status === 'attended').length;
+    const totalAttendedVisits = attendedBookingsCount + attendedEventsCount + attendedWellnessCount;
+    
     // Return with field names that match frontend MemberHistory interface
     res.json({
       bookingHistory: enrichedBookingHistory,
@@ -363,7 +376,7 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       guestCheckInsHistory: guestCheckInsHistory,
       visitHistory: visitHistory,
       guestAppearances,
-      attendedVisitsCount: visitHistory.length
+      attendedVisitsCount: totalAttendedVisits
     });
   } catch (error: any) {
     if (!isProduction) console.error('Member history error:', error);
