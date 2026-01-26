@@ -48,10 +48,13 @@ export {
   createMembershipDeal,
   createDealForLegacyMember,
   createMemberWithDeal,
+  createMemberLocally,
+  syncNewMemberToHubSpot,
   getMemberPaymentStatus,
   handleTierChange,
   type AddMemberInput,
   type AddMemberResult,
+  type CreateMemberLocallyResult,
   type TierChangeResult
 } from './members';
 

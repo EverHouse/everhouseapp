@@ -340,6 +340,163 @@ export async function createDealForLegacyMember(
   }
 }
 
+export interface CreateMemberLocallyResult {
+  success: boolean;
+  userId?: number;
+  error?: string;
+}
+
+export async function createMemberLocally(input: AddMemberInput): Promise<CreateMemberLocallyResult> {
+  const { firstName, lastName, email, phone, tier, startDate, discountReason } = input;
+  const normalizedEmail = email.toLowerCase().trim();
+  
+  try {
+    const existingUser = await pool.query(
+      'SELECT id, email FROM users WHERE LOWER(email) = $1',
+      [normalizedEmail]
+    );
+    
+    if (existingUser.rows.length > 0) {
+      return { success: false, error: 'A member with this email already exists' };
+    }
+    
+    const tags = discountReason ? [discountReason] : [];
+    const result = await pool.query(
+      `INSERT INTO users (
+        email, first_name, last_name, phone, role, tier, 
+        membership_status, billing_provider,
+        tags, data_source, join_date, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, 'member', $5, 'active', 'hubspot', $6, 'staff_manual', $7, NOW(), NOW())
+      RETURNING id`,
+      [
+        normalizedEmail,
+        firstName,
+        lastName,
+        phone || null,
+        tier,
+        JSON.stringify(tags),
+        startDate || new Date().toISOString().split('T')[0]
+      ]
+    );
+    
+    return { success: true, userId: result.rows[0].id };
+  } catch (error: any) {
+    console.error('[AddMember] Failed to create user locally:', error);
+    return { success: false, error: error.message || 'Failed to create member' };
+  }
+}
+
+export async function syncNewMemberToHubSpot(input: AddMemberInput): Promise<void> {
+  const { firstName, lastName, email, phone, tier, startDate, discountReason, createdBy, createdByName } = input;
+  const normalizedEmail = email.toLowerCase().trim();
+  
+  const existingUser = await pool.query(
+    'SELECT id FROM users WHERE LOWER(email) = $1',
+    [normalizedEmail]
+  );
+  
+  if (existingUser.rows.length === 0) {
+    console.warn(`[SyncMember] User ${normalizedEmail} not found in database - skipping HubSpot sync`);
+    return;
+  }
+  
+  const product = await getProductMapping(tier);
+  if (!product) {
+    throw new Error(`No HubSpot product found for tier: ${tier}`);
+  }
+  
+  let discountPercent = 0;
+  if (discountReason) {
+    const discountResult = await pool.query(
+      'SELECT discount_percent FROM discount_rules WHERE discount_tag = $1 AND is_active = true',
+      [discountReason]
+    );
+    if (discountResult.rows.length > 0) {
+      discountPercent = discountResult.rows[0].discount_percent;
+    }
+  }
+  
+  const { contactId, isNew: isNewContact } = await findOrCreateHubSpotContact(
+    normalizedEmail,
+    firstName,
+    lastName,
+    phone,
+    tier
+  );
+  
+  const dealName = `${firstName} ${lastName} - ${tier} Membership`;
+  const dealId = await createMembershipDeal(
+    contactId,
+    normalizedEmail,
+    dealName,
+    tier,
+    startDate
+  );
+  
+  const lineItemResult = await addLineItemToDeal(
+    dealId,
+    product.hubspotProductId,
+    1,
+    discountPercent,
+    discountReason,
+    createdBy,
+    createdByName || createdBy
+  );
+  
+  if (!lineItemResult.success) {
+    try {
+      const hubspot = await getHubSpotClient();
+      await hubspot.crm.deals.basicApi.archive(dealId);
+    } catch (rollbackError) {
+      console.error('[SyncMember] Failed to rollback deal creation:', rollbackError);
+    }
+    throw new Error('Failed to add line item to deal');
+  }
+  
+  await pool.query(
+    'UPDATE users SET hubspot_id = $1, updated_at = NOW() WHERE LOWER(email) = $2',
+    [contactId, normalizedEmail]
+  );
+  
+  try {
+    await db.insert(hubspotDeals).values({
+      memberEmail: normalizedEmail,
+      hubspotContactId: contactId,
+      hubspotDealId: dealId,
+      dealName,
+      pipelineId: MEMBERSHIP_PIPELINE_ID,
+      pipelineStage: HUBSPOT_STAGE_IDS.CLOSED_WON_ACTIVE,
+      isPrimary: true,
+      lastKnownMindbodyStatus: 'active'
+    });
+  } catch (dealError: any) {
+    console.warn('[SyncMember] Failed to store deal record locally:', dealError);
+  }
+  
+  await db.insert(billingAuditLog).values({
+    memberEmail: normalizedEmail,
+    hubspotDealId: dealId,
+    actionType: 'member_created',
+    actionDetails: {
+      firstName,
+      lastName,
+      tier,
+      discountReason,
+      discountPercent,
+      isNewContact,
+      billingProvider: 'hubspot',
+      syncedViaQueue: true
+    },
+    newValue: `Created member with ${tier} membership`,
+    performedBy: createdBy,
+    performedByName: createdByName || createdBy
+  });
+  
+  if (!isProduction) {
+    console.log(`[SyncMember] Successfully synced member ${normalizedEmail} to HubSpot with deal ${dealId}`);
+  }
+}
+
 export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMemberResult> {
   const {
     firstName,

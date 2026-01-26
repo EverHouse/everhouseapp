@@ -7,7 +7,7 @@ import { isStaffOrAdmin, isAdmin } from '../../core/middleware';
 import { getSessionUser } from '../../types/session';
 import { TIER_NAMES } from '../../../shared/constants/tiers';
 import { getTierRank } from './helpers';
-import { createMemberWithDeal, getAllDiscountRules, handleTierChange } from '../../core/hubspot';
+import { createMemberLocally, queueMemberCreation, getAllDiscountRules, handleTierChange } from '../../core/hubspot';
 import { changeSubscriptionTier, pauseSubscription } from '../../core/stripe';
 import { notifyMember } from '../../core/notificationService';
 import { cascadeEmailChange, previewEmailChangeImpact } from '../../core/memberService/emailChangeService';
@@ -516,7 +516,7 @@ router.post('/api/members', isStaffOrAdmin, async (req, res) => {
       }
     }
     
-    const result = await createMemberWithDeal({
+    const memberInput = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       email: email.trim(),
@@ -526,10 +526,20 @@ router.post('/api/members', isStaffOrAdmin, async (req, res) => {
       discountReason: discountReason || undefined,
       createdBy: sessionUser.email,
       createdByName: sessionUser.name || `${sessionUser.firstName || ''} ${sessionUser.lastName || ''}`.trim()
-    });
+    };
+    
+    const result = await createMemberLocally(memberInput);
     
     if (!result.success) {
       return res.status(400).json({ error: result.error || 'Failed to create member' });
+    }
+    
+    let hubspotSyncQueued = false;
+    try {
+      await queueMemberCreation(memberInput);
+      hubspotSyncQueued = true;
+    } catch (queueError) {
+      console.error('[CreateMember] Failed to queue HubSpot sync (member created locally):', queueError);
     }
     
     res.status(201).json({
@@ -540,10 +550,12 @@ router.post('/api/members', isStaffOrAdmin, async (req, res) => {
         email: email.toLowerCase(),
         firstName,
         lastName,
-        tier,
-        hubspotContactId: result.hubspotContactId,
-        hubspotDealId: result.hubspotDealId
-      }
+        tier
+      },
+      hubspotSyncQueued,
+      hubspotSyncNote: hubspotSyncQueued 
+        ? 'HubSpot sync will complete in the background' 
+        : 'HubSpot sync failed to queue - member created locally only'
     });
   } catch (error: any) {
     console.error('Create member error:', error);

@@ -203,8 +203,8 @@ async function executeHubSpotOperation(operation: string, payload: any): Promise
       break;
       
     case 'sync_member':
-      // This is a composite operation - create contact + deal if needed
-      await members.createMemberWithDeal(payload);
+      // Sync a newly created member to HubSpot (contact + deal)
+      await members.syncNewMemberToHubSpot(payload);
       break;
       
     case 'sync_company':
