@@ -256,13 +256,19 @@ router.get('/api/admin/trackman-webhooks', isStaffOrAdmin, async (req: Request, 
         twe.created_at,
         twe.retry_count,
         twe.last_retry_at,
+        twe.payload,
+        br.was_auto_linked,
         br.user_email as matched_user_email,
         br.request_date,
         br.start_time,
         br.end_time,
-        br.resource_id
+        br.resource_id,
+        br.is_unmatched as linked_booking_unmatched,
+        u.first_name || ' ' || u.last_name as linked_member_name,
+        u.email as linked_member_email
       FROM trackman_webhook_events twe
       LEFT JOIN booking_requests br ON twe.matched_booking_id = br.id
+      LEFT JOIN users u ON br.user_id = u.id
       ORDER BY twe.created_at DESC
       LIMIT $1 OFFSET $2
     `, [limit, offset]);
