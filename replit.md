@@ -61,6 +61,9 @@ Server startup is organized into loader modules for clean separation of concerns
 - **Admin Tools**: Admin-configurable features, data integrity dashboard, and data migration tools.
 - **Privacy Compliance**: Privacy modal, CCPA/CPRA features, account deletion, and member data export. Admin audit log tracks staff access to member data.
 - **Waiver Management**: Tracks waiver versions and requires signing on login.
+- **Unified Fee Service (v9.27.0)**: Single authoritative source for all fee calculations (`server/core/billing/unifiedFeeService.ts`). All fee previews, approvals, check-in, and payment flows use `computeFeeBreakdown()`. Always uses `effectivePlayerCount = MAX(declared, actual)` for time allocation. Roster changes trigger `invalidateCachedFees()` to ensure fresh calculations.
+- **Webhook Safety**: Stripe webhooks process exactly once via transactional dedup (claim event → process → commit). Deferred action pattern for external calls (emails/notifications execute only after commit). Resource-based ordering guards prevent out-of-order event processing.
+- **Roster Protection**: Optimistic locking with `roster_version` column. Row-level locking (`FOR UPDATE`) prevents concurrent modifications. Returns 409 `ROSTER_CONFLICT` on version mismatch with current version for retry.
 - **Billing Management**: Staff Payments Dashboard for POS, unified payment history, member billing management, self-service portal, tier change wizard with proration, dunning for failed payments, and refund processing.
 - **Payment Recovery (Dunning)**: Tracks failed payments, retries, and notifies members.
 - **Grace Period System**: Automated 3-day grace period for billing failures with daily reminder emails. Membership terminates after 3 days if not resolved.
