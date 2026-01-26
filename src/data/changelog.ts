@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.26.3",
+    date: "2026-01-26",
+    title: "Add Guest & Financial Summary Fixes",
+    changes: [
+      "Fixed: Add Guest button now works correctly in confirmed booking details",
+      "Fixed: Financial summary now correctly shows Players Owe amounts for non-owner members",
+      "Fixed: Social tier player fees now appear in financial breakdown instead of showing $0",
+      "Added: Guest entry form accepts name and optional email for new guests",
+      "Added: System detects if guest email belongs to existing member and offers to link them instead",
+      "Improved: Unmatched/placeholder booking owners now get empty slots for staff assignment"
+    ]
+  },
+  {
     version: "9.26.2",
     date: "2026-01-26",
     title: "Confirmed Booking Details Enhancement",

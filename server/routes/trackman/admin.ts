@@ -1063,6 +1063,20 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
         
         guestPassesUsedThisBooking = guestParticipants.filter(gp => gp.used_guest_pass).length;
         guestPassesRemainingAfterBooking = ownerGuestPassesRemaining - guestPassesUsedThisBooking;
+      } else {
+        const ownerMember = membersWithFees.find(m => m.isPrimary);
+        const nonOwnerMembers = membersWithFees.filter(m => !m.isPrimary && m.userEmail);
+        const emptySlots = membersWithFees.filter(m => !m.userEmail);
+        const emptySlotFees = emptySlots.length * 25;
+        guestFeesWithoutPass = guestsWithFees.filter(g => !g.usedGuestPass).reduce((sum, g) => sum + g.fee, 0) + emptySlotFees;
+        ownerOverageFee = ownerMember?.fee || 0;
+        totalPlayersOwe = nonOwnerMembers.reduce((sum, m) => sum + m.fee, 0);
+        playerBreakdownFromSession = nonOwnerMembers.map(m => ({
+          name: m.memberName,
+          tier: m.tier,
+          fee: m.fee,
+          feeNote: m.feeNote
+        }));
       }
     } else {
       const ownerMember = membersWithFees.find(m => m.isPrimary);
@@ -1129,6 +1143,87 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
   } catch (error: any) {
     console.error('Get booking members error:', error);
     res.status(500).json({ error: 'Failed to get booking members' });
+  }
+});
+
+router.post('/api/admin/booking/:id/guests', isStaffOrAdmin, async (req, res) => {
+  try {
+    const bookingId = parseInt(req.params.id);
+    const { guestName, guestEmail, slotId, forceAddAsGuest } = req.body;
+    
+    if (!guestName?.trim()) {
+      return res.status(400).json({ error: 'Guest name is required' });
+    }
+    
+    if (guestEmail && !forceAddAsGuest) {
+      const memberMatch = await pool.query(
+        `SELECT id, email, first_name, last_name, tier FROM users WHERE LOWER(email) = LOWER($1)`,
+        [guestEmail.trim()]
+      );
+      if (memberMatch.rowCount && memberMatch.rowCount > 0) {
+        const member = memberMatch.rows[0];
+        return res.status(409).json({
+          error: 'Email belongs to an existing member',
+          memberMatch: {
+            id: member.id,
+            email: member.email,
+            name: `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email,
+            tier: member.tier
+          }
+        });
+      }
+    }
+    
+    const bookingResult = await pool.query(
+      `SELECT b.*, u.id as owner_id FROM bookings b 
+       LEFT JOIN users u ON LOWER(u.email) = LOWER(b.user_email) 
+       WHERE b.id = $1`,
+      [bookingId]
+    );
+    if (bookingResult.rowCount === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    
+    const existingGuests = await pool.query(
+      `SELECT MAX(slot_number) as max_slot FROM booking_guests WHERE booking_id = $1`,
+      [bookingId]
+    );
+    const nextSlotNumber = (existingGuests.rows[0]?.max_slot || 0) + 1;
+    
+    const insertResult = await pool.query(
+      `INSERT INTO booking_guests (booking_id, guest_name, guest_email, slot_number, created_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       RETURNING *`,
+      [bookingId, guestName.trim(), guestEmail?.trim() || null, nextSlotNumber]
+    );
+    
+    if (slotId) {
+      await pool.query(
+        `DELETE FROM booking_members WHERE id = $1 AND booking_id = $2`,
+        [slotId, bookingId]
+      );
+    }
+    
+    const ownerEmail = bookingResult.rows[0].user_email;
+    let guestPassesRemaining = 0;
+    if (ownerEmail) {
+      const passesResult = await pool.query(
+        `SELECT guest_passes_remaining FROM users WHERE LOWER(email) = LOWER($1)`,
+        [ownerEmail]
+      );
+      if (passesResult.rowCount && passesResult.rowCount > 0) {
+        guestPassesRemaining = passesResult.rows[0].guest_passes_remaining || 0;
+      }
+    }
+    
+    res.json({
+      success: true,
+      guest: insertResult.rows[0],
+      guestPassesRemaining
+    });
+  } catch (error: any) {
+    console.error('Add guest error:', error);
+    res.status(500).json({ error: 'Failed to add guest' });
   }
 });
 
