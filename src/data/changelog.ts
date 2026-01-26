@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.26.4",
+    date: "2026-01-26",
+    title: "Simplified Billing Model",
+    changes: [
+      "Changed: Owner now pays all fees (their overage + player fees + guest fees) in one charge",
+      "Improved: Financial summary shows clear breakdown of owner overage, player fees, and guest fees",
+      "Improved: Total displayed as 'Owner Pays' to clarify who is responsible for payment",
+      "Simplified: No more separate 'Players Owe' section - everything rolls up to owner"
+    ]
+  },
+  {
     version: "9.26.3",
     date: "2026-01-26",
     title: "Add Guest & Financial Summary Fixes",

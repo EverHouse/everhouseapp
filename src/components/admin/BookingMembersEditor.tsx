@@ -778,46 +778,37 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
             <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">Financial Summary</p>
           </div>
           
-          <div className="space-y-2">
-            {/* Owner Owes */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-700 dark:text-gray-300">Owner Owes</span>
-                {financialSummary.totalOwnerOwes > 0 && (
-                  <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                    {financialSummary.ownerOverageFee > 0 && financialSummary.guestFeesWithoutPass > 0 
-                      ? `(overage + ${financialSummary.guestFeesWithoutPass > 25 ? 'guest fees' : 'guest fee'})`
-                      : financialSummary.ownerOverageFee > 0 
-                        ? '(tier overage)'
-                        : financialSummary.guestFeesWithoutPass > 0 
-                          ? '(guest fees)'
-                          : ''}
-                  </span>
-                )}
+          <div className="space-y-1.5">
+            {/* Breakdown - only show items with fees */}
+            {financialSummary.ownerOverageFee > 0 && (
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-600 dark:text-gray-400">Owner overage</span>
+                <span className="text-gray-700 dark:text-gray-300">${financialSummary.ownerOverageFee.toFixed(2)}</span>
               </div>
-              <span className={`text-sm font-semibold ${financialSummary.totalOwnerOwes > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                {financialSummary.totalOwnerOwes > 0 ? `$${financialSummary.totalOwnerOwes.toFixed(2)}` : '$0.00'}
-              </span>
-            </div>
+            )}
             
-            {/* Players Owe */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-700 dark:text-gray-300">Players Owe</span>
-                {financialSummary.totalPlayersOwe > 0 && (
-                  <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                    ({financialSummary.playerBreakdown.filter(p => p.fee > 0).length} player{financialSummary.playerBreakdown.filter(p => p.fee > 0).length > 1 ? 's' : ''})
-                  </span>
-                )}
+            {financialSummary.totalPlayersOwe > 0 && (
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-600 dark:text-gray-400">
+                  Player fees ({financialSummary.playerBreakdown.filter(p => p.fee > 0).length} player{financialSummary.playerBreakdown.filter(p => p.fee > 0).length > 1 ? 's' : ''})
+                </span>
+                <span className="text-gray-700 dark:text-gray-300">${financialSummary.totalPlayersOwe.toFixed(2)}</span>
               </div>
-              <span className={`text-sm font-semibold ${financialSummary.totalPlayersOwe > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'}`}>
-                {financialSummary.totalPlayersOwe > 0 ? `$${financialSummary.totalPlayersOwe.toFixed(2)}` : '$0.00'}
-              </span>
-            </div>
+            )}
             
-            {/* Grand Total */}
-            <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-white/10">
-              <span className="text-sm font-medium text-gray-800 dark:text-white">Total Due</span>
+            {financialSummary.guestFeesWithoutPass > 0 && (
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-600 dark:text-gray-400">Guest fees</span>
+                <span className="text-gray-700 dark:text-gray-300">${financialSummary.guestFeesWithoutPass.toFixed(2)}</span>
+              </div>
+            )}
+            
+            {/* Owner Pays Total */}
+            <div className="flex items-center justify-between pt-2 mt-1 border-t border-gray-200 dark:border-white/10">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-medium text-gray-800 dark:text-white">Owner Pays</span>
+                <span className="text-[10px] text-gray-500 dark:text-gray-400">(total)</span>
+              </div>
               <span className={`text-base font-bold ${financialSummary.grandTotal > 0 ? 'text-primary dark:text-white' : 'text-green-600 dark:text-green-400'}`}>
                 {financialSummary.grandTotal > 0 ? `$${financialSummary.grandTotal.toFixed(2)}` : 'No fees due'}
               </span>

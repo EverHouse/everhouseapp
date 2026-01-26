@@ -1094,7 +1094,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
       }));
     }
     
-    const totalOwnerOwes = ownerOverageFee + guestFeesWithoutPass;
+    const grandTotal = ownerOverageFee + guestFeesWithoutPass + totalPlayersOwe;
     
     res.json({
       ownerGuestPassesRemaining,
@@ -1134,9 +1134,9 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
       financialSummary: {
         ownerOverageFee,
         guestFeesWithoutPass,
-        totalOwnerOwes,
+        totalOwnerOwes: grandTotal,
         totalPlayersOwe,
-        grandTotal: totalOwnerOwes + totalPlayersOwe,
+        grandTotal,
         playerBreakdown: playerBreakdownFromSession
       }
     });
