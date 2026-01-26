@@ -3207,6 +3207,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                 showToast(trackmanLinkModal.isRelink ? 'Booking owner changed' : 'Trackman booking linked to member', 'success');
                 handleRefresh();
               }}
+              onOpenBillingModal={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
             />
 
             <ModalShell 

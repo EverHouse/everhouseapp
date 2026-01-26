@@ -16,6 +16,7 @@ interface TrackmanLinkModalProps {
   currentMemberEmail?: string;
   isRelink?: boolean;
   onSuccess?: () => void;
+  onOpenBillingModal?: (bookingId: number) => void;
   importedName?: string;
   notes?: string;
 }
@@ -48,6 +49,7 @@ export function TrackmanLinkModal({
   currentMemberEmail,
   isRelink,
   onSuccess,
+  onOpenBillingModal,
   importedName,
   notes
 }: TrackmanLinkModalProps) {
@@ -239,6 +241,9 @@ export function TrackmanLinkModal({
         }
       });
 
+      let feesRecalculated = false;
+      let resultBookingId = matchedBookingId;
+
       if (matchedBookingId) {
         const res = await fetch(`/api/bookings/${matchedBookingId}/assign-with-players`, {
           method: 'PUT',
@@ -258,6 +263,8 @@ export function TrackmanLinkModal({
           const data = await res.json();
           throw new Error(data.error || data.message || 'Failed to assign member to booking');
         }
+        const data = await res.json();
+        feesRecalculated = data.feesRecalculated === true;
       } else if (trackmanBookingId) {
         const res = await fetch('/api/bookings/link-trackman-to-member', {
           method: 'POST',
@@ -278,11 +285,22 @@ export function TrackmanLinkModal({
           const data = await res.json();
           throw new Error(data.error || data.message || 'Failed to link booking to member');
         }
+        const data = await res.json();
+        feesRecalculated = data.feesRecalculated === true;
+        if (data.bookingId) {
+          resultBookingId = data.bookingId;
+        }
       }
       
       showToast(`Booking assigned with ${filledSlotsCount} player${filledSlotsCount > 1 ? 's' : ''}${guestCount > 0 ? ` (${guestCount} guest${guestCount > 1 ? 's' : ''})` : ''}`, 'success');
       onSuccess?.();
       onClose();
+      
+      if (feesRecalculated && resultBookingId && onOpenBillingModal) {
+        setTimeout(() => {
+          onOpenBillingModal(resultBookingId!);
+        }, 300);
+      }
     } catch (err: any) {
       showToast(err.message || 'Failed to assign booking', 'error');
     } finally {

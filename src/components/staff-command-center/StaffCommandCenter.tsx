@@ -637,6 +637,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
           window.dispatchEvent(new CustomEvent('booking-action-completed'));
           refresh();
         }}
+        onOpenBillingModal={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
       />
 
       {createPortal(

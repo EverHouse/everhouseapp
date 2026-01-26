@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.29.7",
+    date: "2026-01-26",
+    title: "Auto-Open Billing After Assignment",
+    changes: [
+      "UX: Billing modal now opens automatically after assigning a member to a Trackman booking with fees",
+      "Improvement: Staff can immediately mark payments as waived/paid externally for historical bookings",
+      "Workflow: Prevents newly-assigned bookings from appearing as 'overdue' without review"
+    ]
+  },
+  {
     version: "9.29.6",
     date: "2026-01-26",
     title: "Trackman Assignment Fee Recalculation",
