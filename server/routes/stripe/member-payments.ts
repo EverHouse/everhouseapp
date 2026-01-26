@@ -9,7 +9,8 @@ import {
   createPaymentIntent,
   confirmPaymentSuccess,
   getOrCreateStripeCustomer,
-  getInvoice
+  getInvoice,
+  createBalanceAwarePayment
 } from '../../core/stripe';
 import { computeFeeBreakdown, applyFeeBreakdownToParticipants } from '../../core/billing/unifiedFeeService';
 import { GUEST_FEE_CENTS } from './helpers';
@@ -124,12 +125,22 @@ router.post('/api/member/bookings/:id/pay-fees', paymentRateLimiter, async (req:
       memberPayment: 'true'
     };
 
+    // Get or create Stripe customer for balance-aware payment
+    const memberName = booking.user_name || booking.user_email.split('@')[0];
+    const { customerId: stripeCustomerId } = await getOrCreateStripeCustomer(
+      booking.user_id || booking.user_email,
+      booking.user_email,
+      memberName
+    );
+
     let result;
     try {
-      result = await createPaymentIntent({
+      // Use balance-aware payment to apply account credits first
+      result = await createBalanceAwarePayment({
+        stripeCustomerId,
         userId: booking.user_id || booking.user_email,
         email: booking.user_email,
-        memberName: booking.user_name || booking.user_email.split('@')[0],
+        memberName,
         amountCents: serverTotal,
         purpose: 'guest_fee',
         bookingId,
@@ -144,27 +155,57 @@ router.post('/api/member/bookings/:id/pay-fees', paymentRateLimiter, async (req:
       throw stripeErr;
     }
 
+    if (result.error) {
+      if (snapshotId) {
+        await pool.query(`DELETE FROM booking_fee_snapshots WHERE id = $1`, [snapshotId]);
+      }
+      throw new Error(result.error);
+    }
+
+    // Store payment ID for tracking
+    const paymentRef = result.paymentIntentId || result.balanceTransactionId || 'unknown';
     await pool.query(
       `UPDATE booking_fee_snapshots SET stripe_payment_intent_id = $1 WHERE id = $2`,
-      [result.paymentIntentId, snapshotId]
+      [paymentRef, snapshotId]
     );
 
-    console.log(`[Stripe] Member payment intent created for booking ${bookingId}: $${(serverTotal / 100).toFixed(2)}`);
+    console.log(`[Stripe] Member payment created for booking ${bookingId}: $${(serverTotal / 100).toFixed(2)} (balance: $${(result.balanceApplied / 100).toFixed(2)}, remaining: $${(result.remainingCents / 100).toFixed(2)})`);
 
-    const participantFeesList = feeResult.fees.map(f => {
+    const participantFeesList = pendingFees.map(f => {
       const participant = pendingParticipants.rows.find(p => p.id === f.participantId);
       return {
         id: f.participantId,
         displayName: participant?.display_name || 'Guest',
-        amount: f.amountCents / 100
+        amount: f.totalCents / 100
       };
     });
 
+    // If fully paid by balance, mark participants as paid
+    if (result.paidInFull) {
+      const participantIds = pendingFees.map(f => f.participantId);
+      await pool.query(
+        `UPDATE booking_participants 
+         SET payment_status = 'paid', paid_at = NOW(), stripe_payment_intent_id = $1, cached_fee_cents = 0
+         WHERE id = ANY($2::int[])`,
+        [paymentRef, participantIds]
+      );
+      
+      await pool.query(
+        `UPDATE booking_fee_snapshots SET status = 'paid' WHERE id = $1`,
+        [snapshotId]
+      );
+    }
+
     res.json({
+      paidInFull: result.paidInFull,
       clientSecret: result.clientSecret,
       paymentIntentId: result.paymentIntentId,
+      balanceTransactionId: result.balanceTransactionId,
       totalAmount: serverTotal / 100,
-      participantFees: participantFeesList
+      balanceApplied: result.balanceApplied / 100,
+      remainingAmount: result.remainingCents / 100,
+      participantFees: participantFeesList,
+      error: result.error
     });
   } catch (error: any) {
     console.error('[Stripe] Error creating member payment intent:', error);
@@ -821,7 +862,16 @@ router.post('/api/member/balance/pay', async (req: Request, res: Response) => {
       client.release();
     }
 
-    const paymentResult = await createPaymentIntent({
+    // Get or create Stripe customer for balance-aware payment
+    const { customerId: stripeCustomerId } = await getOrCreateStripeCustomer(
+      memberEmail,
+      memberEmail,
+      memberName
+    );
+
+    // Use balance-aware payment to apply account credits first
+    const paymentResult = await createBalanceAwarePayment({
+      stripeCustomerId,
       userId: memberEmail,
       email: memberEmail,
       memberName,
@@ -836,17 +886,46 @@ router.post('/api/member/balance/pay', async (req: Request, res: Response) => {
       }
     });
 
+    if (paymentResult.error) {
+      await pool.query(`DELETE FROM booking_fee_snapshots WHERE id = $1`, [snapshotId]);
+      throw new Error(paymentResult.error);
+    }
+
+    const balancePaymentRef = paymentResult.paymentIntentId || paymentResult.balanceTransactionId || 'unknown';
     await pool.query(
       `UPDATE booking_fee_snapshots SET stripe_payment_intent_id = $1 WHERE id = $2`,
-      [paymentResult.paymentIntentId, snapshotId]
+      [balancePaymentRef, snapshotId]
     );
 
+    // If fully paid by balance, mark participants as paid
+    if (paymentResult.paidInFull) {
+      const participantIds = participantFees.map(f => f.id);
+      await pool.query(
+        `UPDATE booking_participants 
+         SET payment_status = 'paid', paid_at = NOW(), stripe_payment_intent_id = $1, cached_fee_cents = 0
+         WHERE id = ANY($2::int[])`,
+        [balancePaymentRef, participantIds]
+      );
+      
+      await pool.query(
+        `UPDATE booking_fee_snapshots SET status = 'paid' WHERE id = $1`,
+        [snapshotId]
+      );
+    }
+
+    console.log(`[Member Balance] Payment created: $${(totalCents / 100).toFixed(2)} (balance: $${(paymentResult.balanceApplied / 100).toFixed(2)}, remaining: $${(paymentResult.remainingCents / 100).toFixed(2)})`);
+
     res.json({
+      paidInFull: paymentResult.paidInFull,
       clientSecret: paymentResult.clientSecret,
       paymentIntentId: paymentResult.paymentIntentId,
+      balanceTransactionId: paymentResult.balanceTransactionId,
       totalCents,
+      balanceApplied: paymentResult.balanceApplied,
+      remainingCents: paymentResult.remainingCents,
       itemCount: participantFees.length,
-      participantFees
+      participantFees,
+      error: paymentResult.error
     });
   } catch (error: any) {
     console.error('[Member Balance] Error creating payment:', error);

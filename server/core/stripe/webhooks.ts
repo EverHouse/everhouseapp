@@ -636,6 +636,43 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: a
     }
   }
 
+  // Process pending credit refund if exists (from balance-aware payments)
+  const pendingCreditRefund = metadata?.pendingCreditRefund ? parseInt(metadata.pendingCreditRefund, 10) : 0;
+  if (pendingCreditRefund > 0 && customerId) {
+    const localCreditAmount = pendingCreditRefund;
+    const localCustomerId = customerId;
+    const localPiId = id;
+    const localEmail = metadata?.email || '';
+    
+    deferredActions.push(async () => {
+      try {
+        const stripe = await getStripeClient();
+        
+        // Refund the credit portion back to the customer
+        const refund = await stripe.refunds.create({
+          payment_intent: localPiId,
+          amount: localCreditAmount,
+          reason: 'requested_by_customer',
+          metadata: {
+            type: 'account_credit_applied',
+            originalPaymentIntent: localPiId,
+            email: localEmail
+          }
+        });
+        
+        console.log(`[Stripe Webhook] Applied credit refund of $${(localCreditAmount / 100).toFixed(2)} for ${localEmail}, refund: ${refund.id}`);
+      } catch (refundError: any) {
+        console.error(`[Stripe Webhook] Failed to apply credit refund:`, refundError.message);
+        // Log for manual reconciliation
+        await pool.query(
+          `INSERT INTO audit_log (action, resource_type, resource_id, details, created_at)
+           VALUES ('credit_refund_failed', 'payment', $1, $2, NOW())`,
+          [localPiId, JSON.stringify({ email: localEmail, amount: localCreditAmount, error: refundError.message })]
+        );
+      }
+    });
+  }
+
   if (metadata?.email && metadata?.purpose) {
     const email = metadata.email;
     const desc = paymentIntent.description || `Stripe payment: ${metadata.purpose}`;

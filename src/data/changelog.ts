@@ -13,6 +13,29 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.29.3",
+    date: "2026-01-26",
+    title: "Safe Account Credit Integration",
+    changes: [
+      "Improved: Account credits now applied safely - no credit lost if card payment fails",
+      "Changed: For partial credits, full amount is charged first, then credit portion refunded automatically",
+      "Added: Webhook processes credit refunds with audit logging for failed refunds",
+      "UX: Payment modals clearly explain that credits will be applied as a refund after payment"
+    ]
+  },
+  {
+    version: "9.29.2",
+    date: "2026-01-26",
+    title: "Account Credits Applied to Booking Payments",
+    changes: [
+      "Added: Account credits are now automatically applied when members pay guest fees or outstanding balances",
+      "Added: Payment modals show how much account credit was applied vs. card charged",
+      "Added: If account balance covers the full amount, no card payment is needed",
+      "Added: Admin tool to backfill sessions for legacy Trackman-imported bookings",
+      "Reliability: Members with account credits will see them automatically deducted from fees"
+    ]
+  },
+  {
     version: "9.29.1",
     date: "2026-01-26",
     title: "Staff Subscription Management",

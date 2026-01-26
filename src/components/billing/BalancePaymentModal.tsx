@@ -10,9 +10,13 @@ interface ParticipantFee {
 }
 
 interface PayBalanceResponse {
-  clientSecret: string;
-  paymentIntentId: string;
+  paidInFull?: boolean;
+  clientSecret?: string;
+  paymentIntentId?: string;
+  invoiceId?: string;
   totalCents: number;
+  balanceApplied?: number;
+  remainingCents?: number;
   itemCount: number;
   participantFees: ParticipantFee[];
 }
@@ -69,7 +73,13 @@ export function BalancePaymentModal({
 
       if (ok && data) {
         setPaymentData(data);
-        setPaymentIntentId(data.paymentIntentId);
+        if (data.paymentIntentId) {
+          setPaymentIntentId(data.paymentIntentId);
+        }
+        // If fully paid by account balance, trigger success immediately
+        if (data.paidInFull) {
+          setTimeout(() => onSuccess(), 1500); // Show success message briefly
+        }
       } else {
         setError(apiError || 'Failed to initialize payment');
       }
@@ -206,18 +216,81 @@ export function BalancePaymentModal({
                         ${(paymentData.totalCents / 100).toFixed(2)}
                       </span>
                     </div>
+
+                    {/* Show account balance applied if any (only for paidInFull case) */}
+                    {paymentData.paidInFull && paymentData.balanceApplied && paymentData.balanceApplied > 0 && (
+                      <div className={`mt-3 pt-3 border-t ${isDark ? 'border-amber-500/20' : 'border-amber-200'}`}>
+                        <div className="flex items-center justify-between">
+                          <span className={`text-sm ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                            Account Credit Applied
+                          </span>
+                          <span className={`text-sm font-medium ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                            -${(paymentData.balanceApplied / 100).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Show balance that will be applied for partial balance case */}
+                    {!paymentData.paidInFull && paymentData.balanceApplied && paymentData.balanceApplied > 0 && (
+                      <div className={`mt-3 pt-3 border-t ${isDark ? 'border-amber-500/20' : 'border-amber-200'}`}>
+                        <div className={`rounded-lg p-3 ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="material-symbols-outlined text-sm text-emerald-500">wallet</span>
+                            <span className={`text-sm font-medium ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                              Account Credit: ${(paymentData.balanceApplied / 100).toFixed(2)}
+                            </span>
+                          </div>
+                          <p className={`text-xs ${isDark ? 'text-white/60' : 'text-primary/60'}`}>
+                            Credit will be applied as a refund after payment
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  <StripePaymentForm
-                    amount={paymentData.totalCents / 100}
-                    description={`Outstanding balance - ${paymentData.itemCount} item(s)`}
-                    userId={memberEmail}
-                    userEmail={memberEmail}
-                    memberName={memberName}
-                    purpose="overage_fee"
-                    onSuccess={handlePaymentSuccess}
-                    onCancel={onClose}
-                  />
+                  {/* Show success message if fully paid by balance */}
+                  {paymentData.paidInFull ? (
+                    <div className={`rounded-xl p-4 text-center ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'}`}>
+                      <span className="material-symbols-outlined text-4xl text-emerald-500 mb-2">check_circle</span>
+                      <p className={`text-lg font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                        Paid with Account Credit
+                      </p>
+                      <p className={`text-sm mt-1 ${isDark ? 'text-emerald-400/80' : 'text-emerald-600'}`}>
+                        Your account balance covered the full amount
+                      </p>
+                    </div>
+                  ) : paymentData.clientSecret ? (
+                    <StripePaymentForm
+                      amount={(paymentData.remainingCents || paymentData.totalCents) / 100}
+                      description={`Outstanding balance - ${paymentData.itemCount} item(s)`}
+                      userId={memberEmail}
+                      userEmail={memberEmail}
+                      memberName={memberName}
+                      purpose="overage_fee"
+                      onSuccess={handlePaymentSuccess}
+                      onCancel={onClose}
+                    />
+                  ) : paymentData.error ? (
+                    <div className={`rounded-xl p-4 text-center ${isDark ? 'bg-red-500/20' : 'bg-red-100'}`}>
+                      <span className="material-symbols-outlined text-4xl text-red-500 mb-2">error</span>
+                      <p className={`text-sm ${isDark ? 'text-red-400' : 'text-red-700'}`}>
+                        {paymentData.error}
+                      </p>
+                      <button
+                        onClick={() => setPaymentData(null)}
+                        className="mt-3 px-4 py-2 rounded-lg text-sm bg-red-500 text-white hover:bg-red-600"
+                      >
+                        Try Again
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className={`text-sm ${isDark ? 'text-white/60' : 'text-primary/60'}`}>
+                        Processing payment...
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

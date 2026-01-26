@@ -198,6 +198,145 @@ export async function cancelPaymentIntent(
 }
 
 /**
+ * Create a payment for member self-service that applies customer balance.
+ * 
+ * Safe Flow (credit applied AFTER successful payment):
+ * 1. Check customer's available credit
+ * 2. If full coverage: Consume credit immediately, payment complete
+ * 3. If partial/no coverage: Create PaymentIntent for FULL amount, store pending credit in metadata
+ * 4. On successful payment (webhook), refund the credit portion to the customer
+ * 
+ * This ensures no credit is lost if payment fails.
+ */
+export async function createBalanceAwarePayment(params: {
+  stripeCustomerId: string;
+  userId: string;
+  email: string;
+  memberName: string;
+  amountCents: number;
+  purpose: PaymentPurpose;
+  description: string;
+  bookingId?: number;
+  sessionId?: number;
+  metadata?: Record<string, string>;
+}): Promise<{
+  paidInFull: boolean;
+  clientSecret?: string;
+  paymentIntentId?: string;
+  balanceTransactionId?: string;
+  totalCents: number;
+  balanceApplied: number;
+  remainingCents: number;
+  error?: string;
+}> {
+  const { stripeCustomerId, userId, email, memberName, amountCents, purpose, description, bookingId, sessionId, metadata = {} } = params;
+
+  try {
+    const stripe = await getStripeClient();
+
+    // Get customer's current balance (negative = credit, positive = owes)
+    const customer = await stripe.customers.retrieve(stripeCustomerId);
+    if (customer.deleted) {
+      throw new Error('Customer has been deleted');
+    }
+    const customerBalance = (customer as any).balance || 0;
+    // Available credit is the absolute value of a negative balance
+    const availableCredit = customerBalance < 0 ? Math.abs(customerBalance) : 0;
+
+    // Calculate how much credit can be applied
+    const balanceToApply = Math.min(availableCredit, amountCents);
+    const remainingCents = amountCents - balanceToApply;
+
+    // Case 1: Balance covers the FULL amount - consume credit immediately
+    if (remainingCents === 0 && balanceToApply > 0) {
+      const balanceTransaction = await stripe.customers.createBalanceTransaction(
+        stripeCustomerId,
+        {
+          amount: balanceToApply, // Positive = consume credit (reduces negative balance)
+          currency: 'usd',
+          description: `Applied account credit: ${description}`,
+        }
+      );
+
+      // Log to database
+      await pool.query(
+        `INSERT INTO stripe_payment_intents 
+         (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [email, `balance-${balanceTransaction.id}`, stripeCustomerId, amountCents, purpose, bookingId || null, sessionId || null, description, 'succeeded']
+      );
+
+      console.log(`[Stripe] Member payment fully covered by balance: $${(amountCents / 100).toFixed(2)} for ${email}`);
+
+      return {
+        paidInFull: true,
+        balanceTransactionId: balanceTransaction.id,
+        totalCents: amountCents,
+        balanceApplied: balanceToApply,
+        remainingCents: 0,
+      };
+    }
+
+    // Case 2: Need card payment
+    // Charge the FULL amount; if there's credit, we'll refund that portion after payment succeeds
+    const stripeMetadata: Record<string, string> = {
+      ...metadata,
+      userId,
+      email,
+      purpose,
+      source: 'ever_house_app',
+      memberPayment: 'true',
+    };
+    if (bookingId) stripeMetadata.bookingId = bookingId.toString();
+    if (sessionId) stripeMetadata.sessionId = sessionId.toString();
+    
+    // Store pending credit to refund after payment succeeds
+    if (balanceToApply > 0) {
+      stripeMetadata.pendingCreditRefund = balanceToApply.toString();
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amountCents, // Charge FULL amount, credit applied as refund on success
+      currency: 'usd',
+      customer: stripeCustomerId,
+      description: balanceToApply > 0 
+        ? `${description} ($${(balanceToApply / 100).toFixed(2)} credit will be applied)` 
+        : description,
+      metadata: stripeMetadata,
+      automatic_payment_methods: { enabled: true },
+    });
+
+    // Log to database
+    await pool.query(
+      `INSERT INTO stripe_payment_intents 
+       (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [email, paymentIntent.id, stripeCustomerId, amountCents, purpose, bookingId || null, sessionId || null, description, 'pending']
+    );
+
+    console.log(`[Stripe] Member payment: total $${(amountCents / 100).toFixed(2)}, pending credit refund: $${(balanceToApply / 100).toFixed(2)}`);
+
+    return {
+      paidInFull: false,
+      clientSecret: paymentIntent.client_secret || undefined,
+      paymentIntentId: paymentIntent.id,
+      totalCents: amountCents,
+      balanceApplied: balanceToApply, // This will be refunded after payment succeeds
+      remainingCents, // For UI display only - actual charge is full amount
+    };
+  } catch (error: any) {
+    console.error(`[Stripe] Error creating balance-aware payment:`, error);
+    return {
+      paidInFull: false,
+      totalCents: amountCents,
+      balanceApplied: 0,
+      remainingCents: amountCents,
+      error: error.message,
+    };
+  }
+}
+
+/**
  * Charge a fee using invoice (applies customer balance automatically).
  * Use this for backend-initiated charges like overage fees and guest fees.
  * Customer balance is applied first before charging the card.
