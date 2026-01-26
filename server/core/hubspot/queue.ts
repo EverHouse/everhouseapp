@@ -7,7 +7,8 @@ export type HubSpotOperation =
   | 'create_deal'
   | 'sync_member'
   | 'sync_company'
-  | 'sync_day_pass';
+  | 'sync_day_pass'
+  | 'sync_payment';
 
 interface QueueJobOptions {
   priority?: number;  // 1-10, lower = higher priority
@@ -212,6 +213,11 @@ async function executeHubSpotOperation(operation: string, payload: any): Promise
       
     case 'sync_day_pass':
       await contacts.syncDayPassPurchaseToHubSpot(payload);
+      break;
+      
+    case 'sync_payment':
+      const hubspotSync = await import('../stripe/hubspotSync');
+      await hubspotSync.syncPaymentToHubSpot(payload);
       break;
       
     default:

@@ -1,6 +1,5 @@
 import { getStripeSync, getStripeClient } from './client';
-import { syncPaymentToHubSpot, syncDayPassToHubSpot } from './hubspotSync';
-import { syncCompanyToHubSpot } from '../hubspot';
+import { syncCompanyToHubSpot, queuePaymentSyncToHubSpot, queueDayPassSyncToHubSpot } from '../hubspot';
 import { pool } from '../db';
 import { db } from '../../db';
 import { groupMembers } from '../../../shared/models/hubspot-billing';
@@ -646,7 +645,7 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: a
     
     deferredActions.push(async () => {
       try {
-        await syncPaymentToHubSpot({
+        await queuePaymentSyncToHubSpot({
           email,
           amountCents: localAmount,
           purpose: metadata.purpose,
@@ -654,7 +653,7 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: a
           paymentIntentId: localId
         });
       } catch (error) {
-        console.error('[Stripe Webhook] Error syncing to HubSpot:', error);
+        console.error('[Stripe Webhook] Error queuing HubSpot sync:', error);
       }
     });
 
@@ -916,19 +915,16 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: any): 
 
   deferredActions.push(async () => {
     try {
-      await syncPaymentToHubSpot({
+      await queuePaymentSyncToHubSpot({
         paymentIntentId: localPaymentIntent,
-        memberEmail: localEmail,
-        memberName: localMemberName,
+        email: localEmail,
         amountCents: localAmountPaid,
         description: `Membership Renewal: ${localPlanName}`,
         purpose: 'membership_renewal',
-        bookingId: undefined,
-        userId: localUserId,
       });
-      console.log(`[Stripe Webhook] Synced invoice payment to HubSpot for ${localEmail}`);
+      console.log(`[Stripe Webhook] Queued invoice payment HubSpot sync for ${localEmail}`);
     } catch (hubspotError) {
-      console.error('[Stripe Webhook] HubSpot sync failed for invoice payment:', hubspotError);
+      console.error('[Stripe Webhook] Failed to queue HubSpot sync for invoice payment:', hubspotError);
     }
   });
 
@@ -1468,9 +1464,9 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: any):
       console.error('[Stripe Webhook] Failed to send QR pass email:', emailError);
     }
 
-    // Sync to HubSpot for non-members
+    // Queue HubSpot sync for day pass (non-blocking)
     try {
-      await syncDayPassToHubSpot({
+      await queueDayPassSyncToHubSpot({
         email,
         firstName,
         lastName,
@@ -1481,7 +1477,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: any):
         purchaseId: result.purchaseId
       });
     } catch (hubspotError) {
-      console.error('[Stripe Webhook] HubSpot sync failed for day pass:', hubspotError);
+      console.error('[Stripe Webhook] Failed to queue HubSpot sync for day pass:', hubspotError);
     }
   } catch (error) {
     console.error('[Stripe Webhook] Error handling checkout session completed:', error);
