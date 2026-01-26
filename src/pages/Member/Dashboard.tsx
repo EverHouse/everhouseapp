@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useData, Booking } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -306,7 +306,7 @@ const Dashboard: React.FC = () => {
     await fetchUserData(false);
   }, [fetchUserData]);
 
-  const allItems = [
+  const allItems = useMemo(() => [
     ...dbBookings.map(b => {
       // Check if current user is NOT the primary booker (i.e., is a linked member)
       const isLinkedMember = user?.email ? b.user_email?.toLowerCase() !== user.email.toLowerCase() : false;
@@ -413,10 +413,18 @@ const Dashboard: React.FC = () => {
         raw: c,
         source: 'calendar'
       }))
-  ].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  ].sort((a, b) => a.sortKey.localeCompare(b.sortKey)), [dbBookings, dbBookingRequests, dbRSVPs, dbWellnessEnrollments, dbConferenceRoomBookings, user?.email]);
 
   const todayStr = getTodayString();
-  const nowTime = getNowTimePacific();
+  const [nowTime, setNowTime] = useState(getNowTimePacific());
+
+  useEffect(() => {
+    // Update the time every minute to refresh the upcoming items list
+    const interval = setInterval(() => {
+      setNowTime(getNowTimePacific());
+    }, 60000); // 60 seconds
+    return () => clearInterval(interval);
+  }, []);
   
   // Normalize time to HH:MM format for comparison
   const normalizeTime = (t: string) => {
@@ -424,11 +432,11 @@ const Dashboard: React.FC = () => {
     const parts = t.split(':');
     return `${parts[0].padStart(2, '0')}:${parts[1]?.padStart(2, '0') || '00'}`;
   };
-  
-  const upcomingItems = allItems.filter(item => {
+
+  const upcomingItems = useMemo(() => allItems.filter(item => {
     let itemDate: string | undefined;
     let endTime: string | undefined;
-    
+
     if (item.type === 'booking') {
       const raw = item.raw as DBBooking;
       itemDate = raw.booking_date.split('T')[0];
@@ -468,41 +476,47 @@ const Dashboard: React.FC = () => {
     }
     
     return true;
-  });
+  }), [allItems, todayStr, nowTime]);
 
   // Calculate minutes used today for metrics (from allItems, not upcomingItems, to include bookings that have already ended)
-  const todayBookingsAll = allItems.filter(item => 
-    item.rawDate === todayStr && 
-    (item.type === 'booking' || item.type === 'booking_request' || item.type === 'conference_room_calendar')
-  );
-  const simMinutesToday = todayBookingsAll
-    .filter(b => b.resourceType === 'simulator')
-    .reduce((sum, b) => {
-      const raw = b.raw as any;
-      const start = raw.start_time?.split(':').map(Number) || [0, 0];
-      const end = raw.end_time?.split(':').map(Number) || [0, 0];
-      const totalMinutes = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
+  const { simMinutesToday, confMinutesToday } = useMemo(() => {
+    const todayBookingsAll = allItems.filter(item =>
+      item.rawDate === todayStr &&
+      (item.type === 'booking' || item.type === 'booking_request' || item.type === 'conference_room_calendar')
+    );
+
+    const simMinutes = todayBookingsAll
+      .filter(b => b.resourceType === 'simulator')
+      .reduce((sum, b) => {
+        const raw = b.raw as any;
+        const start = raw.start_time?.split(':').map(Number) || [0, 0];
+        const end = raw.end_time?.split(':').map(Number) || [0, 0];
+        const totalMinutes = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
+
+        // Split time among all players based on declared_player_count
+        const playerCount = raw.declared_player_count || 1;
+        const memberShare = Math.ceil(totalMinutes / playerCount);
+
+        return sum + memberShare;
+      }, 0);
+
+    const confMinutes = todayBookingsAll
+      .filter(b => b.resourceType === 'conference_room')
+      .reduce((sum, b) => {
+        const raw = b.raw as any;
+        const start = raw.start_time?.split(':').map(Number) || [0, 0];
+        const end = raw.end_time?.split(':').map(Number) || [0, 0];
+        const totalMinutes = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
+
+        // Split time among all players based on declared_player_count
+        const playerCount = raw.declared_player_count || 1;
+        const memberShare = Math.ceil(totalMinutes / playerCount);
+
+        return sum + memberShare;
+      }, 0);
       
-      // Split time among all players based on declared_player_count
-      const playerCount = raw.declared_player_count || 1;
-      const memberShare = Math.ceil(totalMinutes / playerCount);
-      
-      return sum + memberShare;
-    }, 0);
-  const confMinutesToday = todayBookingsAll
-    .filter(b => b.resourceType === 'conference_room')
-    .reduce((sum, b) => {
-      const raw = b.raw as any;
-      const start = raw.start_time?.split(':').map(Number) || [0, 0];
-      const end = raw.end_time?.split(':').map(Number) || [0, 0];
-      const totalMinutes = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
-      
-      // Split time among all players based on declared_player_count
-      const playerCount = raw.declared_player_count || 1;
-      const memberShare = Math.ceil(totalMinutes / playerCount);
-      
-      return sum + memberShare;
-    }, 0);
+    return { simMinutesToday: simMinutes, confMinutesToday: confMinutes };
+  }, [allItems, todayStr]);
 
   // Calculate next upcoming event/wellness for metrics grid (from all events/classes, not just enrolled)
   const nextEvent = allEvents
@@ -514,28 +528,28 @@ const Dashboard: React.FC = () => {
     .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
     [0];
 
-  // Filter out pending invites from upcomingItems (show them in separate section)
-  // A pending invite is: is_linked_member=true AND invite_status='pending'
-  const pendingInvites = dbBookingRequests.filter(r => 
-    r.is_linked_member === true && 
-    r.invite_status === 'pending' &&
-    ['pending', 'pending_approval', 'approved', 'confirmed'].includes(r.status)
-  );
-  
-  const pendingInviteIds = new Set(pendingInvites.map(p => p.id));
-  
-  // Filter upcomingItems to exclude pending invites
-  // Check both 'booking' and 'booking_request' types since approved bookings have type='booking'
-  const upcomingItemsFiltered = upcomingItems.filter(item => {
-    if (item.type === 'booking_request' || item.type === 'booking') {
-      const raw = item.raw as DBBookingRequest;
-      // Exclude if it's a pending invite (not yet accepted by linked member)
-      if (raw && pendingInviteIds.has(raw.id)) {
-        return false;
+  // Memoize pending invites and the filtered upcoming items list
+  const { pendingInvites, upcomingItemsFiltered } = useMemo(() => {
+    const invites = dbBookingRequests.filter(r =>
+      r.is_linked_member === true &&
+      r.invite_status === 'pending' &&
+      ['pending', 'pending_approval', 'approved', 'confirmed'].includes(r.status)
+    );
+
+    const inviteIds = new Set(invites.map(p => p.id));
+
+    const filteredItems = upcomingItems.filter(item => {
+      if (item.type === 'booking_request' || item.type === 'booking') {
+        const raw = item.raw as DBBookingRequest;
+        if (raw && inviteIds.has(raw.id)) {
+          return false;
+        }
       }
-    }
-    return true;
-  });
+      return true;
+    });
+
+    return { pendingInvites: invites, upcomingItemsFiltered: filteredItems };
+  }, [dbBookingRequests, upcomingItems]);
 
   // Separate bookings from events/wellness (include both confirmed bookings, approved requests, and calendar conference room bookings)
   const upcomingBookings = upcomingItemsFiltered.filter(item => item.type === 'booking' || item.type === 'booking_request' || item.type === 'conference_room_calendar');
