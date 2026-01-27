@@ -549,6 +549,26 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
           }
         }
         
+        // Cancel pending payment intents from stripe_payment_intents table
+        try {
+          const pendingIntents = await pool.query(
+            `SELECT stripe_payment_intent_id 
+             FROM stripe_payment_intents 
+             WHERE booking_id = $1 AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')`,
+            [bookingId]
+          );
+          for (const row of pendingIntents.rows) {
+            try {
+              await cancelPaymentIntent(row.stripe_payment_intent_id);
+              console.log(`[Staff Cancel] Cancelled payment intent ${row.stripe_payment_intent_id} for booking ${bookingId}`);
+            } catch (cancelErr: any) {
+              console.error(`[Staff Cancel] Failed to cancel payment intent ${row.stripe_payment_intent_id}:`, cancelErr.message);
+            }
+          }
+        } catch (cancelIntentsErr) {
+          console.error('[Staff Cancel] Failed to cancel pending payment intents (non-blocking):', cancelIntentsErr);
+        }
+        
         let updatedStaffNotes = staff_notes || '';
         if (existing.trackmanBookingId) {
           const trackmanNote = '[Cancelled in app - needs Trackman cancellation]';

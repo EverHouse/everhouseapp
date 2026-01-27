@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.32.10",
+    date: "2026-01-27",
+    title: "Payment Intent Cancellation Fix",
+    changes: [
+      "Fixed: Payment intents now properly cancelled when bookings are cancelled",
+      "Fixed: Both member-initiated and staff-initiated cancellations now cancel associated payment intents",
+      "Fixed: 'Invalid Date' no longer appears in payment descriptions when date is missing",
+      "Added: Staff cleanup endpoint to cancel stale payment intents from cancelled bookings"
+    ]
+  },
+  {
     version: "9.32.9",
     date: "2026-01-27",
     title: "Critical Fee Estimate Display Fix",

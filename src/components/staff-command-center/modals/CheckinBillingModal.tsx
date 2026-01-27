@@ -345,8 +345,13 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
     const totalAmount = fees.reduce((sum, f) => sum + f.amount, 0);
     
     // Format date nicely (e.g., "Jan 27, 2026")
-    const dateObj = new Date(context.bookingDate + 'T12:00:00');
-    const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    let formattedDate = 'Booking';
+    if (context.bookingDate) {
+      const dateObj = new Date(context.bookingDate + 'T12:00:00');
+      if (!isNaN(dateObj.getTime())) {
+        formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      }
+    }
     
     // Format times (e.g., "8:30 AM - 12:30 PM")
     const formatTime = (time: string) => {

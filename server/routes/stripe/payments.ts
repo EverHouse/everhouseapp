@@ -330,6 +330,42 @@ router.post('/api/stripe/create-customer', isStaffOrAdmin, async (req: Request, 
   }
 });
 
+router.post('/api/stripe/cleanup-stale-intents', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const staleIntents = await pool.query(
+      `SELECT spi.stripe_payment_intent_id, spi.id as local_id, br.status as booking_status
+       FROM stripe_payment_intents spi
+       LEFT JOIN booking_requests br ON spi.booking_id = br.id
+       WHERE spi.status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')
+       AND (br.status = 'cancelled' OR br.id IS NULL)`
+    );
+    
+    const results: { id: string; success: boolean; error?: string }[] = [];
+    
+    for (const row of staleIntents.rows) {
+      try {
+        await cancelPaymentIntent(row.stripe_payment_intent_id);
+        results.push({ id: row.stripe_payment_intent_id, success: true });
+        console.log(`[Cleanup] Cancelled stale payment intent ${row.stripe_payment_intent_id}`);
+      } catch (err: any) {
+        results.push({ id: row.stripe_payment_intent_id, success: false, error: err.message });
+        console.error(`[Cleanup] Failed to cancel ${row.stripe_payment_intent_id}:`, err.message);
+      }
+    }
+    
+    res.json({ 
+      success: true, 
+      processed: results.length,
+      cancelled: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+      details: results 
+    });
+  } catch (error: any) {
+    console.error('[Stripe] Error cleaning up stale intents:', error);
+    res.status(500).json({ error: 'Failed to cleanup stale intents' });
+  }
+});
+
 router.get('/api/stripe/payments/:email', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
     const email = decodeURIComponent(req.params.email);

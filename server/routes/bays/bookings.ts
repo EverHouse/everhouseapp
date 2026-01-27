@@ -892,6 +892,28 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
       }
     }
     
+    // Cancel pending payment intents from stripe_payment_intents table
+    try {
+      const pendingIntents = await pool.query(
+        `SELECT stripe_payment_intent_id 
+         FROM stripe_payment_intents 
+         WHERE booking_id = $1 AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')`,
+        [bookingId]
+      );
+      if (pendingIntents.rows.length > 0) {
+        for (const row of pendingIntents.rows) {
+          try {
+            await cancelPaymentIntent(row.stripe_payment_intent_id);
+            console.log(`[Member Cancel] Cancelled payment intent ${row.stripe_payment_intent_id} for booking ${bookingId}`);
+          } catch (cancelErr: any) {
+            console.error(`[Member Cancel] Failed to cancel payment intent ${row.stripe_payment_intent_id}:`, cancelErr.message);
+          }
+        }
+      }
+    } catch (cancelIntentsErr) {
+      console.error('[Member Cancel] Failed to cancel pending payment intents (non-blocking):', cancelIntentsErr);
+    }
+    
     // Refund participant payments (guest fees paid via Stripe)
     try {
       const sessionResult = await pool.query(
