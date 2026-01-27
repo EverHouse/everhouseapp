@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.32.15",
+    date: "2026-01-27",
+    title: "Fee Estimate Display Fix & Responsive Layout",
+    isMajor: false,
+    changes: [
+      "CRITICAL: Fixed fee estimate showing $0 for all bookings - was caused by incorrect database query (referencing non-existent column)",
+      "Fixed: Session participant query now correctly joins booking_requests to booking_sessions",
+      "Fixed: Fee snapshot reconciliation scheduler error (was referencing non-existent column)",
+      "Improved: Estimated fees card now flexes to screen size on mobile, tablet, and desktop",
+      "Verified: Fee calculation works correctly for all tiers (VIP, Social, Core, Premium, Corporate)"
+    ]
+  },
+  {
     version: "9.32.14",
     date: "2026-01-27",
     title: "Fee Calculation Bug Fixes",
