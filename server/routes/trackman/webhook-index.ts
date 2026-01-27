@@ -1400,10 +1400,10 @@ router.post('/api/trackman/replay-webhooks-to-dev', isAdmin, async (req, res) =>
     logger.info('[Trackman Replay] Starting replay to dev', { dev_url, limit });
     
     const events = await pool.query(`
-      SELECT id, trackman_booking_id, raw_payload, received_at
+      SELECT id, trackman_booking_id, payload, created_at
       FROM trackman_webhook_events
-      WHERE raw_payload IS NOT NULL
-      ORDER BY received_at ASC
+      WHERE payload IS NOT NULL
+      ORDER BY created_at ASC
       LIMIT $1
     `, [limit]);
     
@@ -1417,9 +1417,9 @@ router.post('/api/trackman/replay-webhooks-to-dev', isAdmin, async (req, res) =>
     
     for (const event of events.rows) {
       try {
-        const payload = typeof event.raw_payload === 'string' 
-          ? JSON.parse(event.raw_payload) 
-          : event.raw_payload;
+        const payload = typeof event.payload === 'string' 
+          ? JSON.parse(event.payload) 
+          : event.payload;
         
         const response = await fetch(dev_url, {
           method: 'POST',
@@ -1427,7 +1427,7 @@ router.post('/api/trackman/replay-webhooks-to-dev', isAdmin, async (req, res) =>
             'Content-Type': 'application/json',
             'X-Forwarded-From': 'production',
             'X-Replay-Event-Id': String(event.id),
-            'X-Original-Received-At': event.received_at?.toISOString() || ''
+            'X-Original-Received-At': event.created_at?.toISOString() || ''
           },
           body: JSON.stringify(payload)
         });
