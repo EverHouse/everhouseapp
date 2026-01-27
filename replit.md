@@ -67,7 +67,7 @@ Server startup is organized into loader modules for clean separation of concerns
 - **Roster Protection**: Optimistic locking with `roster_version` column. Row-level locking (`FOR UPDATE`) prevents concurrent modifications. Returns 409 `ROSTER_CONFLICT` on version mismatch with current version for retry.
 - **Billing Management**: Staff Payments Dashboard for POS, unified payment history, member billing management, self-service portal, tier change wizard with proration, dunning for failed payments, and refund processing.
 - **Payment Recovery (Dunning)**: Tracks failed payments, retries, and notifies members.
-- **Grace Period System**: Automated 3-day grace period for billing failures with daily reminder emails. Membership terminates after 3 days if not resolved.
+- **Grace Period System**: 3-day grace period for billing failures. **Note:** Automatic reminder emails are currently disabled pending billing system finalization - staff must manually send payment links via member directory. Membership terminates after 3 days if not resolved.
 - **Day Pass System**: Non-members can purchase day passes with visitor matching, HubSpot sync, and QR code delivery.
 - **QR Code System**: QR codes for day passes and digital access cards for members, with staff scanning functionality.
 - **Corporate Membership**: Supports unified billing groups, volume pricing, corporate checkout, HubSpot company sync, and individual tracking.

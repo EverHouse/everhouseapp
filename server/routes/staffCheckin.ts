@@ -8,7 +8,7 @@ import { logAndRespond } from '../core/logger';
 import { getSessionUser } from '../types/session';
 import { notifyMember, notifyFeeWaived } from '../core/notificationService';
 import { sendFeeWaivedEmail } from '../emails/paymentEmails';
-import { computeFeeBreakdown, applyFeeBreakdownToParticipants } from '../core/billing/unifiedFeeService';
+import { computeFeeBreakdown, applyFeeBreakdownToParticipants, recalculateSessionFees } from '../core/billing/unifiedFeeService';
 import { consumeGuestPassForParticipant, canUseGuestPass } from '../core/billing/guestPassConsumer';
 import { logFromRequest } from '../core/auditLog';
 import { enforceSocialTierRules, type ParticipantForValidation } from '../core/bookingService/tierRules';
@@ -125,12 +125,12 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
           bp.created_at
       `, [booking.session_id]);
 
-      const allParticipantIds = participantsResult.rows.map(p => p.participant_id);
+      // Compute fees in-memory for display, but DO NOT write to DB on GET request
+      // This avoids the anti-pattern of writes during read operations
       const breakdown = await computeFeeBreakdown({
         sessionId: booking.session_id,
         source: 'checkin' as const
       });
-      await applyFeeBreakdownToParticipants(booking.session_id, breakdown);
       
       const feeMap = new Map<number, number>();
       for (const p of breakdown.participants) {
@@ -277,6 +277,17 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
 
     const booking = bookingResult.rows[0];
     const sessionId = booking.session_id;
+
+    // Ensure fees are calculated and persisted to DB before taking any payment action
+    // This handles the case where we no longer write on GET requests
+    if (sessionId) {
+      try {
+        await recalculateSessionFees(sessionId, 'staff_action');
+      } catch (calcError) {
+        console.error('[StaffCheckin] Failed to recalculate fees before payment action:', calcError);
+        // Continue with existing values - non-blocking error
+      }
+    }
 
     if (action === 'confirm' || action === 'waive' || action === 'use_guest_pass') {
       if (!participantId) {

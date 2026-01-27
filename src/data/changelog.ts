@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.29.9",
+    date: "2026-01-27",
+    title: "Check-In Page Architecture Fix",
+    changes: [
+      "Fixed: Viewing the check-in page no longer writes to the database (GET requests are now read-only)",
+      "Improvement: Fees are now recalculated when staff takes a payment action, not when viewing",
+      "Performance: Reduces unnecessary database writes and prevents potential race conditions"
+    ]
+  },
+  {
     version: "9.29.8",
     date: "2026-01-26",
     title: "Session Backfill Payment Status Fix",
