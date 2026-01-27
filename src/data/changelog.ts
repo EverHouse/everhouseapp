@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.32.9",
+    date: "2026-01-27",
+    title: "Critical Fee Estimate Display Fix",
+    isMajor: true,
+    changes: [
+      "CRITICAL: Fixed fee estimates not updating - was calling wrong method on API response",
+      "Fixed: Overage fees now correctly display for Core members booking beyond their daily allowance",
+      "Fixed: 120-minute Core bookings now show correct $50 overage instead of $0",
+      "Added: Cache-control headers to fee estimate endpoints"
+    ]
+  },
+  {
     version: "9.32.8",
     date: "2026-01-27",
     title: "Fee Estimate Caching Fix",

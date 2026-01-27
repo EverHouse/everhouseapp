@@ -1015,8 +1015,8 @@ const BookGolf: React.FC = () => {
         }
         
         const response = await apiRequest(`/api/fee-estimate?${params}`);
-        if (response.ok) {
-          const data = await response.json();
+        if (response.ok && response.data) {
+          const data = response.data;
           // Use ONLY server-calculated values for complete consistency
           setEstimatedFees({
             overageFee: data.feeBreakdown.overageFee,
