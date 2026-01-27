@@ -44,7 +44,7 @@ interface PaymentFormProps {
 }
 
 interface SimpleCheckoutFormProps {
-  onSuccess: () => void;
+  onSuccess: (paymentIntentId?: string) => void;
   onError?: (message: string) => void;
   onCancel?: () => void;
   submitLabel?: string;
@@ -85,7 +85,7 @@ export function SimpleCheckoutForm({
       onError?.(msg);
       setIsProcessing(false);
     } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-      onSuccess();
+      onSuccess(paymentIntent.id);
     } else {
       const msg = 'Payment incomplete. Please try again.';
       setErrorMessage(msg);

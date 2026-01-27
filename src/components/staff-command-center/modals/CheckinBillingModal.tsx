@@ -313,19 +313,35 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
     }
   };
 
-  const handleOveragePaymentSuccess = async () => {
+  const handleOveragePaymentSuccess = async (paymentIntentId?: string) => {
     showToast('Overage payment successful!', 'success');
     setShowOveragePayment(false);
     setOverageClientSecret(null);
+    if (paymentIntentId) {
+      await fetch('/api/stripe/confirm-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ paymentIntentId })
+      });
+    }
     await fetchContext();
   };
 
-  const handleStripePaymentSuccess = async () => {
-    showToast('Payment successful - completing check-in...', 'success');
+  const handleStripePaymentSuccess = async (paymentIntentId?: string) => {
+    showToast('Payment successful - syncing...', 'success');
     setShowStripePayment(false);
     setFrozenPaymentData(null);
     setActionInProgress('checkin-after-payment');
     try {
+      if (paymentIntentId) {
+        await fetch('/api/stripe/confirm-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ paymentIntentId })
+        });
+      }
       const res = await fetch(`/api/bookings/${bookingId}/checkin`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -337,7 +353,12 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
         onClose();
       } else {
         const data = await res.json();
-        showToast(data.error || 'Payment succeeded but check-in failed - please retry', 'error');
+        if (data.requiresRoster) {
+          showToast('Payment recorded! Please fill in guest details before check-in.', 'warning');
+          await fetchContext();
+        } else {
+          showToast(data.error || 'Payment succeeded but check-in failed - please retry', 'error');
+        }
       }
     } catch (err) {
       showToast('Payment succeeded but check-in failed - please retry', 'error');
