@@ -1819,4 +1819,71 @@ router.post('/api/bookings/:bookingId/cancel-guest-payment', async (req: Request
   }
 });
 
+router.patch('/api/admin/booking/:bookingId/player-count', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const bookingId = parseInt(req.params.bookingId, 10);
+    const { playerCount } = req.body;
+    const sessionUser = getSessionUser(req);
+    const staffEmail = sessionUser?.email?.toLowerCase() || 'unknown';
+
+    if (isNaN(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
+
+    if (typeof playerCount !== 'number' || playerCount < 1 || playerCount > 4) {
+      return res.status(400).json({ error: 'Player count must be between 1 and 4' });
+    }
+
+    const bookingResult = await pool.query(`
+      SELECT br.id, br.declared_player_count, br.session_id, br.user_email, br.status
+      FROM booking_requests br
+      WHERE br.id = $1
+    `, [bookingId]);
+
+    if (bookingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const booking = bookingResult.rows[0];
+    const previousCount = booking.declared_player_count;
+
+    await pool.query(`
+      UPDATE booking_requests 
+      SET declared_player_count = $1
+      WHERE id = $2
+    `, [playerCount, bookingId]);
+
+    if (booking.session_id) {
+      await invalidateCachedFees(booking.session_id);
+      await recalculateSessionFees(booking.session_id, 'player_count_update');
+    }
+
+    const { logFromRequest, AuditAction, AuditResourceType } = await import('../core/auditLog');
+    await logFromRequest(req, {
+      action: 'UPDATE_PLAYER_COUNT' as any,
+      resourceType: AuditResourceType.BOOKING,
+      resourceId: String(bookingId),
+      resourceName: `Booking ${bookingId}`,
+      details: { 
+        previousCount, 
+        newCount: playerCount,
+        memberEmail: booking.user_email 
+      }
+    });
+
+    logger.info('[roster] Player count updated', {
+      extra: { bookingId, previousCount, newCount: playerCount, staffEmail }
+    });
+
+    res.json({ 
+      success: true, 
+      previousCount, 
+      newCount: playerCount,
+      feesRecalculated: !!booking.session_id
+    });
+  } catch (error: any) {
+    logAndRespond(req, res, 500, 'Failed to update player count', error);
+  }
+});
+
 export default router;

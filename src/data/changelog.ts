@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.32.11",
+    date: "2026-01-27",
+    title: "Editable Player Count for Staff",
+    changes: [
+      "Staff can now click the Players card in Booking Details to update the player count",
+      "Player count changes automatically recalculate fees (fixes incorrect overage charges)",
+      "Helpful for correcting bookings where Trackman imported wrong player count",
+      "Maximum 4 players per booking enforced"
+    ]
+  },
+  {
     version: "9.32.10",
     date: "2026-01-27",
     title: "Comprehensive Payment Intent Cancellation",

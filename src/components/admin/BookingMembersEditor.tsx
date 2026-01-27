@@ -227,6 +227,11 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
     description: string;
   } | null>(null);
   
+  // Player count editing state
+  const [isEditingPlayerCount, setIsEditingPlayerCount] = useState(false);
+  const [editingPlayerCount, setEditingPlayerCount] = useState<number>(1);
+  const [isUpdatingPlayerCount, setIsUpdatingPlayerCount] = useState(false);
+  
   const { showToast } = useToast();
 
   const fetchBookingMembers = useCallback(async () => {
@@ -725,6 +730,49 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
     }
   };
 
+  const handleStartEditPlayerCount = () => {
+    setEditingPlayerCount(expectedCount);
+    setIsEditingPlayerCount(true);
+  };
+
+  const handleCancelEditPlayerCount = () => {
+    setIsEditingPlayerCount(false);
+    setEditingPlayerCount(expectedCount);
+  };
+
+  const handleSavePlayerCount = async () => {
+    if (editingPlayerCount === expectedCount) {
+      setIsEditingPlayerCount(false);
+      return;
+    }
+
+    setIsUpdatingPlayerCount(true);
+    try {
+      const res = await fetch(`/api/admin/booking/${bookingId}/player-count`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ playerCount: editingPlayerCount })
+      });
+
+      if (res.ok) {
+        showToast(`Player count updated to ${editingPlayerCount}`, 'success');
+        setIsEditingPlayerCount(false);
+        await fetchBookingMembers();
+        if (onMemberLinked) {
+          onMemberLinked();
+        }
+      } else {
+        const data = await res.json();
+        showToast(data.error || 'Failed to update player count', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to update player count', 'error');
+    } finally {
+      setIsUpdatingPlayerCount(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
@@ -805,14 +853,56 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
             <span className={`material-symbols-outlined text-lg ${
               isRosterComplete ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'
             }`}>groups</span>
-            <div>
-              <span className={`text-sm font-medium ${
-                isRosterComplete ? 'text-green-700 dark:text-green-300' : 'text-amber-700 dark:text-amber-300'
-              }`}>
-                {expectedCount} Player{expectedCount !== 1 ? 's' : ''} Expected
-              </span>
-              {bookingContext?.durationMinutes && expectedCount > 0 && (
-                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+            <div className="flex items-center gap-2">
+              {isEditingPlayerCount ? (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={editingPlayerCount}
+                    onChange={(e) => setEditingPlayerCount(parseInt(e.target.value, 10))}
+                    className="px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-primary dark:text-white"
+                    disabled={isUpdatingPlayerCount}
+                  >
+                    {[1, 2, 3, 4].map(n => (
+                      <option key={n} value={n}>{n} Player{n !== 1 ? 's' : ''}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleSavePlayerCount}
+                    disabled={isUpdatingPlayerCount}
+                    className="p-1 rounded hover:bg-green-100 dark:hover:bg-green-500/20 text-green-600 dark:text-green-400"
+                    title="Save"
+                  >
+                    <span className="material-symbols-outlined text-sm">
+                      {isUpdatingPlayerCount ? 'progress_activity' : 'check'}
+                    </span>
+                  </button>
+                  <button
+                    onClick={handleCancelEditPlayerCount}
+                    disabled={isUpdatingPlayerCount}
+                    className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400"
+                    title="Cancel"
+                  >
+                    <span className="material-symbols-outlined text-sm">close</span>
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <span className={`text-sm font-medium ${
+                    isRosterComplete ? 'text-green-700 dark:text-green-300' : 'text-amber-700 dark:text-amber-300'
+                  }`}>
+                    {expectedCount} Player{expectedCount !== 1 ? 's' : ''} Expected
+                  </span>
+                  <button
+                    onClick={handleStartEditPlayerCount}
+                    className="p-1 rounded hover:bg-gray-200 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400"
+                    title="Edit player count"
+                  >
+                    <span className="material-symbols-outlined text-sm">edit</span>
+                  </button>
+                </>
+              )}
+              {!isEditingPlayerCount && bookingContext?.durationMinutes && expectedCount > 0 && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">
                   ({timeAllocationPerPlayer} min each)
                 </span>
               )}
