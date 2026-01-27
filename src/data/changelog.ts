@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.29.10",
+    date: "2026-01-27",
+    title: "Player Search Improvements",
+    changes: [
+      "Fixed: Player search in booking details now finds both members and past guests",
+      "UX: Members appear with green badge showing their tier, guests show in gray",
+      "Workflow: Selecting a member links them as a player, selecting a guest adds them as a guest"
+    ]
+  },
+  {
     version: "9.29.9",
     date: "2026-01-27",
     title: "Check-In Page Architecture Fix",

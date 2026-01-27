@@ -410,13 +410,57 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
     guestSearchTimeoutRef.current = setTimeout(async () => {
       setIsSearchingGuests(true);
       try {
-        const res = await fetch(`/api/guests/search?query=${encodeURIComponent(query)}&limit=8&includeFullEmail=true`, {
-          credentials: 'include'
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setGuestSearchResults(data);
+        // Search both members and past guests in parallel
+        const [membersRes, guestsRes] = await Promise.all([
+          fetch(`/api/members/search?query=${encodeURIComponent(query)}&limit=6&includeVisitors=false`, {
+            credentials: 'include'
+          }),
+          fetch(`/api/guests/search?query=${encodeURIComponent(query)}&limit=6&includeFullEmail=true`, {
+            credentials: 'include'
+          })
+        ]);
+        
+        const combinedResults: Array<{id: string; name: string; email: string; emailRedacted: string; visitorType?: string; isMember?: boolean}> = [];
+        const seenEmails = new Set<string>();
+        
+        // Add members first (they take priority)
+        if (membersRes.ok) {
+          const members = await membersRes.json();
+          for (const m of members) {
+            const email = (m.email || '').toLowerCase();
+            if (!seenEmails.has(email)) {
+              seenEmails.add(email);
+              combinedResults.push({
+                id: m.id,
+                name: m.name || `${m.firstName || ''} ${m.lastName || ''}`.trim() || 'Unknown',
+                email: m.email || '',
+                emailRedacted: m.email || '',
+                visitorType: m.tier || 'Member',
+                isMember: true
+              });
+            }
+          }
         }
+        
+        // Add guests (visitors) that aren't already in the list
+        if (guestsRes.ok) {
+          const guests = await guestsRes.json();
+          for (const g of guests) {
+            const email = (g.email || g.emailRedacted || '').toLowerCase();
+            if (!seenEmails.has(email)) {
+              seenEmails.add(email);
+              combinedResults.push({
+                id: g.id,
+                name: g.name,
+                email: g.email || g.emailRedacted || '',
+                emailRedacted: g.emailRedacted || g.email || '',
+                visitorType: g.visitorType || 'Guest'
+              });
+            }
+          }
+        }
+        
+        setGuestSearchResults(combinedResults.slice(0, 10));
       } catch (err) {
         console.error('Guest search error:', err);
       } finally {
@@ -939,7 +983,7 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
                           type="text"
                           value={guestSearchQuery}
                           onChange={(e) => handleGuestSearch(e.target.value)}
-                          placeholder="Search existing guests by name or email..."
+                          placeholder="Search members or past guests..."
                           autoFocus
                           className="w-full py-1.5 px-2 text-sm rounded-lg border border-gray-200 dark:border-white/20 bg-white dark:bg-black/30 text-primary dark:text-white placeholder:text-gray-400"
                         />
@@ -948,29 +992,45 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
                         )}
                         {guestSearchResults.length > 0 && (
                           <div className="absolute z-50 left-0 right-0 mt-1 rounded-lg border shadow-lg overflow-hidden max-h-40 overflow-y-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-white/20">
-                            {guestSearchResults.map((guest) => (
-                              <button
-                                key={guest.id}
-                                type="button"
-                                onClick={() => handleSelectGuest(slot.id, { id: guest.id, name: guest.name, email: guest.email || guest.emailRedacted })}
-                                className="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-white/5 flex items-center gap-2 border-b border-gray-100 dark:border-white/5 last:border-b-0"
-                              >
-                                <span className="material-symbols-outlined text-amber-500 text-base">person</span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-primary dark:text-white truncate">{guest.name}</p>
-                                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{guest.email || guest.emailRedacted}</p>
-                                </div>
-                                {guest.visitorType && (
-                                  <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 rounded">
-                                    {guest.visitorType}
+                            {guestSearchResults.map((result) => {
+                              const isMember = (result as any).isMember === true;
+                              return (
+                                <button
+                                  key={result.id}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isMember) {
+                                      handleLinkMember(slot.id, result.email);
+                                      resetGuestForm();
+                                    } else {
+                                      handleSelectGuest(slot.id, { id: result.id, name: result.name, email: result.email || result.emailRedacted });
+                                    }
+                                  }}
+                                  className="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-white/5 flex items-center gap-2 border-b border-gray-100 dark:border-white/5 last:border-b-0"
+                                >
+                                  <span className={`material-symbols-outlined text-base ${isMember ? 'text-green-600 dark:text-green-400' : 'text-amber-500'}`}>
+                                    {isMember ? 'verified_user' : 'person'}
                                   </span>
-                                )}
-                              </button>
-                            ))}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-primary dark:text-white truncate">{result.name}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{result.email || result.emailRedacted}</p>
+                                  </div>
+                                  {result.visitorType && (
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                      isMember 
+                                        ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' 
+                                        : 'bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400'
+                                    }`}>
+                                      {result.visitorType}
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
                           </div>
                         )}
                         {guestSearchQuery.length >= 2 && !isSearchingGuests && guestSearchResults.length === 0 && (
-                          <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">No guests found. Try "New" to add a new guest.</p>
+                          <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">No results found. Try "New" to add a new guest.</p>
                         )}
                       </div>
                     ) : (
