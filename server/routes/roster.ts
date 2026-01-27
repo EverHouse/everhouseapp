@@ -32,7 +32,6 @@ import {
 import { 
   computeUsageAllocation,
   calculateOverageFee,
-  recalculateSessionFees,
   type Participant as UsageParticipant
 } from '../core/bookingService/usageCalculator';
 import { getTierLimits, getMemberTierByEmail } from '../core/tierService';
@@ -45,7 +44,7 @@ import {
 import { notifyMember } from '../core/notificationService';
 import { getStripeClient } from '../core/stripe/client';
 import { getOrCreateStripeCustomer } from '../core/stripe/customers';
-import { computeFeeBreakdown, getEffectivePlayerCount, invalidateCachedFees } from '../core/billing/unifiedFeeService';
+import { computeFeeBreakdown, getEffectivePlayerCount, invalidateCachedFees, recalculateSessionFees } from '../core/billing/unifiedFeeService';
 
 const router = Router();
 

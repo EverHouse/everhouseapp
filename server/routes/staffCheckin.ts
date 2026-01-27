@@ -152,7 +152,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
 
     if (sessionId) {
       const participantsResult = await pool.query(`
-        SELECT 
+        SELECT DISTINCT ON (bp.id)
           bp.id as participant_id,
           bp.display_name,
           bp.participant_type,
@@ -165,7 +165,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
           ul.tier_at_booking
         FROM booking_participants bp
         LEFT JOIN users u ON u.id = bp.user_id
-        LEFT JOIN booking_requests br ON br.session_id = bp.session_id
+        LEFT JOIN booking_requests br ON br.session_id = bp.session_id AND br.status != 'cancelled'
         LEFT JOIN usage_ledger ul ON ul.session_id = bp.session_id 
           AND (
             ul.member_id = bp.user_id 
@@ -174,6 +174,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
           )
         WHERE bp.session_id = $1
         ORDER BY 
+          bp.id,
           CASE bp.participant_type 
             WHEN 'owner' THEN 1 
             WHEN 'member' THEN 2 

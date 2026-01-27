@@ -38,7 +38,7 @@ export async function calculateAndCacheParticipantFees(
         mt.guest_fee_cents as tier_guest_fee_cents
        FROM booking_participants bp
        LEFT JOIN users u ON u.id = bp.user_id
-       LEFT JOIN booking_requests br ON br.session_id = bp.session_id
+       LEFT JOIN booking_requests br ON br.session_id = bp.session_id AND br.status != 'cancelled'
        LEFT JOIN users booking_member ON LOWER(booking_member.email) = LOWER(br.user_email)
        LEFT JOIN membership_tiers mt ON mt.id = booking_member.tier_id
        LEFT JOIN usage_ledger ul ON ul.session_id = bp.session_id 

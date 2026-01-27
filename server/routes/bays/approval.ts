@@ -955,7 +955,7 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
           COALESCE(ul.guest_fee, 0)::numeric as guest_fee
         FROM booking_participants bp
         LEFT JOIN users pu ON pu.id = bp.user_id
-        LEFT JOIN booking_requests br ON br.session_id = bp.session_id
+        LEFT JOIN booking_requests br ON br.session_id = bp.session_id AND br.status != 'cancelled'
         LEFT JOIN usage_ledger ul ON ul.session_id = bp.session_id 
           AND (ul.member_id = bp.user_id OR LOWER(ul.member_id) = LOWER(pu.email) OR LOWER(ul.member_id) = LOWER(br.user_email))
         WHERE bp.session_id = $1 AND bp.payment_status = 'pending'
