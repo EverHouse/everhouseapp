@@ -13,6 +13,22 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.32.0",
+    date: "2026-01-27",
+    title: "Cross-Platform Sync Tools",
+    isMajor: true,
+    changes: [
+      "Added: Tier reconciliation check - compares member tier across HubSpot, Stripe, and app database with high-severity flagging for mismatches",
+      "Added: Subscription status alignment tool - syncs membership_status from Stripe subscription states (active, canceled, past_due, etc.)",
+      "Added: Stripe-HubSpot linking tool - creates missing HubSpot contacts for Stripe customers and vice versa",
+      "Added: Payment status sync - updates HubSpot last_payment_status, last_payment_date, and last_payment_amount from Stripe invoices",
+      "Added: Visit count sync - updates HubSpot total_visit_count from actual app check-in records",
+      "Added: Trackman ghost booking auto-fix - creates missing billing sessions for orphaned Trackman bookings with idempotent protection",
+      "Added: Email/contact deduplication detection - finds duplicate emails in app and HubSpot for manual review",
+      "UX: New Cross-Platform Sync Tools section in Data Integrity with Preview/Execute pattern for all tools"
+    ]
+  },
+  {
     version: "9.31.5",
     date: "2026-01-27",
     title: "Mind Body ID Data Integrity",
