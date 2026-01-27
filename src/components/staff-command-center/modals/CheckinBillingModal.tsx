@@ -3,6 +3,14 @@ import { createPortal } from 'react-dom';
 import { useToast } from '../../Toast';
 import { StripePaymentForm } from '../../stripe/StripePaymentForm';
 
+function formatTime12Hour(time: string | undefined): string {
+  if (!time) return '';
+  const [hours, minutes] = time.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const displayHours = hours % 12 || 12;
+  return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+}
+
 interface ParticipantFee {
   participantId: number;
   displayName: string;
@@ -433,7 +441,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
               <div className="bg-primary/5 dark:bg-white/5 rounded-xl p-4">
                 <h3 className="font-semibold text-primary dark:text-white mb-2">{context.ownerName}</h3>
                 <p className="text-sm text-primary/70 dark:text-white/70">
-                  {context.resourceName} • {context.startTime?.slice(0, 5)} - {context.endTime?.slice(0, 5)}
+                  {context.resourceName} • {formatTime12Hour(context.startTime)} - {formatTime12Hour(context.endTime)}
                 </p>
               </div>
               <StripePaymentForm
@@ -467,7 +475,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
               <div className="bg-primary/5 dark:bg-white/5 rounded-xl p-4">
                 <h3 className="font-semibold text-primary dark:text-white mb-2">{context.ownerName}</h3>
                 <p className="text-sm text-primary/70 dark:text-white/70">
-                  {context.resourceName} • {context.startTime?.slice(0, 5)} - {context.endTime?.slice(0, 5)}
+                  {context.resourceName} • {formatTime12Hour(context.startTime)} - {formatTime12Hour(context.endTime)}
                 </p>
                 {context.memberNotes && (
                   <div className="mt-3 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/30 rounded-lg">

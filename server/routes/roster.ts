@@ -1854,8 +1854,7 @@ router.patch('/api/admin/booking/:bookingId/player-count', isStaffOrAdmin, async
     `, [playerCount, bookingId]);
 
     if (booking.session_id) {
-      await invalidateCachedFees(booking.session_id);
-      await recalculateSessionFees(booking.session_id, 'player_count_update');
+      await recalculateSessionFees(booking.session_id, 'staff_action');
     }
 
     const { logFromRequest, AuditAction, AuditResourceType } = await import('../core/auditLog');
