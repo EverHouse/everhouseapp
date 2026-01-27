@@ -670,4 +670,109 @@ router.post('/api/data-tools/cleanup-mindbody-ids', isAdmin, async (req: Request
   }
 });
 
+// Create HubSpot contacts for members who don't have one yet
+router.post('/api/data-tools/sync-members-to-hubspot', isAdmin, async (req: Request, res: Response) => {
+  try {
+    const staffEmail = (req as any).user?.email || 'unknown';
+    const { emails, dryRun = true } = req.body;
+    
+    console.log(`[DataTools] Starting HubSpot sync for members without contacts (dryRun: ${dryRun}) by ${staffEmail}`);
+    
+    // Get members without HubSpot ID
+    let query = `
+      SELECT id, email, first_name, last_name, tier, mindbody_client_id, membership_status
+      FROM users 
+      WHERE hubspot_id IS NULL
+    `;
+    const params: any[] = [];
+    
+    if (emails && Array.isArray(emails) && emails.length > 0) {
+      query += ` AND LOWER(email) = ANY($1::text[])`;
+      params.push(emails.map((e: string) => e.toLowerCase()));
+    }
+    
+    query += ` ORDER BY email LIMIT 100`;
+    
+    const membersWithoutHubspot = await pool.query(query, params);
+    
+    if (membersWithoutHubspot.rows.length === 0) {
+      return res.json({ 
+        message: 'No members found without HubSpot contacts',
+        totalFound: 0,
+        created: 0
+      });
+    }
+    
+    const { findOrCreateHubSpotContact } = await import('../core/hubspot/members');
+    
+    const created: Array<{ email: string; contactId: string }> = [];
+    const existing: Array<{ email: string; contactId: string }> = [];
+    const errors: string[] = [];
+    
+    if (!dryRun) {
+      for (const member of membersWithoutHubspot.rows) {
+        try {
+          const result = await findOrCreateHubSpotContact(
+            member.email,
+            member.first_name || '',
+            member.last_name || '',
+            undefined,
+            member.tier || undefined
+          );
+          
+          // Update user with HubSpot ID
+          await pool.query(
+            'UPDATE users SET hubspot_id = $1, updated_at = NOW() WHERE id = $2',
+            [result.contactId, member.id]
+          );
+          
+          if (result.isNew) {
+            created.push({ email: member.email, contactId: result.contactId });
+          } else {
+            existing.push({ email: member.email, contactId: result.contactId });
+          }
+          
+          console.log(`[DataTools] ${result.isNew ? 'Created' : 'Found existing'} HubSpot contact for ${member.email}: ${result.contactId}`);
+          
+          // Small delay between API calls
+          await new Promise(resolve => setTimeout(resolve, 200));
+        } catch (err: any) {
+          console.error(`[DataTools] Error syncing ${member.email} to HubSpot:`, err);
+          errors.push(`${member.email}: ${err.message}`);
+        }
+      }
+      
+      // Log the action
+      await logFromRequest(req, {
+        action: 'sync_members_to_hubspot',
+        resourceType: 'users',
+        details: {
+          created: created.length,
+          existing: existing.length,
+          errors: errors.length
+        }
+      });
+    }
+    
+    res.json({
+      message: dryRun 
+        ? `Dry run: Found ${membersWithoutHubspot.rows.length} members without HubSpot contacts` 
+        : `Synced ${created.length + existing.length} members to HubSpot (${created.length} new, ${existing.length} existing)`,
+      totalFound: membersWithoutHubspot.rows.length,
+      members: membersWithoutHubspot.rows.map(m => ({
+        email: m.email,
+        name: `${m.first_name || ''} ${m.last_name || ''}`.trim(),
+        tier: m.tier,
+        mindbodyClientId: m.mindbody_client_id
+      })),
+      created: created.length,
+      existing: existing.length,
+      errors: errors.slice(0, 10)
+    });
+  } catch (error: any) {
+    console.error('[DataTools] Sync members to HubSpot error:', error);
+    res.status(500).json({ error: 'Failed to sync members to HubSpot', details: error.message });
+  }
+});
+
 export default router;
