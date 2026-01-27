@@ -208,7 +208,7 @@ const UpdatesTab: React.FC = () => {
     };
 
     const renderAlertsTab = () => (
-        <div className="animate-pop-in" style={{animationDelay: '0.1s'}}>
+        <div className="animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
             {notifications.length > 0 && (
                 <div className="flex justify-end gap-2 mb-4">
                     {unreadCount > 0 && (

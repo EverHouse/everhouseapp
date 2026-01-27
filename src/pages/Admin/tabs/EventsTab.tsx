@@ -1196,14 +1196,14 @@ const EventsAdminContent: React.FC = () => {
             ) : (
                 <div key={activeCategory} className="space-y-6 animate-content-enter">
                     {upcomingEvents.length > 0 && (
-                        <div className="animate-pop-in" style={{animationDelay: '0.1s'}}>
+                        <div className="animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
                             <div className="flex items-center gap-2 mb-3">
                                 <span aria-hidden="true" className="material-symbols-outlined text-green-500">schedule</span>
                                 <h3 className="font-bold text-primary dark:text-white">Upcoming ({upcomingEvents.length})</h3>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {upcomingEvents.map((event, index) => (
-                                    <div key={event.id} onClick={() => openEdit(event)} className="bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 flex flex-col gap-3 relative overflow-hidden cursor-pointer hover:border-primary/30 transition-all animate-pop-in" style={{animationDelay: `${0.15 + index * 0.03}s`}}>
+                                    <div key={event.id} onClick={() => openEdit(event)} className="bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 flex flex-col gap-3 relative overflow-hidden cursor-pointer hover:border-primary/30 transition-all animate-slide-up-stagger" style={{ '--stagger-index': index + 1 } as React.CSSProperties}>
                                         {event.eventbrite_id && (
                                             <div className="absolute top-0 right-0 bg-[#F05537] text-white text-[8px] font-bold uppercase px-2 py-1 rounded-bl-lg z-10">
                                                 Eventbrite
@@ -1262,14 +1262,14 @@ const EventsAdminContent: React.FC = () => {
                     )}
                     
                     {pastEvents.length > 0 && (
-                        <div className="animate-pop-in" style={{animationDelay: '0.2s'}}>
+                        <div className="animate-slide-up-stagger" style={{ '--stagger-index': upcomingEvents.length + 2 } as React.CSSProperties}>
                             <div className="flex items-center gap-2 mb-3">
                                 <span aria-hidden="true" className="material-symbols-outlined text-gray-600 dark:text-gray-500">history</span>
                                 <h3 className="font-bold text-gray-500 dark:text-gray-400">Past ({pastEvents.length})</h3>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-70">
                                 {pastEvents.map((event, index) => (
-                                    <div key={event.id} onClick={() => openEdit(event)} className="bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 flex flex-col gap-3 relative overflow-hidden cursor-pointer hover:border-primary/30 transition-all animate-pop-in" style={{animationDelay: `${0.25 + index * 0.03}s`}}>
+                                    <div key={event.id} onClick={() => openEdit(event)} className="bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 flex flex-col gap-3 relative overflow-hidden cursor-pointer hover:border-primary/30 transition-all animate-slide-up-stagger" style={{ '--stagger-index': upcomingEvents.length + index + 3 } as React.CSSProperties}>
                                         {event.eventbrite_id && (
                                             <div className="absolute top-0 right-0 bg-[#F05537] text-white text-[8px] font-bold uppercase px-2 py-1 rounded-bl-lg z-10">
                                                 Eventbrite
@@ -2287,7 +2287,7 @@ const EventsTab: React.FC = () => {
                     </div>
                 )}
 
-                <div className="flex gap-2 mb-4 animate-pop-in" style={{animationDelay: '0.05s'}}>
+                <div className="flex gap-2 mb-4 animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
                     <button
                         onClick={() => setActiveSubTab('events')}
                         className={`flex-1 py-2.5 px-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-1.5 ${

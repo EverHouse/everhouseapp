@@ -175,8 +175,8 @@ const InquiriesAdmin: React.FC = () => {
     };
 
     return (
-        <div className="animate-pop-in">
-            <div className="flex gap-2 overflow-x-auto pb-4 mb-2 scrollbar-hide -mx-4 px-4 animate-pop-in scroll-fade-right" style={{animationDelay: '0.05s'}}>
+        <div className="animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
+            <div className="flex gap-2 overflow-x-auto pb-4 mb-2 scrollbar-hide -mx-4 px-4 animate-slide-up-stagger scroll-fade-right" style={{ '--stagger-index': 1 } as React.CSSProperties}>
                 {STATUS_TABS.map(tab => (
                     <button
                         key={tab.id}
@@ -193,7 +193,7 @@ const InquiriesAdmin: React.FC = () => {
                 ))}
             </div>
 
-            <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide -mx-4 px-4 animate-pop-in scroll-fade-right" style={{animationDelay: '0.1s'}}>
+            <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide -mx-4 px-4 animate-slide-up-stagger scroll-fade-right" style={{ '--stagger-index': 2 } as React.CSSProperties}>
                 {FORM_TYPE_CHIPS.map(chip => (
                     <button
                         key={chip.id}
@@ -336,19 +336,19 @@ const InquiriesAdmin: React.FC = () => {
                     <p className="text-gray-600 dark:text-gray-300">No form submissions match your current filters.</p>
                 </div>
             ) : (
-                <div className="space-y-3 animate-pop-in" style={{animationDelay: '0.15s'}}>
+                <div className="space-y-3 animate-slide-up-stagger" style={{ '--stagger-index': 3 } as React.CSSProperties}>
                     {inquiries.map((inquiry, index) => (
                         <button
                             key={inquiry.id}
                             onClick={() => openDetail(inquiry)}
-                            className={`w-full text-left bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border cursor-pointer hover:border-primary/30 transition-all animate-pop-in ${
+                            className={`w-full text-left bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border cursor-pointer hover:border-primary/30 transition-all animate-slide-up-stagger ${
                                 inquiry.status === 'new' 
                                     ? 'border-blue-200 dark:border-blue-800/30' 
                                     : inquiry.status === 'archived'
                                         ? 'border-gray-200 dark:border-white/20 opacity-60'
                                         : 'border-gray-200 dark:border-white/20'
                             }`}
-                            style={{animationDelay: `${0.2 + index * 0.03}s`}}
+                            style={{ '--stagger-index': index + 4 } as React.CSSProperties}
                         >
                             <div className="flex items-start gap-3">
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${

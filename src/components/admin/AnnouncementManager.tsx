@@ -159,7 +159,7 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
                 </div>
             </ModalShell>
 
-            <div className="space-y-4 animate-pop-in" style={{animationDelay: '0.1s'}}>
+            <div className="space-y-4 animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
                 {announcements.length > 0 && (
                     <h3 className="text-sm font-bold uppercase text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-2">
                         <span aria-hidden="true" className="material-symbols-outlined text-amber-500 text-[18px]">campaign</span>
@@ -171,7 +171,7 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
                     const idB = parseInt(b.id) || 0;
                     return idB - idA;
                 }).map((item, index) => (
-                    <div key={item.id} onClick={() => openEdit(item)} className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm flex justify-between items-start cursor-pointer hover:border-primary/30 transition-all animate-pop-in" style={{animationDelay: `${0.15 + index * 0.05}s`}}>
+                    <div key={item.id} onClick={() => openEdit(item)} className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm flex justify-between items-start cursor-pointer hover:border-primary/30 transition-all animate-slide-up-stagger" style={{ '--stagger-index': index + 1 } as React.CSSProperties}>
                         <div>
                             <div className="flex items-center gap-2 mb-1.5">
                                 <span className="w-2 h-2 rounded-full bg-accent"></span>

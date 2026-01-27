@@ -260,8 +260,8 @@ const GalleryAdmin: React.FC = () => {
     const categories = ['venue', 'events', 'food', 'golf', 'wellness', 'outdoor'];
 
     return (
-        <div className="animate-pop-in">
-            <div className="flex justify-between items-center mb-4 animate-pop-in" style={{animationDelay: '0.05s'}}>
+        <div className="animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
+            <div className="flex justify-between items-center mb-4 animate-slide-up-stagger" style={{ '--stagger-index': 1 } as React.CSSProperties}>
                 <h2 className="text-xl font-bold text-primary dark:text-white">Gallery Images</h2>
             </div>
 
@@ -390,7 +390,7 @@ const GalleryAdmin: React.FC = () => {
                     <p className="text-gray-600 dark:text-gray-300">Add images to the gallery to get started.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 animate-pop-in" style={{animationDelay: '0.1s'}}>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 animate-slide-up-stagger" style={{ '--stagger-index': 2 } as React.CSSProperties}>
                     {displayImages.map((image) => {
                         const isDragging = image.id === draggedItemId;
                         return (

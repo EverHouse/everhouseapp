@@ -253,8 +253,8 @@ const FaqsAdmin: React.FC = () => {
     }
 
     return (
-        <div className="animate-pop-in">
-            <div className="flex justify-between items-center mb-4 animate-pop-in" style={{animationDelay: '0.05s'}}>
+        <div className="animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
+            <div className="flex justify-between items-center mb-4 animate-slide-up-stagger" style={{ '--stagger-index': 1 } as React.CSSProperties}>
                 <h2 className="text-xl font-bold text-primary dark:text-white">FAQs ({faqs.length})</h2>
                 {faqs.length === 0 && (
                     <button
@@ -390,7 +390,7 @@ const FaqsAdmin: React.FC = () => {
                     </button>
                 </div>
             ) : (
-                <div className="space-y-3 animate-pop-in" style={{animationDelay: '0.1s'}}>
+                <div className="space-y-3 animate-slide-up-stagger" style={{ '--stagger-index': 2 } as React.CSSProperties}>
                     {displayFaqs.map((faq) => {
                         const isDragging = faq.id === draggedItemId;
                         return (

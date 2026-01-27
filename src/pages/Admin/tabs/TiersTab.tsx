@@ -804,13 +804,13 @@ const TiersTab: React.FC = () => {
                             </p>
                         </div>
                     ) : (
-                        <div className="space-y-3 animate-pop-in" style={{animationDelay: '0.1s'}}>
+                        <div className="space-y-3 animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
                             {subscriptionTiers.map((tier, index) => (
                                 <div 
                                     key={tier.id} 
                                     onClick={() => openEdit(tier)}
-                                    className="bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 cursor-pointer hover:border-primary/30 transition-all animate-pop-in"
-                                    style={{animationDelay: `${0.15 + index * 0.03}s`}}
+                                    className="bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 cursor-pointer hover:border-primary/30 transition-all animate-slide-up-stagger"
+                                    style={{ '--stagger-index': index + 1 } as React.CSSProperties}
                                 >
                                     <div className="flex items-start justify-between mb-3">
                                         <div>

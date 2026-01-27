@@ -17,10 +17,10 @@ export const changelog: ChangelogEntry[] = [
     date: "2026-01-27",
     title: "Animation System Refinements",
     changes: [
-      "UX: Dashboard cards now use dynamic stagger indices for smoother cascading entry",
+      "UX: Replaced hardcoded animation delays with dynamic stagger indices across all admin pages",
       "UX: MemberProfileDrawer uses spring physics for natural bounce on slide-in",
-      "UX: Admin tables (Trackman, Data Integrity) animate rows with stagger timing",
-      "UX: Dashboard content crossfades from skeleton using SmoothReveal"
+      "UX: Dashboard content crossfades from skeleton using SmoothReveal wrapper",
+      "UX: Updated InquiriesAdmin, BugReportsAdmin, SimulatorTab, CafeTab, BlocksTab, EventsTab, TiersTab, GalleryAdmin, FaqsAdmin, AnnouncementManager, and History with stagger animations"
     ]
   },
   {

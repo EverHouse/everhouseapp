@@ -340,7 +340,7 @@ const History: React.FC = () => {
                       const monthLabel = new Date(parseInt(year), parseInt(month) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
                       
                       return (
-                        <div key={monthKey} className="animate-pop-in" style={{animationDelay: `${0.05 * monthIndex}s`}}>
+                        <div key={monthKey} className="animate-slide-up-stagger" style={{ '--stagger-index': monthIndex } as React.CSSProperties}>
                           <h3 className={`text-sm font-semibold mb-3 ${isDark ? 'text-white/60' : 'text-primary/60'}`}>
                             {monthLabel}
                           </h3>
@@ -348,8 +348,8 @@ const History: React.FC = () => {
                             {monthPurchases.map((purchase, index) => (
                               <div 
                                 key={purchase.id} 
-                                className={`rounded-xl p-4 border glass-card animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`}
-                                style={{animationDelay: `${0.05 * (monthIndex + index)}s`}}
+                                className={`rounded-xl p-4 border glass-card animate-slide-up-stagger ${isDark ? 'border-white/25' : 'border-black/10'}`}
+                                style={{ '--stagger-index': monthIndex + index + 1 } as React.CSSProperties}
                               >
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="flex-1">

@@ -102,8 +102,8 @@ const CafeTab: React.FC = () => {
     };
 
     return (
-        <div className="animate-pop-in">
-            <div className="flex justify-between items-center mb-4 animate-pop-in" style={{animationDelay: '0.05s'}}>
+        <div className="animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
+            <div className="flex justify-between items-center mb-4 animate-slide-up-stagger" style={{ '--stagger-index': 1 } as React.CSSProperties}>
                 <h2 className="text-xl font-bold text-primary dark:text-white">Menu Items</h2>
                 {cafeMenu.length === 0 && (
                     <button 
@@ -121,7 +121,7 @@ const CafeTab: React.FC = () => {
                     {seedMessage}
                 </div>
             )}
-            <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide -mx-1 px-1 mb-4 animate-pop-in scroll-fade-right" style={{animationDelay: '0.1s'}}>
+            <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide -mx-1 px-1 mb-4 animate-slide-up-stagger scroll-fade-right" style={{ '--stagger-index': 2 } as React.CSSProperties}>
                 {categories.map(cat => (
                     <button
                         key={cat}
@@ -203,9 +203,9 @@ const CafeTab: React.FC = () => {
                 </div>
             </ModalShell>
 
-            <div className="space-y-3 animate-pop-in" style={{animationDelay: '0.15s'}}>
+            <div className="space-y-3 animate-slide-up-stagger" style={{ '--stagger-index': 3 } as React.CSSProperties}>
                 {filteredMenu.map((item, index) => (
-                    <div key={item.id} onClick={() => openEdit(item)} className="bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 flex items-center gap-4 cursor-pointer hover:border-primary/30 transition-all animate-pop-in" style={{animationDelay: `${0.2 + index * 0.03}s`}}>
+                    <div key={item.id} onClick={() => openEdit(item)} className="bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 flex items-center gap-4 cursor-pointer hover:border-primary/30 transition-all animate-slide-up-stagger" style={{ '--stagger-index': index + 4 } as React.CSSProperties}>
                         <div className="w-16 h-16 rounded-lg bg-gray-100 dark:bg-white/5 flex-shrink-0 overflow-hidden">
                              {item.image ? <img src={item.image} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center"><span aria-hidden="true" className="material-symbols-outlined text-gray-600">restaurant</span></div>}
                         </div>

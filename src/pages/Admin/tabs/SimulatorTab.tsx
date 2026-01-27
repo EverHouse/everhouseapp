@@ -1687,8 +1687,8 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                 <div className="flex flex-col lg:flex-row flex-1 lg:overflow-hidden">
                     <div className={`lg:w-[400px] xl:w-[450px] lg:border-r border-gray-200 dark:border-white/25 flex-shrink-0 lg:h-full lg:overflow-y-auto scrollbar-hide relative ${activeView === 'requests' ? 'block' : 'hidden lg:block'}`}>
                         <div className="hidden lg:block absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-white dark:from-[#1e1e1e] to-transparent z-10 pointer-events-none" />
-                        <div className="space-y-6 p-5 animate-pop-in" style={{animationDelay: '0.1s'}}>
-                    <div className="animate-pop-in" style={{animationDelay: '0.05s'}}>
+                        <div className="space-y-6 p-5 animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
+                    <div className="animate-slide-up-stagger" style={{ '--stagger-index': 1 } as React.CSSProperties}>
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="font-bold text-primary dark:text-white flex items-center gap-2">
                                 <span aria-hidden="true" className="material-symbols-outlined text-yellow-500">pending</span>
@@ -1710,7 +1710,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                         ) : (
                             <div className="space-y-3">
                                 {pendingRequests.map((req, index) => (
-                                    <div key={`${req.source || 'request'}-${req.id}`} className="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/25 animate-pop-in" style={{animationDelay: `${0.1 + index * 0.05}s`}}>
+                                    <div key={`${req.source || 'request'}-${req.id}`} className="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/25 animate-slide-up-stagger" style={{ '--stagger-index': index + 2 } as React.CSSProperties}>
                                         <div className="flex justify-between items-start mb-3">
                                             <div>
                                                 <div className="flex items-center gap-2 mb-0.5">
@@ -1799,7 +1799,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                         )}
                     </div>
 
-                    <div className="animate-pop-in" style={{animationDelay: '0.15s'}}>
+                    <div className="animate-slide-up-stagger" style={{ '--stagger-index': 2 } as React.CSSProperties}>
                         <h3 className="font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
                             <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-accent">calendar_today</span>
                             Scheduled ({scheduledBookings.length})
@@ -2001,7 +2001,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                     </div>
                     
                     <div className={`flex-1 lg:flex lg:flex-col lg:h-full lg:overflow-hidden ${activeView === 'calendar' ? 'block' : 'hidden lg:flex'}`}>
-                    <div className="bg-gray-50 dark:bg-white/5 py-3 shrink-0 animate-pop-in" style={{animationDelay: '0.1s'}}>
+                    <div className="bg-gray-50 dark:bg-white/5 py-3 shrink-0 animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
                         <div className="flex items-center justify-center px-2 relative">
                             <div className="flex items-center gap-2 relative">
                                 <button
@@ -2118,7 +2118,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                         </div>
                     </div>
                     
-                    <div className="flex-1 min-h-0 lg:overflow-y-auto scrollbar-hide relative animate-pop-in" style={{animationDelay: '0.15s'}}>
+                    <div className="flex-1 min-h-0 lg:overflow-y-auto scrollbar-hide relative animate-slide-up-stagger" style={{ '--stagger-index': 1 } as React.CSSProperties}>
                         <div className="w-full px-1 sm:px-2 pb-4">
                             <div className="w-full">
                             <div className="grid gap-0.5 w-full" style={{ gridTemplateColumns: `minmax(32px, 0.6fr) repeat(${resources.length}, minmax(0, 1fr))` }}>

@@ -681,7 +681,7 @@ const BlocksTab: React.FC = () => {
                 Synced from Google Calendar: <span className="font-medium">Internal Calendar</span>
             </p>
 
-            <div className="flex gap-2 items-center animate-pop-in overflow-x-auto" style={{animationDelay: '0.05s'}}>
+            <div className="flex gap-2 items-center animate-slide-up-stagger overflow-x-auto" style={{ '--stagger-index': 0 } as React.CSSProperties}>
                 <select
                     value={closuresFilterResource}
                     onChange={(e) => setClosuresFilterResource(e.target.value)}
@@ -1010,7 +1010,7 @@ const BlocksTab: React.FC = () => {
             </div>
 
             {needsReviewClosures.length > 0 && (
-                <div className="space-y-3 animate-pop-in" style={{animationDelay: '0.08s'}}>
+                <div className="space-y-3 animate-slide-up-stagger" style={{ '--stagger-index': 1 } as React.CSSProperties}>
                     <div className="flex items-center gap-2">
                         <span aria-hidden="true" className="material-symbols-outlined text-cyan-500">rate_review</span>
                         <h3 className="font-semibold text-primary dark:text-white">Needs Review</h3>
