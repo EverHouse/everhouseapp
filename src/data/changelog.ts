@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.30.1",
+    date: "2026-01-27",
+    title: "Webhook Matching Safety Improvements",
+    changes: [
+      "Fixed: Back-to-back booking matching now validates end time to prevent matching the wrong slot",
+      "Fixed: Pending request matching correctly handles two consecutive 30-minute bookings",
+      "Improved: Pre-check availability before creating Trackman bookings for clearer conflict logging",
+      "Improved: Cancelled booking linking also uses strict overlap validation"
+    ]
+  },
+  {
     version: "9.30.0",
     date: "2026-01-27",
     title: "Production Readiness Improvements",

@@ -5,6 +5,7 @@ import { notifyAllStaff } from '../../core/staffNotifications';
 import { notifyMember } from '../../core/notificationService';
 import { linkAndNotifyParticipants } from '../../core/bookingEvents';
 import { formatDatePacific, formatTimePacific } from '../../utils/dateUtils';
+import { checkUnifiedAvailability } from '../../core/bookingService/availabilityGuard';
 import {
   TrackmanWebhookPayload,
   TrackmanV2WebhookPayload,
@@ -34,11 +35,15 @@ export async function tryAutoApproveBooking(
   trackmanBookingId: string
 ): Promise<{ matched: boolean; bookingId?: number }> {
   try {
+    // Match pending booking within 10-min tolerance (600 seconds)
+    // CRITICAL: Also require end_time > webhook start_time to prevent matching
+    // a previous back-to-back slot that ended before this booking starts
     const result = await pool.query(
       `SELECT id, user_email, staff_notes FROM booking_requests 
        WHERE LOWER(user_email) = LOWER($1)
          AND request_date = $2
-         AND ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) <= 900
+         AND ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) <= 600
+         AND end_time::time > $3::time
          AND status = 'pending'
          AND trackman_booking_id IS NULL
        ORDER BY ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))), created_at DESC
@@ -187,6 +192,27 @@ export async function createUnmatchedBookingRequest(
   try {
     const durationMinutes = calculateDurationMinutes(startTime, endTime);
     
+    // Pre-check availability before INSERT for better error logging
+    if (resourceId) {
+      const availability = await checkUnifiedAvailability(resourceId, slotDate, startTime, endTime);
+      if (!availability.available) {
+        logger.warn('[Trackman Webhook] Conflict detected before creating unmatched booking', {
+          extra: {
+            trackmanBookingId,
+            date: slotDate,
+            time: startTime,
+            endTime,
+            resourceId,
+            conflictType: availability.conflictType,
+            conflictTitle: availability.conflictTitle,
+            conflictDetails: availability.conflictDetails
+          }
+        });
+        // Still attempt INSERT - DB trigger will prevent true double-booking
+        // but log this clearly so staff can investigate
+      }
+    }
+    
     const result = await pool.query(
       `INSERT INTO booking_requests 
        (request_date, start_time, end_time, duration_minutes, resource_id,
@@ -250,11 +276,14 @@ async function tryLinkCancelledBooking(
   trackmanBookingId: string
 ): Promise<{ matched: boolean; bookingId?: number; refundedPasses?: number }> {
   try {
+    // Match cancelled booking within 10-min tolerance (600 seconds)
+    // Also require end_time > webhook start_time to prevent matching previous slot
     const result = await pool.query(
       `SELECT id, user_email, staff_notes, session_id FROM booking_requests 
        WHERE LOWER(user_email) = LOWER($1)
          AND request_date = $2
-         AND ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) <= 900
+         AND ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) <= 600
+         AND end_time::time > $3::time
          AND status = 'cancelled'
          AND updated_at >= NOW() - INTERVAL '24 hours'
          AND trackman_booking_id IS NULL
