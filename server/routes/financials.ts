@@ -62,16 +62,17 @@ router.get('/api/financials/recent-transactions', isStaffOrAdmin, async (req: Re
     const unifiedQuery = `
       WITH all_transactions AS (
         SELECT 
-          stripe_id as id,
+          stc.stripe_id as id,
           'stripe' as type,
-          amount_cents,
-          COALESCE(description, 'Stripe payment') as description,
-          COALESCE(customer_email, 'Unknown') as member_email,
-          COALESCE(customer_name, customer_email, 'Unknown') as member_name,
-          created_at,
-          status
-        FROM stripe_transaction_cache
-        WHERE status IN ('succeeded', 'paid')${dateFilter}${cursorFilter}
+          stc.amount_cents,
+          COALESCE(stc.description, 'Stripe payment') as description,
+          COALESCE(stc.customer_email, 'Unknown') as member_email,
+          COALESCE(stc.customer_name, u.first_name || ' ' || u.last_name, stc.customer_email, 'Unknown') as member_name,
+          stc.created_at,
+          stc.status
+        FROM stripe_transaction_cache stc
+        LEFT JOIN users u ON LOWER(u.email) = LOWER(stc.customer_email)
+        WHERE stc.status IN ('succeeded', 'paid')${dateFilter.replace(/created_at/g, 'stc.created_at')}${cursorFilter.replace('created_at', 'stc.created_at')}
         
         UNION ALL
         
