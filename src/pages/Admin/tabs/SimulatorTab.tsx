@@ -1786,6 +1786,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                         if (res.ok) {
                                                             showToast(`Confirmed! Overage: $${(data.overageFeeCents / 100).toFixed(2)}`, 'success');
                                                             setRequests(prev => prev.filter(r => r.id !== req.id));
+                                                            handleRefresh();
                                                         } else {
                                                             showToast(data.error || 'Failed to confirm', 'error');
                                                         }

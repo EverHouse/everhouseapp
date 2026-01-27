@@ -888,6 +888,63 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
 
     const fakeTrackmanId = `SIM-${Date.now()}`;
     
+    // Get resource info for realistic webhook
+    const resourceResult = await pool.query(
+      `SELECT id, name, trackman_bay_id FROM resources WHERE id = $1`,
+      [booking.resource_id]
+    );
+    const resource = resourceResult.rows[0];
+    const bayRef = resource?.name?.match(/\d+/)?.[0] || '1';
+    
+    // Build ISO timestamps from booking date and times
+    const bookingDate = typeof booking.request_date === 'string' 
+      ? booking.request_date 
+      : new Date(booking.request_date).toISOString().split('T')[0];
+    const startISO = `${bookingDate}T${booking.start_time}.000Z`;
+    const endISO = `${bookingDate}T${booking.end_time}.000Z`;
+    
+    // Create realistic webhook payload matching Trackman V2 format
+    const realisticPayload = {
+      venue: {
+        id: 941,
+        name: "Even House",
+        slug: "even-house"
+      },
+      booking: {
+        id: parseInt(fakeTrackmanId.replace('SIM-', '')),
+        bay: {
+          id: resource?.trackman_bay_id || 7410,
+          ref: bayRef
+        },
+        end: endISO,
+        type: "bay",
+        range: { id: 947 },
+        start: startISO,
+        status: "confirmed",
+        bayOption: {
+          id: 16727,
+          name: "Member Option",
+          duration: Math.floor((booking.duration_minutes || 60) / 60),
+          subtitle: null
+        },
+        created_at: new Date().toISOString(),
+        playerOptions: [{
+          id: 5854,
+          name: "Member",
+          quantity: booking.declared_player_count || 1,
+          subtitle: null
+        }],
+        customers: [{
+          email: booking.user_email,
+          first_name: booking.user_name?.split(' ')[0] || 'Member',
+          last_name: booking.user_name?.split(' ').slice(1).join(' ') || ''
+        }]
+      },
+      _simulated: true,
+      _simulatedBy: 'staff',
+      _originalBookingId: bookingId
+    };
+    
     // Create a webhook event record so it appears in Trackman Synced section
     const webhookEventResult = await pool.query(`
       INSERT INTO trackman_webhook_events (
@@ -903,12 +960,7 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
       'booking.confirmed',
       fakeTrackmanId,
       bookingId,
-      JSON.stringify({
-        test: true,
-        simulatedBy: 'staff',
-        bookingId: bookingId,
-        players: [{ email: booking.user_email, name: booking.user_name }]
-      })
+      JSON.stringify(realisticPayload)
     ]);
     
     logger.info('[Simulate Confirm] Created webhook event record', {

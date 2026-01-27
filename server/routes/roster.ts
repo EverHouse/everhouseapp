@@ -1845,13 +1845,40 @@ router.patch('/api/admin/booking/:bookingId/player-count', isStaffOrAdmin, async
     }
 
     const booking = bookingResult.rows[0];
-    const previousCount = booking.declared_player_count;
+    const previousCount = booking.declared_player_count || 1;
 
     await pool.query(`
       UPDATE booking_requests 
       SET declared_player_count = $1
       WHERE id = $2
     `, [playerCount, bookingId]);
+
+    // If player count increased, create empty booking_members slots for the additional players
+    if (playerCount > previousCount) {
+      // Get current max slot number
+      const slotResult = await pool.query(
+        `SELECT COALESCE(MAX(slot_number), 0) as max_slot, COUNT(*) as count FROM booking_members WHERE booking_id = $1`,
+        [bookingId]
+      );
+      const maxSlot = parseInt(slotResult.rows[0].max_slot) || 0;
+      const currentMemberCount = parseInt(slotResult.rows[0].count) || 0;
+      const slotsToCreate = playerCount - currentMemberCount;
+      
+      if (slotsToCreate > 0) {
+        // Create empty placeholder slots (user_email = null means "unassigned member slot")
+        for (let i = 0; i < slotsToCreate; i++) {
+          const nextSlot = maxSlot + i + 1;
+          await pool.query(`
+            INSERT INTO booking_members (booking_id, slot_number, user_email, is_primary, created_at)
+            VALUES ($1, $2, NULL, false, NOW())
+            ON CONFLICT (booking_id, slot_number) DO NOTHING
+          `, [bookingId, nextSlot]);
+        }
+        logger.info('[roster] Created empty booking member slots', {
+          extra: { bookingId, slotsCreated: slotsToCreate, previousCount, newCount: playerCount }
+        });
+      }
+    }
 
     if (booking.session_id) {
       await recalculateSessionFees(booking.session_id, 'staff_action');

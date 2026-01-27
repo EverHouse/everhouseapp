@@ -258,6 +258,21 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
             });
           }
 
+          // Handle booking confirmed events (from simulate confirm or manual confirmation)
+          if (message.type === 'booking_confirmed') {
+            console.log('[StaffWebSocket] Received booking_confirmed:', message.data?.bookingId);
+            window.dispatchEvent(new CustomEvent('booking-confirmed', { detail: message }));
+            handleBookingEvent({
+              eventType: 'booking_confirmed',
+              bookingId: message.data?.bookingId || 0,
+              memberEmail: message.data?.userEmail || '',
+              bookingDate: '',
+              startTime: '',
+              status: 'approved',
+              timestamp: new Date().toISOString()
+            });
+          }
+
           // Handle day pass updates
           if (message.type === 'day_pass_update') {
             console.log('[StaffWebSocket] Received day_pass_update:', message.action);

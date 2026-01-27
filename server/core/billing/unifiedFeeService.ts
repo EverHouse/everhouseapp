@@ -58,7 +58,7 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
           br.id as booking_id,
           bs.session_date,
           br.duration_minutes,
-          COALESCE(br.trackman_player_count, br.guest_count + 1, 1) as declared_player_count,
+          COALESCE(br.declared_player_count, br.trackman_player_count, br.guest_count + 1, 1) as declared_player_count,
           br.user_email as host_email
         FROM booking_sessions bs
         JOIN booking_requests br ON br.session_id = bs.id
@@ -73,7 +73,7 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
           br.id as booking_id,
           bs.session_date,
           br.duration_minutes,
-          COALESCE(br.trackman_player_count, br.guest_count + 1, 1) as declared_player_count,
+          COALESCE(br.declared_player_count, br.trackman_player_count, br.guest_count + 1, 1) as declared_player_count,
           br.user_email as host_email
         FROM booking_requests br
         JOIN booking_sessions bs ON br.session_id = bs.id

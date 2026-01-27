@@ -913,12 +913,6 @@ const BookGolf: React.FC = () => {
       
       haptic.success();
       playSound('bookingConfirmed');
-      showToast(
-        rescheduleBookingId 
-          ? 'Reschedule request submitted! Staff will review shortly.' 
-          : 'Booking request sent! We\'ll confirm shortly.', 
-        'success'
-      );
       setShowConfirmation(true);
       setTimeout(async () => {
         setShowConfirmation(false);
