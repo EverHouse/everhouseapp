@@ -1049,9 +1049,11 @@ async function calculateFeeEstimate(params: {
   
   try {
     // Use unified fee service for actual calculation
+    // Only use sessionId lookup for existing sessions - use direct params otherwise
+    // This handles: 1) member preview (no session), 2) staff checking booking without session
     const breakdown = await computeFeeBreakdown(
-      sessionId || bookingId 
-        ? { sessionId, bookingId, declaredPlayerCount: playerCount, source: 'preview' as const }
+      sessionId 
+        ? { sessionId, declaredPlayerCount: playerCount, source: 'preview' as const }
         : {
             sessionDate: requestDate,
             sessionDuration: durationMinutes,

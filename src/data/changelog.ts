@@ -21,6 +21,7 @@ export const changelog: ChangelogEntry[] = [
       "CRITICAL: Fee estimates now correctly show overage charges for new booking requests",
       "Fixed: Preview mode now queries booking_requests table instead of empty usage_ledger",
       "Fixed: Members see accurate fee estimates before submitting booking requests",
+      "Fixed: Staff can preview fees for bookings without sessions (uses booking data directly)",
       "Fixed: Prevents unexpected charges at check-in by showing correct fees upfront"
     ]
   },
