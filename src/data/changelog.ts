@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.32.12",
+    date: "2026-01-27",
+    title: "Booking Flow and Fee Calculation Fixes",
+    changes: [
+      "Fixed: Member booking requests no longer show duplicate confirmation messages",
+      "Fixed: Confirmed bookings stay visible on calendar after Trackman webhook confirmation",
+      "Fixed: Fee calculation now correctly uses staff-edited player count (was ignoring edits)",
+      "Fixed: Empty player slots now created when player count is increased",
+      "Improved: Dev simulated webhook now generates realistic Trackman V2 format for testing"
+    ]
+  },
+  {
     version: "9.32.11",
     date: "2026-01-27",
     title: "Editable Player Count for Staff",
