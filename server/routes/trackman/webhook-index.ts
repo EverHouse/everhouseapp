@@ -1016,9 +1016,14 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
     }
 
     try {
+      const dateStr = typeof booking.request_date === 'string' ? booking.request_date : formatDatePacific(booking.request_date);
+      const timeStr = typeof booking.start_time === 'string' 
+        ? booking.start_time.substring(0, 5) 
+        : formatTimePacific(booking.start_time);
+      
       await notifyMember(booking.user_email, {
         title: 'Booking Confirmed',
-        body: `Your simulator booking for ${formatDatePacific(booking.request_date)} at ${formatTimePacific(booking.start_time)} has been confirmed.`,
+        body: `Your simulator booking for ${dateStr} at ${timeStr} has been confirmed.`,
         type: 'booking_confirmed',
         metadata: { bookingId: bookingId.toString() }
       });
