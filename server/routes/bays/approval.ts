@@ -831,7 +831,15 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
       return res.json({ success: true, message: `Already marked as ${newStatus}`, alreadyProcessed: true });
     }
     
-    if (currentStatus !== 'approved' && currentStatus !== 'confirmed') {
+    // Allow checking in cancelled bookings if they have a session (for overdue payment recovery)
+    const hasSession = existing.session_id !== null;
+    const allowedStatuses = ['approved', 'confirmed'];
+    if (hasSession && currentStatus === 'cancelled') {
+      // Allow recovery of cancelled bookings with sessions (overdue payment scenarios)
+      allowedStatuses.push('cancelled');
+    }
+    
+    if (!allowedStatuses.includes(currentStatus)) {
       return res.status(400).json({ error: `Cannot update booking with status: ${currentStatus}` });
     }
     

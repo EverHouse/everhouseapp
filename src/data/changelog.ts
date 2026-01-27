@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.32.1",
+    date: "2026-01-27",
+    title: "Overdue Payment Check-In Fix",
+    changes: [
+      "Fixed: Staff can now complete check-in for cancelled bookings that have pending payments (overdue payment recovery)",
+      "Fixed: Resolves 'Cannot update booking with status: cancelled' error when marking overdue payments as paid"
+    ]
+  },
+  {
     version: "9.32.0",
     date: "2026-01-27",
     title: "Cross-Platform Sync Tools",
