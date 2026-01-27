@@ -857,6 +857,7 @@ const Dashboard: React.FC = () => {
     {isLoading ? (
       <DashboardSkeleton isDark={isDark} />
     ) : (
+    <>
     <PullToRefresh onRefresh={handleRefresh} className="flex-1 flex flex-col">
       <div className="px-6 pt-4 md:pt-2 pb-32 font-sans relative flex-1">
         <ClosureAlert />
@@ -1559,7 +1560,7 @@ const Dashboard: React.FC = () => {
         );
       })()}
     </ModalShell>
-  </div>
+    </>
     )}
   </div>
   </SmoothReveal>
