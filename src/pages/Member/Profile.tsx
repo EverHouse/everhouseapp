@@ -390,7 +390,7 @@ const Profile: React.FC = () => {
 
          {/* Digital Access Card - only for members, not staff/admin */}
          {!isStaffOrAdminProfile && user.id && (
-           <Section title="Digital Access Card" isDark={isDark} delay="0.05s">
+           <Section title="Digital Access Card" isDark={isDark} staggerIndex={0}>
              <div className={`p-6 flex flex-col items-center ${isDark ? '' : ''}`}>
                <div className={`w-full max-w-xs rounded-2xl overflow-hidden ${isDark ? 'bg-gradient-to-br from-primary via-primary/90 to-primary/80' : 'bg-gradient-to-br from-primary via-primary/95 to-primary/85'} p-6 shadow-xl`}>
                  <div className="flex justify-center mb-4">
@@ -418,7 +418,7 @@ const Profile: React.FC = () => {
 
          {/* Account Balance Section - only for members, not staff/admin */}
          {!isStaffOrAdminProfile && (
-           <Section title="Account Balance" isDark={isDark} delay="0.06s">
+           <Section title="Account Balance" isDark={isDark} staggerIndex={1}>
              <div className={`p-4 ${isDark ? '' : ''}`}>
                <div className="flex items-center justify-between mb-4">
                  <div className="flex items-center gap-4">
@@ -476,13 +476,13 @@ const Profile: React.FC = () => {
            </Section>
          )}
 
-         <Section title="Account" isDark={isDark} delay="0.07s">
+         <Section title="Account" isDark={isDark} staggerIndex={2}>
             <Row icon="person" label="Name" value={user.name} isDark={isDark} />
             <Row icon="mail" label="Email" value={user.email} isDark={isDark} />
             <Row icon="call" label="Phone" value={formatPhoneNumber(staffDetails?.phone || user.phone)} isDark={isDark} />
          </Section>
 
-         <Section title="Settings" isDark={isDark} delay="0.1s">
+         <Section title="Settings" isDark={isDark} staggerIndex={3}>
             <div className={`p-4 flex items-center justify-between transition-colors ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
               <div className="flex items-center gap-4">
                 <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>notifications</span>
@@ -553,7 +553,7 @@ const Profile: React.FC = () => {
 
          {/* Billing Section - only for members, not staff/admin */}
          {!isStaffOrAdminProfile && (
-           <Section title="Billing & Invoices" isDark={isDark} delay="0.12s">
+           <Section title="Billing & Invoices" isDark={isDark} staggerIndex={4}>
              <BillingSection isDark={isDark} />
            </Section>
          )}
@@ -591,7 +591,7 @@ const Profile: React.FC = () => {
 
          {/* Staff Info - only show for staff/admin users */}
          {isStaffOrAdminProfile && (
-           <Section title="Staff Information" isDark={isDark} delay="0.15s">
+           <Section title="Staff Information" isDark={isDark} staggerIndex={5}>
               <Row icon="shield_person" label="Role" value={user?.role === 'admin' ? 'Administrator' : 'Staff'} isDark={isDark} />
               {staffDetails?.job_title && <Row icon="work" label="Job Title" value={staffDetails.job_title} isDark={isDark} />}
            </Section>
@@ -599,7 +599,7 @@ const Profile: React.FC = () => {
 
          {/* Password Section - only show for staff/admin users */}
          {isStaffOrAdminProfile && (
-           <Section title="Security" isDark={isDark} delay="0.2s">
+           <Section title="Security" isDark={isDark} staggerIndex={6}>
               <div 
                 className={`p-4 flex items-center justify-between transition-colors cursor-pointer ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}
                 onClick={() => setShowPasswordSection(!showPasswordSection)}
@@ -680,14 +680,14 @@ const Profile: React.FC = () => {
            </Section>
          )}
 
-         <button onClick={async () => { await logout(); startNavigation(); navigate('/login'); }} className={`w-full py-4 rounded-xl text-red-400 font-bold text-sm transition-colors animate-pop-in ${isDark ? 'glass-button hover:bg-red-500/10' : 'bg-white border border-black/5 hover:bg-red-50'}`} style={{animationDelay: '0.2s'}}>
+         <button onClick={async () => { await logout(); startNavigation(); navigate('/login'); }} className={`w-full py-4 rounded-xl text-red-400 font-bold text-sm transition-colors animate-slide-up-stagger ${isDark ? 'glass-button hover:bg-red-500/10' : 'bg-white border border-black/5 hover:bg-red-50'}`} style={{ '--stagger-index': 8 } as React.CSSProperties}>
             Sign Out
          </button>
 
          <button 
            onClick={() => setShowBugReport(true)} 
-           className={`w-full py-4 rounded-xl font-bold text-sm transition-colors animate-pop-in flex items-center justify-center gap-2 ${isDark ? 'glass-button text-white/80 hover:text-white hover:bg-white/5' : 'bg-white border border-black/5 text-primary/80 hover:text-primary hover:bg-black/5'}`} 
-           style={{animationDelay: '0.25s'}}
+           className={`w-full py-4 rounded-xl font-bold text-sm transition-colors animate-slide-up-stagger flex items-center justify-center gap-2 ${isDark ? 'glass-button text-white/80 hover:text-white hover:bg-white/5' : 'bg-white border border-black/5 text-primary/80 hover:text-primary hover:bg-black/5'}`} 
+           style={{ '--stagger-index': 9 } as React.CSSProperties}
          >
             <span className="material-symbols-outlined text-lg">bug_report</span>
             Report a Bug
@@ -1101,8 +1101,8 @@ const Profile: React.FC = () => {
   );
 };
 
-const Section: React.FC<{title: string; children: React.ReactNode; isDark?: boolean; delay?: string}> = ({ title, children, isDark = true, delay }) => (
-  <div className="animate-pop-in" style={delay ? {animationDelay: delay} : undefined}>
+const Section: React.FC<{title: string; children: React.ReactNode; isDark?: boolean; staggerIndex?: number}> = ({ title, children, isDark = true, staggerIndex }) => (
+  <div className="animate-slide-up-stagger" style={staggerIndex !== undefined ? { '--stagger-index': staggerIndex } as React.CSSProperties : undefined}>
      <h3 className={`text-xs font-bold uppercase tracking-wider ml-2 mb-3 ${isDark ? 'opacity-70' : 'text-primary/70'}`}>{title}</h3>
      <div className={`rounded-2xl overflow-hidden glass-card divide-y ${isDark ? 'divide-white/20 border-white/25' : 'divide-black/5 border-black/10'}`}>
         {children}

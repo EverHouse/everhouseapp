@@ -101,7 +101,7 @@ const PrivateHire: React.FC = () => {
        </section>
 
        <div className="px-4 pb-8 space-y-6">
-          <div className="flex items-center justify-between px-2 pb-2 animate-pop-in" style={{animationDelay: '0.1s'}}>
+          <div className="flex items-center justify-between px-2 pb-2 animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
              <h3 className="text-lg font-bold text-primary">Available Spaces</h3>
              <span className="text-xs font-bold text-primary/50 bg-[#E8E8E0] px-2 py-1 rounded uppercase tracking-widest">Select One</span>
           </div>
@@ -144,7 +144,7 @@ const PrivateHire: React.FC = () => {
 };
 
 const SpaceCard: React.FC<any> = ({ title, cap, img, tags, desc, index = 0 }) => (
-  <div className="group relative flex flex-col rounded-[2rem] overflow-hidden backdrop-blur-xl bg-white/40 border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms] animate-pop-in" style={{animationDelay: `${0.15 + index * 0.08}s`}}>
+  <div className="group relative flex flex-col rounded-[2rem] overflow-hidden backdrop-blur-xl bg-white/40 border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms] animate-slide-up-stagger" style={{ '--stagger-index': index + 1 } as React.CSSProperties}>
      <div className="h-56 bg-cover bg-center relative" style={{backgroundImage: `url("${img}")`}}>
         <div className="absolute inset-0 bg-gradient-to-t from-white/40 to-transparent"></div>
         <div className="absolute top-4 right-4 bg-black/30 backdrop-blur-md border border-white/30 px-3 py-1.5 rounded-full flex items-center gap-1 shadow-[0_0_12px_rgba(0,0,0,0.2)]">

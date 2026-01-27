@@ -15,12 +15,14 @@ export const changelog: ChangelogEntry[] = [
   {
     version: "9.31.3",
     date: "2026-01-27",
-    title: "Animation System Refinements",
+    title: "Animation System Standardization",
     changes: [
-      "UX: Replaced hardcoded animation delays with dynamic stagger indices across all admin pages",
+      "UX: Replaced all hardcoded animation delays with dynamic stagger indices app-wide",
       "UX: MemberProfileDrawer uses spring physics for natural bounce on slide-in",
       "UX: Dashboard content crossfades from skeleton using SmoothReveal wrapper",
-      "UX: Updated InquiriesAdmin, BugReportsAdmin, SimulatorTab, CafeTab, BlocksTab, EventsTab, TiersTab, GalleryAdmin, FaqsAdmin, AnnouncementManager, and History with stagger animations"
+      "UX: Updated admin tabs (Inquiries, BugReports, Simulator, Cafe, Blocks, Events, Tiers), GalleryAdmin, FaqsAdmin, AnnouncementManager, History",
+      "UX: Updated member pages (Profile sections, BookGolf resources, Dashboard membership card)",
+      "UX: Updated public pages (PrivateHire space cards, MenuOverlay contact section)"
     ]
   },
   {

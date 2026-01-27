@@ -1773,7 +1773,7 @@ const BookGolf: React.FC = () => {
               </h3>
               <div className="space-y-3">
                 {getAvailableResourcesForSlot(selectedSlot).map((resource, index) => (
-                  <div key={resource.id} className="animate-pop-in" style={{ animationDelay: `${index * 0.1}s`, animationFillMode: 'both' }}>
+                  <div key={resource.id} className="animate-slide-up-stagger" style={{ '--stagger-index': index, animationFillMode: 'both' } as React.CSSProperties}>
                     <ResourceCard
                       resource={resource}
                       selected={selectedResource?.id === resource.id}

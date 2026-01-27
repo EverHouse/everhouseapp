@@ -949,8 +949,8 @@ const Dashboard: React.FC = () => {
               return (
                 <div 
                   onClick={() => setIsCardOpen(true)} 
-                  className={`relative h-48 lg:h-full lg:min-h-48 w-full rounded-[1.5rem] overflow-hidden cursor-pointer transform transition-transform active:scale-95 shadow-layered group animate-pop-in ${isExpired ? 'grayscale-[30%]' : ''}`}
-                  style={{animationDelay: '0.11s'}}
+                  className={`relative h-48 lg:h-full lg:min-h-48 w-full rounded-[1.5rem] overflow-hidden cursor-pointer transform transition-transform active:scale-95 shadow-layered group animate-slide-up-stagger ${isExpired ? 'grayscale-[30%]' : ''}`}
+                  style={{ '--stagger-index': 2 } as React.CSSProperties}
                 >
                   <div className="absolute inset-0" style={{ backgroundColor: cardBgColor }}></div>
                   <div className="absolute inset-0 bg-glossy opacity-50"></div>
