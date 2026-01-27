@@ -25,6 +25,7 @@ interface ParticipantFee {
   guestFee: number;
   totalFee: number;
   tierAtBooking: string | null;
+  dailyAllowance?: number;
   waiverNeedsReview?: boolean;
   guestPassUsed?: boolean;
   prepaidOnline?: boolean;
@@ -216,6 +217,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
         const overageFee = breakdownItem ? breakdownItem.overageCents / 100 : 0;
         const guestFee = breakdownItem ? breakdownItem.guestCents / 100 : 0;
         const tierAtBooking = breakdownItem?.tierName || null;
+        const dailyAllowance = breakdownItem?.dailyAllowance ?? undefined;
         
         const waiverNeedsReview = 
           p.participant_type === 'guest' && 
@@ -233,6 +235,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
           guestFee,
           totalFee,
           tierAtBooking,
+          dailyAllowance,
           waiverNeedsReview,
           guestPassUsed: p.used_guest_pass || false,
           prepaidOnline: prepaidParticipantIds.has(p.participant_id)
