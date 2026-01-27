@@ -1070,6 +1070,20 @@ async function calculateFeeEstimate(params: {
   }
   
   try {
+    console.log('[FeeEstimate] Calculating for:', {
+      ownerEmail,
+      ownerTier,
+      durationMinutes,
+      playerCount,
+      perPersonMins,
+      dailyAllowance,
+      usedMinutesToday,
+      isSocialTier,
+      isUnlimitedTier,
+      guestCount,
+      requestDate
+    });
+    
     // Use unified fee service for actual calculation
     // Only use sessionId lookup for existing sessions - use direct params otherwise
     // This handles: 1) member preview (no session), 2) staff checking booking without session
@@ -1085,6 +1099,21 @@ async function calculateFeeEstimate(params: {
             source: 'preview' as const
           }
     );
+    
+    console.log('[FeeEstimate] Unified breakdown result:', {
+      overageCents: breakdown.totals.overageCents,
+      guestCents: breakdown.totals.guestCents,
+      totalCents: breakdown.totals.totalCents,
+      participants: breakdown.participants.map(p => ({
+        type: p.participantType,
+        tierName: p.tierName,
+        dailyAllowance: p.dailyAllowance,
+        usedMinutesToday: p.usedMinutesToday,
+        minutesAllocated: p.minutesAllocated,
+        overageCents: p.overageCents,
+        guestCents: p.guestCents
+      }))
+    });
     
     // Map unified breakdown to legacy response format for backward compatibility
     const overageFee = Math.round(breakdown.totals.overageCents / 100);

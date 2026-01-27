@@ -65,7 +65,7 @@ async function reconcilePendingSnapshots(): Promise<{ synced: number; errors: nu
         if (err.code === 'resource_missing') {
           // Payment intent doesn't exist in Stripe - mark as cancelled
           await pool.query(
-            `UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
+            `UPDATE booking_fee_snapshots SET status = 'cancelled' WHERE id = $1`,
             [snapshot.id]
           );
           console.log(`[Fee Snapshot Reconciliation] Marked orphan snapshot ${snapshot.id} as cancelled (PI not found)`);
