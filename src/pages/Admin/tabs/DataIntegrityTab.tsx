@@ -1063,7 +1063,7 @@ const DataIntegrityTab: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-pop-in pb-32">
+    <div className="space-y-6 animate-slide-up-stagger pb-32" style={{ '--stagger-index': 0 } as React.CSSProperties}>
       <div className="mb-6 flex flex-col gap-3">
         <div className="flex gap-3">
           <button

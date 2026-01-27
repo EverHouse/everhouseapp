@@ -922,8 +922,8 @@ const TrackmanTab: React.FC = () => {
             Import History
           </h2>
           <div className="space-y-2">
-            {importRuns.slice(0, 5).map((run: any) => (
-              <div key={run.id} className="p-3 bg-white/50 dark:bg-white/5 rounded-xl">
+            {importRuns.slice(0, 5).map((run: any, idx: number) => (
+              <div key={run.id} className="p-3 bg-white/50 dark:bg-white/5 rounded-xl animate-slide-up-stagger" style={{ '--stagger-index': idx } as React.CSSProperties}>
                 <div className="flex flex-col gap-1">
                   <p className="font-medium text-primary dark:text-white text-sm truncate">{formatImportLabel(run.filename, run.createdAt)}</p>
                   <p className="text-xs text-primary/80 dark:text-white/80">
@@ -1038,8 +1038,8 @@ const TrackmanTab: React.FC = () => {
                       const email = (booking.originalEmail || booking.original_email || '').toLowerCase();
                       return name.includes(query) || email.includes(query);
                     })
-                    .map((booking: any) => (
-                    <tr key={booking.id} className="bg-white/50 dark:bg-white/5 hover:bg-white/80 dark:hover:bg-white/10 transition-colors">
+                    .map((booking: any, idx: number) => (
+                    <tr key={booking.id} className="bg-white/50 dark:bg-white/5 hover:bg-white/80 dark:hover:bg-white/10 transition-colors animate-slide-up-stagger" style={{ '--stagger-index': idx } as React.CSSProperties}>
                       <td className="py-2 px-3 text-primary dark:text-white whitespace-nowrap">
                         <div className="text-sm font-medium">{formatDateDisplayWithDay(booking.bookingDate || booking.booking_date)}</div>
                         <div className="text-xs text-primary/60 dark:text-white/60">{(booking.startTime || booking.start_time)?.substring(0, 5)} - {(booking.endTime || booking.end_time)?.substring(0, 5)}</div>
@@ -1108,8 +1108,8 @@ const TrackmanTab: React.FC = () => {
           </p>
           
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
-            {requiresReviewBookings.map((booking: any) => (
-              <div key={booking.id} className="p-4 bg-white/80 dark:bg-white/5 rounded-xl flex justify-between items-start gap-3 border border-amber-200/50 dark:border-amber-500/20">
+            {requiresReviewBookings.map((booking: any, idx: number) => (
+              <div key={booking.id} className="p-4 bg-white/80 dark:bg-white/5 rounded-xl flex justify-between items-start gap-3 border border-amber-200/50 dark:border-amber-500/20 animate-slide-up-stagger" style={{ '--stagger-index': idx } as React.CSSProperties}>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-primary dark:text-white truncate">
                     {booking.userName || booking.user_name || 'Unknown'}

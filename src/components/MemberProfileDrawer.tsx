@@ -840,9 +840,9 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
       />
       
       <div 
-        className={`fixed right-0 top-0 bottom-0 w-full max-w-xl ${isDark ? 'bg-[#1a1d15]' : 'bg-white'} shadow-2xl transform transition-transform duration-300 ease-out flex flex-col`}
+        className={`fixed right-0 top-0 bottom-0 w-full max-w-xl ${isDark ? 'bg-[#1a1d15]' : 'bg-white'} shadow-2xl transform transition-transform duration-300 flex flex-col`}
         style={{ 
-          animation: 'slideInRight 0.3s ease-out',
+          animation: 'slideInRight 0.4s var(--spring-bounce)',
           paddingTop: 'env(safe-area-inset-top, 0px)'
         }}
       >

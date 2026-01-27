@@ -12,6 +12,7 @@ import WelcomeBanner from '../../components/WelcomeBanner';
 import { formatDateShort, getTodayString, getPacificHour, CLUB_TIMEZONE, formatDateTimePacific, formatMemberSince, formatTime12Hour, getNowTimePacific } from '../../utils/dateUtils';
 import { downloadICalFile } from '../../utils/icalUtils';
 import { DashboardSkeleton } from '../../components/skeletons';
+import { SmoothReveal } from '../../components/motion/SmoothReveal';
 import { getBaseTier, isFoundingMember } from '../../utils/permissions';
 import { getTierColor } from '../../utils/tierUtils';
 import { getStatusBadge as getStatusBadgeColor, formatStatusLabel } from '../../utils/statusColors';
@@ -922,7 +923,7 @@ const Dashboard: React.FC = () => {
         
         <WelcomeBanner />
         
-        <div className="mb-6 animate-content-enter-delay-1">
+        <div className="mb-6 animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
           <div className="flex items-center gap-3">
             <h1 className={`text-3xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-primary'}`}>
               {getGreeting()}, {user?.name.split(' ')[0]}
@@ -997,7 +998,7 @@ const Dashboard: React.FC = () => {
             })()}
 
             {/* Quick Links Metrics Grid */}
-            <div className="h-full animate-pop-in" style={{animationDelay: '0.12s'}}>
+            <div className="h-full animate-slide-up-stagger" style={{ '--stagger-index': 1 } as React.CSSProperties}>
               <MetricsGrid
                 simulatorMinutesUsed={simMinutesToday}
                 simulatorMinutesAllowed={tierPermissions.dailySimulatorMinutes}
@@ -1014,7 +1015,7 @@ const Dashboard: React.FC = () => {
 
         {/* My Balance Section */}
         {!isStaffOrAdminProfile && user?.email && (
-          <div className="mb-6 animate-pop-in" style={{animationDelay: '0.125s'}}>
+          <div className="mb-6 animate-slide-up-stagger" style={{ '--stagger-index': 2 } as React.CSSProperties}>
             <BalanceCard 
               key={`${balanceRefreshKey}-${user.email}`}
               memberEmail={user.email}
@@ -1032,7 +1033,7 @@ const Dashboard: React.FC = () => {
         <>
           {/* Pending Invites Section */}
           {pendingInvites.length > 0 && (
-            <div className="mb-6 animate-pop-in" style={{animationDelay: '0.13s'}}>
+            <div className="mb-6 animate-slide-up-stagger" style={{ '--stagger-index': 3 } as React.CSSProperties}>
               <div className="flex justify-between items-center mb-4 px-1">
                 <h3 className={`text-sm font-bold uppercase tracking-wider ${isDark ? 'text-amber-400/90' : 'text-amber-600'}`}>
                   <span className="material-symbols-outlined text-base mr-1 align-text-bottom">mail</span>
@@ -1106,7 +1107,7 @@ const Dashboard: React.FC = () => {
           )}
 
           {/* Your Schedule - Combined Bookings, Events & Wellness */}
-          <div className="animate-pop-in" style={{animationDelay: '0.15s'}}>
+          <div className="animate-slide-up-stagger" style={{ '--stagger-index': 4 } as React.CSSProperties}>
             <div className="flex justify-between items-center mb-4 px-1">
               <h3 className={`text-sm font-bold uppercase tracking-wider ${isDark ? 'text-white/80' : 'text-primary/80'}`}>Your Schedule</h3>
               <button
