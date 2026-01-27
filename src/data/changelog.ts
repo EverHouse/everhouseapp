@@ -18,6 +18,8 @@ export const changelog: ChangelogEntry[] = [
     title: "Trackman V2 Webhook Processing Fix",
     changes: [
       "Fixed: Trackman V2 webhooks now properly create booking requests when no externalBookingId match",
+      "Fixed: V2 payload parsing now correctly handles start/end ISO datetime format",
+      "Fixed: handleBookingUpdate detects V2 format and uses correct parser",
       "Fixed: Replayed webhooks from production now appear on booking calendar and queue",
       "Fixed: V2 webhooks fall through to standard processing for member matching and booking creation"
     ]

@@ -483,27 +483,55 @@ async function notifyStaffBookingCreated(
 }
 
 export async function handleBookingUpdate(payload: TrackmanWebhookPayload): Promise<{ success: boolean; matchedBookingId?: number }> {
-  const bookingData = extractBookingData(payload);
-  if (!bookingData) {
-    return { success: false };
-  }
+  let normalized: NormalizedBookingFields;
+  let bayRef: string | undefined;
   
-  const normalized = normalizeBookingFields(bookingData);
+  // Detect V2 format and use appropriate parser
+  if (isTrackmanV2Payload(payload)) {
+    const v2Result = parseTrackmanV2Payload(payload as TrackmanV2WebhookPayload);
+    normalized = v2Result.normalized;
+    bayRef = v2Result.bayRef;
+    
+    logger.info('[Trackman Webhook] handleBookingUpdate: Processing V2 payload', {
+      extra: { 
+        trackmanBookingId: normalized.trackmanBookingId,
+        date: normalized.parsedDate,
+        time: normalized.parsedStartTime,
+        bayRef
+      }
+    });
+  } else {
+    const bookingData = extractBookingData(payload);
+    if (!bookingData) {
+      return { success: false };
+    }
+    normalized = normalizeBookingFields(bookingData);
+  }
   
   if (!normalized.trackmanBookingId) {
     logger.warn('[Trackman Webhook] No booking ID in payload');
     return { success: false };
   }
   
-  const startParsed = parseDateTime(normalized.startTime, normalized.date);
-  const endParsed = parseDateTime(normalized.endTime, undefined);
+  // For V2 payloads, parsedDate/parsedStartTime are pre-populated
+  // For V1 payloads, we need to parse from startTime/date
+  let startParsed: { date: string; time: string } | null = null;
+  let endParsed: { time: string } | null = null;
+  
+  if (normalized.parsedDate && normalized.parsedStartTime) {
+    startParsed = { date: normalized.parsedDate, time: normalized.parsedStartTime };
+    endParsed = normalized.parsedEndTime ? { time: normalized.parsedEndTime } : null;
+  } else {
+    startParsed = parseDateTime(normalized.startTime, normalized.date);
+    endParsed = parseDateTime(normalized.endTime, undefined);
+  }
   
   if (!startParsed) {
     logger.warn('[Trackman Webhook] Could not parse start time', { extra: { startTime: normalized.startTime } });
     return { success: false };
   }
   
-  const resourceId = mapBayNameToResourceId(normalized.bayName, normalized.bayId, normalized.baySerial);
+  const resourceId = mapBayNameToResourceId(normalized.bayName, normalized.bayId, normalized.baySerial, bayRef);
   
   if (!resourceId && (normalized.bayName || normalized.bayId || normalized.baySerial)) {
     logger.warn('[Trackman Webhook] Could not map bay to resource ID', {
