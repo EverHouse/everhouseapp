@@ -117,6 +117,43 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
         return res.status(400).json({ error: 'Invalid session/booking combination' });
       }
 
+      const existingPendingSnapshot = await pool.query(
+        `SELECT bfs.id, bfs.stripe_payment_intent_id, spi.status as pi_status
+         FROM booking_fee_snapshots bfs
+         LEFT JOIN stripe_payment_intents spi ON bfs.stripe_payment_intent_id = spi.stripe_payment_intent_id
+         WHERE bfs.booking_id = $1 AND bfs.status = 'pending'
+         AND bfs.created_at > NOW() - INTERVAL '30 minutes'
+         ORDER BY bfs.created_at DESC
+         LIMIT 1`,
+        [bookingId]
+      );
+      
+      if (existingPendingSnapshot.rows.length > 0) {
+        const existing = existingPendingSnapshot.rows[0];
+        if (existing.stripe_payment_intent_id) {
+          try {
+            const stripe = await getStripeClient();
+            const pi = await stripe.paymentIntents.retrieve(existing.stripe_payment_intent_id);
+            if (pi.status === 'succeeded') {
+              await confirmPaymentSuccess(existing.stripe_payment_intent_id, 'system', 'Auto-sync');
+              return res.status(200).json({ 
+                alreadyPaid: true,
+                message: 'Payment already completed' 
+              });
+            } else if (pi.status === 'requires_payment_method' || pi.status === 'requires_confirmation') {
+              console.log(`[Stripe] Reusing existing payment intent ${existing.stripe_payment_intent_id}`);
+              return res.json({ 
+                clientSecret: pi.client_secret, 
+                paymentIntentId: pi.id,
+                reused: true
+              });
+            }
+          } catch (err) {
+            console.warn('[Stripe] Failed to check existing payment intent, creating new one');
+          }
+        }
+      }
+
       const requestedIds: number[] = participantFees.map((pf: any) => pf.id);
 
       // Get participant count for effective player count calculation
