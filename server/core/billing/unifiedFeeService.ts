@@ -205,30 +205,46 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
     tiersResult.rows.forEach(r => tierMap.set(r.email, r.tier));
   }
 
-  // Batch fetch daily usage from ledger - match by EITHER user_id (UUID) or email
-  // usage_ledger.member_id can contain either a UUID or an email
+  // Batch fetch daily usage - use booking_requests for preview mode (no sessionId)
+  // because usage_ledger is only populated after session creation
   const usageMap = new Map<string, number>();
   const excludeId = params.excludeSessionFromUsage ? sessionId : undefined;
+  const isPreviewMode = !sessionId && params.source === 'preview';
+  
   if (allIdentifiers.length > 0) {
-    const usageQuery = excludeId 
-      ? `SELECT LOWER(ul.member_id) as identifier, COALESCE(SUM(ul.minutes_charged), 0) as used
-         FROM usage_ledger ul
-         JOIN booking_sessions bs ON ul.session_id = bs.id
-         WHERE LOWER(ul.member_id) = ANY($1::text[])
-           AND bs.session_date = $2
-           AND ul.session_id != $3
-         GROUP BY LOWER(ul.member_id)`
-      : `SELECT LOWER(ul.member_id) as identifier, COALESCE(SUM(ul.minutes_charged), 0) as used
-         FROM usage_ledger ul
-         JOIN booking_sessions bs ON ul.session_id = bs.id
-         WHERE LOWER(ul.member_id) = ANY($1::text[])
-           AND bs.session_date = $2
-         GROUP BY LOWER(ul.member_id)`;
-    const usageParams = excludeId 
-      ? [allIdentifiers, sessionDate, excludeId]
-      : [allIdentifiers, sessionDate];
-    const usageResult = await pool.query(usageQuery, usageParams);
-    usageResult.rows.forEach(r => usageMap.set(r.identifier, parseInt(r.used) || 0));
+    if (isPreviewMode) {
+      // For preview mode, query booking_requests directly (includes pending/approved/attended)
+      const previewUsageQuery = `
+        SELECT LOWER(user_email) as identifier, COALESCE(SUM(duration_minutes), 0) as used
+        FROM booking_requests
+        WHERE LOWER(user_email) = ANY($1::text[])
+          AND request_date = $2
+          AND status IN ('pending', 'approved', 'attended')
+        GROUP BY LOWER(user_email)`;
+      const usageResult = await pool.query(previewUsageQuery, [emailList.map(e => e.toLowerCase()), sessionDate]);
+      usageResult.rows.forEach(r => usageMap.set(r.identifier, parseInt(r.used) || 0));
+    } else {
+      // For existing sessions, use usage_ledger for accuracy
+      const usageQuery = excludeId 
+        ? `SELECT LOWER(ul.member_id) as identifier, COALESCE(SUM(ul.minutes_charged), 0) as used
+           FROM usage_ledger ul
+           JOIN booking_sessions bs ON ul.session_id = bs.id
+           WHERE LOWER(ul.member_id) = ANY($1::text[])
+             AND bs.session_date = $2
+             AND ul.session_id != $3
+           GROUP BY LOWER(ul.member_id)`
+        : `SELECT LOWER(ul.member_id) as identifier, COALESCE(SUM(ul.minutes_charged), 0) as used
+           FROM usage_ledger ul
+           JOIN booking_sessions bs ON ul.session_id = bs.id
+           WHERE LOWER(ul.member_id) = ANY($1::text[])
+             AND bs.session_date = $2
+           GROUP BY LOWER(ul.member_id)`;
+      const usageParams = excludeId 
+        ? [allIdentifiers, sessionDate, excludeId]
+        : [allIdentifiers, sessionDate];
+      const usageResult = await pool.query(usageQuery, usageParams);
+      usageResult.rows.forEach(r => usageMap.set(r.identifier, parseInt(r.used) || 0));
+    }
   }
 
   // Helper function to look up usage by BOTH userId and email

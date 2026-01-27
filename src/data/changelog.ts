@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.32.5",
+    date: "2026-01-27",
+    title: "Critical Fee Estimate Fix",
+    isMajor: true,
+    changes: [
+      "CRITICAL: Fee estimates now correctly show overage charges for new booking requests",
+      "Fixed: Preview mode now queries booking_requests table instead of empty usage_ledger",
+      "Fixed: Members see accurate fee estimates before submitting booking requests",
+      "Fixed: Prevents unexpected charges at check-in by showing correct fees upfront"
+    ]
+  },
+  {
     version: "9.32.4",
     date: "2026-01-27",
     title: "Billing Modal Session Fix",
