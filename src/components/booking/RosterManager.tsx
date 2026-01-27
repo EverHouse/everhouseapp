@@ -88,12 +88,16 @@ interface FeePreviewResponse {
   };
   ownerFees: {
     tier: string | null;
-    includedDailyMinutes: number;
+    dailyAllowance: number;
+    remainingMinutesToday: number;
     ownerMinutesUsed: number;
     guestMinutesCharged: number;
     totalMinutesResponsible: number;
+    minutesWithinAllowance: number;
     overageMinutes: number;
-    overageFee: number;
+    estimatedOverageFee: number;
+    estimatedGuestFees?: number;
+    estimatedTotalFees?: number;
   };
   guestPasses: {
     monthlyAllowance: number;
@@ -614,14 +618,14 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                 </div>
               </div>
 
-              {feePreview.ownerFees.includedDailyMinutes > 0 && feePreview.ownerFees.includedDailyMinutes < 999 && (
+              {feePreview.ownerFees.dailyAllowance > 0 && feePreview.ownerFees.dailyAllowance < 999 && (
                 <>
                   <div className="flex items-center justify-between">
                     <span className={`text-sm ${isDark ? 'text-white/60' : 'text-[#293515]/60'}`}>
                       Included (daily)
                     </span>
                     <span className={`text-sm font-medium ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                      {feePreview.ownerFees.includedDailyMinutes} min
+                      {feePreview.ownerFees.dailyAllowance} min
                     </span>
                   </div>
                   
@@ -636,20 +640,20 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                     </div>
                   )}
                   
-                  {feePreview.ownerFees.overageFee > 0 && (
+                  {feePreview.ownerFees.estimatedOverageFee > 0 && (
                     <div className={`flex items-center justify-between pt-2 border-t ${isDark ? 'border-white/10' : 'border-black/5'}`}>
                       <span className={`text-sm font-semibold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
                         Est. Overage Fee
                       </span>
                       <span className={`text-sm font-bold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
-                        ${feePreview.ownerFees.overageFee.toFixed(2)}
+                        ${feePreview.ownerFees.estimatedOverageFee.toFixed(2)}
                       </span>
                     </div>
                   )}
                 </>
               )}
 
-              {isOwner && (pendingGuestFees.count > 0 || (feePreview?.ownerFees?.overageFee ?? 0) > 0) && (
+              {isOwner && ((feePreview?.ownerFees?.estimatedTotalFees ?? 0) > 0 || pendingGuestFees.count > 0 || (feePreview?.ownerFees?.estimatedOverageFee ?? 0) > 0) && (
                 <div className={`mt-4 pt-4 border-t ${isDark ? 'border-white/10' : 'border-black/5'}`}>
                   <div className="flex items-center justify-between mb-3">
                     <div>
@@ -657,13 +661,13 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                         Estimated Fees
                       </p>
                       <p className={`text-xs ${isDark ? 'text-white/50' : 'text-[#293515]/50'}`}>
-                        {pendingGuestFees.count > 0 && `${pendingGuestFees.count} guest${pendingGuestFees.count > 1 ? 's' : ''} • $25 each`}
-                        {pendingGuestFees.count > 0 && (feePreview?.ownerFees?.overageFee ?? 0) > 0 && ' + '}
-                        {(feePreview?.ownerFees?.overageFee ?? 0) > 0 && `$${feePreview?.ownerFees?.overageFee?.toFixed(2)} overage`}
+                        {(feePreview?.ownerFees?.estimatedOverageFee ?? 0) > 0 && `$${feePreview?.ownerFees?.estimatedOverageFee?.toFixed(2)} overage`}
+                        {(feePreview?.ownerFees?.estimatedOverageFee ?? 0) > 0 && (feePreview?.ownerFees?.estimatedGuestFees ?? 0) > 0 && ' + '}
+                        {(feePreview?.ownerFees?.estimatedGuestFees ?? 0) > 0 && `$${feePreview?.ownerFees?.estimatedGuestFees?.toFixed(2)} guest fees`}
                       </p>
                     </div>
                     <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-[#293515]'}`}>
-                      ${((pendingGuestFees.count * 25) + (feePreview?.ownerFees?.overageFee ?? 0)).toFixed(2)}
+                      ${(feePreview?.ownerFees?.estimatedTotalFees ?? ((feePreview?.ownerFees?.estimatedOverageFee ?? 0) + (feePreview?.ownerFees?.estimatedGuestFees ?? 0))).toFixed(2)}
                     </span>
                   </div>
                   {(booking?.status === 'confirmed' || booking?.status === 'approved') ? (
