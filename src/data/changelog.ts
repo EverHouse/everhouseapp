@@ -13,6 +13,21 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.32.13",
+    date: "2026-01-27",
+    title: "Payment Cancellation and Refund System Overhaul",
+    isMajor: true,
+    changes: [
+      "CRITICAL: Fixed booking cancellations now properly refund paid payments (was trying to cancel succeeded payments which caused errors)",
+      "CRITICAL: Cancellation now checks actual Stripe payment status before deciding to refund or cancel",
+      "NEW: Centralized PaymentStatusService for atomic updates across all payment tables",
+      "Fixed: All payment status changes now consistently update fee snapshots, participant statuses, and audit logs",
+      "Fixed: Participant payment_status now includes paid_at timestamp and stripe_payment_intent_id when paid",
+      "Fixed: Fee snapshot status now uses 'completed' to match webhook behavior",
+      "Improved: Payment confirmation syncs from Stripe even without webhooks (development environment fix)"
+    ]
+  },
+  {
     version: "9.32.12",
     date: "2026-01-27",
     title: "Booking Flow and Fee Calculation Fixes",

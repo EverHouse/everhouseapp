@@ -57,46 +57,54 @@ export class PaymentStatusService {
       
       const snapshot = snapshotResult.rows[0];
       
-      if (snapshot.status === 'paid') {
-        // Already processed
-        await client.query('COMMIT');
-        return { success: true, participantsUpdated: 0, snapshotsUpdated: 0 };
-      }
-      
-      // Update fee snapshot status
-      await client.query(
-        `UPDATE booking_fee_snapshots SET status = 'paid', updated_at = NOW() WHERE id = $1`,
-        [snapshot.id]
-      );
-      
-      // Update stripe_payment_intents table
+      // Always update stripe_payment_intents table, even if snapshot already processed
       await client.query(
         `UPDATE stripe_payment_intents SET status = 'succeeded', updated_at = NOW() 
          WHERE stripe_payment_intent_id = $1`,
         [paymentIntentId]
       );
       
+      if (snapshot.status === 'completed' || snapshot.status === 'paid') {
+        // Already processed - stripe_payment_intents was updated above
+        await client.query('COMMIT');
+        return { success: true, participantsUpdated: 0, snapshotsUpdated: 0 };
+      }
+      
+      // Update fee snapshot status to 'completed' to match webhook behavior
+      await client.query(
+        `UPDATE booking_fee_snapshots SET status = 'completed', used_at = NOW(), updated_at = NOW() WHERE id = $1`,
+        [snapshot.id]
+      );
+      
       // Parse participant fees and update each participant's payment status
+      // Match webhook behavior: set paid_at, stripe_payment_intent_id, cached_fee_cents=0
       let participantsUpdated = 0;
       const participantFees = snapshot.participant_fees;
       
       if (participantFees && Array.isArray(participantFees)) {
-        for (const fee of participantFees) {
-          const participantId = fee.id;
-          if (participantId) {
-            await client.query(
-              `UPDATE booking_participants SET payment_status = 'paid' WHERE id = $1 AND payment_status = 'pending'`,
-              [participantId]
-            );
-            participantsUpdated++;
-            
-            // Create audit log entry
-            await client.query(
-              `INSERT INTO booking_payment_audit 
-                (booking_id, session_id, participant_id, action, staff_email, staff_name, amount_affected, previous_status, new_status, stripe_payment_intent_id)
-               VALUES ($1, $2, $3, 'payment_succeeded', $4, $5, $6, 'pending', 'paid', $7)`,
-              [snapshot.booking_id, snapshot.session_id, participantId, staffEmail || 'system', staffName || 'Auto-sync', fee.amountCents || 0, paymentIntentId]
-            );
+        const participantIds = participantFees.map((f: any) => f.id).filter(Boolean);
+        
+        if (participantIds.length > 0) {
+          // Bulk update all participants to match webhook behavior
+          await client.query(
+            `UPDATE booking_participants 
+             SET payment_status = 'paid', paid_at = NOW(), stripe_payment_intent_id = $2, cached_fee_cents = 0 
+             WHERE id = ANY($1::int[]) AND payment_status = 'pending'`,
+            [participantIds, paymentIntentId]
+          );
+          participantsUpdated = participantIds.length;
+          
+          // Create audit log entries
+          for (const fee of participantFees) {
+            const participantId = fee.id;
+            if (participantId) {
+              await client.query(
+                `INSERT INTO booking_payment_audit 
+                  (booking_id, session_id, participant_id, action, staff_email, staff_name, amount_affected, previous_status, new_status, stripe_payment_intent_id)
+                 VALUES ($1, $2, $3, 'payment_succeeded', $4, $5, $6, 'pending', 'paid', $7)`,
+                [snapshot.booking_id, snapshot.session_id, participantId, staffEmail || 'system', staffName || 'Auto-sync', fee.amountCents || 0, paymentIntentId]
+              );
+            }
           }
         }
       }
@@ -133,6 +141,13 @@ export class PaymentStatusService {
         [paymentIntentId]
       );
       
+      // Always update stripe_payment_intents table
+      await client.query(
+        `UPDATE stripe_payment_intents SET status = 'refunded', updated_at = NOW() 
+         WHERE stripe_payment_intent_id = $1`,
+        [paymentIntentId]
+      );
+      
       // Update fee snapshot status
       if (snapshotResult.rows.length > 0) {
         const snapshot = snapshotResult.rows[0];
@@ -142,35 +157,35 @@ export class PaymentStatusService {
           [snapshot.id]
         );
         
-        // Update participant payment statuses
+        // Update participant payment statuses with refunded_at timestamp
         const participantFees = snapshot.participant_fees;
         if (participantFees && Array.isArray(participantFees)) {
-          for (const fee of participantFees) {
-            const participantId = fee.id;
-            if (participantId) {
-              await client.query(
-                `UPDATE booking_participants SET payment_status = 'refunded' WHERE id = $1`,
-                [participantId]
-              );
-              
-              // Create audit log entry
-              await client.query(
-                `INSERT INTO booking_payment_audit 
-                  (booking_id, session_id, participant_id, action, staff_email, staff_name, amount_affected, previous_status, new_status, stripe_payment_intent_id)
-                 VALUES ($1, $2, $3, 'payment_refunded', $4, $5, $6, 'paid', 'refunded', $7)`,
-                [snapshot.booking_id, snapshot.session_id, participantId, staffEmail || 'system', staffName || 'Refund', fee.amountCents || 0, paymentIntentId]
-              );
+          const participantIds = participantFees.map((f: any) => f.id).filter(Boolean);
+          
+          if (participantIds.length > 0) {
+            // Bulk update all participants
+            await client.query(
+              `UPDATE booking_participants 
+               SET payment_status = 'refunded'
+               WHERE id = ANY($1::int[])`,
+              [participantIds]
+            );
+            
+            // Create audit log entries
+            for (const fee of participantFees) {
+              const participantId = fee.id;
+              if (participantId) {
+                await client.query(
+                  `INSERT INTO booking_payment_audit 
+                    (booking_id, session_id, participant_id, action, staff_email, staff_name, amount_affected, previous_status, new_status, stripe_payment_intent_id)
+                   VALUES ($1, $2, $3, 'payment_refunded', $4, $5, $6, 'paid', 'refunded', $7)`,
+                  [snapshot.booking_id, snapshot.session_id, participantId, staffEmail || 'system', staffName || 'Refund', fee.amountCents || 0, paymentIntentId]
+                );
+              }
             }
           }
         }
       }
-      
-      // Update stripe_payment_intents table
-      await client.query(
-        `UPDATE stripe_payment_intents SET status = 'refunded', updated_at = NOW() 
-         WHERE stripe_payment_intent_id = $1`,
-        [paymentIntentId]
-      );
       
       await client.query('COMMIT');
       console.log(`[PaymentStatusService] Marked payment ${paymentIntentId} as refunded`);
