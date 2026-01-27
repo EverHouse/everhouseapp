@@ -28,26 +28,29 @@ import {
   refundGuestPassesForCancelledBooking
 } from './webhook-billing';
 import { refundGuestPass } from '../guestPasses';
+import { createSessionWithUsageTracking } from '../../core/bookingService/sessionManager';
+import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 
 export async function tryAutoApproveBooking(
   customerEmail: string,
   slotDate: string,
   startTime: string,
   trackmanBookingId: string
-): Promise<{ matched: boolean; bookingId?: number; resourceId?: number }> {
+): Promise<{ matched: boolean; bookingId?: number; resourceId?: number; sessionId?: number }> {
   try {
-    // Match pending booking within 10-min tolerance (600 seconds)
-    // CRITICAL: Also require end_time > webhook start_time to prevent matching
-    // a previous back-to-back slot that ended before this booking starts
     const result = await pool.query(
-      `SELECT id, user_email, staff_notes, resource_id FROM booking_requests 
-       WHERE LOWER(user_email) = LOWER($1)
-         AND request_date = $2
-         AND ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) <= 600
-         AND end_time::time > $3::time
-         AND status = 'pending'
-         AND trackman_booking_id IS NULL
-       ORDER BY ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))), created_at DESC
+      `SELECT br.id, br.user_email, br.user_name, br.staff_notes, br.resource_id, 
+              br.start_time, br.end_time, br.duration_minutes, br.session_id,
+              u.id as user_id
+       FROM booking_requests br
+       LEFT JOIN users u ON LOWER(u.email) = LOWER(br.user_email)
+       WHERE LOWER(br.user_email) = LOWER($1)
+         AND br.request_date = $2
+         AND ABS(EXTRACT(EPOCH FROM (br.start_time::time - $3::time))) <= 600
+         AND br.end_time::time > $3::time
+         AND br.status = 'pending'
+         AND br.trackman_booking_id IS NULL
+       ORDER BY ABS(EXTRACT(EPOCH FROM (br.start_time::time - $3::time))), br.created_at DESC
        LIMIT 1`,
       [customerEmail, slotDate, startTime]
     );
@@ -74,11 +77,71 @@ export async function tryAutoApproveBooking(
       [trackmanBookingId, updatedNotes, bookingId]
     );
     
+    let createdSessionId: number | undefined;
+    
+    if (!pendingBooking.session_id && resourceId) {
+      try {
+        const sessionResult = await createSessionWithUsageTracking(
+          {
+            ownerEmail: pendingBooking.user_email,
+            resourceId: resourceId,
+            sessionDate: slotDate,
+            startTime: pendingBooking.start_time,
+            endTime: pendingBooking.end_time,
+            durationMinutes: pendingBooking.duration_minutes || 60,
+            participants: [{
+              userId: pendingBooking.user_id || undefined,
+              participantType: 'owner',
+              displayName: pendingBooking.user_name || pendingBooking.user_email
+            }],
+            trackmanBookingId: trackmanBookingId
+          },
+          'trackman_webhook'
+        );
+        
+        if (sessionResult.success && sessionResult.session) {
+          createdSessionId = sessionResult.session.id;
+          
+          await pool.query(
+            `UPDATE booking_requests SET session_id = $1 WHERE id = $2`,
+            [createdSessionId, bookingId]
+          );
+          
+          try {
+            const breakdown = await recalculateSessionFees(createdSessionId, 'approval');
+            logger.info('[Trackman Webhook] Applied unified fees for auto-approved session', {
+              extra: { 
+                sessionId: createdSessionId, 
+                bookingId, 
+                totalCents: breakdown.totals.totalCents 
+              }
+            });
+          } catch (feeError) {
+            logger.warn('[Trackman Webhook] Failed to calculate fees for auto-approved session', {
+              extra: { sessionId: createdSessionId, error: feeError }
+            });
+          }
+          
+          logger.info('[Trackman Webhook] Created session for auto-approved booking', {
+            extra: { sessionId: createdSessionId, bookingId, trackmanBookingId }
+          });
+        } else {
+          logger.warn('[Trackman Webhook] Session creation failed for auto-approved booking', {
+            extra: { bookingId, error: sessionResult.error }
+          });
+        }
+      } catch (sessionError) {
+        logger.warn('[Trackman Webhook] Failed to create session for auto-approved booking', {
+          extra: { bookingId, error: sessionError }
+        });
+      }
+    }
+    
     logger.info('[Trackman Webhook] Auto-approved pending booking', {
-      extra: { bookingId, trackmanBookingId, email: customerEmail, date: slotDate, time: startTime }
+      extra: { bookingId, trackmanBookingId, email: customerEmail, date: slotDate, time: startTime, sessionId: createdSessionId }
     });
     
-    return { matched: true, bookingId, resourceId };
+    return { matched: true, bookingId, resourceId, sessionId: createdSessionId };
   } catch (e) {
     logger.error('[Trackman Webhook] Failed to auto-approve booking', { error: e as Error });
     return { matched: false };

@@ -208,57 +208,30 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
               createdSessionId = sessionResult.session.id;
               createdParticipantIds = sessionResult.participants?.map(p => p.id) || [];
               
-              let overageMinutes = 0;
-              let overageFeeCents = 0;
-              try {
-                const ledgerResult = await tx.execute(sql`
-                  SELECT minutes_charged, overage_fee 
-                  FROM usage_ledger 
-                  WHERE session_id = ${createdSessionId} 
-                    AND LOWER(member_id) = LOWER(${updatedRow.userEmail})
-                  LIMIT 1
-                `);
-                if (ledgerResult.rows.length > 0) {
-                  const ledger = ledgerResult.rows[0] as { minutes_charged?: number; overage_fee?: string };
-                  const overageFeeDecimal = parseFloat(String(ledger.overage_fee || 0));
-                  if (overageFeeDecimal > 0) {
-                    overageFeeCents = Math.round(overageFeeDecimal * 100);
-                    const overageBlocks = overageFeeDecimal / 25;
-                    overageMinutes = Math.round(overageBlocks * 30);
-                  }
-                }
-              } catch (ledgerError) {
-                console.error('[Booking Approval] Failed to get overage info:', ledgerError);
-              }
-              
               await tx.update(bookingRequests)
                 .set({ 
-                  sessionId: createdSessionId,
-                  overageMinutes,
-                  overageFeeCents,
-                  overagePaid: overageFeeCents === 0
+                  sessionId: createdSessionId
                 })
                 .where(eq(bookingRequests.id, bookingId));
               
-              console.log(`[Booking Approval] Created session ${createdSessionId} for booking ${bookingId} with ${createdParticipantIds.length} participants, ${sessionResult.usageLedgerEntries || 0} ledger entries${overageFeeCents > 0 ? `, overage $${(overageFeeCents/100).toFixed(2)}` : ''}`);
+              console.log(`[Booking Approval] Created session ${createdSessionId} for booking ${bookingId} with ${createdParticipantIds.length} participants, ${sessionResult.usageLedgerEntries || 0} ledger entries`);
             } else {
               console.error(`[Booking Approval] Session creation failed: ${sessionResult.error}`);
+              throw { statusCode: 500, error: 'Failed to create booking session. Please try again.', details: sessionResult.error };
             }
-          } catch (sessionError) {
-            console.error('[Booking Approval] Failed to create session (non-blocking):', sessionError);
+          } catch (sessionError: any) {
+            console.error('[Booking Approval] Failed to create session:', sessionError);
+            throw { statusCode: 500, error: 'Failed to create booking session. Please try again.', details: sessionError.message || sessionError };
           }
         }
         
         if (createdSessionId && createdParticipantIds.length > 0) {
-          setImmediate(async () => {
-            try {
-              // Use recalculateSessionFees which syncs fees to booking_requests.overage_fee_cents
-              const breakdown = await recalculateSessionFees(createdSessionId!, 'approval');
-              console.log(`[Booking Approval] Applied unified fees for session ${createdSessionId}: $${(breakdown.totals.totalCents/100).toFixed(2)}, overage: $${(breakdown.totals.overageCents/100).toFixed(2)}`);
-            } catch (feeError) {
-              console.error('[Booking Approval] Failed to compute/apply fees (non-blocking):', feeError);
-            }
-          });
+          try {
+            const breakdown = await recalculateSessionFees(createdSessionId, 'approval');
+            console.log(`[Booking Approval] Applied unified fees for session ${createdSessionId}: $${(breakdown.totals.totalCents/100).toFixed(2)}, overage: $${(breakdown.totals.overageCents/100).toFixed(2)}`);
+          } catch (feeError) {
+            console.error('[Booking Approval] Failed to compute/apply fees:', feeError);
+          }
         }
         
         const isReschedule = !!updatedRow.rescheduleBookingId;
@@ -996,6 +969,21 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
     }
     
     if (newStatus === 'attended' && existing.session_id && !skipPaymentCheck) {
+      const nullFeesCheck = await pool.query(`
+        SELECT COUNT(*) as null_count
+        FROM booking_participants bp
+        WHERE bp.session_id = $1 AND bp.payment_status = 'pending' AND bp.cached_fee_cents IS NULL
+      `, [existing.session_id]);
+      
+      if (parseInt(nullFeesCheck.rows[0]?.null_count) > 0) {
+        try {
+          await recalculateSessionFees(existing.session_id, 'checkin');
+          console.log(`[Check-in Guard] Recalculated fees for session ${existing.session_id} - some participants had NULL cached_fee_cents`);
+        } catch (recalcError) {
+          console.error(`[Check-in Guard] Failed to recalculate fees for session ${existing.session_id}:`, recalcError);
+        }
+      }
+      
       const balanceResult = await pool.query(`
         SELECT 
           bp.id as participant_id,

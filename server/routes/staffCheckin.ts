@@ -152,7 +152,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
 
     if (sessionId) {
       const participantsResult = await pool.query(`
-        SELECT DISTINCT ON (bp.id)
+        SELECT 
           bp.id as participant_id,
           bp.display_name,
           bp.participant_type,
@@ -160,21 +160,10 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
           bp.payment_status,
           bp.waiver_reviewed_at,
           bp.used_guest_pass,
-          COALESCE(ul.overage_fee, 0)::numeric as overage_fee,
-          COALESCE(ul.guest_fee, 0)::numeric as guest_fee,
-          ul.tier_at_booking
+          COALESCE(bp.cached_fee_cents, 0)::numeric / 100.0 as cached_total_fee
         FROM booking_participants bp
-        LEFT JOIN users u ON u.id = bp.user_id
-        LEFT JOIN booking_requests br ON br.session_id = bp.session_id AND br.status != 'cancelled'
-        LEFT JOIN usage_ledger ul ON ul.session_id = bp.session_id 
-          AND (
-            ul.member_id = bp.user_id 
-            OR LOWER(ul.member_id) = LOWER(u.email)
-            OR (bp.user_id IS NULL AND LOWER(ul.member_id) = LOWER(br.user_email))
-          )
         WHERE bp.session_id = $1
         ORDER BY 
-          bp.id,
           CASE bp.participant_type 
             WHEN 'owner' THEN 1 
             WHEN 'member' THEN 2 
@@ -218,11 +207,15 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
       }
       
       for (const p of participantsResult.rows) {
-        const ledgerOverageFee = parseFloat(p.overage_fee) || 0;
-        const ledgerGuestFee = parseFloat(p.guest_fee) || 0;
         const calculatedFee = feeMap.get(p.participant_id) || 0;
+        const cachedFee = parseFloat(p.cached_total_fee) || 0;
         
-        const totalFee = calculatedFee > 0 ? calculatedFee : (ledgerOverageFee + ledgerGuestFee);
+        const totalFee = calculatedFee > 0 ? calculatedFee : cachedFee;
+        
+        const breakdownItem = breakdown.participants.find(bp => bp.participantId === p.participant_id);
+        const overageFee = breakdownItem ? breakdownItem.overageCents / 100 : 0;
+        const guestFee = breakdownItem ? breakdownItem.guestCents / 100 : 0;
+        const tierAtBooking = breakdownItem?.tierName || null;
         
         const waiverNeedsReview = 
           p.participant_type === 'guest' && 
@@ -236,10 +229,10 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
           participantType: p.participant_type,
           userId: p.user_id,
           paymentStatus: p.payment_status || 'pending',
-          overageFee: ledgerOverageFee,
-          guestFee: ledgerGuestFee > 0 ? ledgerGuestFee : (p.participant_type === 'guest' && calculatedFee > 0 ? calculatedFee : 0),
+          overageFee,
+          guestFee,
           totalFee,
-          tierAtBooking: p.tier_at_booking,
+          tierAtBooking,
           waiverNeedsReview,
           guestPassUsed: p.used_guest_pass || false,
           prepaidOnline: prepaidParticipantIds.has(p.participant_id)
