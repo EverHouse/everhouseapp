@@ -142,11 +142,12 @@ export async function getDailyBookedMinutes(email: string, date: string): Promis
 export async function getDailyParticipantMinutes(email: string, date: string, excludeBookingId?: number): Promise<number> {
   try {
     // Check booking_members table - use actual roster count, not floored division
-    // For proper player count: use trackman_player_count if set, otherwise count actual roster
+    // For proper player count: use declared_player_count first (staff edits), then trackman, then roster
     const membersResult = await pool.query(
       `SELECT COALESCE(SUM(
          br.duration_minutes::float / GREATEST(
            COALESCE(
+             NULLIF(br.declared_player_count, 0),
              NULLIF(br.trackman_player_count, 0),
              -- Fall back to actual roster size (booking_members count)
              (SELECT COUNT(*) FROM booking_members bm2 WHERE bm2.booking_id = br.id AND bm2.user_email IS NOT NULL),
@@ -171,6 +172,7 @@ export async function getDailyParticipantMinutes(email: string, date: string, ex
       `SELECT COALESCE(SUM(
          br.duration_minutes::float / GREATEST(
            COALESCE(
+             NULLIF(br.declared_player_count, 0),
              NULLIF(br.trackman_player_count, 0),
              -- Fall back to participant count from session
              (SELECT COUNT(*) FROM booking_participants bp2 WHERE bp2.session_id = br.session_id),
@@ -210,11 +212,12 @@ export async function getTotalDailyUsageMinutes(
 ): Promise<{ ownerMinutes: number; participantMinutes: number; totalMinutes: number }> {
   try {
     // Calculate owner minutes without FLOOR - use actual division for accurate overage
-    // Use proper player count: trackman_player_count if set, otherwise roster size or guest_count + 1
+    // Use proper player count: declared_player_count first (staff edits), then trackman, then roster
     const ownerResult = await pool.query(
       `SELECT COALESCE(SUM(
          duration_minutes::float / GREATEST(
            COALESCE(
+             NULLIF(declared_player_count, 0),
              NULLIF(trackman_player_count, 0),
              -- Fall back to actual roster size (booking_members count)
              (SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id AND bm.user_email IS NOT NULL),
