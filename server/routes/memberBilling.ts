@@ -398,14 +398,34 @@ router.post('/api/member-billing/:email/credit', isStaffOrAdmin, async (req, res
       return res.status(400).json({ error: 'Credits are only available for Stripe billing' });
     }
 
-    if (!member.stripe_customer_id) {
-      return res.status(400).json({ error: 'No Stripe customer ID found' });
+    const stripe = await getStripeClient();
+    
+    let stripeCustomerId = member.stripe_customer_id;
+    
+    if (!stripeCustomerId) {
+      console.log(`[MemberBilling] Creating new Stripe customer for ${email}`);
+      const customer = await stripe.customers.create({
+        email: email,
+        name: member.first_name && member.last_name 
+          ? `${member.first_name} ${member.last_name}` 
+          : email,
+        metadata: {
+          userId: email,
+          tier: member.tier || 'unknown',
+          source: 'credit_application'
+        }
+      });
+      stripeCustomerId = customer.id;
+      
+      await pool.query(
+        'UPDATE users SET stripe_customer_id = $1 WHERE LOWER(email) = LOWER($2)',
+        [stripeCustomerId, email]
+      );
+      console.log(`[MemberBilling] Created Stripe customer ${stripeCustomerId} for ${email}`);
     }
 
-    const stripe = await getStripeClient();
-
     const transaction = await stripe.customers.createBalanceTransaction(
-      member.stripe_customer_id,
+      stripeCustomerId,
       {
         amount: -amountCents,
         currency: 'usd',
