@@ -15,6 +15,7 @@ import { refundGuestPass } from '../guestPasses';
 import { updateHubSpotContactVisitCount } from '../../core/memberSync';
 import { createSessionWithUsageTracking } from '../../core/bookingService/sessionManager';
 import { computeFeeBreakdown, applyFeeBreakdownToParticipants, recalculateSessionFees } from '../../core/billing/unifiedFeeService';
+import { PaymentStatusService } from '../../core/billing/PaymentStatusService';
 import { cancelPaymentIntent, getStripeClient } from '../../core/stripe';
 import { getCalendarNameForBayAsync } from './helpers';
 import { getCalendarIdByName, createCalendarEventOnCalendar, deleteCalendarEvent, CALENDAR_CONFIG } from '../../core/calendar/index';
@@ -602,33 +603,27 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                 });
                 console.log(`[Staff Cancel] Refunded payment ${snapshot.stripe_payment_intent_id} for booking ${bookingId}: $${(pi.amount / 100).toFixed(2)}, refund: ${refund.id}`);
                 
-                // Update snapshot and participant status
-                await pool.query(
-                  `UPDATE booking_fee_snapshots SET status = 'refunded' WHERE id = $1`,
-                  [snapshot.id]
-                );
+                // Use centralized service to update all related records atomically
+                await PaymentStatusService.markPaymentRefunded({
+                  paymentIntentId: snapshot.stripe_payment_intent_id,
+                  bookingId,
+                  refundId: refund.id,
+                  amountCents: pi.amount
+                });
               } else if (['requires_payment_method', 'requires_confirmation', 'requires_action', 'processing'].includes(pi.status)) {
                 // Cancel pending payments
                 await stripe.paymentIntents.cancel(snapshot.stripe_payment_intent_id);
                 console.log(`[Staff Cancel] Cancelled payment intent ${snapshot.stripe_payment_intent_id} for booking ${bookingId}`);
                 
-                await pool.query(
-                  `UPDATE booking_fee_snapshots SET status = 'cancelled' WHERE id = $1`,
-                  [snapshot.id]
-                );
+                await PaymentStatusService.markPaymentCancelled({
+                  paymentIntentId: snapshot.stripe_payment_intent_id
+                });
               } else if (pi.status === 'canceled') {
-                // Already cancelled, just update snapshot
-                await pool.query(
-                  `UPDATE booking_fee_snapshots SET status = 'cancelled' WHERE id = $1`,
-                  [snapshot.id]
-                );
+                // Already cancelled, just update snapshot via service
+                await PaymentStatusService.markPaymentCancelled({
+                  paymentIntentId: snapshot.stripe_payment_intent_id
+                });
               }
-              
-              // Update stripe_payment_intents table status
-              await pool.query(
-                `UPDATE stripe_payment_intents SET status = $1, updated_at = NOW() WHERE stripe_payment_intent_id = $2`,
-                [pi.status === 'succeeded' ? 'refunded' : 'canceled', snapshot.stripe_payment_intent_id]
-              );
             } catch (piErr: any) {
               console.error(`[Staff Cancel] Failed to handle payment ${snapshot.stripe_payment_intent_id}:`, piErr.message);
             }

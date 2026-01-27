@@ -3,6 +3,7 @@ import { db } from '../../db';
 import { billingAuditLog } from '../../../shared/schema';
 import { getStripeClient } from './client';
 import { getOrCreateStripeCustomer } from './customers';
+import { PaymentStatusService } from '../billing/PaymentStatusService';
 
 export type PaymentPurpose = 'guest_fee' | 'overage_fee' | 'one_time_purchase';
 
@@ -113,16 +114,28 @@ export async function confirmPaymentSuccess(
       return { success: false, error: `Payment status is ${paymentIntent.status}, not succeeded` };
     }
 
-    const queryClient = txClient || pool;
+    // Use centralized PaymentStatusService to update all related tables atomically
+    const result = await PaymentStatusService.markPaymentSucceeded({
+      paymentIntentId,
+      staffEmail: performedBy,
+      staffName: performedByName,
+      amountCents: paymentIntent.amount
+    });
 
-    await queryClient.query(
-      `UPDATE stripe_payment_intents 
-       SET status = 'succeeded', updated_at = NOW() 
-       WHERE stripe_payment_intent_id = $1`,
-      [paymentIntentId]
-    );
+    if (!result.success) {
+      console.error(`[Stripe] PaymentStatusService failed:`, result.error);
+      // Fall back to updating just stripe_payment_intents
+      const queryClient = txClient || pool;
+      await queryClient.query(
+        `UPDATE stripe_payment_intents 
+         SET status = 'succeeded', updated_at = NOW() 
+         WHERE stripe_payment_intent_id = $1`,
+        [paymentIntentId]
+      );
+    }
 
-    const localRecord = await queryClient.query(
+    // Log to billing audit log
+    const localRecord = await pool.query(
       'SELECT * FROM stripe_payment_intents WHERE stripe_payment_intent_id = $1',
       [paymentIntentId]
     );
@@ -140,7 +153,9 @@ export async function confirmPaymentSuccess(
           purpose: record.purpose,
           bookingId: record.booking_id,
           sessionId: record.session_id,
-          stripeCustomerId: record.stripe_customer_id
+          stripeCustomerId: record.stripe_customer_id,
+          participantsUpdated: result.participantsUpdated,
+          snapshotsUpdated: result.snapshotsUpdated
         },
         newValue: `Stripe payment of $${(record.amount_cents / 100).toFixed(2)} for ${record.purpose}`,
         performedBy,
@@ -148,7 +163,7 @@ export async function confirmPaymentSuccess(
       });
     }
 
-    console.log(`[Stripe] Payment ${paymentIntentId} confirmed as succeeded`);
+    console.log(`[Stripe] Payment ${paymentIntentId} confirmed as succeeded (${result.participantsUpdated || 0} participants updated)`);
     return { success: true };
   } catch (error: any) {
     console.error('[Stripe] Error confirming payment:', error);
