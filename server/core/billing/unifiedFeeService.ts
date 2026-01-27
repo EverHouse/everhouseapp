@@ -250,7 +250,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
                  FLOOR(br.duration_minutes::float / GREATEST(1, COALESCE(br.declared_player_count, 1))) as minutes_share
           FROM booking_participants bp
           JOIN booking_sessions bs ON bp.session_id = bs.id
-          JOIN booking_requests br ON bs.booking_id = br.id
+          JOIN booking_requests br ON br.session_id = bs.id
           JOIN users u ON bp.user_id = u.id
           WHERE LOWER(u.email) = ANY($1::text[])
             AND br.request_date = $2
