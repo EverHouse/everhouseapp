@@ -631,7 +631,29 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
     const pendingParticipants = billingContext.participants.filter(p => p.paymentStatus === 'pending' && p.totalFee > 0);
     const fees = pendingParticipants.map(p => ({ id: p.participantId, amount: p.totalFee }));
     const totalAmount = fees.reduce((sum, f) => sum + f.amount, 0);
-    const description = `Fees for ${billingContext.resourceName} - ${billingContext.bookingDate}`;
+    
+    // Format date nicely (e.g., "Jan 27, 2026")
+    const dateObj = new Date(billingContext.bookingDate + 'T12:00:00');
+    const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    
+    // Format times (e.g., "8:30 AM - 12:30 PM")
+    const formatTime = (time: string) => {
+      const [h, m] = time.split(':').map(Number);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const hour = h % 12 || 12;
+      return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
+    };
+    const timeRange = `${formatTime(billingContext.startTime)} - ${formatTime(billingContext.endTime)}`;
+    
+    // Build fee breakdown
+    const totalOverage = pendingParticipants.reduce((sum, p) => sum + (p.overageFee || 0), 0);
+    const totalGuestFees = pendingParticipants.reduce((sum, p) => sum + (p.guestFee || 0), 0);
+    const breakdownParts: string[] = [];
+    if (totalOverage > 0) breakdownParts.push(`Overage: $${totalOverage.toFixed(2)}`);
+    if (totalGuestFees > 0) breakdownParts.push(`Guest fees: $${totalGuestFees.toFixed(2)}`);
+    const breakdown = breakdownParts.length > 0 ? ` (${breakdownParts.join(', ')})` : '';
+    
+    const description = `${billingContext.resourceName} • ${formattedDate} • ${timeRange}${breakdown}`;
     
     setFrozenPaymentData({ participantFees: fees, totalAmount, description });
     setShowStripePayment(true);

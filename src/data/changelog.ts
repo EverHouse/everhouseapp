@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.29.11",
+    date: "2026-01-27",
+    title: "Improved Payment Descriptions",
+    changes: [
+      "UX: Payment descriptions now show readable dates (e.g., 'Jan 27, 2026' instead of '2026-01-27T08:00:00.000Z')",
+      "UX: Time range displayed in 12-hour format (e.g., '8:30 AM - 12:30 PM')",
+      "Clarity: Fee breakdown now shows what charges consist of (Overage, Guest fees) for Stripe and member visibility"
+    ]
+  },
+  {
     version: "9.29.10",
     date: "2026-01-27",
     title: "Player Search Improvements",
