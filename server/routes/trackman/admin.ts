@@ -4,7 +4,7 @@ import { pool } from '../../core/db';
 import { sendPushNotification } from '../push';
 import { getGuestPassesRemaining } from '../guestPasses';
 import { getMemberTierByEmail, getTierLimits, getDailyBookedMinutes, getTotalDailyUsageMinutes } from '../../core/tierService';
-import { computeFeeBreakdown, applyFeeBreakdownToParticipants } from '../../core/billing/unifiedFeeService';
+import { computeFeeBreakdown, applyFeeBreakdownToParticipants, recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { logFromRequest } from '../../core/auditLog';
 import { getStripeClient } from '../../core/stripe/client';
 import { getOrCreateStripeCustomer } from '../../core/stripe/customers';
@@ -420,6 +420,14 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
               SET user_id = $1, display_name = $2
               WHERE session_id = $3 AND participant_type = 'owner'
             `, [member.id, `${member.first_name} ${member.last_name}`, sessionId]);
+          }
+          
+          // Recalculate fees for the session now that we have an owner
+          try {
+            await recalculateSessionFees(sessionId, 'assign_to_member');
+            console.log(`[Trackman Resolve] Recalculated fees for session ${sessionId}`);
+          } catch (feeErr) {
+            console.warn(`[Trackman Resolve] Failed to recalculate fees for session ${sessionId}:`, feeErr);
           }
           
           // IDEMPOTENCY: Check existing usage and handle ownership

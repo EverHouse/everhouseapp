@@ -19,7 +19,8 @@ export const changelog: ChangelogEntry[] = [
     changes: [
       "Fixed: Real Trackman webhook bookings now create booking_participants with cached fees (was only working for simulated confirmations)",
       "Fixed: Linked pending bookings via Trackman webhook now create sessions and participants if missing",
-      "Fixed: 'Has Unpaid Fees' indicator now shows correctly for all Trackman-confirmed bookings"
+      "Fixed: 'Has Unpaid Fees' indicator now shows correctly for all Trackman-confirmed bookings",
+      "Fixed: Assigning unmatched Trackman bookings to members now recalculates and caches fees properly"
     ]
   },
   {
