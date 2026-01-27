@@ -20,6 +20,7 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: Member booking requests no longer show duplicate confirmation messages",
       "Fixed: Confirmed bookings stay visible on calendar after Trackman webhook confirmation",
       "Fixed: Fee calculation now correctly uses staff-edited player count (was ignoring edits)",
+      "Fixed: Roster check during check-in now respects staff-edited player count",
       "Fixed: Empty player slots now created when player count is increased",
       "Improved: Dev simulated webhook now generates realistic Trackman V2 format for testing"
     ]

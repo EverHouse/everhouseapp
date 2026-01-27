@@ -897,7 +897,7 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
       
       if (rosterResult.rows.length > 0) {
         const roster = rosterResult.rows[0];
-        const declaredCount = roster.trackman_player_count || roster.declared_player_count || 1;
+        const declaredCount = roster.declared_player_count || roster.trackman_player_count || 1;
         const emptySlots = parseInt(roster.empty_slots) || 0;
         const totalSlots = parseInt(roster.total_slots) || 0;
         
