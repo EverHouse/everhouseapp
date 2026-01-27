@@ -832,10 +832,6 @@ const Dashboard: React.FC = () => {
     return formatDateTimePacific(dateStr);
   };
 
-  if (isLoading) {
-    return <DashboardSkeleton isDark={isDark} />;
-  }
-
   if (error) {
     return (
       <div 
@@ -853,10 +849,14 @@ const Dashboard: React.FC = () => {
 
   return (
     <AnimatedPage>
+    <SmoothReveal isLoaded={!isLoading}>
     <div 
       className="min-h-screen flex flex-col"
       style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}
     >
+    {isLoading ? (
+      <DashboardSkeleton isDark={isDark} />
+    ) : (
     <PullToRefresh onRefresh={handleRefresh} className="flex-1 flex flex-col">
       <div className="px-6 pt-4 md:pt-2 pb-32 font-sans relative flex-1">
         <ClosureAlert />
@@ -1560,6 +1560,9 @@ const Dashboard: React.FC = () => {
       })()}
     </ModalShell>
   </div>
+    )}
+  </div>
+  </SmoothReveal>
   </AnimatedPage>
   );
 };

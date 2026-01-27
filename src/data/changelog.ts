@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.31.3",
+    date: "2026-01-27",
+    title: "Animation System Refinements",
+    changes: [
+      "UX: Dashboard cards now use dynamic stagger indices for smoother cascading entry",
+      "UX: MemberProfileDrawer uses spring physics for natural bounce on slide-in",
+      "UX: Admin tables (Trackman, Data Integrity) animate rows with stagger timing",
+      "UX: Dashboard content crossfades from skeleton using SmoothReveal"
+    ]
+  },
+  {
     version: "9.31.2",
     date: "2026-01-27",
     title: "Premium Motion & Interaction Polish",
