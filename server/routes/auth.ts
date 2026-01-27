@@ -454,33 +454,53 @@ router.post('/api/auth/request-otp', async (req, res) => {
     
     const isStaffOrAdmin = await isStaffOrAdminEmail(normalizedEmail);
     
-    const hubspot = await getHubSpotClient();
+    // Check database first for Stripe-billed members
+    const dbUser = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
+    const hasDbUser = dbUser.length > 0;
+    const isStripeBilled = hasDbUser && (dbUser[0].stripeSubscriptionId || dbUser[0].stripeCustomerId);
     
-    const searchResponse = await hubspot.crm.contacts.searchApi.doSearch({
-      filterGroups: [{
-        filters: [{
-          propertyName: 'email',
-          operator: 'EQ' as any,
-          value: normalizedEmail
-        }]
-      }],
-      properties: ['firstname', 'lastname', 'email', 'membership_status', 'membership_start_date'],
-      limit: 1
-    });
-    
-    let contact = searchResponse.results[0];
     let firstName = isStaffOrAdmin ? 'Team Member' : 'Member';
     
-    if (!contact && !isStaffOrAdmin) {
-      return res.status(404).json({ error: 'No member found with this email address' });
-    }
-    
-    if (contact) {
-      const status = (contact.properties.membership_status || '').toLowerCase();
-      firstName = contact.properties.firstname || firstName;
+    // For Stripe-billed members: use database as source of truth
+    if (hasDbUser && isStripeBilled && !isStaffOrAdmin) {
+      const dbMemberStatus = (dbUser[0].membershipStatus || '').toLowerCase();
+      const activeStatuses = ['active', 'trialing', 'past_due']; // past_due still has access while retrying payment
       
-      if (status !== 'active' && !isStaffOrAdmin) {
+      if (!activeStatuses.includes(dbMemberStatus)) {
         return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
+      }
+      
+      firstName = dbUser[0].firstName || firstName;
+      // Stripe-billed member is valid, continue to send OTP
+    } else {
+      // For non-Stripe members or unknown users: check HubSpot
+      const hubspot = await getHubSpotClient();
+      
+      const searchResponse = await hubspot.crm.contacts.searchApi.doSearch({
+        filterGroups: [{
+          filters: [{
+            propertyName: 'email',
+            operator: 'EQ' as any,
+            value: normalizedEmail
+          }]
+        }],
+        properties: ['firstname', 'lastname', 'email', 'membership_status', 'membership_start_date'],
+        limit: 1
+      });
+      
+      let contact = searchResponse.results[0];
+      
+      if (!contact && !isStaffOrAdmin) {
+        return res.status(404).json({ error: 'No member found with this email address' });
+      }
+      
+      if (contact) {
+        const status = (contact.properties.membership_status || '').toLowerCase();
+        firstName = contact.properties.firstname || firstName;
+        
+        if (status !== 'active' && !isStaffOrAdmin) {
+          return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
+        }
       }
     }
     
