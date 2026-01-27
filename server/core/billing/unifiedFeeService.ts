@@ -475,5 +475,22 @@ export async function recalculateSessionFees(
   
   await applyFeeBreakdownToParticipants(sessionId, breakdown);
   
+  // Sync session fees to booking_requests for legacy compatibility
+  // This ensures member Dashboard can show Pay Now button
+  try {
+    const ownerFee = breakdown.participants.find(p => p.participantType === 'owner');
+    if (ownerFee) {
+      await pool.query(`
+        UPDATE booking_requests 
+        SET overage_fee_cents = $1, 
+            overage_minutes = $2,
+            updated_at = NOW()
+        WHERE session_id = $3
+      `, [ownerFee.fee, breakdown.overageMinutes || 0, sessionId]);
+    }
+  } catch (syncError) {
+    logger.warn('[UnifiedFee] Failed to sync fees to booking_requests', { sessionId, error: syncError });
+  }
+  
   return breakdown;
 }

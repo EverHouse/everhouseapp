@@ -920,46 +920,69 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
     let sessionId = booking.session_id;
     if (!sessionId && booking.resource_id) {
       try {
-        const sessionResult = await pool.query(`
-          INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
-          VALUES ($1, $2, $3, $4, $5, 'staff_manual', 'simulate_confirm')
-          RETURNING id
-        `, [booking.resource_id, booking.request_date, booking.start_time, booking.end_time, fakeTrackmanId]);
+        // First check for existing session that overlaps with this booking's time
+        const existingSession = await pool.query(`
+          SELECT id FROM booking_sessions 
+          WHERE resource_id = $1 
+            AND session_date = $2 
+            AND start_time < $4 
+            AND end_time > $3
+          LIMIT 1
+        `, [booking.resource_id, booking.request_date, booking.start_time, booking.end_time]);
         
-        if (sessionResult.rows.length > 0) {
-          sessionId = sessionResult.rows[0].id;
+        if (existingSession.rows.length > 0) {
+          sessionId = existingSession.rows[0].id;
+          logger.info('[Simulate Confirm] Using existing session', { bookingId, sessionId });
+        } else {
+          const sessionResult = await pool.query(`
+            INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
+            VALUES ($1, $2, $3, $4, $5, 'staff_manual', 'simulate_confirm')
+            RETURNING id
+          `, [booking.resource_id, booking.request_date, booking.start_time, booking.end_time, fakeTrackmanId]);
           
-          const playerCount = booking.declared_player_count || 1;
+          if (sessionResult.rows.length > 0) {
+            sessionId = sessionResult.rows[0].id;
+          }
+        }
+        
+        if (sessionId) {
+          const isNewSession = !existingSession.rows.length;
           
-          const userResult = await pool.query(
-            `SELECT id FROM users WHERE LOWER(email) = LOWER($1)`,
-            [booking.user_email]
-          );
-          const userId = userResult.rows[0]?.id || null;
-          
-          await pool.query(`
-            INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
-            VALUES ($1, $2, 'owner', $3, 'pending')
-          `, [sessionId, userId, booking.user_name || 'Member']);
-          
-          for (let i = 1; i < playerCount; i++) {
+          if (isNewSession) {
+            const playerCount = booking.declared_player_count || 1;
+            
+            const userResult = await pool.query(
+              `SELECT id FROM users WHERE LOWER(email) = LOWER($1)`,
+              [booking.user_email]
+            );
+            const userId = userResult.rows[0]?.id || null;
+            
             await pool.query(`
               INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
-              VALUES ($1, NULL, 'guest', $2, 'pending')
-            `, [sessionId, `Guest ${i + 1}`]);
+              VALUES ($1, $2, 'owner', $3, 'pending')
+            `, [sessionId, userId, booking.user_name || 'Member']);
+            
+            for (let i = 1; i < playerCount; i++) {
+              await pool.query(`
+                INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
+                VALUES ($1, NULL, 'guest', $2, 'pending')
+              `, [sessionId, `Guest ${i + 1}`]);
+            }
+            
+            logger.info('[Simulate Confirm] Created session and participants', {
+              bookingId,
+              sessionId,
+              playerCount
+            });
           }
           
-          logger.info('[Simulate Confirm] Created session and participants', {
-            bookingId,
-            sessionId,
-            playerCount
-          });
-          
+          // Always recalculate fees whether new or existing session
           try {
             const feeResult = await recalculateSessionFees(sessionId);
             logger.info('[Simulate Confirm] Calculated fees for session', {
               sessionId,
-              feeResult: feeResult?.totalSessionFee || 0
+              feeResult: feeResult?.totalSessionFee || 0,
+              isNewSession
             });
           } catch (feeError) {
             logger.warn('[Simulate Confirm] Failed to calculate fees (non-blocking)', { error: feeError });
