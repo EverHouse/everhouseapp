@@ -273,6 +273,7 @@ const ManagePlayersModal: React.FC<ManagePlayersModalProps> = ({
       title="Manage Players"
       size="lg"
       showCloseButton={true}
+      overflowVisible={true}
     >
       <div className="p-4 space-y-4">
         <div className="space-y-2">

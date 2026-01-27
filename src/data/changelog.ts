@@ -15,14 +15,15 @@ export const changelog: ChangelogEntry[] = [
   {
     version: "9.31.4",
     date: "2026-01-27",
-    title: "Responsive Layout Improvements",
+    title: "Responsive Layout & Modal Fixes",
     changes: [
       "UX: Desktop layouts now use responsive grids (3-4 columns) that fill available space alongside sidebar",
       "UX: Dashboard, Events, Wellness grids scale from 1→2→3→4 columns across breakpoints",
       "UX: BookGolf time slots and resource cards use responsive grid layouts on larger screens",
       "UX: History page visits and payments display in 2-column grid on desktop",
       "UX: Increased bottom nav touch targets (48px min height) and improved icon/label sizing",
-      "UX: Added responsive padding scaling (px-6 → lg:px-8 → xl:px-12) across member pages"
+      "UX: Added responsive padding scaling (px-6 → lg:px-8 → xl:px-12) across member pages",
+      "Fixed: Search dropdowns in modals now display properly without being cut off (ManagePlayersModal, StaffDirectAddModal, CompleteRosterModal)"
     ]
   },
   {
