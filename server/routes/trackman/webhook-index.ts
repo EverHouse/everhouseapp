@@ -1034,6 +1034,10 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
           // Always recalculate fees whether new or existing session
           try {
             const feeResult = await recalculateSessionFees(sessionId);
+            // Store the calculated total fee for the response
+            if (feeResult?.totalSessionFee) {
+              (booking as any).calculatedTotalFeeCents = feeResult.totalSessionFee;
+            }
             logger.info('[Simulate Confirm] Calculated fees for session', {
               sessionId,
               feeResult: feeResult?.totalSessionFee || 0,
@@ -1141,11 +1145,15 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
       }
     });
 
+    // Use the calculated total fee (includes guest fees) or fall back to overage
+    const totalFeeCents = (booking as any).calculatedTotalFeeCents || booking.overage_fee_cents || 0;
+    
     res.json({ 
       success: true, 
       message: 'Booking confirmed (simulated)',
       trackmanId: fakeTrackmanId,
-      overageFeeCents: booking.overage_fee_cents
+      overageFeeCents: booking.overage_fee_cents,
+      totalFeeCents
     });
   } catch (error: any) {
     logger.error('[Simulate Confirm] Error', { error });

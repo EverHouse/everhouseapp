@@ -1785,7 +1785,8 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                         });
                                                         const data = await res.json();
                                                         if (res.ok) {
-                                                            showToast(`Confirmed! Overage: $${(data.overageFeeCents / 100).toFixed(2)}`, 'success');
+                                                            const totalFee = (data.totalFeeCents || data.overageFeeCents || 0) / 100;
+                                                            showToast(`Confirmed! Total fees: $${totalFee.toFixed(2)}`, 'success');
                                                             setRequests(prev => prev.filter(r => r.id !== req.id));
                                                             handleRefresh();
                                                         } else {
