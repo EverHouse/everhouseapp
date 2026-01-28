@@ -505,6 +505,15 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
   const [showCreateSubscriptionModal, setShowCreateSubscriptionModal] = useState(false);
   const [isCreatingSubscription, setIsCreatingSubscription] = useState(false);
   const [selectedSubscriptionTier, setSelectedSubscriptionTier] = useState('');
+  const [selectedCoupon, setSelectedCoupon] = useState('');
+  const [availableCoupons, setAvailableCoupons] = useState<Array<{
+    id: string;
+    name: string;
+    percentOff: number | null;
+    amountOff: number | null;
+    duration: string;
+  }>>([]);
+  const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
 
   const showSuccess = (message: string) => {
     setSuccessMessage(message);
@@ -882,7 +891,8 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         credentials: 'include',
         body: JSON.stringify({
           memberEmail,
-          tierName: selectedSubscriptionTier
+          tierName: selectedSubscriptionTier,
+          couponId: selectedCoupon || undefined
         })
       });
       
@@ -891,6 +901,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         await fetchBillingInfo();
         setShowCreateSubscriptionModal(false);
         setSelectedSubscriptionTier('');
+        setSelectedCoupon('');
         showSuccess(data.message || 'Subscription created successfully');
       } else {
         const errData = await res.json();
@@ -1082,7 +1093,21 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
               </p>
             </div>
             <button
-              onClick={() => setShowCreateSubscriptionModal(true)}
+              onClick={async () => {
+                setShowCreateSubscriptionModal(true);
+                setIsLoadingCoupons(true);
+                try {
+                  const res = await fetch('/api/stripe/coupons', { credentials: 'include' });
+                  if (res.ok) {
+                    const data = await res.json();
+                    setAvailableCoupons(data.coupons || []);
+                  }
+                } catch (err) {
+                  console.error('Failed to load coupons:', err);
+                } finally {
+                  setIsLoadingCoupons(false);
+                }
+              }}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 isDark ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30' : 'bg-green-100 text-green-700 hover:bg-green-200'
               }`}
@@ -1478,6 +1503,32 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
             </select>
           </div>
 
+          <div>
+            <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+              Apply Discount (Optional)
+            </label>
+            <select
+              value={selectedCoupon}
+              onChange={(e) => setSelectedCoupon(e.target.value)}
+              disabled={isLoadingCoupons}
+              className={`w-full p-3 rounded-lg border ${
+                isDark
+                  ? 'bg-white/10 border-white/20 text-white'
+                  : 'bg-white border-gray-300 text-gray-900'
+              } focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:opacity-50`}
+            >
+              <option value="">No discount</option>
+              {availableCoupons.map((coupon) => (
+                <option key={coupon.id} value={coupon.id}>
+                  {coupon.name} ({coupon.percentOff ? `${coupon.percentOff}% off` : coupon.amountOff ? `$${(coupon.amountOff / 100).toFixed(2)} off` : ''} - {coupon.duration === 'forever' ? 'Forever' : coupon.duration === 'once' ? 'First invoice' : `${coupon.duration}`})
+                </option>
+              ))}
+            </select>
+            {isLoadingCoupons && (
+              <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Loading coupons...</p>
+            )}
+          </div>
+
           {error && (
             <div className={`p-3 rounded-lg ${isDark ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-600'} text-sm`}>
               {error}
@@ -1489,6 +1540,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
               onClick={() => {
                 setShowCreateSubscriptionModal(false);
                 setSelectedSubscriptionTier('');
+                setSelectedCoupon('');
               }}
               className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isDark ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'

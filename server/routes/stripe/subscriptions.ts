@@ -97,9 +97,37 @@ router.post('/api/stripe/sync-subscriptions', isStaffOrAdmin, async (req: Reques
   }
 });
 
+router.get('/api/stripe/coupons', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const stripe = (await import('../../core/stripe')).getStripeClient();
+    const stripeClient = await stripe;
+    
+    const coupons = await stripeClient.coupons.list({
+      limit: 50
+    });
+    
+    const activeCoupons = coupons.data
+      .filter(c => c.valid)
+      .map(c => ({
+        id: c.id,
+        name: c.name || c.id,
+        percentOff: c.percent_off,
+        amountOff: c.amount_off,
+        currency: c.currency,
+        duration: c.duration,
+        durationInMonths: c.duration_in_months
+      }));
+    
+    res.json({ coupons: activeCoupons });
+  } catch (error: any) {
+    console.error('[Stripe] Error listing coupons:', error);
+    res.status(500).json({ error: 'Failed to load coupons' });
+  }
+});
+
 router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { memberEmail, tierName } = req.body;
+    const { memberEmail, tierName, couponId } = req.body;
     const sessionUser = getSessionUser(req);
     
     if (!memberEmail || !tierName) {
@@ -147,10 +175,12 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, async
     const subscriptionResult = await createSubscription({
       customerId,
       priceId: tier.stripePriceId,
+      couponId: couponId || undefined,
       metadata: {
         memberEmail: member.email,
         tier: tierName,
-        createdBy: sessionUser?.email || 'staff'
+        createdBy: sessionUser?.email || 'staff',
+        ...(couponId ? { couponApplied: couponId } : {})
       }
     });
     

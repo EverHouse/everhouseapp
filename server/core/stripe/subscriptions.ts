@@ -6,6 +6,7 @@ export interface CreateSubscriptionParams {
   customerId: string;
   priceId: string;
   metadata?: Record<string, string>;
+  couponId?: string;
 }
 
 export interface SubscriptionResult {
@@ -22,9 +23,9 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
 }> {
   try {
     const stripe = await getStripeClient();
-    const { customerId, priceId, metadata = {} } = params;
+    const { customerId, priceId, metadata = {}, couponId } = params;
     
-    const subscription = await stripe.subscriptions.create({
+    const subscriptionParams: Stripe.SubscriptionCreateParams = {
       customer: customerId,
       items: [{ price: priceId }],
       payment_behavior: 'default_incomplete',
@@ -36,7 +37,14 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
         ...metadata,
         source: 'even_house_app',
       },
-    });
+    };
+    
+    if (couponId) {
+      subscriptionParams.coupon = couponId;
+      console.log(`[Stripe Subscriptions] Applying coupon ${couponId} to subscription`);
+    }
+    
+    const subscription = await stripe.subscriptions.create(subscriptionParams);
     
     const invoice = subscription.latest_invoice as Stripe.Invoice;
     const paymentIntent = invoice?.payment_intent as Stripe.PaymentIntent;

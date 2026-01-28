@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.33.9",
+    date: "2026-01-28",
+    title: "Coupon Selection for New Subscriptions",
+    changes: [
+      "Added: Staff can now apply coupons/discounts when creating new subscriptions",
+      "Added: Coupon dropdown shows all active Stripe coupons with discount details",
+      "Added: Supports percentage off and fixed amount discounts with duration info"
+    ]
+  },
+  {
     version: "9.33.8",
     date: "2026-01-28",
     title: "Add Billing Source Dropdown & Fix Tier Clearing",
