@@ -53,10 +53,9 @@ router.post('/api/member/bookings/:id/pay-fees', paymentRateLimiter, async (req:
     }
 
     // Get all pending participants (guests, members, and owner for overage fees)
+    // The payment_status filter ensures we only see unpaid fees - no snapshot filtering needed
     const pendingParticipants = await pool.query(
-      `SELECT bp.id, bp.participant_type, bp.display_name, bp.cached_fee_cents,
-              (SELECT COUNT(*) FROM booking_fee_snapshots bfs WHERE bfs.session_id = bp.session_id AND bfs.status = 'pending') as pending_snapshot_count,
-              (SELECT COUNT(*) FROM booking_fee_snapshots bfs WHERE bfs.session_id = bp.session_id) as total_snapshot_count
+      `SELECT bp.id, bp.participant_type, bp.display_name, bp.cached_fee_cents
        FROM booking_participants bp
        WHERE bp.session_id = $1 
          AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
@@ -64,19 +63,11 @@ router.post('/api/member/bookings/:id/pay-fees', paymentRateLimiter, async (req:
       [booking.session_id]
     );
 
-    // Filter out orphaned fees (sessions with only cancelled/paid snapshots)
-    const validParticipants = pendingParticipants.rows.filter(row => {
-      const pendingCount = parseInt(row.pending_snapshot_count) || 0;
-      const totalCount = parseInt(row.total_snapshot_count) || 0;
-      // Include if no snapshots exist (legacy) or if there's a pending snapshot
-      return totalCount === 0 || pendingCount > 0;
-    });
-
-    if (validParticipants.length === 0) {
+    if (pendingParticipants.rows.length === 0) {
       return res.status(400).json({ error: 'No unpaid fees found' });
     }
 
-    const participantIds = validParticipants.map(r => r.id);
+    const participantIds = pendingParticipants.rows.map(r => r.id);
     
     let breakdown;
     try {
