@@ -117,6 +117,15 @@ async function processGracePeriodMembers(): Promise<void> {
             
             console.log(`[Grace Period] TERMINATED membership for ${email} (was tier: ${tier})`);
             
+            // Sync terminated status to HubSpot
+            try {
+              const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
+              await syncMemberToHubSpot({ email, status: 'terminated' });
+              console.log(`[Grace Period] Synced ${email} status=terminated to HubSpot`);
+            } catch (hubspotError) {
+              console.error('[Grace Period] HubSpot sync failed:', hubspotError);
+            }
+            
             await notifyAllStaff(
               'Membership Terminated',
               `${memberName} (${email}) membership has been terminated after ${GRACE_PERIOD_DAYS} days of failed payment. Previous tier: ${tier || 'unknown'}.`,

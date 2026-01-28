@@ -149,6 +149,15 @@ export async function commitTierChange(
       
       // Sync the updated tier to Stripe customer metadata
       await syncCustomerMetadataToStripe(memberEmail);
+      
+      // Sync tier change to HubSpot
+      try {
+        const { syncMemberToHubSpot } = await import('../hubspot/stages');
+        await syncMemberToHubSpot({ email: memberEmail, tier: tier.name, billingProvider: 'stripe' });
+        console.log(`[TierChange] Synced ${memberEmail} tier=${tier.name} to HubSpot`);
+      } catch (hubspotError) {
+        console.error('[TierChange] HubSpot sync failed:', hubspotError);
+      }
     }
     
     // Add member note for audit trail using DB tier names for consistency

@@ -254,18 +254,15 @@ export async function reconcileSubscriptions() {
           
           // Sync to HubSpot
           try {
-            const contactResult = await findOrCreateHubSpotContact(
-              customerEmail,
-              firstName,
-              lastName,
-              undefined,
-              tierName || undefined
-            );
-            
-            if (contactResult?.contactId) {
-              await updateContactMembershipStatus(contactResult.contactId, 'Active', 'system');
-              console.log(`[Reconcile] Synced ${customerEmail} to HubSpot contact ${contactResult.contactId}`);
-            }
+            const { syncMemberToHubSpot } = await import('../hubspot/stages');
+            await syncMemberToHubSpot({
+              email: customerEmail,
+              status: 'active',
+              billingProvider: 'stripe',
+              tier: tierName || undefined,
+              memberSince: new Date()
+            });
+            console.log(`[Reconcile] Synced ${customerEmail} to HubSpot: status=active, tier=${tierName}, billing=stripe`);
           } catch (hubspotError) {
             console.error(`[Reconcile] HubSpot sync failed for ${customerEmail}:`, hubspotError);
           }

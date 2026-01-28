@@ -38,6 +38,16 @@ export async function syncMemberTierFromStripe(
     }
     
     console.log(`[TierSync] Synced ${email} to tier ${tierSlug} (${tierName})`);
+    
+    // Sync tier change to HubSpot
+    try {
+      const { syncMemberToHubSpot } = await import('../hubspot/stages');
+      await syncMemberToHubSpot({ email, tier: tierName, billingProvider: 'stripe' });
+      console.log(`[TierSync] Synced ${email} tier=${tierName} to HubSpot`);
+    } catch (hubspotError) {
+      console.error('[TierSync] HubSpot sync failed:', hubspotError);
+    }
+    
     return { success: true, newTier: tierSlug, newTierId: tierId };
   } catch (error: any) {
     console.error('[TierSync] Error syncing tier:', error);
