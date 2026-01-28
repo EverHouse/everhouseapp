@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.37.4",
+    date: "2026-01-28",
+    title: "Staff PWA Menu Shortcuts",
+    changes: [
+      "Updated: PWA File menu now shows staff-relevant shortcuts (Dashboard, Bookings, Financials, Directory)",
+      "Fixed: Menu shortcuts now link directly to Staff Portal pages"
+    ]
+  },
+  {
     version: "9.37.3",
     date: "2026-01-28",
     title: "Calendar Refresh Button & Last Updated Time",
