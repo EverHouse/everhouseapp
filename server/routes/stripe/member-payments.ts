@@ -744,14 +744,8 @@ router.get('/api/member/balance', async (req: Request, res: Response) => {
     }> = [];
 
     for (const row of result.rows) {
-      // Skip if session has fee snapshots but none are pending (orphaned cached_fee_cents)
-      const pendingCount = parseInt(row.pending_snapshot_count) || 0;
-      const totalCount = parseInt(row.total_snapshot_count) || 0;
-      if (totalCount > 0 && pendingCount === 0) {
-        // Session has snapshots but none pending - skip this orphaned fee
-        continue;
-      }
-      
+      // Include fee if participant has cached_fee_cents OR ledger_fee
+      // The payment_status filter already ensures we only see unpaid fees
       let amountCents = 0;
       
       if (row.cached_fee_cents > 0) {
@@ -774,13 +768,7 @@ router.get('/api/member/balance', async (req: Request, res: Response) => {
     }
 
     for (const row of guestResult.rows) {
-      // Skip if session has fee snapshots but none are pending (orphaned cached_fee_cents)
-      const pendingCount = parseInt(row.pending_snapshot_count) || 0;
-      const totalCount = parseInt(row.total_snapshot_count) || 0;
-      if (totalCount > 0 && pendingCount === 0) {
-        continue;
-      }
-      
+      // Include all guest fees with cached_fee_cents > 0
       const amountCents = row.cached_fee_cents || GUEST_FEE_CENTS;
       const dateStr = row.session_date ? new Date(row.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
       breakdown.push({
@@ -863,13 +851,7 @@ router.post('/api/member/balance/pay', async (req: Request, res: Response) => {
     const participantFees: Array<{id: number; amountCents: number}> = [];
 
     for (const row of result.rows) {
-      // Skip if session has fee snapshots but none are pending (orphaned cached_fee_cents)
-      const pendingCount = parseInt(row.pending_snapshot_count) || 0;
-      const totalCount = parseInt(row.total_snapshot_count) || 0;
-      if (totalCount > 0 && pendingCount === 0) {
-        continue;
-      }
-      
+      // Include all pending fees - the payment_status filter already ensures we only see unpaid fees
       let amountCents = 0;
       if (row.cached_fee_cents > 0) {
         amountCents = row.cached_fee_cents;
@@ -882,13 +864,7 @@ router.post('/api/member/balance/pay', async (req: Request, res: Response) => {
     }
 
     for (const row of guestResult.rows) {
-      // Skip if session has fee snapshots but none are pending
-      const pendingCount = parseInt(row.pending_snapshot_count) || 0;
-      const totalCount = parseInt(row.total_snapshot_count) || 0;
-      if (totalCount > 0 && pendingCount === 0) {
-        continue;
-      }
-      
+      // Include all guest fees with cached_fee_cents > 0
       const amountCents = row.cached_fee_cents || GUEST_FEE_CENTS;
       participantFees.push({ id: row.participant_id, amountCents });
     }
