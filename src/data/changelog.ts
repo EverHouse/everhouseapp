@@ -13,6 +13,22 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.35.0",
+    date: "2026-01-28",
+    title: "Real-Time Updates & Optimistic UI",
+    isMajor: true,
+    changes: [
+      "Added: Real-time member profile updates - members see tier and guest pass changes instantly when staff makes edits",
+      "Added: Real-time wellness class availability - class spots update live when other members book/cancel",
+      "Added: Real-time invoice/payment history - members see payment and refund updates immediately",
+      "Added: Real-time guest pass count - remaining passes update instantly when staff redeems a guest",
+      "Added: Real-time tour scheduling - staff see tour updates from other staff members immediately",
+      "Added: Real-time balance display - member balance updates instantly after payment collection",
+      "Added: Optimistic UI for fee collection - 'Paid' status shows immediately while confirming with server",
+      "Improved: All real-time updates use rollback on error to maintain data consistency"
+    ]
+  },
+  {
     version: "9.34.5",
     date: "2026-01-28",
     title: "Subscription Date Display Fix",
