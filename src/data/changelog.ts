@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.35.1",
+    date: "2026-01-28",
+    title: "Staff Profile Bottom Navigation Fix",
+    changes: [
+      "Fixed: Staff portal profile page no longer shows member bottom navigation on mobile",
+      "Improved: Staff see clean profile page with 'Return to Staff Portal' button instead of member nav"
+    ]
+  },
+  {
     version: "9.35.0",
     date: "2026-01-28",
     title: "Real-Time Updates & Optimistic UI",

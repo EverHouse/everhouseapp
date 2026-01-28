@@ -955,8 +955,10 @@ const Profile: React.FC = () => {
 
       <BottomSentinel />
 
-      {/* Bottom Navigation */}
-      <MemberBottomNav currentPath="/profile" isDarkTheme={isDark} />
+      {/* Bottom Navigation - only show for members, not for staff/admin viewing their own profile */}
+      {(!isStaffOrAdminProfile || isViewingAs) && (
+        <MemberBottomNav currentPath="/profile" isDarkTheme={isDark} />
+      )}
 
       {/* Full Screen Card Modal */}
       <ModalShell 
