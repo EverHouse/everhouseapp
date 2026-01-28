@@ -205,7 +205,7 @@ export function BalancePaymentModal({
                         <span className={`material-symbols-outlined text-lg ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>receipt_long</span>
                       </div>
                       <h4 className={`text-sm font-bold ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
-                        Payment Summary
+                        Outstanding Balance
                       </h4>
                     </div>
                     <div className={`flex items-center justify-between pt-2 border-t ${isDark ? 'border-amber-500/20' : 'border-amber-200'}`}>
@@ -213,35 +213,21 @@ export function BalancePaymentModal({
                         {paymentData.itemCount} {paymentData.itemCount === 1 ? 'item' : 'items'}
                       </span>
                       <span className={`text-xl font-bold font-serif ${isDark ? 'text-white' : 'text-primary'}`}>
-                        ${(paymentData.totalCents / 100).toFixed(2)}
+                        ${((paymentData.remainingCents ?? paymentData.totalCents) / 100).toFixed(2)}
                       </span>
                     </div>
 
-                    {/* Show account balance applied if any (only for paidInFull case) */}
-                    {paymentData.paidInFull && paymentData.balanceApplied && paymentData.balanceApplied > 0 && (
-                      <div className={`mt-3 pt-3 border-t ${isDark ? 'border-amber-500/20' : 'border-amber-200'}`}>
-                        <div className="flex items-center justify-between">
-                          <span className={`text-sm ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                            Account Credit Applied
-                          </span>
-                          <span className={`text-sm font-medium ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                            -${(paymentData.balanceApplied / 100).toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Show balance that will be applied for partial balance case */}
-                    {!paymentData.paidInFull && paymentData.balanceApplied && paymentData.balanceApplied > 0 && (
+                    {/* Show account credit that will be applied */}
+                    {paymentData.balanceApplied && paymentData.balanceApplied > 0 && (
                       <div className={`mt-3 pt-3 border-t ${isDark ? 'border-amber-500/20' : 'border-amber-200'}`}>
                         <div className={`rounded-lg p-3 ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2">
                             <span className="material-symbols-outlined text-sm text-emerald-500">wallet</span>
                             <span className={`text-sm font-medium ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
                               Account Credit: ${(paymentData.balanceApplied / 100).toFixed(2)}
                             </span>
                           </div>
-                          <p className={`text-xs ${isDark ? 'text-white/60' : 'text-primary/60'}`}>
+                          <p className={`text-xs mt-1 ${isDark ? 'text-white/60' : 'text-primary/60'}`}>
                             Credit will be applied as a refund after payment
                           </p>
                         </div>
