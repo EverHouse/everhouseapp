@@ -2132,7 +2132,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                     }}
                                     disabled={isSyncing}
                                     className="p-1.5 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors disabled:opacity-50"
-                                    title="Refresh calendar data"
+                                    title={lastRefresh ? `Refresh calendar (Last: ${lastRefresh.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })})` : 'Refresh calendar data'}
                                 >
                                     <span className={`material-symbols-outlined text-lg ${isSyncing ? 'animate-spin' : ''}`}>sync</span>
                                 </button>
@@ -3142,7 +3142,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                 showToast(data.message || `Unmatched ${data.affectedCount} booking(s)`, 'success', 5000);
                                                 
                                                 setSelectedCalendarBooking(null);
-                                                await fetchCalendarData();
+                                                await handleRefresh();
                                             } catch (err: any) {
                                                 console.error('Failed to unmatch member:', err);
                                                 showToast(err.message || 'Failed to unmatch member', 'error');
