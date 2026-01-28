@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.38.1",
+    date: "2026-01-28",
+    title: "Calendar Quick Booking",
+    changes: [
+      "Added: Click empty calendar cells to open booking form with bay and time pre-filled",
+      "Improved: Queue card now matches calendar height with scrollable content",
+      "Improved: Floating action button positioned correctly on desktop view"
+    ]
+  },
+  {
     version: "9.38.0",
     date: "2026-01-28",
     title: "Staff Manual Booking Tool",

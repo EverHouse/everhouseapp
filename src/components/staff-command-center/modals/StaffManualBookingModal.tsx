@@ -36,6 +36,9 @@ interface StaffManualBookingModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: StaffManualBookingData) => Promise<void>;
+  defaultResourceId?: number;
+  defaultStartTime?: string;
+  defaultDate?: string;
 }
 
 function generateNotesText(
@@ -85,15 +88,18 @@ function calculateEndTime(startTime: string, durationMinutes: number): string {
 export function StaffManualBookingModal({
   isOpen,
   onClose,
-  onSubmit
+  onSubmit,
+  defaultResourceId,
+  defaultStartTime,
+  defaultDate
 }: StaffManualBookingModalProps) {
   const [step, setStep] = useState<1 | 2>(1);
   const [resources, setResources] = useState<Resource[]>([]);
   const [loadingResources, setLoadingResources] = useState(false);
 
-  const [resourceId, setResourceId] = useState<number | null>(null);
-  const [requestDate, setRequestDate] = useState(getTodayPacific());
-  const [startTime, setStartTime] = useState('10:00');
+  const [resourceId, setResourceId] = useState<number | null>(defaultResourceId ?? null);
+  const [requestDate, setRequestDate] = useState(defaultDate ?? getTodayPacific());
+  const [startTime, setStartTime] = useState(defaultStartTime ?? '10:00');
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [playerCount, setPlayerCount] = useState(1);
 
@@ -108,19 +114,33 @@ export function StaffManualBookingModal({
 
   useEffect(() => {
     if (isOpen) {
+      setStep(1);
+      setHostMember(null);
+      setParticipants([]);
+      setNotesText('');
+      setCopied(false);
+      setExternalId('');
+      setError(null);
+      setPlayerCount(1);
+      setDurationMinutes(60);
+      
+      setResourceId(defaultResourceId ?? null);
+      setStartTime(defaultStartTime ?? '10:00');
+      setRequestDate(defaultDate ?? getTodayPacific());
+      
       setLoadingResources(true);
       fetch('/api/resources?type=simulator', { credentials: 'include' })
         .then(res => res.json())
         .then(data => {
           setResources(data);
-          if (data.length > 0 && !resourceId) {
-            setResourceId(data[0].id);
+          if (data.length > 0 && defaultResourceId === undefined) {
+            setResourceId(prev => prev ?? data[0].id);
           }
         })
         .catch(err => console.error('Failed to load resources:', err))
         .finally(() => setLoadingResources(false));
     }
-  }, [isOpen]);
+  }, [isOpen, defaultResourceId, defaultStartTime, defaultDate]);
 
   useEffect(() => {
     const additionalSlots = Math.max(0, playerCount - 1);
