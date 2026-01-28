@@ -654,6 +654,8 @@ router.get('/api/member/balance', async (req: Request, res: Response) => {
       memberEmail = queryEmail.toLowerCase();
     }
 
+    // Only show fees where there's a pending fee snapshot OR no snapshot at all (legacy)
+    // Exclude sessions where all snapshots are cancelled/paid (orphaned cached_fee_cents)
     const result = await pool.query(
       `SELECT 
         bp.id as participant_id,
@@ -666,7 +668,9 @@ router.get('/api/member/balance', async (req: Request, res: Response) => {
         bs.start_time,
         bs.end_time,
         r.name as resource_name,
-        COALESCE(ul.overage_fee, 0) + COALESCE(ul.guest_fee, 0) as ledger_fee
+        COALESCE(ul.overage_fee, 0) + COALESCE(ul.guest_fee, 0) as ledger_fee,
+        (SELECT COUNT(*) FROM booking_fee_snapshots bfs WHERE bfs.session_id = bp.session_id AND bfs.status = 'pending') as pending_snapshot_count,
+        (SELECT COUNT(*) FROM booking_fee_snapshots bfs WHERE bfs.session_id = bp.session_id) as total_snapshot_count
        FROM booking_participants bp
        JOIN booking_sessions bs ON bs.id = bp.session_id
        JOIN users pu ON pu.id = bp.user_id
@@ -692,7 +696,9 @@ router.get('/api/member/balance', async (req: Request, res: Response) => {
         bs.start_time,
         bs.end_time,
         r.name as resource_name,
-        owner_u.email as owner_email
+        owner_u.email as owner_email,
+        (SELECT COUNT(*) FROM booking_fee_snapshots bfs WHERE bfs.session_id = bp.session_id AND bfs.status = 'pending') as pending_snapshot_count,
+        (SELECT COUNT(*) FROM booking_fee_snapshots bfs WHERE bfs.session_id = bp.session_id) as total_snapshot_count
        FROM booking_participants bp
        JOIN booking_sessions bs ON bs.id = bp.session_id
        LEFT JOIN resources r ON r.id = bs.resource_id
@@ -717,6 +723,14 @@ router.get('/api/member/balance', async (req: Request, res: Response) => {
     }> = [];
 
     for (const row of result.rows) {
+      // Skip if session has fee snapshots but none are pending (orphaned cached_fee_cents)
+      const pendingCount = parseInt(row.pending_snapshot_count) || 0;
+      const totalCount = parseInt(row.total_snapshot_count) || 0;
+      if (totalCount > 0 && pendingCount === 0) {
+        // Session has snapshots but none pending - skip this orphaned fee
+        continue;
+      }
+      
       let amountCents = 0;
       
       if (row.cached_fee_cents > 0) {
@@ -739,6 +753,13 @@ router.get('/api/member/balance', async (req: Request, res: Response) => {
     }
 
     for (const row of guestResult.rows) {
+      // Skip if session has fee snapshots but none are pending (orphaned cached_fee_cents)
+      const pendingCount = parseInt(row.pending_snapshot_count) || 0;
+      const totalCount = parseInt(row.total_snapshot_count) || 0;
+      if (totalCount > 0 && pendingCount === 0) {
+        continue;
+      }
+      
       const amountCents = row.cached_fee_cents || GUEST_FEE_CENTS;
       const dateStr = row.session_date ? new Date(row.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
       breakdown.push({

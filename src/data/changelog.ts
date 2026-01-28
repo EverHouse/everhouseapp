@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.32.19",
+    date: "2026-01-28",
+    title: "Member Balance Shows Only Valid Pending Fees",
+    isMajor: false,
+    changes: [
+      "CRITICAL: Fixed member balance showing cancelled/orphaned fees from database instead of actual pending charges",
+      "Balance calculation now checks Stripe fee snapshot status - only includes fees with 'pending' snapshots",
+      "Fees from sessions with cancelled/paid/failed Stripe payment intents are now correctly excluded",
+      "Ensures Stripe is the source of truth for billing - database cached fees are filtered by snapshot validity",
+      "Added HubSpot sync when existing users purchase Stripe subscriptions (was only working for new users)"
+    ]
+  },
+  {
     version: "9.32.18",
     date: "2026-01-27",
     title: "Trackman Webhook Count Display",
