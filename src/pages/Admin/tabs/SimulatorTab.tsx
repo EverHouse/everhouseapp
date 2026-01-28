@@ -1733,10 +1733,10 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                     <span aria-hidden="true" className="material-symbols-outlined animate-spin text-primary dark:text-white">progress_activity</span>
                 </div>
             ) : (
-                <div className="flex flex-col lg:flex-row flex-1">
-                    <div className={`lg:w-[400px] xl:w-[450px] lg:border-r border-gray-200 dark:border-white/25 flex-shrink-0 relative ${activeView === 'requests' ? 'block' : 'hidden lg:block'}`}>
+                <div className="flex flex-col lg:grid lg:grid-cols-[400px_1fr] xl:grid-cols-[450px_1fr] lg:items-stretch flex-1">
+                    <div className={`lg:border-r border-gray-200 dark:border-white/25 relative lg:flex lg:flex-col lg:min-h-0 ${activeView === 'requests' ? 'block' : 'hidden lg:block'}`}>
                         <div className="hidden lg:block absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-white dark:from-[#1e1e1e] to-transparent z-10 pointer-events-none" />
-                        <div className="space-y-6 p-5 animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
+                        <div className="space-y-6 p-5 animate-slide-up-stagger lg:overflow-y-auto lg:flex-1 lg:min-h-0" style={{ '--stagger-index': 0 } as React.CSSProperties}>
                     <div className="animate-slide-up-stagger" style={{ '--stagger-index': 1 } as React.CSSProperties}>
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="font-bold text-primary dark:text-white flex items-center gap-2">
