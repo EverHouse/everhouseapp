@@ -656,6 +656,7 @@ router.post('/api/bookings/:id/assign-member', isStaffOrAdmin, async (req, res) 
           userName: member_name,
           userId: member_id || null,
           isUnmatched: false,
+          status: 'approved',
           staffNotes: sql`COALESCE(${bookingRequests.staffNotes}, '') || ' [Member assigned by staff: ' || ${member_name} || ']'`,
           updatedAt: new Date()
         })
@@ -748,6 +749,7 @@ router.post('/api/bookings/link-trackman-to-member', isStaffOrAdmin, async (req,
             userName: ownerName,
             userId: ownerId || null,
             isUnmatched: false,
+            status: 'approved',
             declaredPlayerCount: totalPlayerCount,
             guestCount: guestCount,
             staffNotes: sql`COALESCE(${bookingRequests.staffNotes}, '') || ' [Linked to member via staff: ' || ${ownerName} || ' with ' || ${totalPlayerCount.toString()} || ' players]'`,
@@ -1004,6 +1006,7 @@ router.put('/api/bookings/:id/assign-with-players', isStaffOrAdmin, async (req, 
           userName: owner.name,
           userId: owner.member_id || null,
           isUnmatched: false,
+          status: 'approved',
           declaredPlayerCount: totalPlayerCount,
           guestCount: guestCount,
           staffNotes: sql`COALESCE(${bookingRequests.staffNotes}, '') || ' [Assigned by staff: ' || ${owner.name} || ' with ' || ${totalPlayerCount.toString()} || ' players]'`,
@@ -1126,6 +1129,7 @@ router.put('/api/bookings/:id/change-owner', isStaffOrAdmin, async (req, res) =>
         userName: new_name,
         userId: member_id || null,
         isUnmatched: false,
+        status: 'approved',
         staffNotes: sql`COALESCE(${bookingRequests.staffNotes}, '') || ' [Owner changed from ' || ${previousOwner} || ' to ' || ${new_name} || ' by staff]'`,
         updatedAt: new Date()
       })

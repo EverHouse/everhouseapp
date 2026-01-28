@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.37.2",
+    date: "2026-01-28",
+    title: "Webhook Booking Link Fix",
+    changes: [
+      "Fixed: Webhook bookings now appear on calendar after linking to member",
+      "Fixed: Linked bookings now show on member dashboard correctly",
+      "Fixed: Booking status properly set to approved when staff assigns or changes owner",
+      "Fixed: All four member assignment endpoints now correctly approve bookings"
+    ]
+  },
+  {
     version: "9.37.1",
     date: "2026-01-28",
     title: "Complete Real-Time Billing Notifications",
