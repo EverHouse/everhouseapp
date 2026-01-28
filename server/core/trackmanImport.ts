@@ -937,19 +937,21 @@ async function createTrackmanSessionAndParticipants(input: SessionCreationInput)
       .set({ sessionId: session.id })
       .where(eq(bookingRequests.id, input.bookingId));
 
-    // Update payment_status and payment_method based on past/future sessions
+    // Update payment_status based on past/future sessions
+    // Past sessions are marked as 'paid' (already happened, assumed settled externally)
+    // Future sessions are marked as 'pending' (require payment through the app)
     if (participants.length > 0) {
       const participantIds = participants.map(p => p.id);
       if (input.isPast) {
         await db.execute(sql`
           UPDATE booking_participants 
-          SET payment_status = 'paid', payment_method = 'credit_card'
+          SET payment_status = 'paid', paid_at = NOW()
           WHERE id = ANY(${participantIds})
         `);
       } else {
         await db.execute(sql`
           UPDATE booking_participants 
-          SET payment_status = 'pending', payment_method = 'unpaid'
+          SET payment_status = 'pending'
           WHERE id = ANY(${participantIds})
         `);
       }
