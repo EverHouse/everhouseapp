@@ -111,7 +111,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   const [eventsLoaded, setEventsLoaded] = useState(false);
   const [announcementsLoaded, setAnnouncementsLoaded] = useState(false);
   const [cafeMenu, setCafeMenu] = useState<CafeItem[]>(INITIAL_CAFE);
-  const [events, setEvents] = useState<EventData[]>(INITIAL_EVENTS);
+  const [events, setEvents] = useState<EventData[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>(INITIAL_ANNOUNCEMENTS);
   const [members, setMembers] = useState<MemberProfile[]>(INITIAL_MEMBERS);
   const [formerMembers, setFormerMembers] = useState<MemberProfile[]>([]);
@@ -863,7 +863,10 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     }
 
     fetchAndCache<any[]>('events', '/api/events', (data) => {
-      if (data?.length) setEvents(formatEventData(data));
+      // Always set events from API response, even if empty - this clears hardcoded placeholder data
+      if (Array.isArray(data)) {
+        setEvents(data.length ? formatEventData(data) : []);
+      }
       setEventsLoaded(true);
     });
     
