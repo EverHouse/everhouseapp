@@ -165,7 +165,7 @@ export async function createBookingForMember(
       const endMinutesCalc = endParts[0] * 60 + endParts[1];
       const newDurationMinutes = endMinutesCalc > startMinutesCalc ? endMinutesCalc - startMinutesCalc : 60;
       
-      await pool.query(
+      const pendingUpdateResult = await pool.query(
         `UPDATE booking_requests 
          SET trackman_booking_id = $1, 
              trackman_player_count = $2,
@@ -180,9 +180,17 @@ export async function createBookingForMember(
              last_sync_source = 'trackman_webhook',
              last_trackman_sync_at = NOW(),
              updated_at = NOW()
-         WHERE id = $7`,
+         WHERE id = $7 AND trackman_booking_id IS NULL
+         RETURNING id`,
         [trackmanBookingId, playerCount, updatedNotes, startTime, endTime, newDurationMinutes, pendingBookingId]
       );
+      
+      if (pendingUpdateResult.rowCount === 0) {
+        logger.warn('[Trackman Webhook] Pending booking was already linked by another process', {
+          extra: { pendingBookingId, trackmanBookingId, email: member.email }
+        });
+        return { success: false };
+      }
       
       const sessionCheck = await pool.query(
         'SELECT session_id FROM booking_requests WHERE id = $1',
@@ -576,7 +584,7 @@ export async function linkByExternalBookingId(
     const originalDuration = booking.duration_minutes;
     const timeChanged = originalDuration !== durationMinutes;
     
-    await pool.query(
+    const externalUpdateResult = await pool.query(
       `UPDATE booking_requests 
        SET trackman_booking_id = $1,
            trackman_player_count = $2,
@@ -591,7 +599,8 @@ export async function linkByExternalBookingId(
            last_sync_source = 'trackman_webhook',
            last_trackman_sync_at = NOW(),
            updated_at = NOW()
-       WHERE id = $8`,
+       WHERE id = $8 AND trackman_booking_id IS NULL
+       RETURNING id`,
       [
         trackmanBookingId,
         playerCount,
@@ -603,6 +612,13 @@ export async function linkByExternalBookingId(
         bookingId
       ]
     );
+    
+    if (externalUpdateResult.rowCount === 0) {
+      logger.warn('[Trackman Webhook] Booking was already linked by another process (externalBookingId)', {
+        extra: { bookingId, trackmanBookingId, externalBookingId }
+      });
+      return { matched: false };
+    }
     
     if (timeChanged && booking.session_id) {
       try {
