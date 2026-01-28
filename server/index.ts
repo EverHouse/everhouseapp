@@ -12,10 +12,37 @@ import { globalRateLimiter } from './middleware/rateLimiting';
 import { getSession, registerAuthRoutes } from './replit_integrations/auth';
 import { setupSupabaseAuthRoutes } from './supabase/auth';
 import { isProduction, pool } from './core/db';
-import { requestIdMiddleware, logRequest } from './core/logger';
+import { requestIdMiddleware, logRequest, logger } from './core/logger';
 import { registerRoutes } from './loaders/routes';
-import { runStartupTasks } from './loaders/startup';
-import { initWebSocketServer } from './core/websocket';
+import { runStartupTasks, getStartupHealth } from './loaders/startup';
+import { initWebSocketServer, closeWebSocketServer } from './core/websocket';
+
+let isShuttingDown = false;
+
+process.on('uncaughtException', (error) => {
+  logger.error('[Process] Uncaught Exception:', { error: error.message, stack: error.stack });
+  console.error('[Process] Uncaught Exception:', error);
+  if (!isShuttingDown) {
+    gracefulShutdown('uncaughtException');
+  }
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  const errorMessage = reason instanceof Error ? reason.message : String(reason);
+  const errorStack = reason instanceof Error ? reason.stack : undefined;
+  logger.error('[Process] Unhandled Rejection:', { error: errorMessage, stack: errorStack });
+  console.error('[Process] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('SIGTERM', () => {
+  console.log('[Process] Received SIGTERM signal');
+  gracefulShutdown('SIGTERM');
+});
+
+process.on('SIGINT', () => {
+  console.log('[Process] Received SIGINT signal');
+  gracefulShutdown('SIGINT');
+});
 import { startIntegrityScheduler } from './schedulers/integrityScheduler';
 import { startWaiverReviewScheduler } from './schedulers/waiverReviewScheduler';
 import { startStripeReconciliationScheduler } from './schedulers/stripeReconciliationScheduler';
@@ -43,17 +70,82 @@ const __dirname = path.dirname(__filename);
 let isReady = false;
 let httpServer: Server | null = null;
 
+async function gracefulShutdown(signal: string) {
+  if (isShuttingDown) {
+    console.log('[Shutdown] Already shutting down...');
+    return;
+  }
+  isShuttingDown = true;
+  isReady = false;
+  
+  console.log(`[Shutdown] Starting graceful shutdown (${signal})...`);
+  
+  const shutdownTimeout = setTimeout(() => {
+    console.error('[Shutdown] Timeout exceeded, forcing exit');
+    process.exit(1);
+  }, 30000);
+  
+  try {
+    closeWebSocketServer();
+    console.log('[Shutdown] WebSocket server closed');
+    
+    if (httpServer) {
+      await new Promise<void>((resolve, reject) => {
+        httpServer!.close((err) => {
+          if (err) {
+            console.error('[Shutdown] HTTP server close error:', err);
+            reject(err);
+          } else {
+            console.log('[Shutdown] HTTP server closed');
+            resolve();
+          }
+        });
+      });
+    }
+    
+    await pool.end();
+    console.log('[Shutdown] Database pool closed');
+    
+    clearTimeout(shutdownTimeout);
+    console.log('[Shutdown] Graceful shutdown complete');
+    process.exit(0);
+  } catch (error) {
+    console.error('[Shutdown] Error during shutdown:', error);
+    clearTimeout(shutdownTimeout);
+    process.exit(1);
+  }
+}
+
 const app = express();
 
 app.get('/healthz', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-app.get('/api/ready', (req, res) => {
-  if (isReady) {
-    res.status(200).json({ ready: true });
-  } else {
-    res.status(503).json({ ready: false });
+app.get('/api/ready', async (req, res) => {
+  const startupHealth = getStartupHealth();
+  
+  if (isShuttingDown) {
+    return res.status(503).json({ ready: false, reason: 'shutting_down' });
+  }
+  
+  if (!isReady) {
+    return res.status(503).json({ ready: false, reason: 'starting_up', startupHealth });
+  }
+  
+  try {
+    await pool.query('SELECT 1');
+    res.status(200).json({ 
+      ready: true, 
+      startupHealth,
+      uptime: process.uptime()
+    });
+  } catch (dbError) {
+    res.status(503).json({ 
+      ready: false, 
+      reason: 'database_unavailable',
+      startupHealth
+    });
   }
 });
 
@@ -193,22 +285,38 @@ app.get('/api/health', async (req, res) => {
   try {
     const dbResult = await pool.query('SELECT NOW() as time');
     const isAuthenticated = req.session?.user?.isStaff === true;
+    const startupHealth = getStartupHealth();
     
     const baseResponse = {
       status: 'ok',
       database: 'connected',
-      timestamp: dbResult.rows[0].time
+      timestamp: dbResult.rows[0].time,
+      uptime: process.uptime()
     };
     
     if (isAuthenticated) {
+      const { getAlertCounts, getRecentAlerts } = await import('./core/monitoring');
+      const alertCounts = getAlertCounts();
+      const recentCritical = getRecentAlerts({ severity: 'critical', limit: 5 });
+      
       const resourceCount = await pool.query('SELECT COUNT(*) as count FROM resources');
       const resourceTypes = await pool.query('SELECT type, COUNT(*) as count FROM resources GROUP BY type');
+      
       res.json({
         ...baseResponse,
         environment: isProduction ? 'production' : 'development',
         resourceCount: parseInt(resourceCount.rows[0].count),
         resourcesByType: resourceTypes.rows,
-        databaseUrl: process.env.DATABASE_URL ? 'configured' : 'missing'
+        databaseUrl: process.env.DATABASE_URL ? 'configured' : 'missing',
+        startupHealth,
+        alerts: {
+          counts: alertCounts,
+          recentCritical: recentCritical.map(a => ({
+            message: a.message,
+            category: a.category,
+            timestamp: a.timestamp
+          }))
+        }
       });
     } else {
       res.json(baseResponse);
@@ -362,28 +470,6 @@ async function autoSeedCafeMenu() {
     if (!isProduction) console.log('Cafe menu table may not exist yet, skipping auto-seed');
   }
 }
-
-async function gracefulShutdown(signal: string) {
-  console.log(`Graceful shutdown initiated... (${signal})`);
-  
-  if (httpServer) {
-    httpServer.close(() => {
-      console.log('[Shutdown] HTTP server closed');
-    });
-  }
-  
-  try {
-    await pool.end();
-    console.log('[Shutdown] Database pool closed');
-  } catch (err) {
-    console.error('[Shutdown] Error closing database pool:', err);
-  }
-  
-  process.exit(0);
-}
-
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 async function startServer() {
   console.log(`[Startup] Environment: ${isProduction ? 'production' : 'development'}`);

@@ -70,13 +70,15 @@ export async function createPaymentIntent(
   if (productId) stripeMetadata.productId = productId;
   if (productName) stripeMetadata.productName = productName;
 
-  // Generate idempotency key to prevent duplicate payment intents
-  // Uses a combination of booking/session IDs and amount for uniqueness
+  // Generate deterministic idempotency key to prevent duplicate payment intents
+  // Uses a combination of booking/session IDs, amount, and purpose for uniqueness
+  // IMPORTANT: Avoid non-deterministic values like Date.now() to ensure true idempotency
   const idempotencyComponents = [
-    bookingId || 'no-booking',
-    sessionId || 'no-session',
+    purpose,
+    bookingId?.toString() || 'no-booking',
+    sessionId?.toString() || 'no-session',
     amountCents.toString(),
-    metadata?.feeSnapshotId || Date.now().toString()
+    metadata?.feeSnapshotId || `${userId}-${email}`.replace(/[^a-zA-Z0-9-]/g, '')
   ];
   const idempotencyKey = `pi_${idempotencyComponents.join('_')}`;
   

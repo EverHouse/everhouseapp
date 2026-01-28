@@ -12,6 +12,7 @@ import { broadcastBillingUpdate, broadcastDayPassUpdate, sendNotificationToUser 
 import { recordDayPassPurchaseFromWebhook } from '../../routes/dayPasses';
 import { handlePrimarySubscriptionCancelled } from './groupBilling';
 import { computeFeeBreakdown } from '../billing/unifiedFeeService';
+import { logPaymentFailure, logWebhookFailure } from '../monitoring';
 import type { PoolClient } from 'pg';
 
 const EVENT_DEDUP_WINDOW_DAYS = 7;
@@ -758,12 +759,21 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: a
 const MAX_RETRY_ATTEMPTS = 3;
 
 async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: any): Promise<DeferredAction[]> {
-  const { id, metadata, amount, last_payment_error } = paymentIntent;
+  const { id, metadata, amount, last_payment_error, customer } = paymentIntent;
   const reason = last_payment_error?.message || 'Payment could not be processed';
   
   const deferredActions: DeferredAction[] = [];
   
   console.log(`[Stripe Webhook] Payment failed: ${id}, amount: $${(amount / 100).toFixed(2)}, reason: ${reason}`);
+  
+  logPaymentFailure({
+    paymentIntentId: id,
+    customerId: customer,
+    userEmail: metadata?.email,
+    amountCents: amount,
+    errorMessage: reason,
+    errorCode: last_payment_error?.code
+  });
 
   const existingResult = await client.query(
     `SELECT retry_count FROM stripe_payment_intents WHERE stripe_payment_intent_id = $1`,
@@ -789,7 +799,7 @@ async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: any)
   
   console.log(`[Stripe Webhook] Updated payment ${id}: retry ${newRetryCount}/${MAX_RETRY_ATTEMPTS}, requires_card_update=${requiresCardUpdate}`);
 
-  const customer = paymentIntent.customer;
+  // customer is already destructured from paymentIntent at function entry
   const customerId = typeof customer === 'string' ? customer : customer?.id;
   const customerEmail = typeof customer === 'object' ? customer?.email : metadata?.email;
   const customerName = typeof customer === 'object' ? customer?.name : metadata?.memberName;
@@ -1022,6 +1032,15 @@ async function handleInvoicePaymentFailed(client: PoolClient, invoice: any): Pro
   const deferredActions: DeferredAction[] = [];
   const invoiceCustomerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
   const invoiceCustomerName = typeof invoice.customer === 'object' ? invoice.customer?.name : undefined;
+  
+  logPaymentFailure({
+    paymentIntentId: invoice.payment_intent,
+    customerId: invoiceCustomerId,
+    userEmail: invoice.customer_email,
+    amountCents: invoice.amount_due,
+    errorMessage: `Invoice payment failed: ${invoice.id}`,
+    errorCode: 'invoice_payment_failed'
+  });
   
   deferredActions.push(async () => {
     await upsertTransactionCache({

@@ -5,39 +5,69 @@ import { runMigrations } from 'stripe-replit-sync';
 import { enableRealtimeForTable } from '../core/supabase/client';
 import { initMemberSyncSettings } from '../core/memberSync';
 
+interface StartupHealth {
+  database: 'ok' | 'failed' | 'pending';
+  stripe: 'ok' | 'failed' | 'pending';
+  realtime: 'ok' | 'failed' | 'pending';
+  criticalFailures: string[];
+  warnings: string[];
+  startedAt: string;
+  completedAt?: string;
+}
+
+const startupHealth: StartupHealth = {
+  database: 'pending',
+  stripe: 'pending',
+  realtime: 'pending',
+  criticalFailures: [],
+  warnings: [],
+  startedAt: new Date().toISOString()
+};
+
+export function getStartupHealth(): StartupHealth {
+  return { ...startupHealth };
+}
+
 export async function runStartupTasks(): Promise<void> {
   console.log('[Startup] Running deferred database initialization...');
   
   try {
     await ensureDatabaseConstraints();
     console.log('[Startup] Database constraints initialized successfully');
-  } catch (err) {
-    console.error('[Startup] Database constraints failed (non-fatal):', err);
+    startupHealth.database = 'ok';
+  } catch (err: any) {
+    console.error('[Startup] Database constraints failed:', err);
+    startupHealth.database = 'failed';
+    startupHealth.criticalFailures.push(`Database constraints: ${err.message}`);
   }
   
   try {
     await seedDefaultNoticeTypes();
-  } catch (err) {
-    console.error('[Startup] Seeding notice types failed (non-fatal):', err);
+  } catch (err: any) {
+    console.error('[Startup] Seeding notice types failed:', err);
+    startupHealth.warnings.push(`Notice types: ${err.message}`);
   }
 
   try {
     await initMemberSyncSettings();
-  } catch (err) {
-    console.error('[Startup] Member sync settings init failed (non-fatal):', err);
+  } catch (err: any) {
+    console.error('[Startup] Member sync settings init failed:', err);
+    startupHealth.warnings.push(`Member sync settings: ${err.message}`);
   }
 
   try {
     await seedTrainingSections();
     console.log('[Startup] Training sections synced');
-  } catch (err) {
-    console.error('[Startup] Seeding training sections failed (non-fatal):', err);
+  } catch (err: any) {
+    console.error('[Startup] Seeding training sections failed:', err);
+    startupHealth.warnings.push(`Training sections: ${err.message}`);
   }
 
   try {
     await createStripeTransactionCache();
-  } catch (err) {
-    console.error('[Startup] Creating stripe transaction cache failed (non-fatal):', err);
+  } catch (err: any) {
+    console.error('[Startup] Creating stripe transaction cache failed:', err);
+    startupHealth.warnings.push(`Stripe transaction cache: ${err.message}`);
   }
 
   try {
@@ -56,10 +86,15 @@ export async function runStartupTasks(): Promise<void> {
         await stripeSync.findOrCreateManagedWebhook(webhookUrl);
         console.log('[Stripe] Webhook configured');
       }
+      
+      startupHealth.stripe = 'ok';
 
       stripeSync.syncBackfill()
         .then(() => console.log('[Stripe] Data sync complete'))
-        .catch((err: any) => console.error('[Stripe] Data sync error:', err.message));
+        .catch((err: any) => {
+          console.error('[Stripe] Data sync error:', err.message);
+          startupHealth.warnings.push(`Stripe backfill: ${err.message}`);
+        });
       
       import('../core/stripe/groupBilling.js')
         .then(({ getOrCreateFamilyCoupon }) => getOrCreateFamilyCoupon())
@@ -81,7 +116,9 @@ export async function runStartupTasks(): Promise<void> {
         .catch((err: any) => console.error('[Stripe] Customer sync failed:', err.message));
     }
   } catch (err: any) {
-    console.error('[Stripe] Initialization failed (non-fatal):', err.message);
+    console.error('[Stripe] Initialization failed:', err.message);
+    startupHealth.stripe = 'failed';
+    startupHealth.criticalFailures.push(`Stripe initialization: ${err.message}`);
   }
 
   try {
@@ -90,7 +127,19 @@ export async function runStartupTasks(): Promise<void> {
     await enableRealtimeForTable('booking_sessions');
     await enableRealtimeForTable('announcements');
     console.log('[Supabase] Realtime enabled for notifications, booking_sessions, announcements');
+    startupHealth.realtime = 'ok';
   } catch (err: any) {
-    console.error('[Supabase] Realtime setup failed (non-fatal):', err.message);
+    console.error('[Supabase] Realtime setup failed:', err.message);
+    startupHealth.realtime = 'failed';
+    startupHealth.warnings.push(`Supabase realtime: ${err.message}`);
+  }
+  
+  startupHealth.completedAt = new Date().toISOString();
+  
+  if (startupHealth.criticalFailures.length > 0) {
+    console.error('[Startup] CRITICAL FAILURES:', startupHealth.criticalFailures);
+  }
+  if (startupHealth.warnings.length > 0) {
+    console.warn('[Startup] Warnings:', startupHealth.warnings);
   }
 }

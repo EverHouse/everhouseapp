@@ -13,6 +13,21 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.36.0",
+    date: "2026-01-28",
+    title: "Production Readiness Improvements",
+    isMajor: true,
+    changes: [
+      "Added: Global error handlers to catch and log unexpected crashes gracefully",
+      "Added: Clean shutdown system - server closes connections properly on restart",
+      "Added: Monitoring and alerting system for payment failures and critical events",
+      "Added: Startup health tracking with categorized warnings and critical failures",
+      "Added: Enhanced health check endpoint with uptime and alert status for staff",
+      "Improved: Server stability with automatic error recovery",
+      "Improved: WebSocket connection security with origin validation"
+    ]
+  },
+  {
     version: "9.35.3",
     date: "2026-01-28",
     title: "Stripe Webhook Fix",

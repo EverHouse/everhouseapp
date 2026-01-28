@@ -164,10 +164,80 @@ async function getVerifiedUserFromRequest(req: IncomingMessage): Promise<{
 const MAX_AUTH_ATTEMPTS = 3;
 const AUTH_TIMEOUT_MS = 10000;
 
+function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+  
+  try {
+    const url = new URL(origin);
+    const hostname = url.hostname;
+    
+    if (hostname.endsWith('.replit.app') || 
+        hostname.endsWith('.replit.dev') || 
+        hostname.endsWith('.repl.co')) {
+      return true;
+    }
+    
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return true;
+    }
+    
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [];
+    if (allowedOrigins.some(allowed => origin.includes(allowed))) {
+      return true;
+    }
+    
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export function closeWebSocketServer(): void {
+  if (wss) {
+    clients.forEach((connections, email) => {
+      connections.forEach(conn => {
+        try {
+          conn.ws.close(1001, 'Server shutting down');
+        } catch (err) {
+          // Ignore close errors during shutdown
+        }
+      });
+    });
+    clients.clear();
+    staffEmails.clear();
+    
+    wss.close((err) => {
+      if (err) {
+        console.error('[WebSocket] Error closing server:', err);
+      } else {
+        console.log('[WebSocket] Server closed gracefully');
+      }
+    });
+    wss = null;
+  }
+}
+
 export function initWebSocketServer(server: Server) {
   wss = new WebSocketServer({ server, path: '/ws' });
+  
+  wss.on('error', (error) => {
+    logger.error('[WebSocket] Server error:', { error: error.message, stack: (error as any).stack });
+    console.error('[WebSocket] Server error:', error);
+  });
 
   wss.on('connection', async (ws, req) => {
+    const origin = req.headers.origin;
+    if (!isAllowedOrigin(origin)) {
+      logger.warn('[WebSocket] Connection rejected - invalid origin', { 
+        extra: { event: 'websocket.rejected', origin, reason: 'invalid_origin' } 
+      });
+      ws.close(4003, 'Forbidden origin');
+      return;
+    }
+    
+    ws.on('error', (error) => {
+      logger.error('[WebSocket] Client connection error:', { error: error.message });
+    });
     let userEmail: string | null = null;
     let isAuthenticated = false;
     let sessionId: string | undefined;
