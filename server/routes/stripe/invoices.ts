@@ -10,6 +10,7 @@ import {
   getInvoice,
   voidInvoice
 } from '../../core/stripe';
+import { sendNotificationToUser, broadcastBillingUpdate } from '../../core/websocket';
 
 const router = Router();
 
@@ -75,6 +76,25 @@ router.post('/api/stripe/invoices', isStaffOrAdmin, async (req: Request, res: Re
       return res.status(500).json({ error: result.error || 'Failed to create invoice' });
     }
     
+    try {
+      const memberLookup = await pool.query(
+        'SELECT email FROM users WHERE stripe_customer_id = $1',
+        [customerId]
+      );
+      if (memberLookup.rows.length > 0) {
+        const memberEmail = memberLookup.rows[0].email;
+        sendNotificationToUser(memberEmail, {
+          type: 'billing_update',
+          title: 'New Invoice',
+          message: 'A new invoice has been created for your account.',
+          data: { invoiceId: result.invoice?.id }
+        });
+        broadcastBillingUpdate(memberEmail, 'invoice_created');
+      }
+    } catch (notifyError) {
+      console.error('[Stripe] Failed to send invoice notification:', notifyError);
+    }
+    
     res.json({
       success: true,
       invoice: result.invoice
@@ -93,6 +113,30 @@ router.post('/api/stripe/invoices/:invoiceId/finalize', isStaffOrAdmin, async (r
     
     if (!result.success) {
       return res.status(500).json({ error: result.error || 'Failed to finalize invoice' });
+    }
+    
+    try {
+      if (result.invoice?.customer) {
+        const customerId = typeof result.invoice.customer === 'string' 
+          ? result.invoice.customer 
+          : result.invoice.customer.id;
+        const memberLookup = await pool.query(
+          'SELECT email FROM users WHERE stripe_customer_id = $1',
+          [customerId]
+        );
+        if (memberLookup.rows.length > 0) {
+          const memberEmail = memberLookup.rows[0].email;
+          sendNotificationToUser(memberEmail, {
+            type: 'billing_update',
+            title: 'Invoice Ready',
+            message: 'Your invoice is ready for payment.',
+            data: { invoiceId: result.invoice.id }
+          });
+          broadcastBillingUpdate(memberEmail, 'invoice_finalized');
+        }
+      }
+    } catch (notifyError) {
+      console.error('[Stripe] Failed to send invoice finalize notification:', notifyError);
     }
     
     res.json({
@@ -126,10 +170,38 @@ router.post('/api/stripe/invoices/:invoiceId/void', isStaffOrAdmin, async (req: 
   try {
     const { invoiceId } = req.params;
     
+    const invoiceResult = await getInvoice(invoiceId);
+    const customerId = invoiceResult.invoice?.customer 
+      ? (typeof invoiceResult.invoice.customer === 'string' 
+          ? invoiceResult.invoice.customer 
+          : invoiceResult.invoice.customer.id)
+      : null;
+    
     const result = await voidInvoice(invoiceId);
     
     if (!result.success) {
       return res.status(500).json({ error: result.error || 'Failed to void invoice' });
+    }
+    
+    try {
+      if (customerId) {
+        const memberLookup = await pool.query(
+          'SELECT email FROM users WHERE stripe_customer_id = $1',
+          [customerId]
+        );
+        if (memberLookup.rows.length > 0) {
+          const memberEmail = memberLookup.rows[0].email;
+          sendNotificationToUser(memberEmail, {
+            type: 'billing_update',
+            title: 'Invoice Voided',
+            message: 'An invoice on your account has been voided.',
+            data: { invoiceId }
+          });
+          broadcastBillingUpdate(memberEmail, 'invoice_voided');
+        }
+      }
+    } catch (notifyError) {
+      console.error('[Stripe] Failed to send invoice void notification:', notifyError);
     }
     
     res.json({ success: true });

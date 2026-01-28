@@ -13,6 +13,7 @@ import {
 } from '../../core/stripe';
 import { getSessionUser } from '../../types/session';
 import { logFromRequest } from '../../core/auditLog';
+import { sendNotificationToUser, broadcastBillingUpdate } from '../../core/websocket';
 
 const router = Router();
 
@@ -54,6 +55,35 @@ router.post('/api/stripe/subscriptions', isStaffOrAdmin, async (req: Request, re
       return res.status(500).json({ error: result.error || 'Failed to create subscription' });
     }
     
+    try {
+      if (memberEmail) {
+        sendNotificationToUser(memberEmail, {
+          type: 'billing_update',
+          title: 'Subscription Started',
+          message: 'Your membership subscription has been activated.',
+          data: { subscriptionId: result.subscription?.subscriptionId }
+        });
+        broadcastBillingUpdate(memberEmail, 'subscription_created');
+      } else {
+        const memberLookup = await pool.query(
+          'SELECT email FROM users WHERE stripe_customer_id = $1',
+          [customerId]
+        );
+        if (memberLookup.rows.length > 0) {
+          const email = memberLookup.rows[0].email;
+          sendNotificationToUser(email, {
+            type: 'billing_update',
+            title: 'Subscription Started',
+            message: 'Your membership subscription has been activated.',
+            data: { subscriptionId: result.subscription?.subscriptionId }
+          });
+          broadcastBillingUpdate(email, 'subscription_created');
+        }
+      }
+    } catch (notifyError) {
+      console.error('[Stripe] Failed to send subscription creation notification:', notifyError);
+    }
+    
     res.json({
       success: true,
       subscription: result.subscription
@@ -68,10 +98,30 @@ router.delete('/api/stripe/subscriptions/:subscriptionId', isStaffOrAdmin, async
   try {
     const { subscriptionId } = req.params;
     
+    const memberLookup = await pool.query(
+      'SELECT email FROM users WHERE stripe_subscription_id = $1',
+      [subscriptionId]
+    );
+    
     const result = await cancelSubscription(subscriptionId);
     
     if (!result.success) {
       return res.status(500).json({ error: result.error || 'Failed to cancel subscription' });
+    }
+    
+    try {
+      if (memberLookup.rows.length > 0) {
+        const memberEmail = memberLookup.rows[0].email;
+        sendNotificationToUser(memberEmail, {
+          type: 'billing_update',
+          title: 'Subscription Cancelled',
+          message: 'Your membership subscription has been cancelled.',
+          data: { subscriptionId }
+        });
+        broadcastBillingUpdate(memberEmail, 'subscription_cancelled');
+      }
+    } catch (notifyError) {
+      console.error('[Stripe] Failed to send subscription cancellation notification:', notifyError);
     }
     
     res.json({ success: true });
@@ -223,6 +273,18 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, async
     }
     
     console.log(`[Stripe] Created subscription for ${member.email}: ${subscriptionResult.subscription?.subscriptionId}`);
+    
+    try {
+      sendNotificationToUser(member.email, {
+        type: 'billing_update',
+        title: 'Membership Activated',
+        message: `Your ${tierName} membership has been activated.`,
+        data: { subscriptionId: subscriptionResult.subscription?.subscriptionId, tier: tierName }
+      });
+      broadcastBillingUpdate(member.email, 'subscription_created');
+    } catch (notifyError) {
+      console.error('[Stripe] Failed to send membership activation notification:', notifyError);
+    }
     
     res.json({
       success: true,

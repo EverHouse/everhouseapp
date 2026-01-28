@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../../core/db';
 import { getSessionUser } from '../../types/session';
+import { sendNotificationToUser, broadcastBillingUpdate } from '../../core/websocket';
 import { computeFeeBreakdown, getEffectivePlayerCount } from '../../core/billing/unifiedFeeService';
 
 const router = Router();
@@ -189,6 +190,20 @@ router.post('/api/stripe/overage/confirm-payment', async (req: Request, res: Res
     
     const booking = result.rows[0];
     console.log(`[Overage Payment] Confirmed payment for booking ${bookingId}: $${(booking.overage_fee_cents / 100).toFixed(2)}`);
+    
+    try {
+      if (booking.user_email) {
+        sendNotificationToUser(booking.user_email, {
+          type: 'billing_update',
+          title: 'Overage Payment Confirmed',
+          message: `Your overage payment of $${(booking.overage_fee_cents / 100).toFixed(2)} has been confirmed.`,
+          data: { bookingId, amount: booking.overage_fee_cents }
+        });
+        broadcastBillingUpdate(booking.user_email, 'overage_paid');
+      }
+    } catch (notifyError) {
+      console.error('[Overage Payment] Failed to send notification:', notifyError);
+    }
     
     res.json({
       success: true,

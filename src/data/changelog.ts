@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.37.1",
+    date: "2026-01-28",
+    title: "Complete Real-Time Billing Notifications",
+    changes: [
+      "Added: Real-time notification when invoice is created for member",
+      "Added: Real-time notification when invoice is finalized and ready for payment",
+      "Added: Real-time notification when invoice is voided",
+      "Added: Real-time notification when overage payment is confirmed",
+      "Added: Real-time notification when subscription is started",
+      "Added: Real-time notification when subscription is cancelled",
+      "Improved: All billing operations now trigger instant member notifications"
+    ]
+  },
+  {
     version: "9.37.0",
     date: "2026-01-28",
     title: "Real-Time Notifications for Bookings & Billing",
