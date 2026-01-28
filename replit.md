@@ -74,7 +74,7 @@ Server startup is organized into loader modules for clean separation of concerns
 - **Data Integrity Architecture**: Stripe as the source of truth for billing, transaction rollback, fail-fast on Stripe errors, webhook idempotency, and automatic status sync. Dual-source active tracking using HubSpot and Stripe.
 - **Stripe Member Auto-Fix**: Login flow automatically verifies Stripe subscription status and corrects `membership_status` if database is out of sync. If a member has a Stripe subscription but incorrect status (e.g., 'non-member'), the system checks Stripe directly and auto-corrects the database. This prevents login failures due to stale data from imports or missed webhooks.
 - **Stripe Subscription → HubSpot Sync**: When a Stripe subscription is created (via webhook), the system automatically: (1) Sets `membership_status` to 'active' in database, (2) Updates member tier based on price ID, (3) Syncs membership status and tier to HubSpot contact. This works for both new users and existing users.
-- **Member Balance Stripe Validation**: The member balance display only shows fees that have a valid 'pending' fee snapshot in the database. Fees from sessions with cancelled/paid/failed Stripe payment intents are filtered out, ensuring orphaned database records don't inflate member balances. This enforces Stripe as the source of truth for billing.
+- **Member Balance Display (v9.32.26+)**: Balance shows all fees where `payment_status = 'pending'` and `cached_fee_cents > 0`. No snapshot-based filtering - the payment_status field is the single source of truth for whether a fee is owed. Booking cancellations automatically clear fees (`cached_fee_cents = 0`, `payment_status = 'waived'`).
 - **Stripe Customer Metadata Sync**: Customer metadata (userId, tier) is synced to Stripe automatically and via a bulk sync endpoint.
 - **Stripe Transaction Cache**: Transactions are cached locally in `stripe_transaction_cache` for fast querying.
 - **Scheduled Maintenance**: Daily scheduled tasks for session cleanup, webhook log cleanup, Stripe reconciliation, and grace period checks.
@@ -89,3 +89,32 @@ Server startup is organized into loader modules for clean separation of concerns
 - **Apple Messages for Business**: For direct messaging.
 - **Amarie Aesthetics MedSpa**: For direct booking links.
 - **Supabase**: For backend admin client, Realtime subscriptions, and session token generation.
+
+## Bug Prevention Guidelines
+These patterns have caused bugs before. Watch out for them:
+
+### Timezone Bugs (CRITICAL)
+- **NEVER use `CURRENT_DATE` in SQL** - It returns UTC date, not Pacific time
+- **ALWAYS use**: `(CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date` for date comparisons
+- **Use `server/utils/dateUtils.ts`** - Contains `getPacificDate()`, `getPacificNow()`, `toPacificTime()` utilities
+- **Test during evening hours** (5 PM - midnight Pacific) when UTC is "tomorrow" but Pacific is still "today"
+
+### Stripe Subscription Status (CRITICAL)
+- **Active statuses include**: `'active'`, `'trialing'`, `'past_due'` - NOT just `'active'`
+- **Also check `stripeSubscriptionId`** - If present, member has a subscription regardless of database status
+- **Database `membership_status` can be stale** - Always verify against Stripe when in doubt
+
+### Data Cleanup on Actions
+- **When cancelling bookings**: Clear associated fees (`cached_fee_cents = 0`, `payment_status = 'waived'`)
+- **When deleting records**: Consider all related data (participants, fees, sessions, notifications)
+- **Think through side effects**: What other data depends on this record?
+
+### Keep Filtering Logic Simple
+- **Prefer single source of truth** - Use `payment_status = 'pending'` instead of complex snapshot-based filtering
+- **Don't over-engineer** - If a simple field tells you the state, trust it
+- **Avoid "orphan detection" logic** - It's usually wrong; fix the root cause instead
+
+### UI/Modal Best Practices
+- **Always set `max-h-[70vh]`** on modals to prevent overflow on mobile
+- **Test on iPhone viewport** - Many members use mobile
+- **Use `overflow-y-auto`** on scrollable content areas
