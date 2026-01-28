@@ -13,6 +13,14 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.33.16",
+    date: "2026-01-28",
+    title: "Member Profile Drawer Visual Fix",
+    changes: [
+      "Fixed: Member profile drawer no longer shows gap on right side during slide-in animation"
+    ]
+  },
+  {
     version: "9.33.15",
     date: "2026-01-28",
     title: "Member Profile Performance Optimization",
