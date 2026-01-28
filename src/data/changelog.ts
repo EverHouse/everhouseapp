@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.33.10",
+    date: "2026-01-28",
+    title: "Fix Double Push Notifications for Booking Requests",
+    changes: [
+      "Fixed: Staff no longer receive duplicate push notifications when members request bookings",
+      "Fixed: Removed redundant push notification call that duplicated notifyAllStaff functionality"
+    ]
+  },
+  {
     version: "9.33.9",
     date: "2026-01-28",
     title: "Coupon Selection for New Subscriptions",

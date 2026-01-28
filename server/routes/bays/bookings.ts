@@ -681,15 +681,10 @@ router.post('/api/booking-requests', async (req, res) => {
         {
           relatedId: row.id,
           relatedType: 'booking_request',
-          url: '/#/admin'
+          url: '/#/admin',
+          sendPush: true
         }
-      ).catch(err => console.error('Staff in-app notification failed:', err));
-      
-      sendPushNotificationToStaff({
-        title: staffTitle,
-        body: staffMessage,
-        url: '/#/admin'
-      }).catch(err => console.error('Staff push notification failed:', err));
+      ).catch(err => console.error('Staff notification failed:', err));
       
       bookingEvents.publish('booking_created', {
         bookingId: row.id,
