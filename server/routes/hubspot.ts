@@ -429,17 +429,17 @@ async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
     `SELECT email, MAX(activity_date) as last_activity FROM (
       SELECT LOWER(user_email) as email, request_date as activity_date
       FROM booking_requests 
-      WHERE LOWER(user_email) = ANY($1) AND request_date < CURRENT_DATE AND status NOT IN ('cancelled', 'declined')
+      WHERE LOWER(user_email) = ANY($1) AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND status NOT IN ('cancelled', 'declined')
       UNION ALL
       SELECT LOWER(er.user_email) as email, e.event_date as activity_date
       FROM event_rsvps er
       JOIN events e ON er.event_id = e.id
-      WHERE LOWER(er.user_email) = ANY($1) AND e.event_date < CURRENT_DATE AND er.status != 'cancelled'
+      WHERE LOWER(er.user_email) = ANY($1) AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND er.status != 'cancelled'
       UNION ALL
       SELECT LOWER(we.user_email) as email, wc.date as activity_date
       FROM wellness_enrollments we
       JOIN wellness_classes wc ON we.class_id = wc.id
-      WHERE LOWER(we.user_email) = ANY($1) AND wc.date < CURRENT_DATE AND we.status != 'cancelled'
+      WHERE LOWER(we.user_email) = ANY($1) AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND we.status != 'cancelled'
     ) combined
     GROUP BY email`,
     [emails]
@@ -456,7 +456,7 @@ async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
     `SELECT LOWER(user_email) as email, COUNT(*)::int as count
      FROM booking_requests
      WHERE LOWER(user_email) = ANY($1)
-       AND request_date < CURRENT_DATE
+       AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
        AND status NOT IN ('cancelled', 'declined')
      GROUP BY LOWER(user_email)`,
     [emails]
@@ -473,7 +473,7 @@ async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
      JOIN events e ON er.event_id = e.id
      WHERE LOWER(u.email) = ANY($1)
        AND er.status != 'cancelled'
-       AND e.event_date < CURRENT_DATE
+       AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
      GROUP BY u.email`,
     [emails]
   );
@@ -488,7 +488,7 @@ async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
      JOIN wellness_classes wc ON we.class_id = wc.id
      WHERE LOWER(we.user_email) = ANY($1)
        AND we.status != 'cancelled'
-       AND wc.date < CURRENT_DATE
+       AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
      GROUP BY LOWER(we.user_email)`,
     [emails]
   );

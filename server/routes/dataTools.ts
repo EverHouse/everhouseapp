@@ -1168,19 +1168,19 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
             SELECT COUNT(DISTINCT booking_id) as count FROM (
               SELECT id as booking_id FROM booking_requests
               WHERE LOWER(user_email) = $1
-                AND request_date < CURRENT_DATE
+                AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
                 AND status NOT IN ('cancelled', 'declined')
               UNION
               SELECT br.id as booking_id FROM booking_requests br
               JOIN booking_members bm ON br.id = bm.booking_id
               WHERE LOWER(bm.user_email) = $1
-                AND br.request_date < CURRENT_DATE
+                AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
                 AND br.status NOT IN ('cancelled', 'declined')
               UNION
               SELECT br.id as booking_id FROM booking_requests br
               JOIN booking_guests bg ON br.id = bg.booking_id
               WHERE LOWER(bg.guest_email) = $1
-                AND br.request_date < CURRENT_DATE
+                AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
                 AND br.status NOT IN ('cancelled', 'declined')
             ) all_bookings
           `, [normalizedEmail]);
@@ -1189,7 +1189,7 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
             SELECT COUNT(*) as count FROM event_rsvps er
             JOIN events e ON er.event_id = e.id
             WHERE (LOWER(er.user_email) = $1 OR er.matched_user_id = $2)
-              AND e.event_date < CURRENT_DATE
+              AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
               AND er.status != 'cancelled'
           `, [normalizedEmail, member.id]);
           
@@ -1197,7 +1197,7 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
             SELECT COUNT(*) as count FROM wellness_enrollments we
             JOIN wellness_classes wc ON we.class_id = wc.id
             WHERE LOWER(we.user_email) = $1
-              AND wc.date < CURRENT_DATE
+              AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
               AND we.status != 'cancelled'
           `, [normalizedEmail]);
           

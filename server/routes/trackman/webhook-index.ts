@@ -323,7 +323,7 @@ router.get('/api/admin/trackman-webhooks/stats', isStaffOrAdmin, async (req: Req
         COUNT(*) as total_slots,
         COUNT(*) FILTER (WHERE status = 'booked') as booked,
         COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
-        COUNT(*) FILTER (WHERE slot_date >= CURRENT_DATE) as upcoming
+        COUNT(*) FILTER (WHERE slot_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date) as upcoming
       FROM trackman_bay_slots
     `);
     
@@ -358,7 +358,7 @@ router.get('/api/admin/trackman-webhook/stats', isStaffOrAdmin, async (req: Requ
         COUNT(*) as total_slots,
         COUNT(*) FILTER (WHERE status = 'booked') as booked,
         COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
-        COUNT(*) FILTER (WHERE slot_date >= CURRENT_DATE) as upcoming
+        COUNT(*) FILTER (WHERE slot_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date) as upcoming
       FROM trackman_bay_slots
     `);
     

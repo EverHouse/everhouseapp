@@ -45,7 +45,7 @@ export function registerAuthRoutes(app: Express): void {
            -- As host
            SELECT br.id FROM booking_requests br
            WHERE LOWER(br.user_email) = LOWER($1)
-             AND br.request_date < CURRENT_DATE
+             AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
              AND br.status NOT IN ('cancelled', 'declined')
            UNION
            -- As added player
@@ -53,14 +53,14 @@ export function registerAuthRoutes(app: Express): void {
            JOIN booking_members bm ON br.id = bm.booking_id
            WHERE LOWER(bm.user_email) = LOWER($1)
              AND bm.is_primary IS NOT TRUE
-             AND br.request_date < CURRENT_DATE
+             AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
              AND br.status NOT IN ('cancelled', 'declined')
            UNION
            -- As guest
            SELECT br.id FROM booking_requests br
            JOIN booking_guests bg ON br.id = bg.booking_id
            WHERE LOWER(bg.guest_email) = LOWER($1)
-             AND br.request_date < CURRENT_DATE
+             AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
              AND br.status NOT IN ('cancelled', 'declined')
          ) unified_bookings`,
         [user.email]
@@ -71,7 +71,7 @@ export function registerAuthRoutes(app: Express): void {
       const eventRsvpResult = await pool.query(
         `SELECT COUNT(*) as rsvp_count FROM event_rsvps er
          JOIN events e ON er.event_id = e.id
-         WHERE e.event_date < CURRENT_DATE
+         WHERE e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
          AND er.status != 'cancelled'
          AND (
            LOWER(er.user_email) = LOWER($1) 
@@ -87,7 +87,7 @@ export function registerAuthRoutes(app: Express): void {
          JOIN wellness_classes wc ON we.class_id = wc.id
          WHERE LOWER(we.user_email) = LOWER($1) 
          AND we.status != 'cancelled'
-         AND wc.date < CURRENT_DATE`,
+         AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date`,
         [user.email]
       );
       const pastWellnessCount = parseInt(wellnessResult.rows[0]?.wellness_count || '0', 10);
@@ -97,30 +97,30 @@ export function registerAuthRoutes(app: Express): void {
         `SELECT MAX(last_date) as last_date FROM (
            -- Bookings as host
            SELECT MAX(request_date) as last_date FROM booking_requests
-           WHERE LOWER(user_email) = LOWER($1) AND request_date < CURRENT_DATE AND status NOT IN ('cancelled', 'declined')
+           WHERE LOWER(user_email) = LOWER($1) AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND status NOT IN ('cancelled', 'declined')
            UNION ALL
            -- Bookings as player
            SELECT MAX(br.request_date) as last_date FROM booking_requests br
            JOIN booking_members bm ON br.id = bm.booking_id
            WHERE LOWER(bm.user_email) = LOWER($1) AND bm.is_primary IS NOT TRUE
-             AND br.request_date < CURRENT_DATE AND br.status NOT IN ('cancelled', 'declined')
+             AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND br.status NOT IN ('cancelled', 'declined')
            UNION ALL
            -- Bookings as guest
            SELECT MAX(br.request_date) as last_date FROM booking_requests br
            JOIN booking_guests bg ON br.id = bg.booking_id
            WHERE LOWER(bg.guest_email) = LOWER($1)
-             AND br.request_date < CURRENT_DATE AND br.status NOT IN ('cancelled', 'declined')
+             AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND br.status NOT IN ('cancelled', 'declined')
            UNION ALL
            -- Events
            SELECT MAX(e.event_date) as last_date FROM event_rsvps er
            JOIN events e ON er.event_id = e.id
            WHERE (LOWER(er.user_email) = LOWER($1) OR er.matched_user_id = $2)
-             AND e.event_date < CURRENT_DATE AND er.status != 'cancelled'
+             AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND er.status != 'cancelled'
            UNION ALL
            -- Wellness
            SELECT MAX(wc.date) as last_date FROM wellness_enrollments we
            JOIN wellness_classes wc ON we.class_id = wc.id
-           WHERE LOWER(we.user_email) = LOWER($1) AND wc.date < CURRENT_DATE AND we.status != 'cancelled'
+           WHERE LOWER(we.user_email) = LOWER($1) AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND we.status != 'cancelled'
          ) all_activities`,
         [user.email, dbUser?.id || null]
       );

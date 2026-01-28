@@ -648,8 +648,8 @@ router.get('/api/bookings/overdue-payments', isStaffOrAdmin, async (req: Request
         LEFT JOIN users pu ON pu.id = bp.user_id
         LEFT JOIN usage_ledger ul ON ul.session_id = bp.session_id 
           AND (ul.member_id = bp.user_id OR LOWER(ul.member_id) = LOWER(pu.email) OR LOWER(ul.member_id) = LOWER(br.user_email))
-        WHERE br.request_date < CURRENT_DATE
-          AND br.request_date >= CURRENT_DATE - INTERVAL '30 days'
+        WHERE br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
+          AND br.request_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date - INTERVAL '30 days'
           AND br.session_id IS NOT NULL
         GROUP BY br.id, br.session_id, br.user_email, br.user_name, 
                  br.request_date, br.start_time, br.end_time, r.name

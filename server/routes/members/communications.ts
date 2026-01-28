@@ -214,7 +214,7 @@ router.get('/api/my-visits', isAuthenticated, async (req, res) => {
         FROM booking_requests br
         LEFT JOIN resources r ON br.resource_id = r.id
         WHERE LOWER(br.user_email) = ${targetEmail}
-          AND br.request_date < CURRENT_DATE
+          AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           AND br.status NOT IN ('cancelled', 'declined')
         
         UNION ALL
@@ -237,7 +237,7 @@ router.get('/api/my-visits', isAuthenticated, async (req, res) => {
         WHERE LOWER(bm.user_email) = ${targetEmail}
           AND (bm.is_primary IS NOT TRUE OR bm.is_primary IS NULL)
           AND LOWER(br.user_email) != ${targetEmail}
-          AND br.request_date < CURRENT_DATE
+          AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           AND br.status NOT IN ('cancelled', 'declined')
         
         UNION ALL
@@ -258,7 +258,7 @@ router.get('/api/my-visits', isAuthenticated, async (req, res) => {
         LEFT JOIN resources r ON br.resource_id = r.id
         LEFT JOIN users host_user ON LOWER(br.user_email) = LOWER(host_user.email)
         WHERE LOWER(bg.guest_email) = ${targetEmail}
-          AND br.request_date < CURRENT_DATE
+          AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           AND br.status NOT IN ('cancelled', 'declined')
         
         UNION ALL
@@ -277,7 +277,7 @@ router.get('/api/my-visits', isAuthenticated, async (req, res) => {
         FROM wellness_enrollments we
         JOIN wellness_classes wc ON we.class_id = wc.id
         WHERE LOWER(we.user_email) = ${targetEmail}
-          AND wc.date < CURRENT_DATE
+          AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           AND we.status NOT IN ('cancelled')
         
         UNION ALL
@@ -296,7 +296,7 @@ router.get('/api/my-visits', isAuthenticated, async (req, res) => {
         FROM event_rsvps er
         JOIN events e ON er.event_id = e.id
         WHERE LOWER(er.user_email) = ${targetEmail}
-          AND e.event_date < CURRENT_DATE
+          AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           AND er.status NOT IN ('cancelled')
       ) all_visits
       ORDER BY visit_type, visit_id, date DESC

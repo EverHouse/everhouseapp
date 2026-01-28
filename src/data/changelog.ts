@@ -13,8 +13,33 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.32.24",
+    date: "2026-01-27",
+    title: "Critical Pacific Timezone Fix",
+    isMajor: false,
+    changes: [
+      "CRITICAL: Fixed all date comparisons to use Pacific time instead of UTC - bookings from today no longer incorrectly show as 'past' during evening hours",
+      "Fixed 50 SQL queries across 8 files that were using server UTC time instead of club Pacific time",
+      "Affects member profile, booking history, visit counts, last activity dates, and all date-sensitive features",
+      "Evening users (5 PM - midnight Pacific) will now see correct 'today' vs 'past' booking status"
+    ]
+  },
+  {
+    version: "9.32.23",
+    date: "2026-01-27",
+    title: "Balance Display Fix - Show All Pending Fees",
+    isMajor: false,
+    changes: [
+      "CRITICAL: Fixed member balance hiding valid fees when fee snapshots were cancelled/paid",
+      "Balance now correctly shows ALL pending fees (overage + guest fees) regardless of snapshot history",
+      "Removed faulty filtering logic that was incorrectly treating fees as 'orphaned' when snapshots existed",
+      "Cleaned up duplicate pending fee snapshots from database",
+      "Fixed $175 in fees only showing as $50 due to incorrect snapshot filtering"
+    ]
+  },
+  {
     version: "9.32.22",
-    date: "2026-01-28",
+    date: "2026-01-27",
     title: "Payment Modal Fix - Use Existing Payment Intent",
     isMajor: false,
     changes: [
@@ -24,7 +49,7 @@ export const changelog: ChangelogEntry[] = [
   },
   {
     version: "9.32.21",
-    date: "2026-01-28",
+    date: "2026-01-27",
     title: "Payment Modal Fix & Activity Tab",
     isMajor: false,
     changes: [

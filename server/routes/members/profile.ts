@@ -56,19 +56,19 @@ router.get('/api/members/:email/details', isAuthenticated, async (req, res) => {
       SELECT COUNT(DISTINCT booking_id) as count FROM (
         SELECT id as booking_id FROM booking_requests
         WHERE LOWER(user_email) = ${normalizedEmail}
-          AND request_date < CURRENT_DATE
+          AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           AND status NOT IN ('cancelled', 'declined')
         UNION
         SELECT br.id as booking_id FROM booking_requests br
         JOIN booking_members bm ON br.id = bm.booking_id
         WHERE LOWER(bm.user_email) = ${normalizedEmail}
-          AND br.request_date < CURRENT_DATE
+          AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           AND br.status NOT IN ('cancelled', 'declined')
         UNION
         SELECT br.id as booking_id FROM booking_requests br
         JOIN booking_guests bg ON br.id = bg.booking_id
         WHERE LOWER(bg.guest_email) = ${normalizedEmail}
-          AND br.request_date < CURRENT_DATE
+          AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           AND br.status NOT IN ('cancelled', 'declined')
       ) all_bookings
     `);
@@ -78,7 +78,7 @@ router.get('/api/members/:email/details', isAuthenticated, async (req, res) => {
       .from(eventRsvps)
       .innerJoin(events, eq(eventRsvps.eventId, events.id))
       .where(and(
-        sql`${events.eventDate} < CURRENT_DATE`,
+        sql`${events.eventDate} < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date`,
         sql`${eventRsvps.status} != 'cancelled'`,
         or(
           sql`LOWER(${eventRsvps.userEmail}) = ${normalizedEmail}`,
@@ -93,7 +93,7 @@ router.get('/api/members/:email/details', isAuthenticated, async (req, res) => {
       .where(and(
         sql`LOWER(${wellnessEnrollments.userEmail}) = ${normalizedEmail}`,
         sql`${wellnessEnrollments.status} != 'cancelled'`,
-        sql`${wellnessClasses.date} < CURRENT_DATE`
+        sql`${wellnessClasses.date} < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date`
       ));
     const pastWellnessCount = Number(pastWellnessResult[0]?.count || 0);
     
@@ -104,32 +104,32 @@ router.get('/api/members/:email/details', isAuthenticated, async (req, res) => {
         SELECT MAX(request_date) as last_date FROM booking_requests
         WHERE LOWER(user_email) = ${normalizedEmail} 
           AND status NOT IN ('cancelled', 'declined')
-          AND request_date < CURRENT_DATE
+          AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
         UNION ALL
         SELECT MAX(br.request_date) as last_date FROM booking_guests bg
         JOIN booking_requests br ON bg.booking_id = br.id
         WHERE LOWER(bg.guest_email) = ${normalizedEmail} 
           AND br.status NOT IN ('cancelled', 'declined')
-          AND br.request_date < CURRENT_DATE
+          AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
         UNION ALL
         SELECT MAX(br.request_date) as last_date FROM booking_members bm
         JOIN booking_requests br ON bm.booking_id = br.id
         WHERE LOWER(bm.user_email) = ${normalizedEmail} 
           AND bm.is_primary IS NOT TRUE 
           AND br.status NOT IN ('cancelled', 'declined')
-          AND br.request_date < CURRENT_DATE
+          AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
         UNION ALL
         SELECT MAX(e.event_date) as last_date FROM event_rsvps er
         JOIN events e ON er.event_id = e.id
         WHERE LOWER(er.user_email) = ${normalizedEmail} 
           AND er.status != 'cancelled'
-          AND e.event_date < CURRENT_DATE
+          AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
         UNION ALL
         SELECT MAX(wc.date) as last_date FROM wellness_enrollments we
         JOIN wellness_classes wc ON we.class_id = wc.id
         WHERE LOWER(we.user_email) = ${normalizedEmail} 
           AND we.status != 'cancelled'
-          AND wc.date < CURRENT_DATE
+          AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
       ) combined
     `);
     const lastBookingDateRaw = (lastActivityResult as any).rows?.[0]?.last_date;
@@ -330,7 +330,7 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
           and(
             eq(bookingRequests.resourceId, 11),
             eq(bookingRequests.status, 'approved'),
-            sql`${bookingRequests.requestDate} < CURRENT_DATE`
+            sql`${bookingRequests.requestDate} < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date`
           )
         )
       ))

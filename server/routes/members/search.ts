@@ -177,14 +177,14 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
           FROM booking_requests
           WHERE LOWER(user_email) = ANY($1)
             AND status NOT IN ('cancelled', 'declined')
-            AND request_date < CURRENT_DATE
+            AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           UNION
           SELECT LOWER(bg.guest_email) as email, br.id as booking_id
           FROM booking_guests bg
           JOIN booking_requests br ON bg.booking_id = br.id
           WHERE LOWER(bg.guest_email) = ANY($1)
             AND br.status NOT IN ('cancelled', 'declined')
-            AND br.request_date < CURRENT_DATE
+            AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           UNION
           SELECT LOWER(bm.user_email) as email, br.id as booking_id
           FROM booking_members bm
@@ -192,7 +192,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
           WHERE LOWER(bm.user_email) = ANY($1)
             AND bm.is_primary IS NOT TRUE
             AND br.status NOT IN ('cancelled', 'declined')
-            AND br.request_date < CURRENT_DATE
+            AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
         ) all_bookings
         GROUP BY email`,
         [memberEmails]
@@ -207,7 +207,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
         JOIN events e ON er.event_id = e.id
         WHERE LOWER(er.user_email) = ANY($1)
           AND er.status != 'cancelled'
-          AND e.event_date < CURRENT_DATE
+          AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
         GROUP BY LOWER(user_email)`,
         [memberEmails]
       );
@@ -221,7 +221,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
         JOIN wellness_classes wc ON we.class_id = wc.id
         WHERE LOWER(we.user_email) = ANY($1)
           AND we.status != 'cancelled'
-          AND wc.date < CURRENT_DATE
+          AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
         GROUP BY LOWER(we.user_email)`,
         [memberEmails]
       );
@@ -235,7 +235,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
           FROM booking_requests
           WHERE LOWER(user_email) = ANY($1) 
             AND status NOT IN ('cancelled', 'declined')
-            AND request_date < CURRENT_DATE
+            AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           GROUP BY LOWER(user_email)
           UNION ALL
           SELECT LOWER(bg.guest_email) as email, MAX(br.request_date) as last_date
@@ -243,7 +243,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
           JOIN booking_requests br ON bg.booking_id = br.id
           WHERE LOWER(bg.guest_email) = ANY($1) 
             AND br.status NOT IN ('cancelled', 'declined')
-            AND br.request_date < CURRENT_DATE
+            AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           GROUP BY LOWER(bg.guest_email)
           UNION ALL
           SELECT LOWER(bm.user_email) as email, MAX(br.request_date) as last_date
@@ -252,7 +252,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
           WHERE LOWER(bm.user_email) = ANY($1) 
             AND bm.is_primary IS NOT TRUE 
             AND br.status NOT IN ('cancelled', 'declined')
-            AND br.request_date < CURRENT_DATE
+            AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           GROUP BY LOWER(bm.user_email)
           UNION ALL
           SELECT LOWER(er.user_email) as email, MAX(e.event_date) as last_date
@@ -260,7 +260,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
           JOIN events e ON er.event_id = e.id
           WHERE LOWER(er.user_email) = ANY($1) 
             AND er.status != 'cancelled'
-            AND e.event_date < CURRENT_DATE
+            AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           GROUP BY LOWER(er.user_email)
           UNION ALL
           SELECT LOWER(we.user_email) as email, MAX(wc.date) as last_date
@@ -268,7 +268,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
           JOIN wellness_classes wc ON we.class_id = wc.id
           WHERE LOWER(we.user_email) = ANY($1) 
             AND we.status != 'cancelled'
-            AND wc.date < CURRENT_DATE
+            AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           GROUP BY LOWER(we.user_email)
         ) combined
         GROUP BY email`,
