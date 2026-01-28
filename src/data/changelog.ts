@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.33.3",
+    date: "2026-01-28",
+    title: "Persistent Sync Timestamp",
+    changes: [
+      "Last sync time now persists across server restarts",
+      "Directory page shows accurate 'Last synced' timestamp even after deployments",
+      "Uses existing app_settings table for reliable storage"
+    ]
+  },
+  {
     version: "9.33.2",
     date: "2026-01-28",
     title: "Background Sync Optimization",
