@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.36.1",
+    date: "2026-01-28",
+    title: "Wellness Tab Mobile Crash Fix",
+    changes: [
+      "Fixed: Wellness tab no longer crashes on mobile when viewing classes",
+      "Fixed: Classes with missing date information are now handled gracefully"
+    ]
+  },
+  {
     version: "9.36.0",
     date: "2026-01-28",
     title: "Production Readiness Improvements",

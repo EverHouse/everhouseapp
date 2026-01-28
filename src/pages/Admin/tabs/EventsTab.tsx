@@ -1477,10 +1477,11 @@ const WellnessAdminContent: React.FC = () => {
     const openEdit = (cls: WellnessClass) => {
         const startTime24 = convertTo24Hour(cls.time);
         const endTime = calculateEndTime(cls.time, cls.duration);
+        const dateStr = cls.date || '';
         setFormData({
             ...cls,
             time: startTime24,
-            date: cls.date.split('T')[0],
+            date: dateStr.includes('T') ? dateStr.split('T')[0] : dateStr,
             endTime
         });
         setEditId(cls.id);
@@ -1511,13 +1512,15 @@ const WellnessAdminContent: React.FC = () => {
 
     const todayWellness = getTodayPacific();
     const upcomingClasses = filteredClasses.filter(c => {
+        if (!c.date) return false;
         const classDate = c.date.includes('T') ? c.date.split('T')[0] : c.date;
         return classDate >= todayWellness;
-    }).sort((a, b) => a.date.localeCompare(b.date));
+    }).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     const pastClasses = filteredClasses.filter(c => {
+        if (!c.date) return false;
         const classDate = c.date.includes('T') ? c.date.split('T')[0] : c.date;
         return classDate < todayWellness;
-    }).sort((a, b) => b.date.localeCompare(a.date));
+    }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
     const calculateDuration = (startTime: string, endTime: string): string => {
         if (!startTime || !endTime) return '60 min';
@@ -1745,7 +1748,7 @@ const WellnessAdminContent: React.FC = () => {
                                             <h4 className="font-medium text-primary dark:text-white truncate">{cls.title}</h4>
                                         </div>
                                         <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                                            <span>{formatDateDisplayWithDay(cls.date.split('T')[0])}</span>
+                                            <span>{formatDateDisplayWithDay((cls.date || '').split('T')[0])}</span>
                                             <span>•</span>
                                             <span>{cls.time}</span>
                                             {cls.instructor && cls.instructor !== 'TBD' && (
