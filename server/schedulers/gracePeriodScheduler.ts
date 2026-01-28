@@ -53,12 +53,6 @@ async function processGracePeriodMembers(): Promise<void> {
       return;
     }
     
-    // DISABLED: Automatic payment reminder emails are disabled until billing system is finalized.
-    // Staff can still manually send reactivation links via the member directory FAB.
-    // To re-enable: remove this return statement and uncomment the email sending logic below.
-    console.log('[Grace Period] Automatic emails disabled - staff must send payment links manually');
-    return;
-    
     console.log('[Grace Period] Starting daily grace period check...');
     
     const membersResult = await pool.query(

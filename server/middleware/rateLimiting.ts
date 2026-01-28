@@ -79,3 +79,19 @@ export const sensitiveActionRateLimiter = rateLimit({
     res.status(429).json({ error: 'Too many requests for this action. Please wait.' });
   }
 });
+
+export const checkoutRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const email = req.body?.email || 'unknown';
+    return `checkout:${email}:${req.ip || 'unknown'}`;
+  },
+  validate: false,
+  handler: (req: Request, res: Response) => {
+    console.warn(`[RateLimit] Checkout limit exceeded for ${req.body?.email || 'unknown'} on ${req.path}`);
+    res.status(429).json({ error: 'Too many checkout attempts. Please wait a minute before trying again.' });
+  }
+});

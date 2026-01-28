@@ -651,23 +651,45 @@ export async function removeGroupMember(params: {
   const client = await pool.connect();
   
   try {
-    const member = await db.select()
-      .from(groupMembers)
-      .where(eq(groupMembers.id, params.memberId))
-      .limit(1);
+    await client.query('BEGIN');
     
-    if (member.length === 0) {
+    const memberResult = await client.query(
+      `SELECT gm.id, gm.member_email, gm.stripe_subscription_item_id, gm.is_active
+       FROM group_members gm
+       WHERE gm.id = $1
+       FOR UPDATE`,
+      [params.memberId]
+    );
+    
+    if (memberResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return { success: false, error: 'Group member not found' };
     }
     
-    const memberRecord = member[0];
+    const memberRecord = memberResult.rows[0];
     
-    if (memberRecord.stripeSubscriptionItemId) {
+    if (!memberRecord.is_active) {
+      await client.query('ROLLBACK');
+      return { success: false, error: 'Member is already inactive' };
+    }
+    
+    await client.query(
+      `UPDATE group_members SET is_active = false, removed_at = NOW() WHERE id = $1`,
+      [params.memberId]
+    );
+    
+    await client.query(
+      'UPDATE users SET billing_group_id = NULL WHERE LOWER(email) = $1',
+      [memberRecord.member_email.toLowerCase()]
+    );
+    
+    if (memberRecord.stripe_subscription_item_id) {
       try {
         const stripe = await getStripeClient();
-        await stripe.subscriptionItems.del(memberRecord.stripeSubscriptionItemId);
-        console.log(`[GroupBilling] Deleted Stripe subscription item ${memberRecord.stripeSubscriptionItemId}`);
+        await stripe.subscriptionItems.del(memberRecord.stripe_subscription_item_id);
+        console.log(`[GroupBilling] Deleted Stripe subscription item ${memberRecord.stripe_subscription_item_id}`);
       } catch (stripeErr: any) {
+        await client.query('ROLLBACK');
         console.error('[GroupBilling] Failed to remove Stripe subscription item:', stripeErr);
         return { 
           success: false, 
@@ -676,37 +698,11 @@ export async function removeGroupMember(params: {
       }
     }
     
-    try {
-      await client.query('BEGIN');
-      
-      await client.query(
-        `UPDATE group_members SET is_active = false, removed_at = NOW() WHERE id = $1`,
-        [params.memberId]
-      );
-      
-      await client.query(
-        'UPDATE users SET billing_group_id = NULL WHERE LOWER(email) = $1',
-        [memberRecord.memberEmail.toLowerCase()]
-      );
-      
-      await client.query('COMMIT');
-      
-      return { success: true };
-    } catch (dbErr: any) {
-      await client.query('ROLLBACK');
-      
-      console.error(
-        `[GroupBilling] CRITICAL: Stripe item deleted but DB update failed for member ${params.memberId}. ` +
-        `Manual reconciliation required.`, 
-        dbErr
-      );
-      
-      return { 
-        success: false, 
-        error: 'Billing was removed but system update failed. Please contact support.' 
-      };
-    }
+    await client.query('COMMIT');
+    console.log(`[GroupBilling] Successfully removed group member ${params.memberId}`);
+    return { success: true };
   } catch (err: any) {
+    await client.query('ROLLBACK');
     console.error('[GroupBilling] Error removing group member:', err);
     return { success: false, error: err.message };
   } finally {

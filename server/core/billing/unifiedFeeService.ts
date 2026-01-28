@@ -584,7 +584,7 @@ export async function recalculateSessionFees(
             overage_minutes = $2,
             updated_at = NOW()
         WHERE session_id = $3
-      `, [ownerFee.fee, breakdown.overageMinutes || 0, sessionId]);
+      `, [ownerFee.totalCents || 0, breakdown.overageMinutes || 0, sessionId]);
     }
   } catch (syncError) {
     logger.warn('[UnifiedFee] Failed to sync fees to booking_requests', { sessionId, error: syncError });

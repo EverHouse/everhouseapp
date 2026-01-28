@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { getStripeClient } from '../core/stripe/client';
 import { getOrCreateStripeCustomer } from '../core/stripe/customers';
 import { upsertVisitor, linkPurchaseToUser } from '../core/visitors/matchingService';
+import { checkoutRateLimiter } from '../middleware/rateLimiting';
 
 const router = Router();
 
@@ -40,7 +41,7 @@ router.get('/api/day-passes/products', async (req: Request, res: Response) => {
  * POST /api/day-passes/checkout
  * Creates a Stripe Checkout Session using synced Price ID
  */
-router.post('/api/day-passes/checkout', async (req: Request, res: Response) => {
+router.post('/api/day-passes/checkout', checkoutRateLimiter, async (req: Request, res: Response) => {
   try {
     const { productSlug, email, firstName, lastName, phone } = req.body;
 

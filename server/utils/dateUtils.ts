@@ -51,6 +51,14 @@ export function getPacificDateParts(): { year: number; month: number; day: numbe
 }
 
 /**
+ * Get current day of month (1-31) in Pacific timezone
+ */
+export function getPacificDayOfMonth(): number {
+  const parts = getPacificDateParts();
+  return parts.day;
+}
+
+/**
  * Add days to a YYYY-MM-DD date string, returning a new YYYY-MM-DD string
  */
 export function addDaysToPacificDate(dateStr: string, days: number): string {

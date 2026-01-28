@@ -32,6 +32,7 @@ import { startWebhookLogCleanupScheduler } from './schedulers/webhookLogCleanupS
 import { startHubSpotQueueScheduler } from './schedulers/hubspotQueueScheduler';
 import { startSessionCleanupScheduler } from './schedulers/sessionCleanupScheduler';
 import { startUnresolvedTrackmanScheduler } from './schedulers/unresolvedTrackmanScheduler';
+import { startGuestPassResetScheduler } from './schedulers/guestPassResetScheduler';
 import { startMemberSyncScheduler } from './schedulers/memberSyncScheduler';
 import { startDuplicateCleanupScheduler } from './schedulers/duplicateCleanupScheduler';
 import { processStripeWebhook } from './core/stripe';
@@ -461,6 +462,7 @@ async function startServer() {
   startHubSpotQueueScheduler();
   startMemberSyncScheduler();
   startDuplicateCleanupScheduler();
+  startGuestPassResetScheduler();
 }
 
 startServer().catch((err) => {
