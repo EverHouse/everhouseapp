@@ -49,6 +49,7 @@ export interface FeeComputeParams {
   sessionId?: number;
   bookingId?: number;
   sessionDate?: string;
+  startTime?: string;
   sessionDuration?: number;
   declaredPlayerCount?: number;
   hostEmail?: string;

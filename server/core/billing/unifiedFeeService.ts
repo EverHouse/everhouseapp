@@ -32,6 +32,7 @@ interface SessionData {
   sessionId: number;
   bookingId: number;
   sessionDate: string;
+  startTime: string;
   sessionDuration: number;
   declaredPlayerCount: number;
   hostEmail: string;
@@ -57,6 +58,7 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
           bs.id as session_id,
           br.id as booking_id,
           bs.session_date,
+          br.start_time,
           br.duration_minutes,
           COALESCE(br.declared_player_count, br.trackman_player_count, br.guest_count + 1, 1) as declared_player_count,
           br.user_email as host_email
@@ -67,16 +69,18 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
       `;
       params = [sessionId];
     } else {
+      // First try with session join
       query = `
         SELECT 
           bs.id as session_id,
           br.id as booking_id,
-          bs.session_date,
+          COALESCE(bs.session_date, br.request_date) as session_date,
+          br.start_time,
           br.duration_minutes,
           COALESCE(br.declared_player_count, br.trackman_player_count, br.guest_count + 1, 1) as declared_player_count,
           br.user_email as host_email
         FROM booking_requests br
-        JOIN booking_sessions bs ON br.session_id = bs.id
+        LEFT JOIN booking_sessions bs ON br.session_id = bs.id
         WHERE br.id = $1
         LIMIT 1
       `;
@@ -88,34 +92,82 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
     
     const session = sessionResult.rows[0];
     
-    const participantsResult = await pool.query(
-      `SELECT 
-        bp.id as participant_id,
-        bp.user_id,
-        u.email,
-        bp.display_name,
-        bp.participant_type
-       FROM booking_participants bp
-       LEFT JOIN users u ON bp.user_id = u.id
-       WHERE bp.session_id = $1
-       ORDER BY bp.participant_type = 'owner' DESC, bp.created_at ASC`,
-      [session.session_id]
-    );
+    let participants: Array<{
+      participantId: number | undefined;
+      userId: string | null;
+      email: string | null;
+      displayName: string;
+      participantType: 'owner' | 'member' | 'guest';
+    }> = [];
     
-    return {
-      sessionId: session.session_id,
-      bookingId: session.booking_id,
-      sessionDate: session.session_date,
-      sessionDuration: session.duration_minutes,
-      declaredPlayerCount: parseInt(session.declared_player_count) || 1,
-      hostEmail: session.host_email,
-      participants: participantsResult.rows.map(row => ({
+    // Try to load participants from session first
+    if (session.session_id) {
+      const participantsResult = await pool.query(
+        `SELECT 
+          bp.id as participant_id,
+          bp.user_id,
+          u.email,
+          bp.display_name,
+          bp.participant_type
+         FROM booking_participants bp
+         LEFT JOIN users u ON bp.user_id = u.id
+         WHERE bp.session_id = $1
+         ORDER BY bp.participant_type = 'owner' DESC, bp.created_at ASC`,
+        [session.session_id]
+      );
+      participants = participantsResult.rows.map(row => ({
         participantId: row.participant_id,
         userId: row.user_id,
         email: row.email,
         displayName: row.display_name,
         participantType: row.participant_type as 'owner' | 'member' | 'guest'
-      }))
+      }));
+    }
+    
+    // If no participants from session, try booking_members table
+    if (participants.length === 0 && session.booking_id) {
+      const bookingMembersResult = await pool.query(
+        `SELECT 
+          bm.id as participant_id,
+          u.id as user_id,
+          bm.user_email as email,
+          COALESCE(u.full_name, bm.user_email) as display_name,
+          CASE WHEN bm.user_email = $2 THEN 'owner' ELSE 'member' END as participant_type
+         FROM booking_members bm
+         LEFT JOIN users u ON LOWER(u.email) = LOWER(bm.user_email)
+         WHERE bm.booking_id = $1
+         ORDER BY bm.user_email = $2 DESC, bm.created_at ASC`,
+        [session.booking_id, session.host_email]
+      );
+      participants = bookingMembersResult.rows.map(row => ({
+        participantId: row.participant_id,
+        userId: row.user_id,
+        email: row.email,
+        displayName: row.display_name,
+        participantType: row.participant_type as 'owner' | 'member' | 'guest'
+      }));
+    }
+    
+    // If still no participants, create one for the host
+    if (participants.length === 0) {
+      participants = [{
+        participantId: undefined,
+        userId: null,
+        email: session.host_email,
+        displayName: session.host_email,
+        participantType: 'owner'
+      }];
+    }
+    
+    return {
+      sessionId: session.session_id,
+      bookingId: session.booking_id,
+      sessionDate: session.session_date,
+      startTime: session.start_time,
+      sessionDuration: session.duration_minutes,
+      declaredPlayerCount: parseInt(session.declared_player_count) || 1,
+      hostEmail: session.host_email,
+      participants
     };
   } catch (error) {
     logger.error('[UnifiedFeeService] Error loading session data:', { error: error as Error });
@@ -125,6 +177,7 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
 
 export async function computeFeeBreakdown(params: FeeComputeParams): Promise<FeeBreakdown> {
   let sessionDate: string;
+  let startTime: string | undefined;
   let sessionDuration: number;
   let declaredPlayerCount: number;
   let hostEmail: string;
@@ -136,6 +189,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
     participantType: 'owner' | 'member' | 'guest';
   }>;
   let sessionId: number | undefined;
+  let currentBookingId: number | undefined;
   
   if (params.sessionId || params.bookingId) {
     const sessionData = await loadSessionData(params.sessionId, params.bookingId);
@@ -143,21 +197,25 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
       throw new Error(`Session or booking not found: sessionId=${params.sessionId}, bookingId=${params.bookingId}`);
     }
     sessionDate = sessionData.sessionDate;
+    startTime = sessionData.startTime;
     sessionDuration = sessionData.sessionDuration;
     declaredPlayerCount = sessionData.declaredPlayerCount;
     hostEmail = sessionData.hostEmail;
     participants = sessionData.participants;
     sessionId = sessionData.sessionId;
+    currentBookingId = sessionData.bookingId;
   } else {
     if (!params.sessionDate || !params.sessionDuration || !params.hostEmail || !params.participants) {
       throw new Error('Missing required parameters for fee calculation preview');
     }
     sessionDate = params.sessionDate;
+    startTime = params.startTime;
     sessionDuration = params.sessionDuration;
     declaredPlayerCount = params.declaredPlayerCount || 1;
     hostEmail = params.hostEmail;
     participants = params.participants;
     sessionId = undefined;
+    currentBookingId = params.bookingId;
   }
   
   const actualPlayerCount = participants.length;
@@ -214,13 +272,47 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
   if (allIdentifiers.length > 0) {
     if (isPreviewMode) {
       // For preview mode, query booking_requests directly (includes pending/approved/attended)
-      // IMPORTANT: Include bookings where the member is EITHER the owner OR a participant
-      // This prevents surprise overage charges at check-in
+      // IMPORTANT: Only count bookings that START EARLIER than the current booking
+      // This ensures the earliest booking uses the daily allowance first, and later bookings
+      // accumulate overage correctly. This prevents charging overage on BOTH bookings
+      // when a member has multiple bookings on the same day.
       // Note: We use UNION (not UNION ALL) and deduplicate by booking_id to prevent double-counting
+      
+      // If we have a bookingId but no startTime, fetch it from the database
+      let effectiveStartTime = startTime;
+      if (!startTime && currentBookingId) {
+        const startTimeResult = await pool.query(
+          `SELECT start_time FROM booking_requests WHERE id = $1`,
+          [currentBookingId]
+        );
+        if (startTimeResult.rows.length > 0 && startTimeResult.rows[0].start_time) {
+          effectiveStartTime = startTimeResult.rows[0].start_time;
+        }
+      }
+      
+      // Build the time filter - only count usage from earlier bookings
+      const hasTimeFilter = effectiveStartTime !== undefined;
+      const hasBookingIdFilter = currentBookingId !== undefined;
+      
+      // Filter clause: only count bookings that started earlier OR same time with lower ID
+      // This ensures deterministic ordering and the current booking is excluded
+      const timeFilterClause = hasTimeFilter 
+        ? `AND (br.start_time < $3 OR (br.start_time = $3 AND br.id < COALESCE($4, 0)))`
+        : hasBookingIdFilter
+          ? `AND br.id != $3`
+          : '';
+      
+      const queryParams = hasTimeFilter
+        ? [emailList.map(e => e.toLowerCase()), sessionDate, effectiveStartTime, currentBookingId || 0]
+        : hasBookingIdFilter
+          ? [emailList.map(e => e.toLowerCase()), sessionDate, currentBookingId]
+          : [emailList.map(e => e.toLowerCase()), sessionDate];
+      
       const previewUsageQuery = `
         WITH owned_bookings AS (
           -- Bookings where the member is the owner
           -- Per-participant minutes = duration / player_count
+          -- Only count bookings that start EARLIER than current booking
           SELECT LOWER(user_email) as identifier, 
                  br.id as booking_id,
                  FLOOR(duration_minutes::float / GREATEST(1, COALESCE(declared_player_count, 1))) as minutes_share
@@ -228,10 +320,12 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
           WHERE LOWER(user_email) = ANY($1::text[])
             AND request_date = $2
             AND status IN ('pending', 'approved', 'attended')
+            ${timeFilterClause}
         ),
         member_bookings AS (
           -- Bookings where the member is a participant (via booking_members table)
           -- Exclude bookings where they are already the owner to prevent double-counting
+          -- Only count bookings that start EARLIER than current booking
           SELECT LOWER(bm.user_email) as identifier,
                  br.id as booking_id,
                  FLOOR(br.duration_minutes::float / GREATEST(1, COALESCE(br.declared_player_count, 1))) as minutes_share
@@ -240,11 +334,13 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
           WHERE LOWER(bm.user_email) = ANY($1::text[])
             AND br.request_date = $2
             AND br.status IN ('pending', 'approved', 'attended')
-            AND LOWER(bm.user_email) != LOWER(br.user_email)  -- Exclude if they're the owner
+            AND LOWER(bm.user_email) != LOWER(br.user_email)
+            ${timeFilterClause}
         ),
         session_participant_bookings AS (
           -- Bookings where the member is a participant (via booking_participants -> booking_sessions)
           -- This handles cases where sessions were created but booking not in booking_members
+          -- Only count bookings that start EARLIER than current booking
           SELECT LOWER(u.email) as identifier,
                  br.id as booking_id,
                  FLOOR(br.duration_minutes::float / GREATEST(1, COALESCE(br.declared_player_count, 1))) as minutes_share
@@ -255,7 +351,8 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
           WHERE LOWER(u.email) = ANY($1::text[])
             AND br.request_date = $2
             AND br.status IN ('pending', 'approved', 'attended')
-            AND LOWER(u.email) != LOWER(br.user_email)  -- Exclude if they're the owner
+            AND LOWER(u.email) != LOWER(br.user_email)
+            ${timeFilterClause}
         ),
         all_usage AS (
           -- Combine all sources and deduplicate by booking_id + identifier
@@ -271,7 +368,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
         SELECT identifier, COALESCE(SUM(minutes_share), 0) as used
         FROM all_usage
         GROUP BY identifier`;
-      const usageResult = await pool.query(previewUsageQuery, [emailList.map(e => e.toLowerCase()), sessionDate]);
+      const usageResult = await pool.query(previewUsageQuery, queryParams);
       usageResult.rows.forEach(r => usageMap.set(r.identifier, parseInt(r.used) || 0));
     } else {
       const usageQuery = excludeId 

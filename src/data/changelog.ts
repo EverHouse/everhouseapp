@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.37.6",
+    date: "2026-01-28",
+    title: "Same-Day Booking Fee Calculation Fix",
+    changes: [
+      "Fixed: Members with multiple bookings on the same day now correctly use their daily allowance on the earliest booking first",
+      "Fixed: Later bookings on the same day now properly calculate overage fees based on remaining allowance",
+      "Improved: Fee calculations now use start time ordering to ensure fair allocation of daily included minutes"
+    ]
+  },
+  {
     version: "9.37.5",
     date: "2026-01-28",
     title: "Member History Bug Fix",
