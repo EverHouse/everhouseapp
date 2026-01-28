@@ -152,8 +152,8 @@ export function BalancePaymentModal({
             aria-modal="true"
             aria-labelledby="balance-payment-modal-title"
             onClick={(e) => e.stopPropagation()}
-            className={`relative w-full max-w-md max-h-[85vh] flex flex-col ${
-              isDark ? 'bg-black/80' : 'bg-white/80'
+            className={`relative w-full max-w-md max-h-[70vh] flex flex-col ${
+              isDark ? 'bg-black/95' : 'bg-white/95'
             } backdrop-blur-xl border border-primary/10 dark:border-white/10 rounded-2xl shadow-2xl animate-modal-slide-up`}
           >
             <div className={`flex items-center justify-between p-4 border-b ${isDark ? 'bg-white/5 border-white/10' : 'bg-primary/5 border-primary/10'}`}>

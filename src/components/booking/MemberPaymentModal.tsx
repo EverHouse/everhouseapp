@@ -148,8 +148,8 @@ export function MemberPaymentModal({
             aria-modal="true"
             aria-labelledby="payment-modal-title"
             onClick={(e) => e.stopPropagation()}
-            className={`relative w-full max-w-md max-h-[90vh] overflow-hidden ${
-              isDark ? 'bg-black/80' : 'bg-white/80'
+            className={`relative w-full max-w-md max-h-[70vh] overflow-hidden ${
+              isDark ? 'bg-black/95' : 'bg-white/95'
             } backdrop-blur-xl border border-primary/10 dark:border-white/10 rounded-2xl shadow-2xl animate-modal-slide-up`}
           >
             <div className={`flex items-center justify-between p-4 border-b ${isDark ? 'bg-white/5 border-white/10' : 'bg-primary/5 border-primary/10'}`}>
@@ -172,7 +172,7 @@ export function MemberPaymentModal({
 
             <div
               className="overflow-y-auto p-4"
-              style={{ maxHeight: 'calc(90vh - 80px)', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', overscrollBehavior: 'contain' }}
+              style={{ maxHeight: 'calc(70vh - 60px)', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', overscrollBehavior: 'contain' }}
             >
               {loading && (
                 <div className="flex items-center justify-center py-12">
