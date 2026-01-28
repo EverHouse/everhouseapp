@@ -4,51 +4,56 @@ import TrackmanIcon from '../../icons/TrackmanIcon';
 
 const ITEMS_PER_PAGE = 10;
 
-const normalizeTimestamp = (dateStr: string): string => {
-  if (!dateStr) return dateStr;
-  let normalized = dateStr.replace(' ', 'T');
-  if (!normalized.includes('Z') && !normalized.includes('+') && !/T[\d:]+[-+]/.test(normalized)) {
-    normalized = normalized + 'Z';
-  }
-  return normalized;
+// Trackman sends times labeled as UTC (with 'Z') but they're actually Pacific local times
+// Extract the time components directly without timezone conversion
+const parseTrackmanTime = (dateStr: string): { date: Date; hour: number; minute: number; year: number; month: number; day: number } | null => {
+  if (!dateStr) return null;
+  
+  // Match ISO format: 2026-01-28T08:30:00.000Z or 2026-01-28T08:30:00Z
+  const match = dateStr.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!match) return null;
+  
+  const [, yearStr, monthStr, dayStr, hourStr, minuteStr] = match;
+  return {
+    date: new Date(dateStr),
+    year: parseInt(yearStr),
+    month: parseInt(monthStr),
+    day: parseInt(dayStr),
+    hour: parseInt(hourStr),
+    minute: parseInt(minuteStr)
+  };
+};
+
+const formatTimeFromParts = (hour: number, minute: number): string => {
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
 };
 
 const formatDateTimePacific = (dateStr: string): string => {
-  const normalizedDateStr = normalizeTimestamp(dateStr);
-  const date = new Date(normalizedDateStr);
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'America/Los_Angeles'
-  }) + ' at ' + date.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-    timeZone: 'America/Los_Angeles'
-  });
+  const parsed = parseTrackmanTime(dateStr);
+  if (!parsed) return '';
+  
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dateDisplay = `${monthNames[parsed.month - 1]} ${parsed.day}, ${parsed.year}`;
+  const timeDisplay = formatTimeFromParts(parsed.hour, parsed.minute);
+  
+  return `${dateDisplay} at ${timeDisplay}`;
 };
 
 const formatBookingDate = (dateStr: string): string => {
-  if (!dateStr) return '';
-  const date = new Date(normalizeTimestamp(dateStr));
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'America/Los_Angeles'
-  });
+  const parsed = parseTrackmanTime(dateStr);
+  if (!parsed) return '';
+  
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${monthNames[parsed.month - 1]} ${parsed.day}, ${parsed.year}`;
 };
 
 const formatTimePacific = (dateStr: string): string => {
-  if (!dateStr) return '';
-  const date = new Date(normalizeTimestamp(dateStr));
-  return date.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-    timeZone: 'America/Los_Angeles'
-  });
+  const parsed = parseTrackmanTime(dateStr);
+  if (!parsed) return '';
+  
+  return formatTimeFromParts(parsed.hour, parsed.minute);
 };
 
 const formatTimeSlot = (startStr: string, endStr: string): string => {
@@ -58,11 +63,15 @@ const formatTimeSlot = (startStr: string, endStr: string): string => {
 
 const calculateDuration = (startStr: string, endStr: string): string => {
   if (!startStr || !endStr) return '';
-  const start = new Date(normalizeTimestamp(startStr));
-  const end = new Date(normalizeTimestamp(endStr));
-  const diffMs = end.getTime() - start.getTime();
-  const diffMins = Math.round(diffMs / 60000);
+  const startParsed = parseTrackmanTime(startStr);
+  const endParsed = parseTrackmanTime(endStr);
+  if (!startParsed || !endParsed) return '';
   
+  const startMins = startParsed.hour * 60 + startParsed.minute;
+  const endMins = endParsed.hour * 60 + endParsed.minute;
+  const diffMins = endMins - startMins;
+  
+  if (diffMins <= 0) return '';
   if (diffMins < 60) {
     return `${diffMins} min`;
   }
