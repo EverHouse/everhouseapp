@@ -209,6 +209,8 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
     const countsMap = new Map<number, BookingCounts>();
     
     if (bookingIds.length > 0) {
+      // Build properly parameterized ARRAY[] using sql.join for safety
+      const bookingIdsSql = sql.join(bookingIds.map(id => sql`${id}`), sql`, `);
       const batchCountsResult = await db.execute(sql`
         WITH member_counts AS (
           SELECT 
@@ -218,13 +220,13 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
             COUNT(*) FILTER (WHERE user_email IS NOT NULL AND is_primary IS NOT TRUE)::int as additional_members,
             BOOL_OR(is_primary = true AND LOWER(user_email) = ${normalizedEmail}) as is_primary_member
           FROM booking_members
-          WHERE booking_id = ANY(${bookingIds}::int[])
+          WHERE booking_id = ANY(ARRAY[${bookingIdsSql}]::int[])
           GROUP BY booking_id
         ),
         guest_counts AS (
           SELECT booking_id, COUNT(*)::int as guest_count
           FROM booking_guests
-          WHERE booking_id = ANY(${bookingIds}::int[])
+          WHERE booking_id = ANY(ARRAY[${bookingIdsSql}]::int[])
           GROUP BY booking_id
         )
         SELECT 

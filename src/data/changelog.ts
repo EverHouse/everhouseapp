@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.37.5",
+    date: "2026-01-28",
+    title: "Member History Bug Fix",
+    changes: [
+      "Fixed: Member profile drawer now correctly loads booking history, event RSVPs, and wellness enrollments",
+      "Fixed: Database query error that prevented staff from viewing member activity in the Directory"
+    ]
+  },
+  {
     version: "9.37.4",
     date: "2026-01-28",
     title: "Staff PWA Menu Shortcuts",
