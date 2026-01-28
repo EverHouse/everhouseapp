@@ -312,14 +312,57 @@ export async function changeSubscriptionTier(
     const stripe = await getStripeClient();
     const sub = await stripe.subscriptions.retrieve(subscriptionId);
     const itemId = sub.items.data[0].id;
+    
+    // Get the customer's default payment method to ensure it's used for the proration invoice
+    let defaultPaymentMethod: string | undefined;
+    
+    // First check if subscription has a default payment method
+    if (sub.default_payment_method) {
+      defaultPaymentMethod = typeof sub.default_payment_method === 'string' 
+        ? sub.default_payment_method 
+        : sub.default_payment_method.id;
+    }
+    
+    // If not, get the customer's default from invoice_settings
+    if (!defaultPaymentMethod) {
+      const customer = await stripe.customers.retrieve(sub.customer as string);
+      if (customer && !customer.deleted) {
+        const invoiceSettings = customer.invoice_settings;
+        if (invoiceSettings?.default_payment_method) {
+          defaultPaymentMethod = typeof invoiceSettings.default_payment_method === 'string'
+            ? invoiceSettings.default_payment_method
+            : invoiceSettings.default_payment_method.id;
+        }
+      }
+    }
+    
+    // If still no payment method, try to get the first attached card
+    if (!defaultPaymentMethod) {
+      const paymentMethods = await stripe.paymentMethods.list({
+        customer: sub.customer as string,
+        type: 'card',
+        limit: 1,
+      });
+      if (paymentMethods.data.length > 0) {
+        defaultPaymentMethod = paymentMethods.data[0].id;
+        console.log(`[Stripe Subscriptions] Using first attached card ${defaultPaymentMethod} for tier change`);
+      }
+    }
 
     if (immediate) {
-      await stripe.subscriptions.update(subscriptionId, {
+      const updateParams: Stripe.SubscriptionUpdateParams = {
         items: [{ id: itemId, price: newPriceId }],
         proration_behavior: 'always_invoice',
         cancel_at_period_end: false,
-      });
-      console.log(`[Stripe Subscriptions] Immediately upgraded subscription ${subscriptionId} to price ${newPriceId}`);
+      };
+      
+      // Set the default payment method on the subscription to ensure proration invoice uses the card
+      if (defaultPaymentMethod) {
+        updateParams.default_payment_method = defaultPaymentMethod;
+      }
+      
+      await stripe.subscriptions.update(subscriptionId, updateParams);
+      console.log(`[Stripe Subscriptions] Immediately upgraded subscription ${subscriptionId} to price ${newPriceId} (payment method: ${defaultPaymentMethod || 'none'})`);
     } else {
       await stripe.subscriptions.update(subscriptionId, {
         items: [{ id: itemId, price: newPriceId }],

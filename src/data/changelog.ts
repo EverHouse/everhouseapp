@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.34.1",
+    date: "2026-01-28",
+    title: "Tier Change Payment Fix",
+    changes: [
+      "Fixed: Tier changes now correctly charge the member's card instead of Stripe balance",
+      "Fixed: Immediate tier changes properly use the customer's default payment method for proration invoices",
+      "Improved: Payment method lookup tries subscription default, then customer default, then first attached card"
+    ]
+  },
+  {
     version: "9.34.0",
     date: "2026-01-28",
     title: "Training Guide & Mobile Navigation Update",
