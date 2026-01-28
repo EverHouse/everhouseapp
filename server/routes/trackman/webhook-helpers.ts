@@ -153,14 +153,19 @@ export function isTrackmanV2Payload(payload: any): payload is TrackmanV2WebhookP
          (payload?.venue || payload?.booking?.bay?.ref);
 }
 
+// Trackman sends times labeled as UTC (with 'Z') but they're actually Pacific local times
+// Extract the date/time components directly from the ISO string without timezone conversion
 export function parseISOToPacific(isoStr: string): { date: string; time: string } {
-  const dt = new Date(isoStr);
-  if (isNaN(dt.getTime())) {
+  // Match ISO format: 2026-01-28T08:30:00.000Z or 2026-01-28T08:30:00Z
+  const match = isoStr.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!match) {
     throw new Error(`Invalid ISO date: ${isoStr}`);
   }
+  
+  const [, year, month, day, hour, minute] = match;
   return {
-    date: formatDatePacific(dt),
-    time: formatTimePacific(dt).substring(0, 5),
+    date: `${year}-${month}-${day}`,
+    time: `${hour}:${minute}`,
   };
 }
 
