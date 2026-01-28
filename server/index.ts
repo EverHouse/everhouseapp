@@ -33,6 +33,7 @@ import { startHubSpotQueueScheduler } from './schedulers/hubspotQueueScheduler';
 import { startSessionCleanupScheduler } from './schedulers/sessionCleanupScheduler';
 import { startUnresolvedTrackmanScheduler } from './schedulers/unresolvedTrackmanScheduler';
 import { startMemberSyncScheduler } from './schedulers/memberSyncScheduler';
+import { startDuplicateCleanupScheduler } from './schedulers/duplicateCleanupScheduler';
 import { processStripeWebhook } from './core/stripe';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -459,6 +460,7 @@ async function startServer() {
   startUnresolvedTrackmanScheduler();
   startHubSpotQueueScheduler();
   startMemberSyncScheduler();
+  startDuplicateCleanupScheduler();
 }
 
 startServer().catch((err) => {

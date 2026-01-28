@@ -18,8 +18,9 @@ export const changelog: ChangelogEntry[] = [
     title: "Duplicate Trackman Booking Fix",
     changes: [
       "Fixed: Added unique constraint on Trackman booking ID to prevent duplicate bookings from race conditions",
+      "Added: Automatic duplicate cleanup runs on server startup and daily at 4am Pacific",
       "Added: Admin endpoint to detect duplicate Trackman bookings (/api/admin/trackman/duplicate-bookings)",
-      "Added: Admin endpoint to clean up duplicate bookings while preserving the original (/api/admin/trackman/cleanup-duplicates)"
+      "Added: Admin endpoint to manually clean up duplicate bookings if needed (/api/admin/trackman/cleanup-duplicates)"
     ]
   },
   {
