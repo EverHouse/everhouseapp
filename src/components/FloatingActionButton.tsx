@@ -38,22 +38,26 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
   
   if (drawerOpen) return null;
   
+  // On desktop (md+), position closer to bottom since there's no bottom nav
+  // On mobile, use existing logic based on scroll position
+  const mobileBottom = isAtBottom 
+    ? 'calc(24px + env(safe-area-inset-bottom, 0px))' 
+    : 'calc(140px + env(safe-area-inset-bottom, 0px))';
+  
   const fabContent = (
     <button
       onClick={onClick}
-      className={`fixed right-5 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ease-out hover:scale-110 active:scale-95 ${colorClasses[color]}`}
+      className={`fixed right-5 md:right-8 bottom-8 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ease-out hover:scale-110 active:scale-95 fab-button ${colorClasses[color]}`}
       style={{ 
         zIndex: 'var(--z-fab)',
-        bottom: isAtBottom 
-          ? 'calc(24px + env(safe-area-inset-bottom, 0px))' 
-          : 'calc(140px + env(safe-area-inset-bottom, 0px))' 
-      }}
+        '--fab-mobile-bottom': mobileBottom,
+      } as React.CSSProperties}
       aria-label={label || 'Add new item'}
     >
       {secondaryIcon ? (
         <div className="relative flex items-center justify-center w-full h-full">
           <span className="material-symbols-outlined text-2xl">{secondaryIcon}</span>
-          <span className="material-symbols-outlined text-[10px] font-bold absolute -left-0.5 -top-0.5 bg-white/80 dark:bg-gray-900/80 text-inherit rounded-full w-4 h-4 flex items-center justify-center shadow-sm">{icon}</span>
+          <span className="material-symbols-outlined text-[10px] font-bold absolute -left-0.5 -top-0.5 text-inherit flex items-center justify-center">{icon}</span>
         </div>
       ) : (
         <span className="material-symbols-outlined text-2xl">{icon}</span>

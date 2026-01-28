@@ -510,6 +510,13 @@ body.has-fab .back-to-top:not(.with-nav) {
   bottom: calc(env(safe-area-inset-bottom, 0px) + 72px + 56px);
 }
 
+/* FAB button mobile positioning - uses CSS variable for dynamic bottom value */
+@media (max-width: 767px) {
+  .fab-button {
+    bottom: var(--fab-mobile-bottom, 2rem) !important;
+  }
+}
+
 .back-to-top button {
   width: 48px;
   height: 48px;
