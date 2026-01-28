@@ -275,9 +275,8 @@ const MemberUpdates: React.FC = () => {
     if (!user?.email) return;
     try {
       await fetch(`/api/notifications/mark-all-read`, { 
-        method: 'POST',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_email: user.email }),
         credentials: 'include' 
       });
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
