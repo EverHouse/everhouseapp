@@ -25,7 +25,7 @@ async function runDailyMemberSync(): Promise<void> {
   try {
     const result = await syncAllMembersFromHubSpot();
     console.log(`[MemberSync] Daily sync complete - Synced: ${result.synced}, Errors: ${result.errors}`);
-    setLastMemberSyncTime(Date.now());
+    await setLastMemberSyncTime(Date.now());
   } catch (err) {
     console.error('[MemberSync] Daily sync failed:', err);
   }

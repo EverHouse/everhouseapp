@@ -3,6 +3,7 @@ import { seedTrainingSections } from '../routes/training';
 import { getStripeSync } from '../core/stripe';
 import { runMigrations } from 'stripe-replit-sync';
 import { enableRealtimeForTable } from '../core/supabase/client';
+import { initMemberSyncSettings } from '../core/memberSync';
 
 export async function runStartupTasks(): Promise<void> {
   console.log('[Startup] Running deferred database initialization...');
@@ -18,6 +19,12 @@ export async function runStartupTasks(): Promise<void> {
     await seedDefaultNoticeTypes();
   } catch (err) {
     console.error('[Startup] Seeding notice types failed (non-fatal):', err);
+  }
+
+  try {
+    await initMemberSyncSettings();
+  } catch (err) {
+    console.error('[Startup] Member sync settings init failed (non-fatal):', err);
   }
 
   try {

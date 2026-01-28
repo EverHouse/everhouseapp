@@ -221,7 +221,7 @@ router.post('/api/hubspot/sync-all-members', isStaffOrAdmin, async (req, res) =>
   try {
     console.log('[HubSpotDeals] Manual member sync triggered');
     const result = await syncAllMembersFromHubSpot();
-    setLastMemberSyncTime(Date.now());
+    await setLastMemberSyncTime(Date.now());
     console.log(`[HubSpotDeals] Manual sync complete - Synced: ${result.synced}, Errors: ${result.errors}`);
     res.json({ success: true, ...result });
   } catch (error: any) {

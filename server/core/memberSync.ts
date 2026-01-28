@@ -4,7 +4,7 @@ import { memberNotes, communicationLogs } from '../../shared/models/membership';
 import { getHubSpotClient } from './integrations';
 import { normalizeTierName, extractTierTags, TIER_NAMES } from '../../shared/constants/tiers';
 import { sql, eq, and } from 'drizzle-orm';
-import { isProduction } from './db';
+import { pool, isProduction } from './db';
 import { broadcastMemberDataUpdated, broadcastDataIntegrityUpdate } from './websocket';
 import { syncDealStageFromMindbodyStatus } from './hubspotDeals';
 import { alertOnHubSpotSyncComplete, alertOnSyncFailure } from './dataAlerts';
@@ -135,12 +135,36 @@ let syncInProgress = false;
 let lastSyncTime = 0;
 const SYNC_COOLDOWN = 5 * 60 * 1000;
 
+export async function initMemberSyncSettings(): Promise<void> {
+  try {
+    const result = await pool.query(
+      `SELECT value FROM app_settings WHERE key = 'last_member_sync_time'`
+    );
+    if (result.rows.length > 0 && result.rows[0].value) {
+      lastSyncTime = parseInt(result.rows[0].value, 10);
+      console.log(`[MemberSync] Loaded last sync time: ${new Date(lastSyncTime).toISOString()}`);
+    }
+  } catch (err) {
+    console.error('[MemberSync] Failed to load last sync time:', err);
+  }
+}
+
 export function getLastMemberSyncTime(): number {
   return lastSyncTime;
 }
 
-export function setLastMemberSyncTime(time: number): void {
+export async function setLastMemberSyncTime(time: number): Promise<void> {
   lastSyncTime = time;
+  try {
+    await pool.query(
+      `INSERT INTO app_settings (key, value, category, updated_at) 
+       VALUES ('last_member_sync_time', $1, 'sync', NOW())
+       ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()`,
+      [time.toString()]
+    );
+  } catch (err) {
+    console.error('[MemberSync] Failed to persist last sync time:', err);
+  }
 }
 
 export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; errors: number }> {
