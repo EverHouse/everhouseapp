@@ -13,10 +13,11 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "9.33.17",
+    version: "9.33.18",
     date: "2026-01-28",
-    title: "Landing Page Header Visual Polish",
+    title: "Day Pass Page & Visual Polish",
     changes: [
+      "Fixed: Simulator Overage fee no longer appears on Day Passes purchase page",
       "Fixed: Landing page header now matches green status bar for unified appearance",
       "Fixed: Removed background transition that caused white flash when scrolling",
       "Fixed: Member profile drawer no longer shows gap on right side during slide-in animation"
