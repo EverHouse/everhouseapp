@@ -77,3 +77,64 @@ The application utilizes a React 19 frontend with Vite, styled using Tailwind CS
 - **Apple Messages for Business**: For direct messaging.
 - **Amarie Aesthetics MedSpa**: For direct booking links.
 - **Supabase**: For backend admin client, Realtime subscriptions, and session token generation.
+
+## Bug Prevention Guidelines
+These patterns have caused bugs before. Watch out for them:
+
+### Timezone Bugs (CRITICAL)
+- **NEVER use `CURRENT_DATE` in SQL** - It returns UTC date, not Pacific time
+- **ALWAYS use**: `(CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date` for date comparisons
+- **Use `server/utils/dateUtils.ts`** - Contains `getPacificDate()`, `getPacificNow()`, `toPacificTime()` utilities
+- **Test during evening hours** (5 PM - midnight Pacific) when UTC is "tomorrow" but Pacific is still "today"
+
+### Active Membership Status (CRITICAL - v9.32.31)
+**The canonical definition of "has membership access":**
+```sql
+-- SQL pattern for active members
+WHERE (membership_status IN ('active', 'trialing', 'past_due') 
+       OR stripe_subscription_id IS NOT NULL)
+```
+```typescript
+// TypeScript pattern for active members
+const activeStatuses = ['active', 'trialing', 'past_due'];
+const isActive = activeStatuses.includes(status) || !!stripeSubscriptionId;
+```
+
+**Why this matters:**
+- `trialing` = New member in trial period (full access)
+- `past_due` = Payment failed but still in grace period (full access for 3 days)
+- `stripeSubscriptionId` = Has subscription in Stripe regardless of DB status (DB can be stale)
+
+**Audit checklist when modifying status-related code:**
+1. Search for `membership_status = 'active'` - should usually be `IN ('active', 'trialing', 'past_due')`
+2. Search for `status: 'active'` in Stripe API calls - should include trialing/past_due
+3. Check SQL queries in: `server/routes/`, `server/core/stripe/`, `server/schedulers/`
+4. Check frontend filters in: `src/contexts/`, `src/pages/Admin/`
+5. Never put `past_due` in "former/inactive" lists - they're still active!
+
+**Files that check membership status (audit these when making changes):**
+- `server/routes/auth.ts` - Login flow
+- `server/routes/members/search.ts` - Directory search
+- `server/routes/hubspot.ts` - HubSpot sync and webhooks
+- `server/routes/stripe/payments.ts` - Billing member search
+- `server/routes/waivers.ts` - Waiver counts
+- `server/core/stripe/reconciliation.ts` - Stripe reconciliation
+- `server/core/stripe/subscriptionSync.ts` - Subscription sync
+- `server/routes/memberBilling.ts` - Member billing operations
+- `src/components/MemberProfileDrawer.tsx` - Member profile UI
+
+### MindBody/HubSpot Status Sync (v9.32.32)
+- **MindBody billing status flows through HubSpot** → HubSpot webhook → Database
+- **HubSpot webhooks update database instantly** when `membership_status` or `membership_tier` changes
+- **Background sync runs every 5 minutes** as a fallback
+- **Both billing sources are valid**: Stripe members have `billing_provider = 'stripe'`, MindBody members have `billing_provider = 'mindbody'`
+
+### Data Cleanup on Actions
+- **When cancelling bookings**: Clear associated fees (`cached_fee_cents = 0`, `payment_status = 'waived'`)
+- **When deleting records**: Consider all related data (participants, fees, sessions, notifications)
+- **Think through side effects**: What other data depends on this record?
+
+### Keep Filtering Logic Simple
+- **Prefer single source of truth** - Use `payment_status = 'pending'` instead of complex snapshot-based filtering
+- **Don't over-engineer** - If a simple field tells you the state, trust it
+- **Avoid "orphan detection" logic** - It's usually wrong; fix the root cause instead

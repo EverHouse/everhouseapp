@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.32.32",
+    date: "2026-01-28",
+    title: "HubSpot Webhook Instant Status Updates",
+    changes: [
+      "HubSpot webhook now instantly updates database when membership_status changes",
+      "HubSpot webhook now instantly updates database when membership_tier changes",
+      "MindBody billing status changes are now reflected immediately (was 5-minute delay)",
+      "Members who pay through MindBody now get instant access updates"
+    ]
+  },
+  {
     version: "9.32.31",
     date: "2026-01-28",
     title: "Deep Sweep - All Status Checks Fixed",

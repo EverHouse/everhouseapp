@@ -1183,6 +1183,36 @@ router.post('/webhooks', async (req, res) => {
           broadcastDirectoryUpdate('synced');
           
           console.log(`[HubSpot Webhook] Contact ${objectId} ${propertyName} changed to: ${propertyValue}`);
+          
+          // INSTANT DATABASE UPDATE: Update the user's status/tier immediately
+          // This ensures MindBody billing status changes are reflected instantly
+          try {
+            const hubspot = await getHubSpotClient();
+            const contact = await hubspot.crm.contacts.basicApi.getById(objectId, ['email', 'membership_status', 'membership_tier']);
+            const email = contact.properties.email?.toLowerCase();
+            
+            if (email) {
+              if (propertyName === 'membership_status') {
+                const newStatus = (propertyValue || 'non-member').toLowerCase();
+                await pool.query(
+                  `UPDATE users SET membership_status = $1, updated_at = NOW() WHERE LOWER(email) = $2`,
+                  [newStatus, email]
+                );
+                console.log(`[HubSpot Webhook] Updated DB membership_status for ${email} to: ${newStatus}`);
+              } else if (propertyName === 'membership_tier') {
+                const normalizedTier = normalizeTierName(propertyValue || '');
+                if (normalizedTier) {
+                  await pool.query(
+                    `UPDATE users SET tier = $1, updated_at = NOW() WHERE LOWER(email) = $2`,
+                    [normalizedTier, email]
+                  );
+                  console.log(`[HubSpot Webhook] Updated DB tier for ${email} to: ${normalizedTier}`);
+                }
+              }
+            }
+          } catch (updateError: any) {
+            console.error(`[HubSpot Webhook] Failed to update DB for contact ${objectId}:`, updateError.message);
+          }
         }
       } else if (subscriptionType === 'deal.propertyChange') {
         // Handle deal property changes (stage, amount)
