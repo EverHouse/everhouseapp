@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.33.8",
+    date: "2026-01-28",
+    title: "Add Billing Source Dropdown & Fix Tier Clearing",
+    changes: [
+      "Added: Billing Source dropdown now visible when member has no active subscription",
+      "Added: Billing Source dropdown visible in wallet-only mode for members billed elsewhere",
+      "Fixed: Staff can now set member tier to 'No Tier' (previously rejected by API)",
+      "Fixed: Tier clearing properly updates HubSpot and notifies member"
+    ]
+  },
+  {
     version: "9.33.7",
     date: "2026-01-28",
     title: "Fix Trackman Webhook ON CONFLICT Syntax",

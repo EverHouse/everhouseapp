@@ -149,13 +149,43 @@ export const StripeBillingSection: React.FC<StripeBillingSectionProps> = ({
     <>
       {/* Wallet-only mode header for MindBody members with Stripe wallet */}
       {isWalletOnly && (
-        <div className={`p-3 rounded-xl mb-4 ${isDark ? 'bg-purple-500/10 border border-purple-500/30' : 'bg-purple-50 border border-purple-200'}`}>
-          <div className="flex items-center gap-2">
+        <div className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-purple-500/10 border border-purple-500/30' : 'bg-purple-50 border border-purple-200'}`}>
+          <div className="flex items-center gap-2 mb-3">
             <span className={`material-symbols-outlined ${isDark ? 'text-purple-400' : 'text-purple-600'} text-lg`}>account_balance_wallet</span>
             <span className={`text-sm font-medium ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>
               Stripe Wallet (Subscription managed elsewhere)
             </span>
           </div>
+          {onUpdateBillingSource && billingProviders.length > 0 && (
+            <div className="mt-3">
+              <p className={`text-xs mb-1.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Billing Source</p>
+              <div className="flex items-center gap-2">
+                <select
+                  value={billingProvider || ''}
+                  onChange={(e) => onUpdateBillingSource(e.target.value)}
+                  disabled={isUpdatingSource}
+                  className={`flex-1 px-3 py-2 rounded-lg border text-sm ${
+                    isDark
+                      ? 'bg-black/30 border-white/20 text-white'
+                      : 'bg-white border-gray-200 text-primary'
+                  } disabled:opacity-50`}
+                >
+                  <option value="">None</option>
+                  {billingProviders.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+                {isUpdatingSource && (
+                  <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+                )}
+              </div>
+              <p className={`text-xs mt-1.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                Change how this member's subscription is managed.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -332,6 +362,37 @@ export const StripeBillingSection: React.FC<StripeBillingSectionProps> = ({
                 <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>This member doesn't have an active Stripe subscription</p>
               </div>
             </div>
+          </div>
+        )}
+
+        {onUpdateBillingSource && billingProviders.length > 0 && !activeSubscription && (
+          <div className="mt-4">
+            <p className={`text-xs mb-1.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Billing Source</p>
+            <div className="flex items-center gap-2">
+              <select
+                value={billingProvider || ''}
+                onChange={(e) => onUpdateBillingSource(e.target.value)}
+                disabled={isUpdatingSource}
+                className={`flex-1 px-3 py-2 rounded-lg border text-sm ${
+                  isDark
+                    ? 'bg-black/30 border-white/20 text-white'
+                    : 'bg-white border-gray-200 text-primary'
+                } disabled:opacity-50`}
+              >
+                <option value="">None</option>
+                {billingProviders.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+              {isUpdatingSource && (
+                <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+              )}
+            </div>
+            <p className={`text-xs mt-1.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+              Change how this member's subscription is managed.
+            </p>
           </div>
         )}
       </div>

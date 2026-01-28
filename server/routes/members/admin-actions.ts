@@ -22,12 +22,10 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
     const { tier, immediate = false } = req.body;
     const sessionUser = getSessionUser(req);
     
-    if (!tier || typeof tier !== 'string') {
-      return res.status(400).json({ error: 'Tier is required' });
-    }
+    const normalizedTier = tier === '' || tier === null || tier === undefined ? null : tier;
     
-    if (!TIER_NAMES.includes(tier as any)) {
-      return res.status(400).json({ error: `Invalid tier. Must be one of: ${TIER_NAMES.join(', ')}` });
+    if (normalizedTier !== null && !TIER_NAMES.includes(normalizedTier as any)) {
+      return res.status(400).json({ error: `Invalid tier. Must be one of: ${TIER_NAMES.join(', ')} or empty to clear` });
     }
     
     const normalizedEmail = decodeURIComponent(email).toLowerCase();
@@ -51,17 +49,18 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
     const member = userResult[0];
     const actualTier = member.tier;
     const oldTierDisplay = actualTier || 'Social';
+    const newTierDisplay = normalizedTier || 'No Tier';
     
-    if (actualTier === tier) {
+    if (actualTier === normalizedTier) {
       return res.json({ 
         success: true, 
         message: 'Member is already on this tier',
-        member: { id: member.id, email: member.email, tier }
+        member: { id: member.id, email: member.email, tier: normalizedTier }
       });
     }
     
     await db.update(users)
-      .set({ tier, updatedAt: new Date() })
+      .set({ tier: normalizedTier, updatedAt: new Date() })
       .where(sql`LOWER(${users.email}) = ${normalizedEmail}`);
     
     const performedBy = sessionUser?.email || 'unknown';
@@ -72,7 +71,7 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
     const hubspotResult = await handleTierChange(
       normalizedEmail,
       oldTierDisplay,
-      tier,
+      newTierDisplay,
       performedBy,
       performedByName
     );
@@ -83,14 +82,14 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
     
     let stripeSync = { success: true, warning: null as string | null };
     
-    if (member.billingProvider === 'stripe' && member.stripeSubscriptionId) {
+    if (member.billingProvider === 'stripe' && member.stripeSubscriptionId && normalizedTier) {
       const tierRecord = await db.select()
         .from(membershipTiers)
-        .where(eq(membershipTiers.name, tier))
+        .where(eq(membershipTiers.name, normalizedTier))
         .limit(1);
       
       if (tierRecord.length > 0 && tierRecord[0].stripePriceId) {
-        const isUpgrade = getTierRank(tier) > getTierRank(oldTierDisplay);
+        const isUpgrade = getTierRank(normalizedTier) > getTierRank(oldTierDisplay);
         const stripeResult = await changeSubscriptionTier(
           member.stripeSubscriptionId,
           tierRecord[0].stripePriceId,
@@ -105,25 +104,29 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
       }
     } else if (member.billingProvider === 'mindbody') {
       stripeSync = { success: true, warning: 'Tier updated in App & HubSpot. PLEASE UPDATE MINDBODY BILLING MANUALLY.' };
+    } else if (!normalizedTier) {
+      stripeSync = { success: true, warning: null };
     }
     
-    const isUpgrade = getTierRank(tier) > getTierRank(oldTierDisplay);
-    const changeType = isUpgrade ? 'upgraded' : 'changed';
+    const isUpgrade = normalizedTier ? getTierRank(normalizedTier) > getTierRank(oldTierDisplay) : false;
+    const changeType = normalizedTier ? (isUpgrade ? 'upgraded' : 'changed') : 'cleared';
     await notifyMember({
       userEmail: normalizedEmail,
-      title: isUpgrade ? 'Membership Upgraded' : 'Membership Updated',
-      message: `Your membership has been ${changeType} from ${oldTierDisplay} to ${tier}`,
+      title: normalizedTier ? (isUpgrade ? 'Membership Upgraded' : 'Membership Updated') : 'Membership Cleared',
+      message: normalizedTier 
+        ? `Your membership has been ${changeType} from ${oldTierDisplay} to ${newTierDisplay}`
+        : `Your membership tier has been cleared (was ${oldTierDisplay})`,
       type: 'system',
       url: '/#/profile'
     });
     
     res.json({
       success: true,
-      message: `Member tier updated from ${oldTierDisplay} to ${tier}`,
+      message: `Member tier updated from ${oldTierDisplay} to ${newTierDisplay}`,
       member: {
         id: member.id,
         email: member.email,
-        tier,
+        tier: normalizedTier,
         previousTier: oldTierDisplay
       },
       hubspotSync: {
