@@ -1665,7 +1665,10 @@ const SubscriptionsSubTab: React.FC = () => {
     }).format(cents / 100);
   };
 
-  const formatDate = (timestamp: number) => {
+  const formatDate = (timestamp: number | null | undefined) => {
+    if (!timestamp || typeof timestamp !== 'number') {
+      return '—';
+    }
     return new Date(timestamp * 1000).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -2011,7 +2014,10 @@ const InvoicesSubTab: React.FC = () => {
     }).format(cents / 100);
   };
 
-  const formatDate = (timestamp: number) => {
+  const formatDate = (timestamp: number | null | undefined) => {
+    if (!timestamp || typeof timestamp !== 'number') {
+      return '—';
+    }
     return new Date(timestamp * 1000).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
