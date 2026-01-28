@@ -617,11 +617,13 @@ async function checkNeedsReviewItems(): Promise<IntegrityCheckResult> {
 async function checkBookingTimeValidity(): Promise<IntegrityCheckResult> {
   const issues: IntegrityIssue[] = [];
   
+  // Exclude cross-midnight bookings (e.g., 23:00-01:00) which are valid late-night events
   const invalidBookings = await db.execute(sql`
     SELECT br.id, br.user_email, br.user_name, br.request_date, br.start_time, br.end_time, r.name as resource_name
     FROM booking_requests br
     LEFT JOIN resources r ON br.resource_id = r.id
     WHERE br.end_time < br.start_time
+    AND NOT (br.start_time >= '20:00:00' AND br.end_time <= '06:00:00')
   `);
   
   for (const row of invalidBookings.rows as any[]) {
@@ -643,11 +645,13 @@ async function checkBookingTimeValidity(): Promise<IntegrityCheckResult> {
     });
   }
   
+  // Exclude cross-midnight sessions (e.g., 23:00-01:00) which are valid late-night events
   const invalidSessions = await db.execute(sql`
     SELECT bs.id, bs.session_date, bs.start_time, bs.end_time, r.name as resource_name
     FROM booking_sessions bs
     LEFT JOIN resources r ON bs.resource_id = r.id
     WHERE bs.end_time < bs.start_time
+    AND NOT (bs.start_time >= '20:00:00' AND bs.end_time <= '06:00:00')
   `);
   
   for (const row of invalidSessions.rows as any[]) {
