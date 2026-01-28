@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useData, Booking } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -159,6 +159,19 @@ const Dashboard: React.FC = () => {
   const [overagePaymentBooking, setOveragePaymentBooking] = useState<{ id: number; amount: number; minutes: number } | null>(null);
   const [isPayingOverage, setIsPayingOverage] = useState(false);
 
+  // PERF: To prevent re-calculating on every render, we throttle the current time
+  // This value is updated once a minute, which is enough to keep the UI fresh
+  const [throttledNowTime, setThrottledNowTime] = useState(getNowTimePacific());
+
+  useEffect(() => {
+    // Update the time every 60 seconds
+    const intervalId = setInterval(() => {
+      setThrottledNowTime(getNowTimePacific());
+    }, 60000); // 60 * 1000 ms
+
+    return () => clearInterval(intervalId);
+  }, []);
+
   const isStaffOrAdminProfile = user?.role === 'admin' || user?.role === 'staff';
   const { permissions: tierPermissions } = useTierPermissions(user?.tier);
 
@@ -307,7 +320,9 @@ const Dashboard: React.FC = () => {
     await fetchUserData(false);
   }, [fetchUserData]);
 
-  const allItems = [
+  // PERF: Memoize all combined/sorted/filtered lists to prevent re-calculation on every render.
+  // These will only re-compute when the underlying API data changes.
+  const allItems = useMemo(() => [
     ...dbBookings.map(b => {
       // Check if current user is NOT the primary booker (i.e., is a linked member)
       const isLinkedMember = user?.email ? b.user_email?.toLowerCase() !== user.email.toLowerCase() : false;
@@ -414,106 +429,113 @@ const Dashboard: React.FC = () => {
         raw: c,
         source: 'calendar'
       }))
-  ].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  ].sort((a, b) => a.sortKey.localeCompare(b.sortKey)), [dbBookings, dbBookingRequests, dbRSVPs, dbWellnessEnrollments, dbConferenceRoomBookings, user?.email]);
 
-  const todayStr = getTodayString();
-  const nowTime = getNowTimePacific();
-  
-  // Normalize time to HH:MM format for comparison
-  const normalizeTime = (t: string) => {
-    if (!t) return '';
-    const parts = t.split(':');
-    return `${parts[0].padStart(2, '0')}:${parts[1]?.padStart(2, '0') || '00'}`;
-  };
-  
-  const upcomingItems = allItems.filter(item => {
-    let itemDate: string | undefined;
-    let endTime: string | undefined;
+  const upcomingItems = useMemo(() => {
+    const todayStr = getTodayString();
     
-    if (item.type === 'booking') {
-      const raw = item.raw as DBBooking;
-      itemDate = raw.booking_date.split('T')[0];
-      endTime = raw.end_time;
-    } else if (item.type === 'booking_request') {
-      const raw = item.raw as DBBookingRequest;
-      itemDate = raw.request_date.split('T')[0];
-      endTime = raw.end_time;
-    } else if (item.type === 'rsvp') {
-      const raw = item.raw as DBRSVP;
-      itemDate = raw.event_date.split('T')[0];
-      // Events typically last ~2 hours, use end_time if available or keep visible all day
-      endTime = raw.end_time;
-    } else if (item.type === 'wellness') {
-      const raw = item.raw as DBWellnessEnrollment;
-      itemDate = raw.date.split('T')[0];
-      // Wellness classes don't have end_time, keep visible until end of day
-      endTime = undefined;
-    } else if (item.type === 'conference_room_calendar') {
-      const raw = item.raw as any;
-      itemDate = raw.request_date.split('T')[0];
-      endTime = raw.end_time;
-    }
+    // Normalize time to HH:MM format for comparison
+    const normalizeTime = (t: string) => {
+      if (!t) return '';
+      const parts = t.split(':');
+      return `${parts[0].padStart(2, '0')}:${parts[1]?.padStart(2, '0') || '00'}`;
+    };
     
-    if (!itemDate) return false;
-    
-    // Future dates are always included
-    if (itemDate > todayStr) return true;
-    
-    // Past dates are always excluded
-    if (itemDate < todayStr) return false;
-    
-    // For today's items, check if they've already ended
-    // Items without end_time stay visible all day
-    if (endTime && normalizeTime(endTime) < nowTime) {
-      return false;
-    }
-    
-    return true;
-  });
+    return allItems.filter(item => {
+      let itemDate: string | undefined;
+      let endTime: string | undefined;
+
+      if (item.type === 'booking') {
+        const raw = item.raw as DBBooking;
+        itemDate = raw.booking_date.split('T')[0];
+        endTime = raw.end_time;
+      } else if (item.type === 'booking_request') {
+        const raw = item.raw as DBBookingRequest;
+        itemDate = raw.request_date.split('T')[0];
+        endTime = raw.end_time;
+      } else if (item.type === 'rsvp') {
+        const raw = item.raw as DBRSVP;
+        itemDate = raw.event_date.split('T')[0];
+        // Events typically last ~2 hours, use end_time if available or keep visible all day
+        endTime = raw.end_time;
+      } else if (item.type === 'wellness') {
+        const raw = item.raw as DBWellnessEnrollment;
+        itemDate = raw.date.split('T')[0];
+        // Wellness classes don't have end_time, keep visible until end of day
+        endTime = undefined;
+      } else if (item.type === 'conference_room_calendar') {
+        const raw = item.raw as any;
+        itemDate = raw.request_date.split('T')[0];
+        endTime = raw.end_time;
+      }
+
+      if (!itemDate) return false;
+
+      // Future dates are always included
+      if (itemDate > todayStr) return true;
+      
+      // Past dates are always excluded
+      if (itemDate < todayStr) return false;
+      
+      // For today's items, check if they've already ended
+      // Items without end_time stay visible all day
+      // PERF: Use throttledNowTime to avoid re-filtering on every render
+      if (endTime && normalizeTime(endTime) < throttledNowTime) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [allItems, throttledNowTime]);
 
   // Calculate minutes used today for metrics (from allItems, not upcomingItems, to include bookings that have already ended)
-  const todayBookingsAll = allItems.filter(item => 
-    item.rawDate === todayStr && 
-    (item.type === 'booking' || item.type === 'booking_request' || item.type === 'conference_room_calendar')
-  );
-  const simMinutesToday = todayBookingsAll
-    .filter(b => b.resourceType === 'simulator')
-    .reduce((sum, b) => {
-      const raw = b.raw as any;
-      const start = raw.start_time?.split(':').map(Number) || [0, 0];
-      const end = raw.end_time?.split(':').map(Number) || [0, 0];
-      const totalMinutes = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
+  const { simMinutesToday, confMinutesToday } = useMemo(() => {
+    const todayStr = getTodayString();
+    const todayBookingsAll = allItems.filter(item =>
+      item.rawDate === todayStr &&
+      (item.type === 'booking' || item.type === 'booking_request' || item.type === 'conference_room_calendar')
+    );
+
+    const simMinutes = todayBookingsAll
+      .filter(b => b.resourceType === 'simulator')
+      .reduce((sum, b) => {
+        const raw = b.raw as any;
+        const start = raw.start_time?.split(':').map(Number) || [0, 0];
+        const end = raw.end_time?.split(':').map(Number) || [0, 0];
+        const totalMinutes = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
+        const playerCount = raw.declared_player_count || 1;
+        const memberShare = Math.ceil(totalMinutes / playerCount);
+        return sum + memberShare;
+      }, 0);
+
+    const confMinutes = todayBookingsAll
+      .filter(b => b.resourceType === 'conference_room')
+      .reduce((sum, b) => {
+        const raw = b.raw as any;
+        const start = raw.start_time?.split(':').map(Number) || [0, 0];
+        const end = raw.end_time?.split(':').map(Number) || [0, 0];
+        const totalMinutes = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
+        const playerCount = raw.declared_player_count || 1;
+        const memberShare = Math.ceil(totalMinutes / playerCount);
+        return sum + memberShare;
+      }, 0);
       
-      // Split time among all players based on declared_player_count
-      const playerCount = raw.declared_player_count || 1;
-      const memberShare = Math.ceil(totalMinutes / playerCount);
-      
-      return sum + memberShare;
-    }, 0);
-  const confMinutesToday = todayBookingsAll
-    .filter(b => b.resourceType === 'conference_room')
-    .reduce((sum, b) => {
-      const raw = b.raw as any;
-      const start = raw.start_time?.split(':').map(Number) || [0, 0];
-      const end = raw.end_time?.split(':').map(Number) || [0, 0];
-      const totalMinutes = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
-      
-      // Split time among all players based on declared_player_count
-      const playerCount = raw.declared_player_count || 1;
-      const memberShare = Math.ceil(totalMinutes / playerCount);
-      
-      return sum + memberShare;
-    }, 0);
+    return { simMinutesToday: simMinutes, confMinutesToday: confMinutes };
+  }, [allItems]);
 
   // Calculate next upcoming event/wellness for metrics grid (from all events/classes, not just enrolled)
-  const nextEvent = allEvents
-    .filter(e => e.event_date.split('T')[0] >= todayStr)
-    .sort((a, b) => a.event_date.localeCompare(b.event_date) || (a.start_time || '').localeCompare(b.start_time || ''))
-    [0];
-  const nextWellnessClass = allWellnessClasses
-    .filter(w => w.date.split('T')[0] >= todayStr)
-    .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
-    [0];
+  const { nextEvent, nextWellnessClass } = useMemo(() => {
+    const todayStr = getTodayString();
+    const nextEv = allEvents
+      .filter(e => e.event_date.split('T')[0] >= todayStr)
+      .sort((a, b) => a.event_date.localeCompare(b.event_date) || (a.start_time || '').localeCompare(b.start_time || ''))
+      [0];
+    const nextWc = allWellnessClasses
+      .filter(w => w.date.split('T')[0] >= todayStr)
+      .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
+      [0];
+    return { nextEvent: nextEv, nextWellnessClass: nextWc };
+  }, [allEvents, allWellnessClasses]);
 
   // Filter out pending invites from upcomingItems (show them in separate section)
   // A pending invite is: is_linked_member=true AND invite_status='pending'
