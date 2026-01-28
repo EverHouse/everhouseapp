@@ -13,16 +13,6 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "9.33.3",
-    date: "2026-01-28",
-    title: "Trackman Webhook Timezone Fix",
-    changes: [
-      "Fixed: Trackman webhook bookings now display correct times",
-      "Trackman sends local times labeled as UTC - now parsed correctly as Pacific",
-      "Booking times like '12:30 AM - 3:30 AM' now correctly show '8:30 AM - 11:30 AM'"
-    ]
-  },
-  {
     version: "9.33.2",
     date: "2026-01-28",
     title: "Background Sync Optimization",
