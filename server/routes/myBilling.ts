@@ -65,9 +65,13 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
               s => s.status === 'active' || s.status === 'trialing' || s.status === 'past_due'
             );
             if (activeSub) {
+              const periodEndTimestamp = activeSub.currentPeriodEnd?.getTime();
+              const validPeriodEnd = periodEndTimestamp && periodEndTimestamp > 0 
+                ? Math.floor(periodEndTimestamp / 1000) 
+                : null;
               billingInfo.subscription = {
                 status: activeSub.status,
-                currentPeriodEnd: Math.floor(activeSub.currentPeriodEnd.getTime() / 1000),
+                currentPeriodEnd: validPeriodEnd,
                 cancelAtPeriodEnd: activeSub.cancelAtPeriodEnd,
                 isPaused: activeSub.isPaused,
               };
@@ -76,8 +80,8 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
               if (hasUpcomingChanges) {
                 billingInfo.upcomingChanges = {
                   cancelAtPeriodEnd: activeSub.cancelAtPeriodEnd,
-                  cancelAt: activeSub.cancelAtPeriodEnd 
-                    ? Math.floor(activeSub.currentPeriodEnd.getTime() / 1000)
+                  cancelAt: activeSub.cancelAtPeriodEnd && validPeriodEnd
+                    ? validPeriodEnd
                     : null,
                   pausedUntil: activeSub.pausedUntil 
                     ? Math.floor(activeSub.pausedUntil.getTime() / 1000)

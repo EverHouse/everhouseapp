@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.34.5",
+    date: "2026-01-28",
+    title: "Subscription Date Display Fix",
+    changes: [
+      "Fixed: Membership renewal date no longer shows '1969' when subscription data is incomplete",
+      "Improved: Invalid or missing renewal dates are now handled gracefully"
+    ]
+  },
+  {
     version: "9.34.4",
     date: "2026-01-28",
     title: "Failed Payments Cleanup & Cancel Button",

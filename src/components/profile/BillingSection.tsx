@@ -8,7 +8,7 @@ interface BillingInfo {
   billingMigrationRequestedAt?: string;
   subscription?: {
     status: string;
-    currentPeriodEnd: number;
+    currentPeriodEnd: number | null;
     cancelAtPeriodEnd: boolean;
     isPaused: boolean;
   };
@@ -155,7 +155,14 @@ export default function BillingSection({ isDark }: Props) {
   }
 
   const formatDate = (timestamp: number) => {
-    return new Date(timestamp * 1000).toLocaleDateString('en-US', {
+    if (!timestamp || timestamp <= 0) {
+      return 'Date unavailable';
+    }
+    const date = new Date(timestamp * 1000);
+    if (date.getFullYear() < 2000) {
+      return 'Date unavailable';
+    }
+    return date.toLocaleDateString('en-US', {
       month: 'short', day: 'numeric', year: 'numeric'
     });
   };
@@ -226,7 +233,7 @@ export default function BillingSection({ isDark }: Props) {
                 )}
               </div>
             </div>
-            {sub && !sub.isPaused && !sub.cancelAtPeriodEnd && (
+            {sub && !sub.isPaused && !sub.cancelAtPeriodEnd && sub.currentPeriodEnd && (
               <span className={`text-xs ${isDark ? 'opacity-60' : 'text-primary/60'}`}>
                 Renews {formatDate(sub.currentPeriodEnd)}
               </span>
