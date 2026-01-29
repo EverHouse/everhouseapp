@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.45.1",
+    date: "2026-01-29",
+    title: "Complete Duplicate Prevention Coverage",
+    changes: [
+      "New: Remember Email checkbox in Manage Players modal (admin booking editor)",
+      "New: Visitor Type dropdown required in Add User modal (staff command center)",
+      "New: Duplicate name warning in Add User modal with clickable options to use existing record",
+      "Fixed: Selecting an existing duplicate now properly uses that record instead of creating new one",
+      "Improved: All member/visitor creation points now have duplicate prevention"
+    ]
+  },
+  {
     version: "9.45.0",
     date: "2026-01-29",
     title: "User Merge & Duplicate Prevention",

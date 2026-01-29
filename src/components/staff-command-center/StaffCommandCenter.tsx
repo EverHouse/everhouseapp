@@ -761,6 +761,9 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
         isOpen={addMemberModalOpen}
         onClose={() => setAddMemberModalOpen(false)}
         onSuccess={() => refresh()}
+        onSelectExisting={(user) => {
+          refresh();
+        }}
       />
     </PullToRefresh>
   );

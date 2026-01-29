@@ -6,6 +6,7 @@ interface AddUserModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  onSelectExisting?: (user: { id: string; email: string; name: string }) => void;
 }
 
 interface FieldErrors {
@@ -38,7 +39,8 @@ const VISITOR_TYPE_OPTIONS = [
 export const AddMemberModal: React.FC<AddUserModalProps> = ({
   isOpen,
   onClose,
-  onSuccess
+  onSuccess,
+  onSelectExisting
 }) => {
   const { showToast } = useToast();
   
@@ -193,8 +195,10 @@ export const AddMemberModal: React.FC<AddUserModalProps> = ({
   };
 
   const handleSelectDuplicate = (duplicate: PotentialDuplicate) => {
-    showToast(`Selected existing user: ${duplicate.name}`, 'success');
-    onSuccess?.();
+    showToast(`Using existing record: ${duplicate.name}`, 'success');
+    if (onSelectExisting) {
+      onSelectExisting({ id: duplicate.id, email: duplicate.email, name: duplicate.name });
+    }
     onClose();
   };
 
