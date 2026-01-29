@@ -97,10 +97,11 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
         (b.user_name || '').includes('Unknown (Trackman)');
     };
     
+    // Only show TODAY's bookings that haven't ended yet (staff can click View all for future dates)
     const scheduledBookings = todaysBookings.filter(booking => {
-      if (booking.request_date > todayPacific) return true;
-      if (booking.request_date === todayPacific && booking.end_time > nowTime) return true;
-      return false;
+      if (booking.request_date !== todayPacific) return false;
+      if (booking.end_time <= nowTime) return false;
+      return true;
     }).filter(booking => {
       // Use String() for reliable comparison
       if (booking.trackman_booking_id && unmatchedTrackmanIds.has(String(booking.trackman_booking_id))) return false;
@@ -108,11 +109,14 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
       return true;
     }).map(b => ({ ...b, is_unmatched: isUnmatchedBooking(b) }));
     
-    const unmatchedWithFlag = unmatchedBookings.map(b => ({
-      ...b,
-      is_unmatched: true,
-      request_date: b.request_date || b.slot_date || todayPacific
-    }));
+    // Only include unmatched bookings that are for today
+    const unmatchedWithFlag = unmatchedBookings
+      .filter(b => (b.request_date || b.slot_date || '') === todayPacific)
+      .map(b => ({
+        ...b,
+        is_unmatched: true,
+        request_date: b.request_date || b.slot_date || todayPacific
+      }));
     
     const allBookings = [...scheduledBookings, ...unmatchedWithFlag];
     
@@ -319,15 +323,15 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
       <div 
         className="flex flex-col bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4"
         role="region"
-        aria-label={hasUnmatchedBookings ? 'Upcoming Bookings - some need member assignment' : 'Upcoming Bookings'}
+        aria-label={hasUnmatchedBookings ? "Today's Bookings - some need member assignment" : "Today's Bookings"}
       >
         <div className="flex items-center justify-between mb-3 lg:mb-4 flex-shrink-0">
-          <h3 className="font-bold text-primary dark:text-white">Upcoming Bookings</h3>
+          <h3 className="font-bold text-primary dark:text-white">Today's Bookings</h3>
           <button onClick={() => onTabChange('simulator')} className="text-xs text-primary/80 dark:text-white/80 hover:underline">View all</button>
         </div>
         {mergedUpcomingBookings.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center py-8">
-            <EmptyState icon="calendar_today" title="No upcoming bookings" variant="compact" />
+            <EmptyState icon="calendar_today" title="No bookings today" variant="compact" />
           </div>
         ) : (
           <div className="space-y-2">

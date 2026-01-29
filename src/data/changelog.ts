@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.39.1",
+    date: "2026-01-29",
+    title: "Dashboard Today's Bookings Filter",
+    changes: [
+      "Improved: Staff dashboard now shows only today's bookings instead of all future dates",
+      "Improved: Card renamed from 'Upcoming Bookings' to 'Today's Bookings' for clarity",
+      "Note: Staff can click 'View all' to see the complete booking list including future dates"
+    ]
+  },
+  {
     version: "9.39.0",
     date: "2026-01-29",
     title: "Comprehensive Activity Logging & Staff Notifications",
