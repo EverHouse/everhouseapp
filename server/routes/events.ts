@@ -13,16 +13,30 @@ import { sendNotificationToUser, broadcastToStaff } from '../core/websocket';
 import { getSessionUser } from '../types/session';
 import { logFromRequest } from '../core/auditLog';
 
-async function createEventAvailabilityBlocks(eventId: number, eventDate: string, startTime: string, endTime: string, createdBy?: string): Promise<void> {
-  const bayIds = await getAllActiveBayIds();
-  const conferenceRoomId = await getConferenceRoomId();
+async function createEventAvailabilityBlocks(
+  eventId: number, 
+  eventDate: string, 
+  startTime: string, 
+  endTime: string, 
+  blockSimulators: boolean, 
+  blockConferenceRoom: boolean,
+  createdBy?: string
+): Promise<void> {
+  const resourceIds: number[] = [];
   
-  const allResourceIds = [...bayIds];
-  if (conferenceRoomId && !allResourceIds.includes(conferenceRoomId)) {
-    allResourceIds.push(conferenceRoomId);
+  if (blockSimulators) {
+    const bayIds = await getAllActiveBayIds();
+    resourceIds.push(...bayIds);
   }
   
-  for (const resourceId of allResourceIds) {
+  if (blockConferenceRoom) {
+    const conferenceRoomId = await getConferenceRoomId();
+    if (conferenceRoomId && !resourceIds.includes(conferenceRoomId)) {
+      resourceIds.push(conferenceRoomId);
+    }
+  }
+  
+  for (const resourceId of resourceIds) {
     await pool.query(
       `INSERT INTO availability_blocks (resource_id, block_date, start_time, end_time, block_type, notes, created_by, event_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -36,9 +50,19 @@ async function removeEventAvailabilityBlocks(eventId: number): Promise<void> {
   await pool.query('DELETE FROM availability_blocks WHERE event_id = $1', [eventId]);
 }
 
-async function updateEventAvailabilityBlocks(eventId: number, eventDate: string, startTime: string, endTime: string, createdBy?: string): Promise<void> {
+async function updateEventAvailabilityBlocks(
+  eventId: number, 
+  eventDate: string, 
+  startTime: string, 
+  endTime: string, 
+  blockSimulators: boolean,
+  blockConferenceRoom: boolean,
+  createdBy?: string
+): Promise<void> {
   await removeEventAvailabilityBlocks(eventId);
-  await createEventAvailabilityBlocks(eventId, eventDate, startTime, endTime, createdBy);
+  if (blockSimulators || blockConferenceRoom) {
+    await createEventAvailabilityBlocks(eventId, eventDate, startTime, endTime, blockSimulators, blockConferenceRoom, createdBy);
+  }
 }
 
 const router = Router();
@@ -253,7 +277,7 @@ router.get('/api/events', async (req, res) => {
 
 router.post('/api/events', isStaffOrAdmin, async (req, res) => {
   try {
-    const { title, description, event_date, start_time, end_time, location, category, image_url, max_attendees, visibility, requires_rsvp, external_url, block_bookings } = req.body;
+    const { title, description, event_date, start_time, end_time, location, category, image_url, max_attendees, visibility, requires_rsvp, external_url, block_bookings, block_simulators, block_conference_room } = req.body;
     
     const trimmedTitle = title?.toString().trim();
     const trimmedEventDate = event_date?.toString().trim();
@@ -310,6 +334,9 @@ router.post('/api/events', isStaffOrAdmin, async (req, res) => {
       return res.status(500).json({ error: 'Failed to create calendar event. Please try again.' });
     }
     
+    const newBlockSimulators = block_simulators === true || block_simulators === 'true';
+    const newBlockConferenceRoom = block_conference_room === true || block_conference_room === 'true';
+    
     const result = await db.insert(events).values({
       title: trimmedTitle,
       description,
@@ -326,14 +353,16 @@ router.post('/api/events', isStaffOrAdmin, async (req, res) => {
       googleCalendarId: googleCalendarId,
       externalUrl: external_url || null,
       blockBookings: block_bookings || false,
+      blockSimulators: newBlockSimulators,
+      blockConferenceRoom: newBlockConferenceRoom,
     }).returning();
     
     const createdEvent = result[0];
     
-    if (block_bookings) {
+    if (newBlockSimulators || newBlockConferenceRoom) {
       try {
         const userEmail = getSessionUser(req)?.email || 'system';
-        await createEventAvailabilityBlocks(createdEvent.id, trimmedEventDate, trimmedStartTime, trimmedEndTime || trimmedStartTime, userEmail);
+        await createEventAvailabilityBlocks(createdEvent.id, trimmedEventDate, trimmedStartTime, trimmedEndTime || trimmedStartTime, newBlockSimulators, newBlockConferenceRoom, userEmail);
       } catch (blockError) {
         if (!isProduction) console.error('Failed to create availability blocks for event:', blockError);
       }
@@ -346,7 +375,8 @@ router.post('/api/events', isStaffOrAdmin, async (req, res) => {
       location: createdEvent.location,
       category: createdEvent.category,
       max_attendees: createdEvent.maxAttendees,
-      block_bookings: createdEvent.blockBookings
+      block_simulators: createdEvent.blockSimulators,
+      block_conference_room: createdEvent.blockConferenceRoom
     });
     
     res.status(201).json(createdEvent);
@@ -359,7 +389,7 @@ router.post('/api/events', isStaffOrAdmin, async (req, res) => {
 router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, event_date, start_time, end_time, location, category, image_url, max_attendees, external_url, block_bookings } = req.body;
+    const { title, description, event_date, start_time, end_time, location, category, image_url, max_attendees, external_url, block_bookings, block_simulators, block_conference_room } = req.body;
     
     const trimmedTitle = title?.toString().trim();
     const trimmedEventDate = event_date?.toString().trim();
@@ -393,11 +423,17 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
     const existing = await db.select({ 
       googleCalendarId: events.googleCalendarId,
       blockBookings: events.blockBookings,
+      blockSimulators: events.blockSimulators,
+      blockConferenceRoom: events.blockConferenceRoom,
       needsReview: events.needsReview
     }).from(events).where(eq(events.id, parseInt(id)));
     
     const previousBlockBookings = existing[0]?.blockBookings || false;
+    const previousBlockSimulators = existing[0]?.blockSimulators || false;
+    const previousBlockConferenceRoom = existing[0]?.blockConferenceRoom || false;
     const newBlockBookings = block_bookings === true || block_bookings === 'true';
+    const newBlockSimulators = block_simulators === true || block_simulators === 'true';
+    const newBlockConferenceRoom = block_conference_room === true || block_conference_room === 'true';
     
     // Auto-exit needs review when required fields are filled:
     // - Category is set and not generic
@@ -420,6 +456,8 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
       maxAttendees: max_attendees,
       externalUrl: external_url || null,
       blockBookings: newBlockBookings,
+      blockSimulators: newBlockSimulators,
+      blockConferenceRoom: newBlockConferenceRoom,
       locallyEdited: true,
       appLastModifiedAt: new Date(),
     };
@@ -466,13 +504,20 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
     const eventId = parseInt(id);
     const userEmail = getSessionUser(req)?.email || 'system';
     
+    // Determine if blocking has changed
+    const hadAnyBlocking = previousBlockSimulators || previousBlockConferenceRoom;
+    const hasAnyBlocking = newBlockSimulators || newBlockConferenceRoom;
+    
     try {
-      if (!previousBlockBookings && newBlockBookings) {
-        await createEventAvailabilityBlocks(eventId, trimmedEventDate, trimmedStartTime, trimmedEndTime || trimmedStartTime, userEmail);
-      } else if (previousBlockBookings && !newBlockBookings) {
+      if (!hadAnyBlocking && hasAnyBlocking) {
+        // Blocks newly enabled
+        await createEventAvailabilityBlocks(eventId, trimmedEventDate, trimmedStartTime, trimmedEndTime || trimmedStartTime, newBlockSimulators, newBlockConferenceRoom, userEmail);
+      } else if (hadAnyBlocking && !hasAnyBlocking) {
+        // Blocks disabled
         await removeEventAvailabilityBlocks(eventId);
-      } else if (newBlockBookings) {
-        await updateEventAvailabilityBlocks(eventId, trimmedEventDate, trimmedStartTime, trimmedEndTime || trimmedStartTime, userEmail);
+      } else if (hasAnyBlocking) {
+        // Blocks changed or time/date changed
+        await updateEventAvailabilityBlocks(eventId, trimmedEventDate, trimmedStartTime, trimmedEndTime || trimmedStartTime, newBlockSimulators, newBlockConferenceRoom, userEmail);
       }
     } catch (blockError) {
       if (!isProduction) console.error('Failed to update availability blocks for event:', blockError);
@@ -486,7 +531,8 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
       location: updatedEvent.location,
       category: updatedEvent.category,
       max_attendees: updatedEvent.maxAttendees,
-      block_bookings: updatedEvent.blockBookings,
+      block_simulators: updatedEvent.blockSimulators,
+      block_conference_room: updatedEvent.blockConferenceRoom,
       locally_edited: updatedEvent.locallyEdited
     });
     

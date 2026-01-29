@@ -43,6 +43,8 @@ interface DBEvent {
     external_url?: string | null;
     visibility?: string;
     block_bookings?: boolean;
+    block_simulators?: boolean;
+    block_conference_room?: boolean;
 }
 
 interface WellnessClass {
@@ -61,6 +63,8 @@ interface WellnessClass {
   external_url?: string | null;
   visibility?: string;
   block_bookings?: boolean;
+  block_simulators?: boolean;
+  block_conference_room?: boolean;
   capacity?: number | null;
   waitlist_enabled?: boolean;
   enrolled_count?: number;
@@ -1150,29 +1154,55 @@ const EventsAdminContent: React.FC = () => {
                             {(newItem.visibility || 'public') === 'public' ? 'Visible on public website and member portal' : 'Only visible to logged-in members'}
                         </p>
                     </div>
-                    <div className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-700/50">
-                        <div className="flex-1">
-                            <label className="font-bold text-sm text-gray-700 dark:text-white flex items-center gap-2">
-                                <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-amber-600">block</span>
-                                Block Bookings During Event
-                            </label>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                Prevents bay and conference room bookings during this event's time slot
-                            </p>
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-700/50">
+                            <div className="flex-1">
+                                <label className="font-bold text-sm text-gray-700 dark:text-white flex items-center gap-2">
+                                    <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-amber-600">sports_golf</span>
+                                    Block Simulators
+                                </label>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    Prevents simulator bay bookings during this event's time slot
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setNewItem({...newItem, block_simulators: !newItem.block_simulators})}
+                                className={`relative w-12 h-6 rounded-full transition-colors ${
+                                    newItem.block_simulators 
+                                        ? 'bg-amber-500' 
+                                        : 'bg-gray-300 dark:bg-white/20'
+                                }`}
+                            >
+                                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${
+                                    newItem.block_simulators ? 'translate-x-6' : 'translate-x-0'
+                                }`} />
+                            </button>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => setNewItem({...newItem, block_bookings: !newItem.block_bookings})}
-                            className={`relative w-12 h-6 rounded-full transition-colors ${
-                                newItem.block_bookings 
-                                    ? 'bg-amber-500' 
-                                    : 'bg-gray-300 dark:bg-white/20'
-                            }`}
-                        >
-                            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${
-                                newItem.block_bookings ? 'translate-x-6' : 'translate-x-0'
-                            }`} />
-                        </button>
+                        <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700/50">
+                            <div className="flex-1">
+                                <label className="font-bold text-sm text-gray-700 dark:text-white flex items-center gap-2">
+                                    <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-blue-600">meeting_room</span>
+                                    Block Conference Room
+                                </label>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    Prevents conference room bookings during this event's time slot
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setNewItem({...newItem, block_conference_room: !newItem.block_conference_room})}
+                                className={`relative w-12 h-6 rounded-full transition-colors ${
+                                    newItem.block_conference_room 
+                                        ? 'bg-blue-500' 
+                                        : 'bg-gray-300 dark:bg-white/20'
+                                }`}
+                            >
+                                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${
+                                    newItem.block_conference_room ? 'translate-x-6' : 'translate-x-0'
+                                }`} />
+                            </button>
+                        </div>
                     </div>
                     <div className="flex gap-3 justify-end pt-2">
                         <button onClick={() => { setIsEditing(false); setError(null); setTouchedFields(new Set()); }} className="px-4 py-2 text-gray-500 dark:text-gray-400 font-bold" disabled={isSaving}>Cancel</button>
@@ -2079,29 +2109,55 @@ const WellnessAdminContent: React.FC = () => {
                         </p>
                     </div>
 
-                    <div className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-700/50">
-                        <div className="flex-1">
-                            <label className="font-bold text-sm text-gray-700 dark:text-white flex items-center gap-2">
-                                <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-amber-600">block</span>
-                                Block Bookings During Class
-                            </label>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                Prevents bay and conference room bookings during this class
-                            </p>
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-700/50">
+                            <div className="flex-1">
+                                <label className="font-bold text-sm text-gray-700 dark:text-white flex items-center gap-2">
+                                    <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-amber-600">sports_golf</span>
+                                    Block Simulators
+                                </label>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    Prevents simulator bay bookings during this class
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, block_simulators: !formData.block_simulators })}
+                                className={`relative w-12 h-6 rounded-full transition-colors ${
+                                    formData.block_simulators 
+                                        ? 'bg-amber-500' 
+                                        : 'bg-gray-300 dark:bg-white/20'
+                                }`}
+                            >
+                                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${
+                                    formData.block_simulators ? 'translate-x-6' : 'translate-x-0'
+                                }`} />
+                            </button>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => setFormData({ ...formData, block_bookings: !formData.block_bookings })}
-                            className={`relative w-12 h-6 rounded-full transition-colors ${
-                                formData.block_bookings 
-                                    ? 'bg-amber-500' 
-                                    : 'bg-gray-300 dark:bg-white/20'
-                            }`}
-                        >
-                            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${
-                                formData.block_bookings ? 'translate-x-6' : 'translate-x-0'
-                            }`} />
-                        </button>
+                        <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700/50">
+                            <div className="flex-1">
+                                <label className="font-bold text-sm text-gray-700 dark:text-white flex items-center gap-2">
+                                    <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-blue-600">meeting_room</span>
+                                    Block Conference Room
+                                </label>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    Prevents conference room bookings during this class
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, block_conference_room: !formData.block_conference_room })}
+                                className={`relative w-12 h-6 rounded-full transition-colors ${
+                                    formData.block_conference_room 
+                                        ? 'bg-blue-500' 
+                                        : 'bg-gray-300 dark:bg-white/20'
+                                }`}
+                            >
+                                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${
+                                    formData.block_conference_room ? 'translate-x-6' : 'translate-x-0'
+                                }`} />
+                            </button>
+                        </div>
                     </div>
 
                     <div className="space-y-4">

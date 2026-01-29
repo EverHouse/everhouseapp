@@ -13,16 +13,30 @@ import { sendNotificationToUser, broadcastToStaff, broadcastWaitlistUpdate } fro
 import { getSessionUser } from '../types/session';
 import { logFromRequest } from '../core/auditLog';
 
-async function createWellnessAvailabilityBlocks(wellnessClassId: number, classDate: string, startTime: string, endTime: string, createdBy?: string): Promise<void> {
-  const bayIds = await getAllActiveBayIds();
-  const conferenceRoomId = await getConferenceRoomId();
+async function createWellnessAvailabilityBlocks(
+  wellnessClassId: number, 
+  classDate: string, 
+  startTime: string, 
+  endTime: string, 
+  blockSimulators: boolean,
+  blockConferenceRoom: boolean,
+  createdBy?: string
+): Promise<void> {
+  const resourceIds: number[] = [];
   
-  const allResourceIds = [...bayIds];
-  if (conferenceRoomId && !allResourceIds.includes(conferenceRoomId)) {
-    allResourceIds.push(conferenceRoomId);
+  if (blockSimulators) {
+    const bayIds = await getAllActiveBayIds();
+    resourceIds.push(...bayIds);
   }
   
-  for (const resourceId of allResourceIds) {
+  if (blockConferenceRoom) {
+    const conferenceRoomId = await getConferenceRoomId();
+    if (conferenceRoomId && !resourceIds.includes(conferenceRoomId)) {
+      resourceIds.push(conferenceRoomId);
+    }
+  }
+  
+  for (const resourceId of resourceIds) {
     await pool.query(
       `INSERT INTO availability_blocks (resource_id, block_date, start_time, end_time, block_type, notes, created_by, wellness_class_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -36,9 +50,19 @@ async function removeWellnessAvailabilityBlocks(wellnessClassId: number): Promis
   await pool.query('DELETE FROM availability_blocks WHERE wellness_class_id = $1', [wellnessClassId]);
 }
 
-async function updateWellnessAvailabilityBlocks(wellnessClassId: number, classDate: string, startTime: string, endTime: string, createdBy?: string): Promise<void> {
+async function updateWellnessAvailabilityBlocks(
+  wellnessClassId: number, 
+  classDate: string, 
+  startTime: string, 
+  endTime: string, 
+  blockSimulators: boolean,
+  blockConferenceRoom: boolean,
+  createdBy?: string
+): Promise<void> {
   await removeWellnessAvailabilityBlocks(wellnessClassId);
-  await createWellnessAvailabilityBlocks(wellnessClassId, classDate, startTime, endTime, createdBy);
+  if (blockSimulators || blockConferenceRoom) {
+    await createWellnessAvailabilityBlocks(wellnessClassId, classDate, startTime, endTime, blockSimulators, blockConferenceRoom, createdBy);
+  }
 }
 
 const router = Router();
@@ -360,7 +384,7 @@ router.get('/api/wellness-classes', async (req, res) => {
 
 router.post('/api/wellness-classes', isStaffOrAdmin, async (req, res) => {
   try {
-    const { title, time, instructor, duration, category, spots, status, description, date, image_url, external_url, block_bookings, capacity, waitlist_enabled } = req.body;
+    const { title, time, instructor, duration, category, spots, status, description, date, image_url, external_url, block_bookings, block_simulators, block_conference_room, capacity, waitlist_enabled } = req.body;
     
     if (!title || !time || !instructor || !duration || !category || !spots || !date) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -425,18 +449,21 @@ router.post('/api/wellness-classes', isStaffOrAdmin, async (req, res) => {
       return res.status(500).json({ error: 'Failed to create calendar event. Please try again.' });
     }
     
+    const newBlockSimulators = block_simulators === true || block_simulators === 'true';
+    const newBlockConferenceRoom = block_conference_room === true || block_conference_room === 'true';
+    
     const result = await pool.query(
-      `INSERT INTO wellness_classes (title, time, instructor, duration, category, spots, status, description, date, google_calendar_id, image_url, external_url, block_bookings, capacity, waitlist_enabled)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
-      [title, time, instructor, duration, category, spots, status || 'available', description || null, date, googleCalendarId, image_url || null, external_url || null, block_bookings || false, capacity || null, waitlist_enabled || false]
+      `INSERT INTO wellness_classes (title, time, instructor, duration, category, spots, status, description, date, google_calendar_id, image_url, external_url, block_bookings, block_simulators, block_conference_room, capacity, waitlist_enabled)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING *`,
+      [title, time, instructor, duration, category, spots, status || 'available', description || null, date, googleCalendarId, image_url || null, external_url || null, block_bookings || false, newBlockSimulators, newBlockConferenceRoom, capacity || null, waitlist_enabled || false]
     );
     
     const createdClass = result.rows[0];
     
-    if (block_bookings) {
+    if (newBlockSimulators || newBlockConferenceRoom) {
       try {
         const userEmail = getSessionUser(req)?.email || 'system';
-        await createWellnessAvailabilityBlocks(createdClass.id, date, startTime24, endTime24, userEmail);
+        await createWellnessAvailabilityBlocks(createdClass.id, date, startTime24, endTime24, newBlockSimulators, newBlockConferenceRoom, userEmail);
       } catch (blockError) {
         if (!isProduction) console.error('Failed to create availability blocks for wellness class:', blockError);
       }
@@ -449,7 +476,9 @@ router.post('/api/wellness-classes', isStaffOrAdmin, async (req, res) => {
       duration,
       category,
       spots,
-      description
+      description,
+      block_simulators: newBlockSimulators,
+      block_conference_room: newBlockConferenceRoom
     });
     
     res.status(201).json(createdClass);
@@ -462,12 +491,16 @@ router.post('/api/wellness-classes', isStaffOrAdmin, async (req, res) => {
 router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, time, instructor, duration, category, spots, status, description, date, is_active, image_url, external_url, block_bookings, capacity, waitlist_enabled, apply_to_recurring } = req.body;
+    const { title, time, instructor, duration, category, spots, status, description, date, is_active, image_url, external_url, block_bookings, block_simulators, block_conference_room, capacity, waitlist_enabled, apply_to_recurring } = req.body;
     
-    const existing = await pool.query('SELECT google_calendar_id, title, time, instructor, duration, category, date, block_bookings, recurring_event_id FROM wellness_classes WHERE id = $1', [id]);
+    const existing = await pool.query('SELECT google_calendar_id, title, time, instructor, duration, category, date, block_bookings, block_simulators, block_conference_room, recurring_event_id FROM wellness_classes WHERE id = $1', [id]);
     
     const previousBlockBookings = existing.rows[0]?.block_bookings || false;
+    const previousBlockSimulators = existing.rows[0]?.block_simulators || false;
+    const previousBlockConferenceRoom = existing.rows[0]?.block_conference_room || false;
     const newBlockBookings = block_bookings === true || block_bookings === 'true';
+    const newBlockSimulators = block_simulators === true || block_simulators === 'true';
+    const newBlockConferenceRoom = block_conference_room === true || block_conference_room === 'true';
     const newWaitlistEnabled = waitlist_enabled === true || waitlist_enabled === 'true';
     
     const sessionUser = getSessionUser(req);
@@ -488,18 +521,20 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
         image_url = COALESCE($11, image_url),
         external_url = COALESCE($12, external_url),
         block_bookings = $13,
-        capacity = $14,
-        waitlist_enabled = $15,
+        block_simulators = $14,
+        block_conference_room = $15,
+        capacity = $16,
+        waitlist_enabled = $17,
         locally_edited = true,
         app_last_modified_at = NOW(),
         updated_at = NOW(),
         conflict_detected = false,
         needs_review = false,
         review_dismissed = true,
-        reviewed_by = $17,
+        reviewed_by = $19,
         reviewed_at = NOW()
-       WHERE id = $16 RETURNING *`,
-      [title, time, instructor, duration, category, spots, status, description, date, is_active, image_url, external_url, newBlockBookings, capacity || null, newWaitlistEnabled, id, reviewedBy]
+       WHERE id = $18 RETURNING *`,
+      [title, time, instructor, duration, category, spots, status, description, date, is_active, image_url, external_url, newBlockBookings, newBlockSimulators, newBlockConferenceRoom, capacity || null, newWaitlistEnabled, id, reviewedBy]
     );
     
     if (result.rows.length === 0) {
@@ -690,16 +725,23 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
       return `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}:00`;
     };
     
+    // Determine if blocking has changed
+    const hadAnyBlocking = previousBlockSimulators || previousBlockConferenceRoom;
+    const hasAnyBlocking = newBlockSimulators || newBlockConferenceRoom;
+    
     try {
       const startTime24 = convertTo24HourForBlocks(updated.time);
       const endTime24 = calculateEndTimeForBlocks(startTime24, updated.duration);
       
-      if (!previousBlockBookings && newBlockBookings) {
-        await createWellnessAvailabilityBlocks(wellnessClassId, updated.date, startTime24, endTime24, userEmail);
-      } else if (previousBlockBookings && !newBlockBookings) {
+      if (!hadAnyBlocking && hasAnyBlocking) {
+        // Blocks newly enabled
+        await createWellnessAvailabilityBlocks(wellnessClassId, updated.date, startTime24, endTime24, newBlockSimulators, newBlockConferenceRoom, userEmail);
+      } else if (hadAnyBlocking && !hasAnyBlocking) {
+        // Blocks disabled
         await removeWellnessAvailabilityBlocks(wellnessClassId);
-      } else if (newBlockBookings) {
-        await updateWellnessAvailabilityBlocks(wellnessClassId, updated.date, startTime24, endTime24, userEmail);
+      } else if (hasAnyBlocking) {
+        // Blocks changed or time/date changed
+        await updateWellnessAvailabilityBlocks(wellnessClassId, updated.date, startTime24, endTime24, newBlockSimulators, newBlockConferenceRoom, userEmail);
       }
     } catch (blockError) {
       if (!isProduction) console.error('Failed to update availability blocks for wellness class:', blockError);
