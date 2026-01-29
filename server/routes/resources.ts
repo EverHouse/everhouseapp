@@ -995,33 +995,37 @@ router.post('/api/bookings/mark-as-event', isStaffOrAdmin, async (req, res) => {
     const { availabilityBlocks } = await import('../../shared/schema');
     const staffEmail = req.session?.user?.email || 'staff';
     
-    // Check for existing closures that overlap with this time/date
-    const existingClosures = await db.select()
-      .from(facilityClosures)
-      .where(and(
-        eq(facilityClosures.startDate, bookingDate),
-        eq(facilityClosures.startTime, startTime),
-        eq(facilityClosures.isActive, true)
-      ));
-    
-    // Check for existing blocks on any of these resources at this time
-    const existingBlocks = resourceIds.length > 0 ? await db.select()
-      .from(availabilityBlocks)
-      .where(and(
-        eq(availabilityBlocks.blockDate, bookingDate),
-        eq(availabilityBlocks.startTime, startTime),
-        sql`${availabilityBlocks.resourceId} IN (${sql.join(resourceIds.map(id => sql`${id}`), sql`, `)})`
-      )) : [];
-    
-    // If blocks already exist for all resources, just delete the bookings
-    const blockedResourceIds = new Set(existingBlocks.map(b => b.resourceId));
-    const unblockResourceIds = resourceIds.filter(id => !blockedResourceIds.has(id));
-    
-    // Use transaction to ensure atomicity - either all succeed or all fail
+    // Use transaction to ensure atomicity and prevent race conditions
+    // All duplicate detection happens inside the transaction
     const result = await db.transaction(async (tx) => {
-      let closure = existingClosures[0]; // Use existing closure if found
+      // Check for existing private_event closures with EXACT time match (inside transaction for safety)
+      const existingClosures = await tx.select()
+        .from(facilityClosures)
+        .where(and(
+          eq(facilityClosures.startDate, bookingDate),
+          eq(facilityClosures.startTime, startTime),
+          eq(facilityClosures.endTime, endTime),
+          eq(facilityClosures.noticeType, 'private_event'),
+          eq(facilityClosures.isActive, true)
+        ));
       
-      // Only create new closure if none exists for this time
+      // Check for existing blocks on these resources with overlapping times
+      const existingBlocks = resourceIds.length > 0 ? await tx.select()
+        .from(availabilityBlocks)
+        .where(and(
+          eq(availabilityBlocks.blockDate, bookingDate),
+          sql`${availabilityBlocks.resourceId} IN (${sql.join(resourceIds.map(id => sql`${id}`), sql`, `)})`,
+          sql`${availabilityBlocks.startTime} < ${endTime}`,
+          sql`${availabilityBlocks.endTime} > ${startTime}`
+        )) : [];
+      
+      // Determine which resources already have blocks covering this time
+      const blockedResourceIds = new Set(existingBlocks.map(b => b.resourceId));
+      const unblockResourceIds = resourceIds.filter(id => !blockedResourceIds.has(id));
+      
+      let closure = existingClosures[0]; // Use existing closure only if exact match
+      
+      // Only create new closure if none exists with exact time/type match
       if (!closure) {
         const [newClosure] = await tx.insert(facilityClosures).values({
           title: eventTitle,
@@ -1038,7 +1042,7 @@ router.post('/api/bookings/mark-as-event', isStaffOrAdmin, async (req, res) => {
         closure = newClosure;
       }
       
-      // Only create blocks for resources that don't already have one
+      // Only create blocks for resources that don't already have overlapping blocks
       if (unblockResourceIds.length > 0 && closure) {
         const blockValues = unblockResourceIds.map(resourceId => ({
           resourceId,
