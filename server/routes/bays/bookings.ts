@@ -12,7 +12,7 @@ import { bookingEvents } from '../../core/bookingEvents';
 import { broadcastAvailabilityUpdate } from '../../core/websocket';
 import { getSessionUser } from '../../types/session';
 import { cancelPaymentIntent, getStripeClient } from '../../core/stripe';
-import { logFromRequest } from '../../core/auditLog';
+import { logFromRequest, logMemberAction } from '../../core/auditLog';
 import { getCalendarNameForBayAsync, isStaffOrAdminCheck } from './helpers';
 import { getCalendarIdByName, deleteCalendarEvent } from '../../core/calendar/index';
 import { getGuestPassesRemaining } from '../guestPasses';
@@ -863,6 +863,9 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
       member_email: existing.userEmail
     });
     
+    let refundedAmountCents = 0;
+    let refundType: 'none' | 'overage' | 'guest_fees' | 'both' = 'none';
+    
     if (existing.overagePaymentIntentId) {
       try {
         if (existing.overagePaid) {
@@ -873,6 +876,8 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
               charge: paymentIntent.latest_charge as string,
               reason: 'requested_by_customer'
             });
+            refundedAmountCents += refund.amount;
+            refundType = 'overage';
             console.log(`[Member Cancel] Refunded overage payment ${existing.overagePaymentIntentId} for booking ${bookingId}, refund: ${refund.id}`);
           }
         } else {
@@ -945,6 +950,8 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
                     participantId: participant.id.toString()
                   }
                 });
+                refundedAmountCents += refund.amount;
+                refundType = refundType === 'overage' ? 'both' : 'guest_fees';
                 console.log(`[Member Cancel] Refunded guest fee for ${participant.display_name}: $${(participant.cached_fee_cents / 100).toFixed(2)}, refund: ${refund.id}`);
               }
             } catch (refundErr: any) {
@@ -1036,6 +1043,35 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
         action: 'cancelled'
       });
     }
+    
+    let bayNameForLog = 'Simulator';
+    if (existing.resourceId) {
+      const [resourceForLog] = await db.select({ name: resources.name }).from(resources).where(eq(resources.id, existing.resourceId));
+      if (resourceForLog?.name) {
+        bayNameForLog = resourceForLog.name;
+      }
+    }
+    
+    const bookingDate = existing.requestDate;
+    const bookingTime = existing.startTime?.substring(0, 5) || '';
+    
+    await logMemberAction({
+      memberEmail: existing.userEmail || '',
+      action: 'booking_cancelled_member',
+      resourceType: 'booking',
+      resourceId: String(bookingId),
+      resourceName: `Booking on ${bookingDate} at ${bookingTime}`,
+      details: {
+        source: 'member_dashboard',
+        booking_date: bookingDate,
+        booking_time: existing.startTime,
+        bay_name: bayNameForLog,
+        had_trackman_booking: !!existing.trackmanBookingId,
+        refund_amount_cents: refundedAmountCents || 0,
+        refund_type: refundType || 'none'
+      },
+      req
+    });
     
     res.json({ success: true, message: 'Booking cancelled successfully' });
   } catch (error: any) {

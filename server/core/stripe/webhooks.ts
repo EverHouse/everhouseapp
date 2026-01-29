@@ -13,6 +13,7 @@ import { recordDayPassPurchaseFromWebhook } from '../../routes/dayPasses';
 import { handlePrimarySubscriptionCancelled } from './groupBilling';
 import { computeFeeBreakdown } from '../billing/unifiedFeeService';
 import { logPaymentFailure, logWebhookFailure } from '../monitoring';
+import { logSystemAction } from '../auditLog';
 import type { PoolClient } from 'pg';
 
 const EVENT_DEDUP_WINDOW_DAYS = 7;
@@ -392,6 +393,31 @@ async function handleChargeRefunded(client: PoolClient, charge: any): Promise<De
     broadcastBillingUpdate({ type: 'refund', chargeId: id, status, amountRefunded: amount_refunded });
   });
 
+  // Audit log for refunds
+  const isPartialRefund = amount_refunded < amount;
+  const memberEmail = charge.billing_details?.email || charge.receipt_email || 'unknown';
+  for (const refund of refunds) {
+    if (refund?.id) {
+      deferredActions.push(async () => {
+        await logSystemAction({
+          action: isPartialRefund ? 'payment_refund_partial' : 'payment_refunded',
+          resourceType: 'payment',
+          resourceId: refund.id,
+          resourceName: `Refund for ${memberEmail}`,
+          details: {
+            source: 'stripe_webhook',
+            stripe_refund_id: refund.id,
+            stripe_payment_intent_id: paymentIntentId,
+            amount_cents: refund.amount,
+            refund_reason: refund.reason || 'not_specified',
+            member_email: memberEmail,
+            is_partial: isPartialRefund
+          }
+        });
+      });
+    }
+  }
+
   return deferredActions;
 }
 
@@ -691,6 +717,24 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: a
     });
   }
 
+  // Audit log for successful payment
+  const paymentMemberEmail = metadata?.email || customerEmail || 'unknown';
+  const paymentDescription = description || metadata?.productName || 'Stripe payment';
+  deferredActions.push(async () => {
+    await logSystemAction({
+      action: 'payment_succeeded',
+      resourceType: 'payment',
+      resourceId: id,
+      resourceName: `Payment from ${paymentMemberEmail}`,
+      details: {
+        source: 'stripe_webhook',
+        amount_cents: amount,
+        member_email: paymentMemberEmail,
+        description: paymentDescription
+      }
+    });
+  });
+
   if (metadata?.email && metadata?.purpose) {
     const email = metadata.email;
     const desc = paymentIntent.description || `Stripe payment: ${metadata.purpose}`;
@@ -819,6 +863,23 @@ async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: any)
       metadata,
       source: 'webhook',
       paymentIntentId: id,
+    });
+  });
+
+  // Audit log for failed payment
+  const failedPaymentEmail = metadata?.email || customerEmail || 'unknown';
+  deferredActions.push(async () => {
+    await logSystemAction({
+      action: 'payment_failed',
+      resourceType: 'payment',
+      resourceId: id,
+      resourceName: `Failed payment from ${failedPaymentEmail}`,
+      details: {
+        source: 'stripe_webhook',
+        amount_cents: amount,
+        member_email: failedPaymentEmail,
+        failure_reason: reason
+      }
     });
   });
 

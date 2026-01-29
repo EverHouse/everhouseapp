@@ -28,8 +28,10 @@ import {
   refundGuestPassesForCancelledBooking
 } from './webhook-billing';
 import { refundGuestPass } from '../guestPasses';
+import { sendPushNotificationToStaff } from '../push';
 import { createSessionWithUsageTracking } from '../../core/bookingService/sessionManager';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
+import { logSystemAction } from '../../core/auditLog';
 
 export async function tryAutoApproveBooking(
   customerEmail: string,
@@ -161,7 +163,12 @@ export async function cancelBookingByTrackmanId(
 ): Promise<{ cancelled: boolean; bookingId?: number; refundedPasses?: number }> {
   try {
     const result = await pool.query(
-      `SELECT id, user_email, status, session_id FROM booking_requests WHERE trackman_booking_id = $1`,
+      `SELECT br.id, br.user_email, br.user_name, br.status, br.session_id, 
+              br.request_date, br.start_time, br.resource_id,
+              r.name as resource_name
+       FROM booking_requests br
+       LEFT JOIN resources r ON br.resource_id = r.id
+       WHERE br.trackman_booking_id = $1`,
       [trackmanBookingId]
     );
     
@@ -172,6 +179,10 @@ export async function cancelBookingByTrackmanId(
     const booking = result.rows[0];
     const bookingId = booking.id;
     const memberEmail = booking.user_email;
+    const memberName = booking.user_name || memberEmail || 'Unknown';
+    const bookingDate = booking.request_date;
+    const startTime = booking.start_time;
+    const bayName = booking.resource_name;
     
     if (booking.status === 'cancelled') {
       return { cancelled: true, bookingId };
@@ -231,6 +242,75 @@ export async function cancelBookingByTrackmanId(
     }
     
     const refundedPasses = await refundGuestPassesForCancelledBooking(bookingId, memberEmail);
+    
+    // Send real-time notifications to staff
+    try {
+      const formattedDate = bookingDate ? formatDatePacific(new Date(bookingDate)) : 'Unknown date';
+      const formattedTime = startTime ? formatTimePacific(startTime) : 'Unknown time';
+      const bayInfo = bayName ? ` (${bayName})` : '';
+      const refundInfo = refundedPasses && refundedPasses > 0 
+        ? `. Refunded: ${refundedPasses} guest pass${refundedPasses > 1 ? 'es' : ''}`
+        : '';
+      
+      const notificationTitle = 'Booking Cancelled via TrackMan';
+      const notificationMessage = `Booking cancelled via TrackMan: ${memberName}'s booking on ${formattedDate} at ${formattedTime}${bayInfo}${refundInfo}`;
+      
+      broadcastToStaff({
+        type: 'booking_cancelled',
+        title: notificationTitle,
+        message: notificationMessage,
+        data: {
+          bookingId,
+          memberEmail,
+          memberName,
+          date: bookingDate,
+          time: startTime,
+          bayName,
+          refundedPasses,
+          source: 'trackman_webhook'
+        }
+      });
+      
+      await sendPushNotificationToStaff({
+        title: notificationTitle,
+        body: notificationMessage,
+        url: '/admin?tab=simulator',
+        tag: `booking-cancelled-${bookingId}`
+      });
+      
+      logger.info('[Trackman Webhook] Sent staff notifications for cancelled booking', {
+        extra: { bookingId, memberEmail, refundedPasses }
+      });
+    } catch (notifyErr) {
+      logger.warn('[Trackman Webhook] Failed to send staff notifications for cancelled booking', {
+        extra: { bookingId, error: (notifyErr as Error).message }
+      });
+    }
+    
+    // Log audit entry for the cancellation
+    try {
+      await logSystemAction({
+        action: 'booking_cancelled_webhook',
+        resourceType: 'booking',
+        resourceId: String(bookingId),
+        resourceName: `Booking for ${memberEmail}`,
+        details: {
+          source: 'trackman_webhook',
+          trackman_booking_id: trackmanBookingId,
+          member_email: memberEmail,
+          refund_amount_cents: 0,
+          refund_type: refundedPasses ? 'guest_pass' : 'none',
+          refunded_passes: refundedPasses || 0,
+          booking_date: bookingDate,
+          booking_time: startTime,
+          bay_name: bayName
+        }
+      });
+    } catch (auditErr) {
+      logger.warn('[Trackman Webhook] Failed to log audit entry for cancelled booking', {
+        extra: { bookingId, error: (auditErr as Error).message }
+      });
+    }
     
     logger.info('[Trackman Webhook] Cancelled booking via Trackman ID', {
       extra: { bookingId, trackmanBookingId, refundedPasses }
