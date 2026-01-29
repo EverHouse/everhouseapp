@@ -190,7 +190,8 @@ router.get('/api/wellness-classes/needs-review', isStaffOrAdmin, async (req, res
   try {
     const result = await pool.query(
       `SELECT id, title, time, instructor, duration, category, spots, status, description, date, 
-              is_active, image_url, external_url, visibility, needs_review, conflict_detected 
+              is_active, image_url, external_url, visibility, needs_review, conflict_detected,
+              block_simulators, block_conference_room 
        FROM wellness_classes 
        WHERE needs_review = true AND is_active = true
        ORDER BY date ASC, time ASC`
