@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.42.4",
+    date: "2026-01-29",
+    title: "Queue Shows Booking Details",
+    changes: [
+      "Added: Queue cards now show original name and email from Trackman import",
+      "Added: Assign Player modal now shows Notes from Import with original booking details",
+      "Fixed: Queue items now pass all booking details (date, time, notes) to assignment modal",
+      "Improved: Staff can see who made the booking at a glance without opening modal"
+    ]
+  },
+  {
     version: "9.42.3",
     date: "2026-01-29",
     title: "Complete Duplicate Prevention Coverage",

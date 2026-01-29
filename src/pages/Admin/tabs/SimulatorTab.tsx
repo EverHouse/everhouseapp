@@ -1842,11 +1842,13 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                 style={{ '--stagger-index': index + 2 } as React.CSSProperties}
                                                 onClick={() => setTrackmanLinkModal({
                                                     isOpen: true,
-                                                    bookingId: item.id,
                                                     trackmanBookingId: (item as any).trackman_booking_id || null,
-                                                    currentEmail: item.user_email,
-                                                    currentName: item.user_name || undefined,
-                                                    bayName: (item as any).bay_name || `Bay ${item.resource_id}`
+                                                    matchedBookingId: item.id,
+                                                    bayName: (item as any).bay_name || `Bay ${item.resource_id}`,
+                                                    bookingDate: formatDateShortAdmin(item.request_date),
+                                                    timeSlot: `${formatTime12Hour(item.start_time)} - ${formatTime12Hour(item.end_time)}`,
+                                                    importedName: item.user_name || (item as any).userName,
+                                                    notes: (item as any).notes || (item as any).trackman_customer_notes || (item as any).staff_notes
                                                 })}
                                             >
                                                 <div className="flex justify-between items-start mb-2">
@@ -1862,8 +1864,18 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                 <p className="text-sm text-amber-700 dark:text-amber-400 mb-1">
                                                     {formatDateShortAdmin(item.request_date)} • {formatTime12Hour(item.start_time)} - {formatTime12Hour(item.end_time)}
                                                 </p>
-                                                {(item as any).trackman_booking_id && (
+                                                {(item.user_name && item.user_name !== 'Unknown (Trackman)') && (
+                                                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                                                        {item.user_name}
+                                                    </p>
+                                                )}
+                                                {item.user_email && !item.user_email.includes('unmatched@') && (
                                                     <p className="text-xs text-amber-600 dark:text-amber-500">
+                                                        {item.user_email}
+                                                    </p>
+                                                )}
+                                                {(item as any).trackman_booking_id && (
+                                                    <p className="text-xs text-amber-600/70 dark:text-amber-500/70">
                                                         Trackman ID: {(item as any).trackman_booking_id}
                                                     </p>
                                                 )}
@@ -1872,11 +1884,13 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                         e.stopPropagation();
                                                         setTrackmanLinkModal({
                                                             isOpen: true,
-                                                            bookingId: item.id,
                                                             trackmanBookingId: (item as any).trackman_booking_id || null,
-                                                            currentEmail: item.user_email,
-                                                            currentName: item.user_name || undefined,
-                                                            bayName: (item as any).bay_name || `Bay ${item.resource_id}`
+                                                            matchedBookingId: item.id,
+                                                            bayName: (item as any).bay_name || `Bay ${item.resource_id}`,
+                                                            bookingDate: formatDateShortAdmin(item.request_date),
+                                                            timeSlot: `${formatTime12Hour(item.start_time)} - ${formatTime12Hour(item.end_time)}`,
+                                                            importedName: item.user_name || (item as any).userName,
+                                                            notes: (item as any).notes || (item as any).trackman_customer_notes || (item as any).staff_notes
                                                         });
                                                     }}
                                                     className="w-full mt-3 py-2 px-3 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 transition-colors"
