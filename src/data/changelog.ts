@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.46.11",
+    date: "2026-01-29",
+    title: "Simplified Safari Toolbar Colors",
+    changes: [
+      "Simplified: All public pages now use light bone toolbar color (#F2F2EC)",
+      "Simplified: Member/staff portal toolbar matches device theme (dark/light)",
+      "Removed: Complex scroll-based toolbar color detection on landing page"
+    ]
+  },
+  {
     version: "9.46.10",
     date: "2026-01-29",
     title: "Safari Toolbar Color Enhancement",

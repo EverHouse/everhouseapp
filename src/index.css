@@ -166,18 +166,11 @@ html.dark, html.dark body {
 }
 
 /* Page-specific backgrounds for Safari translucent toolbar support */
-/* Using !important to override any conflicting styles and ensure Safari picks up correct color */
-html.page-landing, html.page-landing body {
-  background-color: #1a1610 !important;
-}
-
-html.page-landing-scrolled, html.page-landing-scrolled body {
+/* Public pages: light bone | Member/Staff: follows theme */
+html.page-public, html.page-public body,
+html.page-light, html.page-light body {
   background-color: #F2F2EC !important;
   color: var(--brand-primary) !important;
-}
-
-html.page-private-hire, html.page-private-hire body {
-  background-color: #293515 !important;
 }
 
 html.page-dark, html.page-dark body {
@@ -185,13 +178,7 @@ html.page-dark, html.page-dark body {
   color: #F2F2EC !important;
 }
 
-html.page-light, html.page-light body {
-  background-color: #F2F2EC !important;
-  color: var(--brand-primary) !important;
-}
-
 /* Safari bottom toolbar color fix - fixed element that extends into safe area */
-/* This helps Safari detect the correct background color for its translucent toolbar */
 body::after {
   content: '';
   position: fixed;
@@ -204,25 +191,13 @@ body::after {
   z-index: -1;
 }
 
-/* Override for specific page states */
-html.page-landing body::after {
-  background-color: #1a1610;
-}
-
-html.page-landing-scrolled body::after {
+html.page-public body::after,
+html.page-light body::after {
   background-color: #F2F2EC;
-}
-
-html.page-private-hire body::after {
-  background-color: #293515;
 }
 
 html.page-dark body::after {
   background-color: #0f120a;
-}
-
-html.page-light body::after {
-  background-color: #F2F2EC;
 }
 
 #root {

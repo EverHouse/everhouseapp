@@ -508,26 +508,28 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isDarkTheme = (isAdminRoute || isMemberRoute) && effectiveTheme === 'dark';
   const showHeader = !isAdminRoute;
 
+  // Determine if current page is a public page (not member/staff portal)
+  const isPublicPage = !isMemberRoute && !isAdminRoute;
+  
   useEffect(() => {
-    // Use CSS classes instead of inline styles to let Safari's translucent toolbar work correctly
+    // Safari toolbar color: public pages = light, member/staff = match theme
     const html = document.documentElement;
     const metaThemeColor = document.getElementById('theme-color-meta');
     
     // Remove all page-specific classes first
-    html.classList.remove('page-landing', 'page-landing-scrolled', 'page-private-hire', 'page-light', 'page-dark');
+    html.classList.remove('page-public', 'page-dark', 'page-light');
     
     let themeColor: string;
-    if (isLandingPage) {
-      // Landing page: dark hero at top, light when scrolled past hero
-      html.classList.add(hasScrolledPastHero ? 'page-landing-scrolled' : 'page-landing');
-      themeColor = hasScrolledPastHero ? '#F2F2EC' : '#1a1610';
-    } else if (location.pathname === '/private-hire') {
-      html.classList.add('page-private-hire');
-      themeColor = '#293515';
+    if (isPublicPage) {
+      // All public pages use light bone color
+      html.classList.add('page-public');
+      themeColor = '#F2F2EC';
     } else if (isDarkTheme) {
+      // Member/staff portal in dark mode
       html.classList.add('page-dark');
       themeColor = '#0f120a';
     } else {
+      // Member/staff portal in light mode
       html.classList.add('page-light');
       themeColor = '#F2F2EC';
     }
@@ -536,7 +538,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     if (metaThemeColor) {
       metaThemeColor.setAttribute('content', themeColor);
     }
-  }, [isLandingPage, hasScrolledPastHero, isDarkTheme, location.pathname]);
+  }, [isPublicPage, isDarkTheme]);
 
   const handleTopLeftClick = () => {
     setIsMenuOpen(true);
