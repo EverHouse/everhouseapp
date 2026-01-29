@@ -617,48 +617,233 @@ async function createGolfNowVisitor(
   }
 }
 
-export async function autoMatchAllUnmatchedBookings(
+// Auto-match bookings from the legacy trackman_unmatched_bookings table
+async function autoMatchLegacyUnmatchedBookings(
   staffEmail?: string
 ): Promise<{ matched: number; failed: number; results: AutoMatchResult[] }> {
   const results: AutoMatchResult[] = [];
   let matched = 0;
   let failed = 0;
 
-  try {
-    const query = `
-      SELECT id, booking_date, start_time, user_name, notes
-      FROM trackman_unmatched_bookings
-      WHERE status = 'pending' OR status = 'unmatched'
-      ORDER BY booking_date DESC, start_time DESC
-    `;
+  const query = `
+    SELECT id, booking_date, start_time, user_name, notes
+    FROM trackman_unmatched_bookings
+    WHERE status = 'pending' OR status = 'unmatched'
+    ORDER BY booking_date DESC, start_time DESC
+  `;
+  
+  const { rows } = await pool.query(query);
+  
+  console.log(`[AutoMatch] Processing ${rows.length} legacy unmatched bookings...`);
+  
+  for (const row of rows) {
+    const result = await autoMatchSingleBooking(
+      row.id,
+      row.booking_date,
+      row.start_time,
+      row.user_name,
+      row.notes,
+      staffEmail
+    );
     
-    const { rows } = await pool.query(query);
+    results.push(result);
     
-    console.log(`[AutoMatch] Processing ${rows.length} unmatched bookings...`);
-    
-    for (const row of rows) {
-      const result = await autoMatchSingleBooking(
-        row.id,
-        row.booking_date,
-        row.start_time,
-        row.user_name,
-        row.notes,
-        staffEmail
-      );
-      
-      results.push(result);
-      
-      if (result.matched) {
-        matched++;
-        console.log(`[AutoMatch] Matched booking #${row.id}: ${result.matchType} -> ${result.visitorEmail || 'private_event'}`);
-      } else {
-        failed++;
-      }
+    if (result.matched) {
+      matched++;
+      console.log(`[AutoMatch] Matched legacy booking #${row.id}: ${result.matchType} -> ${result.visitorEmail || 'private_event'}`);
+    } else {
+      failed++;
     }
+  }
+  
+  return { matched, failed, results };
+}
+
+// Auto-match GolfNow bookings from booking_requests table
+async function autoMatchBookingRequests(
+  staffEmail?: string
+): Promise<{ matched: number; failed: number; results: AutoMatchResult[] }> {
+  const results: AutoMatchResult[] = [];
+  let matched = 0;
+  let failed = 0;
+
+  // Get unmatched booking_requests with GolfNow indicators
+  const query = `
+    SELECT 
+      id, 
+      user_email,
+      user_name,
+      request_date as booking_date,
+      start_time,
+      end_time,
+      duration_minutes,
+      resource_id,
+      staff_notes,
+      trackman_customer_notes,
+      trackman_booking_id
+    FROM booking_requests 
+    WHERE is_unmatched = true 
+      AND (user_email LIKE 'unmatched-%@%' OR user_email LIKE '%@trackman.local')
+      AND (
+        LOWER(user_name) LIKE '%golfnow%'
+        OR LOWER(staff_notes) LIKE '%golfnow%'
+        OR LOWER(trackman_customer_notes) LIKE '%golfnow%'
+        OR LOWER(user_name) LIKE '%walk-in%'
+        OR LOWER(user_name) LIKE '%walk in%'
+      )
+    ORDER BY request_date DESC, start_time DESC
+    LIMIT 500
+  `;
+  
+  const { rows } = await pool.query(query);
+  
+  console.log(`[AutoMatch] Processing ${rows.length} GolfNow/walk-in booking_requests...`);
+  
+  for (const row of rows) {
+    try {
+      const isFuture = isFutureBooking(row.booking_date);
+      const userName = row.user_name || 'GolfNow Visitor';
+      
+      // Generate visitor email
+      const dateStr = row.booking_date instanceof Date 
+        ? row.booking_date.toISOString().split('T')[0].replace(/-/g, '') 
+        : row.booking_date.replace(/-/g, '');
+      const timeStr = (row.start_time || '12:00').replace(/:/g, '').substring(0, 4);
+      const generatedEmail = `golfnow-${dateStr}-${timeStr}@visitors.evenhouse.club`;
+      
+      // Parse name
+      const nameParts = userName.split(/[,\s]+/).filter(Boolean);
+      let firstName = nameParts[0] || 'GolfNow';
+      let lastName = nameParts.slice(1).join(' ') || 'Visitor';
+      
+      // Handle "Last, First" format
+      if (userName.includes(',')) {
+        lastName = nameParts[0] || 'Visitor';
+        firstName = nameParts.slice(1).join(' ') || 'GolfNow';
+      }
+      
+      // Create visitor
+      const visitor = await upsertVisitor({
+        email: generatedEmail,
+        firstName,
+        lastName
+      }, false);
+      
+      // Update visitor type
+      await updateVisitorType({
+        email: generatedEmail,
+        type: 'golfnow',
+        activitySource: 'trackman_auto_match',
+        activityDate: new Date(row.booking_date)
+      });
+      
+      // For future bookings, create a session
+      let sessionId: number | null = null;
+      if (isFuture && row.resource_id) {
+        try {
+          const sessionResult = await pool.query(`
+            INSERT INTO booking_sessions (
+              resource_id, session_date, start_time, end_time, 
+              trackman_booking_id, source, created_by
+            )
+            VALUES ($1, $2, $3, $4, $5, 'trackman', 'auto_match')
+            ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL
+            DO UPDATE SET updated_at = NOW()
+            RETURNING id
+          `, [
+            row.resource_id, 
+            row.booking_date, 
+            row.start_time, 
+            row.end_time || row.start_time,
+            row.trackman_booking_id
+          ]);
+          
+          if (sessionResult.rows.length > 0) {
+            sessionId = sessionResult.rows[0].id;
+            
+            // Add participant
+            await pool.query(`
+              INSERT INTO booking_participants (session_id, user_id, display_name, participant_type)
+              VALUES ($1, $2, $3, 'owner')
+              ON CONFLICT (session_id, participant_type) WHERE participant_type = 'owner'
+              DO UPDATE SET user_id = EXCLUDED.user_id, display_name = EXCLUDED.display_name
+            `, [sessionId, visitor.id, userName]);
+            
+            // Record usage for visitor
+            await recordUsage(sessionId, {
+              memberId: visitor.id,
+              minutesCharged: row.duration_minutes || 60,
+              overageFee: 0,
+              guestFee: 0,
+              tierAtBooking: undefined
+            }, 'trackman');
+          }
+        } catch (sessionError) {
+          console.log(`[AutoMatch] Could not create session for booking ${row.id}:`, sessionError);
+        }
+      }
+      
+      // Update booking_request with the visitor email
+      await pool.query(`
+        UPDATE booking_requests
+        SET 
+          user_id = $2,
+          user_email = $3,
+          is_unmatched = false,
+          session_id = COALESCE($4, session_id),
+          staff_notes = COALESCE(staff_notes, '') || $5,
+          updated_at = NOW()
+        WHERE id = $1
+      `, [
+        row.id,
+        visitor.id,
+        generatedEmail,
+        sessionId,
+        ` [Auto-matched to GolfNow visitor by ${staffEmail || 'system'}]`
+      ]);
+      
+      results.push({
+        bookingId: row.id,
+        matched: true,
+        matchType: 'golfnow_fallback',
+        visitorEmail: generatedEmail,
+        visitorType: 'golfnow',
+        sessionId: sessionId || undefined
+      });
+      matched++;
+      console.log(`[AutoMatch] Matched booking_request #${row.id} -> ${generatedEmail}`);
+    } catch (error) {
+      console.error(`[AutoMatch] Error matching booking_request #${row.id}:`, error);
+      results.push({
+        bookingId: row.id,
+        matched: false,
+        matchType: 'failed',
+        reason: error instanceof Error ? error.message : 'Unknown error'
+      });
+      failed++;
+    }
+  }
+  
+  return { matched, failed, results };
+}
+
+export async function autoMatchAllUnmatchedBookings(
+  staffEmail?: string
+): Promise<{ matched: number; failed: number; results: AutoMatchResult[] }> {
+  try {
+    // Process both tables
+    const [legacyResults, requestsResults] = await Promise.all([
+      autoMatchLegacyUnmatchedBookings(staffEmail),
+      autoMatchBookingRequests(staffEmail)
+    ]);
     
-    console.log(`[AutoMatch] Complete: ${matched} matched, ${failed} failed`);
+    const totalMatched = legacyResults.matched + requestsResults.matched;
+    const totalFailed = legacyResults.failed + requestsResults.failed;
+    const allResults = [...legacyResults.results, ...requestsResults.results];
     
-    return { matched, failed, results };
+    console.log(`[AutoMatch] Complete: ${totalMatched} matched, ${totalFailed} failed (legacy: ${legacyResults.matched}/${legacyResults.failed}, requests: ${requestsResults.matched}/${requestsResults.failed})`);
+    
+    return { matched: totalMatched, failed: totalFailed, results: allResults };
   } catch (error) {
     console.error('[AutoMatch] Error in batch auto-match:', error);
     throw error;
