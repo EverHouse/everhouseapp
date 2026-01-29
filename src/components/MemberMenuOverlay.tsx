@@ -235,7 +235,7 @@ const MemberMenuLink: React.FC<MemberMenuLinkProps> = ({ item, isActive, onClick
 
       <span className={`material-symbols-outlined text-xl relative z-10 ${
         isActive 
-          ? 'text-[#7cb342]'
+          ? isDark ? 'text-[#CCB8E4]' : 'text-[#293515]'
           : ''
       }`}>
         {item.icon}
@@ -243,7 +243,7 @@ const MemberMenuLink: React.FC<MemberMenuLinkProps> = ({ item, isActive, onClick
       <span className="relative z-10 flex-1">{item.label}</span>
       
       {isActive && (
-        <span className="relative z-10 w-2 h-2 rounded-full bg-[#7cb342]" />
+        <span className={`relative z-10 w-2 h-2 rounded-full ${isDark ? 'bg-[#CCB8E4]' : 'bg-[#293515]'}`} />
       )}
     </button>
   );
