@@ -11,7 +11,7 @@ interface TrackmanLinkModalProps {
   bayName?: string;
   bookingDate?: string;
   timeSlot?: string;
-  matchedBookingId?: number;
+  matchedBookingId?: number | string;
   currentMemberName?: string;
   currentMemberEmail?: string;
   isRelink?: boolean;
@@ -19,6 +19,7 @@ interface TrackmanLinkModalProps {
   onOpenBillingModal?: (bookingId: number) => void;
   importedName?: string;
   notes?: string;
+  isLegacyReview?: boolean;
 }
 
 interface VisitorSearchResult {
@@ -51,7 +52,8 @@ export function TrackmanLinkModal({
   onSuccess,
   onOpenBillingModal,
   importedName,
-  notes
+  notes,
+  isLegacyReview
 }: TrackmanLinkModalProps) {
   const [slots, setSlots] = useState<SlotsArray>([
     { type: 'empty' },
@@ -244,7 +246,41 @@ export function TrackmanLinkModal({
       let feesRecalculated = false;
       let resultBookingId = matchedBookingId;
 
-      if (matchedBookingId) {
+      if (isLegacyReview && matchedBookingId) {
+        // Resolve legacy requires-review booking from trackman_unmatched_bookings table
+        // Extract numeric ID from string or use as-is if already numeric
+        let numericId: number;
+        if (typeof matchedBookingId === 'string') {
+          numericId = parseInt(matchedBookingId.replace('review-', ''), 10);
+        } else {
+          numericId = matchedBookingId;
+        }
+        
+        if (isNaN(numericId)) {
+          throw new Error('Invalid booking ID for legacy resolution');
+        }
+        
+        const res = await fetch(`/api/admin/trackman/unmatched/${numericId}/resolve`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            memberEmail: owner.email,
+            rememberEmail: true
+          })
+        });
+        
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || data.message || 'Failed to resolve booking');
+        }
+        const data = await res.json();
+        feesRecalculated = data.feesRecalculated === true;
+        if (data.booking?.id) {
+          // Ensure resultBookingId is numeric for billing modal
+          resultBookingId = typeof data.booking.id === 'number' ? data.booking.id : parseInt(data.booking.id, 10);
+        }
+      } else if (matchedBookingId && !isLegacyReview) {
         const res = await fetch(`/api/bookings/${matchedBookingId}/assign-with-players`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -292,14 +328,24 @@ export function TrackmanLinkModal({
         }
       }
       
-      showToast(`Booking assigned with ${filledSlotsCount} player${filledSlotsCount > 1 ? 's' : ''}${guestCount > 0 ? ` (${guestCount} guest${guestCount > 1 ? 's' : ''})` : ''}`, 'success');
+      if (isLegacyReview) {
+        showToast(`Booking resolved and assigned to ${owner.name}`, 'success');
+      } else {
+        showToast(`Booking assigned with ${filledSlotsCount} player${filledSlotsCount > 1 ? 's' : ''}${guestCount > 0 ? ` (${guestCount} guest${guestCount > 1 ? 's' : ''})` : ''}`, 'success');
+      }
       onSuccess?.();
       onClose();
       
       if (feesRecalculated && resultBookingId && onOpenBillingModal) {
-        setTimeout(() => {
-          onOpenBillingModal(resultBookingId!);
-        }, 300);
+        // Ensure numeric ID for billing modal
+        const numericBookingId = typeof resultBookingId === 'number' 
+          ? resultBookingId 
+          : parseInt(String(resultBookingId).replace('review-', ''), 10);
+        if (!isNaN(numericBookingId)) {
+          setTimeout(() => {
+            onOpenBillingModal(numericBookingId);
+          }, 300);
+        }
       }
     } catch (err: any) {
       showToast(err.message || 'Failed to assign booking', 'error');
@@ -659,13 +705,19 @@ export function TrackmanLinkModal({
             
             <div className="border-t border-primary/10 dark:border-white/10 pt-2">
               <p className="text-xs text-primary/50 dark:text-white/50 mb-1">Additional Players (Optional)</p>
-              <div className="space-y-2">
-                {[1, 2, 3].map(index => (
-                  <div key={index}>
-                    {renderSlot(index, false)}
-                  </div>
-                ))}
-              </div>
+              {isLegacyReview ? (
+                <p className="text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 p-2 rounded-lg">
+                  Add additional players after assigning the owner. This booking needs review first.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(index => (
+                    <div key={index}>
+                      {renderSlot(index, false)}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

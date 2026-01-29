@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.43.0",
+    date: "2026-01-29",
+    title: "Unified Queue with Requires Review",
+    changes: [
+      "Added: 'Requires Review' bookings (partial name matches) now appear in Queue",
+      "Added: Orange-styled cards for bookings needing name verification",
+      "Added: 'Re-scan for Matches' button in Queue header to retry member matching",
+      "Added: Queue now shows 3 item types: pending requests, unassigned bookings, needs review",
+      "Improved: All Trackman import management consolidated into Simulator page",
+      "Fixed: Legacy review items can be resolved directly from Queue"
+    ],
+    isMajor: true
+  },
+  {
     version: "9.42.4",
     date: "2026-01-29",
     title: "Queue Shows Booking Details",

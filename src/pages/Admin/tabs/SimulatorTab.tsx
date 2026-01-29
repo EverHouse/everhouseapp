@@ -75,6 +75,21 @@ interface CalendarClosure {
     reason: string | null;
 }
 
+interface RequiresReviewBooking {
+    id: number;
+    trackmanBookingId: string | null;
+    userName: string | null;
+    originalEmail: string | null;
+    bookingDate: string;
+    startTime: string;
+    endTime: string;
+    bayNumber: number | null;
+    playerCount: number | null;
+    notes: string | null;
+    matchAttemptReason: string | null;
+    createdAt: string;
+}
+
 interface AvailabilityBlock {
     id: number;
     resourceId: number;
@@ -690,6 +705,8 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
     const [approvedBookings, setApprovedBookings] = useState<BookingRequest[]>([]);
     const [closures, setClosures] = useState<CalendarClosure[]>([]);
     const [availabilityBlocks, setAvailabilityBlocks] = useState<AvailabilityBlock[]>([]);
+    const [requiresReviewBookings, setRequiresReviewBookings] = useState<RequiresReviewBooking[]>([]);
+    const [isRescanningMatches, setIsRescanningMatches] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedRequest, setSelectedRequest] = useState<BookingRequest | null>(null);
     const [actionModal, setActionModal] = useState<'approve' | 'decline' | null>(null);
@@ -914,7 +931,8 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                 fetch('/api/booking-requests?include_all=true'),
                 fetch('/api/pending-bookings'),
                 fetch('/api/bays'),
-                fetch('/api/resources')
+                fetch('/api/resources'),
+                fetch('/api/admin/trackman/requires-review?limit=100')
             ]);
             
             let allRequests: BookingRequest[] = [];
@@ -958,6 +976,11 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
             if (results[3].status === 'fulfilled' && results[3].value.ok) {
                 const data = await results[3].value.json();
                 setResources(data);
+            }
+            
+            if (results[4].status === 'fulfilled' && results[4].value.ok) {
+                const reviewData = await results[4].value.json();
+                setRequiresReviewBookings(reviewData.data || []);
             }
         } catch (err) {
             console.error('Failed to fetch data:', err);
@@ -1421,7 +1444,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
         }
     }, [actionModal, selectedRequest]);
 
-    // Queue shows both pending requests AND unmatched webhook bookings
+    // Queue shows pending requests, unmatched webhook bookings, AND requires-review partial matches
     const pendingRequests = requests.filter(r => 
         r.status === 'pending' || 
         r.status === 'pending_approval'
@@ -1434,10 +1457,35 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
         (b.user_name || '').includes('Unknown (Trackman)')
     );
     
+    // Map requires-review bookings from legacy table to queue format
+    const requiresReviewQueueItems = requiresReviewBookings.map(rb => ({
+        id: `review-${rb.id}`,
+        legacyId: rb.id,
+        user_email: rb.originalEmail,
+        user_name: rb.userName,
+        resource_id: rb.bayNumber,
+        bay_name: rb.bayNumber ? `Bay ${rb.bayNumber}` : null,
+        resource_preference: null,
+        request_date: rb.bookingDate,
+        start_time: rb.startTime,
+        end_time: rb.endTime,
+        duration_minutes: null,
+        notes: rb.notes,
+        status: 'pending_approval' as const,
+        staff_notes: null,
+        suggested_time: null,
+        created_at: rb.createdAt,
+        source: 'booking' as const,
+        trackman_booking_id: rb.trackmanBookingId,
+        matchAttemptReason: rb.matchAttemptReason,
+        queueType: 'requires_review' as const
+    }));
+    
     // Combined queue: all items sorted chronologically by date/time for staff visibility
     const queueItems = [
         ...pendingRequests.map(r => ({ ...r, queueType: 'pending' as const })),
-        ...unmatchedWebhookBookings.map(b => ({ ...b, queueType: 'unmatched' as const }))
+        ...unmatchedWebhookBookings.map(b => ({ ...b, queueType: 'unmatched' as const })),
+        ...requiresReviewQueueItems
     ].sort((a, b) => {
         // Sort chronologically by date first, then time
         if (a.request_date !== b.request_date) {
@@ -1808,20 +1856,58 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                             <h3 className="font-bold text-primary dark:text-white flex items-center gap-2">
                                 <span aria-hidden="true" className="material-symbols-outlined text-yellow-500">pending</span>
                                 Queue ({queueItems.length})
-                                {pendingRequests.length > 0 && unmatchedBookings.length > 0 && (
+                                {queueItems.length > 0 && (
                                     <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
-                                        {pendingRequests.length} pending, {unmatchedBookings.length} unassigned
+                                        {pendingRequests.length > 0 && `${pendingRequests.length} pending`}
+                                        {pendingRequests.length > 0 && (unmatchedWebhookBookings.length > 0 || requiresReviewQueueItems.length > 0) && ', '}
+                                        {unmatchedWebhookBookings.length > 0 && `${unmatchedWebhookBookings.length} unassigned`}
+                                        {unmatchedWebhookBookings.length > 0 && requiresReviewQueueItems.length > 0 && ', '}
+                                        {requiresReviewQueueItems.length > 0 && `${requiresReviewQueueItems.length} need review`}
                                     </span>
                                 )}
                             </h3>
-                            <button
-                                onClick={() => onTabChange('trackman')}
-                                className="hidden lg:flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary dark:text-white bg-primary/10 dark:bg-white/10 hover:bg-primary/20 dark:hover:bg-white/20 rounded-lg transition-colors shadow-sm"
-                                title="Import bookings from Trackman CSV"
-                            >
-                                <span className="material-symbols-outlined text-sm">upload_file</span>
-                                <span>Import</span>
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {(unmatchedWebhookBookings.length > 0 || requiresReviewQueueItems.length > 0) && (
+                                    <button
+                                        onClick={async () => {
+                                            setIsRescanningMatches(true);
+                                            try {
+                                                const res = await fetch('/api/admin/trackman/rescan', {
+                                                    method: 'POST',
+                                                    credentials: 'include'
+                                                });
+                                                if (res.ok) {
+                                                    const data = await res.json();
+                                                    showToast(`Rescanned ${data.scanned || 0} bookings, matched ${data.matched || 0}`, 'success');
+                                                    handleRefresh();
+                                                } else {
+                                                    showToast('Failed to rescan matches', 'error');
+                                                }
+                                            } catch (err) {
+                                                showToast('Failed to rescan matches', 'error');
+                                            } finally {
+                                                setIsRescanningMatches(false);
+                                            }
+                                        }}
+                                        disabled={isRescanningMatches}
+                                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/20 hover:bg-emerald-200 dark:hover:bg-emerald-500/30 rounded-lg transition-colors disabled:opacity-50"
+                                        title="Re-check for member matches"
+                                    >
+                                        <span className={`material-symbols-outlined text-sm ${isRescanningMatches ? 'animate-spin' : ''}`}>
+                                            {isRescanningMatches ? 'progress_activity' : 'refresh'}
+                                        </span>
+                                        <span className="hidden sm:inline">Re-scan</span>
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => onTabChange('trackman')}
+                                    className="hidden lg:flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary dark:text-white bg-primary/10 dark:bg-white/10 hover:bg-primary/20 dark:hover:bg-white/20 rounded-lg transition-colors shadow-sm"
+                                    title="Import bookings from Trackman CSV"
+                                >
+                                    <span className="material-symbols-outlined text-sm">upload_file</span>
+                                    <span>Import</span>
+                                </button>
+                            </div>
                         </div>
                         {queueItems.length === 0 ? (
                             <div className="py-8 text-center border-2 border-dashed border-gray-200 dark:border-white/25 rounded-xl">
@@ -1897,6 +1983,77 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                                 >
                                                     <span aria-hidden="true" className="material-symbols-outlined text-sm">person_add</span>
                                                     Assign Member
+                                                </button>
+                                            </div>
+                                        );
+                                    }
+                                    
+                                    // Requires Review card - partial name matches
+                                    if (item.queueType === 'requires_review') {
+                                        return (
+                                            <div 
+                                                key={`review-${item.id}`} 
+                                                className="bg-orange-50/80 dark:bg-orange-500/10 p-4 rounded-xl border-2 border-dashed border-orange-300 dark:border-orange-500/30 animate-slide-up-stagger cursor-pointer hover:bg-orange-100/80 dark:hover:bg-orange-500/20 transition-colors" 
+                                                style={{ '--stagger-index': index + 2 } as React.CSSProperties}
+                                                onClick={() => setTrackmanLinkModal({
+                                                    isOpen: true,
+                                                    trackmanBookingId: (item as any).trackman_booking_id || null,
+                                                    matchedBookingId: (item as any).legacyId || item.id,
+                                                    bayName: item.bay_name || `Bay ${item.resource_id}`,
+                                                    bookingDate: formatDateShortAdmin(item.request_date),
+                                                    timeSlot: `${formatTime12Hour(item.start_time)} - ${formatTime12Hour(item.end_time)}`,
+                                                    importedName: item.user_name,
+                                                    notes: item.notes,
+                                                    isLegacyReview: true
+                                                })}
+                                            >
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="px-2.5 py-1 text-xs font-semibold bg-orange-200 dark:bg-orange-500/30 text-orange-700 dark:text-orange-400 rounded-lg">
+                                                            Needs Review
+                                                        </span>
+                                                        {item.bay_name && (
+                                                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400">
+                                                                {item.bay_name}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <p className="text-sm text-orange-700 dark:text-orange-400 mb-1">
+                                                    {formatDateShortAdmin(item.request_date)} • {formatTime12Hour(item.start_time)} - {formatTime12Hour(item.end_time)}
+                                                </p>
+                                                {item.user_name && (
+                                                    <p className="text-sm font-medium text-orange-800 dark:text-orange-300">
+                                                        {item.user_name}
+                                                    </p>
+                                                )}
+                                                <p className="text-xs text-orange-600 dark:text-orange-500 mt-1">
+                                                    Partial match - verify correct member
+                                                </p>
+                                                {(item as any).trackman_booking_id && (
+                                                    <p className="text-xs text-orange-600/70 dark:text-orange-500/70">
+                                                        Trackman ID: {(item as any).trackman_booking_id}
+                                                    </p>
+                                                )}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setTrackmanLinkModal({
+                                                            isOpen: true,
+                                                            trackmanBookingId: (item as any).trackman_booking_id || null,
+                                                            matchedBookingId: (item as any).legacyId || item.id,
+                                                            bayName: item.bay_name || `Bay ${item.resource_id}`,
+                                                            bookingDate: formatDateShortAdmin(item.request_date),
+                                                            timeSlot: `${formatTime12Hour(item.start_time)} - ${formatTime12Hour(item.end_time)}`,
+                                                            importedName: item.user_name,
+                                                            notes: item.notes,
+                                                            isLegacyReview: true
+                                                        });
+                                                    }}
+                                                    className="w-full mt-3 py-2 px-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 transition-colors"
+                                                >
+                                                    <span aria-hidden="true" className="material-symbols-outlined text-sm">search</span>
+                                                    Find Matches
                                                 </button>
                                             </div>
                                         );
