@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.46.0",
+    date: "2026-01-29",
+    title: "Member Portal Navigation Menu",
+    changes: [
+      "New: Hamburger menu in member portal header (replaces mascot)",
+      "New: Slide-out navigation with all member pages and nested tabs",
+      "New: Liquid glass selection effect highlights current page",
+      "New: Mascot logo in menu sidebar links back to landing page",
+      "Improved: Member navigation matches public pages sidebar design"
+    ]
+  },
+  {
     version: "9.45.1",
     date: "2026-01-29",
     title: "Complete Duplicate Prevention Coverage",

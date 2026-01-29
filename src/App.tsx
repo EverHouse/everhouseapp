@@ -8,6 +8,7 @@ import { SmoothScrollProvider } from './components/motion/SmoothScroll';
 import DirectionalPageTransition, { TransitionContext } from './components/motion/DirectionalPageTransition';
 import Logo from './components/Logo';
 import MenuOverlay from './components/MenuOverlay';
+import MemberMenuOverlay from './components/MemberMenuOverlay';
 import ViewAsBanner from './components/ViewAsBanner';
 import PageErrorBoundary from './components/PageErrorBoundary';
 import Avatar from './components/Avatar';
@@ -438,6 +439,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Check if actual user is staff/admin (for header logic)
   const isStaffOrAdmin = actualUser?.role === 'admin' || actualUser?.role === 'staff';
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMemberMenuOpen, setIsMemberMenuOpen] = useState(false);
   const unreadCount = useUserStore(state => state.unreadNotifications);
   useWebSocket({ effectiveEmail: user?.email });
   useSupabaseRealtime({ userEmail: user?.email });
@@ -450,7 +452,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isRootPage = location.pathname === '/dashboard' || location.pathname === '/admin';
   const isMemberOrStaff = !!user && (user.role === 'member' || user.role === 'staff' || user.role === 'admin');
   const { isActive: isEdgeSwipeActive, progress: edgeSwipeProgress } = useEdgeSwipe({
-    enabled: isMemberOrStaff && !isRootPage && !isMenuOpen,
+    enabled: isMemberOrStaff && !isRootPage && !isMenuOpen && !isMemberMenuOpen,
     edgeWidth: 20,
     threshold: 100
   });
@@ -599,15 +601,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </button>
           ) : (
             <button 
-              onClick={() => navigate('/')}
-              className={`flex items-center justify-center ${headerBtnClasses} focus:ring-2 focus:ring-accent focus:outline-none rounded-lg py-1`}
-              aria-label="Go to home"
+              onClick={() => setIsMemberMenuOpen(true)}
+              className={`w-10 h-10 flex items-center justify-center ${headerBtnClasses} focus:ring-2 focus:ring-accent focus:outline-none rounded-lg`}
+              aria-label="Open menu"
             >
-              <img 
-                src="/assets/logos/mascot-white.webp" 
-                alt="Ever House" 
-                className="h-10 w-auto object-contain"
-              />
+              <span className="material-symbols-outlined text-[24px]">menu</span>
             </button>
           )
         ) : (
@@ -751,6 +749,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             {/* No overlay for public pages - let content backgrounds show naturally */}
 
             <MenuOverlay isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+            <MemberMenuOverlay isOpen={isMemberMenuOpen} onClose={() => setIsMemberMenuOpen(false)} />
         </div>
       </NotificationContext.Provider>
     </div>
