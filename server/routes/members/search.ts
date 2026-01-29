@@ -134,7 +134,9 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
       statusCondition,
       searchCondition,
       sql`${users.archivedAt} IS NULL`,
-      sql`${users.role} != 'staff'`
+      sql`${users.role} != 'staff'`,
+      // Exclude auto-generated visitors (GolfNow, ClassPass, etc.) from directory
+      sql`(${users.tags} IS NULL OR NOT (${users.tags} @> '["directory_hidden"]'::jsonb))`
     );
     
     const countResult = await db.select({ count: sql<number>`COUNT(*)` })

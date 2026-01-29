@@ -426,6 +426,14 @@ export async function executeMerge(
     );
     
     // Update booking participants (uses user_id column)
+    // DEDUPLICATE: If primary user is already in a session, remove secondary user's duplicate record
+    await client.query(
+      `DELETE FROM booking_participants 
+       WHERE user_id = $1 
+       AND session_id IN (SELECT session_id FROM booking_participants WHERE user_id = $2)`,
+      [secondaryUserId, primaryUserId]
+    );
+    
     const bookingParticipantsResult = await client.query(
       `UPDATE booking_participants SET user_id = $1 WHERE user_id = $2`,
       [primaryUserId, secondaryUserId]
@@ -449,6 +457,14 @@ export async function executeMerge(
     recordsMerged.legacyPurchases = legacyPurchasesResult.rowCount || 0;
     
     // Update group members (uses member_email column)
+    // DEDUPLICATE: If primary email is already in a group, remove secondary email's duplicate record
+    await client.query(
+      `DELETE FROM group_members 
+       WHERE LOWER(member_email) = $1 
+       AND group_id IN (SELECT group_id FROM group_members WHERE LOWER(member_email) = $2)`,
+      [secondaryEmail, primaryEmail]
+    );
+    
     const groupMembersResult = await client.query(
       `UPDATE group_members SET member_email = $1 WHERE LOWER(member_email) = $2`,
       [primaryEmail, secondaryEmail]
@@ -456,6 +472,14 @@ export async function executeMerge(
     recordsMerged.groupMembers = groupMembersResult.rowCount || 0;
     
     // Update push subscriptions (uses user_email column)
+    // DEDUPLICATE: If same endpoint exists for primary, remove secondary's duplicate subscription
+    await client.query(
+      `DELETE FROM push_subscriptions
+       WHERE LOWER(user_email) = $1
+       AND endpoint IN (SELECT endpoint FROM push_subscriptions WHERE LOWER(user_email) = $2)`,
+      [secondaryEmail, primaryEmail]
+    );
+    
     const pushSubscriptionsResult = await client.query(
       `UPDATE push_subscriptions SET user_email = $1 WHERE LOWER(user_email) = $2`,
       [primaryEmail, secondaryEmail]

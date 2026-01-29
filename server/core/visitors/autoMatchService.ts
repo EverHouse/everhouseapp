@@ -603,6 +603,14 @@ async function createGolfNowVisitor(
       lastName
     }, false);
     
+    // Tag visitor as directory_hidden so they don't flood the member directory
+    await pool.query(
+      `UPDATE users 
+       SET tags = COALESCE(tags, '[]'::jsonb) || '["directory_hidden", "auto_generated"]'::jsonb 
+       WHERE id = $1 AND NOT (COALESCE(tags, '[]'::jsonb) @> '["directory_hidden"]'::jsonb)`,
+      [visitor.id]
+    );
+    
     await updateVisitorType({
       email: generatedEmail,
       type: 'golfnow',

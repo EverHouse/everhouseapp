@@ -2363,10 +2363,8 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         );
         
         if (alreadyConvertedToBlock) {
-          process.stderr.write(`[Trackman Import] Skipping ${row.bookingId} - already converted to private event block (bay ${parsedBayId}, ${bookingDate} ${startTime})\n`);
-          skippedAsPrivateEventBlocks++;
-          skippedRows++;
-          continue;
+          // Import the booking anyway to preserve history, just log it
+          process.stderr.write(`[Trackman Import] Importing private event booking ${row.bookingId} (overlaps with private event block - preserving history)\n`);
         }
         
         // CRITICAL: Create booking_request to block the time slot even for unmatched bookings

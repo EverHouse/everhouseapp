@@ -344,7 +344,8 @@ export async function deductGuestPasses(
       if (!passes_total || passes_total === 0) {
         const { getTierLimits } = await import('../tierService');
         const tierLimits = tierName ? await getTierLimits(tierName) : null;
-        const monthlyAllocation = tierLimits?.guest_passes_per_month ?? 4;
+        // Default to 0 if no tier found - don't grant free passes to users without a tier
+        const monthlyAllocation = tierLimits?.guest_passes_per_month ?? 0;
         
         if (passes_used + passCount <= monthlyAllocation) {
           await client.query(
@@ -380,7 +381,8 @@ export async function deductGuestPasses(
     // No existing record - create with ON CONFLICT for race safety
     const { getTierLimits } = await import('../tierService');
     const tierLimits = tierName ? await getTierLimits(tierName) : null;
-    const monthlyAllocation = tierLimits?.guest_passes_per_month ?? 4;
+    // Default to 0 if no tier found - don't grant free passes to users without a tier
+    const monthlyAllocation = tierLimits?.guest_passes_per_month ?? 0;
     
     if (passCount > monthlyAllocation) {
       await client.query('ROLLBACK');
