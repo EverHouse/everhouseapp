@@ -13,6 +13,14 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.39.2",
+    date: "2026-01-29",
+    title: "Staff Cancellation Audit Logging Fix",
+    changes: [
+      "Fixed: Staff cancellations via booking approval workflow now properly logged to Staff Activity"
+    ]
+  },
+  {
     version: "9.39.1",
     date: "2026-01-29",
     title: "Dashboard Today's Bookings Filter",

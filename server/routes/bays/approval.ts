@@ -7,6 +7,7 @@ import { isStaffOrAdmin } from '../../core/middleware';
 import { sendPushNotification, sendPushNotificationToStaff } from '../push';
 import { formatNotificationDateTime, formatDateDisplayWithDay, formatTime12Hour } from '../../utils/dateUtils';
 import { logAndRespond } from '../../core/logger';
+import { logFromRequest } from '../../core/auditLog';
 import { checkClosureConflict, checkAvailabilityBlockConflict } from '../../core/bookingValidation';
 import { bookingEvents } from '../../core/bookingEvents';
 import { sendNotificationToUser, broadcastAvailabilityUpdate, broadcastMemberStatsUpdated, broadcastBillingUpdate } from '../../core/websocket';
@@ -873,6 +874,14 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
           data: { bookingId: parseInt(id, 10), eventType: 'booking_cancelled' }
         }, { action: 'booking_cancelled', bookingId: parseInt(id, 10), triggerSource: 'approval.ts' });
       }
+      
+      logFromRequest(req, 'cancel_booking', 'booking', id, {
+        member_email: bookingData.userEmail,
+        member_name: bookingData.userName,
+        booking_date: bookingData.requestDate,
+        start_time: bookingData.startTime,
+        refund_result: overageRefundResult
+      });
       
       return res.json(formatRow(updated));
     }
