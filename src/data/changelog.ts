@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.42.3",
+    date: "2026-01-29",
+    title: "Complete Duplicate Prevention Coverage",
+    changes: [
+      "Fixed: Legacy booking resolution now handles race conditions with ON CONFLICT",
+      "Fixed: Webhook reprocess endpoint now handles concurrent requests safely",
+      "Fixed: Member assignment from unmatched bookings handles duplicates gracefully",
+      "Fixed: Rescan function uses ON CONFLICT for atomic insert safety",
+      "Improved: All 12 booking creation paths now have duplicate prevention"
+    ]
+  },
+  {
     version: "9.42.2",
     date: "2026-01-29",
     title: "Import Duplicate Prevention & Queue Tab",

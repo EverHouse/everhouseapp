@@ -163,11 +163,19 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
         if (bayNum >= 1 && bayNum <= 4) resourceId = bayNum;
       }
       
+      // Use ON CONFLICT to handle race conditions (e.g., if booking was already created via CSV import)
       const createResult = await pool.query(
         `INSERT INTO booking_requests (
           user_id, user_email, user_name, resource_id, request_date, start_time, end_time,
           duration_minutes, status, trackman_booking_id, is_unmatched, staff_notes, created_at, updated_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'approved', $9, false, $10, NOW(), NOW())
+        ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO UPDATE SET
+          user_id = EXCLUDED.user_id,
+          user_email = EXCLUDED.user_email,
+          user_name = EXCLUDED.user_name,
+          is_unmatched = false,
+          staff_notes = booking_requests.staff_notes || ' ' || EXCLUDED.staff_notes,
+          updated_at = NOW()
         RETURNING id, trackman_booking_id, staff_notes, request_date, start_time, end_time, duration_minutes, resource_id`,
         [
           member.id,

@@ -1383,6 +1383,7 @@ router.post('/api/admin/trackman-webhooks/backfill', isAdmin, async (req, res) =
             member: existingBooking.user_email || existingBooking.user_name
           });
         } else {
+          // Use ON CONFLICT to handle race conditions with concurrent reprocess requests
           const newBooking = await pool.query(`
             INSERT INTO booking_requests 
             (request_date, start_time, end_time, duration_minutes, resource_id,
@@ -1391,7 +1392,10 @@ router.post('/api/admin/trackman-webhooks/backfill', isAdmin, async (req, res) =
              origin, last_sync_source, last_trackman_sync_at, created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, 'approved', $8, $9, $10, true,
                     'trackman_webhook', 'trackman_webhook', NOW(), NOW(), NOW())
-            RETURNING id
+            ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO UPDATE SET
+              last_trackman_sync_at = NOW(),
+              updated_at = NOW()
+            RETURNING id, (xmax = 0) AS was_inserted
           `, [
             requestDate,
             startTime,

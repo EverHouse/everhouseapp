@@ -2633,21 +2633,31 @@ async function insertBookingIfNotExists(
   const parsedPlayers = parseNotesForPlayers(booking.notes || '');
   const actualGuestCount = parsedPlayers.filter(p => p.type === 'guest').length;
 
-  const insertResult = await db.insert(bookingRequests).values({
-    userEmail: memberEmail,
-    userName: booking.userName,
-    resourceId: resourceId,
-    requestDate: booking.bookingDate,
-    startTime: booking.startTime,
-    durationMinutes: booking.durationMinutes || 60,
-    endTime: booking.endTime,
-    notes: `[Trackman Import ID:${booking.trackmanBookingId}] ${booking.notes || ''}`,
-    status: finalStatus,
-    createdAt: booking.createdAt,
-    trackmanBookingId: booking.trackmanBookingId,
-    originalBookedDate: booking.createdAt,
-    guestCount: actualGuestCount,
-  }).returning({ id: bookingRequests.id });
+  let insertResult;
+  try {
+    insertResult = await db.insert(bookingRequests).values({
+      userEmail: memberEmail,
+      userName: booking.userName,
+      resourceId: resourceId,
+      requestDate: booking.bookingDate,
+      startTime: booking.startTime,
+      durationMinutes: booking.durationMinutes || 60,
+      endTime: booking.endTime,
+      notes: `[Trackman Import ID:${booking.trackmanBookingId}] ${booking.notes || ''}`,
+      status: finalStatus,
+      createdAt: booking.createdAt,
+      trackmanBookingId: booking.trackmanBookingId,
+      originalBookedDate: booking.createdAt,
+      guestCount: actualGuestCount,
+    }).returning({ id: bookingRequests.id });
+  } catch (insertErr: any) {
+    // Handle duplicate key violations gracefully (race condition)
+    if (insertErr.message?.includes('duplicate key') || insertErr.code === '23505') {
+      process.stderr.write(`[Trackman Import] Booking ${booking.trackmanBookingId} already exists (race condition) - skipping\n`);
+      return { inserted: false, reason: 'Already imported (race condition)' };
+    }
+    throw insertErr;
+  }
 
   const bookingId = insertResult[0]?.id;
 
@@ -3166,28 +3176,38 @@ export async function rescanUnmatchedBookings(performedBy: string = 'system'): P
               .limit(1);
             
             if (existingBooking.length === 0) {
-              // Create the booking
-              await pool.query(
-                `INSERT INTO booking_requests (
-                  user_email, user_name, request_date, start_time, end_time,
-                  duration_minutes, resource_id, status, trackman_booking_id,
-                  notes, trackman_player_count, created_at, updated_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())`,
-                [
-                  matchedEmail,
-                  booking.userName || '',
-                  bookingDate,
-                  startTime,
-                  endTime,
-                  booking.durationMinutes || 60,
-                  bayId,
-                  'approved',
-                  booking.trackmanBookingId,
-                  `[Trackman Import ID:${booking.trackmanBookingId}] ${booking.notes || ''}`.trim(),
-                  booking.playerCount || 1
-                ]
-              );
-              process.stderr.write(`[Trackman Rescan] Created booking for ${matchedEmail} (Trackman ID: ${booking.trackmanBookingId})\n`);
+              // Create the booking with ON CONFLICT to handle race conditions
+              try {
+                await pool.query(
+                  `INSERT INTO booking_requests (
+                    user_email, user_name, request_date, start_time, end_time,
+                    duration_minutes, resource_id, status, trackman_booking_id,
+                    notes, trackman_player_count, created_at, updated_at
+                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+                  ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO NOTHING`,
+                  [
+                    matchedEmail,
+                    booking.userName || '',
+                    bookingDate,
+                    startTime,
+                    endTime,
+                    booking.durationMinutes || 60,
+                    bayId,
+                    'approved',
+                    booking.trackmanBookingId,
+                    `[Trackman Import ID:${booking.trackmanBookingId}] ${booking.notes || ''}`.trim(),
+                    booking.playerCount || 1
+                  ]
+                );
+                process.stderr.write(`[Trackman Rescan] Created booking for ${matchedEmail} (Trackman ID: ${booking.trackmanBookingId})\n`);
+              } catch (insertErr: any) {
+                // Handle any remaining duplicate key errors
+                if (insertErr.message?.includes('duplicate key') || insertErr.code === '23505') {
+                  process.stderr.write(`[Trackman Rescan] Booking ${booking.trackmanBookingId} already exists - skipping\n`);
+                } else {
+                  throw insertErr;
+                }
+              }
             }
           }
         } catch (bookingError: any) {

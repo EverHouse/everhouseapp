@@ -1428,7 +1428,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
     );
     
     // Include unmatched webhook bookings in the queue for staff visibility
-    const unmatchedBookings = approvedBookings.filter(b => 
+    const unmatchedWebhookBookings = approvedBookings.filter(b => 
         (b as any).is_unmatched === true ||
         b.user_email === 'unmatched@trackman.import' ||
         (b.user_name || '').includes('Unknown (Trackman)')
@@ -1437,7 +1437,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
     // Combined queue: all items sorted chronologically by date/time for staff visibility
     const queueItems = [
         ...pendingRequests.map(r => ({ ...r, queueType: 'pending' as const })),
-        ...unmatchedBookings.map(b => ({ ...b, queueType: 'unmatched' as const }))
+        ...unmatchedWebhookBookings.map(b => ({ ...b, queueType: 'unmatched' as const }))
     ].sort((a, b) => {
         // Sort chronologically by date first, then time
         if (a.request_date !== b.request_date) {
