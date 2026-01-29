@@ -509,14 +509,20 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const showHeader = !isAdminRoute;
 
   useEffect(() => {
-    const bgColor = isFullBleedHeroPage 
-      ? '#293515' 
-      : isDarkTheme 
-        ? '#0f120a' 
-        : '#F2F2EC';
+    let bgColor: string;
+    if (isLandingPage) {
+      // Landing page: dark hero at top, light when scrolled past hero
+      bgColor = hasScrolledPastHero ? '#F2F2EC' : '#1a1610';
+    } else if (location.pathname === '/private-hire') {
+      bgColor = '#293515';
+    } else if (isDarkTheme) {
+      bgColor = '#0f120a';
+    } else {
+      bgColor = '#F2F2EC';
+    }
     document.documentElement.style.backgroundColor = bgColor;
     document.body.style.backgroundColor = bgColor;
-  }, [isFullBleedHeroPage, isDarkTheme, location.pathname]);
+  }, [isLandingPage, hasScrolledPastHero, isDarkTheme, location.pathname]);
 
   const handleTopLeftClick = () => {
     setIsMenuOpen(true);
