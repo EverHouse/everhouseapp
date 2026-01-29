@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.46.10",
+    date: "2026-01-29",
+    title: "Safari Toolbar Color Enhancement",
+    changes: [
+      "Improved: Added fixed element extending into safe area for better Safari color detection",
+      "Improved: Multiple theme-color meta tags with light/dark mode media queries",
+      "Fixed: Safari bottom toolbar should now properly detect page background color",
+      "Fixed: Public pages, member portal, and staff portal all use correct toolbar colors"
+    ]
+  },
+  {
     version: "9.46.9",
     date: "2026-01-29",
     title: "Safari Translucent Toolbar Fix",

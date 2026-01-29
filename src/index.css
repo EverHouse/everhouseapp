@@ -190,6 +190,41 @@ html.page-light, html.page-light body {
   color: var(--brand-primary) !important;
 }
 
+/* Safari bottom toolbar color fix - fixed element that extends into safe area */
+/* This helps Safari detect the correct background color for its translucent toolbar */
+body::after {
+  content: '';
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-bottom, 34px);
+  background-color: inherit;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Override for specific page states */
+html.page-landing body::after {
+  background-color: #1a1610;
+}
+
+html.page-landing-scrolled body::after {
+  background-color: #F2F2EC;
+}
+
+html.page-private-hire body::after {
+  background-color: #293515;
+}
+
+html.page-dark body::after {
+  background-color: #0f120a;
+}
+
+html.page-light body::after {
+  background-color: #F2F2EC;
+}
+
 #root {
   background-color: inherit;
 }
