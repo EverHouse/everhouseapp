@@ -1718,12 +1718,16 @@ router.get('/api/admin/trackman/potential-matches', isStaffOrAdmin, async (req, 
     
     const unmatchedResult = await pool.query(
       `SELECT 
-        id, trackman_booking_id, user_name, original_email, 
-        TO_CHAR(booking_date, 'YYYY-MM-DD') as booking_date,
-        start_time, end_time, bay_number, player_count, status, notes, created_at
-       FROM trackman_unmatched_bookings
-       WHERE resolved_at IS NULL
-       ORDER BY booking_date DESC, start_time DESC
+        tub.id, tub.trackman_booking_id, tub.user_name, tub.original_email, 
+        TO_CHAR(tub.booking_date, 'YYYY-MM-DD') as booking_date,
+        tub.start_time, tub.end_time, tub.bay_number, tub.player_count, tub.status, tub.notes, tub.created_at
+       FROM trackman_unmatched_bookings tub
+       WHERE tub.resolved_at IS NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM booking_requests br 
+           WHERE br.trackman_booking_id = tub.trackman_booking_id::text
+         )
+       ORDER BY tub.booking_date DESC, tub.start_time DESC
        LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
@@ -1958,31 +1962,39 @@ router.get('/api/admin/trackman/requires-review', isStaffOrAdmin, async (req, re
     
     const result = await pool.query(
       `SELECT 
-        id,
-        trackman_booking_id as "trackmanBookingId",
-        user_name as "userName",
-        original_email as "originalEmail",
-        TO_CHAR(booking_date, 'YYYY-MM-DD') as "bookingDate",
-        start_time as "startTime",
-        end_time as "endTime",
-        bay_number as "bayNumber",
-        player_count as "playerCount",
-        notes,
-        match_attempt_reason as "matchAttemptReason",
-        created_at as "createdAt"
-       FROM trackman_unmatched_bookings
-       WHERE resolved_at IS NULL
-         AND match_attempt_reason LIKE '%REQUIRES_REVIEW%'
-       ORDER BY booking_date DESC, start_time DESC
+        tub.id,
+        tub.trackman_booking_id as "trackmanBookingId",
+        tub.user_name as "userName",
+        tub.original_email as "originalEmail",
+        TO_CHAR(tub.booking_date, 'YYYY-MM-DD') as "bookingDate",
+        tub.start_time as "startTime",
+        tub.end_time as "endTime",
+        tub.bay_number as "bayNumber",
+        tub.player_count as "playerCount",
+        tub.notes,
+        tub.match_attempt_reason as "matchAttemptReason",
+        tub.created_at as "createdAt"
+       FROM trackman_unmatched_bookings tub
+       WHERE tub.resolved_at IS NULL
+         AND tub.match_attempt_reason LIKE '%REQUIRES_REVIEW%'
+         AND NOT EXISTS (
+           SELECT 1 FROM booking_requests br 
+           WHERE br.trackman_booking_id = tub.trackman_booking_id::text
+         )
+       ORDER BY tub.booking_date DESC, tub.start_time DESC
        LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
     
     const countResult = await pool.query(
       `SELECT COUNT(*) as total 
-       FROM trackman_unmatched_bookings 
-       WHERE resolved_at IS NULL 
-         AND match_attempt_reason LIKE '%REQUIRES_REVIEW%'`
+       FROM trackman_unmatched_bookings tub
+       WHERE tub.resolved_at IS NULL 
+         AND tub.match_attempt_reason LIKE '%REQUIRES_REVIEW%'
+         AND NOT EXISTS (
+           SELECT 1 FROM booking_requests br 
+           WHERE br.trackman_booking_id = tub.trackman_booking_id::text
+         )`
     );
     
     res.json({ 
