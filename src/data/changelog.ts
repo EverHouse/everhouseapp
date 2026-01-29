@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.41.1",
+    date: "2026-01-29",
+    title: "Booking Availability Fix",
+    changes: [
+      "Fixed: Members not seeing available time slots due to stale/duplicate TrackMan data",
+      "Fixed: Resolved 78 duplicate unmatched booking entries that were blocking availability",
+      "Fixed: Cleaned up 5 past booking entries from availability checks",
+      "Improved: Availability system now correctly shows open slots"
+    ]
+  },
+  {
     version: "9.41.0",
     date: "2026-01-29",
     title: "UI/UX & Accessibility Improvements",
