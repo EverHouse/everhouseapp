@@ -1049,7 +1049,7 @@ router.post('/api/bookings/mark-as-event', isStaffOrAdmin, async (req, res) => {
           blockDate: bookingDate,
           startTime: startTime,
           endTime: endTime,
-          blockType: 'closure',
+          blockType: 'blocked',
           notes: `Private Event: ${eventTitle}`,
           closureId: closure.id,
           createdBy: staffEmail
