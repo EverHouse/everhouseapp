@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.46.5",
+    date: "2026-01-29",
+    title: "Private Event from Unmatched Bookings",
+    changes: [
+      "Fixed: Can now mark unmatched Trackman bookings as private events directly",
+      "Fixed: 'Booking not found' error when converting Trackman imports that are still in review queue",
+      "Improved: Private events created from unmatched bookings automatically resolve those entries"
+    ]
+  },
+  {
     version: "9.46.4",
     date: "2026-01-29",
     title: "Staff Portal Directory Fix",

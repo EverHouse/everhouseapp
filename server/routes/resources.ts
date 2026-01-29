@@ -961,6 +961,8 @@ router.post('/api/bookings/mark-as-event', isStaffOrAdmin, async (req, res) => {
     
     // Get the primary booking
     let primaryBooking: any;
+    let isFromUnmatched = false;
+    
     if (booking_id) {
       const [booking] = await db.select()
         .from(bookingRequests)
@@ -971,6 +973,39 @@ router.post('/api/bookings/mark-as-event', isStaffOrAdmin, async (req, res) => {
         .from(bookingRequests)
         .where(eq(bookingRequests.trackmanBookingId, trackman_booking_id));
       primaryBooking = booking;
+    }
+    
+    // If not found in bookingRequests and we have a trackman_booking_id, check unmatched bookings
+    if (!primaryBooking && trackman_booking_id) {
+      const { trackmanUnmatchedBookings } = await import('../../shared/models/scheduling');
+      const [unmatchedBooking] = await db.select()
+        .from(trackmanUnmatchedBookings)
+        .where(eq(trackmanUnmatchedBookings.trackmanBookingId, trackman_booking_id));
+      
+      if (unmatchedBooking) {
+        // Look up resource ID from bay number
+        let resourceId: number | null = null;
+        if (unmatchedBooking.bayNumber) {
+          const [resource] = await db.select()
+            .from(resources)
+            .where(eq(resources.name, `Bay ${unmatchedBooking.bayNumber}`));
+          resourceId = resource?.id ?? null;
+        }
+        
+        // Map unmatched booking fields to expected format
+        primaryBooking = {
+          id: unmatchedBooking.id,
+          userName: unmatchedBooking.userName,
+          requestDate: unmatchedBooking.bookingDate,
+          startTime: unmatchedBooking.startTime,
+          endTime: unmatchedBooking.endTime,
+          durationMinutes: unmatchedBooking.durationMinutes,
+          resourceId: resourceId,
+          trackmanBookingId: unmatchedBooking.trackmanBookingId,
+          isUnmatched: true,
+        };
+        isFromUnmatched = true;
+      }
     }
     
     if (!primaryBooking) {
@@ -1000,6 +1035,8 @@ router.post('/api/bookings/mark-as-event', isStaffOrAdmin, async (req, res) => {
     }
     
     let relatedBookings: any[] = [];
+    let relatedUnmatchedIds: number[] = [];
+    
     if (userName && bookingDate && startTime) {
       relatedBookings = await db.select()
         .from(bookingRequests)
@@ -1009,11 +1046,45 @@ router.post('/api/bookings/mark-as-event', isStaffOrAdmin, async (req, res) => {
           eq(bookingRequests.startTime, startTime),
           eq(bookingRequests.isUnmatched, true)
         ));
+      
+      // Also find related unmatched bookings if coming from unmatched table
+      if (isFromUnmatched) {
+        const { trackmanUnmatchedBookings } = await import('../../shared/models/scheduling');
+        const relatedUnmatched = await db.select()
+          .from(trackmanUnmatchedBookings)
+          .where(and(
+            sql`LOWER(TRIM(${trackmanUnmatchedBookings.userName})) = ${userName}`,
+            eq(trackmanUnmatchedBookings.bookingDate, bookingDate),
+            eq(trackmanUnmatchedBookings.startTime, startTime),
+            sql`${trackmanUnmatchedBookings.resolvedAt} IS NULL`
+          ));
+        relatedUnmatchedIds = relatedUnmatched.map(u => u.id);
+        
+        // Look up resource IDs from bay numbers for unmatched bookings
+        for (const unmatched of relatedUnmatched) {
+          if (unmatched.bayNumber) {
+            const [resource] = await db.select()
+              .from(resources)
+              .where(eq(resources.name, `Bay ${unmatched.bayNumber}`));
+            if (resource) {
+              relatedBookings.push({
+                ...unmatched,
+                resourceId: resource.id,
+                requestDate: unmatched.bookingDate,
+                isUnmatched: true
+              });
+            }
+          }
+        }
+      }
     }
     
     // If no related bookings found, just include the primary one
     if (relatedBookings.length === 0) {
       relatedBookings = [primaryBooking];
+      if (isFromUnmatched && !relatedUnmatchedIds.includes(primaryBooking.id)) {
+        relatedUnmatchedIds = [primaryBooking.id];
+      }
     }
     
     // Collect all unique resource IDs (bays) from related bookings
@@ -1089,13 +1160,27 @@ router.post('/api/bookings/mark-as-event', isStaffOrAdmin, async (req, res) => {
       }
       
       // Delete the bookings from the queue (they're now represented as blocks)
-      if (bookingIds.length > 0) {
-        await tx.delete(bookingMembers).where(sql`booking_id IN (${sql.join(bookingIds.map(id => sql`${id}`), sql`, `)})`);
-        await tx.delete(bookingGuests).where(sql`booking_id IN (${sql.join(bookingIds.map(id => sql`${id}`), sql`, `)})`);
-        await tx.delete(bookingRequests).where(sql`id IN (${sql.join(bookingIds.map(id => sql`${id}`), sql`, `)})`);
+      // Only delete bookingRequests entries (not unmatched bookings which are handled separately)
+      const regularBookingIds = bookingIds.filter(id => !relatedUnmatchedIds.includes(id));
+      if (regularBookingIds.length > 0) {
+        await tx.delete(bookingMembers).where(sql`booking_id IN (${sql.join(regularBookingIds.map(id => sql`${id}`), sql`, `)})`);
+        await tx.delete(bookingGuests).where(sql`booking_id IN (${sql.join(regularBookingIds.map(id => sql`${id}`), sql`, `)})`);
+        await tx.delete(bookingRequests).where(sql`id IN (${sql.join(regularBookingIds.map(id => sql`${id}`), sql`, `)})`);
       }
       
-      return { closure, bookingIds, resourceIds, reusedExistingClosure: existingClosures.length > 0, newBlocksCreated: unblockResourceIds.length };
+      // Mark unmatched bookings as resolved (converted to private event)
+      if (relatedUnmatchedIds.length > 0) {
+        const { trackmanUnmatchedBookings } = await import('../../shared/models/scheduling');
+        await tx.update(trackmanUnmatchedBookings)
+          .set({
+            resolvedAt: new Date(),
+            resolvedBy: staffEmail,
+            resolvedEmail: 'PRIVATE_EVENT',
+          })
+          .where(sql`id IN (${sql.join(relatedUnmatchedIds.map(id => sql`${id}`), sql`, `)})`);
+      }
+      
+      return { closure, bookingIds, resourceIds, reusedExistingClosure: existingClosures.length > 0, newBlocksCreated: unblockResourceIds.length, resolvedUnmatchedCount: relatedUnmatchedIds.length };
     });
     
     // Broadcast updates after successful transaction
