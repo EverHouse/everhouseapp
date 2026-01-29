@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.39.5",
+    date: "2026-01-29",
+    title: "Human-Readable Activity Details",
+    changes: [
+      "Improved: Staff Activity cards now show human-readable details instead of raw JSON",
+      "Added: Formatting for Recorded Charge, Detect Duplicates, Fix Ghost Bookings, Mark Booking As Event",
+      "Added: Formatting for subscription actions, tier changes, refunds, HubSpot sync, and more",
+      "Added: Missing icons and labels for 8+ additional action types"
+    ]
+  },
+  {
     version: "9.39.4",
     date: "2026-01-29",
     title: "Complete Activity Logging Coverage",

@@ -93,6 +93,14 @@ const ACTION_LABELS: Record<string, { label: string; icon: string; color: string
     reassign_booking: { label: 'Reassigned Booking', icon: 'swap_horiz', color: 'text-indigo-600 bg-indigo-100 dark:text-indigo-400 dark:bg-indigo-900/30' },
     unmatch_booking: { label: 'Unmatched Booking', icon: 'link_off', color: 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-900/30' },
     reset_trackman_data: { label: 'Reset Trackman Data', icon: 'restart_alt', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
+    // Data tools/admin actions
+    duplicate_detection: { label: 'Detect Duplicates', icon: 'content_copy', color: 'text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30' },
+    detect_duplicates: { label: 'Detect Duplicates', icon: 'content_copy', color: 'text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30' },
+    fix_ghost_bookings: { label: 'Fix Ghost Bookings', icon: 'auto_fix_high', color: 'text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30' },
+    fix_trackman_ghost_bookings: { label: 'Fix TrackMan Ghost Bookings', icon: 'auto_fix_high', color: 'text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30' },
+    mark_booking_as_event: { label: 'Mark Booking As Event', icon: 'event', color: 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30' },
+    assign_booking_with_players: { label: 'Assigned Booking', icon: 'group_add', color: 'text-teal-600 bg-teal-100 dark:text-teal-400 dark:bg-teal-900/30' },
+    update_member_notes: { label: 'Updated Member Notes', icon: 'edit_note', color: 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-900/30' },
     // Group billing actions
     add_group_member: { label: 'Added Group Member', icon: 'group_add', color: 'text-teal-600 bg-teal-100 dark:text-teal-400 dark:bg-teal-900/30' },
     remove_group_member: { label: 'Removed Group Member', icon: 'group_remove', color: 'text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900/30' },
@@ -114,12 +122,12 @@ const ACTION_LABELS: Record<string, { label: string; icon: string; color: string
 
 const FILTER_CATEGORIES = [
     { key: 'all', label: 'All' },
-    { key: 'bookings', label: 'Bookings', actions: ['approve_booking', 'decline_booking', 'cancel_booking', 'create_booking', 'reschedule_booking', 'mark_no_show', 'mark_attended', 'add_guest_to_booking', 'remove_guest_from_booking', 'link_member_to_booking', 'unlink_member_from_booking', 'direct_add_participant', 'reassign_booking', 'unmatch_booking', 'import_trackman', 'change_booking_owner', 'assign_member_to_booking', 'link_trackman_to_member', 'booking_cancelled_webhook', 'booking_cancelled_member'] },
+    { key: 'bookings', label: 'Bookings', actions: ['approve_booking', 'decline_booking', 'cancel_booking', 'create_booking', 'reschedule_booking', 'mark_no_show', 'mark_attended', 'add_guest_to_booking', 'remove_guest_from_booking', 'link_member_to_booking', 'unlink_member_from_booking', 'direct_add_participant', 'reassign_booking', 'unmatch_booking', 'import_trackman', 'change_booking_owner', 'assign_member_to_booking', 'link_trackman_to_member', 'booking_cancelled_webhook', 'booking_cancelled_member', 'mark_booking_as_event', 'assign_booking_with_players'] },
     { key: 'billing', label: 'Billing', actions: ['pause_subscription', 'resume_subscription', 'cancel_subscription', 'record_charge', 'process_refund', 'send_payment_link', 'change_tier', 'update_payment_status', 'add_group_member', 'remove_group_member', 'link_group_subscription', 'payment_refunded', 'payment_refund_partial', 'payment_failed', 'payment_succeeded'] },
     { key: 'members', label: 'Members', actions: ['invite_member', 'create_member', 'update_member', 'delete_member', 'archive_member', 'sync_hubspot', 'link_stripe_customer', 'update_member_notes', 'review_waiver'] },
     { key: 'tours', label: 'Tours', actions: ['tour_checkin', 'tour_completed', 'tour_no_show', 'tour_cancelled', 'tour_status_changed'] },
     { key: 'events', label: 'Events', actions: ['create_event', 'update_event', 'delete_event', 'sync_events', 'manual_rsvp', 'remove_rsvp', 'create_wellness_class', 'update_wellness_class', 'delete_wellness_class', 'sync_wellness', 'manual_enrollment', 'cancel_wellness_enrollment', 'cancel_event_rsvp'] },
-    { key: 'admin', label: 'Admin', actions: ['create_announcement', 'update_announcement', 'delete_announcement', 'create_closure', 'update_closure', 'delete_closure', 'sync_closures', 'reset_trackman_data'] },
+    { key: 'admin', label: 'Admin', actions: ['create_announcement', 'update_announcement', 'delete_announcement', 'create_closure', 'update_closure', 'delete_closure', 'sync_closures', 'reset_trackman_data', 'duplicate_detection', 'detect_duplicates', 'fix_ghost_bookings', 'fix_trackman_ghost_bookings'] },
 ];
 
 const ChangelogTab: React.FC = () => {
@@ -366,6 +374,66 @@ const ChangelogTab: React.FC = () => {
                 break;
             case 'send_payment_link':
                 if (d.member_email) parts.push(d.member_email);
+                break;
+            case 'duplicate_detection':
+            case 'detect_duplicates':
+                if (d.appDuplicateCount !== undefined) parts.push(`App: ${d.appDuplicateCount} duplicates`);
+                if (d.hubspotDuplicateCount !== undefined) parts.push(`HubSpot: ${d.hubspotDuplicateCount} duplicates`);
+                if (d.action) parts.push(d.action.replace(/_/g, ' '));
+                break;
+            case 'fix_ghost_bookings':
+            case 'fix_trackman_ghost_bookings':
+                if (d.ghostBookingsFound !== undefined) parts.push(`${d.ghostBookingsFound} ghost bookings found`);
+                if (d.action) parts.push(d.action.replace(/_/g, ' '));
+                break;
+            case 'mark_booking_as_event':
+                if (d.trackman_booking_id) parts.push(`TM: ${d.trackman_booking_id}`);
+                break;
+            case 'assign_booking_with_players':
+                if (d.owner_email) parts.push(d.owner_email);
+                if (d.owner_name) parts.push(d.owner_name);
+                if (d.total_players) parts.push(`${d.total_players} players`);
+                break;
+            case 'change_booking_owner':
+                if (d.previous_owner && d.new_email) parts.push(`${d.previous_owner} → ${d.new_email}`);
+                else if (d.new_email) parts.push(d.new_email);
+                if (d.new_name) parts.push(d.new_name);
+                break;
+            case 'cancel_booking':
+                if (d.member_email) parts.push(d.member_email);
+                if (d.booking_date) parts.push(d.booking_date);
+                if (d.start_time) parts.push(d.start_time);
+                break;
+            case 'process_refund':
+                if (d.member_email) parts.push(d.member_email);
+                if (d.amount) parts.push(`$${(typeof d.amount === 'number' ? d.amount / 100 : parseFloat(d.amount)).toFixed(2)}`);
+                if (d.reason) parts.push(d.reason);
+                break;
+            case 'pause_subscription':
+            case 'resume_subscription':
+            case 'cancel_subscription':
+                if (d.member_email) parts.push(d.member_email);
+                if (d.tier) parts.push(d.tier);
+                if (d.reason) parts.push(d.reason);
+                break;
+            case 'change_tier':
+                if (d.member_email) parts.push(d.member_email);
+                if (d.old_tier && d.new_tier) parts.push(`${d.old_tier} → ${d.new_tier}`);
+                else if (d.new_tier) parts.push(d.new_tier);
+                break;
+            case 'sync_hubspot':
+                if (d.contactsUpdated !== undefined) parts.push(`${d.contactsUpdated} contacts updated`);
+                if (d.contactsCreated !== undefined) parts.push(`${d.contactsCreated} created`);
+                break;
+            case 'link_stripe_customer':
+                if (d.member_email) parts.push(d.member_email);
+                if (d.stripe_customer_id) parts.push(`Stripe: ${d.stripe_customer_id.substring(0, 12)}...`);
+                break;
+            case 'update_member_notes':
+                if (d.member_email) parts.push(d.member_email);
+                break;
+            case 'reset_trackman_data':
+                if (d.bookingsReset !== undefined) parts.push(`${d.bookingsReset} bookings reset`);
                 break;
             default:
                 // Generic fallback
