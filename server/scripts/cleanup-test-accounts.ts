@@ -89,6 +89,13 @@ async function cleanupTestAccounts() {
         WHERE booking_id IN (SELECT id FROM booking_requests WHERE user_email = $1)
       `, [email.toLowerCase()]);
       
+      // Clear billing & financial records
+      await pool.query('DELETE FROM usage_ledger WHERE user_id = $1', [userId]);
+      await pool.query('DELETE FROM stripe_payment_intents WHERE user_id = $1', [userId]);
+      
+      // Clear linked emails
+      await pool.query('DELETE FROM user_linked_emails WHERE user_id = $1', [userId]);
+      
       await pool.query('DELETE FROM member_notes WHERE member_email = $1', [email.toLowerCase()]);
       await pool.query('DELETE FROM communication_logs WHERE member_email = $1', [email.toLowerCase()]);
       await pool.query('DELETE FROM guest_passes WHERE member_email = $1', [email.toLowerCase()]);
