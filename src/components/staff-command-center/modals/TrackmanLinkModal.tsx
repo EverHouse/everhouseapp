@@ -65,7 +65,7 @@ export function TrackmanLinkModal({
   const [linking, setLinking] = useState(false);
   const [markingAsEvent, setMarkingAsEvent] = useState(false);
   const [showAddVisitor, setShowAddVisitor] = useState(false);
-  const [visitorData, setVisitorData] = useState({ firstName: '', lastName: '', email: '' });
+  const [visitorData, setVisitorData] = useState({ firstName: '', lastName: '', email: '', visitorType: 'guest' as string });
   const [isCreatingVisitor, setIsCreatingVisitor] = useState(false);
   const [visitorSearch, setVisitorSearch] = useState('');
   const [visitorSearchResults, setVisitorSearchResults] = useState<VisitorSearchResult[]>([]);
@@ -84,7 +84,7 @@ export function TrackmanLinkModal({
       setLinking(false);
       setMarkingAsEvent(false);
       setShowAddVisitor(false);
-      setVisitorData({ firstName: '', lastName: '', email: '' });
+      setVisitorData({ firstName: '', lastName: '', email: '', visitorType: 'guest' });
       setVisitorSearch('');
       setVisitorSearchResults([]);
     }
@@ -175,6 +175,7 @@ export function TrackmanLinkModal({
           email: visitorData.email,
           firstName: visitorData.firstName,
           lastName: visitorData.lastName,
+          visitorType: visitorData.visitorType,
           createStripeCustomer: true
         })
       });
@@ -207,7 +208,7 @@ export function TrackmanLinkModal({
       });
       
       setShowAddVisitor(false);
-      setVisitorData({ firstName: '', lastName: '', email: '' });
+      setVisitorData({ firstName: '', lastName: '', email: '', visitorType: 'guest' });
       setActiveSlotIndex(null);
     } catch (err: any) {
       showToast(err.message || 'Failed to create visitor', 'error');
@@ -442,7 +443,7 @@ export function TrackmanLinkModal({
               <button
                 onClick={() => {
                   setShowAddVisitor(false);
-                  setVisitorData({ firstName: '', lastName: '', email: '' });
+                  setVisitorData({ firstName: '', lastName: '', email: '', visitorType: 'guest' });
                   setVisitorSearch('');
                   setVisitorSearchResults([]);
                 }}
@@ -511,6 +512,22 @@ export function TrackmanLinkModal({
                   onChange={(e) => setVisitorData({ ...visitorData, email: e.target.value })}
                   className="w-full px-2 py-1.5 rounded-lg bg-white dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white placeholder:text-primary/50 dark:placeholder:text-white/50 text-xs"
                 />
+                <div>
+                  <label className="block text-xs text-primary/70 dark:text-white/70 mb-1">Visitor Type</label>
+                  <select
+                    value={visitorData.visitorType}
+                    onChange={(e) => setVisitorData({ ...visitorData, visitorType: e.target.value })}
+                    className="w-full px-2 py-1.5 rounded-lg bg-white dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white text-xs"
+                  >
+                    <option value="guest">Guest</option>
+                    <option value="day_pass">Day Pass</option>
+                    <option value="sim_walkin">Simulator Walk-in</option>
+                    <option value="golfnow">GolfNow</option>
+                    <option value="classpass">ClassPass</option>
+                    <option value="private_lesson">Private Lesson</option>
+                    <option value="lead">Lead</option>
+                  </select>
+                </div>
               </div>
             </div>
 
