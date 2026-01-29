@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" id="theme-color-meta" content="#293515" />
+    <meta name="theme-color" id="theme-color-meta" content="#F2F2EC" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="EH Members" />
@@ -22,6 +22,29 @@
         var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         var isDark = themeMode === 'dark' || (themeMode === 'system' && prefersDark) || (!themeMode && prefersDark);
         if (isDark) document.documentElement.classList.add('dark');
+        
+        // Set initial theme-color based on current path for Safari
+        var path = window.location.pathname;
+        var hash = window.location.hash.replace(/^#\/?/, ''); // Normalize: "#/dashboard" -> "dashboard"
+        var memberPaths = ['dashboard', 'book', 'member-events', 'member-wellness', 'profile', 'updates', 'history'];
+        var isMemberRoute = memberPaths.some(function(p) { return hash.startsWith(p); });
+        var isAdminRoute = hash.startsWith('admin') || path.includes('/admin');
+        var isLanding = (path === '/' && !hash) || hash === '';
+        var isPrivateHire = path === '/private-hire' || hash.startsWith('private-hire');
+        
+        var themeColor;
+        if (isLanding) {
+          themeColor = '#1a1610'; // Dark hero
+        } else if (isPrivateHire) {
+          themeColor = '#293515'; // Dark green
+        } else if ((isMemberRoute || isAdminRoute) && isDark) {
+          themeColor = '#0f120a'; // Dark mode
+        } else {
+          themeColor = '#F2F2EC'; // Light mode (default for public pages)
+        }
+        
+        var meta = document.getElementById('theme-color-meta');
+        if (meta) meta.setAttribute('content', themeColor);
       })();
     </script>
     <link rel="manifest" href="/manifest.webmanifest" />

@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.46.9",
+    date: "2026-01-29",
+    title: "Safari Translucent Toolbar Fix",
+    changes: [
+      "Fixed: Safari bottom toolbar now shows proper translucent effect with correct tint",
+      "Fixed: Public pages use light theme color for Safari toolbar",
+      "Fixed: Member/staff dark mode pages use dark theme color for Safari toolbar",
+      "Fixed: Initial page load now sets correct Safari theme immediately",
+      "Improved: CSS-based backgrounds for better Safari translucency support"
+    ]
+  },
+  {
     version: "9.46.8",
     date: "2026-01-29",
     title: "Safari Browser Theme Improvements",

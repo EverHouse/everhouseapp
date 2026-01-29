@@ -509,19 +509,33 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const showHeader = !isAdminRoute;
 
   useEffect(() => {
-    let bgColor: string;
+    // Use CSS classes instead of inline styles to let Safari's translucent toolbar work correctly
+    const html = document.documentElement;
+    const metaThemeColor = document.getElementById('theme-color-meta');
+    
+    // Remove all page-specific classes first
+    html.classList.remove('page-landing', 'page-landing-scrolled', 'page-private-hire', 'page-light', 'page-dark');
+    
+    let themeColor: string;
     if (isLandingPage) {
       // Landing page: dark hero at top, light when scrolled past hero
-      bgColor = hasScrolledPastHero ? '#F2F2EC' : '#1a1610';
+      html.classList.add(hasScrolledPastHero ? 'page-landing-scrolled' : 'page-landing');
+      themeColor = hasScrolledPastHero ? '#F2F2EC' : '#1a1610';
     } else if (location.pathname === '/private-hire') {
-      bgColor = '#293515';
+      html.classList.add('page-private-hire');
+      themeColor = '#293515';
     } else if (isDarkTheme) {
-      bgColor = '#0f120a';
+      html.classList.add('page-dark');
+      themeColor = '#0f120a';
     } else {
-      bgColor = '#F2F2EC';
+      html.classList.add('page-light');
+      themeColor = '#F2F2EC';
     }
-    document.documentElement.style.backgroundColor = bgColor;
-    document.body.style.backgroundColor = bgColor;
+    
+    // Update Safari theme-color meta tag
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', themeColor);
+    }
   }, [isLandingPage, hasScrolledPastHero, isDarkTheme, location.pathname]);
 
   const handleTopLeftClick = () => {
