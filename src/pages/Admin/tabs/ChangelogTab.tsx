@@ -118,6 +118,49 @@ const ACTION_LABELS: Record<string, { label: string; icon: string; color: string
     payment_refund_partial: { label: 'Partial Refund', icon: 'currency_exchange', color: 'text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30' },
     payment_failed: { label: 'Payment Failed', icon: 'credit_card_off', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
     payment_succeeded: { label: 'Payment Successful', icon: 'check_circle', color: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30' },
+    // Stripe webhook subscription events
+    subscription_created: { label: 'Subscription Created', icon: 'add_card', color: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30' },
+    subscription_updated: { label: 'Subscription Updated', icon: 'credit_card', color: 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30' },
+    subscription_cancelled: { label: 'Subscription Cancelled', icon: 'credit_card_off', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
+    // Invoice actions
+    invoice_paid: { label: 'Invoice Paid', icon: 'receipt_long', color: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30' },
+    invoice_failed: { label: 'Invoice Failed', icon: 'receipt', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
+    invoice_overdue: { label: 'Invoice Overdue', icon: 'warning', color: 'text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30' },
+    invoice_removed: { label: 'Invoice Removed', icon: 'delete', color: 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-900/30' },
+    // Day pass actions
+    day_pass_purchased: { label: 'Day Pass Purchased', icon: 'confirmation_number', color: 'text-emerald-600 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/30' },
+    day_pass_redeemed: { label: 'Day Pass Redeemed', icon: 'qr_code_scanner', color: 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30' },
+    day_pass_refunded: { label: 'Day Pass Refunded', icon: 'currency_exchange', color: 'text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30' },
+    guest_pass_used: { label: 'Guest Pass Used', icon: 'badge', color: 'text-teal-600 bg-teal-100 dark:text-teal-400 dark:bg-teal-900/30' },
+    // Waiver actions
+    waiver_marked_reviewed: { label: 'Waiver Reviewed', icon: 'verified', color: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30' },
+    all_waivers_marked_reviewed: { label: 'All Waivers Reviewed', icon: 'verified', color: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30' },
+    // TrackMan sync actions
+    trackman_rescan: { label: 'TrackMan Rescan', icon: 'refresh', color: 'text-cyan-600 bg-cyan-100 dark:text-cyan-400 dark:bg-cyan-900/30' },
+    trackman_backfill: { label: 'TrackMan Backfill', icon: 'history', color: 'text-cyan-600 bg-cyan-100 dark:text-cyan-400 dark:bg-cyan-900/30' },
+    backfill_sessions: { label: 'Backfill Sessions', icon: 'history', color: 'text-cyan-600 bg-cyan-100 dark:text-cyan-400 dark:bg-cyan-900/30' },
+    // Booking status actions from webhooks
+    booking_approved: { label: 'Booking Approved', icon: 'check_circle', color: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30' },
+    booking_approved_linked: { label: 'Booking Approved & Linked', icon: 'check_circle', color: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30' },
+    booking_declined: { label: 'Booking Declined', icon: 'cancel', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
+    booking_attended: { label: 'Booking Attended', icon: 'how_to_reg', color: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30' },
+    booking_no_show: { label: 'Booking No-Show', icon: 'person_off', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
+    booking_payment_updated: { label: 'Booking Payment Updated', icon: 'payment', color: 'text-emerald-600 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/30' },
+    // Privacy/CCPA actions
+    anonymize: { label: 'Member Anonymized', icon: 'visibility_off', color: 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-900/30' },
+    // Visitor actions
+    visitor_created: { label: 'Visitor Created', icon: 'person_add', color: 'text-teal-600 bg-teal-100 dark:text-teal-400 dark:bg-teal-900/30' },
+    visitor_stripe_linked: { label: 'Visitor Linked to Stripe', icon: 'link', color: 'text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30' },
+    delete_visitor: { label: 'Visitor Deleted', icon: 'person_remove', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
+    data_migration: { label: 'Data Migration', icon: 'sync_alt', color: 'text-indigo-600 bg-indigo-100 dark:text-indigo-400 dark:bg-indigo-900/30' },
+    // Bulk actions
+    bulk_status_sync: { label: 'Bulk Status Sync', icon: 'sync', color: 'text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900/30' },
+    bulk_link_stripe_hubspot: { label: 'Bulk Link Stripe/HubSpot', icon: 'link', color: 'text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30' },
+    bulk_visit_count_sync: { label: 'Bulk Visit Count Sync', icon: 'sync', color: 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30' },
+    bulk_payment_status_sync: { label: 'Bulk Payment Sync', icon: 'sync', color: 'text-emerald-600 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/30' },
+    cleanup_mindbody_ids: { label: 'Cleanup MindBody IDs', icon: 'cleaning_services', color: 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-900/30' },
+    sync_members_to_hubspot: { label: 'Sync Members to HubSpot', icon: 'sync', color: 'text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900/30' },
+    manual_sync: { label: 'Manual Sync', icon: 'sync', color: 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30' },
 };
 
 const FILTER_CATEGORIES = [
@@ -434,6 +477,129 @@ const ChangelogTab: React.FC = () => {
                 break;
             case 'reset_trackman_data':
                 if (d.bookingsReset !== undefined) parts.push(`${d.bookingsReset} bookings reset`);
+                break;
+            // Stripe subscription events
+            case 'subscription_created':
+            case 'subscription_updated':
+            case 'subscription_cancelled':
+                if (d.member_email) parts.push(d.member_email);
+                if (d.tier) parts.push(d.tier);
+                if (d.stripe_subscription_id) parts.push(`Sub: ${d.stripe_subscription_id.substring(0, 12)}...`);
+                break;
+            // Invoice events
+            case 'invoice_paid':
+            case 'invoice_failed':
+            case 'invoice_overdue':
+            case 'invoice_removed':
+                if (d.member_email) parts.push(d.member_email);
+                if (d.amount_cents) parts.push(`$${(d.amount_cents / 100).toFixed(2)}`);
+                if (d.invoice_id) parts.push(`Invoice: ${d.invoice_id.substring(0, 12)}...`);
+                break;
+            // Day pass events
+            case 'day_pass_purchased':
+            case 'day_pass_redeemed':
+            case 'day_pass_refunded':
+                if (d.visitor_email || d.email) parts.push(d.visitor_email || d.email);
+                if (d.visitor_name || d.name) parts.push(d.visitor_name || d.name);
+                if (d.amount_cents) parts.push(`$${(d.amount_cents / 100).toFixed(2)}`);
+                break;
+            case 'guest_pass_used':
+                if (d.member_email) parts.push(d.member_email);
+                if (d.guest_name) parts.push(d.guest_name);
+                if (d.passes_remaining !== undefined) parts.push(`${d.passes_remaining} passes left`);
+                break;
+            // Waiver events
+            case 'waiver_marked_reviewed':
+            case 'all_waivers_marked_reviewed':
+                if (d.member_email) parts.push(d.member_email);
+                if (d.count) parts.push(`${d.count} waivers`);
+                break;
+            // TrackMan sync events
+            case 'trackman_rescan':
+            case 'trackman_backfill':
+            case 'backfill_sessions':
+                if (d.bookingsProcessed !== undefined) parts.push(`${d.bookingsProcessed} bookings`);
+                if (d.startDate && d.endDate) parts.push(`${d.startDate} to ${d.endDate}`);
+                break;
+            // Booking status events
+            case 'booking_approved':
+            case 'booking_approved_linked':
+            case 'booking_declined':
+            case 'booking_attended':
+            case 'booking_no_show':
+                if (d.member_email) parts.push(d.member_email);
+                if (d.booking_date) parts.push(d.booking_date);
+                if (d.start_time) parts.push(d.start_time);
+                if (d.bay_name) parts.push(d.bay_name);
+                break;
+            case 'booking_payment_updated':
+                if (d.member_email) parts.push(d.member_email);
+                if (d.payment_status) parts.push(`Status: ${d.payment_status}`);
+                if (d.amount_cents) parts.push(`$${(d.amount_cents / 100).toFixed(2)}`);
+                break;
+            // Privacy/CCPA
+            case 'anonymize':
+                if (d.member_email) parts.push(d.member_email);
+                if (d.reason) parts.push(d.reason);
+                break;
+            // Visitor events
+            case 'visitor_created':
+            case 'visitor_stripe_linked':
+            case 'delete_visitor':
+                if (d.visitor_email || d.email) parts.push(d.visitor_email || d.email);
+                if (d.visitor_name || d.name) parts.push(d.visitor_name || d.name);
+                break;
+            case 'data_migration':
+                if (d.from && d.to) parts.push(`${d.from} → ${d.to}`);
+                if (d.recordsAffected !== undefined) parts.push(`${d.recordsAffected} records`);
+                break;
+            // Bulk actions
+            case 'bulk_status_sync':
+            case 'bulk_link_stripe_hubspot':
+            case 'bulk_visit_count_sync':
+            case 'bulk_payment_status_sync':
+            case 'cleanup_mindbody_ids':
+            case 'sync_members_to_hubspot':
+            case 'manual_sync':
+                if (d.recordsUpdated !== undefined) parts.push(`${d.recordsUpdated} updated`);
+                if (d.recordsCreated !== undefined) parts.push(`${d.recordsCreated} created`);
+                if (d.recordsSkipped !== undefined) parts.push(`${d.recordsSkipped} skipped`);
+                if (d.total !== undefined) parts.push(`${d.total} total`);
+                break;
+            // Basic booking/member actions
+            case 'approve_booking':
+            case 'decline_booking':
+            case 'create_booking':
+            case 'reschedule_booking':
+            case 'mark_no_show':
+            case 'mark_attended':
+                if (d.member_email) parts.push(d.member_email);
+                if (d.booking_date) parts.push(d.booking_date);
+                if (d.start_time) parts.push(d.start_time);
+                if (d.bay_name || d.bay) parts.push(d.bay_name || `Bay ${d.bay}`);
+                break;
+            case 'invite_member':
+            case 'create_member':
+            case 'update_member':
+            case 'delete_member':
+            case 'archive_member':
+                if (d.member_email || d.email) parts.push(d.member_email || d.email);
+                if (d.member_name || d.name) parts.push(d.member_name || d.name);
+                if (d.tier) parts.push(d.tier);
+                break;
+            case 'sync_events':
+            case 'sync_wellness':
+                if (d.eventsUpdated !== undefined) parts.push(`${d.eventsUpdated} updated`);
+                if (d.eventsCreated !== undefined) parts.push(`${d.eventsCreated} created`);
+                if (d.source) parts.push(`Source: ${d.source}`);
+                break;
+            case 'review_waiver':
+                if (d.member_email) parts.push(d.member_email);
+                if (d.waiver_version) parts.push(`v${d.waiver_version}`);
+                break;
+            case 'link_trackman_to_member':
+                if (d.member_email) parts.push(d.member_email);
+                if (d.trackman_email) parts.push(`TM: ${d.trackman_email}`);
                 break;
             default:
                 // Generic fallback

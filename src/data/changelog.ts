@@ -13,14 +13,14 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "9.39.5",
+    version: "9.39.6",
     date: "2026-01-29",
-    title: "Human-Readable Activity Details",
+    title: "Complete Human-Readable Activity Details",
     changes: [
-      "Improved: Staff Activity cards now show human-readable details instead of raw JSON",
-      "Added: Formatting for Recorded Charge, Detect Duplicates, Fix Ghost Bookings, Mark Booking As Event",
-      "Added: Formatting for subscription actions, tier changes, refunds, HubSpot sync, and more",
-      "Added: Missing icons and labels for 8+ additional action types"
+      "Improved: All Staff Activity cards now show human-readable details instead of raw JSON",
+      "Added: Formatting for 40+ action types including Stripe events, invoices, day passes, waivers, and bulk actions",
+      "Added: Icons and labels for subscription, invoice, visitor, and TrackMan sync events",
+      "Added: Proper detail formatting for member actions, booking status changes, and data migrations"
     ]
   },
   {
