@@ -929,46 +929,122 @@ router.post('/api/bookings/mark-as-event', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Missing required field: booking_id or trackman_booking_id' });
     }
     
-    let bookingId = booking_id;
-    
-    if (!bookingId && trackman_booking_id) {
-      const [existingBooking] = await db.select()
+    // Get the primary booking
+    let primaryBooking: any;
+    if (booking_id) {
+      const [booking] = await db.select()
+        .from(bookingRequests)
+        .where(eq(bookingRequests.id, booking_id));
+      primaryBooking = booking;
+    } else if (trackman_booking_id) {
+      const [booking] = await db.select()
         .from(bookingRequests)
         .where(eq(bookingRequests.trackmanBookingId, trackman_booking_id));
-      
-      if (!existingBooking) {
-        return res.status(404).json({ error: 'Booking not found for trackman_booking_id' });
-      }
-      bookingId = existingBooking.id;
+      primaryBooking = booking;
     }
     
-    const [updated] = await db.update(bookingRequests)
-      .set({
-        isEvent: true,
-        isUnmatched: false,
-        staffNotes: sql`COALESCE(${bookingRequests.staffNotes}, '') || ' [Marked as private event by staff]'`,
-        updatedAt: new Date()
-      })
-      .where(eq(bookingRequests.id, bookingId))
-      .returning();
-    
-    if (!updated) {
+    if (!primaryBooking) {
       return res.status(404).json({ error: 'Booking not found' });
     }
     
-    const { broadcastToStaff } = await import('../core/websocket');
+    // Auto-group: Find all bookings with same name + date + start_time across different bays
+    const userName = primaryBooking.userName?.toLowerCase()?.trim();
+    const bookingDate = primaryBooking.requestDate;
+    const startTime = primaryBooking.startTime;
+    const endTime = primaryBooking.endTime;
+    
+    let relatedBookings: any[] = [];
+    if (userName && bookingDate && startTime) {
+      relatedBookings = await db.select()
+        .from(bookingRequests)
+        .where(and(
+          sql`LOWER(TRIM(${bookingRequests.userName})) = ${userName}`,
+          eq(bookingRequests.requestDate, bookingDate),
+          eq(bookingRequests.startTime, startTime),
+          eq(bookingRequests.isUnmatched, true)
+        ));
+    }
+    
+    // If no related bookings found, just include the primary one
+    if (relatedBookings.length === 0) {
+      relatedBookings = [primaryBooking];
+    }
+    
+    // Collect all unique resource IDs (bays) from related bookings
+    const resourceIds = [...new Set(relatedBookings.map(b => b.resourceId).filter(Boolean))] as number[];
+    const bookingIds = relatedBookings.map(b => b.id);
+    
+    // Create a facility closure for the private event
+    const eventTitle = primaryBooking.userName || 'Private Event';
+    const { availabilityBlocks } = await import('../../shared/schema');
+    
+    const [closure] = await db.insert(facilityClosures).values({
+      title: eventTitle,
+      reason: 'Private Event',
+      noticeType: 'private_event',
+      startDate: bookingDate,
+      startTime: startTime,
+      endDate: bookingDate,
+      endTime: endTime,
+      affectedAreas: JSON.stringify(resourceIds.map(id => `bay_${id}`)),
+      isActive: true,
+      createdBy: req.session?.user?.email || 'staff'
+    }).returning();
+    
+    // Create availability blocks for each bay
+    if (resourceIds.length > 0 && closure) {
+      const blockValues = resourceIds.map(resourceId => ({
+        resourceId,
+        blockDate: bookingDate,
+        startTime: startTime,
+        endTime: endTime,
+        blockType: 'private_event',
+        notes: `Private Event: ${eventTitle}`,
+        closureId: closure.id,
+        createdBy: req.session?.user?.email || 'staff'
+      }));
+      
+      await db.insert(availabilityBlocks).values(blockValues).onConflictDoNothing();
+    }
+    
+    // Delete the bookings from the queue (they're now represented as blocks)
+    if (bookingIds.length > 0) {
+      // First delete related records
+      await db.delete(bookingMembers).where(sql`booking_id IN (${sql.join(bookingIds.map(id => sql`${id}`), sql`, `)})`);
+      await db.delete(bookingGuests).where(sql`booking_id IN (${sql.join(bookingIds.map(id => sql`${id}`), sql`, `)})`);
+      await db.delete(bookingRequests).where(sql`id IN (${sql.join(bookingIds.map(id => sql`${id}`), sql`, `)})`);
+    }
+    
+    const { broadcastToStaff, broadcastClosureUpdate } = await import('../core/websocket');
     broadcastToStaff({
       type: 'booking_updated',
-      bookingId: updated.id,
-      action: 'marked_as_event'
+      action: 'converted_to_private_event',
+      bookingIds,
+      closureId: closure?.id
     });
     
-    logFromRequest(req, 'mark_booking_as_event', 'booking', updated.id.toString(), {
-      booking_id: bookingId,
-      trackman_booking_id
+    if (closure) {
+      broadcastClosureUpdate({
+        type: 'closure_created',
+        closureId: closure.id
+      });
+    }
+    
+    logFromRequest(req, 'mark_booking_as_event', 'booking', primaryBooking.id.toString(), `Private Event: ${eventTitle}`, {
+      booking_id: primaryBooking.id,
+      trackman_booking_id,
+      grouped_booking_count: bookingIds.length,
+      resource_ids: resourceIds,
+      closure_id: closure?.id
     });
     
-    res.json({ success: true, booking: updated });
+    res.json({ 
+      success: true, 
+      message: `Converted ${bookingIds.length} booking(s) to private event block`,
+      closureId: closure?.id,
+      convertedBookingIds: bookingIds,
+      resourceIds
+    });
   } catch (error: any) {
     logAndRespond(req, res, 500, 'Failed to mark booking as event', error, 'MARK_EVENT_ERROR');
   }
