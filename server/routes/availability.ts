@@ -153,10 +153,14 @@ router.post('/api/availability/batch', async (req, res) => {
          WHERE resource_id = ANY($1) AND block_date = $2`,
         [resource_ids, date]
       ),
-      // Fetch all unmatched Trackman bookings
+      // Fetch all unmatched Trackman bookings (excluding those already in booking_requests)
       pool.query(
-        `SELECT bay_number, start_time, end_time FROM trackman_unmatched_bookings 
-         WHERE bay_number = ANY($1::text[]) AND booking_date = $2 AND resolved_at IS NULL`,
+        `SELECT tub.bay_number, tub.start_time, tub.end_time FROM trackman_unmatched_bookings tub
+         WHERE tub.bay_number = ANY($1::text[]) AND tub.booking_date = $2 AND tub.resolved_at IS NULL
+           AND NOT EXISTS (
+             SELECT 1 FROM booking_requests br 
+             WHERE br.trackman_booking_id = tub.trackman_booking_id::text
+           )`,
         [resource_ids.map(String), date]
       ).catch(() => ({ rows: [] })), // Non-blocking if table doesn't exist
       // Fetch Trackman webhook cache slots (real-time availability from webhooks)
@@ -302,11 +306,16 @@ router.get('/api/availability', async (req, res) => {
     );
     
     // Also check unmatched Trackman bookings (unresolved imports occupy time slots)
+    // Exclude entries that already exist in booking_requests to prevent double-counting
     let unmatchedTrackmanSlots: { rows: { start_time: string; end_time: string }[] } = { rows: [] };
     try {
       unmatchedTrackmanSlots = await pool.query(
-        `SELECT start_time, end_time FROM trackman_unmatched_bookings 
-         WHERE bay_number = $1::text AND booking_date = $2 AND resolved_at IS NULL`,
+        `SELECT tub.start_time, tub.end_time FROM trackman_unmatched_bookings tub
+         WHERE tub.bay_number = $1::text AND tub.booking_date = $2 AND tub.resolved_at IS NULL
+           AND NOT EXISTS (
+             SELECT 1 FROM booking_requests br 
+             WHERE br.trackman_booking_id = tub.trackman_booking_id::text
+           )`,
         [resource_id, date]
       );
     } catch (e) {

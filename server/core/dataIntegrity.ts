@@ -200,15 +200,25 @@ async function checkUnmatchedTrackmanBookings(): Promise<IntegrityCheckResult> {
   
   try {
     const unmatchedBookings = await db.execute(sql`
-      SELECT id, trackman_booking_id, user_name, user_email, booking_date, bay_number, start_time, end_time
-      FROM trackman_unmatched_bookings
-      WHERE resolved_at IS NULL
-      ORDER BY booking_date DESC
+      SELECT tub.id, tub.trackman_booking_id, tub.user_name, tub.user_email, tub.booking_date, tub.bay_number, tub.start_time, tub.end_time
+      FROM trackman_unmatched_bookings tub
+      WHERE tub.resolved_at IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM booking_requests br 
+          WHERE br.trackman_booking_id = tub.trackman_booking_id::text
+        )
+      ORDER BY tub.booking_date DESC
       LIMIT 100
     `);
     
     const totalCount = await db.execute(sql`
-      SELECT COUNT(*)::int as count FROM trackman_unmatched_bookings WHERE resolved_at IS NULL
+      SELECT COUNT(*)::int as count 
+      FROM trackman_unmatched_bookings tub
+      WHERE tub.resolved_at IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM booking_requests br 
+          WHERE br.trackman_booking_id = tub.trackman_booking_id::text
+        )
     `);
     const total = (totalCount.rows[0] as any)?.count || 0;
     

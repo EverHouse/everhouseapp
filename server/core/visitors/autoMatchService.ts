@@ -626,10 +626,14 @@ async function autoMatchLegacyUnmatchedBookings(
   let failed = 0;
 
   const query = `
-    SELECT id, booking_date, start_time, user_name, notes
-    FROM trackman_unmatched_bookings
-    WHERE status = 'pending' OR status = 'unmatched'
-    ORDER BY booking_date DESC, start_time DESC
+    SELECT tub.id, tub.booking_date, tub.start_time, tub.user_name, tub.notes
+    FROM trackman_unmatched_bookings tub
+    WHERE (tub.status = 'pending' OR tub.status = 'unmatched')
+      AND NOT EXISTS (
+        SELECT 1 FROM booking_requests br 
+        WHERE br.trackman_booking_id = tub.trackman_booking_id::text
+      )
+    ORDER BY tub.booking_date DESC, tub.start_time DESC
   `;
   
   const { rows } = await pool.query(query);
