@@ -13,13 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "9.39.8",
+    version: "9.39.9",
     date: "2026-01-29",
-    title: "Fix Staff Activity Raw JSON Display",
+    title: "Staff Activity Human-Readable Details",
     changes: [
-      "Fixed: Staff Activity now properly parses JSON details from both API and database",
-      "Fixed: Record Charge, Detect Duplicates, Fix Ghost Bookings now show readable text",
-      "Improved: All 40+ action types display human-readable formatted details"
+      "Fixed: Staff Activity now displays human-readable text instead of raw JSON",
+      "Improved: Universal field extraction for email, amount, description, counts",
+      "Fixed: Record Charge shows email and formatted dollar amount",
+      "Fixed: Detect Duplicates shows App and HubSpot counts",
+      "Fixed: Fix Ghost Bookings shows number of bookings found"
     ]
   },
   {

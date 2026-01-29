@@ -100,7 +100,6 @@ const ACTION_LABELS: Record<string, { label: string; icon: string; color: string
     fix_trackman_ghost_bookings: { label: 'Fix TrackMan Ghost Bookings', icon: 'auto_fix_high', color: 'text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30' },
     mark_booking_as_event: { label: 'Mark Booking As Event', icon: 'event', color: 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30' },
     assign_booking_with_players: { label: 'Assigned Booking', icon: 'group_add', color: 'text-teal-600 bg-teal-100 dark:text-teal-400 dark:bg-teal-900/30' },
-    update_member_notes: { label: 'Updated Member Notes', icon: 'edit_note', color: 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-900/30' },
     // Group billing actions
     add_group_member: { label: 'Added Group Member', icon: 'group_add', color: 'text-teal-600 bg-teal-100 dark:text-teal-400 dark:bg-teal-900/30' },
     remove_group_member: { label: 'Removed Group Member', icon: 'group_remove', color: 'text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900/30' },
@@ -281,20 +280,22 @@ const ChangelogTab: React.FC = () => {
         const parts: string[] = [];
         
         // Parse details - handle both object and string (from database)
-        // Database may return JSONB as string depending on the driver/context
         let d: Record<string, any> = {};
-        const rawDetails = entry.details as unknown;
-        if (rawDetails) {
-            if (typeof rawDetails === 'string') {
-                try {
+        try {
+            const rawDetails = entry.details as unknown;
+            if (rawDetails) {
+                if (typeof rawDetails === 'string') {
                     d = JSON.parse(rawDetails);
-                } catch {
-                    // If JSON parse fails, just return the string as-is
-                    return rawDetails;
+                } else if (typeof rawDetails === 'object' && rawDetails !== null) {
+                    d = rawDetails as Record<string, any>;
                 }
-            } else if (typeof rawDetails === 'object') {
-                d = rawDetails as Record<string, any>;
             }
+        } catch {
+            // If parsing fails, try to extract readable content
+            const str = String(entry.details || '');
+            const emailMatch = str.match(/[\w.+-]+@[\w.-]+\.\w+/);
+            if (emailMatch) return emailMatch[0];
+            return str.substring(0, 100) || 'Details available';
         }
         
         // Resource name first
@@ -302,7 +303,52 @@ const ChangelogTab: React.FC = () => {
             parts.push(entry.resourceName);
         }
         
-        // Action-specific details
+        // Universal field extractors - these work for any action type
+        // Extract email fields
+        if (d.member_email) parts.push(d.member_email);
+        else if (d.email) parts.push(d.email);
+        else if (d.visitor_email) parts.push(d.visitor_email);
+        else if (d.guest_email) parts.push(d.guest_email);
+        else if (d.attendee_email) parts.push(d.attendee_email);
+        
+        // Extract amount fields (convert cents to dollars)
+        if (d.amount !== undefined && typeof d.amount === 'number') {
+            parts.push(`$${(d.amount / 100).toFixed(2)}`);
+        } else if (d.amount_cents !== undefined) {
+            parts.push(`$${(d.amount_cents / 100).toFixed(2)}`);
+        }
+        
+        // Extract description/reason fields
+        if (d.description) parts.push(d.description);
+        else if (d.reason) parts.push(d.reason);
+        
+        // Extract count fields
+        if (d.appDuplicateCount !== undefined) parts.push(`App: ${d.appDuplicateCount}`);
+        if (d.hubspotDuplicateCount !== undefined) parts.push(`HubSpot: ${d.hubspotDuplicateCount}`);
+        if (d.ghostBookingsFound !== undefined) parts.push(`${d.ghostBookingsFound} ghost bookings`);
+        if (d.bookingsProcessed !== undefined) parts.push(`${d.bookingsProcessed} bookings`);
+        if (d.recordsUpdated !== undefined) parts.push(`${d.recordsUpdated} updated`);
+        
+        // Extract date/time fields
+        if (d.booking_date) parts.push(d.booking_date);
+        if (d.start_time) parts.push(d.start_time);
+        if (d.bay_name) parts.push(d.bay_name);
+        
+        // Extract action subtype if present
+        if (d.action && d.action !== entry.action) {
+            parts.push(d.action.replace(/_/g, ' '));
+        }
+        
+        // Extract tier info
+        if (d.tier) parts.push(d.tier);
+        if (d.old_tier && d.new_tier) parts.push(`${d.old_tier} → ${d.new_tier}`);
+        
+        // If we got parts, return them; otherwise try action-specific handling
+        if (parts.length > 0) {
+            return parts.join(' • ');
+        }
+        
+        // Action-specific details as fallback
         switch (entry.action) {
             case 'view_member':
             case 'view_member_profile':
