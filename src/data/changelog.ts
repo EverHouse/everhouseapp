@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.44.1",
+    date: "2026-01-29",
+    title: "Duplicate Visitor Cleanup & Desktop Queue Stats",
+    changes: [
+      "Fixed: Merged 139 duplicate visitor records (same name, multiple date-based emails)",
+      "Fixed: Reassigned 157 bookings from duplicate visitors to primary records",
+      "New: Desktop dashboard shows queue stats below header (pending requests + needs assignment)",
+      "Improved: Queue stats are clickable buttons that navigate to Simulator tab",
+      "Improved: Mobile keeps compact pending indicator in header"
+    ]
+  },
+  {
     version: "9.44.0",
     date: "2026-01-29",
     title: "Auto-Match Visitors from MindBody",
