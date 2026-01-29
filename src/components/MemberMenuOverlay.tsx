@@ -29,7 +29,7 @@ const MEMBER_MENU_ITEMS: MenuItem[] = [
   { id: 'history', label: 'Visit History', path: '/history', icon: 'history' },
   { id: 'payments', label: 'Payment History', path: '/history?tab=payments', icon: 'receipt_long' },
   { id: 'announcements', label: 'Announcements', path: '/updates?tab=announcements', icon: 'campaign' },
-  { id: 'notices', label: 'Notices', path: '/updates?tab=activity', icon: 'notifications' },
+  { id: 'notices', label: 'Notices', path: '/updates?tab=notices', icon: 'notifications' },
   { id: 'profile', label: 'Profile', path: '/profile', icon: 'person' },
 ];
 

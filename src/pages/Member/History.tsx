@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useData } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePageReady } from '../../contexts/PageReadyContext';
@@ -43,9 +44,11 @@ const History: React.FC = () => {
   const { user } = useData();
   const { effectiveTheme } = useTheme();
   const { setPageReady } = usePageReady();
+  const [searchParams] = useSearchParams();
   const isDark = effectiveTheme === 'dark';
   
-  const [activeTab, setActiveTab] = useState<'visits' | 'payments'>('visits');
+  const initialTab = searchParams.get('tab') === 'payments' ? 'payments' : 'visits';
+  const [activeTab, setActiveTab] = useState<'visits' | 'payments'>(initialTab);
   const [visits, setVisits] = useState<UnifiedVisit[]>([]);
   const [purchases, setPurchases] = useState<UnifiedPurchase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
