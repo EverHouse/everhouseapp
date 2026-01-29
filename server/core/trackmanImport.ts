@@ -2459,8 +2459,27 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
 
   // 2. Cancel matched bookings (booking_requests) that are no longer in the import file
   // Only cancel future bookings to avoid messing with historical data
+  // FIX: Scope to CSV date range to prevent "wipeout" of future bookings not in partial CSV
   const todayStr = getTodayPacific();
-  const matchedToCancel = await db.select({ 
+  
+  // Calculate date range from the imported CSV to prevent canceling bookings outside CSV scope
+  let csvMinDate: string | null = null;
+  let csvMaxDate: string | null = null;
+  for (let i = 1; i < parsedRows.length; i++) {
+    const fields = parsedRows[i];
+    if (fields.length >= 9) {
+      const dateStr = extractDate(fields[8]); // Start date column
+      if (dateStr) {
+        if (!csvMinDate || dateStr < csvMinDate) csvMinDate = dateStr;
+        if (!csvMaxDate || dateStr > csvMaxDate) csvMaxDate = dateStr;
+      }
+    }
+  }
+  
+  process.stderr.write(`[Trackman Import] CSV date range: ${csvMinDate || 'none'} to ${csvMaxDate || 'none'}\n`);
+  
+  // Only run cancellation logic if we have a valid date range
+  const matchedToCancel = csvMinDate && csvMaxDate ? await db.select({ 
     id: bookingRequests.id, 
     trackmanBookingId: bookingRequests.trackmanBookingId,
     userName: bookingRequests.userName,
@@ -2470,7 +2489,12 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
     status: bookingRequests.status
   })
     .from(bookingRequests)
-    .where(sql`trackman_booking_id IS NOT NULL AND status NOT IN ('cancelled', 'attended', 'no_show')`);
+    .where(sql`
+      trackman_booking_id IS NOT NULL 
+      AND status NOT IN ('cancelled', 'attended', 'no_show')
+      AND request_date >= ${csvMinDate}::date 
+      AND request_date <= ${csvMaxDate}::date
+    `) : [];
   
   for (const booking of matchedToCancel) {
     if (booking.trackmanBookingId && !importBookingIds.has(booking.trackmanBookingId)) {

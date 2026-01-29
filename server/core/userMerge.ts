@@ -579,6 +579,22 @@ export async function executeMerge(
     const currentTags = (primaryUser.tags as any[]) || [];
     const updatedTags = [...currentTags, { type: 'merge_record', ...mergeInfo }];
     
+    // FIX: Transfer external IDs (Stripe/HubSpot) from secondary to primary if primary is missing them
+    // This prevents losing billing history when merging a fresh duplicate into the active payer
+    const transferStripeId = !primaryUser.stripeCustomerId && secondaryUser.stripeCustomerId;
+    const transferHubspotId = !primaryUser.hubspotId && secondaryUser.hubspotId;
+    
+    if (transferStripeId) {
+      logger.info('[UserMerge] Transferring Stripe Customer from secondary to primary', {
+        extra: { stripeCustomerId: secondaryUser.stripeCustomerId, primaryUserId, secondaryUserId }
+      });
+    }
+    if (transferHubspotId) {
+      logger.info('[UserMerge] Transferring HubSpot ID from secondary to primary', {
+        extra: { hubspotId: secondaryUser.hubspotId, primaryUserId, secondaryUserId }
+      });
+    }
+    
     await client.query(
       `UPDATE users SET
          lifetime_visits = $1,
@@ -586,9 +602,20 @@ export async function executeMerge(
          waiver_version = $3,
          waiver_signed_at = $4,
          tags = $5,
+         stripe_customer_id = COALESCE($6, stripe_customer_id),
+         hubspot_id = COALESCE($7, hubspot_id),
          updated_at = NOW()
-       WHERE id = $6`,
-      [combinedVisits, earlierJoinDate, newerWaiver.version, newerWaiver.signedAt, JSON.stringify(updatedTags), primaryUserId]
+       WHERE id = $8`,
+      [
+        combinedVisits, 
+        earlierJoinDate, 
+        newerWaiver.version, 
+        newerWaiver.signedAt, 
+        JSON.stringify(updatedTags),
+        transferStripeId ? secondaryUser.stripeCustomerId : null,
+        transferHubspotId ? secondaryUser.hubspotId : null,
+        primaryUserId
+      ]
     );
     
     const secondaryTags = (secondaryUser.tags as any[]) || [];

@@ -390,6 +390,10 @@ export async function createUnmatchedBookingRequest(
     const durationMinutes = calculateDurationMinutes(startTime, endTime);
     
     // Pre-check availability before INSERT for better error logging
+    // FIX: If conflict with Private Event, set status to 'pending' instead of 'approved'
+    let bookingStatus = 'approved';
+    let conflictNote = '';
+    
     if (resourceId) {
       const availability = await checkUnifiedAvailability(resourceId, slotDate, startTime, endTime);
       if (!availability.available) {
@@ -405,6 +409,15 @@ export async function createUnmatchedBookingRequest(
             conflictDetails: availability.conflictDetails
           }
         });
+        
+        // If conflict is a Private Event block, downgrade to pending for staff review
+        if (availability.conflictType === 'private_event' || availability.conflictType === 'availability_block') {
+          bookingStatus = 'pending';
+          conflictNote = ` [Pending: Conflicts with ${availability.conflictTitle || 'private event'}]`;
+          logger.info('[Trackman Webhook] Downgrading to pending due to private event conflict', {
+            extra: { trackmanBookingId, conflictType: availability.conflictType, conflictTitle: availability.conflictTitle }
+          });
+        }
         // Still attempt INSERT - DB trigger will prevent true double-booking
         // but log this clearly so staff can investigate
       }
@@ -416,9 +429,9 @@ export async function createUnmatchedBookingRequest(
       `INSERT INTO booking_requests 
        (request_date, start_time, end_time, duration_minutes, resource_id,
         user_email, user_name, status, trackman_booking_id, trackman_external_id,
-        trackman_player_count, is_unmatched, 
+        trackman_player_count, is_unmatched, staff_notes,
         origin, last_sync_source, last_trackman_sync_at, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'approved', $8, $9, $10, true,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $11, $8, $9, $10, true, $12,
                'trackman_webhook', 'trackman_webhook', NOW(), NOW(), NOW())
        ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO UPDATE SET
          last_trackman_sync_at = NOW(),
@@ -434,7 +447,9 @@ export async function createUnmatchedBookingRequest(
         customerName || 'Unknown (Trackman)',
         trackmanBookingId,
         externalBookingId || null,
-        playerCount
+        playerCount,
+        bookingStatus,
+        conflictNote || null
       ]
     );
     

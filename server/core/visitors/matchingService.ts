@@ -45,25 +45,29 @@ export function normalizePhone(phone: string): string {
  * 3. Exact hubspotId match
  * 4. Exact phone match (normalized)
  * 5. firstName + lastName + phone match (all three required)
+ * 
+ * NOTE: All lookups exclude archived users to prevent matching "zombie" merged profiles
  */
 export async function findMatchingUser(criteria: MatchCriteria): Promise<User | null> {
   // 1. Exact email match (case-insensitive, trim whitespace)
+  // FIX: Exclude archived users to prevent matching merged/deleted profiles
   if (criteria.email) {
     const trimmedEmail = criteria.email.trim().toLowerCase();
     const results = await db
       .select()
       .from(users)
-      .where(ilike(users.email, trimmedEmail))
+      .where(and(ilike(users.email, trimmedEmail), sql`archived_at IS NULL`))
       .limit(1);
     if (results.length > 0) return results[0];
     
     // 1b. Check user_linked_emails table for linked email match
+    // FIX: Exclude archived users
     try {
       const linkedResult = await db
         .select({ user: users })
         .from(userLinkedEmails)
         .innerJoin(users, eq(users.email, userLinkedEmails.primaryEmail))
-        .where(ilike(userLinkedEmails.linkedEmail, trimmedEmail))
+        .where(and(ilike(userLinkedEmails.linkedEmail, trimmedEmail), sql`${users.archivedAt} IS NULL`))
         .limit(1);
       if (linkedResult.length > 0) return linkedResult[0].user;
     } catch {
@@ -71,46 +75,51 @@ export async function findMatchingUser(criteria: MatchCriteria): Promise<User | 
     }
     
     // 1c. Check manuallyLinkedEmails JSONB field for linked email match
+    // FIX: Exclude archived users
     const manuallyLinkedResults = await db
       .select()
       .from(users)
-      .where(sql`COALESCE(${users.manuallyLinkedEmails}, '[]'::jsonb) @> ${JSON.stringify([trimmedEmail])}::jsonb`)
+      .where(and(sql`COALESCE(${users.manuallyLinkedEmails}, '[]'::jsonb) @> ${JSON.stringify([trimmedEmail])}::jsonb`, sql`archived_at IS NULL`))
       .limit(1);
     if (manuallyLinkedResults.length > 0) return manuallyLinkedResults[0];
   }
 
   // 2. Exact mindbodyClientId match
+  // FIX: Exclude archived users
   if (criteria.mindbodyClientId) {
     const results = await db
       .select()
       .from(users)
-      .where(eq(users.mindbodyClientId, criteria.mindbodyClientId))
+      .where(and(eq(users.mindbodyClientId, criteria.mindbodyClientId), sql`archived_at IS NULL`))
       .limit(1);
     if (results.length > 0) return results[0];
   }
 
   // 3. Exact hubspotId match
+  // FIX: Exclude archived users
   if (criteria.hubspotId) {
     const results = await db
       .select()
       .from(users)
-      .where(eq(users.hubspotId, criteria.hubspotId))
+      .where(and(eq(users.hubspotId, criteria.hubspotId), sql`archived_at IS NULL`))
       .limit(1);
     if (results.length > 0) return results[0];
   }
 
   // 4. Exact phone match (normalize phone format first)
+  // FIX: Exclude archived users
   if (criteria.phone) {
     const normalizedPhone = normalizePhone(criteria.phone);
     const results = await db
       .select()
       .from(users)
-      .where(eq(users.phone, normalizedPhone))
+      .where(and(eq(users.phone, normalizedPhone), sql`archived_at IS NULL`))
       .limit(1);
     if (results.length > 0) return results[0];
   }
 
   // 5. firstName + lastName + phone match (all three required)
+  // FIX: Exclude archived users
   if (criteria.firstName && criteria.lastName && criteria.phone) {
     const normalizedPhone = normalizePhone(criteria.phone);
     const results = await db
@@ -120,7 +129,8 @@ export async function findMatchingUser(criteria: MatchCriteria): Promise<User | 
         and(
           ilike(users.firstName, criteria.firstName),
           ilike(users.lastName, criteria.lastName),
-          eq(users.phone, normalizedPhone)
+          eq(users.phone, normalizedPhone),
+          sql`archived_at IS NULL`
         )
       )
       .limit(1);
