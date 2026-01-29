@@ -36,6 +36,12 @@ export interface MergePreview {
     memberNotes: number;
     guestCheckIns: number;
     usageLedger: number;
+    bookingParticipants: number;
+    dayPassPurchases: number;
+    legacyPurchases: number;
+    groupMembers: number;
+    pushSubscriptions: number;
+    dismissedNotices: number;
   };
   conflicts: string[];
   recommendations: string[];
@@ -54,6 +60,12 @@ export interface MergeResult {
     memberNotes: number;
     guestCheckIns: number;
     usageLedger: number;
+    bookingParticipants: number;
+    dayPassPurchases: number;
+    legacyPurchases: number;
+    groupMembers: number;
+    pushSubscriptions: number;
+    dismissedNotices: number;
     linkedEmails: number;
   };
   mergedLifetimeVisits: number;
@@ -135,6 +147,48 @@ export async function previewMerge(primaryUserId: string, secondaryUserId: strin
   );
   const usageLedgerCount = parseInt(usageLedgerResult.rows[0]?.count || '0');
   
+  // Count booking participants (uses user_id column)
+  const bookingParticipantsResult = await pool.query(
+    `SELECT COUNT(*) as count FROM booking_participants WHERE user_id = $1`,
+    [secondaryUserId]
+  );
+  const bookingParticipantsCount = parseInt(bookingParticipantsResult.rows[0]?.count || '0');
+  
+  // Count day pass purchases (uses user_id and purchaser_email columns)
+  const dayPassResult = await pool.query(
+    `SELECT COUNT(*) as count FROM day_pass_purchases WHERE user_id = $1 OR LOWER(purchaser_email) = $2`,
+    [secondaryUserId, secondaryEmail]
+  );
+  const dayPassCount = parseInt(dayPassResult.rows[0]?.count || '0');
+  
+  // Count legacy purchases (uses user_id and member_email columns)
+  const legacyPurchasesResult = await pool.query(
+    `SELECT COUNT(*) as count FROM legacy_purchases WHERE user_id = $1 OR LOWER(member_email) = $2`,
+    [secondaryUserId, secondaryEmail]
+  );
+  const legacyPurchasesCount = parseInt(legacyPurchasesResult.rows[0]?.count || '0');
+  
+  // Count group members (uses member_email column)
+  const groupMembersResult = await pool.query(
+    `SELECT COUNT(*) as count FROM group_members WHERE LOWER(member_email) = $1`,
+    [secondaryEmail]
+  );
+  const groupMembersCount = parseInt(groupMembersResult.rows[0]?.count || '0');
+  
+  // Count push subscriptions (uses user_email column)
+  const pushSubscriptionsResult = await pool.query(
+    `SELECT COUNT(*) as count FROM push_subscriptions WHERE LOWER(user_email) = $1`,
+    [secondaryEmail]
+  );
+  const pushSubscriptionsCount = parseInt(pushSubscriptionsResult.rows[0]?.count || '0');
+  
+  // Count dismissed notices (uses user_email column)
+  const dismissedNoticesResult = await pool.query(
+    `SELECT COUNT(*) as count FROM user_dismissed_notices WHERE LOWER(user_email) = $1`,
+    [secondaryEmail]
+  );
+  const dismissedNoticesCount = parseInt(dismissedNoticesResult.rows[0]?.count || '0');
+  
   const conflicts: string[] = [];
   const recommendations: string[] = [];
   
@@ -191,6 +245,12 @@ export async function previewMerge(primaryUserId: string, secondaryUserId: strin
       memberNotes: memberNotesCount,
       guestCheckIns: guestCheckInsCount,
       usageLedger: usageLedgerCount,
+      bookingParticipants: bookingParticipantsCount,
+      dayPassPurchases: dayPassCount,
+      legacyPurchases: legacyPurchasesCount,
+      groupMembers: groupMembersCount,
+      pushSubscriptions: pushSubscriptionsCount,
+      dismissedNotices: dismissedNoticesCount,
     },
     conflicts,
     recommendations,
@@ -222,6 +282,12 @@ export async function executeMerge(
     memberNotes: 0,
     guestCheckIns: 0,
     usageLedger: 0,
+    bookingParticipants: 0,
+    dayPassPurchases: 0,
+    legacyPurchases: 0,
+    groupMembers: 0,
+    pushSubscriptions: 0,
+    dismissedNotices: 0,
     linkedEmails: 0,
   };
   
@@ -303,6 +369,50 @@ export async function executeMerge(
       `UPDATE guest_passes SET member_email = $1 WHERE LOWER(member_email) = $2`,
       [primaryEmail, secondaryEmail]
     );
+    
+    // Update booking participants (uses user_id column)
+    const bookingParticipantsResult = await client.query(
+      `UPDATE booking_participants SET user_id = $1 WHERE user_id = $2`,
+      [primaryUserId, secondaryUserId]
+    );
+    recordsMerged.bookingParticipants = bookingParticipantsResult.rowCount || 0;
+    
+    // Update day pass purchases (uses user_id and purchaser_email columns)
+    const dayPassResult = await client.query(
+      `UPDATE day_pass_purchases SET user_id = $1, purchaser_email = $2 
+       WHERE user_id = $3 OR LOWER(purchaser_email) = $4`,
+      [primaryUserId, primaryEmail, secondaryUserId, secondaryEmail]
+    );
+    recordsMerged.dayPassPurchases = dayPassResult.rowCount || 0;
+    
+    // Update legacy purchases (uses user_id and member_email columns)
+    const legacyPurchasesResult = await client.query(
+      `UPDATE legacy_purchases SET user_id = $1, member_email = $2 
+       WHERE user_id = $3 OR LOWER(member_email) = $4`,
+      [primaryUserId, primaryEmail, secondaryUserId, secondaryEmail]
+    );
+    recordsMerged.legacyPurchases = legacyPurchasesResult.rowCount || 0;
+    
+    // Update group members (uses member_email column)
+    const groupMembersResult = await client.query(
+      `UPDATE group_members SET member_email = $1 WHERE LOWER(member_email) = $2`,
+      [primaryEmail, secondaryEmail]
+    );
+    recordsMerged.groupMembers = groupMembersResult.rowCount || 0;
+    
+    // Update push subscriptions (uses user_email column)
+    const pushSubscriptionsResult = await client.query(
+      `UPDATE push_subscriptions SET user_email = $1 WHERE LOWER(user_email) = $2`,
+      [primaryEmail, secondaryEmail]
+    );
+    recordsMerged.pushSubscriptions = pushSubscriptionsResult.rowCount || 0;
+    
+    // Update dismissed notices (uses user_email column)
+    const dismissedNoticesResult = await client.query(
+      `UPDATE user_dismissed_notices SET user_email = $1 WHERE LOWER(user_email) = $2`,
+      [primaryEmail, secondaryEmail]
+    );
+    recordsMerged.dismissedNotices = dismissedNoticesResult.rowCount || 0;
     
     // Update user_linked_emails (uses primary_email column, not user_id)
     await client.query(

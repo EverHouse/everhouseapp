@@ -1304,6 +1304,42 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                         Guest Check-ins: <strong>{mergePreview.recordsToMerge.guestCheckIns}</strong>
                       </div>
                     )}
+                    {mergePreview.recordsToMerge?.bookingParticipants !== undefined && mergePreview.recordsToMerge.bookingParticipants > 0 && (
+                      <div className={`${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <span className="material-symbols-outlined text-sm align-middle mr-1">group</span>
+                        Booking Participants: <strong>{mergePreview.recordsToMerge.bookingParticipants}</strong>
+                      </div>
+                    )}
+                    {mergePreview.recordsToMerge?.dayPassPurchases !== undefined && mergePreview.recordsToMerge.dayPassPurchases > 0 && (
+                      <div className={`${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <span className="material-symbols-outlined text-sm align-middle mr-1">confirmation_number</span>
+                        Day Passes: <strong>{mergePreview.recordsToMerge.dayPassPurchases}</strong>
+                      </div>
+                    )}
+                    {mergePreview.recordsToMerge?.legacyPurchases !== undefined && mergePreview.recordsToMerge.legacyPurchases > 0 && (
+                      <div className={`${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <span className="material-symbols-outlined text-sm align-middle mr-1">receipt_long</span>
+                        Legacy Purchases: <strong>{mergePreview.recordsToMerge.legacyPurchases}</strong>
+                      </div>
+                    )}
+                    {mergePreview.recordsToMerge?.groupMembers !== undefined && mergePreview.recordsToMerge.groupMembers > 0 && (
+                      <div className={`${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <span className="material-symbols-outlined text-sm align-middle mr-1">groups</span>
+                        Group Memberships: <strong>{mergePreview.recordsToMerge.groupMembers}</strong>
+                      </div>
+                    )}
+                    {mergePreview.recordsToMerge?.pushSubscriptions !== undefined && mergePreview.recordsToMerge.pushSubscriptions > 0 && (
+                      <div className={`${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <span className="material-symbols-outlined text-sm align-middle mr-1">notifications_active</span>
+                        Push Subscriptions: <strong>{mergePreview.recordsToMerge.pushSubscriptions}</strong>
+                      </div>
+                    )}
+                    {mergePreview.recordsToMerge?.dismissedNotices !== undefined && mergePreview.recordsToMerge.dismissedNotices > 0 && (
+                      <div className={`${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <span className="material-symbols-outlined text-sm align-middle mr-1">visibility_off</span>
+                        Dismissed Notices: <strong>{mergePreview.recordsToMerge.dismissedNotices}</strong>
+                      </div>
+                    )}
                   </div>
                   
                   {((mergePreview.conflicts && mergePreview.conflicts.length > 0) || (mergePreview.recommendations && mergePreview.recommendations.length > 0)) && (

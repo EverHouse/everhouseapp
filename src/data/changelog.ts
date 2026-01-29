@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.46.1",
+    date: "2026-01-29",
+    title: "Expanded User Merge Coverage",
+    changes: [
+      "New: Merge now includes booking participants in multi-member bookings",
+      "New: Merge now includes day pass purchases",
+      "New: Merge now includes legacy purchases",
+      "New: Merge now includes group/corporate memberships",
+      "New: Merge now includes push notification subscriptions",
+      "New: Merge now includes dismissed notice preferences",
+      "Improved: Merge preview shows counts for all 14 data types being transferred"
+    ]
+  },
+  {
     version: "9.46.0",
     date: "2026-01-29",
     title: "Member Portal Navigation Menu",
