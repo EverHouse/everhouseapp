@@ -13,6 +13,21 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.46.12",
+    date: "2026-01-29",
+    title: "Critical Bug Fixes - Data Integrity & User Management",
+    changes: [
+      "Fixed: CSV imports no longer wipe out future bookings - cancellations now scoped to the date range in the uploaded file",
+      "Fixed: Merging user profiles now properly transfers Stripe and HubSpot IDs from secondary to primary account",
+      "Fixed: Archived/merged users no longer appear in member searches or auto-matching systems",
+      "Fixed: Trackman bookings that conflict with private events now go to pending status for staff review",
+      "Fixed: Day pass purchases now correctly match to walk-in bookings with proper redemption tracking",
+      "Fixed: Merged user emails are now released for re-registration instead of blocking future signups",
+      "Improved: Day pass matching only triggers for explicit day-pass bookings to prevent false matches",
+      "Improved: Audit trail for day pass redemptions with trackman booking ID linkage"
+    ]
+  },
+  {
     version: "9.46.11",
     date: "2026-01-29",
     title: "Simplified Safari Toolbar Colors",

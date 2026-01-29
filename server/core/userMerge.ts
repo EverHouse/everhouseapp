@@ -623,19 +623,29 @@ export async function executeMerge(
       type: 'merged_into', 
       primaryUserId, 
       primaryEmail,
+      originalEmail: secondaryEmail, // Preserve original email in tags for history
       mergedAt: new Date().toISOString(),
       mergedBy: performedBy
     }];
+    
+    // FIX: "Email Hostage" bug - release the email address by appending .merged.{timestamp}
+    // This allows the email to be re-used for new signups or HubSpot sync
+    const archivedEmail = `${secondaryEmail}.merged.${Date.now()}`;
+    
+    logger.info('[UserMerge] Releasing email address from archived user', {
+      extra: { originalEmail: secondaryEmail, archivedEmail, secondaryUserId }
+    });
     
     await client.query(
       `UPDATE users SET
          archived_at = NOW(),
          archived_by = $1,
          membership_status = 'merged',
+         email = $4,
          tags = $2,
          updated_at = NOW()
        WHERE id = $3`,
-      [performedBy, JSON.stringify(archiveTags), secondaryUserId]
+      [performedBy, JSON.stringify(archiveTags), secondaryUserId, archivedEmail]
     );
     
     await client.query('COMMIT');
