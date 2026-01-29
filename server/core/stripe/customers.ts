@@ -1,5 +1,6 @@
 import { pool } from '../db';
 import { getStripeClient } from './client';
+import { alertOnExternalServiceError } from '../errorAlerts';
 
 export async function getOrCreateStripeCustomer(
   userId: string,
@@ -18,12 +19,26 @@ export async function getOrCreateStripeCustomer(
     return { customerId: userResult.rows[0].stripe_customer_id, isNew: false };
   }
 
-  const stripe = await getStripeClient();
+  let stripe;
+  try {
+    stripe = await getStripeClient();
+  } catch (error: any) {
+    console.error('[Stripe] Failed to get Stripe client:', error);
+    await alertOnExternalServiceError('Stripe', error, 'initialize Stripe client');
+    throw error;
+  }
   
-  const existingCustomers = await stripe.customers.list({
-    email: email.toLowerCase(),
-    limit: 1
-  });
+  let existingCustomers;
+  try {
+    existingCustomers = await stripe.customers.list({
+      email: email.toLowerCase(),
+      limit: 1
+    });
+  } catch (error: any) {
+    console.error('[Stripe] Failed to search for existing customer:', error);
+    await alertOnExternalServiceError('Stripe', error, 'search for existing customer');
+    throw error;
+  }
 
   let customerId: string;
   let isNew = false;
@@ -36,21 +51,27 @@ export async function getOrCreateStripeCustomer(
     metadata.tier = userTier;
   }
 
-  if (existingCustomers.data.length > 0) {
-    customerId = existingCustomers.data[0].id;
-    await stripe.customers.update(customerId, {
-      metadata: metadata,
-      name: name || existingCustomers.data[0].name || undefined
-    });
-    console.log(`[Stripe] Updated metadata for existing customer ${customerId}`);
-  } else {
-    const customer = await stripe.customers.create({
-      email: email.toLowerCase(),
-      name: name || undefined,
-      metadata: metadata
-    });
-    customerId = customer.id;
-    isNew = true;
+  try {
+    if (existingCustomers.data.length > 0) {
+      customerId = existingCustomers.data[0].id;
+      await stripe.customers.update(customerId, {
+        metadata: metadata,
+        name: name || existingCustomers.data[0].name || undefined
+      });
+      console.log(`[Stripe] Updated metadata for existing customer ${customerId}`);
+    } else {
+      const customer = await stripe.customers.create({
+        email: email.toLowerCase(),
+        name: name || undefined,
+        metadata: metadata
+      });
+      customerId = customer.id;
+      isNew = true;
+    }
+  } catch (error: any) {
+    console.error('[Stripe] Failed to create/update customer:', error);
+    await alertOnExternalServiceError('Stripe', error, 'create or update customer');
+    throw error;
   }
 
   await pool.query(
@@ -130,6 +151,7 @@ export async function syncCustomerMetadataToStripe(
     return { success: true };
   } catch (error: any) {
     console.error('[Stripe] Failed to sync customer metadata:', error);
+    await alertOnExternalServiceError('Stripe', error, 'sync customer metadata');
     return { success: false, error: error.message };
   }
 }

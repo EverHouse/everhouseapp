@@ -28,6 +28,7 @@ import {
 import { logFromRequest } from '../../core/auditLog';
 import { getStaffInfo, MAX_RETRY_ATTEMPTS, GUEST_FEE_CENTS } from './helpers';
 import { broadcastBillingUpdate, sendNotificationToUser } from '../../core/websocket';
+import { alertOnExternalServiceError } from '../../core/errorAlerts';
 
 const router = Router();
 
@@ -281,7 +282,11 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
     });
   } catch (error: any) {
     console.error('[Stripe] Error creating payment intent:', error);
-    res.status(500).json({ error: 'Failed to create payment intent' });
+    await alertOnExternalServiceError('Stripe', error, 'create payment intent');
+    res.status(500).json({ 
+      error: 'Payment processing failed. Please try again.',
+      retryable: true
+    });
   }
 });
 
@@ -315,7 +320,11 @@ router.post('/api/stripe/confirm-payment', isStaffOrAdmin, async (req: Request, 
     res.json({ success: true });
   } catch (error: any) {
     console.error('[Stripe] Error confirming payment:', error);
-    res.status(500).json({ error: 'Failed to confirm payment' });
+    await alertOnExternalServiceError('Stripe', error, 'confirm payment');
+    res.status(500).json({ 
+      error: 'Payment confirmation failed. Please try again.',
+      retryable: true
+    });
   }
 });
 
@@ -352,7 +361,11 @@ router.post('/api/stripe/cancel-payment', isStaffOrAdmin, async (req: Request, r
     res.json({ success: true });
   } catch (error: any) {
     console.error('[Stripe] Error canceling payment:', error);
-    res.status(500).json({ error: 'Failed to cancel payment' });
+    await alertOnExternalServiceError('Stripe', error, 'cancel payment');
+    res.status(500).json({ 
+      error: 'Payment cancellation failed. Please try again.',
+      retryable: true
+    });
   }
 });
 
@@ -372,7 +385,11 @@ router.post('/api/stripe/create-customer', isStaffOrAdmin, async (req: Request, 
     });
   } catch (error: any) {
     console.error('[Stripe] Error creating customer:', error);
-    res.status(500).json({ error: 'Failed to create customer' });
+    await alertOnExternalServiceError('Stripe', error, 'create customer');
+    res.status(500).json({ 
+      error: 'Customer creation failed. Please try again.',
+      retryable: true
+    });
   }
 });
 
@@ -623,7 +640,11 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, async (req: Reques
     });
   } catch (error: any) {
     console.error('[Stripe] Error creating quick charge:', error);
-    res.status(500).json({ error: 'Failed to create payment' });
+    await alertOnExternalServiceError('Stripe', error, 'create quick charge');
+    res.status(500).json({ 
+      error: 'Payment processing failed. Please try again.',
+      retryable: true
+    });
   }
 });
 
@@ -658,7 +679,11 @@ router.post('/api/stripe/staff/quick-charge/confirm', isStaffOrAdmin, async (req
     res.json({ success: true });
   } catch (error: any) {
     console.error('[Stripe] Error confirming quick charge:', error);
-    res.status(500).json({ error: 'Failed to confirm payment' });
+    await alertOnExternalServiceError('Stripe', error, 'confirm quick charge');
+    res.status(500).json({ 
+      error: 'Payment confirmation failed. Please try again.',
+      retryable: true
+    });
   }
 });
 
@@ -1231,7 +1256,11 @@ router.post('/api/payments/retry', isStaffOrAdmin, async (req: Request, res: Res
     }
   } catch (error: any) {
     console.error('[Payments] Error retrying payment:', error);
-    res.status(500).json({ error: error.message || 'Failed to retry payment' });
+    await alertOnExternalServiceError('Stripe', error, 'retry payment');
+    res.status(500).json({ 
+      error: 'Payment retry failed. Please try again.',
+      retryable: true
+    });
   }
 });
 

@@ -1,9 +1,30 @@
+import crypto from 'crypto';
 import { pool } from '../db';
 import { db } from '../../db';
 import { billingAuditLog } from '../../../shared/schema';
 import { getStripeClient } from './client';
 import { getOrCreateStripeCustomer } from './customers';
 import { PaymentStatusService } from '../billing/PaymentStatusService';
+
+/**
+ * Generate a deterministic idempotency key for Stripe payment intents.
+ * This prevents duplicate charges when users click pay multiple times.
+ * 
+ * @param bookingId - The booking ID
+ * @param sessionId - The session ID (optional)
+ * @param participantIds - Array of participant IDs being charged
+ * @param amountCents - Total amount in cents
+ * @returns A 32-character hex string for use as idempotency key
+ */
+export function generatePaymentIdempotencyKey(
+  bookingId: number,
+  sessionId: number | null,
+  participantIds: number[],
+  amountCents: number
+): string {
+  const data = `${bookingId}-${sessionId || 'none'}-${participantIds.sort((a, b) => a - b).join(',')}-${amountCents}`;
+  return crypto.createHash('sha256').update(data).digest('hex').substring(0, 32);
+}
 
 export type PaymentPurpose = 'guest_fee' | 'overage_fee' | 'one_time_purchase';
 
@@ -324,6 +345,15 @@ export async function createBalanceAwarePayment(params: {
       stripeMetadata.pendingCreditRefund = balanceToApply.toString();
     }
 
+    // Generate idempotency key to prevent duplicate charges
+    // Uses booking/session IDs, participant IDs, and amount for uniqueness
+    const participantIds: number[] = metadata?.participantIds 
+      ? metadata.participantIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
+      : [];
+    const idempotencyKey = bookingId && sessionId
+      ? generatePaymentIdempotencyKey(bookingId, sessionId, participantIds, amountCents)
+      : `pi_${purpose}_${userId.replace(/[^a-zA-Z0-9-]/g, '')}_${amountCents}_${Date.now()}`;
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountCents, // Charge FULL amount, credit applied as refund on success
       currency: 'usd',
@@ -333,6 +363,8 @@ export async function createBalanceAwarePayment(params: {
         : description,
       metadata: stripeMetadata,
       automatic_payment_methods: { enabled: true },
+    }, {
+      idempotencyKey
     });
 
     // Log to database

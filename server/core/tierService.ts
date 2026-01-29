@@ -1,5 +1,6 @@
 import { pool } from './db';
 import { normalizeTierName, DEFAULT_TIER } from '../../shared/constants/tiers';
+import { normalizeEmail } from './utils/emailNormalization';
 
 export interface TierLimits {
   daily_sim_minutes: number;
@@ -89,13 +90,14 @@ export function invalidateTierCache(tierName: string): void {
 
 export async function getMemberTierByEmail(email: string, options?: { allowInactive?: boolean }): Promise<string | null> {
   try {
+    const normalizedEmailValue = normalizeEmail(email);
     const result = await pool.query(
       `SELECT u.tier, mt.name as tier_name, u.membership_status
        FROM users u
        LEFT JOIN membership_tiers mt ON u.tier_id = mt.id
        WHERE LOWER(u.email) = LOWER($1)
        LIMIT 1`,
-      [email]
+      [normalizedEmailValue]
     );
     
     if (result.rows.length === 0) {

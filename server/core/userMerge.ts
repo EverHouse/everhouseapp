@@ -3,6 +3,7 @@ import { pool } from './db';
 import { users } from '../../shared/schema';
 import { eq, sql } from 'drizzle-orm';
 import { logger } from './logger';
+import { normalizeEmail } from './utils/emailNormalization';
 
 export interface MergePreview {
   primaryUser: {
@@ -97,7 +98,7 @@ export async function previewMerge(primaryUserId: string, secondaryUserId: strin
     throw new Error('Secondary user has already been archived/merged');
   }
   
-  const secondaryEmail = secondaryUser.email?.toLowerCase() || '';
+  const secondaryEmail = normalizeEmail(secondaryUser.email);
   
   // Count bookings (all booking requests for this user)
   const bookingsResult = await pool.query(
@@ -320,8 +321,8 @@ export async function executeMerge(
   if (primaryUserId === secondaryUserId) throw new Error('Cannot merge a user with themselves');
   if (secondaryUser.archivedAt) throw new Error('Secondary user has already been archived/merged');
   
-  const primaryEmail = primaryUser.email?.toLowerCase() || '';
-  const secondaryEmail = secondaryUser.email?.toLowerCase() || '';
+  const primaryEmail = normalizeEmail(primaryUser.email);
+  const secondaryEmail = normalizeEmail(secondaryUser.email);
   
   const recordsMerged = {
     bookings: 0,

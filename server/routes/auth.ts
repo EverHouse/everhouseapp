@@ -13,6 +13,7 @@ import { withResendRetry } from '../core/retryUtils';
 import { getSessionUser } from '../types/session';
 import { sendWelcomeEmail } from '../emails/welcomeEmail';
 import { getSupabaseAdmin } from '../core/supabase/client';
+import { normalizeEmail } from '../core/utils/emailNormalization';
 
 interface StaffUserData {
   firstName: string;
@@ -62,8 +63,8 @@ async function getStaffUserByEmail(email: string): Promise<StaffUserData | null>
 }
 
 async function getUserRole(email: string): Promise<'admin' | 'staff' | 'member'> {
-  const normalizedEmail = email.toLowerCase();
-  const staffUser = await getStaffUserByEmail(normalizedEmail);
+  const normalized = normalizeEmail(email);
+  const staffUser = await getStaffUserByEmail(normalized);
   if (staffUser) {
     return staffUser.role;
   }
@@ -90,7 +91,7 @@ interface UpsertUserData {
 
 async function upsertUserWithTier(data: UpsertUserData): Promise<void> {
   try {
-    const normalizedEmail = data.email.toLowerCase();
+    const normalizedEmailValue = normalizeEmail(data.email);
     const isStaffOrAdmin = data.role === 'admin' || data.role === 'staff';
     
     // Staff/admin users don't have membership tiers
@@ -108,7 +109,7 @@ async function upsertUserWithTier(data: UpsertUserData): Promise<void> {
     await db.insert(users)
       .values({
         id: crypto.randomUUID(),
-        email: normalizedEmail,
+        email: normalizedEmailValue,
         firstName: data.firstName || null,
         lastName: data.lastName || null,
         tier: normalizedTier,
@@ -133,7 +134,7 @@ async function upsertUserWithTier(data: UpsertUserData): Promise<void> {
         }
       });
     
-    if (!isProduction) console.log(`[Auth] Updated user ${normalizedEmail} with role ${data.role}, tier ${normalizedTier || 'none'}`);
+    if (!isProduction) console.log(`[Auth] Updated user ${normalizedEmailValue} with role ${data.role}, tier ${normalizedTier || 'none'}`);
   } catch (error) {
     console.error('[Auth] Error upserting user tier:', error);
   }
@@ -296,7 +297,7 @@ router.post('/api/auth/verify-member', async (req, res) => {
       return res.status(400).json({ error: 'Email is required' });
     }
     
-    const normalizedEmail = email.toLowerCase();
+    const normalizedEmail = normalizeEmail(email);
     
     // Check if this is a staff/admin user first
     const staffUserData = await getStaffUserByEmail(normalizedEmail);
@@ -476,7 +477,7 @@ router.post('/api/auth/request-otp', async (req, res) => {
       return res.status(400).json({ error: 'Email is required' });
     }
     
-    const normalizedEmail = email.toLowerCase();
+    const normalizedEmail = normalizeEmail(email);
     const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
     
     const rateCheck = checkOtpRequestLimit(normalizedEmail, clientIp);
@@ -701,7 +702,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
       return res.status(400).json({ error: 'Email and code are required' });
     }
     
-    const normalizedEmail = email.toLowerCase();
+    const normalizedEmail = normalizeEmail(email);
     const normalizedCode = code.toString().trim();
     
     const attemptCheck = checkOtpVerifyAttempts(normalizedEmail);
@@ -985,7 +986,7 @@ router.get('/api/auth/check-staff-admin', async (req, res) => {
       return res.status(400).json({ error: 'Email is required' });
     }
     
-    const normalizedEmail = email.toLowerCase();
+    const normalizedEmail = normalizeEmail(email);
     
     const staffResult = await db.select({
       id: staffUsers.id,
@@ -1022,7 +1023,7 @@ router.post('/api/auth/password-login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
     
-    const normalizedEmail = email.toLowerCase();
+    const normalizedEmail = normalizeEmail(email);
     
     let userRecord: { id: number; email: string; name: string | null; passwordHash: string | null; role: string | null } | null = null;
     let userRole: 'admin' | 'staff' | 'member' = 'member';

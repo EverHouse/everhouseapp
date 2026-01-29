@@ -12,7 +12,7 @@ import {
   BookingSession,
   BookingParticipant
 } from '../../../shared/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { logger } from '../logger';
 import { getMemberTierByEmail } from '../tierService';
 
@@ -166,9 +166,31 @@ export async function recordUsage(
   input: RecordUsageInput,
   source: BookingSource = 'member_request',
   tx?: TransactionContext
-): Promise<void> {
+): Promise<{ success: boolean; alreadyRecorded?: boolean }> {
   const dbCtx = tx || db;
   try {
+    // Idempotency guard: Check if entry already exists for this session/member/source combination
+    const existingEntry = await dbCtx
+      .select({ id: usageLedger.id })
+      .from(usageLedger)
+      .where(
+        and(
+          eq(usageLedger.sessionId, sessionId),
+          input.memberId 
+            ? eq(usageLedger.memberId, input.memberId) 
+            : isNull(usageLedger.memberId),
+          eq(usageLedger.source, source)
+        )
+      )
+      .limit(1);
+
+    if (existingEntry.length > 0) {
+      logger.info(`[UsageLedger] Entry already exists for session ${sessionId}, member ${input.memberId} - skipping duplicate`, {
+        extra: { sessionId, memberId: input.memberId, source }
+      });
+      return { success: true, alreadyRecorded: true };
+    }
+
     let tierAtBooking = input.tierAtBooking;
     
     // If tier not provided, look it up - use transaction context for consistency
@@ -206,7 +228,17 @@ export async function recordUsage(
         tier: tierAtBooking
       }
     });
-  } catch (error) {
+    
+    return { success: true, alreadyRecorded: false };
+  } catch (error: any) {
+    // Handle PostgreSQL unique constraint violation (23505) as a fallback
+    // This handles race conditions where two concurrent requests pass the existence check
+    if (error.code === '23505') {
+      logger.info(`[UsageLedger] Duplicate entry prevented for session ${sessionId} (constraint violation)`, {
+        extra: { sessionId, memberId: input.memberId, source }
+      });
+      return { success: true, alreadyRecorded: true };
+    }
     logger.error('[recordUsage] Error recording usage:', { error: error as Error });
     throw error;
   }

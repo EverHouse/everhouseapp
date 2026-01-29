@@ -4,13 +4,14 @@ import { db } from '../db';
 import { staffUsers } from '../../shared/schema';
 import { isProduction } from '../core/db';
 import { isAdmin, isStaffOrAdmin } from '../core/middleware';
+import { normalizeEmail } from '../core/utils/emailNormalization';
 
 const router = Router();
 
 router.get('/api/staff-users/by-email/:email', isStaffOrAdmin, async (req, res) => {
   try {
     const { email } = req.params;
-    const normalizedEmail = decodeURIComponent(email).toLowerCase().trim();
+    const normalizedEmail = normalizeEmail(decodeURIComponent(email));
     
     const result = await db.select({
       id: staffUsers.id,
@@ -79,7 +80,7 @@ router.post('/api/staff-users', isAdmin, async (req, res) => {
     
     const result = await db.insert(staffUsers)
       .values({
-        email: email.toLowerCase().trim(),
+        email: normalizeEmail(email),
         name: name || null,
         firstName: first_name || null,
         lastName: last_name || null,
@@ -119,7 +120,7 @@ router.put('/api/staff-users/:id', isAdmin, async (req, res) => {
     const { email, name, first_name, last_name, phone, job_title, role, is_active } = req.body;
     
     const updateData: Record<string, any> = {};
-    if (email !== undefined) updateData.email = email.toLowerCase().trim();
+    if (email !== undefined) updateData.email = normalizeEmail(email);
     if (name !== undefined) updateData.name = name;
     if (first_name !== undefined) updateData.firstName = first_name;
     if (last_name !== undefined) updateData.lastName = last_name;
@@ -223,7 +224,7 @@ router.post('/api/admin-users', isAdmin, async (req, res) => {
     
     const result = await db.insert(staffUsers)
       .values({
-        email: email.toLowerCase().trim(),
+        email: normalizeEmail(email),
         name: name || null,
         role: 'admin',
         isActive: true,
@@ -258,7 +259,7 @@ router.put('/api/admin-users/:id', isAdmin, async (req, res) => {
     const { email, name, first_name, last_name, phone, job_title, is_active } = req.body;
     
     const updateData: Record<string, any> = {};
-    if (email !== undefined) updateData.email = email.toLowerCase().trim();
+    if (email !== undefined) updateData.email = normalizeEmail(email);
     if (name !== undefined) updateData.name = name;
     if (first_name !== undefined) updateData.firstName = first_name;
     if (last_name !== undefined) updateData.lastName = last_name;

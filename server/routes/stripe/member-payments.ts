@@ -15,6 +15,7 @@ import {
 import { computeFeeBreakdown, applyFeeBreakdownToParticipants } from '../../core/billing/unifiedFeeService';
 import { GUEST_FEE_CENTS } from './helpers';
 import { sendNotificationToUser, broadcastBillingUpdate } from '../../core/websocket';
+import { alertOnExternalServiceError } from '../../core/errorAlerts';
 
 const router = Router();
 
@@ -285,7 +286,11 @@ router.post('/api/member/bookings/:id/pay-fees', paymentRateLimiter, async (req:
     });
   } catch (error: any) {
     console.error('[Stripe] Error creating member payment intent:', error);
-    res.status(500).json({ error: 'Failed to create payment' });
+    await alertOnExternalServiceError('Stripe', error, 'create member payment intent');
+    res.status(500).json({ 
+      error: 'Payment processing failed. Please try again.',
+      retryable: true
+    });
   }
 });
 
@@ -419,7 +424,11 @@ router.post('/api/member/bookings/:id/confirm-payment', async (req: Request, res
     res.json({ success: true });
   } catch (error: any) {
     console.error('[Stripe] Error confirming member payment:', error);
-    res.status(500).json({ error: 'Failed to confirm payment' });
+    await alertOnExternalServiceError('Stripe', error, 'confirm member payment');
+    res.status(500).json({ 
+      error: 'Payment confirmation failed. Please try again.',
+      retryable: true
+    });
   }
 });
 
@@ -511,7 +520,11 @@ router.post('/api/member/invoices/:invoiceId/pay', async (req: Request, res: Res
     });
   } catch (error: any) {
     console.error('[Stripe] Error creating invoice payment intent:', error);
-    res.status(500).json({ error: 'Failed to initialize payment' });
+    await alertOnExternalServiceError('Stripe', error, 'create invoice payment intent');
+    res.status(500).json({ 
+      error: 'Payment initialization failed. Please try again.',
+      retryable: true
+    });
   }
 });
 
@@ -584,7 +597,11 @@ router.post('/api/member/invoices/:invoiceId/confirm', async (req: Request, res:
     res.json({ success: true });
   } catch (error: any) {
     console.error('[Stripe] Error confirming invoice payment:', error);
-    res.status(500).json({ error: 'Failed to confirm payment' });
+    await alertOnExternalServiceError('Stripe', error, 'confirm invoice payment');
+    res.status(500).json({ 
+      error: 'Payment confirmation failed. Please try again.',
+      retryable: true
+    });
   }
 });
 
@@ -665,7 +682,11 @@ router.post('/api/member/guest-passes/purchase', async (req: Request, res: Respo
     });
   } catch (error: any) {
     console.error('[Stripe] Error creating guest pass payment intent:', error);
-    res.status(500).json({ error: 'Failed to initialize payment' });
+    await alertOnExternalServiceError('Stripe', error, 'create guest pass payment intent');
+    res.status(500).json({ 
+      error: 'Payment initialization failed. Please try again.',
+      retryable: true
+    });
   }
 });
 
@@ -743,7 +764,11 @@ router.post('/api/member/guest-passes/confirm', async (req: Request, res: Respon
     res.json({ success: true, passesAdded: quantity });
   } catch (error: any) {
     console.error('[Stripe] Error confirming guest pass purchase:', error);
-    res.status(500).json({ error: 'Failed to confirm payment' });
+    await alertOnExternalServiceError('Stripe', error, 'confirm guest pass purchase');
+    res.status(500).json({ 
+      error: 'Payment confirmation failed. Please try again.',
+      retryable: true
+    });
   }
 });
 
@@ -1048,7 +1073,11 @@ router.post('/api/member/balance/pay', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('[Member Balance] Error creating payment:', error);
-    res.status(500).json({ error: 'Failed to create payment' });
+    await alertOnExternalServiceError('Stripe', error, 'create balance payment');
+    res.status(500).json({ 
+      error: 'Payment processing failed. Please try again.',
+      retryable: true
+    });
   }
 });
 
@@ -1077,7 +1106,11 @@ router.post('/api/member/balance/confirm', async (req: Request, res: Response) =
     res.json({ success: true });
   } catch (error: any) {
     console.error('[Member Balance] Error confirming payment:', error);
-    res.status(500).json({ error: 'Failed to confirm payment' });
+    await alertOnExternalServiceError('Stripe', error, 'confirm balance payment');
+    res.status(500).json({ 
+      error: 'Payment confirmation failed. Please try again.',
+      retryable: true
+    });
   }
 });
 
