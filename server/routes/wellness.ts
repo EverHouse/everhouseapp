@@ -20,7 +20,8 @@ async function createWellnessAvailabilityBlocks(
   endTime: string, 
   blockSimulators: boolean,
   blockConferenceRoom: boolean,
-  createdBy?: string
+  createdBy?: string,
+  classTitle?: string
 ): Promise<void> {
   const resourceIds: number[] = [];
   
@@ -36,12 +37,14 @@ async function createWellnessAvailabilityBlocks(
     }
   }
   
+  const blockNotes = classTitle ? `Blocked for: ${classTitle}` : 'Blocked for wellness class';
+  
   for (const resourceId of resourceIds) {
     await pool.query(
       `INSERT INTO availability_blocks (resource_id, block_date, start_time, end_time, block_type, notes, created_by, wellness_class_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT DO NOTHING`,
-      [resourceId, classDate, startTime, endTime || startTime, 'wellness', 'Blocked for wellness class', createdBy || 'system', wellnessClassId]
+      [resourceId, classDate, startTime, endTime || startTime, 'wellness', blockNotes, createdBy || 'system', wellnessClassId]
     );
   }
 }
@@ -57,11 +60,12 @@ async function updateWellnessAvailabilityBlocks(
   endTime: string, 
   blockSimulators: boolean,
   blockConferenceRoom: boolean,
-  createdBy?: string
+  createdBy?: string,
+  classTitle?: string
 ): Promise<void> {
   await removeWellnessAvailabilityBlocks(wellnessClassId);
   if (blockSimulators || blockConferenceRoom) {
-    await createWellnessAvailabilityBlocks(wellnessClassId, classDate, startTime, endTime, blockSimulators, blockConferenceRoom, createdBy);
+    await createWellnessAvailabilityBlocks(wellnessClassId, classDate, startTime, endTime, blockSimulators, blockConferenceRoom, createdBy, classTitle);
   }
 }
 
@@ -463,7 +467,7 @@ router.post('/api/wellness-classes', isStaffOrAdmin, async (req, res) => {
     if (newBlockSimulators || newBlockConferenceRoom) {
       try {
         const userEmail = getSessionUser(req)?.email || 'system';
-        await createWellnessAvailabilityBlocks(createdClass.id, date, startTime24, endTime24, newBlockSimulators, newBlockConferenceRoom, userEmail);
+        await createWellnessAvailabilityBlocks(createdClass.id, date, startTime24, endTime24, newBlockSimulators, newBlockConferenceRoom, userEmail, title);
       } catch (blockError) {
         if (!isProduction) console.error('Failed to create availability blocks for wellness class:', blockError);
       }
@@ -616,6 +620,8 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
                  capacity = COALESCE($6, capacity),
                  image_url = COALESCE($7, image_url),
                  external_url = COALESCE($8, external_url),
+                 block_simulators = $13,
+                 block_conference_room = $14,
                  needs_review = false,
                  reviewed_by = $9,
                  reviewed_at = NOW(),
@@ -628,11 +634,12 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
                AND id != $11 
                AND date > $12
                AND is_active = true
-             RETURNING id`,
+             RETURNING id, date, time, duration, title`,
             [
               category, instructor, title, duration, spots, capacity || null, 
               image_url, external_url, reviewedBy,
-              existingRow.recurring_event_id, id, updated.date
+              existingRow.recurring_event_id, id, updated.date,
+              newBlockSimulators, newBlockConferenceRoom
             ]
           );
         } else if (existingRow?.title) {
@@ -649,6 +656,8 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
                  capacity = COALESCE($6, capacity),
                  image_url = COALESCE($7, image_url),
                  external_url = COALESCE($8, external_url),
+                 block_simulators = $15,
+                 block_conference_room = $16,
                  needs_review = false,
                  reviewed_by = $9,
                  reviewed_at = NOW(),
@@ -663,17 +672,79 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
                AND id != $13 
                AND date > $14
                AND is_active = true
-             RETURNING id`,
+             RETURNING id, date, time, duration, title`,
             [
               category, instructor, title, duration, spots, capacity || null, 
               image_url, external_url, reviewedBy,
-              existingRow.title, originalTime, dayOfWeek, id, updated.date
+              existingRow.title, originalTime, dayOfWeek, id, updated.date,
+              newBlockSimulators, newBlockConferenceRoom
             ]
           );
         }
         
         if (recurringResult) {
           recurringUpdated = recurringResult.rows.length;
+          
+          // Create/update blocks for all recurring instances
+          // Note: newBlockSimulators and newBlockConferenceRoom are already defined above as parsed booleans
+          const recurringUserEmail = getSessionUser(req)?.email || 'system';
+          
+          if (newBlockSimulators || newBlockConferenceRoom) {
+            for (const row of recurringResult.rows) {
+              try {
+                // Helper to convert time to 24h format
+                const convertTime = (timeStr: string): string => {
+                  const match12h = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+                  if (match12h) {
+                    let hours = parseInt(match12h[1]);
+                    const minutes = match12h[2];
+                    const period = match12h[3].toUpperCase();
+                    if (period === 'PM' && hours !== 12) hours += 12;
+                    if (period === 'AM' && hours === 12) hours = 0;
+                    return `${hours.toString().padStart(2, '0')}:${minutes}:00`;
+                  }
+                  const match24h = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+                  if (match24h) {
+                    return `${match24h[1].padStart(2, '0')}:${match24h[2]}:${match24h[3] || '00'}`;
+                  }
+                  return '09:00:00';
+                };
+                
+                const calcEndTime = (startTime24: string, durationStr: string): string => {
+                  const durationMatch = durationStr?.match(/(\d+)/);
+                  const durationMinutes = durationMatch ? parseInt(durationMatch[1]) : 60;
+                  const [hours, minutes] = startTime24.split(':').map(Number);
+                  const totalMinutes = hours * 60 + minutes + durationMinutes;
+                  const endHours = Math.floor(totalMinutes / 60) % 24;
+                  const endMins = totalMinutes % 60;
+                  return `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}:00`;
+                };
+                
+                const startTime24 = convertTime(row.time);
+                const endTime24 = calcEndTime(startTime24, row.duration || updated.duration);
+                
+                // First remove any existing blocks for this instance
+                await removeWellnessAvailabilityBlocks(row.id);
+                // Then create new blocks
+                await createWellnessAvailabilityBlocks(
+                  row.id, row.date, startTime24, endTime24, 
+                  newBlockSimulators, newBlockConferenceRoom, 
+                  recurringUserEmail, row.title || updated.title
+                );
+              } catch (blockError) {
+                if (!isProduction) console.error(`Failed to create blocks for recurring wellness class ${row.id}:`, blockError);
+              }
+            }
+          } else {
+            // Blocking was disabled - remove blocks from all recurring instances
+            for (const row of recurringResult.rows) {
+              try {
+                await removeWellnessAvailabilityBlocks(row.id);
+              } catch (blockError) {
+                if (!isProduction) console.error(`Failed to remove blocks for recurring wellness class ${row.id}:`, blockError);
+              }
+            }
+          }
         }
       } catch (recurError) {
         if (!isProduction) console.error('Failed to update recurring wellness classes:', recurError);
@@ -735,13 +806,13 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
       
       if (!hadAnyBlocking && hasAnyBlocking) {
         // Blocks newly enabled
-        await createWellnessAvailabilityBlocks(wellnessClassId, updated.date, startTime24, endTime24, newBlockSimulators, newBlockConferenceRoom, userEmail);
+        await createWellnessAvailabilityBlocks(wellnessClassId, updated.date, startTime24, endTime24, newBlockSimulators, newBlockConferenceRoom, userEmail, updated.title);
       } else if (hadAnyBlocking && !hasAnyBlocking) {
         // Blocks disabled
         await removeWellnessAvailabilityBlocks(wellnessClassId);
       } else if (hasAnyBlocking) {
         // Blocks changed or time/date changed
-        await updateWellnessAvailabilityBlocks(wellnessClassId, updated.date, startTime24, endTime24, newBlockSimulators, newBlockConferenceRoom, userEmail);
+        await updateWellnessAvailabilityBlocks(wellnessClassId, updated.date, startTime24, endTime24, newBlockSimulators, newBlockConferenceRoom, userEmail, updated.title);
       }
     } catch (blockError) {
       if (!isProduction) console.error('Failed to update availability blocks for wellness class:', blockError);
