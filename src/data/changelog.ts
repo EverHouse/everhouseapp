@@ -13,13 +13,13 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "9.40.0",
+    version: "9.40.1",
     date: "2026-01-29",
     title: "Staff Notification Coverage",
     changes: [
       "Added: Staff notifications for all TrackMan unmatched bookings (no customer email, unmapped bay)",
       "Added: Staff notifications when members cancel their subscription",
-      "Added: Staff notifications when subscriptions go unpaid/suspended",
+      "Added: Staff notifications when subscriptions go past due or unpaid/suspended",
       "Added: Staff notifications when member payment cards are expiring soon",
       "Improved: Complete staff visibility into booking and billing events requiring attention"
     ]

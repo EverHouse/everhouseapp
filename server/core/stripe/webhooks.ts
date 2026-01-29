@@ -2073,6 +2073,14 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
         type: 'membership_past_due',
       }, { sendPush: true });
 
+      // Notify staff about subscription going past due
+      await notifyAllStaff(
+        'Membership Past Due',
+        `${memberName} (${email}) subscription payment is past due.`,
+        'membership_past_due',
+        { sendPush: true, sendWebSocket: true }
+      );
+
       console.log(`[Stripe Webhook] Past due notification sent to ${email}`);
       
       // Sync past_due status to HubSpot
