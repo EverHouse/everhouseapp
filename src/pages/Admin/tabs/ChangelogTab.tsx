@@ -281,17 +281,19 @@ const ChangelogTab: React.FC = () => {
         const parts: string[] = [];
         
         // Parse details - handle both object and string (from database)
+        // Database may return JSONB as string depending on the driver/context
         let d: Record<string, any> = {};
-        if (entry.details) {
-            if (typeof entry.details === 'string') {
+        const rawDetails = entry.details as unknown;
+        if (rawDetails) {
+            if (typeof rawDetails === 'string') {
                 try {
-                    d = JSON.parse(entry.details);
+                    d = JSON.parse(rawDetails);
                 } catch {
                     // If JSON parse fails, just return the string as-is
-                    return entry.details;
+                    return rawDetails;
                 }
-            } else {
-                d = entry.details;
+            } else if (typeof rawDetails === 'object') {
+                d = rawDetails as Record<string, any>;
             }
         }
         

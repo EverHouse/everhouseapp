@@ -530,7 +530,15 @@ router.get('/api/data-tools/staff-activity', isAdmin, async (req: Request, res: 
       .orderBy(desc(adminAuditLog.createdAt))
       .limit(limitParam);
     
-    res.json({ logs });
+    // Ensure details are parsed objects, not strings (driver may return jsonb as string)
+    const parsedLogs = logs.map(log => ({
+      ...log,
+      details: typeof log.details === 'string' 
+        ? (() => { try { return JSON.parse(log.details); } catch { return log.details; } })()
+        : log.details
+    }));
+    
+    res.json({ logs: parsedLogs });
   } catch (error: any) {
     console.error('[DataTools] Get staff activity error:', error);
     res.status(500).json({ error: 'Failed to get staff activity', details: error.message });
