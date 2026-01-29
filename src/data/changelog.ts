@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.46.7",
+    date: "2026-01-29",
+    title: "Smart Queue Resolution",
+    changes: [
+      "Improved: ClassPass and GolfNow bookings now auto-create visitor records instead of staying in queue",
+      "Improved: Birthday parties, events, and group bookings automatically resolve as private events",
+      "Improved: Auto-matching now handles walk-ins, lessons, and anonymous bookings more intelligently",
+      "Reduced: Trackman queue clutter with smarter auto-resolution of common booking types"
+    ]
+  },
+  {
     version: "9.46.6",
     date: "2026-01-29",
     title: "Tag Display Crash Fix",

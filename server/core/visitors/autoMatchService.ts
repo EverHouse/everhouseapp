@@ -32,7 +32,7 @@ export interface PurchaseMatch {
 export interface AutoMatchResult {
   bookingId: number;
   matched: boolean;
-  matchType: 'purchase' | 'private_event' | 'golfnow_fallback' | 'failed';
+  matchType: 'purchase' | 'private_event' | 'golfnow_fallback' | 'classpass_visitor' | 'name_match' | 'failed';
   visitorEmail?: string;
   visitorType?: VisitorType;
   purchaseId?: number;
@@ -686,6 +686,7 @@ async function autoMatchBookingRequests(
     FROM booking_requests 
     WHERE is_unmatched = true 
       AND (user_email LIKE 'unmatched-%@%' OR user_email LIKE '%@trackman.local')
+      AND status IN ('pending', 'approved', 'attended')
       AND (
         LOWER(user_name) LIKE '%golfnow%'
         OR LOWER(notes) LIKE '%golfnow%'
@@ -700,6 +701,11 @@ async function autoMatchBookingRequests(
         OR LOWER(user_name) LIKE '%lesson%'
         OR LOWER(notes) LIKE '%lesson%'
         OR LOWER(user_name) LIKE '%anonymous%'
+        OR LOWER(user_name) = 'birthday booking'
+        OR LOWER(user_name) LIKE '%birthday party%'
+        OR LOWER(notes) LIKE '%''s event%'
+        OR LOWER(notes) LIKE '%private event%'
+        OR LOWER(notes) LIKE '%birthday party%'
       )
     ORDER BY request_date DESC, start_time DESC
     LIMIT 500
@@ -715,6 +721,41 @@ async function autoMatchBookingRequests(
       const userName = row.user_name || 'Visitor';
       const allNotes = `${row.notes || ''} ${row.staff_notes || ''} ${row.trackman_customer_notes || ''}`.toLowerCase();
       const lowerName = userName.toLowerCase();
+      
+      // Check if this should be marked as a private event
+      // Only match very specific patterns to avoid false positives:
+      // - "Birthday Booking" or similar (specific name patterns)
+      // - Notes containing "'s Event" (e.g., "Jeanne Stein's Event")
+      // - Notes containing "private event" explicitly
+      const isPrivateEventBooking = 
+        (lowerName === 'birthday booking') || 
+        (lowerName.includes('birthday') && lowerName.includes('booking')) ||
+        (lowerName.includes('birthday') && lowerName.includes('party')) ||
+        allNotes.includes("'s event") ||
+        allNotes.includes('private event') ||
+        allNotes.includes('birthday party');
+      
+      if (isPrivateEventBooking) {
+        // Mark as private event - clear unmatched status
+        await pool.query(`
+          UPDATE booking_requests
+          SET 
+            is_unmatched = false,
+            staff_notes = COALESCE(staff_notes, '') || ' [Auto-resolved: Private event by ${staffEmail || 'system'}]',
+            updated_at = NOW()
+          WHERE id = $1
+        `, [row.id]);
+        
+        results.push({
+          bookingId: row.id,
+          matched: true,
+          matchType: 'private_event',
+          reason: `Auto-resolved as private event: ${userName}`
+        });
+        matched++;
+        console.log(`[AutoMatch] Marked booking_request #${row.id} as private event: ${userName}`);
+        continue;
+      }
       
       // Determine visitor type based on content
       let visitorType: VisitorType = 'guest';
