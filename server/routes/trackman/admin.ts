@@ -2349,12 +2349,13 @@ router.post('/api/admin/trackman/auto-match-visitors', isStaffOrAdmin, async (re
     const results = await autoMatchAllUnmatchedBookings(sessionUser);
     
     // Log the auto-match action
-    await logFromRequest(req, {
-      action: 'bulk_action',
-      resourceType: 'booking',
-      resourceId: undefined,
-      resourceName: 'Auto-Match Visitors',
-      details: { 
+    logFromRequest(
+      req,
+      'bulk_action',
+      'booking',
+      undefined,
+      'Auto-Match Visitors',
+      { 
         matched: results.matched, 
         failed: results.failed,
         matchTypes: results.results.reduce((acc, r) => {
@@ -2362,7 +2363,7 @@ router.post('/api/admin/trackman/auto-match-visitors', isStaffOrAdmin, async (re
           return acc;
         }, {} as Record<string, number>)
       }
-    });
+    );
     
     res.json({
       success: true,
