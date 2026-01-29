@@ -540,6 +540,8 @@ interface NeedsReviewEvent {
     visibility: string | null;
     needs_review: boolean;
     conflict_detected?: boolean;
+    block_simulators?: boolean;
+    block_conference_room?: boolean;
 }
 
 const EventsAdminContent: React.FC = () => {
@@ -620,6 +622,8 @@ const EventsAdminContent: React.FC = () => {
             location: event.location || '',
             category: event.category || 'Social',
             visibility: event.visibility || 'public',
+            block_simulators: event.block_simulators || false,
+            block_conference_room: event.block_conference_room || false,
         });
         setEditId(event.id);
         setIsEditing(true);
@@ -1605,6 +1609,8 @@ const WellnessAdminContent: React.FC = () => {
                 external_url: formData.external_url || null,
                 visibility: formData.visibility || 'public',
                 block_bookings: formData.block_bookings || false,
+                block_simulators: formData.block_simulators || false,
+                block_conference_room: formData.block_conference_room || false,
                 capacity: formData.capacity || null,
                 waitlist_enabled: formData.waitlist_enabled || false,
             };

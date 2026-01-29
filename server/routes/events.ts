@@ -174,6 +174,8 @@ router.get('/api/events/needs-review', isStaffOrAdmin, async (req, res) => {
       visibility: events.visibility,
       needs_review: events.needsReview,
       conflict_detected: events.conflictDetected,
+      block_simulators: events.blockSimulators,
+      block_conference_room: events.blockConferenceRoom,
     }).from(events)
       .where(eq(events.needsReview, true))
       .orderBy(events.eventDate, events.startTime);
