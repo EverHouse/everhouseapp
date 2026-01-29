@@ -77,45 +77,53 @@ export async function previewMerge(primaryUserId: string, secondaryUserId: strin
   
   const secondaryEmail = secondaryUser.email?.toLowerCase() || '';
   
-  const [bookingsCount] = await pool.query(
+  const bookingsResult = await pool.query(
     `SELECT COUNT(*) as count FROM booking_requests WHERE LOWER(user_email) = $1 OR user_id = $2`,
     [secondaryEmail, secondaryUserId]
   );
+  const bookingsCount = bookingsResult.rows[0];
   
-  const [visitsCount] = await pool.query(
+  const visitsResult = await pool.query(
     `SELECT COUNT(*) as count FROM visits WHERE LOWER(member_email) = $1`,
     [secondaryEmail]
   );
+  const visitsCount = visitsResult.rows[0];
   
-  const [wellnessCount] = await pool.query(
+  const wellnessResult = await pool.query(
     `SELECT COUNT(*) as count FROM wellness_bookings WHERE LOWER(member_email) = $1`,
     [secondaryEmail]
   );
+  const wellnessCount = wellnessResult.rows[0];
   
-  const [eventRsvpsCount] = await pool.query(
+  const eventRsvpsResult = await pool.query(
     `SELECT COUNT(*) as count FROM event_rsvps WHERE LOWER(member_email) = $1`,
     [secondaryEmail]
   );
+  const eventRsvpsCount = eventRsvpsResult.rows[0];
   
-  const [notificationsCount] = await pool.query(
+  const notificationsResult = await pool.query(
     `SELECT COUNT(*) as count FROM notifications WHERE user_id = $1`,
     [secondaryUserId]
   );
+  const notificationsCount = notificationsResult.rows[0];
   
-  const [memberNotesCount] = await pool.query(
+  const memberNotesResult = await pool.query(
     `SELECT COUNT(*) as count FROM member_notes WHERE LOWER(member_email) = $1`,
     [secondaryEmail]
   );
+  const memberNotesCount = memberNotesResult.rows[0];
   
-  const [guestCheckInsCount] = await pool.query(
+  const guestCheckInsResult = await pool.query(
     `SELECT COUNT(*) as count FROM guest_check_ins WHERE LOWER(host_email) = $1`,
     [secondaryEmail]
   );
+  const guestCheckInsCount = guestCheckInsResult.rows[0];
   
-  const [usageLedgerCount] = await pool.query(
+  const usageLedgerResult = await pool.query(
     `SELECT COUNT(*) as count FROM usage_ledger WHERE user_id = $1`,
     [secondaryUserId]
   );
+  const usageLedgerCount = usageLedgerResult.rows[0];
   
   const conflicts: string[] = [];
   const recommendations: string[] = [];
