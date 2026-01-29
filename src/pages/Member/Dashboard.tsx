@@ -332,11 +332,29 @@ const Dashboard: React.FC = () => {
     await fetchUserData(false);
   }, [fetchUserData]);
 
-  const allItems = [
+  // --- PERFORMANCE OPTIMIZATION ---
+  // Memoizing expensive calculations to prevent re-computation on every render.
+  // The Dashboard component was identified as a high-frequency re-render component,
+  // and these data transformations were happening on every single render.
+
+  // 1. Stabilize `nowTime`: state is updated only once per minute, preventing
+  //    memoized hooks below from re-calculating on every render.
+  const [nowTime, setNowTime] = useState(getNowTimePacific());
+
+  useEffect(() => {
+    // Update the current time every 60 seconds
+    const intervalId = setInterval(() => {
+      setNowTime(getNowTimePacific());
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // 2. Memoize `allItems`: This is the most expensive calculation. It merges and sorts
+  //    multiple data sources. It will only re-run if the source data changes.
+  const allItems = React.useMemo(() => [
     ...dbBookings.map(b => {
-      // Check if current user is NOT the primary booker (i.e., is a linked member)
       const isLinkedMember = user?.email ? b.user_email?.toLowerCase() !== user.email.toLowerCase() : false;
-      // For linked members, show the primary booker's email (before @) as the booker name
       const primaryBookerName = isLinkedMember && b.user_email 
         ? b.user_email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
         : null;
@@ -413,11 +431,8 @@ const Dashboard: React.FC = () => {
       sortKey: `${w.date}T${w.time}`,
       raw: w
     })),
-    // Filter out calendar bookings that already exist as DB booking requests (avoid duplicates)
     ...dbConferenceRoomBookings
       .filter(c => {
-        // Check if this calendar event already exists as a DB booking (by calendar_event_id)
-        // Must check all active statuses, not just 'approved', to avoid duplicates when status changes
         const isDuplicate = dbBookingRequests.some(r => 
           r.calendar_event_id === c.calendar_event_id && 
           ['pending', 'pending_approval', 'approved', 'confirmed', 'attended'].includes(r.status)
@@ -439,10 +454,9 @@ const Dashboard: React.FC = () => {
         raw: c,
         source: 'calendar'
       }))
-  ].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  ].sort((a, b) => a.sortKey.localeCompare(b.sortKey)), [dbBookings, dbBookingRequests, dbRSVPs, dbWellnessEnrollments, dbConferenceRoomBookings, user?.email]);
 
   const todayStr = getTodayString();
-  const nowTime = getNowTimePacific();
   
   // Normalize time to HH:MM format for comparison
   const normalizeTime = (t: string) => {
@@ -450,8 +464,10 @@ const Dashboard: React.FC = () => {
     const parts = t.split(':');
     return `${parts[0].padStart(2, '0')}:${parts[1]?.padStart(2, '0') || '00'}`;
   };
-  
-  const upcomingItems = allItems.filter(item => {
+
+  // 3. Memoize derived data: These values are derived from `allItems`. They will only
+  //    re-calculate when `allItems` changes, not on every render.
+  const upcomingItems = React.useMemo(() => allItems.filter(item => {
     let itemDate: string | undefined;
     let endTime: string | undefined;
     
@@ -466,12 +482,10 @@ const Dashboard: React.FC = () => {
     } else if (item.type === 'rsvp') {
       const raw = item.raw as DBRSVP;
       itemDate = raw.event_date.split('T')[0];
-      // Events typically last ~2 hours, use end_time if available or keep visible all day
       endTime = raw.end_time;
     } else if (item.type === 'wellness') {
       const raw = item.raw as DBWellnessEnrollment;
       itemDate = raw.date.split('T')[0];
-      // Wellness classes don't have end_time, keep visible until end of day
       endTime = undefined;
     } else if (item.type === 'conference_room_calendar') {
       const raw = item.raw as any;
@@ -480,55 +494,45 @@ const Dashboard: React.FC = () => {
     }
     
     if (!itemDate) return false;
-    
-    // Future dates are always included
     if (itemDate > todayStr) return true;
-    
-    // Past dates are always excluded
     if (itemDate < todayStr) return false;
     
-    // For today's items, check if they've already ended
-    // Items without end_time stay visible all day
     if (endTime && normalizeTime(endTime) < nowTime) {
       return false;
     }
     
     return true;
-  });
+  }), [allItems, todayStr, nowTime]);
 
-  // Calculate minutes used today for metrics (from allItems, not upcomingItems, to include bookings that have already ended)
-  const todayBookingsAll = allItems.filter(item => 
+  // Calculate minutes used today for metrics
+  const todayBookingsAll = React.useMemo(() => allItems.filter(item =>
     item.rawDate === todayStr && 
     (item.type === 'booking' || item.type === 'booking_request' || item.type === 'conference_room_calendar')
-  );
-  const simMinutesToday = todayBookingsAll
+  ), [allItems, todayStr]);
+
+  const simMinutesToday = React.useMemo(() => todayBookingsAll
     .filter(b => b.resourceType === 'simulator')
     .reduce((sum, b) => {
       const raw = b.raw as any;
       const start = raw.start_time?.split(':').map(Number) || [0, 0];
       const end = raw.end_time?.split(':').map(Number) || [0, 0];
       const totalMinutes = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
-      
-      // Split time among all players based on declared_player_count
       const playerCount = raw.declared_player_count || 1;
       const memberShare = Math.ceil(totalMinutes / playerCount);
-      
       return sum + memberShare;
-    }, 0);
-  const confMinutesToday = todayBookingsAll
+    }, 0), [todayBookingsAll]);
+
+  const confMinutesToday = React.useMemo(() => todayBookingsAll
     .filter(b => b.resourceType === 'conference_room')
     .reduce((sum, b) => {
       const raw = b.raw as any;
       const start = raw.start_time?.split(':').map(Number) || [0, 0];
       const end = raw.end_time?.split(':').map(Number) || [0, 0];
       const totalMinutes = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
-      
-      // Split time among all players based on declared_player_count
       const playerCount = raw.declared_player_count || 1;
       const memberShare = Math.ceil(totalMinutes / playerCount);
-      
       return sum + memberShare;
-    }, 0);
+    }, 0), [todayBookingsAll]);
 
   // Calculate next upcoming event/wellness for metrics grid (from all events/classes, not just enrolled)
   const nextEvent = allEvents
