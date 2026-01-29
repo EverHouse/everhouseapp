@@ -379,14 +379,38 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
             {pendingCount > 0 && (
               <button 
                 onClick={() => onTabChange('simulator')}
-                className="flex items-center gap-1 px-2 py-0.5 lg:py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-[10px] lg:text-xs font-medium"
+                className="flex lg:hidden items-center gap-1 px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-[10px] font-medium"
               >
-                <span className="material-symbols-outlined text-xs lg:text-sm">pending_actions</span>
+                <span className="material-symbols-outlined text-xs">pending_actions</span>
                 {pendingCount} pending
               </button>
             )}
           </div>
         </div>
+
+        {/* Desktop Queue Stats - below header */}
+        {(pendingCount > 0 || unmatchedBookings.length > 0) && (
+          <div className="hidden lg:flex items-center gap-4 mb-4 animate-content-enter-delay-1">
+            {pendingCount > 0 && (
+              <button 
+                onClick={() => onTabChange('simulator')}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-xs font-medium hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+              >
+                <span className="material-symbols-outlined text-sm">pending_actions</span>
+                {pendingCount} pending request{pendingCount !== 1 ? 's' : ''}
+              </button>
+            )}
+            {unmatchedBookings.length > 0 && (
+              <button 
+                onClick={() => onTabChange('simulator')}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-full text-xs font-medium hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors"
+              >
+                <span className="material-symbols-outlined text-sm">link_off</span>
+                {unmatchedBookings.length} need{unmatchedBookings.length !== 1 ? '' : 's'} assignment
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Desktop Layout */}
         <div className="hidden lg:block space-y-6 animate-content-enter-delay-2">
