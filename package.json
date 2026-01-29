@@ -17,7 +17,9 @@
     "test:ui": "vitest --ui",
     "test:unit": "vitest run tests/unit",
     "test:e2e": "vitest run tests/e2e",
-    "jules:sync": "tsx scripts/jules-sync.ts"
+    "jules:sync": "tsx scripts/jules-sync.ts",
+    "stripe:cleanup": "tsx server/scripts/cleanup-stripe-duplicates.ts",
+    "stripe:cleanup:execute": "tsx server/scripts/cleanup-stripe-duplicates.ts --execute"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.18.0",
