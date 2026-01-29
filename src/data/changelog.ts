@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.41.0",
+    date: "2026-01-29",
+    title: "UI/UX & Accessibility Improvements",
+    changes: [
+      "Added: Global keyboard focus indicators for all buttons, links, and inputs (WCAG 2.4.7 compliance)",
+      "Added: Darker lavender color variant for better text contrast on light backgrounds",
+      "Fixed: Touch targets on icon buttons now meet 44x44px minimum (WCAG accessibility)",
+      "Fixed: Missing screen reader labels on 6 icon-only buttons (notes, delete, edit, pin actions)",
+      "Fixed: Notices tab header spacing - added breathing room between filters, legend, and sections",
+      "Fixed: TrackMan webhook error messages now wrap properly instead of breaking card layouts"
+    ]
+  },
+  {
     version: "9.40.3",
     date: "2026-01-29",
     title: "Staff Notification Coverage",
