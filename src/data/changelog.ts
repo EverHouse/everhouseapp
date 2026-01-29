@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.46.13",
+    date: "2026-01-29",
+    title: "Staff Lesson Auto-Conversion",
+    changes: [
+      "New: Trackman imports now auto-detect lesson bookings and convert them to availability blocks",
+      "New: Staff emails (tim@, rebecca@evenhouse.club) are automatically recognized as instructors",
+      "New: 'Lesson' keywords in booking notes trigger automatic block conversion",
+      "New: Admin cleanup tool to retroactively convert historical lesson bookings to blocks",
+      "Improved: Lessons no longer appear in member booking history or financial reports",
+      "Improved: Clean separation between member bookings and staff-led instruction time"
+    ]
+  },
+  {
     version: "9.46.12",
     date: "2026-01-29",
     title: "Critical Bug Fixes - Data Integrity & User Management",

@@ -1262,6 +1262,87 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         notes: fields[16] || ''
       };
 
+      // -----------------------------------------------------------------------
+      // STAFF EMAIL DETECTION: Convert lessons to availability blocks
+      // When staff book in Trackman using their @evenhouse.club emails, or when
+      // notes contain "lesson" keywords, convert to blocks instead of bookings.
+      // This prevents financial pollution and directory distortion.
+      // -----------------------------------------------------------------------
+      const INSTRUCTOR_EMAILS = [
+        'tim@evenhouse.club',
+        'rebecca@evenhouse.club',
+        'instructors@evenhouse.club'
+      ];
+      
+      const notesLower = (row.notes || '').toLowerCase();
+      const userNameLower = (row.userName || '').toLowerCase();
+      const userEmailLower = (row.userEmail || '').toLowerCase();
+      
+      const isStaffLesson = 
+        // 1. Check for specific instructor emails
+        INSTRUCTOR_EMAILS.includes(userEmailLower) ||
+        // 2. Check for lesson keywords in notes
+        notesLower.includes('lesson') ||
+        notesLower.includes('private instruction') ||
+        // 3. Check for lesson keywords in userName
+        userNameLower.includes('lesson') ||
+        // 4. Legacy instructor name patterns
+        (userNameLower.includes('rebecca') && userNameLower.includes('lee')) ||
+        (userNameLower.includes('tim') && userNameLower.includes('silverman'));
+      
+      if (isStaffLesson && row.status.toLowerCase() !== 'cancelled' && row.status.toLowerCase() !== 'canceled') {
+        const bookingDate = extractDate(row.startDate);
+        const startTime = extractTime(row.startDate);
+        const endTime = extractTime(row.endDate);
+        const resourceId = parseInt(row.bayNumber) || null;
+        
+        if (resourceId && bookingDate && startTime) {
+          // Check if block already exists to avoid duplicates
+          const existingBlock = await isConvertedToPrivateEventBlock(
+            resourceId,
+            bookingDate,
+            startTime,
+            endTime
+          );
+          
+          if (!existingBlock) {
+            try {
+              // Create Facility Closure (container)
+              const [closure] = await db.insert(facilityClosures).values({
+                resourceId,
+                startDate: bookingDate,
+                endDate: bookingDate,
+                startTime: startTime,
+                endTime: endTime || startTime,
+                reason: `Lesson: ${row.userName || 'Private Instruction'}`,
+                noticeType: 'private_event',
+                isActive: true,
+                createdBy: 'trackman_import'
+              }).returning();
+              
+              // Create Availability Block (time slot)
+              await db.insert(availabilityBlocks).values({
+                closureId: closure.id,
+                resourceId,
+                blockDate: bookingDate,
+                startTime: startTime,
+                endTime: endTime || startTime,
+                reason: `Lesson - ${row.userName}`
+              });
+              
+              process.stderr.write(`[Trackman Import] Converted staff lesson to block: ${row.userEmail} -> "${row.userName}" on ${bookingDate}\n`);
+            } catch (blockErr: any) {
+              process.stderr.write(`[Trackman Import] Error creating lesson block for ${row.bookingId}: ${blockErr.message}\n`);
+            }
+          }
+          
+          // Skip creation of booking_request - this is a block, not a booking
+          skippedAsPrivateEventBlocks++;
+          continue;
+        }
+      }
+      // -----------------------------------------------------------------------
+
       // Handle cancelled bookings - check if booking exists and cancel it
       if (row.status.toLowerCase() === 'cancelled' || row.status.toLowerCase() === 'canceled') {
         // Check if this booking exists in the system

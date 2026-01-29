@@ -2585,4 +2585,268 @@ router.post('/api/admin/trackman/auto-match-visitors', isStaffOrAdmin, async (re
   }
 });
 
+// -----------------------------------------------------------------------
+// HISTORICAL LESSON CLEANUP
+// Converts existing bookings linked to instructors into availability blocks
+// and resolves unmatched lesson entries from the queue
+// -----------------------------------------------------------------------
+router.post('/api/trackman/admin/cleanup-lessons', isStaffOrAdmin, async (req, res) => {
+  try {
+    const dryRun = req.query.dryRun === 'true';
+    const sessionUser = (req as any).session?.user?.email || 'system';
+    const logs: string[] = [];
+    const log = (msg: string) => {
+      console.log(msg);
+      logs.push(msg);
+    };
+
+    log(`[Lesson Cleanup] Starting cleanup run (Dry Run: ${dryRun})...`);
+
+    // Staff email patterns to detect lesson bookings
+    const INSTRUCTOR_EMAILS = [
+      'tim@evenhouse.club',
+      'rebecca@evenhouse.club',
+      'instructors@evenhouse.club'
+    ];
+
+    let convertedBookings = 0;
+    let resolvedUnmatched = 0;
+
+    // 1. Find bookings that look like lessons based on patterns
+    const lessonBookings = await pool.query(`
+      SELECT 
+        br.id,
+        br.user_name,
+        br.user_email,
+        br.resource_id,
+        br.request_date,
+        br.start_time,
+        br.end_time,
+        br.duration_minutes,
+        br.notes,
+        br.trackman_booking_id
+      FROM booking_requests br
+      WHERE br.status != 'cancelled'
+        AND (
+          LOWER(br.user_email) = ANY($1)
+          OR LOWER(br.user_name) LIKE '%lesson%'
+          OR LOWER(br.notes) LIKE '%lesson%'
+          OR (LOWER(br.user_name) LIKE '%rebecca%' AND LOWER(br.user_name) LIKE '%lee%')
+          OR (LOWER(br.user_name) LIKE '%tim%' AND LOWER(br.user_name) LIKE '%silverman%')
+        )
+      ORDER BY br.request_date DESC
+      LIMIT 500
+    `, [INSTRUCTOR_EMAILS]);
+
+    log(`[Lesson Cleanup] Found ${lessonBookings.rows.length} lesson bookings to process.`);
+
+    for (const booking of lessonBookings.rows) {
+      if (!booking.resource_id || !booking.request_date || !booking.start_time) continue;
+
+      const bookingDate = booking.request_date instanceof Date 
+        ? booking.request_date.toISOString().split('T')[0]
+        : booking.request_date;
+      const endTime = booking.end_time || booking.start_time;
+
+      // Check if block already exists
+      const existingBlock = await pool.query(`
+        SELECT ab.id FROM availability_blocks ab
+        JOIN facility_closures fc ON ab.closure_id = fc.id
+        WHERE ab.resource_id = $1
+          AND ab.block_date = $2
+          AND ab.start_time < $4::time
+          AND ab.end_time > $3::time
+          AND fc.notice_type = 'private_event'
+          AND fc.is_active = true
+        LIMIT 1
+      `, [booking.resource_id, bookingDate, booking.start_time, endTime]);
+
+      const blockAlreadyExists = existingBlock.rows.length > 0;
+
+      if (!dryRun) {
+        // Create block if it doesn't exist
+        if (!blockAlreadyExists) {
+          // Create Facility Closure with trackman reference
+          const closureResult = await pool.query(`
+            INSERT INTO facility_closures 
+              (resource_id, start_date, end_date, start_time, end_time, reason, notice_type, is_active, created_by)
+            VALUES ($1, $2, $2, $3, $4, $5, 'private_event', true, $6)
+            RETURNING id
+          `, [
+            booking.resource_id, 
+            bookingDate, 
+            booking.start_time, 
+            endTime,
+            `Lesson (Converted): ${booking.user_name} [TM:${booking.trackman_booking_id || booking.id}]`,
+            'system_cleanup'
+          ]);
+
+          // Create Availability Block
+          await pool.query(`
+            INSERT INTO availability_blocks 
+              (closure_id, resource_id, block_date, start_time, end_time, reason)
+            VALUES ($1, $2, $3, $4, $5, $6)
+          `, [
+            closureResult.rows[0].id,
+            booking.resource_id,
+            bookingDate,
+            booking.start_time,
+            endTime,
+            `Lesson - ${booking.user_name}`
+          ]);
+        }
+
+        // ALWAYS cancel the booking and clean up financial artifacts (even if block exists)
+        // Soft delete the booking (mark as cancelled with cleanup note)
+        await pool.query(`
+          UPDATE booking_requests 
+          SET status = 'cancelled',
+              staff_notes = COALESCE(staff_notes, '') || ' [Converted to Availability Block by ${sessionUser}]',
+              updated_at = NOW()
+          WHERE id = $1
+        `, [booking.id]);
+
+        // Clean up booking participants and members
+        await pool.query(`DELETE FROM booking_members WHERE booking_id = $1`, [booking.id]);
+        await pool.query(`DELETE FROM booking_guests WHERE booking_id = $1`, [booking.id]);
+        await pool.query(`DELETE FROM booking_participants WHERE booking_id = $1`, [booking.id]);
+
+        // Clean up financial artifacts: usage_ledger entries
+        await pool.query(`DELETE FROM usage_ledger WHERE booking_id = $1`, [booking.id]);
+
+        // Cancel any pending payment intents
+        const pendingIntents = await pool.query(`
+          SELECT stripe_payment_intent_id FROM stripe_payment_intents 
+          WHERE booking_id = $1 AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')
+        `, [booking.id]);
+        
+        for (const intent of pendingIntents.rows) {
+          try {
+            const stripe = getStripeClient();
+            await stripe.paymentIntents.cancel(intent.stripe_payment_intent_id);
+          } catch (err: any) {
+            log(`[Lesson Cleanup] Could not cancel payment intent ${intent.stripe_payment_intent_id}: ${err.message}`);
+          }
+        }
+
+        // Clean up booking sessions linked to this booking
+        await pool.query(`DELETE FROM booking_sessions WHERE booking_id = $1`, [booking.id]);
+      }
+
+      log(`[Lesson Cleanup] ${blockAlreadyExists ? 'Block exists, cleaned up booking' : 'Converted Booking'} #${booking.id} (${booking.user_name}).`);
+      convertedBookings++;
+    }
+
+    // 2. Resolve unmatched lesson entries from the queue
+    const unmatchedLessons = await pool.query(`
+      SELECT id, user_name, booking_date, start_time, end_time, bay_number, notes, trackman_booking_id
+      FROM trackman_unmatched_bookings
+      WHERE resolved_at IS NULL
+        AND (
+          LOWER(user_name) LIKE '%lesson%'
+          OR LOWER(notes) LIKE '%lesson%'
+          OR (LOWER(user_name) LIKE '%rebecca%')
+          OR (LOWER(user_name) LIKE '%tim%' AND LOWER(user_name) LIKE '%silverman%')
+        )
+      LIMIT 500
+    `);
+
+    log(`[Lesson Cleanup] Found ${unmatchedLessons.rows.length} unmatched lesson entries to resolve.`);
+
+    for (const item of unmatchedLessons.rows) {
+      const resourceId = parseInt(item.bay_number) || null;
+      
+      if (resourceId && item.booking_date && item.start_time) {
+        if (!dryRun) {
+          const bookingDate = item.booking_date instanceof Date 
+            ? item.booking_date.toISOString().split('T')[0]
+            : item.booking_date;
+
+          // Check if block already exists
+          const existingBlock = await pool.query(`
+            SELECT ab.id FROM availability_blocks ab
+            JOIN facility_closures fc ON ab.closure_id = fc.id
+            WHERE ab.resource_id = $1
+              AND ab.block_date = $2
+              AND ab.start_time < $4::time
+              AND ab.end_time > $3::time
+              AND fc.notice_type = 'private_event'
+              AND fc.is_active = true
+            LIMIT 1
+          `, [resourceId, bookingDate, item.start_time, item.end_time || item.start_time]);
+
+          if (existingBlock.rows.length === 0) {
+            // Create block with Trackman ID reference for audit trail
+            const closureResult = await pool.query(`
+              INSERT INTO facility_closures 
+                (resource_id, start_date, end_date, start_time, end_time, reason, notice_type, is_active, created_by)
+              VALUES ($1, $2, $2, $3, $4, $5, 'private_event', true, $6)
+              RETURNING id
+            `, [
+              resourceId,
+              bookingDate,
+              item.start_time,
+              item.end_time || item.start_time,
+              `Lesson: ${item.user_name} [TM:${item.trackman_booking_id || item.id}]`,
+              'system_cleanup'
+            ]);
+
+            await pool.query(`
+              INSERT INTO availability_blocks 
+                (closure_id, resource_id, block_date, start_time, end_time, reason)
+              VALUES ($1, $2, $3, $4, $5, $6)
+            `, [
+              closureResult.rows[0].id,
+              resourceId,
+              bookingDate,
+              item.start_time,
+              item.end_time || item.start_time,
+              `Lesson - ${item.user_name}`
+            ]);
+          }
+
+          // Mark as resolved
+          await pool.query(`
+            UPDATE trackman_unmatched_bookings
+            SET resolved_at = NOW(),
+                resolved_by = $1,
+                match_attempt_reason = 'Converted to Availability Block (Lesson Cleanup)'
+            WHERE id = $2
+          `, [sessionUser, item.id]);
+        }
+
+        log(`[Lesson Cleanup] Resolved unmatched lesson #${item.id} (${item.user_name}).`);
+        resolvedUnmatched++;
+      }
+    }
+
+    // Log the cleanup action
+    logFromRequest(
+      req,
+      'bulk_action',
+      'booking',
+      undefined,
+      'Lesson Cleanup',
+      { 
+        dryRun,
+        convertedBookings,
+        resolvedUnmatched
+      }
+    );
+
+    res.json({
+      success: true,
+      dryRun,
+      convertedBookings,
+      resolvedUnmatched,
+      logs
+    });
+  } catch (error: any) {
+    console.error('[Lesson Cleanup] Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to cleanup lessons: ' + (error.message || 'Unknown error') 
+    });
+  }
+});
+
 export default router;
