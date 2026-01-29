@@ -1421,7 +1421,30 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
         }
     }, [actionModal, selectedRequest]);
 
-    const pendingRequests = requests.filter(r => r.status === 'pending' || r.status === 'pending_approval');
+    // Queue shows both pending requests AND unmatched webhook bookings
+    const pendingRequests = requests.filter(r => 
+        r.status === 'pending' || 
+        r.status === 'pending_approval'
+    );
+    
+    // Include unmatched webhook bookings in the queue for staff visibility
+    const unmatchedBookings = approvedBookings.filter(b => 
+        (b as any).is_unmatched === true ||
+        b.user_email === 'unmatched@trackman.import' ||
+        (b.user_name || '').includes('Unknown (Trackman)')
+    );
+    
+    // Combined queue: all items sorted chronologically by date/time for staff visibility
+    const queueItems = [
+        ...pendingRequests.map(r => ({ ...r, queueType: 'pending' as const })),
+        ...unmatchedBookings.map(b => ({ ...b, queueType: 'unmatched' as const }))
+    ].sort((a, b) => {
+        // Sort chronologically by date first, then time
+        if (a.request_date !== b.request_date) {
+            return a.request_date.localeCompare(b.request_date);
+        }
+        return a.start_time.localeCompare(b.start_time);
+    });
 
     const scheduledBookings = useMemo(() => {
         const today = getTodayPacific();
@@ -1736,7 +1759,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                             }`}
                         >
-                            Queue {pendingRequests.length > 0 && `(${pendingRequests.length})`}
+                            Queue {queueItems.length > 0 && `(${queueItems.length})`}
                             {activeView === 'requests' && (
                                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary dark:bg-white" />
                             )}
@@ -1784,7 +1807,12 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="font-bold text-primary dark:text-white flex items-center gap-2">
                                 <span aria-hidden="true" className="material-symbols-outlined text-yellow-500">pending</span>
-                                Pending Requests ({pendingRequests.length})
+                                Queue ({queueItems.length})
+                                {pendingRequests.length > 0 && unmatchedBookings.length > 0 && (
+                                    <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
+                                        {pendingRequests.length} pending, {unmatchedBookings.length} unassigned
+                                    </span>
+                                )}
                             </h3>
                             <button
                                 onClick={() => onTabChange('trackman')}
@@ -1795,13 +1823,73 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                 <span>Import</span>
                             </button>
                         </div>
-                        {pendingRequests.length === 0 ? (
+                        {queueItems.length === 0 ? (
                             <div className="py-8 text-center border-2 border-dashed border-gray-200 dark:border-white/25 rounded-xl">
-                                <p className="text-gray-600 dark:text-white/70">No pending requests</p>
+                                <p className="text-gray-600 dark:text-white/70">No items in queue</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                {pendingRequests.map((req, index) => (
+                                {queueItems.map((item, index) => {
+                                    const isUnmatchedItem = item.queueType === 'unmatched';
+                                    const req = item;
+                                    
+                                    if (isUnmatchedItem) {
+                                        // Unmatched webhook booking card
+                                        return (
+                                            <div 
+                                                key={`unmatched-${item.id}`} 
+                                                className="bg-amber-50/80 dark:bg-amber-500/10 p-4 rounded-xl border-2 border-dashed border-amber-300 dark:border-amber-500/30 animate-slide-up-stagger cursor-pointer hover:bg-amber-100/80 dark:hover:bg-amber-500/20 transition-colors" 
+                                                style={{ '--stagger-index': index + 2 } as React.CSSProperties}
+                                                onClick={() => setTrackmanLinkModal({
+                                                    isOpen: true,
+                                                    bookingId: item.id,
+                                                    trackmanBookingId: (item as any).trackman_booking_id || null,
+                                                    currentEmail: item.user_email,
+                                                    currentName: item.user_name || undefined,
+                                                    bayName: (item as any).bay_name || `Bay ${item.resource_id}`
+                                                })}
+                                            >
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="px-2.5 py-1 text-xs font-semibold bg-amber-200 dark:bg-amber-500/30 text-amber-700 dark:text-amber-400 rounded-lg">
+                                                            Needs Assignment
+                                                        </span>
+                                                        <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                                                            {(item as any).bay_name || `Bay ${item.resource_id}`}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <p className="text-sm text-amber-700 dark:text-amber-400 mb-1">
+                                                    {formatDateShortAdmin(item.request_date)} • {formatTime12Hour(item.start_time)} - {formatTime12Hour(item.end_time)}
+                                                </p>
+                                                {(item as any).trackman_booking_id && (
+                                                    <p className="text-xs text-amber-600 dark:text-amber-500">
+                                                        Trackman ID: {(item as any).trackman_booking_id}
+                                                    </p>
+                                                )}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setTrackmanLinkModal({
+                                                            isOpen: true,
+                                                            bookingId: item.id,
+                                                            trackmanBookingId: (item as any).trackman_booking_id || null,
+                                                            currentEmail: item.user_email,
+                                                            currentName: item.user_name || undefined,
+                                                            bayName: (item as any).bay_name || `Bay ${item.resource_id}`
+                                                        });
+                                                    }}
+                                                    className="w-full mt-3 py-2 px-3 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 transition-colors"
+                                                >
+                                                    <span aria-hidden="true" className="material-symbols-outlined text-sm">person_add</span>
+                                                    Assign Member
+                                                </button>
+                                            </div>
+                                        );
+                                    }
+                                    
+                                    // Pending request card (existing design)
+                                    return (
                                     <div key={`${req.source || 'request'}-${req.id}`} className="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/25 animate-slide-up-stagger" style={{ '--stagger-index': index + 2 } as React.CSSProperties}>
                                         <div className="flex justify-between items-start mb-3">
                                             <div>
@@ -1888,7 +1976,8 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                             </button>
                                         )}
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

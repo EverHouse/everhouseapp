@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.42.1",
+    date: "2026-01-29",
+    title: "Queue Tab Shows Unassigned Bookings",
+    changes: [
+      "Added: Unassigned webhook bookings now appear in the Queue tab alongside pending requests",
+      "Added: Queue tab shows combined count of pending requests and unassigned bookings",
+      "Improved: Staff can see chronological view of all items needing attention in one place",
+      "Improved: Clicking unassigned booking in queue opens the member assignment modal"
+    ]
+  },
+  {
     version: "9.42.0",
     date: "2026-01-29",
     title: "TrackMan Import & Email Learning System",
