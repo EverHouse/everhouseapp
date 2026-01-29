@@ -691,6 +691,10 @@ async function autoMatchBookingRequests(
         OR LOWER(notes) LIKE '%golfnow%'
         OR LOWER(staff_notes) LIKE '%golfnow%'
         OR LOWER(trackman_customer_notes) LIKE '%golfnow%'
+        OR LOWER(user_name) LIKE '%classpass%'
+        OR LOWER(notes) LIKE '%classpass%'
+        OR LOWER(staff_notes) LIKE '%classpass%'
+        OR LOWER(trackman_customer_notes) LIKE '%classpass%'
         OR LOWER(user_name) LIKE '%walk-in%'
         OR LOWER(user_name) LIKE '%walk in%'
         OR LOWER(user_name) LIKE '%lesson%'
@@ -719,6 +723,9 @@ async function autoMatchBookingRequests(
       if (lowerName.includes('golfnow') || allNotes.includes('golfnow')) {
         visitorType = 'golfnow';
         emailPrefix = 'golfnow';
+      } else if (lowerName.includes('classpass') || allNotes.includes('classpass')) {
+        visitorType = 'classpass';
+        emailPrefix = 'classpass';
       } else if (lowerName.includes('lesson') || allNotes.includes('lesson')) {
         visitorType = 'private_lesson';
         emailPrefix = 'lesson';
