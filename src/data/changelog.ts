@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.51.1",
+    date: "2026-01-30",
+    title: "Fix Player Removal Not Updating Billing",
+    changes: [
+      "Fixed: Removing a player from a booking now properly deletes them from the billing participants list",
+      "Fixed: Fee calculations update correctly after removing a player from the roster",
+      "Fixed: Check-In & Billing modal now shows accurate player list after roster changes",
+      "Technical: Unlink endpoint was comparing email to UUID column - now properly looks up user ID first"
+    ]
+  },
+  {
     version: "9.51.0",
     date: "2026-01-30",
     title: "UI Polish - Smoother Animations & Visual Feedback",

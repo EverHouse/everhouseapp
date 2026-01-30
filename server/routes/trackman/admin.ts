@@ -2114,11 +2114,29 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/unlink', isStaffOrAdmi
     
     if (bookingResult.rows[0]?.session_id) {
       const sessionId = bookingResult.rows[0].session_id;
-      await pool.query(
-        `DELETE FROM booking_participants 
-         WHERE session_id = $1 AND user_id = $2 AND participant_type = 'member'`,
-        [sessionId, memberEmail.toLowerCase()]
+      
+      // Look up user ID from email first
+      const userResult = await pool.query(
+        `SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+        [memberEmail]
       );
+      
+      if (userResult.rows.length > 0) {
+        const userId = userResult.rows[0].id;
+        await pool.query(
+          `DELETE FROM booking_participants 
+           WHERE session_id = $1 AND user_id = $2 AND participant_type = 'member'`,
+          [sessionId, userId]
+        );
+        
+        // Recalculate session fees after removing participant
+        try {
+          const { recalculateSessionFees } = await import('../../core/billing/unifiedFeeService');
+          await recalculateSessionFees(sessionId, 'roster_change');
+        } catch (feeError) {
+          console.warn('[unlink] Failed to recalculate session fees (non-blocking):', feeError);
+        }
+      }
     }
     
     logFromRequest(req, 'unlink_member_from_booking', 'booking', bookingId, memberEmail.toLowerCase(), {
