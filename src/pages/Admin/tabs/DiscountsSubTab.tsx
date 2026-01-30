@@ -197,11 +197,20 @@ const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
             <p className="text-xs text-red-500 mt-1">{error}</p>
           )}
         </div>
-        <button
-          onClick={openCreateModal}
-          data-create-coupon-btn
-          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg transition-colors"
-        >
+        <div className="flex items-center gap-2">
+          <button
+            onClick={fetchCoupons}
+            disabled={isLoading}
+            className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50"
+            title="Refresh coupons"
+          >
+            <span className={`material-symbols-outlined text-xl ${isLoading ? 'animate-spin' : ''}`}>refresh</span>
+          </button>
+          <button
+            onClick={openCreateModal}
+            data-create-coupon-btn
+            className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg transition-colors"
+          >
           <span aria-hidden="true" className="material-symbols-outlined text-lg">add</span>
           Create Coupon
         </button>
