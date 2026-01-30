@@ -1452,35 +1452,44 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
     );
     
     // Include unmatched webhook bookings in the queue for staff visibility
-    const unmatchedWebhookBookings = approvedBookings.filter(b => 
-        (b as any).is_unmatched === true ||
-        b.user_email === 'unmatched@trackman.import' ||
-        (b.user_name || '').includes('Unknown (Trackman)')
-    );
+    // Only show TODAY and FUTURE bookings - historical ones go to Trackman Admin panel
+    const today = getTodayPacific();
+    const unmatchedWebhookBookings = approvedBookings.filter(b => {
+        const isUnmatched = (b as any).is_unmatched === true ||
+            b.user_email === 'unmatched@trackman.import' ||
+            (b.user_name || '').includes('Unknown (Trackman)');
+        
+        // Only include if it's today or in the future
+        const bookingDate = b.request_date || '';
+        return isUnmatched && bookingDate >= today;
+    });
     
     // Map requires-review bookings from legacy table to queue format
-    const requiresReviewQueueItems = requiresReviewBookings.map(rb => ({
-        id: `review-${rb.id}`,
-        legacyId: rb.id,
-        user_email: rb.originalEmail,
-        user_name: rb.userName,
-        resource_id: rb.bayNumber,
-        bay_name: rb.bayNumber ? `Bay ${rb.bayNumber}` : null,
-        resource_preference: null,
-        request_date: rb.bookingDate,
-        start_time: rb.startTime,
-        end_time: rb.endTime,
-        duration_minutes: null,
-        notes: rb.notes,
-        status: 'pending_approval' as const,
-        staff_notes: null,
-        suggested_time: null,
-        created_at: rb.createdAt,
-        source: 'booking' as const,
-        trackman_booking_id: rb.trackmanBookingId,
-        matchAttemptReason: rb.matchAttemptReason,
-        queueType: 'requires_review' as const
-    }));
+    // Only show TODAY and FUTURE bookings - historical ones go to Trackman Admin panel
+    const requiresReviewQueueItems = requiresReviewBookings
+        .filter(rb => (rb.bookingDate || '') >= today)
+        .map(rb => ({
+            id: `review-${rb.id}`,
+            legacyId: rb.id,
+            user_email: rb.originalEmail,
+            user_name: rb.userName,
+            resource_id: rb.bayNumber,
+            bay_name: rb.bayNumber ? `Bay ${rb.bayNumber}` : null,
+            resource_preference: null,
+            request_date: rb.bookingDate,
+            start_time: rb.startTime,
+            end_time: rb.endTime,
+            duration_minutes: null,
+            notes: rb.notes,
+            status: 'pending_approval' as const,
+            staff_notes: null,
+            suggested_time: null,
+            created_at: rb.createdAt,
+            source: 'booking' as const,
+            trackman_booking_id: rb.trackmanBookingId,
+            matchAttemptReason: rb.matchAttemptReason,
+            queueType: 'requires_review' as const
+        }));
     
     // Combined queue: all items sorted chronologically by date/time for staff visibility
     const queueItems = [
