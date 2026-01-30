@@ -67,7 +67,7 @@ The application utilizes a React 19 frontend with Vite, styled using Tailwind CS
 ## External Dependencies
 - **Stripe Payments**: For in-app payment collection, subscription management, and webhook processing.
 - **Resend**: For email-based OTP verification and automated alerts.
-- **HubSpot CRM**: For contact and member management, two-way data sync, and communication preferences.
+- **HubSpot CRM**: For contact and member management, two-way data sync, and communication preferences. Enhanced bidirectional sync includes: Stripe delinquent status tracking, granular SMS preferences (promotional, transactional, reminders), and linked emails extraction from merged HubSpot contacts (stored in `user_linked_emails` with source `hubspot_merge`).
 - **HubSpot Forms**: For application form submissions.
 - **Eventbrite**: For syncing members-only events.
 - **Google Calendar**: For integration with various club calendars.
