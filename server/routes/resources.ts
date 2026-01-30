@@ -908,7 +908,7 @@ router.post('/api/bookings/link-trackman-to-member', isStaffOrAdmin, async (req,
         blockDate: bookingData.requestDate,
         startTime: bookingData.startTime,
         endTime: bookingData.endTime || bookingData.startTime,
-        blockType: 'lesson',
+        blockType: 'blocked',
         notes: `Lesson - ${ownerName}`,
         createdBy: (req as any).user?.email || 'staff_link'
       });
