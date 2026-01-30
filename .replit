@@ -79,7 +79,7 @@ ENABLE_TEST_LOGIN = "true"
 
 
 [deployment]
-deploymentTarget = "autoscale"
+deploymentTarget = "vm"
 run = ["npm", "run", "start"]
 build = ["sh", "-c", "npm install && npm run build"]
 
