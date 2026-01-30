@@ -80,8 +80,6 @@ const TrackmanTab: React.FC = () => {
   const [needsPlayersSearchQuery, setNeedsPlayersSearchQuery] = useState('');
   const [potentialMatches, setPotentialMatches] = useState<any[]>([]);
   const [potentialMatchesTotalCount, setPotentialMatchesTotalCount] = useState<number>(0);
-  const [requiresReviewBookings, setRequiresReviewBookings] = useState<any[]>([]);
-  const [requiresReviewTotalCount, setRequiresReviewTotalCount] = useState<number>(0);
   const [fuzzyMatchModal, setFuzzyMatchModal] = useState<{ booking: any; matches: any[]; isLoading: boolean; selectedEmail: string; rememberEmail: boolean } | null>(null);
   const [importRuns, setImportRuns] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -184,19 +182,6 @@ const TrackmanTab: React.FC = () => {
     }
   };
 
-  const fetchRequiresReview = async () => {
-    try {
-      const cacheBuster = `_t=${Date.now()}`;
-      const res = await fetch(`/api/admin/trackman/requires-review?${cacheBuster}`, { credentials: 'include' });
-      if (res.ok) {
-        const result = await res.json();
-        setRequiresReviewBookings(result.data || []);
-        setRequiresReviewTotalCount(result.totalCount || 0);
-      }
-    } catch (err) {
-      console.error('Failed to fetch requires-review bookings:', err);
-    }
-  };
 
   const handleOpenFuzzyMatchModal = async (booking: any) => {
     setFuzzyMatchModal({ booking, matches: [], isLoading: true, selectedEmail: '', rememberEmail: true });
@@ -271,14 +256,13 @@ const TrackmanTab: React.FC = () => {
       const unmatchedOffset = (unmatchedPage - 1) * ITEMS_PER_PAGE;
       const matchedOffset = (matchedPage - 1) * ITEMS_PER_PAGE;
       const needsPlayersOffset = (needsPlayersPage - 1) * ITEMS_PER_PAGE;
-      const [unmatchedRes, matchedRes, runsRes, membersRes, needsPlayersRes, potentialMatchesRes, requiresReviewRes] = await Promise.all([
+      const [unmatchedRes, matchedRes, runsRes, membersRes, needsPlayersRes, potentialMatchesRes] = await Promise.all([
         fetch(`/api/admin/trackman/unmatched?resolved=false&limit=${ITEMS_PER_PAGE}&offset=${unmatchedOffset}&${cacheBuster}`, { credentials: 'include' }),
         fetch(`/api/admin/trackman/matched?limit=${ITEMS_PER_PAGE}&offset=${matchedOffset}&${cacheBuster}`, { credentials: 'include' }),
         fetch(`/api/admin/trackman/import-runs?${cacheBuster}`, { credentials: 'include' }),
         fetch('/api/hubspot/contacts?status=all', { credentials: 'include' }),
         fetch(`/api/admin/trackman/needs-players?limit=${ITEMS_PER_PAGE}&offset=${needsPlayersOffset}&${cacheBuster}`, { credentials: 'include' }),
-        fetch(`/api/admin/trackman/potential-matches?${cacheBuster}`, { credentials: 'include' }),
-        fetch(`/api/admin/trackman/requires-review?${cacheBuster}`, { credentials: 'include' })
+        fetch(`/api/admin/trackman/potential-matches?${cacheBuster}`, { credentials: 'include' })
       ]);
       
       if (unmatchedRes.ok) {
@@ -309,11 +293,6 @@ const TrackmanTab: React.FC = () => {
         const result = await potentialMatchesRes.json();
         setPotentialMatches(result.data || []);
         setPotentialMatchesTotalCount(result.totalCount || 0);
-      }
-      if (requiresReviewRes.ok) {
-        const result = await requiresReviewRes.json();
-        setRequiresReviewBookings(result.data || []);
-        setRequiresReviewTotalCount(result.totalCount || 0);
       }
     } catch (err) {
       console.error('Failed to fetch Trackman data:', err);
@@ -856,44 +835,6 @@ const TrackmanTab: React.FC = () => {
           </div>
         )}
       </div>
-
-      {requiresReviewBookings.length > 0 && (
-        <div className="glass-card p-6 rounded-2xl border border-amber-200 dark:border-amber-500/30 bg-amber-50/50 dark:bg-amber-900/10">
-          <h2 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-            <span aria-hidden="true" className="material-symbols-outlined text-amber-600 dark:text-amber-400">person_search</span>
-            Requires Review ({requiresReviewTotalCount})
-          </h2>
-          <p className="text-sm text-primary/70 dark:text-white/70 mb-4">
-            These bookings have incomplete info (like "Bobby S." or just a first name) so the system couldn't auto-match them. Click "Find Matches" to search for the member and assign them as the owner. This ensures their visit counts toward their account.
-          </p>
-          
-          <div className="space-y-2 max-h-[400px] overflow-y-auto">
-            {requiresReviewBookings.map((booking: any, idx: number) => (
-              <div key={booking.id} className="p-4 bg-white/80 dark:bg-white/5 rounded-xl flex justify-between items-start gap-3 border border-amber-200/50 dark:border-amber-500/20 animate-slide-up-stagger" style={{ '--stagger-index': idx } as React.CSSProperties}>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-primary dark:text-white truncate">
-                    {booking.userName || booking.user_name || 'Unknown'}
-                  </p>
-                  <p className="text-xs text-primary/80 dark:text-white/80 mt-1">
-                    {formatDateDisplayWithDay(booking.bookingDate || booking.booking_date)} • {(booking.startTime || booking.start_time)?.substring(0, 5)} - {(booking.endTime || booking.end_time)?.substring(0, 5)} • Bay {booking.bayNumber || booking.bay_number}
-                  </p>
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-xs">info</span>
-                    Partial name - needs member matching
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleOpenFuzzyMatchModal(booking)}
-                  className="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-bold hover:bg-amber-600 transition-colors shrink-0 flex items-center gap-1"
-                >
-                  <span className="material-symbols-outlined text-sm">search</span>
-                  Find Matches
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {potentialMatches.length > 0 && (
         <div className="glass-card p-6 rounded-2xl border border-primary/10 dark:border-white/25">

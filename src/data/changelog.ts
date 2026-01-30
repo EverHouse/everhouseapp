@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.50.5",
+    date: "2026-01-30",
+    title: "Remove Duplicate Requires Review Section",
+    changes: [
+      "Removed: Duplicate 'Requires Review' section from Trackman page",
+      "Improved: Unmatched Bookings section now handles all review cases including private events"
+    ]
+  },
+  {
     version: "9.50.4",
     date: "2026-01-30",
     title: "Optimistic UI for Data Integrity Fixes",
