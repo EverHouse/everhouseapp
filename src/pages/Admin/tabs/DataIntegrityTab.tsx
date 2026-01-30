@@ -231,6 +231,8 @@ const DataIntegrityTab: React.FC = () => {
   const [showSyncTools, setShowSyncTools] = useState(true);
   const [isRunningSubscriptionSync, setIsRunningSubscriptionSync] = useState(false);
   const [subscriptionStatusResult, setSubscriptionStatusResult] = useState<{ success: boolean; message: string; totalChecked?: number; mismatchCount?: number; updated?: any[]; dryRun?: boolean } | null>(null);
+  const [isRunningOrphanedStripeCleanup, setIsRunningOrphanedStripeCleanup] = useState(false);
+  const [orphanedStripeResult, setOrphanedStripeResult] = useState<{ success: boolean; message: string; totalChecked?: number; orphanedCount?: number; cleared?: any[]; dryRun?: boolean } | null>(null);
   const [isRunningStripeHubspotLink, setIsRunningStripeHubspotLink] = useState(false);
   const [stripeHubspotLinkResult, setStripeHubspotLinkResult] = useState<{ success: boolean; message: string; stripeOnlyMembers?: any[]; hubspotOnlyMembers?: any[]; linkedCount?: number; dryRun?: boolean } | null>(null);
   const [isRunningPaymentStatusSync, setIsRunningPaymentStatusSync] = useState(false);
@@ -716,38 +718,82 @@ const DataIntegrityTab: React.FC = () => {
       case 'Subscription Status Drift':
       case 'Stripe Subscription Sync':
         return (
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mb-4">
-            <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
-              <strong>Quick Fix:</strong> Sync membership status from Stripe to correct mismatches
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => handleSyncSubscriptionStatus(true)}
-                disabled={isRunningSubscriptionSync}
-                className="px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
-              >
-                {isRunningSubscriptionSync && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
-                <span className="material-symbols-outlined text-[14px]">visibility</span>
-                Preview
-              </button>
-              <button
-                onClick={() => handleSyncSubscriptionStatus(false)}
-                disabled={isRunningSubscriptionSync}
-                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
-              >
-                {isRunningSubscriptionSync && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
-                <span className="material-symbols-outlined text-[14px]">sync</span>
-                Sync from Stripe
-              </button>
-            </div>
-            {subscriptionStatusResult && (
-              <div className={`mt-2 p-2 rounded ${getResultStyle(subscriptionStatusResult)}`}>
-                {subscriptionStatusResult.dryRun && (
-                  <p className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400 mb-1">Preview Only - No Changes Made</p>
-                )}
-                <p className={`text-xs ${getTextStyle(subscriptionStatusResult)}`}>{subscriptionStatusResult.message}</p>
+          <div className="space-y-3">
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+              <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+                <strong>Sync Status:</strong> Sync membership status from Stripe to correct mismatches
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleSyncSubscriptionStatus(true)}
+                  disabled={isRunningSubscriptionSync}
+                  className="px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                >
+                  {isRunningSubscriptionSync && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
+                  <span className="material-symbols-outlined text-[14px]">visibility</span>
+                  Preview
+                </button>
+                <button
+                  onClick={() => handleSyncSubscriptionStatus(false)}
+                  disabled={isRunningSubscriptionSync}
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                >
+                  {isRunningSubscriptionSync && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
+                  <span className="material-symbols-outlined text-[14px]">sync</span>
+                  Sync from Stripe
+                </button>
               </div>
-            )}
+              {subscriptionStatusResult && (
+                <div className={`mt-2 p-2 rounded ${getResultStyle(subscriptionStatusResult)}`}>
+                  {subscriptionStatusResult.dryRun && (
+                    <p className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400 mb-1">Preview Only - No Changes Made</p>
+                  )}
+                  <p className={`text-xs ${getTextStyle(subscriptionStatusResult)}`}>{subscriptionStatusResult.message}</p>
+                </div>
+              )}
+            </div>
+            <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3">
+              <p className="text-xs text-red-700 dark:text-red-300 mb-2">
+                <strong>Clear Orphaned IDs:</strong> Remove Stripe customer IDs that no longer exist in Stripe
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleClearOrphanedStripeIds(true)}
+                  disabled={isRunningOrphanedStripeCleanup}
+                  className="px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                >
+                  {isRunningOrphanedStripeCleanup && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
+                  <span className="material-symbols-outlined text-[14px]">visibility</span>
+                  Preview
+                </button>
+                <button
+                  onClick={() => handleClearOrphanedStripeIds(false)}
+                  disabled={isRunningOrphanedStripeCleanup}
+                  className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                >
+                  {isRunningOrphanedStripeCleanup && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
+                  <span className="material-symbols-outlined text-[14px]">delete_sweep</span>
+                  Clear Orphaned IDs
+                </button>
+              </div>
+              {orphanedStripeResult && (
+                <div className={`mt-2 p-2 rounded ${getResultStyle(orphanedStripeResult)}`}>
+                  {orphanedStripeResult.dryRun && (
+                    <p className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400 mb-1">Preview Only - No Changes Made</p>
+                  )}
+                  <p className={`text-xs ${getTextStyle(orphanedStripeResult)}`}>{orphanedStripeResult.message}</p>
+                  {orphanedStripeResult.cleared && orphanedStripeResult.cleared.length > 0 && (
+                    <div className="mt-2 max-h-24 overflow-y-auto text-xs bg-white dark:bg-white/10 rounded p-2">
+                      {orphanedStripeResult.cleared.map((c: any, i: number) => (
+                        <div key={i} className="py-1 border-b border-gray-100 dark:border-white/10 last:border-0">
+                          {c.email}: {c.stripeCustomerId}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         );
 
@@ -1500,6 +1546,43 @@ const DataIntegrityTab: React.FC = () => {
       showToast('Failed to sync subscription status', 'error');
     } finally {
       setIsRunningSubscriptionSync(false);
+    }
+  };
+
+  const handleClearOrphanedStripeIds = async (dryRun: boolean = true) => {
+    setIsRunningOrphanedStripeCleanup(true);
+    setOrphanedStripeResult(null);
+    try {
+      const res = await fetch('/api/data-tools/clear-orphaned-stripe-ids', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ dryRun })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setOrphanedStripeResult({
+          success: true,
+          message: data.message || `Found ${data.orphanedCount} orphaned Stripe IDs`,
+          totalChecked: data.totalChecked,
+          orphanedCount: data.orphanedCount,
+          cleared: data.cleared,
+          dryRun
+        });
+        showToast(dryRun ? 'Preview complete - no changes made' : (data.message || 'Orphaned Stripe IDs cleared'), dryRun ? 'info' : 'success');
+        if (!dryRun && data.clearedCount > 0) {
+          fetchIntegrityData();
+        }
+      } else {
+        setOrphanedStripeResult({ success: false, message: data.error || 'Failed to clear orphaned Stripe IDs' });
+        showToast(data.error || 'Failed to clear orphaned Stripe IDs', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to clear orphaned Stripe IDs:', err);
+      setOrphanedStripeResult({ success: false, message: 'Network error occurred' });
+      showToast('Failed to clear orphaned Stripe IDs', 'error');
+    } finally {
+      setIsRunningOrphanedStripeCleanup(false);
     }
   };
 

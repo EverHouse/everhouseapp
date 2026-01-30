@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.50.3",
+    date: "2026-01-30",
+    title: "Clear Orphaned Stripe IDs Tool",
+    changes: [
+      "Added: 'Clear Orphaned IDs' button in Data Integrity to remove Stripe customer IDs that no longer exist in Stripe",
+      "Added: Preview mode shows which orphaned IDs would be cleared before executing",
+      "Improved: After clearing orphaned IDs, the Data Integrity page automatically refreshes"
+    ]
+  },
+  {
     version: "9.50.2",
     date: "2026-01-30",
     title: "Prevent Placeholder Stripe Customers",

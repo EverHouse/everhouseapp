@@ -972,6 +972,123 @@ router.post('/api/data-tools/sync-subscription-status', isAdmin, async (req: Req
   }
 });
 
+router.post('/api/data-tools/clear-orphaned-stripe-ids', isAdmin, async (req: Request, res: Response) => {
+  try {
+    const staffEmail = (req as any).user?.email || 'unknown';
+    const { dryRun = true } = req.body;
+    
+    console.log(`[DataTools] Clearing orphaned Stripe customer IDs (dryRun: ${dryRun}) by ${staffEmail}`);
+    
+    const { getStripeClient } = await import('../core/stripe/client');
+    const stripe = await getStripeClient();
+    
+    const usersWithStripe = await pool.query(
+      `SELECT id, email, first_name, last_name, stripe_customer_id, role, membership_status
+       FROM users 
+       WHERE stripe_customer_id IS NOT NULL
+       ORDER BY email
+       LIMIT 500`
+    );
+    
+    if (usersWithStripe.rows.length === 0) {
+      return res.json({ 
+        message: 'No users with Stripe customer IDs found',
+        totalChecked: 0,
+        orphanedCount: 0,
+        cleared: []
+      });
+    }
+    
+    const orphaned: Array<{
+      email: string;
+      name: string;
+      stripeCustomerId: string;
+      userId: string;
+      role: string;
+    }> = [];
+    
+    const cleared: Array<{ email: string; stripeCustomerId: string }> = [];
+    const errors: string[] = [];
+    
+    const BATCH_SIZE = 10;
+    const BATCH_DELAY_MS = 100;
+    
+    for (let i = 0; i < usersWithStripe.rows.length; i += BATCH_SIZE) {
+      const batch = usersWithStripe.rows.slice(i, i + BATCH_SIZE);
+      
+      await Promise.all(batch.map(async (user) => {
+        try {
+          const customerId = user.stripe_customer_id;
+          if (!customerId) return;
+          
+          try {
+            await stripe.customers.retrieve(customerId);
+          } catch (err: any) {
+            const isNotFound = err.code === 'resource_missing' || 
+              err.statusCode === 404 || 
+              err.message?.includes('No such customer');
+            
+            if (isNotFound) {
+              const userName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Unknown';
+              orphaned.push({
+                email: user.email,
+                name: userName,
+                stripeCustomerId: customerId,
+                userId: user.id,
+                role: user.role
+              });
+              
+              if (!dryRun) {
+                await pool.query(
+                  'UPDATE users SET stripe_customer_id = NULL, updated_at = NOW() WHERE id = $1',
+                  [user.id]
+                );
+                
+                cleared.push({
+                  email: user.email,
+                  stripeCustomerId: customerId
+                });
+                
+                console.log(`[DataTools] Cleared orphaned Stripe ID for ${user.email}: ${customerId}`);
+              }
+            }
+          }
+        } catch (err: any) {
+          errors.push(`${user.email}: ${err.message}`);
+        }
+      }));
+      
+      if (i + BATCH_SIZE < usersWithStripe.rows.length) {
+        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+      }
+    }
+    
+    if (!dryRun && cleared.length > 0) {
+      logFromRequest(req, 'clear_orphaned_stripe_ids', 'users', null, {
+        action: 'bulk_clear_orphaned',
+        clearedCount: cleared.length,
+        staffEmail
+      });
+    }
+    
+    res.json({
+      message: dryRun 
+        ? `Preview: Found ${orphaned.length} orphaned Stripe customer IDs out of ${usersWithStripe.rows.length} users`
+        : `Cleared ${cleared.length} orphaned Stripe customer IDs`,
+      totalChecked: usersWithStripe.rows.length,
+      orphanedCount: orphaned.length,
+      clearedCount: cleared.length,
+      orphaned: orphaned.slice(0, 100),
+      cleared: cleared.slice(0, 50),
+      errors: errors.slice(0, 10),
+      dryRun
+    });
+  } catch (error: any) {
+    console.error('[DataTools] Clear orphaned Stripe IDs error:', error);
+    res.status(500).json({ error: 'Failed to clear orphaned Stripe IDs', details: error.message });
+  }
+});
+
 router.post('/api/data-tools/link-stripe-hubspot', isAdmin, async (req: Request, res: Response) => {
   try {
     const staffEmail = (req as any).user?.email || 'unknown';
