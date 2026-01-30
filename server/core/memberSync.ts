@@ -1,6 +1,6 @@
 import { db } from '../db';
 import { users, membershipTiers } from '../../shared/schema';
-import { memberNotes, communicationLogs } from '../../shared/models/membership';
+import { memberNotes, communicationLogs, userLinkedEmails } from '../../shared/models/membership';
 import { getHubSpotClient } from './integrations';
 import { normalizeTierName, extractTierTags, TIER_NAMES } from '../../shared/constants/tiers';
 import { sql, eq, and } from 'drizzle-orm';
@@ -506,6 +506,87 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
     }
     
     if (!isProduction) console.log(`[MemberSync] Complete - Synced: ${synced}, Errors: ${errors}, Status Changes: ${statusChanges}`);
+    
+    // Process merged contact IDs to extract linked emails
+    // hs_merged_object_ids contains semicolon-separated HubSpot contact IDs that were merged into this contact
+    const contactsWithMergedIds = allContacts.filter(c => c.properties.hs_merged_object_ids);
+    if (contactsWithMergedIds.length > 0) {
+      if (!isProduction) console.log(`[MemberSync] Processing ${contactsWithMergedIds.length} contacts with merged IDs`);
+      
+      // Collect all merged IDs to batch fetch
+      const mergedIdsByPrimaryEmail = new Map<string, string[]>();
+      for (const contact of contactsWithMergedIds) {
+        const primaryEmail = contact.properties.email?.toLowerCase();
+        if (!primaryEmail) continue;
+        
+        const mergedIds = contact.properties.hs_merged_object_ids!
+          .split(';')
+          .map(id => id.trim())
+          .filter(id => id.length > 0);
+        
+        if (mergedIds.length > 0) {
+          mergedIdsByPrimaryEmail.set(primaryEmail, mergedIds);
+        }
+      }
+      
+      // Batch lookup merged contacts to get their emails (process in batches to avoid rate limits)
+      const allMergedIds = [...new Set([...mergedIdsByPrimaryEmail.values()].flat())];
+      const mergedContactEmails = new Map<string, string>();
+      
+      if (allMergedIds.length > 0) {
+        const BATCH_SIZE = 50;
+        for (let i = 0; i < allMergedIds.length; i += BATCH_SIZE) {
+          const batchIds = allMergedIds.slice(i, i + BATCH_SIZE);
+          try {
+            const batchResponse = await hubspot.crm.contacts.batchApi.read({
+              inputs: batchIds.map(id => ({ id })),
+              properties: ['email'],
+              propertiesWithHistory: []
+            });
+            
+            for (const result of batchResponse.results) {
+              const email = result.properties?.email?.toLowerCase();
+              if (email) {
+                mergedContactEmails.set(result.id, email);
+              }
+            }
+          } catch (err) {
+            if (!isProduction) console.error(`[MemberSync] Error fetching merged contacts:`, err);
+          }
+          
+          // Add delay between batches
+          if (i + BATCH_SIZE < allMergedIds.length) {
+            await delay(500);
+          }
+        }
+        
+        // Add linked emails to user_linked_emails table
+        let linkedEmailsAdded = 0;
+        for (const [primaryEmail, mergedIds] of mergedIdsByPrimaryEmail) {
+          for (const mergedId of mergedIds) {
+            const mergedEmail = mergedContactEmails.get(mergedId);
+            if (mergedEmail && mergedEmail !== primaryEmail) {
+              try {
+                await db.insert(userLinkedEmails)
+                  .values({
+                    primaryEmail,
+                    linkedEmail: mergedEmail,
+                    source: 'hubspot_merge'
+                  })
+                  .onConflictDoNothing();
+                linkedEmailsAdded++;
+              } catch (err) {
+                // Ignore duplicate key errors
+              }
+            }
+          }
+        }
+        
+        if (!isProduction && linkedEmailsAdded > 0) {
+          console.log(`[MemberSync] Added ${linkedEmailsAdded} linked emails from HubSpot merged contacts`);
+        }
+      }
+    }
     
     // Sync deal stages in batches with throttling to avoid HubSpot rate limits
     // Run this AFTER the main sync completes to avoid blocking member data updates
