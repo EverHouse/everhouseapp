@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.50.2",
+    date: "2026-01-30",
+    title: "Prevent Placeholder Stripe Customers",
+    changes: [
+      "Fixed: Stripe customers are no longer created for placeholder visitor emails (GolfNow, ClassPass, anonymous imports)",
+      "Fixed: Placeholder emails like 'golfnow-YYYYMMDD-HHMM@visitors.evenhouse.club' are now excluded from Stripe",
+      "Improved: This prevents orphaned Stripe customers from being created for temporary booking placeholders"
+    ]
+  },
+  {
     version: "9.50.1",
     date: "2026-01-30",
     title: "Orphaned Stripe Customer Detection",

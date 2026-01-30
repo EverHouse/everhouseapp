@@ -9,6 +9,23 @@ import { getSessionUser } from '../../types/session';
 import { getOrCreateStripeCustomer } from '../../core/stripe';
 import { logFromRequest } from '../../core/auditLog';
 
+const PLACEHOLDER_EMAIL_PATTERNS = [
+  '@visitors.evenhouse.club',
+  '@trackman.local',
+  'unmatched-',
+  'golfnow-',
+  'classpass-',
+  'anonymous-',
+  'anongolfnow@',
+  'placeholder@'
+];
+
+function isPlaceholderEmail(email: string | null | undefined): boolean {
+  if (!email) return true;
+  const lower = email.toLowerCase();
+  return PLACEHOLDER_EMAIL_PATTERNS.some(pattern => lower.includes(pattern));
+}
+
 const router = Router();
 
 router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
@@ -458,7 +475,7 @@ router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
       const isNonMemberOrLead = ['non-member', 'visitor', 'lead'].includes(user.membership_status) || 
                                 ['visitor', 'lead'].includes(user.role);
       
-      if (isNonMemberOrLead && createStripeCustomer) {
+      if (isNonMemberOrLead && createStripeCustomer && !isPlaceholderEmail(normalizedEmail)) {
         let stripeCustomerId: string | null = null;
         try {
           const fullName = [firstName || user.first_name, lastName || user.last_name].filter(Boolean).join(' ') || undefined;
@@ -530,7 +547,7 @@ router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
     const newUser = insertResult.rows[0];
     let stripeCustomerId: string | null = null;
     
-    if (createStripeCustomer) {
+    if (createStripeCustomer && !isPlaceholderEmail(normalizedEmail)) {
       try {
         const fullName = [firstName, lastName].filter(Boolean).join(' ') || undefined;
         const result = await getOrCreateStripeCustomer(userId, normalizedEmail, fullName, 'visitor');

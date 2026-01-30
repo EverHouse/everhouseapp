@@ -5,6 +5,23 @@ import { User } from "../../../shared/schema";
 import { eq, ilike, and, sql } from "drizzle-orm";
 import { getOrCreateStripeCustomer } from "../stripe/customers";
 
+const PLACEHOLDER_EMAIL_PATTERNS = [
+  '@visitors.evenhouse.club',
+  '@trackman.local',
+  'unmatched-',
+  'golfnow-',
+  'classpass-',
+  'anonymous-',
+  'anongolfnow@',
+  'placeholder@'
+];
+
+function isPlaceholderEmail(email: string | null | undefined): boolean {
+  if (!email) return true;
+  const lower = email.toLowerCase();
+  return PLACEHOLDER_EMAIL_PATTERNS.some(pattern => lower.includes(pattern));
+}
+
 /**
  * Criteria for matching existing users
  */
@@ -165,9 +182,9 @@ export async function upsertVisitor(data: VisitorData, createStripeCustomer: boo
       .where(eq(users.id, existingUser.id))
       .returning();
 
-    // Ensure Stripe customer exists for existing visitor
+    // Ensure Stripe customer exists for existing visitor (skip placeholder emails)
     // getOrCreateStripeCustomer handles both lookup and DB update internally
-    if (createStripeCustomer && data.email && !existingUser.stripeCustomerId) {
+    if (createStripeCustomer && data.email && !existingUser.stripeCustomerId && !isPlaceholderEmail(data.email)) {
       try {
         const fullName = [data.firstName ?? existingUser.firstName, data.lastName ?? existingUser.lastName]
           .filter(Boolean).join(' ') || undefined;
@@ -197,9 +214,9 @@ export async function upsertVisitor(data: VisitorData, createStripeCustomer: boo
 
   const createdUser = newUser[0];
 
-  // Create Stripe customer for new visitor
+  // Create Stripe customer for new visitor (skip placeholder emails)
   // getOrCreateStripeCustomer handles both creation and DB update internally
-  if (createStripeCustomer && data.email) {
+  if (createStripeCustomer && data.email && !isPlaceholderEmail(data.email)) {
     try {
       const fullName = [data.firstName, data.lastName].filter(Boolean).join(' ') || undefined;
       await getOrCreateStripeCustomer(createdUser.id, data.email, fullName, 'visitor');
