@@ -78,6 +78,7 @@ export interface MergeResult {
     hubspotDeals: number;
     stripePaymentIntents: number;
     linkedEmails: number;
+    guests: number;
   };
   mergedLifetimeVisits: number;
   secondaryArchived: boolean;
@@ -345,11 +346,27 @@ export async function executeMerge(
     hubspotDeals: 0,
     stripePaymentIntents: 0,
     linkedEmails: 0,
+    guests: 0,
   };
   
   const client = await pool.connect();
   
   try {
+    // Check for active sessions (cannot merge user who is currently playing)
+    const activeSession = await pool.query(`
+      SELECT bp.session_id, bs.session_date, bs.start_time
+      FROM booking_participants bp
+      JOIN booking_sessions bs ON bp.session_id = bs.id
+      WHERE bp.user_id = $1
+        AND bs.session_date = CURRENT_DATE
+        AND bs.start_time <= CURRENT_TIME
+        AND bs.end_time > CURRENT_TIME
+    `, [secondaryUserId]);
+
+    if (activeSession.rows.length > 0) {
+      throw new Error(`Cannot merge: Secondary user has ${activeSession.rows.length} active session(s). Wait until session ends.`);
+    }
+    
     await client.query('BEGIN');
     
     const bookingsResult = await client.query(
@@ -425,6 +442,13 @@ export async function executeMerge(
       `UPDATE guest_passes SET member_email = $1 WHERE LOWER(member_email) = $2`,
       [primaryEmail, secondaryEmail]
     );
+    
+    // Update guests created by secondary user
+    const guestsResult = await client.query(
+      `UPDATE guests SET created_by_member_id = $1 WHERE created_by_member_id = $2`,
+      [primaryUserId, secondaryUserId]
+    );
+    recordsMerged.guests = guestsResult.rowCount || 0;
     
     // Update booking participants (uses user_id column)
     // DEDUPLICATE: If primary user is already in a session, remove secondary user's duplicate record

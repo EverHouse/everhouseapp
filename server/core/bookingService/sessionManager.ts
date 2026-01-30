@@ -346,18 +346,26 @@ export async function linkBookingRequestToSession(
   }
 }
 
-export async function deductGuestPasses(
+// Internal implementation that accepts an optional external client for transaction participation
+async function deductGuestPassesInternal(
   memberEmail: string,
   passCount: number,
-  tierName?: string
+  tierName?: string,
+  externalClient?: PoolClient
 ): Promise<{ success: boolean; passesDeducted: number }> {
   if (passCount <= 0) {
     return { success: true, passesDeducted: 0 };
   }
   
-  const client = await pool.connect();
+  // If external client provided, use it (caller manages transaction)
+  // Otherwise, create our own client and manage transaction internally
+  const client = externalClient || await pool.connect();
+  const manageTransaction = !externalClient;
+  
   try {
-    await client.query('BEGIN');
+    if (manageTransaction) {
+      await client.query('BEGIN');
+    }
     
     // Try to lock existing row first
     const lockResult = await client.query(
@@ -386,11 +394,11 @@ export async function deductGuestPasses(
              WHERE LOWER(member_email) = LOWER($1)`,
             [memberEmail, passCount, monthlyAllocation]
           );
-          await client.query('COMMIT');
+          if (manageTransaction) await client.query('COMMIT');
           logger.info('[deductGuestPasses] Passes deducted (backfilled)', { extra: { memberEmail, passCount } });
           return { success: true, passesDeducted: passCount };
         }
-        await client.query('ROLLBACK');
+        if (manageTransaction) await client.query('ROLLBACK');
         return { success: false, passesDeducted: 0 };
       }
       
@@ -401,11 +409,11 @@ export async function deductGuestPasses(
            WHERE LOWER(member_email) = LOWER($1)`,
           [memberEmail, passCount]
         );
-        await client.query('COMMIT');
+        if (manageTransaction) await client.query('COMMIT');
         logger.info('[deductGuestPasses] Passes deducted', { extra: { memberEmail, passCount } });
         return { success: true, passesDeducted: passCount };
       }
-      await client.query('ROLLBACK');
+      if (manageTransaction) await client.query('ROLLBACK');
       logger.warn('[deductGuestPasses] Insufficient passes', { extra: { memberEmail, passCount, passes_used, passes_total } });
       return { success: false, passesDeducted: 0 };
     }
@@ -417,7 +425,7 @@ export async function deductGuestPasses(
     const monthlyAllocation = tierLimits?.guest_passes_per_month ?? 0;
     
     if (passCount > monthlyAllocation) {
-      await client.query('ROLLBACK');
+      if (manageTransaction) await client.query('ROLLBACK');
       return { success: false, passesDeducted: 0 };
     }
     
@@ -433,22 +441,41 @@ export async function deductGuestPasses(
     );
     
     if (insertResult.rows.length > 0) {
-      await client.query('COMMIT');
+      if (manageTransaction) await client.query('COMMIT');
       logger.info('[deductGuestPasses] Passes deducted (new/conflict resolved)', { extra: { memberEmail, passCount } });
       return { success: true, passesDeducted: passCount };
     }
     
     // ON CONFLICT WHERE clause failed - insufficient passes after race
-    await client.query('ROLLBACK');
+    if (manageTransaction) await client.query('ROLLBACK');
     logger.warn('[deductGuestPasses] Insufficient passes after race resolution', { extra: { memberEmail, passCount } });
     return { success: false, passesDeducted: 0 };
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (manageTransaction) await client.query('ROLLBACK');
     logger.error('[deductGuestPasses] Error:', { error: error as Error });
     return { success: false, passesDeducted: 0 };
   } finally {
-    client.release();
+    if (manageTransaction) client.release();
   }
+}
+
+// Public API - standalone usage with internal transaction management
+export async function deductGuestPasses(
+  memberEmail: string,
+  passCount: number,
+  tierName?: string
+): Promise<{ success: boolean; passesDeducted: number }> {
+  return deductGuestPassesInternal(memberEmail, passCount, tierName);
+}
+
+// Transaction-aware version for use inside an existing transaction
+export async function deductGuestPassesWithClient(
+  client: PoolClient,
+  memberEmail: string,
+  passCount: number,
+  tierName?: string
+): Promise<{ success: boolean; passesDeducted: number }> {
+  return deductGuestPassesInternal(memberEmail, passCount, tierName, client);
 }
 
 // Import tier rules for orchestration
@@ -632,16 +659,11 @@ export async function createSessionWithUsageTracking(
       ? await executeDbWrites(externalTx)
       : await db.transaction(executeDbWrites);
     
-    logger.info('[createSessionWithUsageTracking] Session created with new billing', {
-      extra: {
-        sessionId: txResult.session.id,
-        totalOverageFees: billingResult.totalOverageFees,
-        totalGuestFees: billingResult.totalGuestFees,
-        guestPassesUsed: billingResult.guestPassesUsed
-      }
-    });
-    
-    // Step 6: Deduct guest passes (outside transaction - separate concern)
+    // Step 6: Deduct guest passes AFTER session is confirmed
+    // This happens outside the Drizzle transaction because deductGuestPasses uses its own
+    // pg connection with FOR UPDATE row-level locking. If deduction fails after session
+    // creation, the session remains valid but passes aren't deducted (acceptable - minor issue).
+    // The alternative (deducting before) would be worse: passes deducted but no session.
     if (billingResult.guestPassesUsed > 0) {
       const deductResult = await deductGuestPasses(
         request.ownerEmail, 
@@ -650,11 +672,26 @@ export async function createSessionWithUsageTracking(
       );
 
       if (!deductResult.success) {
-        logger.warn('Failed to deduct guest passes during session creation', { 
-          extra: { email: request.ownerEmail, passesToDeduct: billingResult.guestPassesUsed }
+        // Log warning but don't fail the booking - session is already created
+        // Staff can manually adjust passes if needed
+        logger.warn('[createSessionWithUsageTracking] Guest pass deduction failed after session creation', {
+          extra: {
+            sessionId: txResult.session.id,
+            ownerEmail: request.ownerEmail,
+            passesNeeded: billingResult.guestPassesUsed
+          }
         });
       }
     }
+    
+    logger.info('[createSessionWithUsageTracking] Session created with new billing', {
+      extra: {
+        sessionId: txResult.session.id,
+        totalOverageFees: billingResult.totalOverageFees,
+        totalGuestFees: billingResult.totalGuestFees,
+        guestPassesUsed: billingResult.guestPassesUsed
+      }
+    });
     
     logger.info('[createSessionWithUsageTracking] Session created with usage tracking', {
       extra: {

@@ -909,12 +909,13 @@ async function autoMatchBookingRequests(
         emailPrefix = 'walkin';
       }
       
-      // Generate visitor email
+      // Generate visitor email with random suffix to prevent collisions
       const dateStr = row.booking_date instanceof Date 
         ? row.booking_date.toISOString().split('T')[0].replace(/-/g, '') 
         : row.booking_date.replace(/-/g, '');
       const timeStr = (row.start_time || '12:00').replace(/:/g, '').substring(0, 4);
-      const generatedEmail = `${emailPrefix}-${dateStr}-${timeStr}@visitors.evenhouse.club`;
+      const randomSuffix = Math.random().toString(36).substring(2, 6);
+      const generatedEmail = `${emailPrefix}-${dateStr}-${timeStr}-${randomSuffix}@visitors.evenhouse.club`;
       
       // Parse name - extract actual person name from booking name if possible
       let firstName = 'Visitor';

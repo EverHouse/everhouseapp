@@ -80,6 +80,7 @@ export {
   enqueueHubSpotSync,
   processHubSpotQueue,
   getQueueStats,
+  recoverStuckProcessingJobs,
   type HubSpotOperation
 } from './queue';
 

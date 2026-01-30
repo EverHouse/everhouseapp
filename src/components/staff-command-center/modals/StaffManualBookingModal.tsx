@@ -2,7 +2,6 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { ModalShell } from '../../ModalShell';
 import { MemberSearchInput, type SelectedMember } from '../../shared/MemberSearchInput';
 import { getTodayPacific, formatTime12Hour, formatDateShort } from '../../../utils/dateUtils';
-import toast from 'react-hot-toast';
 
 const TRACKMAN_PORTAL_URL = 'https://portal.trackmangolf.com/facility/RmFjaWxpdHkKZGI4YWMyN2FhLTM2YWQtNDM4ZC04MjUzLWVmOWU5NzMwMjkxZg==';
 
@@ -245,7 +244,6 @@ export function StaffManualBookingModal({
       await navigator.clipboard.writeText(text);
       setLessonCopied(true);
       setTimeout(() => setLessonCopied(false), 2000);
-      toast.success('Notes copied to clipboard');
     } catch (err) {
       console.error('Failed to copy:', err);
     }

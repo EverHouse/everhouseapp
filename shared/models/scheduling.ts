@@ -434,7 +434,19 @@ export const trackmanBaySlots = pgTable("trackman_bay_slots", {
   uniqueIndex("trackman_bay_slots_unique_idx").on(table.resourceId, table.slotDate, table.startTime, table.trackmanBookingId),
 ]);
 
+export const trackmanWebhookDedup = pgTable("trackman_webhook_dedup", {
+  id: serial("id").primaryKey(),
+  trackmanBookingId: varchar("trackman_booking_id").notNull().unique(),
+  receivedAt: timestamp("received_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("trackman_webhook_dedup_booking_idx").on(table.trackmanBookingId),
+  index("trackman_webhook_dedup_received_idx").on(table.receivedAt),
+]);
+
 export type TrackmanWebhookEvent = typeof trackmanWebhookEvents.$inferSelect;
 export type InsertTrackmanWebhookEvent = typeof trackmanWebhookEvents.$inferInsert;
 export type TrackmanBaySlot = typeof trackmanBaySlots.$inferSelect;
 export type InsertTrackmanBaySlot = typeof trackmanBaySlots.$inferInsert;
+export type TrackmanWebhookDedup = typeof trackmanWebhookDedup.$inferSelect;
+export type InsertTrackmanWebhookDedup = typeof trackmanWebhookDedup.$inferInsert;

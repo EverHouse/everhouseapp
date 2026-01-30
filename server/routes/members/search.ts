@@ -23,6 +23,8 @@ router.get('/api/members/search', isAuthenticated, async (req, res) => {
     
     let whereConditions = and(
       sql`${users.archivedAt} IS NULL`,
+      // Exclude directory_hidden users (auto-generated visitors, etc.)
+      sql`(${users.tags} IS NULL OR NOT (${users.tags} @> '["directory_hidden"]'::jsonb))`,
       sql`(
         LOWER(COALESCE(${users.firstName}, '') || ' ' || COALESCE(${users.lastName}, '')) LIKE ${searchTerm}
         OR LOWER(COALESCE(${users.firstName}, '')) LIKE ${searchTerm}

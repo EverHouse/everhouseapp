@@ -1240,6 +1240,31 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
   }
   process.stderr.write(`[Trackman Import] Found ${importBookingIds.size} valid booking IDs in import file\n`);
 
+  // Calculate CSV date range to prevent accidental cancellations outside the CSV's date scope
+  let csvDateRange: { min: string; max: string } | null = null;
+  const csvDates = new Set<string>();
+  for (let i = 1; i < parsedRows.length; i++) {
+    const fields = parsedRows[i];
+    if (fields.length >= 9) {
+      const startDate = fields[8]; // startDate field
+      if (startDate) {
+        const date = extractDate(startDate);
+        if (date) {
+          csvDates.add(date);
+        }
+      }
+    }
+  }
+  
+  if (csvDates.size > 0) {
+    const sortedDates = Array.from(csvDates).sort();
+    csvDateRange = {
+      min: sortedDates[0],
+      max: sortedDates[sortedDates.length - 1]
+    };
+    process.stderr.write(`[Trackman Import] CSV date range: ${csvDateRange.min} to ${csvDateRange.max}\n`);
+  }
+
   for (let i = 1; i < parsedRows.length; i++) {
     try {
       const fields = parsedRows[i];
@@ -1348,7 +1373,9 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         // Check if this booking exists in the system
         const existingBookingToCancel = await db.select({ 
           id: bookingRequests.id,
-          status: bookingRequests.status
+          status: bookingRequests.status,
+          sessionId: bookingRequests.sessionId,
+          createdAt: bookingRequests.createdAt
         })
           .from(bookingRequests)
           .where(sql`trackman_booking_id = ${row.bookingId} OR notes LIKE ${'%[Trackman Import ID:' + row.bookingId + ']%'}`)
@@ -1356,6 +1383,38 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         
         if (existingBookingToCancel.length > 0) {
           const booking = existingBookingToCancel[0];
+          
+          // Determine the booking's date for date-range validation
+          let bookingDate: string | null = null;
+          if (booking.sessionId) {
+            try {
+              const sessionResult = await db.select({ 
+                sessionDate: bookingSessions.sessionDate
+              })
+                .from(bookingSessions)
+                .where(eq(bookingSessions.id, booking.sessionId))
+                .limit(1);
+              
+              if (sessionResult.length > 0) {
+                bookingDate = sessionResult[0].sessionDate;
+              }
+            } catch (dateErr: any) {
+              process.stderr.write(`[Trackman Import] Warning: Failed to fetch session date for booking #${booking.id}: ${dateErr.message}\n`);
+            }
+          }
+          
+          // Fallback to booking creation date if session date not found
+          if (!bookingDate && booking.createdAt) {
+            const date = booking.createdAt instanceof Date ? booking.createdAt : new Date(booking.createdAt);
+            bookingDate = date.toISOString().split('T')[0];
+          }
+          
+          // Skip cancellations outside CSV date range to prevent accidental data loss
+          if (csvDateRange && bookingDate && (bookingDate < csvDateRange.min || bookingDate > csvDateRange.max)) {
+            process.stderr.write(`[Trackman Import] Skipping out-of-range cancellation: Booking #${booking.id} (Trackman ID: ${row.bookingId}, date: ${bookingDate}) is outside CSV range [${csvDateRange.min} to ${csvDateRange.max}]\n`);
+            skippedRows++;
+            continue;
+          }
           
           // Only cancel if not already cancelled
           if (booking.status !== 'cancelled') {
@@ -1378,7 +1437,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
             await db.delete(bookingGuests)
               .where(eq(bookingGuests.bookingId, booking.id));
             
-            process.stderr.write(`[Trackman Import] Cancelled booking #${booking.id} (Trackman ID: ${row.bookingId}) - status was ${booking.status}\n`);
+            process.stderr.write(`[Trackman Import] Cancelled booking #${booking.id} (Trackman ID: ${row.bookingId}, date: ${bookingDate}) - status was ${booking.status}\n`);
             cancelledBookings++;
           } else {
             // Already cancelled, just skip

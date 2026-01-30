@@ -159,6 +159,19 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
           error,
           extra: { jobId: job.id, operation: job.operation }
         });
+        
+        // Alert staff so failed syncs don't go unnoticed
+        try {
+          const { notifyAllStaff } = await import('../staffNotifications');
+          await notifyAllStaff(
+            'HubSpot Sync Failed Permanently',
+            `Job ${job.id} (${job.operation}) failed after ${job.max_retries} retries. ` +
+            `Last error: ${error.message}. Manual intervention may be required.`,
+            'integration_error'
+          );
+        } catch (notifyErr) {
+          logger.error('[HubSpot Queue] Failed to notify staff of dead job', { error: notifyErr });
+        }
       }
       
       stats.failed++;
@@ -224,6 +237,34 @@ async function executeHubSpotOperation(operation: string, payload: any): Promise
       
     default:
       throw new Error(`Unknown HubSpot operation: ${operation}`);
+  }
+}
+
+// Recover jobs stuck in 'processing' status (server crash recovery)
+export async function recoverStuckProcessingJobs(): Promise<number> {
+  try {
+    const result = await pool.query(`
+      UPDATE hubspot_sync_queue
+      SET status = 'failed', 
+          retry_count = retry_count + 1,
+          last_error = 'Processing timeout - server may have crashed',
+          next_retry_at = NOW() + INTERVAL '5 minutes',
+          updated_at = NOW()
+      WHERE status = 'processing' 
+        AND updated_at < NOW() - INTERVAL '10 minutes'
+      RETURNING id
+    `);
+    
+    if ((result.rowCount || 0) > 0) {
+      logger.warn('[HubSpot Queue] Recovered stuck processing jobs', { 
+        extra: { count: result.rowCount }
+      });
+    }
+    
+    return result.rowCount || 0;
+  } catch (error) {
+    logger.error('[HubSpot Queue] Error recovering stuck jobs', { error });
+    return 0;
   }
 }
 

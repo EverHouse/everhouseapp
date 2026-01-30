@@ -1,4 +1,4 @@
-import { processHubSpotQueue, getQueueStats } from '../core/hubspot';
+import { processHubSpotQueue, getQueueStats, recoverStuckProcessingJobs } from '../core/hubspot';
 import { logger } from '../core/logger';
 import { alertOnScheduledTaskFailure } from '../core/dataAlerts';
 
@@ -13,6 +13,9 @@ async function processQueue(): Promise<void> {
   isProcessing = true;
   
   try {
+    // First, recover any jobs stuck in 'processing' state (server crash recovery)
+    await recoverStuckProcessingJobs();
+    
     const stats = await processHubSpotQueue(20); // Process up to 20 jobs per batch
     
     if (stats.processed > 0) {

@@ -68,6 +68,7 @@ async function checkResourceEventOrder(
   eventTimestamp: number
 ): Promise<boolean> {
   const EVENT_PRIORITY: Record<string, number> = {
+    // Payment intent lifecycle
     'payment_intent.created': 1,
     'payment_intent.processing': 2,
     'payment_intent.requires_action': 3,
@@ -75,6 +76,7 @@ async function checkResourceEventOrder(
     'payment_intent.payment_failed': 10,
     'charge.succeeded': 11,
     'charge.refunded': 20,
+    // Invoice lifecycle
     'invoice.created': 1,
     'invoice.finalized': 2,
     'invoice.payment_succeeded': 10,
@@ -82,6 +84,12 @@ async function checkResourceEventOrder(
     'invoice.paid': 11,
     'invoice.voided': 20,
     'invoice.marked_uncollectible': 20,
+    // Subscription lifecycle (prevents cancelled user reactivation)
+    'customer.subscription.created': 1,
+    'customer.subscription.updated': 5,
+    'customer.subscription.paused': 8,
+    'customer.subscription.resumed': 9,
+    'customer.subscription.deleted': 20,
   };
 
   const currentPriority = EVENT_PRIORITY[eventType] || 5;

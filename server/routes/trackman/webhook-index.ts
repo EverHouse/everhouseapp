@@ -74,6 +74,68 @@ async function notifyMemberBookingConfirmed(
   }
 }
 
+/**
+ * Extract trackmanBookingId from webhook payload (handles both V1 and V2 formats)
+ */
+function extractTrackmanBookingId(payload: any): string | undefined {
+  // V2 format: payload.booking.id
+  if (payload?.booking?.id !== undefined) {
+    return String(payload.booking.id);
+  }
+  
+  // V1 format: payload.data.id or payload.data.booking_id
+  if (payload?.data?.id !== undefined) {
+    return String(payload.data.id);
+  }
+  if (payload?.data?.booking_id !== undefined) {
+    return String(payload.data.booking_id);
+  }
+  
+  // Fallback: direct payload.id or payload.booking_id
+  if (payload?.id !== undefined) {
+    return String(payload.id);
+  }
+  if (payload?.booking_id !== undefined) {
+    return String(payload.booking_id);
+  }
+  
+  return undefined;
+}
+
+/**
+ * Check if webhook is a duplicate using idempotency guard
+ * Returns true if this is a NEW webhook (not a duplicate)
+ * Returns false if this is a DUPLICATE webhook
+ */
+async function checkWebhookIdempotency(trackmanBookingId: string): Promise<boolean> {
+  try {
+    // Try to INSERT the webhook ID. If it already exists (CONFLICT), this will return no rows
+    const dedupResult = await pool.query(
+      `INSERT INTO trackman_webhook_dedup (trackman_booking_id, received_at)
+       VALUES ($1, NOW())
+       ON CONFLICT (trackman_booking_id) DO NOTHING
+       RETURNING id`,
+      [trackmanBookingId]
+    );
+    
+    const isNewWebhook = (dedupResult.rowCount || 0) > 0;
+    
+    if (!isNewWebhook) {
+      logger.info('[Trackman Webhook] Duplicate webhook ignored - idempotency guard triggered', {
+        extra: { trackmanBookingId }
+      });
+    }
+    
+    return isNewWebhook;
+  } catch (error) {
+    logger.error('[Trackman Webhook] Failed to check webhook idempotency', {
+      extra: { trackmanBookingId, error: (error as Error).message }
+    });
+    // On error, allow processing to continue (fail open)
+    return true;
+  }
+}
+
 router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
   logger.info('[Trackman Webhook] Received webhook', {
     extra: { 
@@ -110,6 +172,19 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
   }
   
   const payload: TrackmanWebhookPayload = req.body;
+  
+  // Check for duplicate webhook using idempotency guard BEFORE processing
+  const trackmanBookingIdFromPayload = extractTrackmanBookingId(payload);
+  if (trackmanBookingIdFromPayload) {
+    const isNewWebhook = await checkWebhookIdempotency(trackmanBookingIdFromPayload);
+    if (!isNewWebhook) {
+      // Duplicate webhook - return success immediately without processing
+      logger.info('[Trackman Webhook] Duplicate webhook detected - returning early', {
+        extra: { trackmanBookingId: trackmanBookingIdFromPayload }
+      });
+      return res.status(200).json({ received: true, duplicate: true });
+    }
+  }
   
   res.status(200).json({ received: true });
   

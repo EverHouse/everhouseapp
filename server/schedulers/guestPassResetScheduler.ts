@@ -1,7 +1,24 @@
 import { pool } from '../core/db';
-import { getPacificHour, getPacificDayOfMonth } from '../utils/dateUtils';
+import { getPacificHour, getPacificDayOfMonth, getPacificDateParts } from '../utils/dateUtils';
 
 const RESET_HOUR = 3;
+
+async function tryClaimResetSlot(monthKey: string): Promise<boolean> {
+  try {
+    const result = await pool.query(
+      `INSERT INTO system_settings (key, value, updated_at)
+       VALUES ('last_guest_pass_reset', $1, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()
+       WHERE system_settings.value IS DISTINCT FROM $1
+       RETURNING key`,
+      [monthKey]
+    );
+    return (result.rowCount || 0) > 0;
+  } catch (err) {
+    console.error('[Guest Pass Reset] Failed to claim reset slot:', err);
+    return false;
+  }
+}
 
 async function resetGuestPasses(): Promise<void> {
   try {
@@ -9,6 +26,15 @@ async function resetGuestPasses(): Promise<void> {
     const dayOfMonth = getPacificDayOfMonth();
     
     if (currentHour !== RESET_HOUR || dayOfMonth !== 1) {
+      return;
+    }
+    
+    // Create a unique key for this month to prevent double runs
+    const parts = getPacificDateParts();
+    const monthKey = `${parts.year}-${String(parts.month).padStart(2, '0')}`;
+    
+    if (!await tryClaimResetSlot(monthKey)) {
+      console.log('[Guest Pass Reset] Already ran this month, skipping');
       return;
     }
     

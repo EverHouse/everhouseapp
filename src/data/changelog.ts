@@ -13,6 +13,27 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.48.0",
+    date: "2026-01-30",
+    title: "Infrastructure Reliability & Data Protection Audit",
+    isMajor: true,
+    changes: [
+      "Fixed: Cancelled membership webhooks can no longer accidentally reactivate cancelled users (subscription event ordering)",
+      "Fixed: Guest pass deductions are now atomic - prevents double-charging on simultaneous bookings",
+      "Fixed: Trackman import cancellations now validate date ranges to prevent accidental data loss",
+      "Fixed: User merge now checks for active sessions before proceeding (prevents mid-session data corruption)",
+      "Fixed: Webhook duplicate processing prevented with idempotency guard (new trackman_webhook_dedup table)",
+      "Fixed: Visitor email collisions prevented with random suffix generation",
+      "Fixed: Member search now excludes auto-generated visitors (directory_hidden users)",
+      "Fixed: Webhook time matching tolerance reduced from 30 to 10 minutes for more accurate booking links",
+      "Fixed: Guest pass reset scheduler now uses slot claiming to prevent double runs on restarts",
+      "Improved: Stripe reconciliation failures now alert staff (no silent failures)",
+      "Improved: HubSpot queue dead jobs now notify staff for manual intervention",
+      "Improved: HubSpot queue recovers jobs stuck in 'processing' state after server crashes",
+      "Improved: User merge now properly updates guest 'created_by' references"
+    ]
+  },
+  {
     version: "9.47.1",
     date: "2026-01-29",
     title: "Zombie User Fix & Lesson Cleanup Tool",

@@ -770,7 +770,7 @@ export async function tryMatchByBayDateTime(
   playerCount: number
 ): Promise<{ matched: boolean; bookingId?: number; memberEmail?: string; memberName?: string }> {
   try {
-    // Find pending or approved bookings at the same bay/date/time (within 30 min tolerance)
+    // Find pending or approved bookings at the same bay/date/time (within 10 min tolerance)
     const result = await pool.query(
       `SELECT id, user_email, user_name, status, start_time, end_time, duration_minutes, session_id
        FROM booking_requests 
@@ -778,7 +778,7 @@ export async function tryMatchByBayDateTime(
          AND request_date = $2
          AND trackman_booking_id IS NULL
          AND status IN ('pending', 'approved')
-         AND ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) <= 1800
+         AND ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) <= 600
        ORDER BY 
          CASE WHEN status = 'pending' THEN 0 ELSE 1 END,
          ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) ASC

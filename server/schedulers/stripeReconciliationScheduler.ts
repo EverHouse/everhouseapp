@@ -52,6 +52,14 @@ async function checkAndRunReconciliation(): Promise<void> {
           console.log('[Stripe Reconciliation] Subscription reconciliation complete:', subscriptionResults);
         } catch (error) {
           console.error('[Stripe Reconciliation] Error running reconciliation:', error);
+          
+          // Alert staff so financial discrepancies don't go unnoticed
+          const { alertOnScheduledTaskFailure } = await import('../core/dataAlerts');
+          await alertOnScheduledTaskFailure(
+            'Daily Stripe Reconciliation',
+            error instanceof Error ? error : new Error(String(error)),
+            { context: 'Scheduled reconciliation at 5am Pacific' }
+          );
         }
       }
     }
