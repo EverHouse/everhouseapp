@@ -588,6 +588,8 @@ const TiersTab: React.FC = () => {
                                                     stripe_product_id: null,
                                                     price_cents: null
                                                 });
+                                                setSuccessMessage('Stripe link removed. Save to confirm.');
+                                                setTimeout(() => setSuccessMessage(null), 3000);
                                             }}
                                             className="ml-auto px-2 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                                         >
