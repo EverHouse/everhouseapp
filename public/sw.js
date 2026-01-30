@@ -15,8 +15,17 @@ const CACHEABLE_API_ENDPOINTS = ['events', 'wellness-classes', 'cafe-menu', 'hou
 self.addEventListener('install', function(event) {
   console.log('[SW] Installing new version:', BUILD_VERSION);
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(STATIC_ASSETS))
+    caches.keys().then(keys => {
+      return Promise.all(
+        keys.filter(key => key.startsWith('ever-house-') || key.startsWith('api-cache-'))
+          .map(key => {
+            console.log('[SW] Pre-clearing cache during install:', key);
+            return caches.delete(key);
+          })
+      );
+    }).then(() => {
+      return caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS));
+    })
   );
 });
 
@@ -85,11 +94,25 @@ self.addEventListener('fetch', function(event) {
     event.respondWith(
       fetch(request)
         .then(response => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+          }
           return response;
         })
-        .catch(() => caches.match(request))
+        .catch(() => {
+          return caches.match(request).then(cachedResponse => {
+            if (cachedResponse) {
+              return cachedResponse;
+            }
+            return caches.match('/').then(fallback => {
+              return fallback || new Response('App offline. Please refresh when online.', {
+                status: 503,
+                headers: { 'Content-Type': 'text/plain' }
+              });
+            });
+          });
+        })
     );
     return;
   }

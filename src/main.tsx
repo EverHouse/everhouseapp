@@ -4,6 +4,26 @@ import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 
+declare global {
+  interface Window {
+    clearPWACaches: () => Promise<void>;
+  }
+}
+
+window.clearPWACaches = async () => {
+  if ('caches' in window) {
+    const keys = await caches.keys();
+    await Promise.all(keys.map(key => caches.delete(key)));
+    console.log('[App] All caches cleared');
+  }
+  if ('serviceWorker' in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map(reg => reg.unregister()));
+    console.log('[App] Service workers unregistered');
+  }
+  window.location.reload();
+};
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
@@ -28,6 +48,11 @@ if ('serviceWorker' in navigator) {
       
     } catch (error) {
       console.error('[App] Service worker registration failed:', error);
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(key => caches.delete(key)));
+        console.log('[App] Cleared caches after SW registration failure');
+      }
     }
   });
 }
