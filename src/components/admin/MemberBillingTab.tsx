@@ -1074,49 +1074,23 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
           billingProviders={BILLING_PROVIDERS}
           onUpdateBillingSource={handleUpdateBillingSource}
           isUpdatingSource={isUpdatingSource}
+          hasStripeCustomer={!!billingInfo.stripeCustomerId}
+          onCreateSubscription={async () => {
+            setShowCreateSubscriptionModal(true);
+            setIsLoadingCoupons(true);
+            try {
+              const res = await fetch('/api/stripe/coupons', { credentials: 'include' });
+              if (res.ok) {
+                const data = await res.json();
+                setAvailableCoupons(data.coupons || []);
+              }
+            } catch (err) {
+              console.error('Failed to load coupons:', err);
+            } finally {
+              setIsLoadingCoupons(false);
+            }
+          }}
         />
-      )}
-
-      {/* Create Subscription option - when Stripe customer exists but no active subscription */}
-      {billingInfo?.stripeCustomerId && !billingInfo?.activeSubscription && (
-        <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isDark ? 'bg-green-500/20' : 'bg-green-100'}`}>
-              <span className={`material-symbols-outlined ${isDark ? 'text-green-400' : 'text-green-600'}`}>add_card</span>
-            </div>
-            <div className="flex-1">
-              <p className={`text-sm font-medium ${isDark ? 'text-white' : 'text-primary'}`}>No Active Subscription</p>
-              <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                {billingInfo?.billingProvider === 'mindbody'
-                  ? 'Create a Stripe subscription to migrate this member from Mindbody billing.'
-                  : 'This member has Stripe set up but no active membership subscription.'}
-              </p>
-            </div>
-            <button
-              onClick={async () => {
-                setShowCreateSubscriptionModal(true);
-                setIsLoadingCoupons(true);
-                try {
-                  const res = await fetch('/api/stripe/coupons', { credentials: 'include' });
-                  if (res.ok) {
-                    const data = await res.json();
-                    setAvailableCoupons(data.coupons || []);
-                  }
-                } catch (err) {
-                  console.error('Failed to load coupons:', err);
-                } finally {
-                  setIsLoadingCoupons(false);
-                }
-              }}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isDark ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30' : 'bg-green-100 text-green-700 hover:bg-green-200'
-              }`}
-            >
-              <span className="material-symbols-outlined text-base">add</span>
-              Create Subscription
-            </button>
-          </div>
-        </div>
       )}
 
       {billingInfo?.billingProvider === 'mindbody' && (

@@ -72,6 +72,8 @@ interface StripeBillingSectionProps {
   billingProviders?: BillingProvider[];
   onUpdateBillingSource?: (source: string) => void;
   isUpdatingSource?: boolean;
+  onCreateSubscription?: () => void;
+  hasStripeCustomer?: boolean;
 }
 
 function formatCurrency(cents: number): string {
@@ -127,6 +129,8 @@ export const StripeBillingSection: React.FC<StripeBillingSectionProps> = ({
   billingProviders = [],
   onUpdateBillingSource,
   isUpdatingSource = false,
+  onCreateSubscription,
+  hasStripeCustomer = false,
 }) => {
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -393,6 +397,33 @@ export const StripeBillingSection: React.FC<StripeBillingSectionProps> = ({
             <p className={`text-xs mt-1.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
               Change how this member's subscription is managed.
             </p>
+          </div>
+        )}
+
+        {onCreateSubscription && hasStripeCustomer && !activeSubscription && (
+          <div className={`mt-4 p-4 rounded-lg ${isDark ? 'bg-green-500/10 border border-green-500/20' : 'bg-green-50 border border-green-200'}`}>
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isDark ? 'bg-green-500/20' : 'bg-green-100'}`}>
+                <span className={`material-symbols-outlined ${isDark ? 'text-green-400' : 'text-green-600'}`}>add_card</span>
+              </div>
+              <div className="flex-1">
+                <p className={`text-sm font-medium ${isDark ? 'text-white' : 'text-primary'}`}>Create Subscription</p>
+                <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {billingProvider === 'mindbody'
+                    ? 'Create a Stripe subscription to migrate from Mindbody billing.'
+                    : 'Set up a membership subscription for this member.'}
+                </p>
+              </div>
+              <button
+                onClick={onCreateSubscription}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isDark ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30' : 'bg-green-100 text-green-700 hover:bg-green-200'
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">add</span>
+                Create
+              </button>
+            </div>
           </div>
         )}
       </div>
