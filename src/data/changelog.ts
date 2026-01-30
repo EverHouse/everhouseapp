@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.50.1",
+    date: "2026-01-30",
+    title: "Orphaned Stripe Customer Detection",
+    changes: [
+      "Improved: Data integrity now properly identifies orphaned Stripe customers (IDs in database that no longer exist in Stripe)",
+      "Improved: Cleaner error messages for orphaned customers instead of scary stack traces",
+      "Fixed: Stripe subscription sync check now categorizes 'customer not found' as a data quality issue"
+    ]
+  },
+  {
     version: "9.50.0",
     date: "2026-01-30",
     title: "Stripe Customer Email Linking",

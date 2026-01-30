@@ -1075,8 +1075,27 @@ async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResult> {
         }
       }
     } catch (err: any) {
-      if (!isProduction) console.error(`[DataIntegrity] Error fetching Stripe subscriptions for ${customerId}:`, err);
-      if (err?.code !== 'resource_missing') {
+      const isCustomerNotFound = err?.type === 'StripeInvalidRequestError' && 
+        (err?.code === 'resource_missing' || err?.message?.includes('No such customer'));
+      
+      if (isCustomerNotFound) {
+        issues.push({
+          category: 'data_quality',
+          severity: 'error',
+          table: 'users',
+          recordId: member.id,
+          description: `Member "${memberName}" has orphaned Stripe customer ID (${customerId}) - customer no longer exists in Stripe`,
+          suggestion: 'Clear the stripe_customer_id field or run Stripe cleanup to remove orphaned references',
+          context: {
+            memberName,
+            memberEmail: member.email || undefined,
+            stripeCustomerId: customerId,
+            userId: member.id,
+            errorType: 'orphaned_stripe_customer'
+          }
+        });
+      } else {
+        if (!isProduction) console.warn(`[DataIntegrity] Stripe API error for ${customerId}:`, err.message);
         issues.push({
           category: 'sync_mismatch',
           severity: 'warning',
