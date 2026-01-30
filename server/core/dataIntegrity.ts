@@ -1379,6 +1379,105 @@ async function checkBookingsWithoutSessions(): Promise<IntegrityCheckResult> {
   };
 }
 
+async function checkDuplicateStripeCustomers(): Promise<IntegrityCheckResult> {
+  const issues: IntegrityIssue[] = [];
+  
+  const duplicatesResult = await db.execute(sql`
+    WITH users_with_stripe AS (
+      SELECT id, email, stripe_customer_id, LOWER(email) as normalized_email
+      FROM users
+      WHERE stripe_customer_id IS NOT NULL
+    ),
+    linked_with_stripe AS (
+      SELECT u.id as user_id, u.email as primary_email, u.stripe_customer_id, 
+             LOWER(ule.linked_email) as normalized_email
+      FROM users u
+      JOIN user_linked_emails ule ON ule.user_id = u.id
+      WHERE u.stripe_customer_id IS NOT NULL
+    ),
+    all_email_mappings AS (
+      SELECT id as user_id, email as primary_email, stripe_customer_id, normalized_email
+      FROM users_with_stripe
+      UNION ALL
+      SELECT user_id, primary_email, stripe_customer_id, normalized_email
+      FROM linked_with_stripe
+    ),
+    email_customer_counts AS (
+      SELECT 
+        normalized_email,
+        COUNT(DISTINCT stripe_customer_id) as customer_count,
+        ARRAY_AGG(DISTINCT stripe_customer_id) as customer_ids,
+        ARRAY_AGG(DISTINCT primary_email) as member_emails
+      FROM all_email_mappings
+      GROUP BY normalized_email
+      HAVING COUNT(DISTINCT stripe_customer_id) > 1
+    )
+    SELECT * FROM email_customer_counts
+    ORDER BY customer_count DESC
+    LIMIT 25
+  `);
+  
+  const duplicates = duplicatesResult.rows as any[];
+  
+  for (const dup of duplicates) {
+    issues.push({
+      category: 'data_quality',
+      severity: 'warning',
+      table: 'users',
+      recordId: dup.normalized_email,
+      description: `Email "${dup.normalized_email}" has ${dup.customer_count} different Stripe customers: ${(dup.customer_ids as string[]).join(', ')}`,
+      suggestion: 'Consolidate to a single Stripe customer to prevent billing issues and duplicate charges.',
+      context: {
+        email: dup.normalized_email,
+        stripeCustomerIds: dup.customer_ids,
+        memberEmails: dup.member_emails
+      }
+    });
+  }
+
+  const sharedCustomersResult = await db.execute(sql`
+    SELECT 
+      stripe_customer_id,
+      COUNT(*) as user_count,
+      ARRAY_AGG(email ORDER BY created_at DESC) as emails
+    FROM users
+    WHERE stripe_customer_id IS NOT NULL
+    GROUP BY stripe_customer_id
+    HAVING COUNT(*) > 1
+    LIMIT 25
+  `);
+  
+  const sharedCustomers = sharedCustomersResult.rows as any[];
+  
+  for (const shared of sharedCustomers) {
+    const emails = shared.emails as string[];
+    if (emails.length <= 2) {
+      continue;
+    }
+    
+    issues.push({
+      category: 'data_quality',
+      severity: 'info',
+      table: 'users',
+      recordId: shared.stripe_customer_id,
+      description: `Stripe customer ${shared.stripe_customer_id} is shared by ${shared.user_count} members: ${emails.slice(0, 5).join(', ')}${emails.length > 5 ? '...' : ''}`,
+      suggestion: 'This may be intentional for billing groups. Review if these should be separate customers.',
+      context: {
+        stripeCustomerId: shared.stripe_customer_id,
+        memberEmails: emails
+      }
+    });
+  }
+
+  return {
+    checkName: 'Duplicate Stripe Customers',
+    status: issues.length === 0 ? 'pass' : issues.some(i => i.severity === 'warning') ? 'warning' : 'info',
+    issueCount: issues.length,
+    issues,
+    lastRun: new Date()
+  };
+}
+
 async function storeCheckHistory(results: IntegrityCheckResult[], triggeredBy: 'manual' | 'scheduled' = 'manual'): Promise<void> {
   const totalIssues = results.reduce((sum, r) => sum + r.issueCount, 0);
   
@@ -1477,7 +1576,8 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
     checkStripeSubscriptionSync(),
     checkStuckTransitionalMembers(),
     checkTierReconciliation(),
-    checkBookingsWithoutSessions()
+    checkBookingsWithoutSessions(),
+    checkDuplicateStripeCustomers()
   ]);
   
   const now = new Date();

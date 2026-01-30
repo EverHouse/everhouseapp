@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.50.0",
+    date: "2026-01-30",
+    title: "Stripe Customer Email Linking",
+    isMajor: true,
+    changes: [
+      "New: Stripe customers are now tied to member emails including linked emails",
+      "New: When creating a Stripe customer, system checks all linked emails to prevent duplicates",
+      "New: Data integrity check 'Duplicate Stripe Customers' detects members sharing the same email with different Stripe customers",
+      "Improved: Stripe customer metadata now includes primary email and linked emails for better tracking",
+      "Improved: Fails fast on Stripe network/rate limit errors to prevent accidental duplicate creation",
+      "Improved: Deterministic customer selection - prefers primary email match, then most recent"
+    ]
+  },
+  {
     version: "9.49.4",
     date: "2026-01-30",
     title: "Stripe Error Handling Improvements",

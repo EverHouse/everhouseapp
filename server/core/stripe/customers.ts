@@ -19,6 +19,40 @@ export async function getOrCreateStripeCustomer(
     return { customerId: userResult.rows[0].stripe_customer_id, isNew: false };
   }
 
+  const linkedEmailsResult = await pool.query(
+    `SELECT linked_email FROM user_linked_emails WHERE user_id = $1`,
+    [userId]
+  );
+  const linkedEmails = linkedEmailsResult.rows.map((r: any) => r.linked_email.toLowerCase());
+  const allEmails = [email.toLowerCase(), ...linkedEmails];
+  const uniqueEmails = [...new Set(allEmails)];
+
+  const existingFromLinkedResult = await pool.query(
+    `SELECT u.stripe_customer_id, u.email,
+            CASE WHEN LOWER(u.email) = $2 THEN 0 ELSE 1 END as priority
+     FROM users u 
+     WHERE u.stripe_customer_id IS NOT NULL 
+       AND (LOWER(u.email) = ANY($1) 
+            OR EXISTS (SELECT 1 FROM user_linked_emails ule 
+                       WHERE ule.user_id = u.id 
+                       AND LOWER(ule.linked_email) = ANY($1)))
+     ORDER BY priority ASC, u.created_at DESC
+     LIMIT 1`,
+    [uniqueEmails, email.toLowerCase()]
+  );
+  
+  if (existingFromLinkedResult.rows[0]?.stripe_customer_id) {
+    const existingCustomerId = existingFromLinkedResult.rows[0].stripe_customer_id;
+    console.log(`[Stripe] Found existing customer ${existingCustomerId} via linked email for user ${userId}`);
+    
+    await pool.query(
+      'UPDATE users SET stripe_customer_id = $1, updated_at = NOW() WHERE id = $2',
+      [existingCustomerId, userId]
+    );
+    
+    return { customerId: existingCustomerId, isNew: false };
+  }
+
   let stripe;
   try {
     stripe = await getStripeClient();
@@ -28,16 +62,52 @@ export async function getOrCreateStripeCustomer(
     throw error;
   }
   
-  let existingCustomers;
-  try {
-    existingCustomers = await stripe.customers.list({
-      email: email.toLowerCase(),
-      limit: 1
-    });
-  } catch (error: any) {
-    console.error('[Stripe] Failed to search for existing customer:', error);
-    await alertOnExternalServiceError('Stripe', error, 'search for existing customer');
-    throw error;
+  let foundCustomerId: string | null = null;
+  let foundViaEmail: string | null = null;
+  const stripeErrors: Array<{ email: string; error: string }> = [];
+  
+  for (const searchEmail of uniqueEmails) {
+    try {
+      const existingCustomers = await stripe.customers.list({
+        email: searchEmail,
+        limit: 10
+      });
+      if (existingCustomers.data.length > 0) {
+        const sortedCustomers = existingCustomers.data.sort((a, b) => b.created - a.created);
+        const primaryEmailMatch = sortedCustomers.find(c => 
+          c.email?.toLowerCase() === email.toLowerCase()
+        );
+        const selectedCustomer = primaryEmailMatch || sortedCustomers[0];
+        
+        foundCustomerId = selectedCustomer.id;
+        foundViaEmail = searchEmail;
+        console.log(`[Stripe] Found existing customer ${foundCustomerId} in Stripe via email ${searchEmail} (preferred: ${primaryEmailMatch ? 'primary match' : 'most recent'})`);
+        
+        if (existingCustomers.data.length > 1) {
+          console.warn(`[Stripe] Multiple customers found for ${searchEmail}: ${existingCustomers.data.map(c => c.id).join(', ')} - selected ${foundCustomerId}`);
+        }
+        break;
+      }
+    } catch (error: any) {
+      const isRateLimitOrNetwork = error.type === 'StripeRateLimitError' || 
+        error.type === 'StripeConnectionError' ||
+        error.code === 'ECONNREFUSED';
+      
+      stripeErrors.push({ email: searchEmail, error: error.message });
+      
+      if (isRateLimitOrNetwork) {
+        console.error(`[Stripe] Critical error searching for customer ${searchEmail}, aborting to prevent duplicates:`, error);
+        await alertOnExternalServiceError('Stripe', error, `search for customer by email ${searchEmail}`);
+        throw new Error(`Stripe unavailable while searching for existing customers - cannot safely create new customer: ${error.message}`);
+      }
+      
+      console.warn(`[Stripe] Non-critical error searching for customer by email ${searchEmail}:`, error.message);
+    }
+  }
+  
+  if (stripeErrors.length === uniqueEmails.length && uniqueEmails.length > 0) {
+    console.error(`[Stripe] All email searches failed, cannot safely create customer`);
+    throw new Error(`Failed to search Stripe for existing customers across all emails: ${stripeErrors.map(e => e.error).join('; ')}`);
   }
 
   let customerId: string;
@@ -45,20 +115,25 @@ export async function getOrCreateStripeCustomer(
 
   const metadata: Record<string, string> = {
     userId: userId,
-    source: 'even_house_app'
+    source: 'even_house_app',
+    primaryEmail: email.toLowerCase()
   };
   if (userTier) {
     metadata.tier = userTier;
   }
+  if (linkedEmails.length > 0) {
+    metadata.linkedEmails = linkedEmails.slice(0, 5).join(',');
+  }
 
   try {
-    if (existingCustomers.data.length > 0) {
-      customerId = existingCustomers.data[0].id;
+    if (foundCustomerId) {
+      customerId = foundCustomerId;
       await stripe.customers.update(customerId, {
         metadata: metadata,
-        name: name || existingCustomers.data[0].name || undefined
+        name: name || undefined,
+        email: email.toLowerCase()
       });
-      console.log(`[Stripe] Updated metadata for existing customer ${customerId}`);
+      console.log(`[Stripe] Updated metadata for existing customer ${customerId}, set primary email to ${email}`);
     } else {
       const customer = await stripe.customers.create({
         email: email.toLowerCase(),
