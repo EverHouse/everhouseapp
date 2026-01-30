@@ -24,7 +24,11 @@ router.get('/api/stripe/subscriptions/:customerId', isStaffOrAdmin, async (req: 
     const result = await listCustomerSubscriptions(customerId);
     
     if (!result.success) {
-      return res.status(500).json({ error: result.error || 'Failed to list subscriptions' });
+      const statusCode = result.errorCode === 'CUSTOMER_NOT_FOUND' ? 404 : 500;
+      return res.status(statusCode).json({ 
+        error: result.error || 'Failed to list subscriptions',
+        errorCode: result.errorCode
+      });
     }
     
     res.json({

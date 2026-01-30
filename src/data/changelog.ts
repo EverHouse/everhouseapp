@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.49.4",
+    date: "2026-01-30",
+    title: "Stripe Error Handling Improvements",
+    changes: [
+      "Fixed: Stripe subscription lookups now gracefully handle customers that no longer exist in Stripe",
+      "Improved: API returns proper 404 status when a Stripe customer is not found instead of 500 error",
+      "Improved: Better error messages distinguish between 'customer not found' and other Stripe errors"
+    ]
+  },
+  {
     version: "9.49.3",
     date: "2026-01-30",
     title: "Fix Tool Endpoint Corrections",

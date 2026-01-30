@@ -111,6 +111,7 @@ export async function listCustomerSubscriptions(customerId: string): Promise<{
     } | null;
   }>;
   error?: string;
+  errorCode?: 'CUSTOMER_NOT_FOUND' | string;
 }> {
   try {
     const stripe = await getStripeClient();
@@ -202,6 +203,18 @@ export async function listCustomerSubscriptions(customerId: string): Promise<{
       }),
     };
   } catch (error: any) {
+    const isCustomerNotFound = error.type === 'StripeInvalidRequestError' && 
+      error.message?.includes('No such customer');
+    
+    if (isCustomerNotFound) {
+      console.warn(`[Stripe Subscriptions] Customer not found: ${customerId}`);
+      return {
+        success: false,
+        error: 'Customer not found in Stripe',
+        errorCode: 'CUSTOMER_NOT_FOUND',
+      };
+    }
+    
     console.error('[Stripe Subscriptions] Error listing subscriptions:', error);
     return {
       success: false,
