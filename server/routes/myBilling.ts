@@ -131,7 +131,9 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
             primaryEmail: familyGroup.primaryEmail,
           };
         }
-      } catch (e) {}
+      } catch (familyError: any) {
+        console.warn('[MyBilling] Family group lookup failed:', familyError.message);
+      }
     }
     
     res.json(billingInfo);
