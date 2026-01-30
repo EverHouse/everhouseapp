@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.49.3",
+    date: "2026-01-30",
+    title: "Fix Tool Endpoint Corrections",
+    changes: [
+      "Fixed: 'Create Sessions' button now uses correct backfill endpoint to actually create billing sessions",
+      "Fixed: Preview for Active Bookings now correctly shows how many will be fixed"
+    ]
+  },
+  {
     version: "9.49.2",
     date: "2026-01-30",
     title: "Data Integrity Fix Tools",

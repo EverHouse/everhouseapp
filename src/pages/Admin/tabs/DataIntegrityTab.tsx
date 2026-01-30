@@ -1609,25 +1609,45 @@ const DataIntegrityTab: React.FC = () => {
     setIsRunningGhostBookingFix(true);
     setGhostBookingResult(null);
     try {
-      const res = await fetch('/api/data-tools/fix-trackman-ghost-bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ dryRun })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setGhostBookingResult({
-          success: true,
-          message: data.message || `Found ${data.totalFound || data.ghostBookings} ghost bookings${data.fixed !== undefined ? `, fixed ${data.fixed}` : ''}`,
-          ghostBookings: data.totalFound || data.ghostBookings,
-          fixed: data.fixed,
-          dryRun
+      if (dryRun) {
+        const res = await fetch('/api/admin/backfill-sessions/preview', {
+          method: 'GET',
+          credentials: 'include'
         });
-        showToast(dryRun ? 'Preview complete - no changes made' : (data.message || 'Ghost booking fix complete'), dryRun ? 'info' : 'success');
+        const data = await res.json();
+        if (res.ok) {
+          setGhostBookingResult({
+            success: true,
+            message: data.message || `Found ${data.totalCount} bookings without sessions`,
+            ghostBookings: data.totalCount,
+            fixed: 0,
+            dryRun: true
+          });
+          showToast('Preview complete - no changes made', 'info');
+        } else {
+          setGhostBookingResult({ success: false, message: data.error || 'Failed to preview' });
+          showToast(data.error || 'Failed to preview', 'error');
+        }
       } else {
-        setGhostBookingResult({ success: false, message: data.error || 'Failed to fix ghost bookings' });
-        showToast(data.error || 'Failed to fix ghost bookings', 'error');
+        const res = await fetch('/api/admin/backfill-sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include'
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setGhostBookingResult({
+            success: true,
+            message: data.message || `Created ${data.sessionsCreated} sessions`,
+            ghostBookings: data.sessionsCreated,
+            fixed: data.sessionsCreated,
+            dryRun: false
+          });
+          showToast(data.message || `Created ${data.sessionsCreated} sessions`, 'success');
+        } else {
+          setGhostBookingResult({ success: false, message: data.error || 'Failed to create sessions' });
+          showToast(data.error || 'Failed to create sessions', 'error');
+        }
       }
     } catch (err) {
       console.error('Failed to fix ghost bookings:', err);
