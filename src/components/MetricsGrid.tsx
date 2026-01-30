@@ -28,7 +28,7 @@ interface MetricCardProps {
   ariaLabel: string;
 }
 
-const MetricCard: React.FC<MetricCardProps> = ({ icon, label, value, subtext, isDark, onClick, ariaLabel }) => (
+const MetricCard: React.FC<MetricCardProps> = React.memo(({ icon, label, value, subtext, isDark, onClick, ariaLabel }) => (
   <button
     type="button"
     onClick={onClick}
@@ -57,7 +57,7 @@ const MetricCard: React.FC<MetricCardProps> = ({ icon, label, value, subtext, is
       </div>
     )}
   </button>
-);
+));
 
 const formatMinutesUsage = (used: number, allowed: number): { value: string; subtext: string } => {
   if (allowed === 999) {
