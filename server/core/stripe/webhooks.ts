@@ -14,6 +14,7 @@ import { handlePrimarySubscriptionCancelled } from './groupBilling';
 import { computeFeeBreakdown } from '../billing/unifiedFeeService';
 import { logPaymentFailure, logWebhookFailure } from '../monitoring';
 import { logSystemAction } from '../auditLog';
+import { queueJobInTransaction } from '../jobQueue';
 import type { PoolClient } from 'pg';
 
 const EVENT_DEDUP_WINDOW_DAYS = 7;
@@ -776,59 +777,48 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: a
     const localAmount = amount;
     const localId = id;
     
-    deferredActions.push(async () => {
-      try {
-        await queuePaymentSyncToHubSpot({
-          email,
-          amountCents: localAmount,
-          purpose: metadata.purpose,
-          description: desc,
-          paymentIntentId: localId
-        });
-      } catch (error) {
-        console.error('[Stripe Webhook] Error queuing HubSpot sync:', error);
-      }
-    });
+    const userResult = await client.query('SELECT first_name, last_name FROM users WHERE email = $1', [email]);
+    const memberName = userResult.rows[0] 
+      ? `${userResult.rows[0].first_name || ''} ${userResult.rows[0].last_name || ''}`.trim() || email
+      : email;
 
-    deferredActions.push(async () => {
-      try {
-        const userResult = await pool.query('SELECT first_name, last_name FROM users WHERE email = $1', [email]);
-        const memberName = userResult.rows[0] 
-          ? `${userResult.rows[0].first_name || ''} ${userResult.rows[0].last_name || ''}`.trim() || email
-          : email;
+    await queueJobInTransaction(client, 'sync_to_hubspot', {
+      email,
+      amountCents: localAmount,
+      purpose: metadata.purpose,
+      description: desc,
+      paymentIntentId: localId
+    }, { webhookEventId: localId, priority: 1 });
 
-        await notifyPaymentSuccess(email, localAmount / 100, desc, { 
-          sendEmail: false, 
-          bookingId: !isNaN(localBookingId) ? localBookingId : undefined 
-        });
+    await queueJobInTransaction(client, 'send_payment_receipt', {
+      to: email,
+      memberName,
+      amount: localAmount / 100,
+      description: desc,
+      date: new Date().toISOString(),
+      paymentMethod: 'card'
+    }, { webhookEventId: localId, priority: 2 });
 
-        await sendPaymentReceiptEmail(email, { 
-          memberName, 
-          amount: localAmount / 100, 
-          description: desc, 
-          date: new Date(),
-          transactionId: localId
-        });
+    await queueJobInTransaction(client, 'notify_payment_success', {
+      userEmail: email,
+      amount: localAmount / 100,
+      description: desc
+    }, { webhookEventId: localId, priority: 1 });
 
-        broadcastBillingUpdate({
-          action: 'payment_succeeded',
-          memberEmail: email,
-          memberName,
-          amount: localAmount / 100
-        });
+    await queueJobInTransaction(client, 'notify_all_staff', {
+      title: 'Payment Received',
+      message: `${memberName} (${email}) made a payment of $${(localAmount / 100).toFixed(2)} for: ${desc}`,
+      type: 'payment_success'
+    }, { webhookEventId: localId, priority: 0 });
 
-        await notifyAllStaff(
-          'Payment Received',
-          `${memberName} (${email}) made a payment of $${(localAmount / 100).toFixed(2)} for: ${desc}`,
-          'payment_success',
-          { sendPush: true }
-        );
+    await queueJobInTransaction(client, 'broadcast_billing_update', {
+      action: 'payment_succeeded',
+      memberEmail: email,
+      memberName,
+      amount: localAmount / 100
+    }, { webhookEventId: localId, priority: 0 });
 
-        console.log(`[Stripe Webhook] Payment notifications sent to ${email} and staff`);
-      } catch (error) {
-        console.error('[Stripe Webhook] Error sending payment notifications:', error);
-      }
-    });
+    console.log(`[Stripe Webhook] Queued ${5} jobs for payment ${localId} to ${email}`);
   }
 
   return deferredActions;

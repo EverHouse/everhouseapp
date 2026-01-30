@@ -64,6 +64,7 @@ import { startGuestPassResetScheduler } from './schedulers/guestPassResetSchedul
 import { startMemberSyncScheduler } from './schedulers/memberSyncScheduler';
 import { startDuplicateCleanupScheduler } from './schedulers/duplicateCleanupScheduler';
 import { processStripeWebhook } from './core/stripe';
+import { startJobProcessor, stopJobProcessor } from './core/jobQueue';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -87,6 +88,7 @@ async function gracefulShutdown(signal: string) {
   }, 30000);
   
   try {
+    stopJobProcessor();
     closeWebSocketServer();
     console.log('[Shutdown] WebSocket server closed');
     
@@ -565,6 +567,7 @@ async function startServer() {
       startMemberSyncScheduler();
       startDuplicateCleanupScheduler();
       startGuestPassResetScheduler();
+      startJobProcessor(5000);
     });
   });
 

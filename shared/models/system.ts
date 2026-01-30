@@ -172,3 +172,46 @@ export const dataExportRequests = pgTable("data_export_requests", {
 
 export type DataExportRequest = typeof dataExportRequests.$inferSelect;
 export type InsertDataExportRequest = typeof dataExportRequests.$inferInsert;
+
+export const rateLimits = pgTable("rate_limits", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 500 }).notNull().unique(),
+  limitType: varchar("limit_type", { length: 50 }).notNull(),
+  count: integer("count").notNull().default(0),
+  resetAt: timestamp("reset_at").notNull(),
+  lockedUntil: timestamp("locked_until"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  keyIdx: uniqueIndex("rate_limits_key_idx").on(table.key),
+  resetAtIdx: index("rate_limits_reset_at_idx").on(table.resetAt),
+}));
+
+export type RateLimit = typeof rateLimits.$inferSelect;
+export type InsertRateLimit = typeof rateLimits.$inferInsert;
+
+export const jobQueue = pgTable("job_queue", {
+  id: serial("id").primaryKey(),
+  jobType: varchar("job_type", { length: 100 }).notNull(),
+  payload: jsonb("payload").notNull(),
+  status: varchar("status", { length: 50 }).notNull().default('pending'),
+  priority: integer("priority").notNull().default(0),
+  maxRetries: integer("max_retries").notNull().default(3),
+  retryCount: integer("retry_count").notNull().default(0),
+  lastError: text("last_error"),
+  lockedAt: timestamp("locked_at"),
+  lockedBy: varchar("locked_by", { length: 255 }),
+  scheduledFor: timestamp("scheduled_for").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  processedAt: timestamp("processed_at"),
+  webhookEventId: varchar("webhook_event_id", { length: 255 }),
+}, (table) => ({
+  statusIdx: index("job_queue_status_idx").on(table.status),
+  jobTypeIdx: index("job_queue_job_type_idx").on(table.jobType),
+  scheduledForIdx: index("job_queue_scheduled_for_idx").on(table.scheduledFor),
+  webhookEventIdx: index("job_queue_webhook_event_idx").on(table.webhookEventId),
+  pendingJobsIdx: index("job_queue_pending_jobs_idx").on(table.status, table.scheduledFor, table.priority),
+}));
+
+export type JobQueue = typeof jobQueue.$inferSelect;
+export type InsertJobQueue = typeof jobQueue.$inferInsert;

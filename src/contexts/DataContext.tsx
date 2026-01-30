@@ -610,33 +610,17 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     fetchAndCache<any[]>('cafe_menu', '/api/cafe-menu', (data) => {
       if (isValidCafeData(data)) {
         setCafeMenu(formatCafeData(data));
-        setCafeMenuLoaded(true);
       }
+      setCafeMenuLoaded(true);
+    }).then(() => {
+      setCafeMenuLoaded(true);
+    }).catch(() => {
+      setCafeMenuLoaded(true);
     });
 
-    const directFetch = async () => {
-      try {
-        const res = await fetch('/api/cafe-menu');
-        if (res.ok) {
-          const contentType = res.headers.get('content-type');
-          if (contentType?.includes('application/json')) {
-            const data = await res.json();
-            if (isValidCafeData(data)) {
-              setCafeMenu(formatCafeData(data));
-              setCafeMenuLoaded(true);
-            }
-          }
-        }
-      } catch {}
+    if (cached?.length) {
       setCafeMenuLoaded(true);
-    };
-
-    const timer = setTimeout(() => {
-      if (cafeMenu.length === 0) directFetch();
-      else setCafeMenuLoaded(true);
-    }, 1500);
-
-    return () => clearTimeout(timer);
+    }
   }, []);
 
   // Function to refresh announcements
