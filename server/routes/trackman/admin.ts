@@ -2136,6 +2136,8 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/unlink', isStaffOrAdmi
         } catch (feeError) {
           console.warn('[unlink] Failed to recalculate session fees (non-blocking):', feeError);
         }
+      } else {
+        console.warn(`[unlink] No user found for email ${memberEmail} - booking_members may be out of sync with users table`);
       }
     }
     
