@@ -132,3 +132,35 @@ export type GuestCheckIn = typeof guestCheckIns.$inferSelect;
 export type InsertGuestCheckIn = typeof guestCheckIns.$inferInsert;
 export type UserLinkedEmail = typeof userLinkedEmails.$inferSelect;
 export type InsertUserLinkedEmail = typeof userLinkedEmails.$inferInsert;
+
+// Tier Features - global feature definitions for compare table
+export const tierFeatures = pgTable("tier_features", {
+  id: serial("id").primaryKey(),
+  featureKey: varchar("feature_key").notNull().unique(),
+  displayLabel: varchar("display_label").notNull(),
+  valueType: varchar("value_type").notNull().default("boolean"), // 'boolean', 'number', 'text'
+  sortOrder: integer("sort_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("tier_features_sort_order_idx").on(table.sortOrder),
+]);
+
+// Tier Feature Values - per-tier values for each feature
+export const tierFeatureValues = pgTable("tier_feature_values", {
+  id: serial("id").primaryKey(),
+  featureId: integer("feature_id").notNull().references(() => tierFeatures.id, { onDelete: 'cascade' }),
+  tierId: integer("tier_id").notNull().references(() => membershipTiers.id, { onDelete: 'cascade' }),
+  valueBoolean: boolean("value_boolean"),
+  valueNumber: numeric("value_number"),
+  valueText: varchar("value_text"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("tier_feature_values_feature_tier_idx").on(table.featureId, table.tierId),
+]);
+
+export type TierFeature = typeof tierFeatures.$inferSelect;
+export type InsertTierFeature = typeof tierFeatures.$inferInsert;
+export type TierFeatureValue = typeof tierFeatureValues.$inferSelect;
+export type InsertTierFeatureValue = typeof tierFeatureValues.$inferInsert;

@@ -1,4 +1,4 @@
-import { ensureDatabaseConstraints, seedDefaultNoticeTypes, createStripeTransactionCache, setupEmailNormalization, normalizeExistingEmails, cleanupOrphanedRecords } from '../db-init';
+import { ensureDatabaseConstraints, seedDefaultNoticeTypes, createStripeTransactionCache, setupEmailNormalization, normalizeExistingEmails, cleanupOrphanedRecords, seedTierFeatures } from '../db-init';
 import { seedTrainingSections } from '../routes/training';
 import { getStripeSync } from '../core/stripe';
 import { runMigrations } from 'stripe-replit-sync';
@@ -57,6 +57,13 @@ export async function runStartupTasks(): Promise<void> {
   } catch (err: any) {
     console.error('[Startup] Seeding notice types failed:', err);
     startupHealth.warnings.push(`Notice types: ${err.message}`);
+  }
+
+  try {
+    await seedTierFeatures();
+  } catch (err: any) {
+    console.error('[Startup] Seeding tier features failed:', err);
+    startupHealth.warnings.push(`Tier features: ${err.message}`);
   }
 
   try {

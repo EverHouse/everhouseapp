@@ -286,3 +286,59 @@ export async function ensureDatabaseConstraints() {
     console.error('[DB Init] Failed to ensure constraints:', error.message);
   }
 }
+
+export async function seedTierFeatures(): Promise<void> {
+  try {
+    const existing = await pool.query('SELECT COUNT(*) FROM tier_features');
+    if (parseInt(existing.rows[0].count) > 0) {
+      console.log('[DB Init] Tier features already seeded, skipping');
+      return;
+    }
+
+    const features = [
+      { key: 'daily_golf_time', label: 'Daily Golf Time', type: 'text' },
+      { key: 'guest_passes', label: 'Guest Passes', type: 'text' },
+      { key: 'booking_window', label: 'Booking Window', type: 'text' },
+      { key: 'cafe_bar_access', label: 'Cafe & Bar Access', type: 'boolean' },
+      { key: 'lounge_access', label: 'Lounge Access', type: 'boolean' },
+      { key: 'work_desks', label: 'Work Desks', type: 'boolean' },
+      { key: 'golf_simulators', label: 'Golf Simulators', type: 'boolean' },
+      { key: 'putting_green', label: 'Putting Green', type: 'boolean' },
+      { key: 'member_events', label: 'Member Events', type: 'boolean' },
+      { key: 'conference_room', label: 'Conference Room', type: 'text' },
+      { key: 'group_lessons', label: 'Group Lessons', type: 'boolean' },
+      { key: 'extended_sessions', label: 'Extended Sessions', type: 'boolean' },
+      { key: 'private_lessons', label: 'Private Lessons', type: 'boolean' },
+      { key: 'sim_guest_passes', label: 'Sim Guest Passes', type: 'boolean' },
+      { key: 'discounted_merch', label: 'Discounted Merch', type: 'boolean' },
+    ];
+
+    const tiersResult = await pool.query('SELECT id FROM membership_tiers');
+    const tierIds = tiersResult.rows.map(r => r.id);
+
+    for (let i = 0; i < features.length; i++) {
+      const f = features[i];
+      const featureResult = await pool.query(
+        `INSERT INTO tier_features (feature_key, display_label, value_type, sort_order, is_active)
+         VALUES ($1, $2, $3, $4, true)
+         RETURNING id`,
+        [f.key, f.label, f.type, i]
+      );
+      const featureId = featureResult.rows[0].id;
+
+      for (const tierId of tierIds) {
+        const defaultBoolean = f.type === 'boolean' ? false : null;
+        const defaultText = f.type === 'text' ? '' : null;
+        await pool.query(
+          `INSERT INTO tier_feature_values (feature_id, tier_id, value_boolean, value_number, value_text)
+           VALUES ($1, $2, $3, NULL, $4)`,
+          [featureId, tierId, defaultBoolean, defaultText]
+        );
+      }
+    }
+
+    console.log(`[DB Init] Seeded ${features.length} tier features with values for ${tierIds.length} tiers`);
+  } catch (error: any) {
+    console.error('[DB Init] Failed to seed tier features:', error.message);
+  }
+}
