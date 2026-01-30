@@ -83,15 +83,14 @@ router.get('/api/members/search', isAuthenticated, async (req, res) => {
     let staffInfoMap: Map<string, { role: string; isActive: boolean }> = new Map();
     
     if (resultEmails.length > 0) {
-      // Use raw SQL with proper array casting for case-insensitive lookup
-      const emailArrayLiteral = `{${resultEmails.map(e => `"${e}"`).join(',')}}`;
+      // Use inArray for proper array matching
       const staffInfo = await db.select({
         email: staffUsers.email,
         role: staffUsers.role,
         isActive: staffUsers.isActive
       })
         .from(staffUsers)
-        .where(sql`LOWER(${staffUsers.email}) = ANY(${emailArrayLiteral}::text[])`);
+        .where(sql`LOWER(${staffUsers.email}) = ANY(ARRAY[${sql.join(resultEmails.map(e => sql`${e}`), sql`, `)}]::text[])`);
       
       for (const staff of staffInfo) {
         if (staff.email) {
