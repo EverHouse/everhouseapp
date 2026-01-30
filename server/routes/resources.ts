@@ -925,10 +925,10 @@ router.post('/api/bookings/link-trackman-to-member', isStaffOrAdmin, async (req,
       await db.delete(trackmanUnmatchedBookings)
         .where(eq(trackmanUnmatchedBookings.trackmanBookingId, trackman_booking_id));
       
-      // Update webhook event to mark as processed
+      // Update webhook event to mark as processed (no booking, converted to availability block)
       await pool.query(
-        `UPDATE trackman_webhook_events SET matched_booking_id = NULL, staff_notes = COALESCE(staff_notes, '') || ' [Converted to lesson block for instructor: ' || $1 || ']' WHERE trackman_booking_id = $2`,
-        [ownerName, trackman_booking_id]
+        `UPDATE trackman_webhook_events SET matched_booking_id = NULL, processed_at = NOW() WHERE trackman_booking_id = $1`,
+        [trackman_booking_id]
       );
       
       const { broadcastToStaff } = await import('../core/websocket');
