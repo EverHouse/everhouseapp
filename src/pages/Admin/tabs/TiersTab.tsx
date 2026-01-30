@@ -135,9 +135,13 @@ const TiersTab: React.FC = () => {
         setLoadingPrices(true);
         try {
             const res = await fetch('/api/stripe/prices/recurring', { credentials: 'include' });
+            console.log('[TiersTab] Stripe prices response status:', res.status);
             if (res.ok) {
                 const data = await res.json();
+                console.log('[TiersTab] Stripe prices received:', data.prices?.length || 0, 'prices');
                 setStripePrices(data.prices || []);
+            } else {
+                console.error('[TiersTab] Stripe prices fetch failed:', res.status);
             }
         } catch (err) {
             console.error('Failed to fetch Stripe prices:', err);
