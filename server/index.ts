@@ -150,12 +150,23 @@ app.get('/api/ready', async (req, res) => {
 });
 
 app.get('/', (req, res, next) => {
+  const userAgent = req.get('User-Agent') || '';
+  
+  const isHealthCheck = userAgent.includes('GoogleHC') || 
+                        userAgent.includes('kube-probe') ||
+                        userAgent.includes('health') ||
+                        userAgent === '' ||
+                        req.get('X-Forwarded-For') === undefined && !userAgent.includes('Mozilla');
+  
+  if (isHealthCheck) {
+    return res.status(200).send('OK');
+  }
+  
   if (!isProduction) {
     return next();
   }
   
   const acceptHeader = req.get('Accept') || '';
-  const userAgent = req.get('User-Agent') || '';
   
   const wantsHtml = acceptHeader.includes('text/html');
   const acceptsAnything = acceptHeader.includes('*/*');
