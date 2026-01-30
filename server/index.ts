@@ -493,11 +493,14 @@ async function startServer() {
       return;
     }
     
-    if (req.url === '/' && req.headers['user-agent'] && 
-        !req.headers['user-agent'].includes('Mozilla')) {
-      res.writeHead(200, { 'Content-Type': 'text/plain' });
-      res.end('OK');
-      return;
+    if (req.url === '/') {
+      const ua = req.headers['user-agent'] || '';
+      const isBrowser = ua.includes('Mozilla') || ua.includes('Chrome') || ua.includes('Safari');
+      if (!isBrowser) {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('OK');
+        return;
+      }
     }
     
     app(req, res);
