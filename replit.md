@@ -35,6 +35,7 @@ The application utilizes a React 19 frontend with Vite, styled using Tailwind CS
 - **Timezone Handling**: All date/time operations prioritize the 'America/Los_Angeles' timezone.
 - **Backend Structure**: Modular API routes, loader modules for startup tasks, readiness/health checks, and graceful shutdown.
 - **Member Management**: Supports member tiers, tags, directory, and unified billing groups with primary payers.
+- **Tier Features System**: Flexible, database-driven comparison table with `tier_features` and `tier_feature_values` tables. Features can have boolean (checkmarks), number, or text values. Admin can add/rename/delete features which automatically appear across all tiers.
 - **Booking System**: Features "Request & Hold," conflict detection, staff/member initiated bookings, multi-member bookings, calendar management, and uses database transactions with row-level locking and a trigger to prevent double-bookings.
 - **Check-In Notifications**: In-app and WebSocket notifications for check-in status and refunds.
 - **Trackman Integration**: Unified 1:1 sync for CSV imports and webhooks with origin tracking, UPSERT logic, and placeholder handling. Webhook integration supports real-time booking synchronization, delta billing, idempotency, and cross-midnight durations.
