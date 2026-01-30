@@ -1921,6 +1921,228 @@ const DataIntegrityTab: React.FC = () => {
         )}
       </div>
 
+      {results.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="font-bold text-primary dark:text-white text-lg">Check Results</h2>
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="w-full lg:w-[30%] bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl overflow-hidden">
+              <div className="p-3 border-b border-primary/10 dark:border-white/10 bg-white/80 dark:bg-white/10">
+                <h3 className="text-sm font-semibold text-primary dark:text-white">Integrity Checks</h3>
+              </div>
+              <div className="max-h-[500px] overflow-y-auto divide-y divide-primary/5 dark:divide-white/5">
+                {results.map((result) => {
+                  const metadata = getCheckMetadata(result.checkName);
+                  const displayTitle = metadata?.title || result.checkName;
+                  const severity = metadata?.severity;
+                  const isSelected = selectedCheck === result.checkName;
+                  
+                  return (
+                    <button
+                      key={result.checkName}
+                      onClick={() => setSelectedCheck(isSelected ? null : result.checkName)}
+                      className={`w-full p-3 text-left transition-colors ${
+                        isSelected 
+                          ? 'bg-accent/20 dark:bg-accent/30 border-l-4 border-accent' 
+                          : 'hover:bg-primary/5 dark:hover:bg-white/5'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${getStatusColor(result.status)}`}>
+                          {result.status}
+                        </span>
+                        {severity && (
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${getCheckSeverityColor(severity)}`}>
+                            {severity}
+                          </span>
+                        )}
+                        {result.issueCount > 0 && (
+                          <span className="text-xs text-primary/60 dark:text-white/60 ml-auto">{result.issueCount}</span>
+                        )}
+                      </div>
+                      <span className="font-medium text-sm text-primary dark:text-white block truncate">{displayTitle}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            
+            <div className="w-full lg:w-[70%] bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl overflow-hidden">
+              {selectedCheck ? (() => {
+                const result = results.find(r => r.checkName === selectedCheck);
+                if (!result) return null;
+                const metadata = getCheckMetadata(result.checkName);
+                const displayTitle = metadata?.title || result.checkName;
+                const description = metadata?.description;
+                const impact = metadata?.impact;
+                
+                return (
+                  <div className="h-full flex flex-col">
+                    <div className="p-4 border-b border-primary/10 dark:border-white/10 bg-white/80 dark:bg-white/10">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-bold text-primary dark:text-white">{displayTitle}</h3>
+                          {description && (
+                            <p className="text-xs text-primary/60 dark:text-white/60 mt-1">{description}</p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setSelectedCheck(null)}
+                          className="p-1 hover:bg-primary/10 dark:hover:bg-white/10 rounded transition-colors lg:hidden"
+                        >
+                          <span aria-hidden="true" className="material-symbols-outlined text-primary/60 dark:text-white/60">close</span>
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto max-h-[500px] p-4 space-y-4">
+                      {impact && (
+                        <div className="bg-primary/5 dark:bg-white/5 rounded-lg p-3">
+                          <p className="text-xs font-medium text-primary/80 dark:text-white/80 uppercase tracking-wide mb-1">Business Impact</p>
+                          <p className="text-sm text-primary/70 dark:text-white/70">{impact}</p>
+                        </div>
+                      )}
+                      
+                      {result.issues.length === 0 ? (
+                        <div className="flex items-center gap-2 text-green-600 dark:text-green-400 p-4 bg-green-50 dark:bg-green-500/10 rounded-lg">
+                          <span aria-hidden="true" className="material-symbols-outlined">check_circle</span>
+                          <span className="text-sm">No issues found</span>
+                        </div>
+                      ) : (
+                        <>
+                          {renderCheckFixTools(result.checkName)}
+                          
+                          {result.issues.filter(i => !i.ignored).length > 1 && (
+                            <div className="flex justify-end">
+                              <button
+                                onClick={() => openBulkIgnoreModal(result.checkName, result.issues)}
+                                className="text-xs px-3 py-1.5 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded-lg font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center gap-1"
+                              >
+                                <span aria-hidden="true" className="material-symbols-outlined text-[14px]">block</span>
+                                Exclude All ({result.issues.filter(i => !i.ignored).length})
+                              </button>
+                            </div>
+                          )}
+                          
+                          <div className="overflow-x-auto rounded-lg border border-primary/10 dark:border-white/10">
+                            <table className="w-full text-sm">
+                              <thead className="bg-white/80 dark:bg-white/10 sticky top-0 z-10">
+                                <tr className="border-b border-primary/10 dark:border-white/10">
+                                  <th className="text-left py-2 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Severity</th>
+                                  <th className="text-left py-2 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Table</th>
+                                  <th className="text-left py-2 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide hidden md:table-cell">ID</th>
+                                  <th className="text-left py-2 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Description</th>
+                                  <th className="text-right py-2 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-primary/5 dark:divide-white/5">
+                                {result.issues.map((issue, idx) => {
+                                  const tracking = getIssueTracking(issue);
+                                  return (
+                                    <tr key={idx} className="bg-white/50 dark:bg-white/5 hover:bg-white/80 dark:hover:bg-white/10 transition-colors">
+                                      <td className="py-2 px-3">
+                                        <div className="flex items-center gap-1">
+                                          <span aria-hidden="true" className="material-symbols-outlined text-[16px]">{getSeverityIcon(issue.severity)}</span>
+                                          <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                                            issue.severity === 'error' ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' :
+                                            issue.severity === 'warning' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' :
+                                            'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                                          }`}>{issue.severity}</span>
+                                        </div>
+                                        {tracking && tracking.daysUnresolved > 0 && (
+                                          <span className={`text-[10px] mt-1 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 ${
+                                            tracking.daysUnresolved >= 7 
+                                              ? 'bg-red-200 dark:bg-red-800/50 text-red-700 dark:text-red-300' 
+                                              : 'bg-amber-200 dark:bg-amber-800/50 text-amber-700 dark:text-amber-300'
+                                          }`}>
+                                            <span aria-hidden="true" className="material-symbols-outlined text-[10px]">schedule</span>
+                                            {tracking.daysUnresolved}d
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="py-2 px-3">
+                                        <span className="text-xs font-mono bg-black/10 dark:bg-white/10 px-1.5 py-0.5 rounded">{issue.table}</span>
+                                      </td>
+                                      <td className="py-2 px-3 hidden md:table-cell">
+                                        <span className="text-xs font-mono text-primary/70 dark:text-white/70">{issue.recordId}</span>
+                                      </td>
+                                      <td className="py-2 px-3 text-primary dark:text-white">
+                                        <p className="text-sm truncate max-w-[250px]" title={issue.description}>{issue.description}</p>
+                                        {issue.suggestion && (
+                                          <p className="text-xs text-primary/50 dark:text-white/50 truncate max-w-[250px]" title={issue.suggestion}>{issue.suggestion}</p>
+                                        )}
+                                      </td>
+                                      <td className="py-2 px-3 text-right whitespace-nowrap">
+                                        <div className="flex gap-1 justify-end">
+                                          {issue.context?.syncComparison && issue.context.syncType === 'hubspot' && (
+                                            <>
+                                              <button
+                                                onClick={() => handleSyncPush(issue)}
+                                                disabled={syncingIssues.has(`${issue.table}_${issue.recordId}`)}
+                                                className="px-2 py-1 bg-blue-600 dark:bg-blue-500 text-white rounded text-xs hover:opacity-90 transition-opacity disabled:opacity-50"
+                                                title="Push to HubSpot"
+                                              >
+                                                <span aria-hidden="true" className="material-symbols-outlined text-sm">cloud_upload</span>
+                                              </button>
+                                              <button
+                                                onClick={() => handleSyncPull(issue)}
+                                                disabled={syncingIssues.has(`${issue.table}_${issue.recordId}`)}
+                                                className="px-2 py-1 bg-orange-600 dark:bg-orange-500 text-white rounded text-xs hover:opacity-90 transition-opacity disabled:opacity-50"
+                                                title="Pull from HubSpot"
+                                              >
+                                                <span aria-hidden="true" className="material-symbols-outlined text-sm">cloud_download</span>
+                                              </button>
+                                            </>
+                                          )}
+                                          {!issue.ignored ? (
+                                            <button
+                                              onClick={() => openIgnoreModal(issue, result.checkName)}
+                                              className="px-2 py-1 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded text-xs hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                              title="Exclude"
+                                            >
+                                              <span aria-hidden="true" className="material-symbols-outlined text-sm">block</span>
+                                            </button>
+                                          ) : (
+                                            <button
+                                              onClick={() => handleUnignoreIssue(`${issue.table}_${issue.recordId}`)}
+                                              className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded text-xs hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+                                              title="Remove Exclusion"
+                                            >
+                                              <span aria-hidden="true" className="material-symbols-outlined text-sm">do_not_disturb_off</span>
+                                            </button>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })() : (
+                <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center p-8">
+                  <span aria-hidden="true" className="material-symbols-outlined text-4xl text-primary/20 dark:text-white/20 mb-3">arrow_back</span>
+                  <p className="text-primary/60 dark:text-white/60">Select a check from the list to view details</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {results.length === 0 && !isRunning && (
+        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-8 text-center">
+          <span aria-hidden="true" className="material-symbols-outlined text-4xl text-primary/30 dark:text-white/30 mb-3 block">fact_check</span>
+          <p className="text-primary/60 dark:text-white/60">
+            Click "Run Integrity Checks" to scan your database for issues
+          </p>
+        </div>
+      )}
+
       <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
         <button
           onClick={() => setShowDataTools(!showDataTools)}
@@ -2793,227 +3015,7 @@ const DataIntegrityTab: React.FC = () => {
         )}
       </div>
 
-      {results.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="font-bold text-primary dark:text-white text-lg">Check Results</h2>
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="w-full lg:w-[30%] bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl overflow-hidden">
-              <div className="p-3 border-b border-primary/10 dark:border-white/10 bg-white/80 dark:bg-white/10">
-                <h3 className="text-sm font-semibold text-primary dark:text-white">Integrity Checks</h3>
-              </div>
-              <div className="max-h-[500px] overflow-y-auto divide-y divide-primary/5 dark:divide-white/5">
-                {results.map((result) => {
-                  const metadata = getCheckMetadata(result.checkName);
-                  const displayTitle = metadata?.title || result.checkName;
-                  const severity = metadata?.severity;
-                  const isSelected = selectedCheck === result.checkName;
-                  
-                  return (
-                    <button
-                      key={result.checkName}
-                      onClick={() => setSelectedCheck(isSelected ? null : result.checkName)}
-                      className={`w-full p-3 text-left transition-colors ${
-                        isSelected 
-                          ? 'bg-accent/20 dark:bg-accent/30 border-l-4 border-accent' 
-                          : 'hover:bg-primary/5 dark:hover:bg-white/5'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${getStatusColor(result.status)}`}>
-                          {result.status}
-                        </span>
-                        {severity && (
-                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${getCheckSeverityColor(severity)}`}>
-                            {severity}
-                          </span>
-                        )}
-                        {result.issueCount > 0 && (
-                          <span className="text-xs text-primary/60 dark:text-white/60 ml-auto">{result.issueCount}</span>
-                        )}
-                      </div>
-                      <span className="font-medium text-sm text-primary dark:text-white block truncate">{displayTitle}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            
-            <div className="w-full lg:w-[70%] bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl overflow-hidden">
-              {selectedCheck ? (() => {
-                const result = results.find(r => r.checkName === selectedCheck);
-                if (!result) return null;
-                const metadata = getCheckMetadata(result.checkName);
-                const displayTitle = metadata?.title || result.checkName;
-                const description = metadata?.description;
-                const impact = metadata?.impact;
-                
-                return (
-                  <div className="h-full flex flex-col">
-                    <div className="p-4 border-b border-primary/10 dark:border-white/10 bg-white/80 dark:bg-white/10">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-bold text-primary dark:text-white">{displayTitle}</h3>
-                          {description && (
-                            <p className="text-xs text-primary/60 dark:text-white/60 mt-1">{description}</p>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => setSelectedCheck(null)}
-                          className="p-1 hover:bg-primary/10 dark:hover:bg-white/10 rounded transition-colors lg:hidden"
-                        >
-                          <span aria-hidden="true" className="material-symbols-outlined text-primary/60 dark:text-white/60">close</span>
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="flex-1 overflow-y-auto max-h-[500px] p-4 space-y-4">
-                      {impact && (
-                        <div className="bg-primary/5 dark:bg-white/5 rounded-lg p-3">
-                          <p className="text-xs font-medium text-primary/80 dark:text-white/80 uppercase tracking-wide mb-1">Business Impact</p>
-                          <p className="text-sm text-primary/70 dark:text-white/70">{impact}</p>
-                        </div>
-                      )}
-                      
-                      {result.issues.length === 0 ? (
-                        <div className="flex items-center gap-2 text-green-600 dark:text-green-400 p-4 bg-green-50 dark:bg-green-500/10 rounded-lg">
-                          <span aria-hidden="true" className="material-symbols-outlined">check_circle</span>
-                          <span className="text-sm">No issues found</span>
-                        </div>
-                      ) : (
-                        <>
-                          {renderCheckFixTools(result.checkName)}
-                          
-                          {result.issues.filter(i => !i.ignored).length > 1 && (
-                            <div className="flex justify-end">
-                              <button
-                                onClick={() => openBulkIgnoreModal(result.checkName, result.issues)}
-                                className="text-xs px-3 py-1.5 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded-lg font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center gap-1"
-                              >
-                                <span aria-hidden="true" className="material-symbols-outlined text-[14px]">block</span>
-                                Exclude All ({result.issues.filter(i => !i.ignored).length})
-                              </button>
-                            </div>
-                          )}
-                          
-                          <div className="overflow-x-auto rounded-lg border border-primary/10 dark:border-white/10">
-                            <table className="w-full text-sm">
-                              <thead className="bg-white/80 dark:bg-white/10 sticky top-0 z-10">
-                                <tr className="border-b border-primary/10 dark:border-white/10">
-                                  <th className="text-left py-2 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Severity</th>
-                                  <th className="text-left py-2 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Table</th>
-                                  <th className="text-left py-2 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide hidden md:table-cell">ID</th>
-                                  <th className="text-left py-2 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Description</th>
-                                  <th className="text-right py-2 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-primary/5 dark:divide-white/5">
-                                {result.issues.map((issue, idx) => {
-                                  const tracking = getIssueTracking(issue);
-                                  return (
-                                    <tr key={idx} className="bg-white/50 dark:bg-white/5 hover:bg-white/80 dark:hover:bg-white/10 transition-colors">
-                                      <td className="py-2 px-3">
-                                        <div className="flex items-center gap-1">
-                                          <span aria-hidden="true" className="material-symbols-outlined text-[16px]">{getSeverityIcon(issue.severity)}</span>
-                                          <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                                            issue.severity === 'error' ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' :
-                                            issue.severity === 'warning' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' :
-                                            'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                                          }`}>{issue.severity}</span>
-                                        </div>
-                                        {tracking && tracking.daysUnresolved > 0 && (
-                                          <span className={`text-[10px] mt-1 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 ${
-                                            tracking.daysUnresolved >= 7 
-                                              ? 'bg-red-200 dark:bg-red-800/50 text-red-700 dark:text-red-300' 
-                                              : 'bg-amber-200 dark:bg-amber-800/50 text-amber-700 dark:text-amber-300'
-                                          }`}>
-                                            <span aria-hidden="true" className="material-symbols-outlined text-[10px]">schedule</span>
-                                            {tracking.daysUnresolved}d
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td className="py-2 px-3">
-                                        <span className="text-xs font-mono bg-black/10 dark:bg-white/10 px-1.5 py-0.5 rounded">{issue.table}</span>
-                                      </td>
-                                      <td className="py-2 px-3 hidden md:table-cell">
-                                        <span className="text-xs font-mono text-primary/70 dark:text-white/70">{issue.recordId}</span>
-                                      </td>
-                                      <td className="py-2 px-3 text-primary dark:text-white">
-                                        <p className="text-sm truncate max-w-[250px]" title={issue.description}>{issue.description}</p>
-                                        {issue.suggestion && (
-                                          <p className="text-xs text-primary/50 dark:text-white/50 truncate max-w-[250px]" title={issue.suggestion}>{issue.suggestion}</p>
-                                        )}
-                                      </td>
-                                      <td className="py-2 px-3 text-right whitespace-nowrap">
-                                        <div className="flex gap-1 justify-end">
-                                          {issue.context?.syncComparison && issue.context.syncType === 'hubspot' && (
-                                            <>
-                                              <button
-                                                onClick={() => handleSyncPush(issue)}
-                                                disabled={syncingIssues.has(`${issue.table}_${issue.recordId}`)}
-                                                className="px-2 py-1 bg-blue-600 dark:bg-blue-500 text-white rounded text-xs hover:opacity-90 transition-opacity disabled:opacity-50"
-                                                title="Push to HubSpot"
-                                              >
-                                                <span aria-hidden="true" className="material-symbols-outlined text-sm">cloud_upload</span>
-                                              </button>
-                                              <button
-                                                onClick={() => handleSyncPull(issue)}
-                                                disabled={syncingIssues.has(`${issue.table}_${issue.recordId}`)}
-                                                className="px-2 py-1 bg-orange-600 dark:bg-orange-500 text-white rounded text-xs hover:opacity-90 transition-opacity disabled:opacity-50"
-                                                title="Pull from HubSpot"
-                                              >
-                                                <span aria-hidden="true" className="material-symbols-outlined text-sm">cloud_download</span>
-                                              </button>
-                                            </>
-                                          )}
-                                          {!issue.ignored ? (
-                                            <button
-                                              onClick={() => openIgnoreModal(issue, result.checkName)}
-                                              className="px-2 py-1 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded text-xs hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                                              title="Exclude"
-                                            >
-                                              <span aria-hidden="true" className="material-symbols-outlined text-sm">block</span>
-                                            </button>
-                                          ) : (
-                                            <button
-                                              onClick={() => handleUnignoreIssue(`${issue.table}_${issue.recordId}`)}
-                                              className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded text-xs hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
-                                              title="Remove Exclusion"
-                                            >
-                                              <span aria-hidden="true" className="material-symbols-outlined text-sm">do_not_disturb_off</span>
-                                            </button>
-                                          )}
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })() : (
-                <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center p-8">
-                  <span aria-hidden="true" className="material-symbols-outlined text-4xl text-primary/20 dark:text-white/20 mb-3">arrow_back</span>
-                  <p className="text-primary/60 dark:text-white/60">Select a check from the list to view details</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {results.length === 0 && !isRunning && (
-        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-8 text-center">
-          <span aria-hidden="true" className="material-symbols-outlined text-4xl text-primary/30 dark:text-white/30 mb-3 block">fact_check</span>
-          <p className="text-primary/60 dark:text-white/60">
-            Click "Run Integrity Checks" to scan your database for issues
-          </p>
-        </div>
-      )}
 
       {ignoredIssues.length > 0 && (
         <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">

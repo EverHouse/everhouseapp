@@ -19,7 +19,8 @@ export const changelog: ChangelogEntry[] = [
     changes: [
       "New: Deal Stage Drift check now has 'Remediate Deal Stages' fix tool",
       "New: Active Bookings Without Sessions check shows 'Create Sessions' fix tool",
-      "Improved: All fix tools appear directly above the issues list when clicking a check"
+      "Improved: All fix tools appear directly above the issues list when clicking a check",
+      "Improved: Check Results section now appears before Data Tools section for easier access"
     ]
   },
   {
