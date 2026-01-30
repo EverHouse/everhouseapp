@@ -45,7 +45,10 @@ const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/stripe/coupons', { credentials: 'include' });
+      const res = await fetch('/api/stripe/coupons', { 
+        credentials: 'include',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
       if (!res.ok) throw new Error('Failed to fetch coupons');
       const data = await res.json();
       setCoupons(data.coupons || []);
