@@ -80,13 +80,17 @@ router.get('/api/guest-passes/:email', async (req, res) => {
           .from(guestPasses)
           .where(eq(guestPasses.memberEmail, email))
       );
-    } else if (result[0].passesTotal < passesTotal) {
+    } else if (result[0].passesTotal !== passesTotal) {
+      // Update passes_total to match tier config (handles both upgrades AND downgrades)
+      // Also clamp passes_used to not exceed new total
+      const newPassesUsed = Math.min(result[0].passesUsed, passesTotal);
       await withRetry(() =>
         db.update(guestPasses)
-          .set({ passesTotal: passesTotal })
+          .set({ passesTotal: passesTotal, passesUsed: newPassesUsed })
           .where(eq(guestPasses.memberEmail, email))
       );
       result[0].passesTotal = passesTotal;
+      result[0].passesUsed = newPassesUsed;
     }
     
     const data = result[0];
