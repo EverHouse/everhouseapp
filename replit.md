@@ -39,7 +39,7 @@ The application utilizes a React 19 frontend with Vite, styled using Tailwind CS
 - **Check-In Notifications**: In-app and WebSocket notifications for check-in status and refunds.
 - **Trackman Integration**: Unified 1:1 sync for CSV imports and webhooks with origin tracking, UPSERT logic, and placeholder handling. Webhook integration supports real-time booking synchronization, delta billing, idempotency, and cross-midnight durations.
 - **Linked Email Addresses**: Supports alternate email addresses and auto-learns associations during Trackman imports.
-- **Security**: Role-based access control with `isAdmin` and `isStaffOrAdmin` middleware.
+- **Security**: Role-based access control with `isAdmin` and `isStaffOrAdmin` middleware. Staff roles: `admin`, `staff`, `golf_instructor`. Golf instructors get special handling in Trackman imports (their bookings are converted to availability blocks instead of member bookings).
 - **Notifications**: In-app real-time notifications and a sequential notice dismissal system with 3-channel delivery.
 - **Real-Time Sync**: Instant updates via WebSocket, with Supabase Realtime as a parallel channel.
 - **PWA Features**: Service Worker caching, offline support, and iOS-style interactions.

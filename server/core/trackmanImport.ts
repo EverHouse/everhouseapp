@@ -14,6 +14,30 @@ import { calculateFullSessionBilling, FLAT_GUEST_FEE, Participant } from './book
 import { useGuestPass } from '../routes/guestPasses';
 import { cancelPaymentIntent } from './stripe';
 import { alertOnTrackmanImportIssues } from './dataAlerts';
+import { staffUsers } from '../../shared/schema';
+
+/**
+ * Fetches email addresses of all active staff members with the 'golf_instructor' role.
+ * Used to identify lesson bookings during Trackman import and cleanup.
+ */
+export async function getGolfInstructorEmails(): Promise<string[]> {
+  try {
+    const instructors = await db.select({ email: staffUsers.email })
+      .from(staffUsers)
+      .where(and(
+        eq(staffUsers.role, 'golf_instructor'),
+        eq(staffUsers.isActive, true)
+      ));
+    
+    return instructors
+      .map(i => i.email?.toLowerCase())
+      .filter((email): email is string => !!email);
+  } catch (err) {
+    console.error('[Trackman] Error fetching golf instructor emails:', err);
+    // Fallback to empty array - caller should handle gracefully
+    return [];
+  }
+}
 
 async function cancelPendingPaymentIntentsForBooking(bookingId: number): Promise<void> {
   try {
@@ -1213,6 +1237,10 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
     process.stderr.write(`[Trackman Import] Error loading trackman_email mappings: ${err.message}\n`);
   }
 
+  // Fetch golf instructor emails once before processing rows
+  const INSTRUCTOR_EMAILS = await getGolfInstructorEmails();
+  process.stderr.write(`[Trackman Import] Loaded ${INSTRUCTOR_EMAILS.length} golf instructor emails: ${INSTRUCTOR_EMAILS.join(', ') || '(none)'}\n`);
+
   let matchedRows = 0;
   let unmatchedRows = 0;
   let skippedRows = 0;
@@ -1292,28 +1320,20 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
       // When staff book in Trackman using their @evenhouse.club emails, or when
       // notes contain "lesson" keywords, convert to blocks instead of bookings.
       // This prevents financial pollution and directory distortion.
+      // (INSTRUCTOR_EMAILS is loaded dynamically from staff_users with role 'golf_instructor')
       // -----------------------------------------------------------------------
-      const INSTRUCTOR_EMAILS = [
-        'tim@evenhouse.club',
-        'rebecca@evenhouse.club',
-        'instructors@evenhouse.club'
-      ];
-      
       const notesLower = (row.notes || '').toLowerCase();
       const userNameLower = (row.userName || '').toLowerCase();
       const userEmailLower = (row.userEmail || '').toLowerCase();
       
       const isStaffLesson = 
-        // 1. Check for specific instructor emails
+        // 1. Check for specific instructor emails (dynamically loaded from staff_users)
         INSTRUCTOR_EMAILS.includes(userEmailLower) ||
         // 2. Check for lesson keywords in notes
         notesLower.includes('lesson') ||
         notesLower.includes('private instruction') ||
         // 3. Check for lesson keywords in userName
-        userNameLower.includes('lesson') ||
-        // 4. Legacy instructor name patterns
-        (userNameLower.includes('rebecca') && userNameLower.includes('lee')) ||
-        (userNameLower.includes('tim') && userNameLower.includes('silverman'));
+        userNameLower.includes('lesson');
       
       if (isStaffLesson && row.status.toLowerCase() !== 'cancelled' && row.status.toLowerCase() !== 'canceled') {
         const bookingDate = extractDate(row.startDate);
@@ -3492,11 +3512,9 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
 
   log(`[Lesson Cleanup] Starting run (Dry Run: ${dryRun})...`);
 
-  // Staff emails to detect lesson bookings - Tim and Rebecca
-  const INSTRUCTOR_EMAILS = [
-    'tim@evenhouse.club',
-    'rebecca@evenhouse.club'
-  ];
+  // Fetch instructor emails dynamically from staff_users with role 'golf_instructor'
+  const INSTRUCTOR_EMAILS = await getGolfInstructorEmails();
+  log(`[Lesson Cleanup] Found ${INSTRUCTOR_EMAILS.length} golf instructors: ${INSTRUCTOR_EMAILS.join(', ') || '(none)'}`);
 
   let convertedBookings = 0;
   let resolvedUnmatched = 0;
@@ -3523,8 +3541,6 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
         LOWER(br.user_email) = ANY($1)
         OR LOWER(br.user_name) LIKE '%lesson%'
         OR LOWER(br.notes) LIKE '%lesson%'
-        OR (LOWER(br.user_name) LIKE '%rebecca%' AND LOWER(br.user_name) LIKE '%lee%')
-        OR (LOWER(br.user_name) LIKE '%tim%' AND LOWER(br.user_name) LIKE '%silverman%')
       )
     ORDER BY br.request_date DESC
     LIMIT 1000
@@ -3648,8 +3664,6 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
       AND (
         LOWER(user_name) LIKE '%lesson%'
         OR LOWER(notes) LIKE '%lesson%'
-        OR (LOWER(user_name) LIKE '%rebecca%')
-        OR (LOWER(user_name) LIKE '%tim%' AND LOWER(user_name) LIKE '%silverman%')
       )
     LIMIT 500
   `);

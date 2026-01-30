@@ -6,6 +6,8 @@ import FloatingActionButton from '../../../components/FloatingActionButton';
 import { formatPhoneNumber } from '../../../utils/formatting';
 import { AnimatedPage } from '../../../components/motion';
 
+type StaffRole = 'staff' | 'admin' | 'golf_instructor';
+
 interface TeamMember {
   id: number;
   email: string;
@@ -14,17 +16,24 @@ interface TeamMember {
   last_name: string | null;
   phone: string | null;
   job_title: string | null;
-  role: 'staff' | 'admin' | null;
+  role: StaffRole | null;
   is_active: boolean;
   created_at: string;
   created_by: string | null;
 }
 
-const RoleBadge: React.FC<{ role: 'staff' | 'admin' | null }> = ({ role }) => {
+const RoleBadge: React.FC<{ role: StaffRole | null }> = ({ role }) => {
   if (role === 'admin') {
     return (
       <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
         Admin
+      </span>
+    );
+  }
+  if (role === 'golf_instructor') {
+    return (
+      <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+        Golf Instructor
       </span>
     );
   }
@@ -71,7 +80,7 @@ const TeamTab: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddingPerson, setIsAddingPerson] = useState(false);
-  const [newPerson, setNewPerson] = useState({ firstName: '', lastName: '', email: '', phone: '', jobTitle: '', role: 'staff' as 'staff' | 'admin' });
+  const [newPerson, setNewPerson] = useState({ firstName: '', lastName: '', email: '', phone: '', jobTitle: '', role: 'staff' as StaffRole });
   const [addError, setAddError] = useState<string | null>(null);
   const [editFieldErrors, setEditFieldErrors] = useState<TeamFieldErrors>({});
   const [addFieldErrors, setAddFieldErrors] = useState<TeamFieldErrors>({});
@@ -396,9 +405,11 @@ const TeamTab: React.FC = () => {
             <span className={`px-2 py-1 rounded-full text-xs font-bold ${
               selectedMember?.role === 'admin' 
                 ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' 
+                : selectedMember?.role === 'golf_instructor'
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                 : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
             }`}>
-              {selectedMember?.role === 'admin' ? 'Admin' : 'Staff'}
+              {selectedMember?.role === 'admin' ? 'Admin' : selectedMember?.role === 'golf_instructor' ? 'Golf Instructor' : 'Staff'}
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -513,11 +524,12 @@ const TeamTab: React.FC = () => {
             </label>
             <select
               value={selectedMember?.role || 'staff'}
-              onChange={(e) => selectedMember && setSelectedMember({...selectedMember, role: e.target.value as 'staff' | 'admin'})}
+              onChange={(e) => selectedMember && setSelectedMember({...selectedMember, role: e.target.value as StaffRole})}
               className="w-full p-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white"
             >
               <option value="staff">Staff</option>
               <option value="admin">Admin</option>
+              <option value="golf_instructor">Golf Instructor</option>
             </select>
           </div>
 
@@ -542,7 +554,7 @@ const TeamTab: React.FC = () => {
         </div>
       </ModalShell>}
 
-      <ModalShell isOpen={isAddingPerson} onClose={() => { setIsAddingPerson(false); setAddError(null); setAddFieldErrors({}); setNewPerson({ firstName: '', lastName: '', email: '', phone: '', jobTitle: '', role: 'staff' }); }} title="Add Team Member" showCloseButton={false}>
+      <ModalShell isOpen={isAddingPerson} onClose={() => { setIsAddingPerson(false); setAddError(null); setAddFieldErrors({}); setNewPerson({ firstName: '', lastName: '', email: '', phone: '', jobTitle: '', role: 'staff' as StaffRole }); }} title="Add Team Member" showCloseButton={false}>
         <div className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -626,11 +638,12 @@ const TeamTab: React.FC = () => {
             </label>
             <select
               value={newPerson.role}
-              onChange={(e) => setNewPerson({...newPerson, role: e.target.value as 'staff' | 'admin'})}
+              onChange={(e) => setNewPerson({...newPerson, role: e.target.value as StaffRole})}
               className="w-full p-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white"
             >
               <option value="staff">Staff</option>
               <option value="admin">Admin</option>
+              <option value="golf_instructor">Golf Instructor</option>
             </select>
           </div>
 
@@ -640,7 +653,7 @@ const TeamTab: React.FC = () => {
 
           <div className="flex gap-3 pt-2">
             <button
-              onClick={() => { setIsAddingPerson(false); setAddError(null); setAddFieldErrors({}); setNewPerson({ firstName: '', lastName: '', email: '', phone: '', jobTitle: '', role: 'staff' }); }}
+              onClick={() => { setIsAddingPerson(false); setAddError(null); setAddFieldErrors({}); setNewPerson({ firstName: '', lastName: '', email: '', phone: '', jobTitle: '', role: 'staff' as StaffRole }); }}
               className="flex-1 py-3 px-4 rounded-lg border border-gray-200 dark:border-white/25 text-gray-600 dark:text-gray-300 font-medium"
             >
               Cancel
