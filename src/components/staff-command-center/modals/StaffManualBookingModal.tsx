@@ -203,6 +203,7 @@ export function StaffManualBookingModal({
     if (!resourceId) return false;
     if (!requestDate) return false;
     if (!startTime) return false;
+    if (durationMinutes < 30 || durationMinutes > 240) return false;
 
     for (const p of participants) {
       if (p.type === 'member' && !p.member) {
@@ -210,7 +211,7 @@ export function StaffManualBookingModal({
       }
     }
     return true;
-  }, [hostMember, resourceId, requestDate, startTime, participants]);
+  }, [hostMember, resourceId, requestDate, startTime, durationMinutes, participants]);
 
   const handleFinalize = useCallback(() => {
     if (!canFinalize() || !hostMember) {

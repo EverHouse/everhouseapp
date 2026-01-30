@@ -1166,11 +1166,15 @@ async function handleInvoicePaymentFailed(client: PoolClient, invoice: any): Pro
   await client.query(
     `UPDATE users SET 
       grace_period_start = COALESCE(grace_period_start, NOW()),
+      membership_status = CASE 
+        WHEN membership_status = 'active' THEN 'past_due'
+        ELSE membership_status 
+      END,
       updated_at = NOW()
     WHERE LOWER(email) = LOWER($1) AND grace_period_start IS NULL`,
     [email]
   );
-  console.log(`[Stripe Webhook] Started grace period for ${email}`);
+  console.log(`[Stripe Webhook] Started grace period and set past_due status for ${email}`);
   
   // Sync payment failure status to HubSpot
   try {
@@ -2065,7 +2069,9 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
     if (status === 'active') {
       await pool.query(
         `UPDATE users SET membership_status = 'active', updated_at = NOW() 
-         WHERE id = $1 AND (membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'past_due'))`,
+         WHERE id = $1 
+         AND (membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'past_due'))
+         AND COALESCE(membership_status, '') NOT IN ('cancelled', 'suspended', 'terminated')`,
         [userId]
       );
       console.log(`[Stripe Webhook] Membership status set to active for ${email}`);
