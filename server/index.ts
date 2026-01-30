@@ -119,9 +119,8 @@ async function gracefulShutdown(signal: string) {
 
 const app = express();
 
-app.get('/healthz', (_req, res) => {
-  res.status(200).send('OK');
-});
+// Note: /healthz is handled by HTTP server wrapper BEFORE Express for instant responses
+// This ensures Cloud Run health checks succeed even during startup
 
 app.get('/api/ready', async (req, res) => {
   const startupHealth = getStartupHealth();
@@ -150,20 +149,8 @@ app.get('/api/ready', async (req, res) => {
   }
 });
 
-app.get('/', (req, res, next) => {
-  const userAgent = req.get('User-Agent') || '';
-  const isBot = !userAgent || (!userAgent.includes('Mozilla') && !userAgent.includes('Safari'));
-  
-  if (isBot) {
-    return res.status(200).send('OK');
-  }
-  
-  if (!isProduction) {
-    return next();
-  }
-  
-  return next();
-});
+// Note: Root route bot handling is done by HTTP server wrapper BEFORE Express
+// This prevents health check timing issues during startup
 
 app.set('trust proxy', 1);
 
