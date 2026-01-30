@@ -16,6 +16,7 @@ import { getSupabaseAdmin } from '../core/supabase/client';
 import { normalizeEmail } from '../core/utils/emailNormalization';
 
 interface StaffUserData {
+  id: number;
   firstName: string;
   lastName: string;
   phone: string;
@@ -33,6 +34,7 @@ async function getStaffUserByEmail(email: string): Promise<StaffUserData | null>
   if (!email) return null;
   try {
     const result = await db.select({
+      id: staffUsers.id,
       firstName: staffUsers.firstName,
       lastName: staffUsers.lastName,
       phone: staffUsers.phone,
@@ -48,6 +50,7 @@ async function getStaffUserByEmail(email: string): Promise<StaffUserData | null>
     
     if (result.length > 0) {
       return {
+        id: result[0].id,
         firstName: result[0].firstName || '',
         lastName: result[0].lastName || '',
         phone: result[0].phone || '',
@@ -447,8 +450,12 @@ router.post('/api/auth/verify-member', async (req, res) => {
       jobTitle = staffUserData.jobTitle || '';
     }
 
+    const memberId = dbUser[0]?.id 
+      || contact?.id 
+      || (isStaffOrAdmin && staffUserData ? `staff-${staffUserData.id}` : crypto.randomUUID());
+    
     const member = {
-      id: dbUser[0]?.id || contact?.id || crypto.randomUUID(),
+      id: memberId,
       firstName,
       lastName,
       email: dbUser[0]?.email || contact?.properties.email || normalizedEmail,
@@ -766,7 +773,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
       shouldSetupPassword = pwCheck.length > 0 && !pwCheck[0].passwordHash;
       
       member = {
-        id: crypto.randomUUID(),
+        id: `staff-${staffUserData.id}`,
         firstName: staffUserData.firstName,
         lastName: staffUserData.lastName,
         email: normalizedEmail,

@@ -544,6 +544,24 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: a
       validatedParticipantIds.push(pf.id);
     }
     
+    const unpaidTotal = participantFees.reduce((sum, pf) => sum + pf.amountCents, 0);
+    if (amount > unpaidTotal + 1 && participantFees.length < snapshotFees.length) {
+      const alreadyPaidCount = snapshotFees.length - participantFees.length;
+      const overpaymentCents = amount - unpaidTotal;
+      console.error(`[Stripe Webhook] CRITICAL: Potential overpayment detected`, {
+        sessionId: snapshot.session_id,
+        paymentAmount: amount,
+        unpaidTotal,
+        overpaymentCents,
+        alreadyPaidCount,
+        message: `Payment of ${amount} cents received but only ${unpaidTotal} cents was owed. ${alreadyPaidCount} participant(s) already paid separately.`
+      });
+      await client.query(
+        `UPDATE booking_sessions SET needs_review = true, review_reason = $1 WHERE id = $2`,
+        [`Potential overpayment: received ${amount} cents but only ${unpaidTotal} cents was owed. ${alreadyPaidCount} participant(s) had already paid ${overpaymentCents} cents separately.`, snapshot.session_id]
+      );
+    }
+    
     await client.query(
       `UPDATE booking_fee_snapshots SET status = 'completed', used_at = NOW() WHERE id = $1`,
       [feeSnapshotId]

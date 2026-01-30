@@ -1,5 +1,8 @@
 import { pool } from '../db';
 import { logger } from '../logger';
+import { ACTIVE_BOOKING_STATUSES } from '../../../shared/constants/statuses';
+
+const OCCUPIED_STATUSES = [...ACTIVE_BOOKING_STATUSES, 'checked_in'];
 
 export interface ConflictingBooking {
   bookingId: number;
@@ -74,6 +77,8 @@ export async function findConflictingBookings(
     );
     const memberId = memberResult.rows[0]?.id;
 
+    const statusPlaceholders = OCCUPIED_STATUSES.map((_, i) => `$${i + 3}`).join(', ');
+    const excludeIdPlaceholder = 3 + OCCUPIED_STATUSES.length;
     const ownerQuery = `
       SELECT 
         br.id as booking_id,
@@ -87,12 +92,12 @@ export async function findConflictingBookings(
       LEFT JOIN resources r ON br.resource_id = r.id
       WHERE LOWER(br.user_email) = LOWER($1)
         AND br.request_date = $2
-        AND br.status IN ('pending', 'approved', 'confirmed')
-        ${excludeBookingId ? 'AND br.id != $5' : ''}
+        AND br.status IN (${statusPlaceholders})
+        ${excludeBookingId ? `AND br.id != $${excludeIdPlaceholder}` : ''}
     `;
     const ownerParams = excludeBookingId 
-      ? [normalizedEmail, date, startTime, endTime, excludeBookingId]
-      : [normalizedEmail, date, startTime, endTime];
+      ? [normalizedEmail, date, ...OCCUPIED_STATUSES, excludeBookingId]
+      : [normalizedEmail, date, ...OCCUPIED_STATUSES];
     
     const ownerResult = await pool.query(ownerQuery, ownerParams);
     
@@ -129,12 +134,12 @@ export async function findConflictingBookings(
         WHERE bp.user_id = $1
           AND bs.session_date = $2
           AND bp.invite_status IN ('pending', 'accepted')
-          AND br.status IN ('pending', 'approved', 'confirmed')
-          ${excludeBookingId ? 'AND br.id != $5' : ''}
+          AND br.status IN (${statusPlaceholders})
+          ${excludeBookingId ? `AND br.id != $${excludeIdPlaceholder}` : ''}
       `;
       const participantParams = excludeBookingId
-        ? [memberId, date, startTime, endTime, excludeBookingId]
-        : [memberId, date, startTime, endTime];
+        ? [memberId, date, ...OCCUPIED_STATUSES, excludeBookingId]
+        : [memberId, date, ...OCCUPIED_STATUSES];
       
       const participantResult = await pool.query(participantQuery, participantParams);
       
@@ -171,12 +176,12 @@ export async function findConflictingBookings(
       LEFT JOIN resources r ON br.resource_id = r.id
       WHERE LOWER(bm.user_email) = LOWER($1)
         AND br.request_date = $2
-        AND br.status IN ('pending', 'approved', 'confirmed')
-        ${excludeBookingId ? 'AND br.id != $5' : ''}
+        AND br.status IN (${statusPlaceholders})
+        ${excludeBookingId ? `AND br.id != $${excludeIdPlaceholder}` : ''}
     `;
     const inviteParams = excludeBookingId
-      ? [normalizedEmail, date, startTime, endTime, excludeBookingId]
-      : [normalizedEmail, date, startTime, endTime];
+      ? [normalizedEmail, date, ...OCCUPIED_STATUSES, excludeBookingId]
+      : [normalizedEmail, date, ...OCCUPIED_STATUSES];
     
     const inviteResult = await pool.query(inviteQuery, inviteParams);
     
