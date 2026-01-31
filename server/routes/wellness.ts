@@ -647,7 +647,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
                AND is_active = true
              RETURNING id, date, time, duration, title`,
             [
-              category, instructor, title, duration, spots, capacity || null, 
+              category, instructor, title, duration, finalSpots, finalCapacity, 
               image_url, external_url, reviewedBy,
               existingRow.recurring_event_id, id, updated.date,
               newBlockSimulators, newBlockConferenceRoom
@@ -685,7 +685,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
                AND is_active = true
              RETURNING id, date, time, duration, title`,
             [
-              category, instructor, title, duration, spots, capacity || null, 
+              category, instructor, title, duration, finalSpots, finalCapacity, 
               image_url, external_url, reviewedBy,
               existingRow.title, originalTime, dayOfWeek, id, updated.date,
               newBlockSimulators, newBlockConferenceRoom
