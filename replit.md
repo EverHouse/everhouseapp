@@ -24,11 +24,13 @@ The application utilizes a React 19 frontend with Vite, styled using Tailwind CS
 - **Design System**: Liquid Glass (iOS-inspired glassmorphism) with an EH monogram logo, WCAG AA contrast compliance, and `aria-label` attributes for accessibility.
 - **Typography**: Playfair Display for headlines and Inter for body/UI.
 - **Color Palette**: Deep Green, Lavender, Bone, Background Dark.
-- **Navigation**: Unified header and Member Bottom Nav.
-- **Responsive Design**: Optimized for iPhone, iPad, and Desktop.
+- **Navigation**: Unified header and Member Bottom Nav. Admin uses route-based navigation (/admin/bookings, /admin/directory, etc.) with React Router nested routes.
+- **Responsive Design**: Optimized for iPhone, iPad, and Desktop. Tables use responsive pattern: cards on mobile (<md), tables on desktop (>=md).
 - **Theme System**: Supports Light, Dark, and System themes, persisted locally.
 - **Motion Architecture**: Pure CSS keyframe animations, staggered content, parallax scrolling, and entry/exit animations.
-- **Drawer UX**: MemberProfileDrawer hides bottom navigation and floating action button on mobile.
+- **Drawer UX**: MemberProfileDrawer hides bottom navigation and floating action button on mobile. All modals converted to SlideUpDrawer with drag-to-dismiss gesture support and sticky action buttons.
+- **Staff FAB**: Floating action button with slide-up drawer menu for quick actions: New User, Announcement, Notice, Manual Booking, QR Scanner.
+- **ConfirmDialog**: Custom Liquid Glass styled confirmation dialogs replacing all browser confirm() calls. Supports danger, warning, and info variants.
 
 ### Technical Implementations
 - **Core Stack**: React 19 (Vite), React Router DOM, Express.js (REST API), PostgreSQL, Tailwind CSS.
