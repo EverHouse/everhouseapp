@@ -4,12 +4,39 @@ import { isAdmin } from '../core/middleware';
 
 const router = Router();
 
+const FEATURE_KEY_TO_TIER_COLUMN: Record<string, { column: string; type: 'boolean' | 'number' | 'text'; format?: (val: any) => string }> = {
+  'daily_golf_time': { column: 'daily_sim_minutes', type: 'text', format: (val) => val > 0 ? `${val} min` : '—' },
+  'guest_passes': { column: 'guest_passes_per_month', type: 'text', format: (val) => val > 0 ? `${val}/mo` : '—' },
+  'booking_window': { column: 'booking_window_days', type: 'text', format: (val) => val > 0 ? `${val} days` : '—' },
+  'cafe_bar_access': { column: null, type: 'boolean' },
+  'lounge_access': { column: null, type: 'boolean' },
+  'work_desks': { column: null, type: 'boolean' },
+  'golf_simulators': { column: 'can_book_simulators', type: 'boolean' },
+  'putting_green': { column: null, type: 'boolean' },
+  'member_events': { column: null, type: 'boolean' },
+  'conference_room': { column: 'daily_conf_room_minutes', type: 'text', format: (val) => val > 0 ? `${val} min` : '—' },
+  'group_lessons': { column: 'has_group_lessons', type: 'boolean' },
+  'extended_sessions': { column: 'has_extended_sessions', type: 'boolean' },
+  'private_lessons': { column: 'has_private_lesson', type: 'boolean' },
+  'sim_guest_passes': { column: 'has_simulator_guest_passes', type: 'boolean' },
+  'discounted_merch': { column: 'has_discounted_merch', type: 'boolean' },
+};
+
 router.get('/api/tier-features', async (req, res) => {
   try {
     const featuresResult = await pool.query(`
       SELECT id, feature_key, display_label, value_type, sort_order, is_active
       FROM tier_features
       ORDER BY sort_order ASC, id ASC
+    `);
+
+    const tiersResult = await pool.query(`
+      SELECT id, name, slug, daily_sim_minutes, guest_passes_per_month, booking_window_days, 
+             daily_conf_room_minutes, can_book_simulators, can_book_conference, can_book_wellness,
+             has_group_lessons, has_extended_sessions, has_private_lesson, 
+             has_simulator_guest_passes, has_discounted_merch
+      FROM membership_tiers
+      WHERE is_active = true AND show_in_comparison = true
     `);
 
     const valuesResult = await pool.query(`
@@ -29,9 +56,9 @@ router.get('/api/tier-features', async (req, res) => {
       }
       
       let value: any = null;
-      if (row.value_text !== null) {
+      if (row.value_text !== null && row.value_text !== '') {
         value = row.value_text;
-      } else if (row.value_number !== null) {
+      } else if (row.value_number !== null && row.value_number !== 0) {
         value = parseFloat(row.value_number);
       } else if (row.value_boolean !== null) {
         value = row.value_boolean;
@@ -43,15 +70,52 @@ router.get('/api/tier-features', async (req, res) => {
       };
     }
 
-    const features = featuresResult.rows.map(row => ({
-      id: row.id,
-      featureKey: row.feature_key,
-      displayLabel: row.display_label,
-      valueType: row.value_type,
-      sortOrder: row.sort_order,
-      isActive: row.is_active,
-      values: valuesByFeature[row.id] || {}
-    }));
+    const features = featuresResult.rows.map(row => {
+      const featureKey = row.feature_key;
+      const mapping = FEATURE_KEY_TO_TIER_COLUMN[featureKey];
+      
+      const values: Record<number, { tierId: number; value: any }> = {};
+      
+      for (const tier of tiersResult.rows) {
+        const existingValue = valuesByFeature[row.id]?.[tier.id];
+        
+        if (existingValue && existingValue.value !== null && existingValue.value !== '' && existingValue.value !== false) {
+          values[tier.id] = existingValue;
+        } else if (mapping) {
+          let derivedValue: any = null;
+          
+          if (mapping.column === null) {
+            derivedValue = true;
+          } else {
+            const rawValue = tier[mapping.column];
+            if (mapping.format) {
+              derivedValue = mapping.format(rawValue);
+              if (derivedValue === '—') derivedValue = null;
+            } else if (mapping.type === 'boolean') {
+              derivedValue = rawValue === true;
+            } else if (mapping.type === 'number') {
+              derivedValue = rawValue !== null && rawValue !== 0 ? Number(rawValue) : null;
+            } else {
+              derivedValue = rawValue;
+            }
+          }
+          
+          values[tier.id] = { tierId: tier.id, value: derivedValue };
+        } else {
+          values[tier.id] = existingValue || { tierId: tier.id, value: null };
+        }
+      }
+
+      return {
+        id: row.id,
+        featureKey: row.feature_key,
+        displayLabel: row.display_label,
+        valueType: row.value_type,
+        sortOrder: row.sort_order,
+        isActive: row.is_active,
+        values
+      };
+    });
 
     res.json({ features });
   } catch (error: any) {
