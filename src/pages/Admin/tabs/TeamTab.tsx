@@ -309,6 +309,20 @@ const TeamTab: React.FC = () => {
     }
   };
 
+  if (!isAdmin) {
+    return (
+      <AnimatedPage>
+        <div className="bg-white dark:bg-surface-dark rounded-2xl p-8 border border-gray-200 dark:border-white/25 text-center animate-content-enter-delay-1">
+          <span className="material-symbols-outlined text-6xl mb-4 text-gray-400 dark:text-white/40">lock</span>
+          <h3 className="text-lg font-bold text-primary dark:text-white mb-2">Admin Access Required</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Only administrators can access team management. Please contact an admin if you need access.
+          </p>
+        </div>
+      </AnimatedPage>
+    );
+  }
+
   return (
     <AnimatedPage>
       <div className="bg-white dark:bg-surface-dark rounded-2xl p-6 border border-gray-200 dark:border-white/25 animate-content-enter-delay-1">
@@ -316,7 +330,7 @@ const TeamTab: React.FC = () => {
           <div>
             <h3 className="text-lg font-bold text-primary dark:text-white">Team Directory</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {isAdmin ? 'Manage team members and portal access' : 'View team contact information'}
+              Manage team members and portal access
             </p>
           </div>
         </div>

@@ -25,7 +25,7 @@ router.get('/api/admin/trackman/unmatched', isStaffOrAdmin, async (req, res) => 
     let paramIndex = 1;
     
     if (resolved === 'false') {
-      whereClause += ` AND (br.user_email IS NULL OR br.user_email LIKE 'unmatched-%@%' OR br.user_email LIKE '%@trackman.local')`;
+      whereClause += ` AND (br.user_email IS NULL OR br.user_email = '' OR br.user_email LIKE 'unmatched-%@%' OR br.user_email LIKE '%@trackman.local')`;
     }
     
     if (search) {
@@ -179,7 +179,7 @@ router.post('/api/admin/trackman/unmatched/auto-resolve', isStaffOrAdmin, async 
       FROM booking_requests br
       INNER JOIN users u ON LOWER(u.email) = LOWER(REGEXP_REPLACE(br.trackman_customer_notes, '.*Original email:\\s*([^,\\s]+).*', '\\1'))
       WHERE br.is_unmatched = true
-        AND (br.user_email IS NULL OR br.user_email LIKE 'unmatched-%@%' OR br.user_email LIKE '%@trackman.local')
+        AND (br.user_email IS NULL OR br.user_email = '' OR br.user_email LIKE 'unmatched-%@%' OR br.user_email LIKE '%@trackman.local')
       ORDER BY br.request_date DESC
       LIMIT 100
     `);
@@ -313,16 +313,39 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
     }
     
     const memberResult = await pool.query(
-      `SELECT id, email, first_name, last_name, role, stripe_customer_id, tier FROM users WHERE email = $1`,
+      `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.stripe_customer_id, u.tier, u.archived_at,
+              su.role as staff_role, su.is_active as is_staff_active
+       FROM users u
+       LEFT JOIN staff_users su ON LOWER(su.email) = LOWER(u.email) AND su.is_active = true
+       WHERE LOWER(u.email) = LOWER($1)`,
       [resolveEmail.toLowerCase()]
     );
     
     if (memberResult.rows.length === 0) {
+      // Check if this email exists in staff_users but not users table
+      const staffCheck = await pool.query(
+        `SELECT id, email, first_name, last_name, role FROM staff_users WHERE LOWER(email) = LOWER($1) AND is_active = true`,
+        [resolveEmail.toLowerCase()]
+      );
+      
+      if (staffCheck.rows.length > 0) {
+        return res.status(404).json({ 
+          error: 'This is a staff email but no user profile exists. Please ask an admin to set up this staff member in the system first.',
+          isStaffEmail: true
+        });
+      }
+      
       return res.status(404).json({ error: 'Member not found with that email. Make sure they exist in the member directory.' });
     }
     
     const member = memberResult.rows[0];
-    const isVisitor = member.role === 'visitor';
+    
+    // Task 7: Check if member is archived
+    if (member.archived_at) {
+      return res.status(400).json({ error: 'Cannot assign booking to an archived member. Please reactivate the member first.' });
+    }
+    
+    const isVisitor = member.role === 'visitor' && !member.staff_role;
     const staffEmail = (req as any).session?.user?.email || 'admin';
     
     let bookingResult = await pool.query(

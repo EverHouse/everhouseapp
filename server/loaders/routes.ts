@@ -47,6 +47,7 @@ import financialsRouter from '../routes/financials';
 import accountRouter from '../routes/account';
 import dataExportRouter from '../routes/dataExport';
 import staffManualBookingRouter from '../routes/staff/manualBooking';
+import staffRouter from '../routes/staff';
 import tierFeaturesRouter from '../routes/tierFeatures';
 import { registerObjectStorageRoutes } from '../replit_integrations/object_storage';
 
@@ -98,6 +99,7 @@ export function registerRoutes(app: Express): void {
   app.use(dayPassesRouter);
   app.use(financialsRouter);
   app.use(staffManualBookingRouter);
+  app.use(staffRouter);
   app.use(tierFeaturesRouter);
   registerObjectStorageRoutes(app);
 }

@@ -711,7 +711,6 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
     const [prefillStartTime, setPrefillStartTime] = useState<string | null>(null);
     const [selectedCalendarBooking, setSelectedCalendarBooking] = useState<BookingRequest | null>(null);
     const [isCancellingFromModal, setIsCancellingFromModal] = useState(false);
-    const [isUnmatchingMember, setIsUnmatchingMember] = useState(false);
     const [scheduledFilter, setScheduledFilter] = useState<'all' | 'today' | 'tomorrow' | 'week'>('all');
     const [markStatusModal, setMarkStatusModal] = useState<{ booking: BookingRequest | null; confirmNoShow: boolean }>({ booking: null, confirmNoShow: false });
     
@@ -3449,59 +3448,12 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                 !emailLower.includes('anonymous@') &&
                                 !emailLower.includes('booking@');
                             
-                            if (isTrackmanBooking && hasMatchedMember) {
-                                return (
-                                    <button
-                                        onClick={async () => {
-                                            if (!selectedCalendarBooking?.user_email) return;
-                                            if (!confirm(`Unmatch all Trackman bookings for ${selectedCalendarBooking.user_email}? This will allow you to reassign them to a different member.`)) {
-                                                return;
-                                            }
-                                            
-                                            setIsUnmatchingMember(true);
-                                            try {
-                                                const res = await fetch('/api/admin/trackman/unmatch-member', {
-                                                    method: 'POST',
-                                                    headers: { 'Content-Type': 'application/json' },
-                                                    credentials: 'include',
-                                                    body: JSON.stringify({ email: selectedCalendarBooking.user_email })
-                                                });
-                                                
-                                                if (!res.ok) {
-                                                    const errData = await res.json();
-                                                    throw new Error(errData.error || 'Failed to unmatch member');
-                                                }
-                                                
-                                                const data = await res.json();
-                                                showToast(data.message || `Unmatched ${data.affectedCount} booking(s)`, 'success', 5000);
-                                                
-                                                setSelectedCalendarBooking(null);
-                                                await handleRefresh();
-                                            } catch (err: any) {
-                                                console.error('Failed to unmatch member:', err);
-                                                showToast(err.message || 'Failed to unmatch member', 'error');
-                                            } finally {
-                                                setIsUnmatchingMember(false);
-                                            }
-                                        }}
-                                        disabled={isUnmatchingMember || isCancellingFromModal}
-                                        className="w-full py-2.5 px-4 rounded-lg border border-orange-300 dark:border-orange-500/50 text-orange-600 dark:text-orange-400 font-medium flex items-center justify-center gap-2 hover:bg-orange-50 dark:hover:bg-orange-500/10 hover:shadow-md active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {isUnmatchingMember ? (
-                                            <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
-                                        ) : (
-                                            <span aria-hidden="true" className="material-symbols-outlined text-sm">person_remove</span>
-                                        )}
-                                        Unmatch Member
-                                    </button>
-                                );
-                            }
-                            return null;
+return null;
                         })()}
                         <button
                             onClick={() => setSelectedCalendarBooking(null)}
                             className="w-full py-2 px-4 rounded-lg text-gray-500 dark:text-gray-400 text-sm font-medium hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
-                            disabled={isCancellingFromModal || isUnmatchingMember}
+                            disabled={isCancellingFromModal}
                         >
                             Close
                         </button>

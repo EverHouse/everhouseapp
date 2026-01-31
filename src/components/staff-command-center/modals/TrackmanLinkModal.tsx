@@ -78,6 +78,10 @@ export function TrackmanLinkModal({
   const [rememberEmail, setRememberEmail] = useState(true);
   const [potentialDuplicates, setPotentialDuplicates] = useState<Array<{id: string; email: string; name: string}>>([]);
   const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
+  const [showStaffList, setShowStaffList] = useState(false);
+  const [staffList, setStaffList] = useState<Array<{id: string; email: string; first_name: string; last_name: string; role: string; user_id: string | null}>>([]);
+  const [isLoadingStaff, setIsLoadingStaff] = useState(false);
+  const [assigningToStaff, setAssigningToStaff] = useState(false);
   const { showToast } = useToast();
 
   const isPlaceholderEmail = (email: string): boolean => {
@@ -116,8 +120,29 @@ export function TrackmanLinkModal({
       setVisitorSearchResults([]);
       setRememberEmail(true);
       setPotentialDuplicates([]);
+      setShowStaffList(false);
+      setStaffList([]);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    const fetchStaffList = async () => {
+      if (!showStaffList || staffList.length > 0) return;
+      setIsLoadingStaff(true);
+      try {
+        const res = await fetch('/api/staff/list', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          setStaffList(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch staff list:', err);
+      } finally {
+        setIsLoadingStaff(false);
+      }
+    };
+    fetchStaffList();
+  }, [showStaffList]);
 
   useEffect(() => {
     const checkDuplicates = async () => {
@@ -454,6 +479,115 @@ export function TrackmanLinkModal({
       showToast(err.message || 'Failed to mark as event', 'error');
     } finally {
       setMarkingAsEvent(false);
+    }
+  };
+
+  const handleAssignToStaff = async (staff: {id: string; email: string; first_name: string; last_name: string; role: string; user_id: string | null}) => {
+    if (assigningToStaff) return;
+    
+    setAssigningToStaff(true);
+    try {
+      const staffName = `${staff.first_name} ${staff.last_name}`;
+      
+      if (isLegacyReview && matchedBookingId) {
+        let numericId: number;
+        if (typeof matchedBookingId === 'string') {
+          numericId = parseInt(matchedBookingId.replace('review-', ''), 10);
+        } else {
+          numericId = matchedBookingId;
+        }
+        
+        if (isNaN(numericId)) {
+          throw new Error('Invalid booking ID for legacy resolution');
+        }
+        
+        const res = await fetch(`/api/admin/trackman/unmatched/${numericId}/resolve`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            memberEmail: staff.email,
+            rememberEmail: false
+          })
+        });
+        
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || data.message || 'Failed to assign to staff');
+        }
+      } else if (matchedBookingId) {
+        const res = await fetch(`/api/bookings/${matchedBookingId}/assign-with-players`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            owner: {
+              email: staff.email,
+              name: staffName,
+              member_id: staff.user_id
+            },
+            additional_players: [],
+            rememberEmail: false
+          })
+        });
+        
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || data.message || 'Failed to assign to staff');
+        }
+      } else if (trackmanBookingId) {
+        const res = await fetch('/api/bookings/link-trackman-to-member', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            trackman_booking_id: trackmanBookingId,
+            owner: {
+              email: staff.email,
+              name: staffName,
+              member_id: staff.user_id
+            },
+            additional_players: [],
+            rememberEmail: false
+          })
+        });
+        
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || data.message || 'Failed to assign to staff');
+        }
+      }
+      
+      showToast(`Booking assigned to ${staffName}`, 'success');
+      onSuccess?.({ memberEmail: staff.email, memberName: staffName });
+      onClose();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to assign to staff', 'error');
+    } finally {
+      setAssigningToStaff(false);
+    }
+  };
+
+  const getRoleBadge = (role: string) => {
+    switch (role) {
+      case 'golf_instructor':
+        return (
+          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 rounded">
+            Instructor
+          </span>
+        );
+      case 'admin':
+        return (
+          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 rounded">
+            Admin
+          </span>
+        );
+      default:
+        return (
+          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded">
+            Staff
+          </span>
+        );
     }
   };
 
@@ -931,6 +1065,53 @@ export function TrackmanLinkModal({
               </>
             )}
           </button>
+
+          <button
+            onClick={() => setShowStaffList(!showStaffList)}
+            disabled={assigningToStaff}
+            className="w-full py-2.5 px-4 rounded-lg border border-teal-500 text-teal-600 dark:text-teal-400 font-medium hover:bg-teal-50 dark:hover:bg-teal-500/10 transition-colors flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined text-sm">badge</span>
+            Assign to Staff
+            <span className={`material-symbols-outlined text-sm transition-transform ${showStaffList ? 'rotate-180' : ''}`}>expand_more</span>
+          </button>
+
+          {showStaffList && (
+            <div className="border border-teal-200 dark:border-teal-500/30 rounded-lg overflow-hidden">
+              {isLoadingStaff ? (
+                <div className="p-4 text-center">
+                  <span className="material-symbols-outlined animate-spin text-teal-500">progress_activity</span>
+                  <p className="text-sm text-primary/60 dark:text-white/60 mt-1">Loading staff...</p>
+                </div>
+              ) : staffList.length === 0 ? (
+                <div className="p-4 text-center">
+                  <p className="text-sm text-primary/60 dark:text-white/60">No active staff found</p>
+                </div>
+              ) : (
+                <div className="max-h-48 overflow-y-auto">
+                  {staffList.map((staff) => (
+                    <button
+                      key={staff.id}
+                      onClick={() => handleAssignToStaff(staff)}
+                      disabled={assigningToStaff}
+                      className="w-full p-3 text-left hover:bg-teal-50 dark:hover:bg-teal-500/10 transition-colors border-b border-teal-100 dark:border-teal-500/20 last:border-b-0 disabled:opacity-50"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-sm text-primary dark:text-white">
+                            {staff.first_name} {staff.last_name}
+                          </p>
+                          <p className="text-xs text-primary/60 dark:text-white/60">{staff.email}</p>
+                        </div>
+                        {getRoleBadge(staff.role)}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <p className="text-xs text-center text-primary/50 dark:text-white/50">
             Use for event blocks that don't require member assignment
           </p>

@@ -163,11 +163,51 @@ const DesktopRowComponent = ({ index, style, data, memberTab, isAdmin, openDetai
 
 type SortField = 'name' | 'tier' | 'visits' | 'joinDate' | 'lastVisit';
 type SortDirection = 'asc' | 'desc';
-type MemberTab = 'active' | 'former' | 'visitors';
+type MemberTab = 'active' | 'former' | 'visitors' | 'team';
 
 type VisitorType = 'all' | 'NEW' | 'classpass' | 'sim_walkin' | 'private_lesson' | 'day_pass' | 'guest' | 'lead';
 type VisitorSource = 'all' | 'mindbody' | 'hubspot' | 'stripe' | 'APP';
 type VisitorSortField = 'name' | 'type' | 'source' | 'lastActivity' | 'createdAt';
+
+type StaffRole = 'staff' | 'admin' | 'golf_instructor';
+
+interface TeamMember {
+    staff_id: number;
+    email: string;
+    first_name: string | null;
+    last_name: string | null;
+    phone: string | null;
+    job_title: string | null;
+    role: StaffRole | null;
+    is_active: boolean;
+    user_id: string | null;
+    tier: string | null;
+    membership_status: string | null;
+    stripe_customer_id: string | null;
+    hubspot_id: string | null;
+}
+
+const RoleBadge: React.FC<{ role: StaffRole | null }> = ({ role }) => {
+    if (role === 'golf_instructor') {
+        return (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                Instructor
+            </span>
+        );
+    }
+    if (role === 'admin') {
+        return (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                Admin
+            </span>
+        );
+    }
+    return (
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400">
+            Staff
+        </span>
+    );
+};
 
 interface Visitor {
     id: string;
@@ -275,6 +315,10 @@ const DirectoryTab: React.FC = () => {
     const [visitorsPage, setVisitorsPage] = useState(1);
     const [visitorsTotalPages, setVisitorsTotalPages] = useState(1);
     const VISITORS_PAGE_SIZE = 100;
+    const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+    const [teamLoading, setTeamLoading] = useState(false);
+    const [teamError, setTeamError] = useState(false);
+    const [teamSearchQuery, setTeamSearchQuery] = useState('');
     
     const isAdmin = actualUser?.role === 'admin';
     
@@ -443,6 +487,23 @@ const DirectoryTab: React.FC = () => {
         }
     }, []);
 
+    // Fetch team members
+    const fetchTeam = useCallback(async () => {
+        setTeamLoading(true);
+        setTeamError(false);
+        try {
+            const res = await fetch('/api/directory/team', { credentials: 'include' });
+            if (!res.ok) throw new Error('Failed to fetch team');
+            const data = await res.json();
+            setTeamMembers(data || []);
+        } catch (err) {
+            console.error('Error loading team:', err);
+            setTeamError(true);
+        } finally {
+            setTeamLoading(false);
+        }
+    }, []);
+
     // Fetch former members or visitors when switching to that tab
     const handleTabChange = useCallback(async (tab: MemberTab) => {
         setMemberTab(tab);
@@ -460,8 +521,10 @@ const DirectoryTab: React.FC = () => {
             }
         } else if (tab === 'visitors') {
             await fetchVisitors(visitorTypeFilter, visitorSourceFilter, visitorSearchQuery);
+        } else if (tab === 'team') {
+            await fetchTeam();
         }
-    }, [fetchFormerMembers, fetchVisitors, visitorTypeFilter, visitorSourceFilter, visitorSearchQuery]);
+    }, [fetchFormerMembers, fetchVisitors, fetchTeam, visitorTypeFilter, visitorSourceFilter, visitorSearchQuery]);
     
     // Refetch visitors when filters change (immediate) or search changes (debounced)
     useEffect(() => {
@@ -535,6 +598,51 @@ const DirectoryTab: React.FC = () => {
         setSelectedVisitor(visitor);
         setVisitorDetailsOpen(true);
     }, []);
+
+    // Convert team member to MemberProfile format for drawer
+    const teamMemberToMemberProfile = useCallback((member: TeamMember): MemberProfile => ({
+        email: member.email || '',
+        name: [member.first_name, member.last_name].filter(Boolean).join(' ') || 'Unknown',
+        tier: member.tier || null,
+        rawTier: member.tier || null,
+        role: member.role || 'staff',
+        joinDate: null,
+        phone: member.phone || '',
+        mindbodyId: null,
+        accountBalance: 0,
+        tags: [],
+        lifetimeVisits: 0,
+        lastVisit: null,
+        membershipStatus: member.membership_status || null,
+        stripeCustomerId: member.stripe_customer_id || null,
+        status: 'active',
+        billingProvider: null,
+        legacySource: null,
+        firstName: member.first_name || null,
+        lastName: member.last_name || null,
+        userId: member.user_id || undefined,
+        hubspotId: member.hubspot_id || null,
+    }), []);
+
+    // Open team member details drawer
+    const openTeamMemberDetails = useCallback((member: TeamMember) => {
+        const profile = teamMemberToMemberProfile(member);
+        setSelectedMember(profile);
+        setIsViewingDetails(true);
+    }, [teamMemberToMemberProfile]);
+
+    // Filter team members based on search
+    const filteredTeamMembers = useMemo(() => {
+        if (!teamSearchQuery.trim()) return teamMembers;
+        const query = teamSearchQuery.toLowerCase().trim();
+        return teamMembers.filter(member => {
+            const name = [member.first_name, member.last_name].filter(Boolean).join(' ').toLowerCase();
+            const email = member.email?.toLowerCase() || '';
+            const role = member.role?.toLowerCase() || 'staff';
+            const jobTitle = member.job_title?.toLowerCase() || '';
+            return name.includes(query) || email.includes(query) || role.includes(query) || jobTitle.includes(query);
+        });
+    }, [teamMembers, teamSearchQuery]);
 
     // Get current member list based on tab - ensure arrays are always defined
     const currentMembers = memberTab === 'active' ? (members || []) : (formerMembers || []);
@@ -803,6 +911,22 @@ const DirectoryTab: React.FC = () => {
                         }`}
                     >
                         Visitors
+                    </button>
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleTabChange('team');
+                            setShowMissingTierOnly(false);
+                        }}
+                        className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${
+                            memberTab === 'team'
+                                ? 'bg-primary dark:bg-lavender text-white'
+                                : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
+                        }`}
+                    >
+                        Team
                     </button>
                     {syncMessage && (
                         <span className={`text-[10px] font-medium ${syncMessage.type === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -1465,8 +1589,150 @@ const DirectoryTab: React.FC = () => {
                     </div>
                 )}
 
+                {/* Team tab - Loading state */}
+                {teamLoading && memberTab === 'team' && (
+                    <DirectoryTabSkeleton />
+                )}
+
+                {/* Team tab - Error state */}
+                {!teamLoading && teamError && memberTab === 'team' && (
+                    <div className="flex flex-col items-center justify-center py-16 px-6 rounded-2xl border-2 border-dashed border-red-200 dark:border-red-500/25 bg-red-50 dark:bg-red-500/5">
+                        <span aria-hidden="true" className="material-symbols-outlined text-6xl mb-4 text-red-400 dark:text-red-400/70">cloud_off</span>
+                        <h3 className="text-lg font-bold mb-2 text-red-600 dark:text-red-400">
+                            Failed to load team
+                        </h3>
+                        <p className="text-sm text-red-500 dark:text-red-400/80 max-w-sm mx-auto text-center mb-4">
+                            There was a problem connecting to the server. Please try again.
+                        </p>
+                        <button
+                            onClick={fetchTeam}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold transition-colors"
+                        >
+                            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">refresh</span>
+                            Retry
+                        </button>
+                    </div>
+                )}
+
+                {/* Team tab - Empty state */}
+                {!teamLoading && !teamError && memberTab === 'team' && teamMembers.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-16 px-6 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-white/5">
+                        <span aria-hidden="true" className="material-symbols-outlined text-6xl mb-4 text-gray-400 dark:text-white/30">groups</span>
+                        <h3 className="text-lg font-bold mb-2 text-gray-600 dark:text-white/70">
+                            No team members found
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-white/60 max-w-sm mx-auto text-center">
+                            Active staff members will appear here.
+                        </p>
+                    </div>
+                )}
+
+                {/* Team tab - Search filter */}
+                {!teamLoading && !teamError && memberTab === 'team' && teamMembers.length > 0 && (
+                    <div className="mb-4">
+                        <div className="relative mb-2">
+                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-white/40 text-[20px]">search</span>
+                            <input
+                                type="text"
+                                value={teamSearchQuery}
+                                onChange={(e) => setTeamSearchQuery(e.target.value)}
+                                placeholder="Search by name, email, or role..."
+                                className="w-full pl-10 pr-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-white/20 bg-white dark:bg-surface-dark text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                aria-label="Search team"
+                            />
+                            {teamSearchQuery && (
+                                <button
+                                    onClick={() => setTeamSearchQuery('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-white/40 dark:hover:text-white/70"
+                                    aria-label="Clear search"
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">close</span>
+                                </button>
+                            )}
+                        </div>
+                        <span className="text-sm text-gray-500 dark:text-white/60">
+                            {filteredTeamMembers.length} team member{filteredTeamMembers.length !== 1 ? 's' : ''}
+                        </span>
+                    </div>
+                )}
+
+                {/* Team tab - Mobile list */}
+                {!teamLoading && !teamError && memberTab === 'team' && filteredTeamMembers.length > 0 && (
+                    <div className="md:hidden flex-1 min-h-0 relative">
+                        <div className="h-full overflow-y-auto pt-2 pb-24">
+                            <div className="space-y-3 px-1">
+                                {filteredTeamMembers.map((member, index) => (
+                                    <div 
+                                        key={member.staff_id}
+                                        onClick={() => openTeamMemberDetails(member)}
+                                        className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm cursor-pointer hover:border-primary/50 transition-colors animate-slide-up-stagger"
+                                        style={{ '--stagger-index': index } as React.CSSProperties}
+                                    >
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <h4 className="font-bold text-lg text-primary dark:text-white">
+                                                        {[member.first_name, member.last_name].filter(Boolean).join(' ') || 'Unknown'}
+                                                    </h4>
+                                                    <RoleBadge role={member.role} />
+                                                </div>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">{member.email}</p>
+                                                {member.phone && <p className="text-xs text-gray-500 dark:text-gray-400">{formatPhoneNumber(member.phone)}</p>}
+                                            </div>
+                                        </div>
+                                        {member.job_title && (
+                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{member.job_title}</p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Team tab - Desktop list */}
+                {!teamLoading && !teamError && memberTab === 'team' && filteredTeamMembers.length > 0 && (
+                    <div className="hidden md:flex flex-col flex-1 min-h-0 overflow-hidden">
+                        <div className="flex bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/20 shrink-0 rounded-t-xl overflow-hidden">
+                            <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '20%' }}>Name</div>
+                            <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '15%' }}>Role</div>
+                            <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '20%' }}>Job Title</div>
+                            <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '30%' }}>Email</div>
+                            <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '15%' }}>Phone</div>
+                        </div>
+                        <div className="relative flex-1 min-h-0">
+                            <div className="h-full overflow-y-auto pt-2">
+                                {filteredTeamMembers.map((member, index) => (
+                                    <div 
+                                        key={member.staff_id}
+                                        onClick={() => openTeamMemberDetails(member)}
+                                        className="flex items-center border-b border-gray-200 dark:border-white/20 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer animate-slide-up-stagger"
+                                        style={{ '--stagger-index': index } as React.CSSProperties}
+                                    >
+                                        <div style={{ width: '20%' }} className="p-4 font-medium text-primary dark:text-white truncate">
+                                            {[member.first_name, member.last_name].filter(Boolean).join(' ') || 'Unknown'}
+                                        </div>
+                                        <div style={{ width: '15%' }} className="p-4">
+                                            <RoleBadge role={member.role} />
+                                        </div>
+                                        <div style={{ width: '20%' }} className="p-4 text-gray-600 dark:text-gray-400 text-sm truncate">
+                                            {member.job_title || '-'}
+                                        </div>
+                                        <div style={{ width: '30%' }} className="p-4 text-gray-500 dark:text-gray-400 text-sm truncate" title={member.email}>
+                                            {member.email}
+                                        </div>
+                                        <div style={{ width: '15%' }} className="p-4 text-gray-500 dark:text-gray-400 text-sm">
+                                            {member.phone ? formatPhoneNumber(member.phone) : '-'}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Mobile view - Virtualized only for large lists (members only) */}
-                {!formerLoading && memberTab !== 'visitors' && filteredList.length > 0 && (
+                {!formerLoading && memberTab !== 'visitors' && memberTab !== 'team' && filteredList.length > 0 && (
                 <div className="md:hidden flex-1 min-h-0 relative">
                     <div className="h-full overflow-y-auto pt-2 pb-24">
                         {/* Non-virtualized rendering for small lists */}
@@ -1542,7 +1808,7 @@ const DirectoryTab: React.FC = () => {
             )}
 
             {/* Desktop view - Virtualized only for large lists with flex-based layout (members only) */}
-            {!formerLoading && memberTab !== 'visitors' && filteredList.length > 0 && (
+            {!formerLoading && memberTab !== 'visitors' && memberTab !== 'team' && filteredList.length > 0 && (
             <div className="hidden md:flex flex-col flex-1 min-h-0 overflow-hidden">
                 {/* Header row - fixed */}
                 <div className="flex bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/20 shrink-0 rounded-t-xl overflow-hidden">

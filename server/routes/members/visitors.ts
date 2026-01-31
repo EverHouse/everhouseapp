@@ -611,17 +611,21 @@ router.get('/api/visitors/search', isStaffOrAdmin, async (req, res) => {
     // Default: only visitors
     // includeStaff: also search staff/admin users (for booking assignment)
     // includeMembers: also search active members
+    // Note: Always include users who are in staff_users table (instructors, staff, admins)
+    // even if their users.membership_status is 'non-member'
     let roleCondition = `(role = 'visitor' OR membership_status = 'visitor')`;
     if (shouldIncludeStaff && shouldIncludeMembers) {
       roleCondition = `(
         role = 'visitor' OR membership_status = 'visitor'
         OR role IN ('staff', 'admin')
         OR membership_status IN ('active', 'trialing', 'past_due')
+        OR EXISTS (SELECT 1 FROM staff_users su2 WHERE LOWER(su2.email) = LOWER(u.email) AND su2.is_active = true)
       )`;
     } else if (shouldIncludeStaff) {
       roleCondition = `(
         role = 'visitor' OR membership_status = 'visitor'
         OR role IN ('staff', 'admin')
+        OR EXISTS (SELECT 1 FROM staff_users su2 WHERE LOWER(su2.email) = LOWER(u.email) AND su2.is_active = true)
       )`;
     } else if (shouldIncludeMembers) {
       roleCondition = `(
