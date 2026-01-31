@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { useToast } from '../../Toast';
 import BookingMembersEditor from '../../admin/BookingMembersEditor';
 import { CheckinBillingModal } from './CheckinBillingModal';
+import SlideUpDrawer from '../../SlideUpDrawer';
 
 interface BookingContext {
   bookingId: number;
@@ -63,7 +63,6 @@ export const CompleteRosterModal: React.FC<CompleteRosterModalProps> = ({
           bookingDetails = await bookingRes.json();
         }
         
-        // Booking details come from the proper API endpoint now
         const ownerName = bookingDetails?.user_name || 'Unknown';
         const ownerEmail = bookingDetails?.user_email || '';
         
@@ -129,8 +128,6 @@ export const CompleteRosterModal: React.FC<CompleteRosterModalProps> = ({
     }
   };
 
-  if (!isOpen) return null;
-
   const formatTime = (time: string) => {
     if (!time) return '';
     const [hours, minutes] = time.split(':');
@@ -146,25 +143,52 @@ export const CompleteRosterModal: React.FC<CompleteRosterModalProps> = ({
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
-  const modalContent = (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center px-4 pt-20 pb-6 bg-black/50 backdrop-blur-sm overflow-y-auto">
-      <div className="w-full max-w-lg bg-white dark:bg-[#1a1d12] rounded-2xl shadow-2xl border border-primary/20 dark:border-white/10 overflow-visible max-h-[calc(100vh-6rem)] flex flex-col">
-        <div className="px-6 py-4 border-b border-primary/10 dark:border-white/10 bg-amber-50 dark:bg-amber-900/20 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-primary dark:text-white flex items-center gap-2">
-              <span className="material-symbols-outlined text-amber-600 dark:text-amber-400">group_add</span>
-              Complete Booking Details
-            </h2>
-            <button onClick={onClose} className="p-1 hover:bg-primary/10 dark:hover:bg-white/10 rounded-lg" aria-label="Close">
-              <span className="material-symbols-outlined text-primary/60 dark:text-white/60" aria-hidden="true">close</span>
-            </button>
-          </div>
-          <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-            Please assign all player slots to proceed with check-in
-          </p>
-        </div>
+  const drawerTitle = context 
+    ? `Complete Roster - ${context.ownerName}`
+    : 'Complete Booking Details';
 
-        <div className="p-6 overflow-y-auto flex-1">
+  const stickyFooter = (
+    <div className="px-5 py-4 bg-primary/5 dark:bg-white/5">
+      <div className="flex flex-col gap-2">
+        <button
+          onClick={handleCheckIn}
+          disabled={isCheckingIn || !rosterComplete}
+          className={`w-full py-3 font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors ${
+            rosterComplete
+              ? 'bg-green-600 text-white hover:bg-green-700'
+              : 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+          } disabled:opacity-50`}
+        >
+          <span className="material-symbols-outlined">how_to_reg</span>
+          {isCheckingIn ? 'Checking In...' : rosterComplete ? 'Complete Check-In' : 'Assign All Players to Check In'}
+        </button>
+        <button
+          onClick={onClose}
+          className="w-full py-2 text-primary/70 dark:text-white/70 font-medium hover:text-primary dark:hover:text-white"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <SlideUpDrawer
+        isOpen={isOpen}
+        onClose={onClose}
+        title={drawerTitle}
+        maxHeight="large"
+        stickyFooter={stickyFooter}
+      >
+        <div className="p-5">
+          <div className="mb-4 px-1">
+            <p className="text-sm text-amber-700 dark:text-amber-300 flex items-center gap-2">
+              <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-lg">group_add</span>
+              Please assign all player slots to proceed with check-in
+            </p>
+          </div>
+
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
@@ -224,36 +248,7 @@ export const CompleteRosterModal: React.FC<CompleteRosterModalProps> = ({
             </div>
           ) : null}
         </div>
-
-        <div className="px-6 py-4 border-t border-primary/10 dark:border-white/10 bg-primary/5 dark:bg-white/5 flex-shrink-0">
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={handleCheckIn}
-              disabled={isCheckingIn || !rosterComplete}
-              className={`w-full py-3 font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors ${
-                rosterComplete
-                  ? 'bg-green-600 text-white hover:bg-green-700'
-                  : 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-              } disabled:opacity-50`}
-            >
-              <span className="material-symbols-outlined">how_to_reg</span>
-              {isCheckingIn ? 'Checking In...' : rosterComplete ? 'Complete Check-In' : 'Assign All Players to Check In'}
-            </button>
-            <button
-              onClick={onClose}
-              className="w-full py-2 text-primary/70 dark:text-white/70 font-medium hover:text-primary dark:hover:text-white"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  return (
-    <>
-      {createPortal(modalContent, document.body)}
+      </SlideUpDrawer>
       <CheckinBillingModal
         isOpen={showBillingModal}
         onClose={() => setShowBillingModal(false)}

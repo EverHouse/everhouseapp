@@ -19,6 +19,7 @@ interface SlideUpDrawerProps {
   className?: string;
   hideHandle?: boolean;
   stickyFooter?: ReactNode;
+  onContentScroll?: (e: React.UIEvent<HTMLDivElement>) => void;
 }
 
 const maxHeightClasses = {
@@ -38,7 +39,8 @@ export function SlideUpDrawer({
   maxHeight = 'large',
   className = '',
   hideHandle = false,
-  stickyFooter
+  stickyFooter,
+  onContentScroll
 }: SlideUpDrawerProps) {
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === 'dark';
@@ -220,6 +222,7 @@ export function SlideUpDrawer({
             touchAction: 'pan-y',
             overscrollBehavior: 'contain'
           }}
+          onScroll={onContentScroll}
         >
           {children}
         </div>

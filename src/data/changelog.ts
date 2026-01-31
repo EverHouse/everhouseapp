@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.56.0",
+    date: "2026-01-31",
+    title: "Mobile UX: Slide-Up Drawers",
+    changes: [
+      "Added: SlideUpDrawer component - new mobile-optimized drawer with drag-to-dismiss gesture support",
+      "Improved: Check-in billing modal now slides up from bottom on mobile with swipe-to-dismiss",
+      "Improved: Trackman link modal now slides up from bottom on mobile with swipe-to-dismiss",
+      "Improved: Complete roster modal now slides up from bottom on mobile with swipe-to-dismiss",
+      "Improved: Waiver signing modal now slides up from bottom on mobile with swipe-to-dismiss",
+      "Improved: All converted modals have sticky action buttons at the bottom for easier one-handed use",
+      "Improved: iOS safe area handling prevents content from being hidden behind device notches/home bars"
+    ]
+  },
+  {
     version: "9.55.0",
     date: "2026-01-31",
     title: "Staff Management & Private Event Linking",
