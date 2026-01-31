@@ -1,0 +1,4 @@
+## 2025-05-14 - Dashboard Memoization and Time Stability
+**Learning:** The `Member/Dashboard.tsx` component performs heavy data transformations (filters, sorts, maps) on a large set of fetched data. These were being executed on every re-render (e.g., when a modal opens). Additionally, time-sensitive logic used `getNowTimePacific()` and `getTodayString()` directly, which return new values frequently and negate `useMemo` optimization if used as dependencies.
+
+**Action:** Wrap complex data transformations in `useMemo`. Introduce stable `currentTime` and `currentDate` states updated via a minute-interval timer to provide stable dependencies for `useMemo` and ensure time-based filtering remains accurate without excessive re-calculation. Use `Set` for O(N+M) duplicate checks when merging data sources.
