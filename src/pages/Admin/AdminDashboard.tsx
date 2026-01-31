@@ -12,6 +12,7 @@ import PageErrorBoundary from '../../components/PageErrorBoundary';
 import { useStaffWebSocket } from '../../hooks/useStaffWebSocket';
 import StaffCommandCenter from '../../components/StaffCommandCenter';
 import StaffMobileSidebar from '../../components/StaffMobileSidebar';
+import { useConfirmDialog } from '../../components/ConfirmDialog';
 
 import { TabType, StaffBottomNav, StaffSidebar, usePendingCounts, useUnreadNotifications } from './layout';
 
@@ -451,6 +452,7 @@ const StaffTrainingGuide: React.FC = () => {
     const { actualUser } = useData();
     const isAdmin = actualUser?.role === 'admin';
     const printRef = useRef<HTMLDivElement>(null);
+    const { confirm, ConfirmDialogComponent } = useConfirmDialog();
 
     useEffect(() => {
         fetchSections();
@@ -490,7 +492,13 @@ const StaffTrainingGuide: React.FC = () => {
     };
 
     const handleDelete = async (id: number) => {
-        if (!confirm('Are you sure you want to delete this training section?')) return;
+        const confirmed = await confirm({
+            title: 'Delete Training Section',
+            message: 'Are you sure you want to delete this training section?',
+            confirmText: 'Delete',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
         try {
             const response = await fetch(`/api/admin/training-sections/${id}`, {
                 method: 'DELETE',
@@ -640,6 +648,7 @@ const StaffTrainingGuide: React.FC = () => {
                 section={editingSection}
                 onSave={handleSave}
             />
+            <ConfirmDialogComponent />
         </div>
     );
 };

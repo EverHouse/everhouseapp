@@ -4,6 +4,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import ModalShell from '../../components/ModalShell';
 import { getBugReportStatusColor, formatStatusLabel, getRoleColor } from '../../utils/statusColors';
 import { formatRelativeTime, formatCardTimestamp } from '../../utils/dateUtils';
+import { useConfirmDialog } from '../../components/ConfirmDialog';
 
 interface BugReport {
     id: number;
@@ -40,6 +41,7 @@ const BugReportsAdmin: React.FC = () => {
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [staffNotes, setStaffNotes] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const { confirm, ConfirmDialogComponent } = useConfirmDialog();
 
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -125,7 +127,13 @@ const BugReportsAdmin: React.FC = () => {
 
     const handleDelete = async () => {
         if (!selectedReport) return;
-        if (!confirm('Are you sure you want to delete this bug report?')) return;
+        const confirmed = await confirm({
+            title: 'Delete Bug Report',
+            message: 'Are you sure you want to delete this bug report?',
+            confirmText: 'Delete',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
         
         setIsSaving(true);
         try {
@@ -351,6 +359,7 @@ const BugReportsAdmin: React.FC = () => {
                     </div>
                 )}
             </ModalShell>
+            <ConfirmDialogComponent />
         </div>
     );
 };

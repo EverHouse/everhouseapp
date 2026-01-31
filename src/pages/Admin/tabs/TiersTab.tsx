@@ -5,6 +5,7 @@ import FloatingActionButton from '../../../components/FloatingActionButton';
 import ProductsSubTab from './ProductsSubTab';
 import DiscountsSubTab from './DiscountsSubTab';
 import { apiRequest } from '../../../lib/apiRequest';
+import { useConfirmDialog } from '../../../components/ConfirmDialog';
 
 type SubTab = 'tiers' | 'products' | 'fees' | 'discounts';
 
@@ -92,6 +93,7 @@ const TiersTab: React.FC = () => {
     const [editingLabelId, setEditingLabelId] = useState<number | null>(null);
     const [newFeatureForm, setNewFeatureForm] = useState({ key: '', label: '', type: 'boolean' as 'boolean' | 'number' | 'text' });
     const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
+    const { confirm, ConfirmDialogComponent } = useConfirmDialog();
 
     const SUB_TABS: { key: SubTab; label: string; icon: string }[] = [
         { key: 'tiers', label: 'Memberships', icon: 'layers' },
@@ -240,7 +242,13 @@ const TiersTab: React.FC = () => {
     };
 
     const deleteFeature = async (featureId: number) => {
-        if (!confirm('Are you sure you want to delete this feature? This will remove it from all tiers.')) return;
+        const confirmed = await confirm({
+            title: 'Delete Feature',
+            message: 'Are you sure you want to delete this feature? This will remove it from all tiers.',
+            confirmText: 'Delete',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
         try {
             const res = await fetch(`/api/tier-features/${featureId}`, {
                 method: 'DELETE',
@@ -1088,6 +1096,7 @@ const TiersTab: React.FC = () => {
                     label="Create new coupon" 
                 />
             )}
+            <ConfirmDialogComponent />
         </div>
     );
 };

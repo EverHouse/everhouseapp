@@ -13,6 +13,7 @@ import RecentTransactionsSection, { TransactionListRef, Transaction } from '../.
 import OverduePaymentsPanel from '../../../components/admin/payments/OverduePaymentsPanel';
 import { useIsMobile } from '../../../hooks/useBreakpoint';
 import { AnimatedPage } from '../../../components/motion';
+import { useConfirmDialog } from '../../../components/ConfirmDialog';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || '');
 
@@ -959,6 +960,7 @@ const FailedPaymentsSection: React.FC<SectionProps> = ({ onClose, variant = 'mod
   const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
   const [retryingPaymentId, setRetryingPaymentId] = useState<string | null>(null);
   const [cancelingPaymentId, setCancelingPaymentId] = useState<string | null>(null);
+  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
 
   const fetchFailedPayments = async () => {
     try {
@@ -1001,9 +1003,13 @@ const FailedPaymentsSection: React.FC<SectionProps> = ({ onClose, variant = 'mod
   };
 
   const handleCancelPayment = async (paymentIntentId: string) => {
-    if (!window.confirm('Cancel this payment? This will remove it from the failed payments list.')) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Cancel Payment',
+      message: 'Cancel this payment? This will remove it from the failed payments list.',
+      confirmText: 'Cancel Payment',
+      variant: 'warning'
+    });
+    if (!confirmed) return;
     setCancelingPaymentId(paymentIntentId);
     try {
       const res = await fetch('/api/payments/cancel', {
@@ -1188,39 +1194,45 @@ const FailedPaymentsSection: React.FC<SectionProps> = ({ onClose, variant = 'mod
 
   if (variant === 'card') {
     return (
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <span className="material-symbols-outlined text-red-600 dark:text-red-400">error</span>
-          <h3 className="font-bold text-primary dark:text-white">Failed Payments</h3>
-          {failedPayments.length > 0 && (
-            <span className="px-2 py-0.5 text-xs font-bold bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 rounded-full">
-              {failedPayments.length}
-            </span>
-          )}
+      <>
+        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="material-symbols-outlined text-red-600 dark:text-red-400">error</span>
+            <h3 className="font-bold text-primary dark:text-white">Failed Payments</h3>
+            {failedPayments.length > 0 && (
+              <span className="px-2 py-0.5 text-xs font-bold bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 rounded-full">
+                {failedPayments.length}
+              </span>
+            )}
+          </div>
+          {content}
         </div>
-        {content}
-      </div>
+        <ConfirmDialogComponent />
+      </>
     );
   }
 
   return (
-    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-red-600 dark:text-red-400">error</span>
-          <h3 className="font-bold text-primary dark:text-white">Failed Payments</h3>
-          {failedPayments.length > 0 && (
-            <span className="px-2 py-0.5 text-xs font-bold bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 rounded-full">
-              {failedPayments.length}
-            </span>
-          )}
+    <>
+      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-red-600 dark:text-red-400">error</span>
+            <h3 className="font-bold text-primary dark:text-white">Failed Payments</h3>
+            {failedPayments.length > 0 && (
+              <span className="px-2 py-0.5 text-xs font-bold bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 rounded-full">
+                {failedPayments.length}
+              </span>
+            )}
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-primary/10 dark:hover:bg-white/10 rounded-full">
+            <span className="material-symbols-outlined text-primary/60 dark:text-white/60">close</span>
+          </button>
         </div>
-        <button onClick={onClose} className="p-2 hover:bg-primary/10 dark:hover:bg-white/10 rounded-full">
-          <span className="material-symbols-outlined text-primary/60 dark:text-white/60">close</span>
-        </button>
+        {content}
       </div>
-      {content}
-    </div>
+      <ConfirmDialogComponent />
+    </>
   );
 };
 

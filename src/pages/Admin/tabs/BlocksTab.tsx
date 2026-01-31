@@ -8,6 +8,7 @@ import ModalShell from '../../../components/ModalShell';
 import FloatingActionButton from '../../../components/FloatingActionButton';
 import AvailabilityBlocksContent from '../components/AvailabilityBlocksContent';
 import { AnimatedPage } from '../../../components/motion';
+import { useConfirmDialog } from '../../../components/ConfirmDialog';
 
 interface BlocksClosure {
     id: number;
@@ -102,6 +103,7 @@ const BlocksTab: React.FC = () => {
     });
     const [closureSaving, setClosureSaving] = useState(false);
     const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+    const { confirm, ConfirmDialogComponent } = useConfirmDialog();
 
     const markTouched = (field: string) => {
         setTouchedFields(prev => new Set(prev).add(field));
@@ -229,7 +231,13 @@ const BlocksTab: React.FC = () => {
     };
 
     const handleDeleteClosureReason = async (id: number) => {
-        if (!confirm('Are you sure you want to delete this closure reason?')) return;
+        const confirmed = await confirm({
+            title: 'Delete Closure Reason',
+            message: 'Are you sure you want to delete this closure reason?',
+            confirmText: 'Delete',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
         try {
             const res = await fetch(`/api/closure-reasons/${id}`, { method: 'DELETE' });
             if (res.ok) {
@@ -314,7 +322,13 @@ const BlocksTab: React.FC = () => {
     };
 
     const handleDeleteNoticeType = async (id: number) => {
-        if (!confirm('Are you sure you want to delete this notice type?')) return;
+        const confirmed = await confirm({
+            title: 'Delete Notice Type',
+            message: 'Are you sure you want to delete this notice type?',
+            confirmText: 'Delete',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
         try {
             const res = await fetch(`/api/notice-types/${id}`, { method: 'DELETE' });
             if (res.ok) {
@@ -437,7 +451,13 @@ const BlocksTab: React.FC = () => {
 
     const handleDeleteClosure = async (closureId: number, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
-        if (!confirm('Are you sure you want to delete this notice? This will also remove the calendar event and announcement.')) return;
+        const confirmed = await confirm({
+            title: 'Delete Notice',
+            message: 'Are you sure you want to delete this notice? This will also remove the calendar event and announcement.',
+            confirmText: 'Delete',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
         
         const snapshot = [...closures];
         setClosures(prev => prev.filter(c => c.id !== closureId));
@@ -1600,6 +1620,7 @@ const BlocksTab: React.FC = () => {
             </>
             )}
             </div>
+            <ConfirmDialogComponent />
         </AnimatedPage>
         </PullToRefresh>
     );

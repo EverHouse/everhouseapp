@@ -5,6 +5,7 @@ import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 import FloatingActionButton from '../../../components/FloatingActionButton';
 import { formatPhoneNumber } from '../../../utils/formatting';
 import { AnimatedPage } from '../../../components/motion';
+import { useConfirmDialog } from '../../../components/ConfirmDialog';
 
 type StaffRole = 'staff' | 'admin' | 'golf_instructor';
 
@@ -84,6 +85,7 @@ const TeamTab: React.FC = () => {
   const [addError, setAddError] = useState<string | null>(null);
   const [editFieldErrors, setEditFieldErrors] = useState<TeamFieldErrors>({});
   const [addFieldErrors, setAddFieldErrors] = useState<TeamFieldErrors>({});
+  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
 
   useEffect(() => {
     fetchTeamMembers();
@@ -148,7 +150,13 @@ const TeamTab: React.FC = () => {
       }
     }
 
-    if (!window.confirm(`Remove ${member.name || member.email} from team?`)) return;
+    const confirmed = await confirm({
+      title: 'Remove Team Member',
+      message: `Remove ${member.name || member.email} from team?`,
+      confirmText: 'Remove',
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       const res = await fetch(`/api/staff-users/${member.id}`, {
@@ -683,6 +691,7 @@ const TeamTab: React.FC = () => {
       </ModalShell>
 
       {isAdmin && <FloatingActionButton onClick={() => setIsAddingPerson(true)} color="brand" label="Add team member" />}
+      <ConfirmDialogComponent />
     </AnimatedPage>
   );
 };

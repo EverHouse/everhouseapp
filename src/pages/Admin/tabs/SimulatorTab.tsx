@@ -18,6 +18,7 @@ import { TrackmanLinkModal } from '../../../components/staff-command-center/moda
 import { StaffManualBookingModal, type StaffManualBookingData } from '../../../components/staff-command-center/modals/StaffManualBookingModal';
 import { AnimatedPage } from '../../../components/motion';
 import FloatingActionButton from '../../../components/FloatingActionButton';
+import { useConfirmDialog } from '../../../components/ConfirmDialog';
 
 interface BookingRequest {
     id: number | string;
@@ -742,6 +743,7 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
     const [billingModal, setBillingModal] = useState<{isOpen: boolean; bookingId: number | null}>({isOpen: false, bookingId: null});
     const [rosterModal, setRosterModal] = useState<{isOpen: boolean; bookingId: number | null}>({isOpen: false, bookingId: null});
     const [trackmanModal, setTrackmanModal] = useState<{ isOpen: boolean; booking: BookingRequest | null }>({ isOpen: false, booking: null });
+    const { confirm, ConfirmDialogComponent } = useConfirmDialog();
     const [trackmanLinkModal, setTrackmanLinkModal] = useState<{ 
         isOpen: boolean; 
         trackmanBookingId: string | null;
@@ -3310,9 +3312,13 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                             <button
                                 onClick={async () => {
                                     if (!selectedCalendarBooking) return;
-                                    if (!confirm(`Cancel booking for ${selectedCalendarBooking.user_name || selectedCalendarBooking.user_email}?`)) {
-                                        return;
-                                    }
+                                    const confirmed = await confirm({
+                                        title: 'Cancel Booking',
+                                        message: `Cancel booking for ${selectedCalendarBooking.user_name || selectedCalendarBooking.user_email}?`,
+                                        confirmText: 'Cancel Booking',
+                                        variant: 'warning'
+                                    });
+                                    if (!confirmed) return;
                                     
                                     setIsCancellingFromModal(true);
                                     try {
@@ -3654,6 +3660,7 @@ return null;
                   color="brand"
                   label="Create Booking for Member"
                 />
+                <ConfirmDialogComponent />
             </AnimatedPage>
     );
 };
