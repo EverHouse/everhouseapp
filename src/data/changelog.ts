@@ -24,6 +24,8 @@ export const changelog: ChangelogEntry[] = [
       "Improved: Booking slots still block availability correctly without requiring a fake user",
       "Added: HubSpot sync now rejects placeholder emails to prevent contact pollution",
       "Fixed: TrackmanLinkModal hides placeholder emails, shows 'Unassigned' status cleanly",
+      "Fixed: Staff 'unmatch booking' action now uses null email instead of generating placeholder",
+      "Fixed: Unmatched booking queries updated to find both null emails and legacy placeholders",
       "Cleanup: Deleted 73 existing placeholder Stripe customers",
       "Cleanup: Archived 73 placeholder user records in database",
       "Technical: All booking detection logic updated to treat null/empty email as unmatched"

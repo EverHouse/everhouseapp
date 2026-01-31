@@ -25,7 +25,7 @@ router.get('/api/admin/trackman/unmatched', isStaffOrAdmin, async (req, res) => 
     let paramIndex = 1;
     
     if (resolved === 'false') {
-      whereClause += ` AND (br.user_email LIKE 'unmatched-%@%' OR br.user_email LIKE '%@trackman.local')`;
+      whereClause += ` AND (br.user_email IS NULL OR br.user_email LIKE 'unmatched-%@%' OR br.user_email LIKE '%@trackman.local')`;
     }
     
     if (search) {
@@ -179,7 +179,7 @@ router.post('/api/admin/trackman/unmatched/auto-resolve', isStaffOrAdmin, async 
       FROM booking_requests br
       INNER JOIN users u ON LOWER(u.email) = LOWER(REGEXP_REPLACE(br.trackman_customer_notes, '.*Original email:\\s*([^,\\s]+).*', '\\1'))
       WHERE br.is_unmatched = true
-        AND (br.user_email LIKE 'unmatched-%@%' OR br.user_email LIKE '%@trackman.local')
+        AND (br.user_email IS NULL OR br.user_email LIKE 'unmatched-%@%' OR br.user_email LIKE '%@trackman.local')
       ORDER BY br.request_date DESC
       LIMIT 100
     `);
@@ -1372,12 +1372,12 @@ router.post('/api/admin/trackman/unmatch-member', isStaffOrAdmin, async (req, re
       
       await pool.query(
         `UPDATE booking_requests 
-         SET user_email = $1,
-             user_name = $2,
-             staff_notes = COALESCE(staff_notes, '') || $3
-         WHERE id = $4`,
+         SET user_email = NULL,
+             user_name = $1,
+             is_unmatched = true,
+             staff_notes = COALESCE(staff_notes, '') || $2
+         WHERE id = $3`,
         [
-          `unmatched-${trackmanId}@trackman.local`,
           originalName,
           ` [Unmatched from ${normalizedEmail} by ${unmatchedBy} on ${new Date().toISOString()}]`,
           booking.id

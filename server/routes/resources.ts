@@ -1389,6 +1389,7 @@ router.post('/api/bookings/mark-as-event', isStaffOrAdmin, async (req, res) => {
       const unmatchedInBookingRequests = bookingIds.filter(id => {
         const booking = relatedBookings.find(b => b.id === id);
         return booking?.isUnmatched === true || 
+               !booking?.userEmail ||
                (booking?.userEmail && (booking.userEmail.includes('unmatched-') || booking.userEmail.includes('@trackman.local')));
       });
       const regularBookingIds = bookingIds.filter(id => !relatedUnmatchedIds.includes(id) && !unmatchedInBookingRequests.includes(id));
