@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.59.1",
+    date: "2026-01-31",
+    title: "Staff FAB Quick Actions Stay In-Place",
+    changes: [
+      "Fixed: New Announcement and New Notice quick actions now open drawers directly on the command console instead of navigating away",
+      "Improved: Quick actions are faster with simpler forms - just title, description, and notification toggle",
+      "Note: For advanced notice options (booking blocks, affected areas), use the full Facility Notices page"
+    ]
+  },
+  {
     version: "9.59.0",
     date: "2026-01-31",
     title: "Major UX Overhaul: Mobile-First Navigation & Drawers",

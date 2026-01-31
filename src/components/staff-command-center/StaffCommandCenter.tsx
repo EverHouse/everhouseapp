@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { useData } from '../../contexts/DataContext';
+import { useData, Announcement } from '../../contexts/DataContext';
 import { useBottomNav } from '../../contexts/BottomNavContext';
 import { useIsMobile } from '../../hooks/useBreakpoint';
 import PullToRefresh from '../PullToRefresh';
@@ -41,7 +41,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   const { showToast } = useToast();
   const { isAtBottom } = useBottomNav();
   const isMobile = useIsMobile();
-  const { actualUser } = useData();
+  const { actualUser, addAnnouncement } = useData();
   
   const navigateToTab = useCallback((tab: TabType) => {
     if (tabToPath[tab as keyof typeof tabToPath]) {
@@ -59,6 +59,12 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   const [addMemberModalOpen, setAddMemberModalOpen] = useState(false);
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
   const [manualBookingModalOpen, setManualBookingModalOpen] = useState(false);
+  const [announcementDrawerOpen, setAnnouncementDrawerOpen] = useState(false);
+  const [announcementForm, setAnnouncementForm] = useState<Partial<Announcement>>({ type: 'announcement' });
+  const [announcementSaving, setAnnouncementSaving] = useState(false);
+  const [noticeDrawerOpen, setNoticeDrawerOpen] = useState(false);
+  const [noticeForm, setNoticeForm] = useState({ title: '', description: '', notifyMembers: false });
+  const [noticeSaving, setNoticeSaving] = useState(false);
   const [trackmanModal, setTrackmanModal] = useState<{ isOpen: boolean; booking: BookingRequest | null }>({ isOpen: false, booking: null });
   const [trackmanLinkModal, setTrackmanLinkModal] = useState<{
     isOpen: boolean;
@@ -400,10 +406,70 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
       const error = await response.json().catch(() => ({}));
       throw new Error(error.error || 'Failed to create booking');
     }
-    
-    showToast('Manual booking created successfully', 'success');
     refresh();
-  }, [showToast, refresh]);
+  }, [refresh]);
+
+  const handleAnnouncementSave = useCallback(async () => {
+    if (!announcementForm.title) {
+      showToast('Title is required', 'error');
+      return;
+    }
+    setAnnouncementSaving(true);
+    try {
+      const ann: any = {
+        title: announcementForm.title,
+        desc: announcementForm.desc || '',
+        type: 'announcement',
+        date: 'Just now',
+        notifyMembers: announcementForm.notifyMembers,
+        showAsBanner: announcementForm.showAsBanner
+      };
+      await addAnnouncement(ann);
+      showToast('Announcement created', 'success');
+      setAnnouncementDrawerOpen(false);
+      setAnnouncementForm({ type: 'announcement' });
+    } catch (err) {
+      console.error('Failed to create announcement:', err);
+      showToast('Failed to create announcement', 'error');
+    } finally {
+      setAnnouncementSaving(false);
+    }
+  }, [announcementForm, addAnnouncement, showToast]);
+
+  const handleNoticeSave = useCallback(async () => {
+    if (!noticeForm.title) {
+      showToast('Title is required', 'error');
+      return;
+    }
+    setNoticeSaving(true);
+    try {
+      const response = await fetch('/api/closures', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          title: noticeForm.title,
+          description: noticeForm.description,
+          start_date: new Date().toISOString().split('T')[0],
+          end_date: new Date().toISOString().split('T')[0],
+          affected_areas: 'none',
+          notice_type: 'General',
+          notify_members: noticeForm.notifyMembers
+        })
+      });
+      if (!response.ok) {
+        throw new Error('Failed to create notice');
+      }
+      showToast('Notice created', 'success');
+      setNoticeDrawerOpen(false);
+      setNoticeForm({ title: '', description: '', notifyMembers: false });
+    } catch (err) {
+      console.error('Failed to create notice:', err);
+      showToast('Failed to create notice', 'error');
+    } finally {
+      setNoticeSaving(false);
+    }
+  }, [noticeForm, showToast]);
 
   const handleRefresh = useCallback(async () => {
     await refresh();
@@ -765,8 +831,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
             <button
               onClick={() => { 
                 setFabOpen(false); 
-                navigateToTab('updates');
-                setTimeout(() => window.dispatchEvent(new CustomEvent('open-new-announcement')), 100);
+                setAnnouncementDrawerOpen(true);
               }}
               className="flex flex-col items-center gap-2 p-4 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-xl transition-colors"
             >
@@ -779,8 +844,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
             <button
               onClick={() => { 
                 setFabOpen(false); 
-                navigateToTab('blocks');
-                setTimeout(() => window.dispatchEvent(new CustomEvent('open-new-closure')), 100);
+                setNoticeDrawerOpen(true);
               }}
               className="flex flex-col items-center gap-2 p-4 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-xl transition-colors"
             >
@@ -848,6 +912,141 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         onClose={() => setManualBookingModalOpen(false)}
         onSubmit={handleManualBookingSubmit}
       />
+
+      <SlideUpDrawer
+        isOpen={announcementDrawerOpen}
+        onClose={() => { setAnnouncementDrawerOpen(false); setAnnouncementForm({ type: 'announcement' }); }}
+        title="New Announcement"
+        maxHeight="large"
+        stickyFooter={
+          <div className="flex gap-3 p-4">
+            <button 
+              onClick={() => { setAnnouncementDrawerOpen(false); setAnnouncementForm({ type: 'announcement' }); }}
+              className="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 font-medium"
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={handleAnnouncementSave}
+              disabled={announcementSaving || !announcementForm.title}
+              className="flex-1 py-3 rounded-xl bg-primary text-white font-medium disabled:opacity-50"
+            >
+              {announcementSaving ? 'Posting...' : 'Post'}
+            </button>
+          </div>
+        }
+      >
+        <div className="p-5 space-y-4">
+          <input 
+            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500" 
+            placeholder="Title" 
+            value={announcementForm.title || ''} 
+            onChange={e => setAnnouncementForm({...announcementForm, title: e.target.value})} 
+          />
+          <textarea 
+            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 resize-none" 
+            placeholder="Description (optional)" 
+            rows={3} 
+            value={announcementForm.desc || ''} 
+            onChange={e => setAnnouncementForm({...announcementForm, desc: e.target.value})} 
+          />
+          
+          <div className="flex items-center justify-between py-2">
+            <div className="flex-1">
+              <label className="text-sm font-medium text-gray-700 dark:text-white">Send push notification</label>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Notify all members</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAnnouncementForm({...announcementForm, notifyMembers: !announcementForm.notifyMembers})}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${announcementForm.notifyMembers ? 'bg-primary' : 'bg-gray-200 dark:bg-white/20'}`}
+              role="switch"
+            >
+              <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${announcementForm.notifyMembers ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+          </div>
+          
+          <div className="flex items-center justify-between py-2">
+            <div className="flex-1">
+              <label className="text-sm font-medium text-gray-700 dark:text-white">Show as banner</label>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Display on member dashboard</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAnnouncementForm({...announcementForm, showAsBanner: !announcementForm.showAsBanner})}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${announcementForm.showAsBanner ? 'bg-lavender' : 'bg-gray-200 dark:bg-white/20'}`}
+              role="switch"
+            >
+              <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${announcementForm.showAsBanner ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+          </div>
+        </div>
+      </SlideUpDrawer>
+
+      <SlideUpDrawer
+        isOpen={noticeDrawerOpen}
+        onClose={() => { setNoticeDrawerOpen(false); setNoticeForm({ title: '', description: '', notifyMembers: false }); }}
+        title="New Notice"
+        maxHeight="medium"
+        stickyFooter={
+          <div className="flex gap-3 p-4">
+            <button 
+              onClick={() => { setNoticeDrawerOpen(false); setNoticeForm({ title: '', description: '', notifyMembers: false }); }}
+              className="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 font-medium"
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={handleNoticeSave}
+              disabled={noticeSaving || !noticeForm.title}
+              className="flex-1 py-3 rounded-xl bg-amber-500 text-white font-medium disabled:opacity-50"
+            >
+              {noticeSaving ? 'Creating...' : 'Create'}
+            </button>
+          </div>
+        }
+      >
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Title</label>
+            <input 
+              className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-3 rounded-xl text-primary dark:text-white placeholder:text-gray-500" 
+              placeholder="e.g., Holiday Hours, Maintenance" 
+              value={noticeForm.title} 
+              onChange={e => setNoticeForm({...noticeForm, title: e.target.value})} 
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Description (optional)</label>
+            <textarea 
+              className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-3 rounded-xl text-primary dark:text-white placeholder:text-gray-500 resize-none" 
+              placeholder="Additional details..." 
+              rows={2} 
+              value={noticeForm.description} 
+              onChange={e => setNoticeForm({...noticeForm, description: e.target.value})} 
+            />
+          </div>
+          
+          <div className="flex items-center justify-between py-2">
+            <div className="flex-1">
+              <label className="text-sm font-medium text-gray-700 dark:text-white">Notify members</label>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Send push notification</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setNoticeForm({...noticeForm, notifyMembers: !noticeForm.notifyMembers})}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${noticeForm.notifyMembers ? 'bg-amber-500' : 'bg-gray-200 dark:bg-white/20'}`}
+              role="switch"
+            >
+              <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${noticeForm.notifyMembers ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+          </div>
+          
+          <p className="text-xs text-gray-500 dark:text-gray-400 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg">
+            This creates a simple announcement notice. For booking blocks or full notice options, go to Facility Notices.
+          </p>
+        </div>
+      </SlideUpDrawer>
     </PullToRefresh>
   );
 };
