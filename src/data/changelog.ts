@@ -13,6 +13,35 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.59.0",
+    date: "2026-01-31",
+    title: "Major UX Overhaul: Mobile-First Navigation & Drawers",
+    isMajor: true,
+    changes: [
+      "Routing: Admin navigation now uses proper URL routes (/admin/bookings, /admin/directory, etc.) instead of query params",
+      "Routing: Legacy ?tab= URLs automatically redirect to new routes for backward compatibility",
+      "Staff FAB: Quick actions menu now uses slide-up drawer with 5 quick actions: New User, Announcement, Notice, Manual Booking, QR Scanner",
+      "Modals: Converted 19+ modals to slide-up drawers with drag-to-dismiss gesture support",
+      "Modals: Payment modals (Balance, Invoice, Member Payment, Guest Pass) now use mobile-friendly drawers",
+      "Modals: Guest entry, player management, and form modals (HubSpot, Event Inquiry) now use drawers",
+      "Modals: All admin modals (Notice, Event, Wellness, Announcement) now use drawers",
+      "Tables: Trackman and Financials tables now show as cards on mobile, tables on desktop",
+      "Inline Edits: TiersTab and BlocksTab inline editing now uses slide-up drawers for better mobile UX",
+      "Branding: Renamed 'CLASS' to 'WELLNESS' throughout the app for accuracy",
+      "SEO: Added sitemap.xml, robots.txt, and meta tags for public pages",
+      "UX: Created ConfirmDialog component with Liquid Glass styling, replacing all browser confirm dialogs"
+    ]
+  },
+  {
+    version: "9.58.0",
+    date: "2026-01-31",
+    title: "SimulatorTab Cleanup",
+    changes: [
+      "Cleanup: Removed redundant Re-scan, Auto-Match, and Notes buttons from Simulator admin",
+      "Improved: Cleaner toolbar with only essential actions"
+    ]
+  },
+  {
     version: "9.57.0",
     date: "2026-01-31",
     title: "Trackman Admin Cleanup & Mobile UX",

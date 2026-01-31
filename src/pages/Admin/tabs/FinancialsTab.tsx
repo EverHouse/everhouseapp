@@ -1819,81 +1819,146 @@ const SubscriptionsSubTab: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-primary/10 dark:border-white/10">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Member</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Plan</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Amount</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Status</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Next Billing</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-primary/5 dark:divide-white/5">
-                {filteredSubscriptions.map((sub) => (
-                  <tr key={sub.id} className="hover:bg-primary/5 dark:hover:bg-white/5 transition-colors">
-                    <td className="px-4 py-3">
-                      <div>
-                        <p className="font-medium text-primary dark:text-white">{sub.memberName}</p>
-                        <p className="text-xs text-primary/60 dark:text-white/60">{sub.memberEmail}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-primary dark:text-white">{sub.planName}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-primary dark:text-white">
-                        {formatCurrency(sub.amount, sub.currency)}
-                        <span className="text-xs text-primary/60 dark:text-white/60">/{sub.interval}</span>
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(sub.status)}`}>
-                          {sub.status === 'past_due' ? 'Past Due' : sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
-                        </span>
-                        {sub.cancelAtPeriodEnd && (
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
-                            Canceling
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-primary dark:text-white">{formatDate(sub.currentPeriodEnd)}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-2">
-                        {sub.status === 'past_due' && (
-                          <button
-                            onClick={() => handleSendReminder(sub.id)}
-                            disabled={sendingReminder === sub.id}
-                            className="px-3 py-1.5 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
-                          >
-                            <span className="material-symbols-outlined text-sm">mail</span>
-                            {sendingReminder === sub.id ? 'Sending...' : 'Remind'}
-                          </button>
-                        )}
-                        <a
-                          href={getStripeSubscriptionUrl(sub.id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 dark:bg-white/10 dark:hover:bg-white/15 text-primary dark:text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
-                        >
-                          <span className="material-symbols-outlined text-sm">open_in_new</span>
-                          Stripe
-                        </a>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <>
+          {/* Mobile card view */}
+          <div className="md:hidden space-y-3">
+            {filteredSubscriptions.map((sub) => (
+              <div key={sub.id} className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-primary dark:text-white truncate">{sub.memberName}</p>
+                    <p className="text-xs text-primary/60 dark:text-white/60 truncate">{sub.memberEmail}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(sub.status)}`}>
+                      {sub.status === 'past_due' ? 'Past Due' : sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
+                    </span>
+                    {sub.cancelAtPeriodEnd && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                        Canceling
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                  <div>
+                    <span className="text-primary/50 dark:text-white/50 text-xs">Plan</span>
+                    <p className="text-primary dark:text-white">{sub.planName}</p>
+                  </div>
+                  <div>
+                    <span className="text-primary/50 dark:text-white/50 text-xs">Amount</span>
+                    <p className="text-primary dark:text-white">
+                      {formatCurrency(sub.amount, sub.currency)}
+                      <span className="text-xs text-primary/60 dark:text-white/60">/{sub.interval}</span>
+                    </p>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-primary/50 dark:text-white/50 text-xs">Next Billing</span>
+                    <p className="text-primary dark:text-white">{formatDate(sub.currentPeriodEnd)}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-2 border-t border-primary/10 dark:border-white/10">
+                  {sub.status === 'past_due' && (
+                    <button
+                      onClick={() => handleSendReminder(sub.id)}
+                      disabled={sendingReminder === sub.id}
+                      className="flex-1 px-3 py-2 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-sm">mail</span>
+                      {sendingReminder === sub.id ? 'Sending...' : 'Send Reminder'}
+                    </button>
+                  )}
+                  <a
+                    href={getStripeSubscriptionUrl(sub.id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 px-3 py-2 bg-primary/10 hover:bg-primary/20 dark:bg-white/10 dark:hover:bg-white/15 text-primary dark:text-white rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-sm">open_in_new</span>
+                    View in Stripe
+                  </a>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+
+          {/* Desktop table view */}
+          <div className="hidden md:block bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-primary/10 dark:border-white/10">
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Member</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Plan</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Amount</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Status</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Next Billing</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-primary/5 dark:divide-white/5">
+                  {filteredSubscriptions.map((sub) => (
+                    <tr key={sub.id} className="hover:bg-primary/5 dark:hover:bg-white/5 transition-colors">
+                      <td className="px-4 py-3">
+                        <div>
+                          <p className="font-medium text-primary dark:text-white">{sub.memberName}</p>
+                          <p className="text-xs text-primary/60 dark:text-white/60">{sub.memberEmail}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-primary dark:text-white">{sub.planName}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-primary dark:text-white">
+                          {formatCurrency(sub.amount, sub.currency)}
+                          <span className="text-xs text-primary/60 dark:text-white/60">/{sub.interval}</span>
+                        </p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(sub.status)}`}>
+                            {sub.status === 'past_due' ? 'Past Due' : sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
+                          </span>
+                          {sub.cancelAtPeriodEnd && (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                              Canceling
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-primary dark:text-white">{formatDate(sub.currentPeriodEnd)}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          {sub.status === 'past_due' && (
+                            <button
+                              onClick={() => handleSendReminder(sub.id)}
+                              disabled={sendingReminder === sub.id}
+                              className="px-3 py-1.5 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+                            >
+                              <span className="material-symbols-outlined text-sm">mail</span>
+                              {sendingReminder === sub.id ? 'Sending...' : 'Remind'}
+                            </button>
+                          )}
+                          <a
+                            href={getStripeSubscriptionUrl(sub.id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 dark:bg-white/10 dark:hover:bg-white/15 text-primary dark:text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-sm">open_in_new</span>
+                            Stripe
+                          </a>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
 
       <div className="flex items-center justify-between text-sm text-primary/60 dark:text-white/60">
@@ -2169,83 +2234,149 @@ const InvoicesSubTab: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-primary/10 dark:border-white/10">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Invoice #</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Member</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Amount</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Status</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Date</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-primary/5 dark:divide-white/5">
-                {filteredInvoices.map((invoice, index) => (
-                  <tr key={invoice.id} className={`hover:bg-primary/5 dark:hover:bg-white/5 transition-colors animate-list-item-delay-${Math.min(index + 1, 10)}`}>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-primary dark:text-white font-mono text-sm">
-                        {invoice.number || '-'}
+        <>
+          {/* Mobile card view */}
+          <div className="md:hidden space-y-3">
+            {filteredInvoices.map((invoice) => (
+              <div key={invoice.id} className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-primary dark:text-white truncate">{invoice.memberName}</p>
+                    <p className="text-xs text-primary/60 dark:text-white/60 truncate">{invoice.memberEmail}</p>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ml-2 flex-shrink-0 ${getStatusBadgeClass(invoice.status)}`}>
+                    {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                  <div>
+                    <span className="text-primary/50 dark:text-white/50 text-xs">Invoice #</span>
+                    <p className="text-primary dark:text-white font-mono text-sm">{invoice.number || '-'}</p>
+                  </div>
+                  <div>
+                    <span className="text-primary/50 dark:text-white/50 text-xs">Date</span>
+                    <p className="text-primary dark:text-white">{formatDate(invoice.created)}</p>
+                  </div>
+                  <div>
+                    <span className="text-primary/50 dark:text-white/50 text-xs">Amount Due</span>
+                    <p className="text-primary dark:text-white font-medium">
+                      {formatCurrency(invoice.amountDue, invoice.currency)}
+                    </p>
+                  </div>
+                  {invoice.amountPaid > 0 && invoice.amountPaid < invoice.amountDue && (
+                    <div>
+                      <span className="text-primary/50 dark:text-white/50 text-xs">Paid</span>
+                      <p className="text-green-600 dark:text-green-400">
+                        {formatCurrency(invoice.amountPaid, invoice.currency)}
                       </p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div>
-                        <p className="font-medium text-primary dark:text-white">{invoice.memberName}</p>
-                        <p className="text-xs text-primary/60 dark:text-white/60">{invoice.memberEmail}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div>
-                        <p className="text-primary dark:text-white font-medium">
-                          {formatCurrency(invoice.amountDue, invoice.currency)}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 pt-2 border-t border-primary/10 dark:border-white/10">
+                  {invoice.invoicePdf && (
+                    <a
+                      href={invoice.invoicePdf}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 px-3 py-2 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-400 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
+                      Download PDF
+                    </a>
+                  )}
+                  <a
+                    href={getStripeInvoiceUrl(invoice.id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 px-3 py-2 bg-primary/10 hover:bg-primary/20 dark:bg-white/10 dark:hover:bg-white/15 text-primary dark:text-white rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-sm">open_in_new</span>
+                    View in Stripe
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table view */}
+          <div className="hidden md:block bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-primary/10 dark:border-white/10">
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Invoice #</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Member</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Amount</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Status</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Date</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-primary/5 dark:divide-white/5">
+                  {filteredInvoices.map((invoice, index) => (
+                    <tr key={invoice.id} className={`hover:bg-primary/5 dark:hover:bg-white/5 transition-colors animate-list-item-delay-${Math.min(index + 1, 10)}`}>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-primary dark:text-white font-mono text-sm">
+                          {invoice.number || '-'}
                         </p>
-                        {invoice.amountPaid > 0 && invoice.amountPaid < invoice.amountDue && (
-                          <p className="text-xs text-green-600 dark:text-green-400">
-                            Paid: {formatCurrency(invoice.amountPaid, invoice.currency)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div>
+                          <p className="font-medium text-primary dark:text-white">{invoice.memberName}</p>
+                          <p className="text-xs text-primary/60 dark:text-white/60">{invoice.memberEmail}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div>
+                          <p className="text-primary dark:text-white font-medium">
+                            {formatCurrency(invoice.amountDue, invoice.currency)}
                           </p>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(invoice.status)}`}>
-                        {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-primary dark:text-white">{formatDate(invoice.created)}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-2">
-                        {invoice.invoicePdf && (
+                          {invoice.amountPaid > 0 && invoice.amountPaid < invoice.amountDue && (
+                            <p className="text-xs text-green-600 dark:text-green-400">
+                              Paid: {formatCurrency(invoice.amountPaid, invoice.currency)}
+                            </p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(invoice.status)}`}>
+                          {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-primary dark:text-white">{formatDate(invoice.created)}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          {invoice.invoicePdf && (
+                            <a
+                              href={invoice.invoicePdf}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-400 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                            >
+                              <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
+                              PDF
+                            </a>
+                          )}
                           <a
-                            href={invoice.invoicePdf}
+                            href={getStripeInvoiceUrl(invoice.id)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-400 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                            className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 dark:bg-white/10 dark:hover:bg-white/15 text-primary dark:text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
                           >
-                            <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
-                            PDF
+                            <span className="material-symbols-outlined text-sm">open_in_new</span>
+                            Stripe
                           </a>
-                        )}
-                        <a
-                          href={getStripeInvoiceUrl(invoice.id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 dark:bg-white/10 dark:hover:bg-white/15 text-primary dark:text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
-                        >
-                          <span className="material-symbols-outlined text-sm">open_in_new</span>
-                          Stripe
-                        </a>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       <div className="flex items-center justify-between text-sm text-primary/60 dark:text-white/60">

@@ -513,13 +513,72 @@ const TrackmanTab: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-2">
-            <div className="overflow-x-auto max-h-[500px] overflow-y-auto rounded-lg border border-primary/10 dark:border-white/10">
+            {/* Mobile card view */}
+            <div className="md:hidden space-y-3 max-h-[500px] overflow-y-auto">
+              {unmatchedBookings
+                .filter((booking: any) => {
+                  if (!unmatchedSearchQuery.trim()) return true;
+                  const query = unmatchedSearchQuery.toLowerCase();
+                  const name = (booking.userName || booking.user_name || '').toLowerCase();
+                  const email = (booking.originalEmail || booking.original_email || '').toLowerCase();
+                  return name.includes(query) || email.includes(query);
+                })
+                .map((booking: any, idx: number) => (
+                <div 
+                  key={booking.id} 
+                  className="bg-white/50 dark:bg-white/5 rounded-xl p-4 border border-primary/10 dark:border-white/10 animate-slide-up-stagger" 
+                  style={{ '--stagger-index': idx } as React.CSSProperties}
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="font-bold text-primary dark:text-white">
+                        {booking.userName || booking.user_name || 'Unknown'}
+                      </p>
+                      <p className="text-xs text-primary/60 dark:text-white/60 mt-0.5">
+                        {booking.originalEmail || booking.original_email || 'No email'}
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold text-primary dark:text-white bg-primary/10 dark:bg-white/10 px-2 py-1 rounded-lg">
+                      Bay {booking.bayNumber || booking.bay_number}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                    <div>
+                      <span className="text-xs text-primary/50 dark:text-white/50">Date</span>
+                      <p className="text-primary dark:text-white font-medium text-sm">
+                        {formatDateDisplayWithDay(booking.bookingDate || booking.booking_date)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-primary/50 dark:text-white/50">Time</span>
+                      <p className="text-primary dark:text-white font-medium text-sm">
+                        {(booking.startTime || booking.start_time)?.substring(0, 5)} - {(booking.endTime || booking.end_time)?.substring(0, 5)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mb-3">
+                    <span className="text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 px-2 py-1 rounded-full">
+                      {booking.matchAttemptReason || booking.match_attempt_reason || 'No match'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setAssignPlayersModal({ booking, isOpen: true })}
+                    className="w-full py-2 bg-accent text-primary rounded-lg text-sm font-bold hover:opacity-90 transition-opacity"
+                  >
+                    Resolve
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table view */}
+            <div className="hidden md:block overflow-x-auto max-h-[500px] overflow-y-auto rounded-lg border border-primary/10 dark:border-white/10">
               <table className="w-full text-sm">
                 <thead className="bg-white/80 dark:bg-white/10 sticky top-0 z-10">
                   <tr className="border-b border-primary/10 dark:border-white/10">
                     <th className="text-left py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Date/Time</th>
                     <th className="text-left py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Trackman Name</th>
-                    <th className="text-left py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide hidden md:table-cell">Email</th>
+                    <th className="text-left py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Email</th>
                     <th className="text-left py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Bay</th>
                     <th className="text-left py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide hidden lg:table-cell">Issue</th>
                     <th className="text-right py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Action</th>
@@ -542,9 +601,8 @@ const TrackmanTab: React.FC = () => {
                       </td>
                       <td className="py-2 px-3 text-primary dark:text-white">
                         <div className="font-medium truncate max-w-[150px]">{booking.userName || booking.user_name || 'Unknown'}</div>
-                        <div className="text-xs text-primary/60 dark:text-white/60 truncate max-w-[150px] md:hidden">{booking.originalEmail || booking.original_email || 'No email'}</div>
                       </td>
-                      <td className="py-2 px-3 text-primary/80 dark:text-white/80 hidden md:table-cell">
+                      <td className="py-2 px-3 text-primary/80 dark:text-white/80">
                         <div className="truncate max-w-[180px]">{booking.originalEmail || booking.original_email || 'No email'}</div>
                       </td>
                       <td className="py-2 px-3 text-primary dark:text-white font-medium">{booking.bayNumber || booking.bay_number}</td>

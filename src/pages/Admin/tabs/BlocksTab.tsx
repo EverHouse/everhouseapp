@@ -76,15 +76,16 @@ const BlocksTab: React.FC = () => {
     const [closureReasons, setClosureReasons] = useState<ClosureReason[]>([]);
     const [showClosureReasonsSection, setShowClosureReasonsSection] = useState(false);
     const [newReasonLabel, setNewReasonLabel] = useState('');
-    const [editingReasonId, setEditingReasonId] = useState<number | null>(null);
-    const [editingReasonLabel, setEditingReasonLabel] = useState('');
     const [reasonSaving, setReasonSaving] = useState(false);
     
     const [showNoticeTypesSection, setShowNoticeTypesSection] = useState(false);
     const [newNoticeTypeName, setNewNoticeTypeName] = useState('');
-    const [editingNoticeTypeId, setEditingNoticeTypeId] = useState<number | null>(null);
-    const [editingNoticeTypeName, setEditingNoticeTypeName] = useState('');
     const [noticeTypeSaving, setNoticeTypeSaving] = useState(false);
+    
+    const [isReasonDrawerOpen, setIsReasonDrawerOpen] = useState(false);
+    const [reasonDrawerData, setReasonDrawerData] = useState<{ id: number; label: string; sortOrder: number } | null>(null);
+    const [isNoticeTypeDrawerOpen, setIsNoticeTypeDrawerOpen] = useState(false);
+    const [noticeTypeDrawerData, setNoticeTypeDrawerData] = useState<{ id: number; name: string; sortOrder: number } | null>(null);
     
     const [closuresFilterResource, setClosuresFilterResource] = useState<string>('all');
     const [closuresFilterDate, setClosuresFilterDate] = useState<string>('');
@@ -192,21 +193,27 @@ const BlocksTab: React.FC = () => {
         }
     };
 
-    const handleUpdateClosureReason = async (id: number, label: string, sortOrder?: number) => {
+    const openReasonDrawer = (reason: ClosureReason) => {
+        setReasonDrawerData({ id: reason.id, label: reason.label, sortOrder: reason.sortOrder });
+        setIsReasonDrawerOpen(true);
+    };
+
+    const closeReasonDrawer = () => {
+        setIsReasonDrawerOpen(false);
+        setReasonDrawerData(null);
+    };
+
+    const handleSaveReasonFromDrawer = async () => {
+        if (!reasonDrawerData) return;
         setReasonSaving(true);
         try {
-            const body: Record<string, any> = {};
-            if (label) body.label = label;
-            if (sortOrder !== undefined) body.sort_order = sortOrder;
-            
-            const res = await fetch(`/api/closure-reasons/${id}`, {
+            const res = await fetch(`/api/closure-reasons/${reasonDrawerData.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
+                body: JSON.stringify({ label: reasonDrawerData.label, sort_order: reasonDrawerData.sortOrder })
             });
             if (res.ok) {
-                setEditingReasonId(null);
-                setEditingReasonLabel('');
+                closeReasonDrawer();
                 fetchClosureReasons();
                 showToast('Closure reason updated', 'success');
             } else {
@@ -283,21 +290,27 @@ const BlocksTab: React.FC = () => {
         }
     };
 
-    const handleUpdateNoticeType = async (id: number, name: string, sortOrder?: number) => {
+    const openNoticeTypeDrawer = (noticeType: NoticeType) => {
+        setNoticeTypeDrawerData({ id: noticeType.id, name: noticeType.name, sortOrder: noticeType.sortOrder });
+        setIsNoticeTypeDrawerOpen(true);
+    };
+
+    const closeNoticeTypeDrawer = () => {
+        setIsNoticeTypeDrawerOpen(false);
+        setNoticeTypeDrawerData(null);
+    };
+
+    const handleSaveNoticeTypeFromDrawer = async () => {
+        if (!noticeTypeDrawerData) return;
         setNoticeTypeSaving(true);
         try {
-            const body: Record<string, any> = {};
-            if (name) body.name = name;
-            if (sortOrder !== undefined) body.sort_order = sortOrder;
-            
-            const res = await fetch(`/api/notice-types/${id}`, {
+            const res = await fetch(`/api/notice-types/${noticeTypeDrawerData.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
+                body: JSON.stringify({ name: noticeTypeDrawerData.name, sort_order: noticeTypeDrawerData.sortOrder })
             });
             if (res.ok) {
-                setEditingNoticeTypeId(null);
-                setEditingNoticeTypeName('');
+                closeNoticeTypeDrawer();
                 fetchNoticeTypes();
                 showToast('Notice type updated', 'success');
             } else {
@@ -803,67 +816,26 @@ const BlocksTab: React.FC = () => {
                             {closureReasons.filter(r => r.isActive).map((reason) => (
                                 <div 
                                     key={reason.id}
-                                    className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10"
+                                    className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10"
                                 >
-                                    {editingReasonId === reason.id ? (
-                                        <div className="flex-1 flex flex-col sm:flex-row gap-2">
-                                            <input
-                                                type="text"
-                                                value={editingReasonLabel}
-                                                onChange={(e) => setEditingReasonLabel(e.target.value)}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') handleUpdateClosureReason(reason.id, editingReasonLabel);
-                                                    if (e.key === 'Escape') { setEditingReasonId(null); setEditingReasonLabel(''); }
-                                                }}
-                                                autoFocus
-                                                className="flex-1 px-3 py-1.5 rounded-lg bg-white dark:bg-black/30 border border-gray-300 dark:border-white/20 text-primary dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                                            />
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => handleUpdateClosureReason(reason.id, editingReasonLabel)}
-                                                    disabled={reasonSaving}
-                                                    className="px-3 py-1.5 rounded-lg bg-green-500 text-white text-sm hover:bg-green-600 disabled:opacity-50 transition-colors"
-                                                >
-                                                    Save
-                                                </button>
-                                                <button
-                                                    onClick={() => { setEditingReasonId(null); setEditingReasonLabel(''); }}
-                                                    className="px-3 py-1.5 rounded-lg bg-gray-200 dark:bg-white/20 text-gray-600 dark:text-white/70 text-sm hover:bg-gray-300 dark:hover:bg-white/30 transition-colors"
-                                                >
-                                                    Cancel
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div className="flex-1 flex items-center gap-3">
-                                                <input
-                                                    type="number"
-                                                    value={reason.sortOrder}
-                                                    onChange={(e) => handleUpdateClosureReason(reason.id, '', parseInt(e.target.value) || 100)}
-                                                    className="w-16 px-2 py-1 rounded-lg bg-white dark:bg-black/30 border border-gray-300 dark:border-white/20 text-primary dark:text-white text-sm text-center focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                                                    title="Sort order (lower = first)"
-                                                />
-                                                <span className="text-sm text-primary dark:text-white font-medium">{reason.label}</span>
-                                            </div>
-                                            <div className="flex gap-2 ml-auto sm:ml-0">
-                                                <button
-                                                    onClick={() => { setEditingReasonId(reason.id); setEditingReasonLabel(reason.label); }}
-                                                    className="p-1.5 rounded-lg bg-gray-200 dark:bg-white/20 text-gray-600 dark:text-white/70 hover:bg-gray-300 dark:hover:bg-white/30 transition-colors"
-                                                    title="Edit"
-                                                >
-                                                    <span aria-hidden="true" className="material-symbols-outlined text-base">edit</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteClosureReason(reason.id)}
-                                                    className="p-1.5 rounded-lg bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-500/30 transition-colors"
-                                                    title="Delete"
-                                                >
-                                                    <span aria-hidden="true" className="material-symbols-outlined text-base">delete</span>
-                                                </button>
-                                            </div>
-                                        </>
-                                    )}
+                                    <span className="w-8 text-center text-xs text-gray-400 dark:text-white/40 tabular-nums">{reason.sortOrder}</span>
+                                    <span className="flex-1 text-sm text-primary dark:text-white font-medium truncate">{reason.label}</span>
+                                    <div className="flex gap-2 flex-shrink-0">
+                                        <button
+                                            onClick={() => openReasonDrawer(reason)}
+                                            className="p-1.5 rounded-lg bg-gray-200 dark:bg-white/20 text-gray-600 dark:text-white/70 hover:bg-gray-300 dark:hover:bg-white/30 transition-colors"
+                                            title="Edit"
+                                        >
+                                            <span aria-hidden="true" className="material-symbols-outlined text-base">edit</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteClosureReason(reason.id)}
+                                            className="p-1.5 rounded-lg bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-500/30 transition-colors"
+                                            title="Delete"
+                                        >
+                                            <span aria-hidden="true" className="material-symbols-outlined text-base">delete</span>
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -939,78 +911,32 @@ const BlocksTab: React.FC = () => {
                             {noticeTypes.map((noticeType) => (
                                 <div 
                                     key={noticeType.id}
-                                    className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10"
+                                    className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10"
                                 >
-                                    {editingNoticeTypeId === noticeType.id && !noticeType.isPreset ? (
-                                        <div className="flex-1 flex flex-col sm:flex-row gap-2">
-                                            <input
-                                                type="text"
-                                                value={editingNoticeTypeName}
-                                                onChange={(e) => setEditingNoticeTypeName(e.target.value)}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') handleUpdateNoticeType(noticeType.id, editingNoticeTypeName);
-                                                    if (e.key === 'Escape') { setEditingNoticeTypeId(null); setEditingNoticeTypeName(''); }
-                                                }}
-                                                autoFocus
-                                                className="flex-1 px-3 py-1.5 rounded-lg bg-white dark:bg-black/30 border border-gray-300 dark:border-white/20 text-primary dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                                            />
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => handleUpdateNoticeType(noticeType.id, editingNoticeTypeName)}
-                                                    disabled={noticeTypeSaving}
-                                                    className="px-3 py-1.5 rounded-lg bg-green-500 text-white text-sm hover:bg-green-600 disabled:opacity-50 transition-colors"
-                                                >
-                                                    Save
-                                                </button>
-                                                <button
-                                                    onClick={() => { setEditingNoticeTypeId(null); setEditingNoticeTypeName(''); }}
-                                                    className="px-3 py-1.5 rounded-lg bg-gray-200 dark:bg-white/20 text-gray-600 dark:text-white/70 text-sm hover:bg-gray-300 dark:hover:bg-white/30 transition-colors"
-                                                >
-                                                    Cancel
-                                                </button>
-                                            </div>
+                                    <span className="w-8 text-center text-xs text-gray-400 dark:text-white/40 tabular-nums">{noticeType.sortOrder}</span>
+                                    <span className="flex-1 text-sm text-primary dark:text-white font-medium truncate">{noticeType.name}</span>
+                                    {noticeType.isPreset && (
+                                        <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex-shrink-0">
+                                            Preset
+                                        </span>
+                                    )}
+                                    {!noticeType.isPreset && (
+                                        <div className="flex gap-2 flex-shrink-0">
+                                            <button
+                                                onClick={() => openNoticeTypeDrawer(noticeType)}
+                                                className="p-1.5 rounded-lg bg-gray-200 dark:bg-white/20 text-gray-600 dark:text-white/70 hover:bg-gray-300 dark:hover:bg-white/30 transition-colors"
+                                                title="Edit"
+                                            >
+                                                <span aria-hidden="true" className="material-symbols-outlined text-base">edit</span>
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteNoticeType(noticeType.id)}
+                                                className="p-1.5 rounded-lg bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-500/30 transition-colors"
+                                                title="Delete"
+                                            >
+                                                <span aria-hidden="true" className="material-symbols-outlined text-base">delete</span>
+                                            </button>
                                         </div>
-                                    ) : (
-                                        <>
-                                            <div className="flex-1 flex items-center gap-3">
-                                                {!noticeType.isPreset && (
-                                                    <input
-                                                        type="number"
-                                                        value={noticeType.sortOrder}
-                                                        onChange={(e) => handleUpdateNoticeType(noticeType.id, '', parseInt(e.target.value) || 100)}
-                                                        className="w-16 px-2 py-1 rounded-lg bg-white dark:bg-black/30 border border-gray-300 dark:border-white/20 text-primary dark:text-white text-sm text-center focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                                                        title="Sort order (lower = first)"
-                                                    />
-                                                )}
-                                                {noticeType.isPreset && (
-                                                    <span className="w-16 text-center text-xs text-gray-400 dark:text-white/40">{noticeType.sortOrder}</span>
-                                                )}
-                                                <span className="text-sm text-primary dark:text-white font-medium">{noticeType.name}</span>
-                                                {noticeType.isPreset && (
-                                                    <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400">
-                                                        Preset
-                                                    </span>
-                                                )}
-                                            </div>
-                                            {!noticeType.isPreset && (
-                                                <div className="flex gap-2 ml-auto sm:ml-0">
-                                                    <button
-                                                        onClick={() => { setEditingNoticeTypeId(noticeType.id); setEditingNoticeTypeName(noticeType.name); }}
-                                                        className="p-1.5 rounded-lg bg-gray-200 dark:bg-white/20 text-gray-600 dark:text-white/70 hover:bg-gray-300 dark:hover:bg-white/30 transition-colors"
-                                                        title="Edit"
-                                                    >
-                                                        <span aria-hidden="true" className="material-symbols-outlined text-base">edit</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteNoticeType(noticeType.id)}
-                                                        className="p-1.5 rounded-lg bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-500/30 transition-colors"
-                                                        title="Delete"
-                                                    >
-                                                        <span aria-hidden="true" className="material-symbols-outlined text-base">delete</span>
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </>
                                     )}
                                 </div>
                             ))}
@@ -1604,6 +1530,100 @@ const BlocksTab: React.FC = () => {
                                 onChange={e => setClosureForm({...closureForm, end_time: e.target.value})} 
                             />
                         </div>
+                    </div>
+                </div>
+            </SlideUpDrawer>
+
+            <SlideUpDrawer
+                isOpen={isReasonDrawerOpen}
+                onClose={closeReasonDrawer}
+                title="Edit Closure Reason"
+                maxHeight="small"
+                stickyFooter={
+                    <div className="flex gap-3 p-4">
+                        <button
+                            onClick={closeReasonDrawer}
+                            className="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-white/70 font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleSaveReasonFromDrawer}
+                            disabled={!reasonDrawerData?.label?.trim() || reasonSaving}
+                            className="flex-1 py-3 rounded-xl font-medium text-white bg-primary hover:bg-primary/90 disabled:bg-primary/50 transition-colors"
+                        >
+                            {reasonSaving ? 'Saving...' : 'Save'}
+                        </button>
+                    </div>
+                }
+            >
+                <div className="p-5 space-y-4">
+                    <div>
+                        <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Label *</label>
+                        <input
+                            type="text"
+                            value={reasonDrawerData?.label || ''}
+                            onChange={(e) => setReasonDrawerData(prev => prev ? { ...prev, label: e.target.value } : null)}
+                            placeholder="e.g., Private Event, Maintenance"
+                            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Sort Order</label>
+                        <input
+                            type="number"
+                            value={reasonDrawerData?.sortOrder || 100}
+                            onChange={(e) => setReasonDrawerData(prev => prev ? { ...prev, sortOrder: parseInt(e.target.value) || 100 } : null)}
+                            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Lower numbers appear first in dropdown menus</p>
+                    </div>
+                </div>
+            </SlideUpDrawer>
+
+            <SlideUpDrawer
+                isOpen={isNoticeTypeDrawerOpen}
+                onClose={closeNoticeTypeDrawer}
+                title="Edit Notice Type"
+                maxHeight="small"
+                stickyFooter={
+                    <div className="flex gap-3 p-4">
+                        <button
+                            onClick={closeNoticeTypeDrawer}
+                            className="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-white/70 font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleSaveNoticeTypeFromDrawer}
+                            disabled={!noticeTypeDrawerData?.name?.trim() || noticeTypeSaving}
+                            className="flex-1 py-3 rounded-xl font-medium text-white bg-primary hover:bg-primary/90 disabled:bg-primary/50 transition-colors"
+                        >
+                            {noticeTypeSaving ? 'Saving...' : 'Save'}
+                        </button>
+                    </div>
+                }
+            >
+                <div className="p-5 space-y-4">
+                    <div>
+                        <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Name *</label>
+                        <input
+                            type="text"
+                            value={noticeTypeDrawerData?.name || ''}
+                            onChange={(e) => setNoticeTypeDrawerData(prev => prev ? { ...prev, name: e.target.value } : null)}
+                            placeholder="e.g., Maintenance, Holiday"
+                            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Sort Order</label>
+                        <input
+                            type="number"
+                            value={noticeTypeDrawerData?.sortOrder || 100}
+                            onChange={(e) => setNoticeTypeDrawerData(prev => prev ? { ...prev, sortOrder: parseInt(e.target.value) || 100 } : null)}
+                            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Lower numbers appear first in dropdown menus</p>
                     </div>
                 </div>
             </SlideUpDrawer>

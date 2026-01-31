@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import ModalShell from '../../../components/ModalShell';
+import SlideUpDrawer from '../../../components/SlideUpDrawer';
 import Toggle from '../../../components/Toggle';
 import FloatingActionButton from '../../../components/FloatingActionButton';
 import ProductsSubTab from './ProductsSubTab';
@@ -294,27 +294,6 @@ const TiersTab: React.FC = () => {
         fetchStripePrices();
     }, []);
 
-    useEffect(() => {
-        if (isEditing) {
-            document.body.style.overflow = 'hidden';
-            document.body.style.position = 'fixed';
-            document.body.style.width = '100%';
-            document.body.style.top = `-${window.scrollY}px`;
-        } else {
-            const scrollY = document.body.style.top;
-            document.body.style.overflow = '';
-            document.body.style.position = '';
-            document.body.style.width = '';
-            document.body.style.top = '';
-            window.scrollTo(0, parseInt(scrollY || '0') * -1);
-        }
-        return () => {
-            document.body.style.overflow = '';
-            document.body.style.position = '';
-            document.body.style.width = '';
-            document.body.style.top = '';
-        };
-    }, [isEditing]);
 
     useEffect(() => {
         if (isEditing || isCreating) {
@@ -518,8 +497,31 @@ const TiersTab: React.FC = () => {
             {activeSubTab === 'discounts' && <DiscountsSubTab />}
 
 
-            <ModalShell isOpen={isEditing && !!selectedTier} onClose={() => { setIsEditing(false); setIsCreating(false); }} title={isCreating ? 'New Tier' : `Edit Tier: ${selectedTier?.name || ''}`} size="full">
-                <div className="p-6 pt-4 space-y-6">
+            <SlideUpDrawer 
+                isOpen={isEditing && !!selectedTier} 
+                onClose={() => { setIsEditing(false); setIsCreating(false); }} 
+                title={isCreating ? 'New Tier' : `Edit: ${selectedTier?.name || ''}`}
+                maxHeight="full"
+                stickyFooter={
+                    <div className="flex gap-3 justify-end p-4">
+                        <button 
+                            onClick={() => { setIsEditing(false); setIsCreating(false); }} 
+                            className="px-5 py-2.5 text-gray-500 dark:text-white/80 font-bold hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={handleSave} 
+                            disabled={isSaving}
+                            className="px-6 py-2.5 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+                        >
+                            {isSaving && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
+                            {isSaving ? 'Saving...' : 'Save Changes'}
+                        </button>
+                    </div>
+                }
+            >
+                <div className="p-5 space-y-6">
                     {error && (
                         <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg text-sm">
                             {error}
@@ -978,24 +980,8 @@ const TiersTab: React.FC = () => {
                         )}
                     </div>
 
-                    <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-white/25">
-                        <button 
-                            onClick={() => setIsEditing(false)} 
-                            className="px-5 py-2.5 text-gray-500 dark:text-white/80 font-bold hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button 
-                            onClick={handleSave} 
-                            disabled={isSaving}
-                            className="px-6 py-2.5 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
-                        >
-                            {isSaving && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
-                            {isSaving ? 'Saving...' : 'Save Changes'}
-                        </button>
-                    </div>
                 </div>
-            </ModalShell>
+            </SlideUpDrawer>
 
             {activeSubTab === 'tiers' && (() => {
                 const subscriptionTiers = tiers.filter(t => t.product_type !== 'one_time');
