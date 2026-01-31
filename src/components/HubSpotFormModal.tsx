@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { triggerHaptic } from '../utils/haptics';
 import WalkingGolferSpinner from './WalkingGolferSpinner';
-import ModalShell from './ModalShell';
+import SlideUpDrawer from './SlideUpDrawer';
 
 
 const getHubspotCookie = (): string | null => {
@@ -120,8 +120,48 @@ const HubSpotFormModal: React.FC<HubSpotFormModalProps> = ({
     onClose();
   };
 
+  const renderFooter = () => {
+    if (success) {
+      return (
+        <div className="p-4">
+          <button
+            onClick={handleClose}
+            className="w-full py-4 min-h-[44px] bg-primary dark:bg-accent text-white dark:text-brand-green rounded-[2rem] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-[400ms] ease-in-out"
+          >
+            Close
+          </button>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="p-4">
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={loading}
+          className="w-full py-4 min-h-[44px] bg-primary dark:bg-accent text-white dark:text-brand-green rounded-[2rem] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-[400ms] ease-in-out disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {loading ? (
+            <>
+              <WalkingGolferSpinner size="sm" variant="light" />
+              Submitting...
+            </>
+          ) : (
+            submitButtonText
+          )}
+        </button>
+      </div>
+    );
+  };
+
   return (
-    <ModalShell isOpen={isOpen} onClose={handleClose} title={title} size="md">
+    <SlideUpDrawer 
+      isOpen={isOpen} 
+      onClose={handleClose} 
+      title={title}
+      stickyFooter={renderFooter()}
+    >
       <div className="p-6">
         {subtitle && <p className="text-gray-600 dark:text-white/80 text-sm mb-6">{subtitle}</p>}
         
@@ -132,15 +172,9 @@ const HubSpotFormModal: React.FC<HubSpotFormModalProps> = ({
             </div>
             <h3 className="text-xl font-bold text-primary dark:text-white mb-2">Thank You!</h3>
             <p className="text-primary/70 dark:text-white/80 mb-6">We've received your submission and will be in touch soon.</p>
-            <button
-              onClick={handleClose}
-              className="px-6 py-3 min-h-[44px] bg-primary dark:bg-accent text-white dark:text-brand-green rounded-[2rem] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-[400ms] ease-in-out"
-            >
-              Close
-            </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-4">
             {fields.map(field => (
               <div key={field.name}>
                 <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-1.5 pl-1">
@@ -190,25 +224,10 @@ const HubSpotFormModal: React.FC<HubSpotFormModalProps> = ({
                 <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
               </div>
             )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 min-h-[44px] bg-primary dark:bg-accent text-white dark:text-brand-green rounded-[2rem] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-[400ms] ease-in-out disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <WalkingGolferSpinner size="sm" variant="light" />
-                  Submitting...
-                </>
-              ) : (
-                submitButtonText
-              )}
-            </button>
-          </form>
+          </div>
         )}
       </div>
-    </ModalShell>
+    </SlideUpDrawer>
   );
 };
 

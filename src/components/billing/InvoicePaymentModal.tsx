@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { apiRequest } from '../../lib/apiRequest';
 import {
@@ -9,6 +8,7 @@ import {
   useElements,
 } from '@stripe/react-stripe-js';
 import { loadStripe, Stripe, StripeElementsOptions } from '@stripe/stripe-js';
+import { SlideUpDrawer } from '../SlideUpDrawer';
 
 let stripePromise: Promise<Stripe | null> | null = null;
 
@@ -40,6 +40,7 @@ interface Invoice {
 }
 
 export interface InvoicePaymentModalProps {
+  isOpen: boolean;
   invoice: Invoice;
   userEmail: string;
   userName: string;
@@ -60,16 +61,19 @@ function InvoiceCheckoutForm({
   onSuccess, 
   onCancel,
   invoiceId,
-  paymentIntentId
+  paymentIntentId,
+  isProcessing,
+  setIsProcessing
 }: { 
   onSuccess: () => void; 
   onCancel: () => void;
   invoiceId: string;
   paymentIntentId: string;
+  isProcessing: boolean;
+  setIsProcessing: (v: boolean) => void;
 }) {
   const stripe = useStripe();
   const elements = useElements();
-  const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -128,39 +132,12 @@ function InvoiceCheckoutForm({
           {errorMessage}
         </div>
       )}
-
-      <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={!stripe || isProcessing}
-          className="flex-1 py-4 rounded-xl backdrop-blur-md transition-all duration-300 flex items-center justify-center gap-2 group border bg-emerald-100/60 text-emerald-900 border-emerald-200 hover:bg-emerald-200/60 dark:bg-emerald-950/40 dark:text-emerald-100 dark:border-emerald-500/20 dark:hover:bg-emerald-900/60 disabled:opacity-50 font-semibold"
-        >
-          {isProcessing ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-emerald-600 dark:border-emerald-400 border-t-transparent" />
-              Processing...
-            </>
-          ) : (
-            <>
-              <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 group-hover:text-emerald-700 dark:group-hover:text-emerald-300">credit_card</span>
-              Pay Now
-            </>
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={isProcessing}
-          className="py-3 px-6 rounded-lg font-medium transition-colors text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-white/40 dark:hover:text-white dark:hover:bg-white/5 disabled:opacity-50"
-        >
-          Cancel
-        </button>
-      </div>
     </form>
   );
 }
 
 export function InvoicePaymentModal({
+  isOpen,
   invoice,
   userEmail,
   userName,
@@ -174,13 +151,7 @@ export function InvoicePaymentModal({
   const [error, setError] = useState<string | null>(null);
   const [paymentData, setPaymentData] = useState<PayInvoiceResponse | null>(null);
   const [stripeInstance, setStripeInstance] = useState<Stripe | null>(null);
-
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, []);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const initializePayment = useCallback(async () => {
     try {
@@ -216,8 +187,10 @@ export function InvoicePaymentModal({
   }, [invoice.id]);
 
   useEffect(() => {
-    initializePayment();
-  }, [initializePayment]);
+    if (isOpen) {
+      initializePayment();
+    }
+  }, [isOpen, initializePayment]);
 
   const formatAmount = (cents: number) => `$${(cents / 100).toFixed(2)}`;
   const primaryLine = invoice.lines?.[0];
@@ -238,138 +211,123 @@ export function InvoicePaymentModal({
     },
   } : null;
 
-  const modalContent = (
-    <div
-      className={`fixed inset-0 z-[60] ${isDark ? 'dark' : ''}`}
-      style={{ overscrollBehavior: 'contain' }}
-    >
-      <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm animate-backdrop-fade-in"
-        aria-hidden="true"
-        onClick={onClose}
-      />
+  const handleFormSubmit = () => {
+    const form = document.querySelector('form');
+    if (form) {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    }
+  };
 
-      <div
-        className="fixed inset-0 overflow-y-auto"
-        style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            onClose();
-          }
-        }}
+  const stickyFooter = !loading && !error && paymentData && stripeInstance && options ? (
+    <div className="flex gap-2 p-4">
+      <button
+        type="button"
+        onClick={handleFormSubmit}
+        disabled={isProcessing}
+        className="flex-1 py-4 rounded-xl backdrop-blur-md transition-all duration-300 flex items-center justify-center gap-2 group border bg-emerald-100/60 text-emerald-900 border-emerald-200 hover:bg-emerald-200/60 dark:bg-emerald-950/40 dark:text-emerald-100 dark:border-emerald-500/20 dark:hover:bg-emerald-900/60 disabled:opacity-50 font-semibold"
       >
-        <div
-          className="flex min-h-full items-center justify-center p-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              onClose();
-            }
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="invoice-payment-modal-title"
-            onClick={(e) => e.stopPropagation()}
-            className={`relative w-full max-w-md max-h-[90vh] overflow-hidden ${
-              isDark ? 'bg-black/80' : 'bg-white/80'
-            } backdrop-blur-xl border border-primary/10 dark:border-white/10 rounded-2xl shadow-2xl animate-modal-slide-up`}
-          >
-            <div className={`flex items-center justify-between p-4 border-b ${isDark ? 'bg-white/5 border-white/10' : 'bg-primary/5 border-primary/10'}`}>
-              <h3
-                id="invoice-payment-modal-title"
-                className={`text-xl font-bold font-serif ${isDark ? 'text-white' : 'text-primary'}`}
-              >
-                Pay Invoice
-              </h3>
-              <button
-                onClick={onClose}
-                className={`p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-colors ${
-                  isDark ? 'hover:bg-white/10 text-gray-300' : 'hover:bg-gray-100 text-gray-600'
-                }`}
-                aria-label="Close modal"
-              >
-                <span className="material-symbols-outlined text-xl" aria-hidden="true">close</span>
-              </button>
-            </div>
-
-            <div
-              className="overflow-y-auto p-4"
-              style={{ maxHeight: 'calc(90vh - 80px)', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', overscrollBehavior: 'contain' }}
-            >
-              {loading && (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#CCB8E4] border-t-transparent" />
-                </div>
-              )}
-
-              {error && (
-                <div className="text-center py-8">
-                  <span className="material-symbols-outlined text-4xl text-red-500 mb-2">error</span>
-                  <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
-                  <button
-                    onClick={onClose}
-                    className="py-3 px-6 rounded-lg font-medium transition-colors text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-white/40 dark:hover:text-white dark:hover:bg-white/5"
-                  >
-                    Go Back
-                  </button>
-                </div>
-              )}
-
-              {!loading && !error && paymentData && stripeInstance && options && (
-                <div className="space-y-4">
-                  <div className={`rounded-xl p-4 ${isDark ? 'bg-white/5' : 'bg-primary/5'}`}>
-                    <h4 className={`text-sm font-bold mb-3 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
-                      Invoice Summary
-                    </h4>
-                    <div className="space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <span className={`text-sm flex-1 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
-                          {description}
-                        </span>
-                        <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-primary'}`}>
-                          {formatAmount(invoice.amountDue)}
-                        </span>
-                      </div>
-                      {invoice.lines.length > 1 && invoice.lines.slice(1).map((line, idx) => (
-                        <div key={idx} className="flex items-start justify-between gap-2">
-                          <span className={`text-sm flex-1 ${isDark ? 'text-white/60' : 'text-primary/60'}`}>
-                            {line.description || 'Item'}
-                          </span>
-                          <span className={`text-sm ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
-                            {formatAmount(line.amount)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className={`mt-3 pt-3 border-t flex items-center justify-between ${isDark ? 'border-white/10' : 'border-primary/10'}`}>
-                      <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-primary'}`}>
-                        Total Due
-                      </span>
-                      <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-primary'}`}>
-                        {formatAmount(invoice.amountDue)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <Elements stripe={stripeInstance} options={options}>
-                    <InvoiceCheckoutForm 
-                      onSuccess={onSuccess} 
-                      onCancel={onClose}
-                      invoiceId={invoice.id}
-                      paymentIntentId={paymentData.paymentIntentId}
-                    />
-                  </Elements>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+        {isProcessing ? (
+          <>
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-emerald-600 dark:border-emerald-400 border-t-transparent" />
+            Processing...
+          </>
+        ) : (
+          <>
+            <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 group-hover:text-emerald-700 dark:group-hover:text-emerald-300">credit_card</span>
+            Pay Now
+          </>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={onClose}
+        disabled={isProcessing}
+        className="py-3 px-6 rounded-lg font-medium transition-colors text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-white/40 dark:hover:text-white dark:hover:bg-white/5 disabled:opacity-50"
+      >
+        Cancel
+      </button>
     </div>
-  );
+  ) : null;
 
-  return createPortal(modalContent, document.body);
+  return (
+    <SlideUpDrawer
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Pay Invoice"
+      maxHeight="large"
+      stickyFooter={stickyFooter}
+    >
+      <div className="p-4">
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#CCB8E4] border-t-transparent" />
+          </div>
+        )}
+
+        {error && (
+          <div className="text-center py-8">
+            <span className="material-symbols-outlined text-4xl text-red-500 mb-2">error</span>
+            <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+            <button
+              onClick={onClose}
+              className="py-3 px-6 rounded-lg font-medium transition-colors text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-white/40 dark:hover:text-white dark:hover:bg-white/5"
+            >
+              Go Back
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && paymentData && stripeInstance && options && (
+          <div className="space-y-4">
+            <div className={`rounded-xl p-4 ${isDark ? 'bg-white/5' : 'bg-primary/5'}`}>
+              <h4 className={`text-sm font-bold mb-3 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
+                Invoice Summary
+              </h4>
+              <div className="space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <span className={`text-sm flex-1 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
+                    {description}
+                  </span>
+                  <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-primary'}`}>
+                    {formatAmount(invoice.amountDue)}
+                  </span>
+                </div>
+                {invoice.lines.length > 1 && invoice.lines.slice(1).map((line, idx) => (
+                  <div key={idx} className="flex items-start justify-between gap-2">
+                    <span className={`text-sm flex-1 ${isDark ? 'text-white/60' : 'text-primary/60'}`}>
+                      {line.description || 'Item'}
+                    </span>
+                    <span className={`text-sm ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
+                      {formatAmount(line.amount)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className={`mt-3 pt-3 border-t flex items-center justify-between ${isDark ? 'border-white/10' : 'border-primary/10'}`}>
+                <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-primary'}`}>
+                  Total Due
+                </span>
+                <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-primary'}`}>
+                  {formatAmount(invoice.amountDue)}
+                </span>
+              </div>
+            </div>
+
+            <Elements stripe={stripeInstance} options={options}>
+              <InvoiceCheckoutForm 
+                onSuccess={onSuccess} 
+                onCancel={onClose}
+                invoiceId={invoice.id}
+                paymentIntentId={paymentData.paymentIntentId}
+                isProcessing={isProcessing}
+                setIsProcessing={setIsProcessing}
+              />
+            </Elements>
+          </div>
+        )}
+      </div>
+    </SlideUpDrawer>
+  );
 }
 
 export default InvoicePaymentModal;

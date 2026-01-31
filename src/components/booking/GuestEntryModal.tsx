@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import ModalShell from '../ModalShell';
+import SlideUpDrawer from '../SlideUpDrawer';
 import Input from '../Input';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -95,14 +95,45 @@ const GuestEntryModal: React.FC<GuestEntryModalProps> = ({
 
   const isSubmitDisabled = isSocialTier || !name.trim() || !email.trim();
 
+  const footerContent = (
+    <div className="flex gap-3 p-4">
+      <button
+        type="button"
+        onClick={onClose}
+        className={`flex-1 py-3 px-4 rounded-2xl font-semibold text-sm transition-all active:scale-[0.98] ${
+          isDark
+            ? 'bg-white/10 text-white hover:bg-white/15'
+            : 'bg-black/5 text-[#293515] hover:bg-black/10'
+        }`}
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        form="guest-entry-form"
+        disabled={isSubmitDisabled}
+        className={`flex-1 py-3 px-4 rounded-2xl font-semibold text-sm transition-all active:scale-[0.98] ${
+          isSubmitDisabled
+            ? isDark
+              ? 'bg-white/10 text-white/40 cursor-not-allowed'
+              : 'bg-black/5 text-black/30 cursor-not-allowed'
+            : 'bg-[#293515] text-white hover:bg-[#3a4a20]'
+        }`}
+      >
+        Add Guest
+      </button>
+    </div>
+  );
+
   return (
-    <ModalShell
+    <SlideUpDrawer
       isOpen={isOpen}
       onClose={onClose}
       title="Add Guest"
-      size="md"
+      maxHeight="medium"
+      stickyFooter={footerContent}
     >
-      <form onSubmit={handleSubmit} className="p-4 space-y-4">
+      <form id="guest-entry-form" onSubmit={handleSubmit} className="p-4 space-y-4">
         {isSocialTier && (
           <div className={`p-4 rounded-2xl flex items-start gap-3 ${
             isDark 
@@ -144,35 +175,8 @@ const GuestEntryModal: React.FC<GuestEntryModalProps> = ({
           required
           disabled={isSocialTier}
         />
-        
-        <div className="flex gap-3 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className={`flex-1 py-3 px-4 rounded-2xl font-semibold text-sm transition-all active:scale-[0.98] ${
-              isDark
-                ? 'bg-white/10 text-white hover:bg-white/15'
-                : 'bg-black/5 text-[#293515] hover:bg-black/10'
-            }`}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitDisabled}
-            className={`flex-1 py-3 px-4 rounded-2xl font-semibold text-sm transition-all active:scale-[0.98] ${
-              isSubmitDisabled
-                ? isDark
-                  ? 'bg-white/10 text-white/40 cursor-not-allowed'
-                  : 'bg-black/5 text-black/30 cursor-not-allowed'
-                : 'bg-[#293515] text-white hover:bg-[#3a4a20]'
-            }`}
-          >
-            Add Guest
-          </button>
-        </div>
       </form>
-    </ModalShell>
+    </SlideUpDrawer>
   );
 };
 

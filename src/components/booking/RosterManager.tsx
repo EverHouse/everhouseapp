@@ -898,8 +898,9 @@ const RosterManager: React.FC<RosterManagerProps> = ({
         </div>
       </ModalShell>
 
-      {showPaymentModal && booking?.sessionId && (
+      {booking?.sessionId && (
         <MemberPaymentModal
+          isOpen={showPaymentModal}
           bookingId={bookingId}
           sessionId={booking.sessionId}
           ownerEmail={booking.ownerEmail}

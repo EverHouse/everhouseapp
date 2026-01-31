@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import ModalShell from '../ModalShell';
+import SlideUpDrawer from '../SlideUpDrawer';
 import TierBadge from '../TierBadge';
 import { MemberSearchInput, SelectedMember } from '../shared/MemberSearchInput';
 import { useData } from '../../contexts/DataContext';
@@ -329,16 +329,43 @@ const ManagePlayersModal: React.FC<ManagePlayersModalProps> = ({
     return match?.tier || null;
   }, [ownerMember, allMembersList]);
 
+  const footerContent = (
+    <div className="flex items-center justify-between gap-3 p-4">
+      <button
+        onClick={onClose}
+        className="px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+      >
+        Back
+      </button>
+      <button
+        onClick={handleSave}
+        disabled={isSaving}
+        className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+      >
+        {isSaving ? (
+          <>
+            <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+            Saving...
+          </>
+        ) : (
+          <>
+            <span className="material-symbols-outlined text-sm">save</span>
+            Save Players
+          </>
+        )}
+      </button>
+    </div>
+  );
+
   if (!isOpen) return null;
 
   return (
-    <ModalShell
+    <SlideUpDrawer
       isOpen={isOpen}
       onClose={onClose}
       title="Manage Players"
-      size="lg"
-      showCloseButton={true}
-      overflowVisible={true}
+      maxHeight="large"
+      stickyFooter={footerContent}
     >
       <div className="p-4 space-y-4">
         <div className="space-y-2">
@@ -614,33 +641,7 @@ const ManagePlayersModal: React.FC<ManagePlayersModalProps> = ({
           </>
         )}
       </div>
-
-      <div className="sticky bottom-0 p-4 border-t border-gray-200 dark:border-white/10 bg-white dark:bg-[#1a1d15] flex items-center justify-between gap-3">
-        <button
-          onClick={onClose}
-          className="px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-        >
-          Back
-        </button>
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
-        >
-          {isSaving ? (
-            <>
-              <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
-              Saving...
-            </>
-          ) : (
-            <>
-              <span className="material-symbols-outlined text-sm">save</span>
-              Save Players
-            </>
-          )}
-        </button>
-      </div>
-    </ModalShell>
+    </SlideUpDrawer>
   );
 };
 

@@ -431,22 +431,15 @@ const History: React.FC = () => {
       </SwipeablePage>
       <MemberBottomNav currentPath="/history" isDarkTheme={isDark} />
 
-      {payingInvoice && payingInvoice.stripeInvoiceId && user && (
+      {user && (
         <InvoicePaymentModal
+          isOpen={!!(payingInvoice && payingInvoice.stripeInvoiceId)}
           invoice={{
-            id: payingInvoice.stripeInvoiceId,
-            status: payingInvoice.status,
-            amountDue: payingInvoice.amountCents,
-            amountPaid: 0,
-            currency: 'usd',
-            customerEmail: user.email,
-            description: payingInvoice.itemName,
-            hostedInvoiceUrl: payingInvoice.hostedInvoiceUrl || null,
-            invoicePdf: null,
-            created: payingInvoice.date,
-            dueDate: null,
-            paidAt: null,
-            lines: [{ description: payingInvoice.itemName, amount: payingInvoice.amountCents, quantity: 1 }],
+            id: payingInvoice?.stripeInvoiceId || '',
+            status: payingInvoice?.status || '',
+            amountDue: payingInvoice?.amountCents || 0,
+            description: payingInvoice?.itemName || null,
+            lines: [{ description: payingInvoice?.itemName || '', amount: payingInvoice?.amountCents || 0, quantity: 1 }],
           }}
           userEmail={user.email || ''}
           userName={user.name || user.email?.split('@')[0] || 'Member'}

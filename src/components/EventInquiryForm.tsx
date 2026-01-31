@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { triggerHaptic } from '../utils/haptics';
 import WalkingGolferSpinner from './WalkingGolferSpinner';
-import ModalShell from './ModalShell';
+import SlideUpDrawer from './SlideUpDrawer';
 
 const getHubspotCookie = (): string | null => {
   const cookies = document.cookie.split(';');
@@ -181,8 +181,70 @@ const EventInquiryForm: React.FC<EventInquiryFormProps> = ({
     onClose();
   };
 
+  const renderFooter = () => {
+    if (success) {
+      return (
+        <div className="p-4">
+          <button
+            onClick={handleClose}
+            className="w-full py-4 min-h-[44px] bg-primary dark:bg-accent text-white dark:text-brand-green rounded-[2rem] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-[400ms] ease-in-out"
+          >
+            Close
+          </button>
+        </div>
+      );
+    }
+    
+    if (step === 1) {
+      return (
+        <div className="p-4">
+          <button
+            type="button"
+            onClick={handleNext}
+            className="w-full py-4 min-h-[44px] bg-primary dark:bg-accent text-white dark:text-brand-green rounded-[2rem] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-[400ms] ease-in-out"
+          >
+            Next
+          </button>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="p-4 flex gap-3">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="flex-1 py-4 min-h-[44px] bg-gray-100 dark:bg-white/10 text-primary dark:text-white rounded-[2rem] font-semibold hover:bg-gray-200 dark:hover:bg-white/20 transition-all duration-[400ms] ease-in-out"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={loading}
+          className="flex-1 py-4 min-h-[44px] bg-primary dark:bg-accent text-white dark:text-brand-green rounded-[2rem] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-[400ms] ease-in-out disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {loading ? (
+            <>
+              <WalkingGolferSpinner size="sm" variant="light" />
+              Submitting...
+            </>
+          ) : (
+            'Submit'
+          )}
+        </button>
+      </div>
+    );
+  };
+
   return (
-    <ModalShell isOpen={isOpen} onClose={handleClose} title="Host Your Event with Us" size="lg">
+    <SlideUpDrawer 
+      isOpen={isOpen} 
+      onClose={handleClose} 
+      title="Host Your Event with Us" 
+      maxHeight="full"
+      stickyFooter={renderFooter()}
+    >
       <div className="p-6">
         {success ? (
           <div className="text-center py-8">
@@ -191,12 +253,6 @@ const EventInquiryForm: React.FC<EventInquiryFormProps> = ({
             </div>
             <h3 className="text-xl font-bold text-primary dark:text-white mb-2">Thank You!</h3>
             <p className="text-primary/70 dark:text-white/80 mb-6">We've received your event inquiry and will be in touch soon to discuss the details.</p>
-            <button
-              onClick={handleClose}
-              className="px-6 py-3 min-h-[44px] bg-primary dark:bg-accent text-white dark:text-brand-green rounded-[2rem] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-[400ms] ease-in-out"
-            >
-              Close
-            </button>
           </div>
         ) : (
           <>
@@ -206,7 +262,7 @@ const EventInquiryForm: React.FC<EventInquiryFormProps> = ({
               <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${step === 2 ? 'bg-primary text-white' : 'bg-primary/10 text-primary'}`}>2</div>
             </div>
 
-            <form onSubmit={handleSubmit}>
+            <div>
               {step === 1 ? (
                 <div className="space-y-4">
                   <p className="text-gray-600 dark:text-white/80 text-sm mb-4">Tell us about your vision, and our team will be in touch to help you bring it to life.</p>
@@ -307,14 +363,6 @@ const EventInquiryForm: React.FC<EventInquiryFormProps> = ({
                       <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
                     </div>
                   )}
-
-                  <button
-                    type="button"
-                    onClick={handleNext}
-                    className="w-full py-4 min-h-[44px] bg-primary dark:bg-accent text-white dark:text-brand-green rounded-[2rem] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-[400ms] ease-in-out"
-                  >
-                    Next
-                  </button>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -417,37 +465,13 @@ const EventInquiryForm: React.FC<EventInquiryFormProps> = ({
                       <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
                     </div>
                   )}
-
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={handleBack}
-                      className="flex-1 py-4 min-h-[44px] bg-gray-100 dark:bg-white/10 text-primary dark:text-white rounded-[2rem] font-semibold hover:bg-gray-200 dark:hover:bg-white/20 transition-all duration-[400ms] ease-in-out"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="flex-1 py-4 min-h-[44px] bg-primary dark:bg-accent text-white dark:text-brand-green rounded-[2rem] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-[400ms] ease-in-out disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                      {loading ? (
-                        <>
-                          <WalkingGolferSpinner size="sm" variant="light" />
-                          Submitting...
-                        </>
-                      ) : (
-                        'Submit'
-                      )}
-                    </button>
-                  </div>
                 </div>
               )}
-            </form>
+            </div>
           </>
         )}
       </div>
-    </ModalShell>
+    </SlideUpDrawer>
   );
 };
 

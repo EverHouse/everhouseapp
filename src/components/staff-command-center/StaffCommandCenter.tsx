@@ -23,6 +23,8 @@ import { AddMemberModal } from './modals/AddMemberModal';
 import QrScannerModal from './modals/QrScannerModal';
 import { TrackmanBookingModal } from './modals/TrackmanBookingModal';
 import { TrackmanLinkModal } from './modals/TrackmanLinkModal';
+import { StaffManualBookingModal, type StaffManualBookingData } from './modals/StaffManualBookingModal';
+import { SlideUpDrawer } from '../SlideUpDrawer';
 import type { StaffCommandCenterProps, BookingRequest, RecentActivity } from './types';
 
 interface OptimisticUpdateRef {
@@ -45,6 +47,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
   const [rosterModal, setRosterModal] = useState<{ isOpen: boolean; bookingId: number | null }>({ isOpen: false, bookingId: null });
   const [addMemberModalOpen, setAddMemberModalOpen] = useState(false);
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
+  const [manualBookingModalOpen, setManualBookingModalOpen] = useState(false);
   const [trackmanModal, setTrackmanModal] = useState<{ isOpen: boolean; booking: BookingRequest | null }>({ isOpen: false, booking: null });
   const [trackmanLinkModal, setTrackmanLinkModal] = useState<{
     isOpen: boolean;
@@ -364,6 +367,32 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
   const handleBillingModalComplete = useCallback(() => {
     refresh();
   }, [refresh]);
+
+  const handleManualBookingSubmit = useCallback(async (bookingData: StaffManualBookingData) => {
+    const response = await fetch('/api/staff/manual-booking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        hostMemberId: bookingData.hostMember.id,
+        resourceId: bookingData.resourceId,
+        requestDate: bookingData.requestDate,
+        startTime: bookingData.startTime,
+        durationMinutes: bookingData.durationMinutes,
+        declaredPlayerCount: bookingData.declaredPlayerCount,
+        participants: bookingData.participants,
+        trackmanExternalId: bookingData.trackmanExternalId
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to create booking');
+    }
+    
+    showToast('Manual booking created successfully', 'success');
+    refresh();
+  }, [showToast, refresh]);
 
   const handleRefresh = useCallback(async () => {
     await refresh();
@@ -695,52 +724,6 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
             transition: 'bottom 0.3s ease-out'
           }}
         >
-          <div 
-            role="menu" 
-            aria-label="Quick actions"
-            aria-hidden={!fabOpen}
-            className={`absolute bottom-16 right-0 flex flex-col gap-3 transition-all duration-300 ${fabOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
-          >
-            <button
-              role="menuitem"
-              tabIndex={fabOpen ? 0 : -1}
-              onClick={() => { 
-                setFabOpen(false); 
-                setAddMemberModalOpen(true);
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600/90 text-white rounded-full shadow-lg whitespace-nowrap backdrop-blur-sm"
-            >
-              <span className="material-symbols-outlined text-lg" aria-hidden="true">person_add</span>
-              <span className="text-sm font-medium">New User</span>
-            </button>
-            <button
-              role="menuitem"
-              tabIndex={fabOpen ? 0 : -1}
-              onClick={() => { 
-                setFabOpen(false); 
-                onTabChange('updates');
-                setTimeout(() => window.dispatchEvent(new CustomEvent('open-new-announcement')), 100);
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-[#CCB8E4]/90 text-[#293515] rounded-full shadow-lg whitespace-nowrap backdrop-blur-sm"
-            >
-              <span className="material-symbols-outlined text-lg" aria-hidden="true">campaign</span>
-              <span className="text-sm font-medium">New Announcement</span>
-            </button>
-            <button
-              role="menuitem"
-              tabIndex={fabOpen ? 0 : -1}
-              onClick={() => { 
-                setFabOpen(false); 
-                onTabChange('blocks');
-                setTimeout(() => window.dispatchEvent(new CustomEvent('open-new-closure')), 100);
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-500/90 text-white rounded-full shadow-lg whitespace-nowrap backdrop-blur-sm"
-            >
-              <span className="material-symbols-outlined text-lg" aria-hidden="true">notifications</span>
-              <span className="text-sm font-medium">New Notice</span>
-            </button>
-          </div>
-
           <button
             onClick={() => setFabOpen(!fabOpen)}
             aria-label={fabOpen ? 'Close quick actions menu' : 'Open quick actions menu'}
@@ -751,13 +734,91 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
                 ? 'bg-red-500/80 text-white backdrop-blur-xl rotate-45' 
                 : 'bg-primary/50 dark:bg-white/50 text-white dark:text-primary backdrop-blur-xl'
             } border border-white/30`}
-            title="Quick Actions: New User, Announcement, or Notice"
+            title="Quick Actions"
           >
             <span className="material-symbols-outlined text-2xl" aria-hidden="true">add</span>
           </button>
         </div>,
         document.body
       )}
+
+      <SlideUpDrawer
+        isOpen={fabOpen}
+        onClose={() => setFabOpen(false)}
+        title="Quick Actions"
+        maxHeight="small"
+      >
+        <div className="p-4">
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => { 
+                setFabOpen(false); 
+                setAddMemberModalOpen(true);
+              }}
+              className="flex flex-col items-center gap-2 p-4 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-xl transition-colors"
+            >
+              <div className="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl text-white">person_add</span>
+              </div>
+              <span className="text-sm font-medium text-green-700 dark:text-green-400">New User</span>
+            </button>
+
+            <button
+              onClick={() => { 
+                setFabOpen(false); 
+                onTabChange('updates');
+                setTimeout(() => window.dispatchEvent(new CustomEvent('open-new-announcement')), 100);
+              }}
+              className="flex flex-col items-center gap-2 p-4 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-xl transition-colors"
+            >
+              <div className="w-12 h-12 rounded-full bg-[#CCB8E4] flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl text-[#293515]">campaign</span>
+              </div>
+              <span className="text-sm font-medium text-purple-700 dark:text-[#CCB8E4]">New Announcement</span>
+            </button>
+
+            <button
+              onClick={() => { 
+                setFabOpen(false); 
+                onTabChange('blocks');
+                setTimeout(() => window.dispatchEvent(new CustomEvent('open-new-closure')), 100);
+              }}
+              className="flex flex-col items-center gap-2 p-4 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-xl transition-colors"
+            >
+              <div className="w-12 h-12 rounded-full bg-amber-500 flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl text-white">notifications</span>
+              </div>
+              <span className="text-sm font-medium text-amber-700 dark:text-amber-400">New Notice</span>
+            </button>
+
+            <button
+              onClick={() => { 
+                setFabOpen(false); 
+                setManualBookingModalOpen(true);
+              }}
+              className="flex flex-col items-center gap-2 p-4 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-xl transition-colors"
+            >
+              <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl text-white">edit_calendar</span>
+              </div>
+              <span className="text-sm font-medium text-blue-700 dark:text-blue-400">Manual Booking</span>
+            </button>
+
+            <button
+              onClick={() => { 
+                setFabOpen(false); 
+                setQrScannerOpen(true);
+              }}
+              className="flex flex-col items-center gap-2 p-4 bg-primary/5 dark:bg-white/5 hover:bg-primary/10 dark:hover:bg-white/10 rounded-xl transition-colors col-span-2"
+            >
+              <div className="w-12 h-12 rounded-full bg-primary dark:bg-white/90 flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl text-white dark:text-primary">qr_code_scanner</span>
+              </div>
+              <span className="text-sm font-medium text-primary dark:text-white">QR Scanner</span>
+            </button>
+          </div>
+        </div>
+      </SlideUpDrawer>
       
       <CheckinBillingModal
         isOpen={billingModal.isOpen}
@@ -781,6 +842,12 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
         onSelectExisting={(user) => {
           refresh();
         }}
+      />
+
+      <StaffManualBookingModal
+        isOpen={manualBookingModalOpen}
+        onClose={() => setManualBookingModalOpen(false)}
+        onSubmit={handleManualBookingSubmit}
       />
     </PullToRefresh>
   );

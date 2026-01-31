@@ -1359,8 +1359,9 @@ const Dashboard: React.FC = () => {
     />
 
     {/* Balance Payment Modal */}
-    {showBalancePaymentModal && user && (
+    {user && (
       <BalancePaymentModal
+        isOpen={showBalancePaymentModal}
         memberEmail={user.email}
         memberName={user.name}
         onSuccess={() => {
