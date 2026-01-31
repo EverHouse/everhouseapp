@@ -1,5 +1,6 @@
 import { pool } from '../db';
 import { getStripeClient } from './client';
+import { isPlaceholderEmail } from './customers';
 
 export interface CustomerSyncResult {
   success: boolean;
@@ -52,6 +53,14 @@ export async function syncStripeCustomersForMindBodyMembers(): Promise<CustomerS
     
     for (const member of members) {
       try {
+        // Skip placeholder emails
+        if (isPlaceholderEmail(member.email)) {
+          console.log(`[Stripe Customer Sync] Skipping placeholder email: ${member.email}`);
+          result.skipped++;
+          result.details.push({ email: member.email, action: 'skipped', reason: 'placeholder_email' });
+          continue;
+        }
+        
         const existingCustomers = await stripe.customers.list({
           email: member.email.toLowerCase(),
           limit: 1

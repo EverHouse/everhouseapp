@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { isStaffOrAdmin } from '../core/middleware';
 import { pool } from '../core/db';
 import { getStripeClient } from '../core/stripe/client';
+import { isPlaceholderEmail } from '../core/stripe/customers';
 import { getBillingGroupByMemberEmail } from '../core/stripe/groupBilling';
 import { listCustomerInvoices, getCustomerPaymentHistory } from '../core/stripe/invoices';
 import { listCustomerSubscriptions } from '../core/stripe/subscriptions';
@@ -408,6 +409,11 @@ router.post('/api/member-billing/:email/credit', isStaffOrAdmin, async (req, res
 
     if (!member) {
       return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    // Prevent operations on placeholder emails
+    if (isPlaceholderEmail(email)) {
+      return res.status(400).json({ error: 'Cannot add credits to placeholder accounts' });
     }
 
     if (member.billing_provider !== 'stripe') {

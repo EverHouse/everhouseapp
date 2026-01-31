@@ -9,6 +9,7 @@ import { getSessionUser } from '../../types/session';
 import { isExpandedProduct } from '../../types/stripe-helpers';
 import { getTodayPacific, getPacificMidnightUTC } from '../../utils/dateUtils';
 import { getStripeClient } from '../../core/stripe/client';
+import { isPlaceholderEmail } from '../../core/stripe/customers';
 import {
   createPaymentIntent,
   confirmPaymentSuccess,
@@ -532,6 +533,11 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, async (req: Reques
 
     if (numericAmount > 99999999) {
       return res.status(400).json({ error: 'Amount exceeds maximum allowed' });
+    }
+    
+    // Prevent creating Stripe customers for placeholder emails
+    if (isPlaceholderEmail(memberEmail)) {
+      return res.status(400).json({ error: 'Cannot charge placeholder emails. Please use a real email address.' });
     }
 
     let member: { id: string; email: string; first_name?: string; last_name?: string; stripe_customer_id?: string } | null = null;

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../core/db';
 import { getStripeClient } from '../core/stripe/client';
+import { isPlaceholderEmail } from '../core/stripe/customers';
 import { listCustomerSubscriptions } from '../core/stripe/subscriptions';
 import { getBillingGroupByMemberEmail } from '../core/stripe/groupBilling';
 import { listCustomerInvoices } from '../core/stripe/invoices';

@@ -2,12 +2,36 @@ import { pool } from '../db';
 import { getStripeClient } from './client';
 import { alertOnExternalServiceError } from '../errorAlerts';
 
+const PLACEHOLDER_EMAIL_PATTERNS = [
+  '@visitors.evenhouse.club',
+  '@trackman.local',
+  'unmatched-',
+  'golfnow-',
+  'classpass-',
+  'lesson-',
+  'anonymous-',
+  '@placeholder.',
+  '@test.local'
+];
+
+export function isPlaceholderEmail(email: string): boolean {
+  if (!email) return true;
+  const lowerEmail = email.toLowerCase();
+  return PLACEHOLDER_EMAIL_PATTERNS.some(pattern => lowerEmail.includes(pattern));
+}
+
 export async function getOrCreateStripeCustomer(
   userId: string,
   email: string,
   name?: string,
   tier?: string
 ): Promise<{ customerId: string; isNew: boolean }> {
+  // Prevent creating Stripe customers for placeholder emails
+  if (isPlaceholderEmail(email)) {
+    console.log(`[Stripe] Skipping customer creation for placeholder email: ${email}`);
+    throw new Error(`Cannot create Stripe customer for placeholder email: ${email}`);
+  }
+  
   const userResult = await pool.query(
     'SELECT stripe_customer_id, tier FROM users WHERE id = $1',
     [userId]

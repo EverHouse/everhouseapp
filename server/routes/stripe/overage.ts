@@ -3,6 +3,7 @@ import { pool } from '../../core/db';
 import { getSessionUser } from '../../types/session';
 import { sendNotificationToUser, broadcastBillingUpdate } from '../../core/websocket';
 import { computeFeeBreakdown, getEffectivePlayerCount } from '../../core/billing/unifiedFeeService';
+import { isPlaceholderEmail } from '../../core/stripe/customers';
 
 const router = Router();
 
@@ -68,6 +69,12 @@ router.post('/api/stripe/overage/create-payment-intent', async (req: Request, re
     
     const { getStripeClient } = await import('../../core/stripe/client');
     const stripe = await getStripeClient();
+    
+    // Prevent creating Stripe customers for placeholder emails
+    if (isPlaceholderEmail(booking.user_email)) {
+      console.log(`[Stripe] Skipping overage payment for placeholder email: ${booking.user_email}`);
+      return res.status(400).json({ error: 'Cannot process payment for placeholder booking. Please assign this booking to a real member first.' });
+    }
     
     let customerId = booking.stripe_customer_id;
     if (!customerId) {
