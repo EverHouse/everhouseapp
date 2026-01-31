@@ -13,6 +13,23 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.54.0",
+    date: "2026-01-31",
+    title: "Eliminate Placeholder Email Generation",
+    isMajor: true,
+    changes: [
+      "Refactored: Trackman imports no longer create placeholder emails for unmatched bookings",
+      "Refactored: Unmatched bookings now use null user_email instead of fake generated emails",
+      "Improved: Auto-match system only links to existing real visitors, never creates fake ones",
+      "Improved: Booking slots still block availability correctly without requiring a fake user",
+      "Added: HubSpot sync now rejects placeholder emails to prevent contact pollution",
+      "Fixed: TrackmanLinkModal hides placeholder emails, shows 'Unassigned' status cleanly",
+      "Cleanup: Deleted 73 existing placeholder Stripe customers",
+      "Cleanup: Archived 73 placeholder user records in database",
+      "Technical: All booking detection logic updated to treat null/empty email as unmatched"
+    ]
+  },
+  {
     version: "9.53.0",
     date: "2026-01-31",
     title: "Placeholder Account Cleanup Tool",

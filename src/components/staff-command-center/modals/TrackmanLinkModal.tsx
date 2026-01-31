@@ -778,7 +778,7 @@ export function TrackmanLinkModal({
               <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">person</span>
               <div>
                 <p className="font-medium text-blue-800 dark:text-blue-200">{currentMemberName}</p>
-                {currentMemberEmail && (
+                {currentMemberEmail && !isPlaceholderEmail(currentMemberEmail) && (
                   <p className="text-sm text-blue-600 dark:text-blue-400">{currentMemberEmail}</p>
                 )}
               </div>

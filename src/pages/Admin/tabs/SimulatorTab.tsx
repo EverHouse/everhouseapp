@@ -1432,8 +1432,21 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
     // Only show TODAY and FUTURE bookings - historical ones go to Trackman Admin panel
     const today = getTodayPacific();
     const unmatchedWebhookBookings = approvedBookings.filter(b => {
+        // A booking is unmatched if:
+        // 1. is_unmatched flag is true, OR
+        // 2. user_email is null/empty, OR
+        // 3. user_email matches placeholder patterns
+        const email = (b.user_email || '').toLowerCase();
+        const isPlaceholderEmail = !email || 
+            email.includes('@trackman.local') ||
+            email.includes('@visitors.evenhouse.club') ||
+            email.startsWith('unmatched-') ||
+            email.startsWith('golfnow-') ||
+            email.startsWith('classpass-') ||
+            email === 'unmatched@trackman.import';
+        
         const isUnmatched = (b as any).is_unmatched === true ||
-            b.user_email === 'unmatched@trackman.import' ||
+            isPlaceholderEmail ||
             (b.user_name || '').includes('Unknown (Trackman)');
         
         // Only include if it's today or in the future
@@ -1487,8 +1500,21 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
     }, [approvedBookings, scheduledFilter]);
 
     const isBookingUnmatched = useCallback((booking: BookingRequest): boolean => {
+        // A booking is unmatched if:
+        // 1. is_unmatched flag is true, OR
+        // 2. user_email is null/empty, OR
+        // 3. user_email matches placeholder patterns
+        const email = (booking.user_email || '').toLowerCase();
+        const isPlaceholderEmail = !email || 
+            email.includes('@trackman.local') ||
+            email.includes('@visitors.evenhouse.club') ||
+            email.startsWith('unmatched-') ||
+            email.startsWith('golfnow-') ||
+            email.startsWith('classpass-') ||
+            email === 'unmatched@trackman.import';
+        
         return (booking as any).is_unmatched === true ||
-            booking.user_email === 'unmatched@trackman.import' ||
+            isPlaceholderEmail ||
             (booking.user_name || '').includes('Unknown (Trackman)');
     }, []);
 
@@ -2972,9 +2998,16 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                         ? parseInt(String(selectedCalendarBooking.id).replace('cal_', '')) 
                                         : selectedCalendarBooking.id as number;
                                     const email = selectedCalendarBooking?.user_email?.toLowerCase() || '';
-                                    const isUnmatched = (selectedCalendarBooking as any)?.is_unmatched || 
+                                    const isPlaceholderEmail = !email || 
+                                        email.includes('@trackman.local') ||
+                                        email.includes('@visitors.evenhouse.club') ||
+                                        email.startsWith('unmatched-') ||
+                                        email.startsWith('golfnow-') ||
+                                        email.startsWith('classpass-') ||
                                         email.includes('unmatched@') || 
-                                        email.includes('@trackman.import') ||
+                                        email.includes('@trackman.import');
+                                    const isUnmatched = (selectedCalendarBooking as any)?.is_unmatched || 
+                                        isPlaceholderEmail ||
                                         selectedCalendarBooking?.user_name === 'Unknown (Trackman)';
                                     const currentName = isUnmatched ? undefined : (() => {
                                         return email && memberNameMap[email] ? memberNameMap[email] : selectedCalendarBooking?.user_name || 'Unknown';
@@ -2997,18 +3030,32 @@ const SimulatorTab: React.FC<{ onTabChange: (tab: TabType) => void }> = ({ onTab
                                 className="p-2 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors"
                                 title={(() => {
                                     const email = selectedCalendarBooking?.user_email?.toLowerCase() || '';
-                                    const isUnmatched = (selectedCalendarBooking as any)?.is_unmatched || 
+                                    const isPlaceholderEmail = !email || 
+                                        email.includes('@trackman.local') ||
+                                        email.includes('@visitors.evenhouse.club') ||
+                                        email.startsWith('unmatched-') ||
+                                        email.startsWith('golfnow-') ||
+                                        email.startsWith('classpass-') ||
                                         email.includes('unmatched@') || 
-                                        email.includes('@trackman.import') ||
+                                        email.includes('@trackman.import');
+                                    const isUnmatched = (selectedCalendarBooking as any)?.is_unmatched || 
+                                        isPlaceholderEmail ||
                                         selectedCalendarBooking?.user_name === 'Unknown (Trackman)';
                                     return isUnmatched ? "Assign member to booking" : "Change booking owner";
                                 })()}
                             >
                                 <span className="material-symbols-outlined text-sm">{(() => {
                                     const email = selectedCalendarBooking?.user_email?.toLowerCase() || '';
-                                    const isUnmatched = (selectedCalendarBooking as any)?.is_unmatched || 
+                                    const isPlaceholderEmail = !email || 
+                                        email.includes('@trackman.local') ||
+                                        email.includes('@visitors.evenhouse.club') ||
+                                        email.startsWith('unmatched-') ||
+                                        email.startsWith('golfnow-') ||
+                                        email.startsWith('classpass-') ||
                                         email.includes('unmatched@') || 
-                                        email.includes('@trackman.import') ||
+                                        email.includes('@trackman.import');
+                                    const isUnmatched = (selectedCalendarBooking as any)?.is_unmatched || 
+                                        isPlaceholderEmail ||
                                         selectedCalendarBooking?.user_name === 'Unknown (Trackman)';
                                     return isUnmatched ? "person_add" : "edit";
                                 })()}</span>

@@ -693,55 +693,22 @@ async function markBookingAsPrivateEvent(bookingId: number, staffEmail?: string)
   `, [bookingId, staffEmail || 'system']);
 }
 
+/**
+ * REFACTORED: No longer creates placeholder visitors with fake emails.
+ * GolfNow bookings should remain unmatched until staff manually assigns a real member/visitor.
+ * Staff will use TrackmanLinkModal to assign the booking to a real user.
+ * 
+ * @returns null - booking should remain unmatched with null user_email
+ */
 async function createGolfNowVisitor(
   userName: string | null,
   bookingDate: Date | string,
   startTime: string
 ): Promise<string | null> {
-  if (!userName) return null;
-  
-  const nameParts = userName.split(/[,\s]+/).filter(Boolean);
-  let firstName = nameParts[0] || 'GolfNow';
-  let lastName = nameParts.slice(1).join(' ') || 'Visitor';
-  
-  if (userName.includes(',')) {
-    lastName = nameParts[0] || 'Visitor';
-    firstName = nameParts.slice(1).join(' ') || 'GolfNow';
-  }
-  
-  const dateStr = typeof bookingDate === 'string' 
-    ? bookingDate.replace(/-/g, '') 
-    : bookingDate.toISOString().split('T')[0].replace(/-/g, '');
-  const timeStr = startTime.replace(/:/g, '').substring(0, 4);
-  const generatedEmail = `golfnow-${dateStr}-${timeStr}@visitors.evenhouse.club`;
-  
-  try {
-    const visitor = await upsertVisitor({
-      email: generatedEmail,
-      firstName,
-      lastName
-    }, false);
-    
-    // Tag visitor as directory_hidden so they don't flood the member directory
-    await pool.query(
-      `UPDATE users 
-       SET tags = COALESCE(tags, '[]'::jsonb) || '["directory_hidden", "auto_generated"]'::jsonb 
-       WHERE id = $1 AND NOT (COALESCE(tags, '[]'::jsonb) @> '["directory_hidden"]'::jsonb)`,
-      [visitor.id]
-    );
-    
-    await updateVisitorType({
-      email: generatedEmail,
-      type: 'golfnow',
-      activitySource: 'trackman_auto_match',
-      activityDate: typeof bookingDate === 'string' ? new Date(bookingDate) : bookingDate
-    });
-    
-    return generatedEmail;
-  } catch (error) {
-    console.error('[AutoMatch] Error creating GolfNow visitor:', error);
-    return null;
-  }
+  // No longer create placeholder visitors - return null to keep booking unmatched
+  // Staff will manually assign via TrackmanLinkModal
+  console.log(`[AutoMatch] GolfNow booking for "${userName}" will remain unmatched - staff must assign manually`);
+  return null;
 }
 
 // Auto-match bookings from the legacy trackman_unmatched_bookings table
@@ -816,7 +783,7 @@ async function autoMatchBookingRequests(
       trackman_booking_id
     FROM booking_requests 
     WHERE is_unmatched = true 
-      AND (user_email LIKE 'unmatched-%@%' OR user_email LIKE '%@trackman.local')
+      AND (user_email IS NULL OR user_email LIKE 'unmatched-%@%' OR user_email LIKE '%@trackman.local' OR user_email LIKE '%@visitors.evenhouse.club')
       AND status IN ('pending', 'approved', 'attended')
       AND (
         LOWER(user_name) LIKE '%golfnow%'
@@ -890,35 +857,19 @@ async function autoMatchBookingRequests(
       
       // Determine visitor type based on content
       let visitorType: VisitorType = 'guest';
-      let emailPrefix = 'visitor';
       
       if (lowerName.includes('golfnow') || allNotes.includes('golfnow')) {
         visitorType = 'golfnow';
-        emailPrefix = 'golfnow';
       } else if (lowerName.includes('classpass') || allNotes.includes('classpass')) {
         visitorType = 'classpass';
-        emailPrefix = 'classpass';
       } else if (lowerName.includes('lesson') || allNotes.includes('lesson')) {
         visitorType = 'private_lesson';
-        emailPrefix = 'lesson';
-      } else if (lowerName.includes('anonymous') || allNotes.includes('anonymous')) {
-        visitorType = 'guest';
-        emailPrefix = 'anonymous';
       } else if (lowerName.includes('walk-in') || lowerName.includes('walk in')) {
         visitorType = 'sim_walkin';
-        emailPrefix = 'walkin';
       }
       
-      // Generate visitor email with random suffix to prevent collisions
-      const dateStr = row.booking_date instanceof Date 
-        ? row.booking_date.toISOString().split('T')[0].replace(/-/g, '') 
-        : row.booking_date.replace(/-/g, '');
-      const timeStr = (row.start_time || '12:00').replace(/:/g, '').substring(0, 4);
-      const randomSuffix = Math.random().toString(36).substring(2, 6);
-      const generatedEmail = `${emailPrefix}-${dateStr}-${timeStr}-${randomSuffix}@visitors.evenhouse.club`;
-      
       // Parse name - extract actual person name from booking name if possible
-      let firstName = 'Visitor';
+      let firstName = '';
       let lastName = '';
       
       // Try to extract real name (e.g., "Beginner Group Lesson Tim Silverman" -> "Tim Silverman")
@@ -926,23 +877,23 @@ async function autoMatchBookingRequests(
       if (nameMatch) {
         const extractedName = nameMatch[1].trim();
         const parts = extractedName.split(/\s+/);
-        firstName = parts[0] || 'Visitor';
+        firstName = parts[0] || '';
         lastName = parts.slice(1).join(' ') || '';
       } else {
         const nameParts = userName.split(/[,\s]+/).filter(Boolean);
-        firstName = nameParts[0] || 'Visitor';
+        firstName = nameParts[0] || '';
         lastName = nameParts.slice(1).join(' ') || '';
         
         // Handle "Last, First" format
         if (userName.includes(',')) {
           lastName = nameParts[0] || '';
-          firstName = nameParts.slice(1).join(' ') || 'Visitor';
+          firstName = nameParts.slice(1).join(' ') || '';
         }
       }
       
-      // First, check if a visitor with the same name already exists
+      // REFACTORED: Only match to EXISTING real visitors by name - don't create placeholder visitors
+      // If no existing visitor found, keep booking unmatched for staff to manually assign
       let visitor: { id: string; email: string } | null = null;
-      let usedExistingVisitor = false;
       
       if (firstName && lastName) {
         const existingVisitorResult = await pool.query(`
@@ -952,6 +903,9 @@ async function autoMatchBookingRequests(
             AND LOWER(last_name) = LOWER($2)
             AND (role = 'visitor' OR membership_status IN ('visitor', 'non-member'))
             AND archived_at IS NULL
+            AND email NOT LIKE '%@visitors.evenhouse.club'
+            AND email NOT LIKE '%@trackman.local'
+            AND email NOT LIKE 'unmatched-%'
           ORDER BY created_at ASC
           LIMIT 1
         `, [firstName, lastName]);
@@ -959,32 +913,24 @@ async function autoMatchBookingRequests(
         if (existingVisitorResult.rows.length > 0) {
           const existing = existingVisitorResult.rows[0];
           visitor = { id: existing.id, email: existing.email };
-          usedExistingVisitor = true;
-          
-          // Add the generated email as a linked email if it's different
-          if (existing.email.toLowerCase() !== generatedEmail.toLowerCase()) {
-            await pool.query(`
-              INSERT INTO linked_email_addresses (user_id, email, source, is_verified)
-              VALUES ($1, $2, 'trackman_auto_match', false)
-              ON CONFLICT (email) DO NOTHING
-            `, [existing.id, generatedEmail]);
-          }
-          
-          console.log(`[AutoMatch] Found existing visitor ${firstName} ${lastName} (${existing.email}) - linking booking`);
+          console.log(`[AutoMatch] Found existing REAL visitor ${firstName} ${lastName} (${existing.email}) - linking booking`);
         }
       }
       
-      // Only create a new visitor if no existing one found
+      // If no existing real visitor found, skip this booking - staff must manually assign
       if (!visitor) {
-        const newVisitor = await upsertVisitor({
-          email: generatedEmail,
-          firstName,
-          lastName: lastName || 'Visitor'
-        }, false);
-        visitor = newVisitor;
+        console.log(`[AutoMatch] No existing real visitor found for "${userName}" - booking #${row.id} will remain unmatched for staff to assign`);
+        results.push({
+          bookingId: row.id,
+          matched: false,
+          matchType: 'failed',
+          reason: `No existing real visitor found for "${userName}" - requires manual staff assignment`
+        });
+        failed++;
+        continue;
       }
       
-      // Update visitor type (always try, in case it needs updating)
+      // Update visitor type for existing visitor (if applicable)
       await updateVisitorType({
         email: visitor.email,
         type: visitorType,
@@ -1039,9 +985,7 @@ async function autoMatchBookingRequests(
       }
       
       // Update booking_request with the visitor email
-      const matchNote = usedExistingVisitor 
-        ? ` [Auto-matched to existing ${visitorType} visitor ${visitor.email} by ${staffEmail || 'system'}]`
-        : ` [Auto-matched to new ${visitorType} visitor by ${staffEmail || 'system'}]`;
+      const matchNote = ` [Auto-matched to existing ${visitorType} visitor ${visitor.email} by ${staffEmail || 'system'}]`;
       
       await pool.query(`
         UPDATE booking_requests
@@ -1064,13 +1008,13 @@ async function autoMatchBookingRequests(
       results.push({
         bookingId: row.id,
         matched: true,
-        matchType: usedExistingVisitor ? 'name_match' : 'golfnow_fallback',
+        matchType: 'name_match',
         visitorEmail: visitor.email,
         visitorType: visitorType,
         sessionId: sessionId || undefined
       });
       matched++;
-      console.log(`[AutoMatch] Matched booking_request #${row.id} -> ${visitor.email}${usedExistingVisitor ? ' (existing)' : ' (new)'}`);
+      console.log(`[AutoMatch] Matched booking_request #${row.id} -> ${visitor.email} (existing real visitor)`);
     } catch (error) {
       console.error(`[AutoMatch] Error matching booking_request #${row.id}:`, error);
       results.push({

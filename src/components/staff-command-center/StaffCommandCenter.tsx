@@ -138,7 +138,22 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange, is
 
   const today = getTodayPacific();
   const pendingCount = data.pendingRequests.length;
-  const unmatchedBookings = data.todaysBookings.filter(b => (b as any).is_unmatched === true);
+  
+  // Filter unmatched bookings - check is_unmatched flag OR null/placeholder emails
+  const unmatchedBookings = data.todaysBookings.filter(b => {
+    if ((b as any).is_unmatched === true) return true;
+    
+    // Also consider booking unmatched if user_email is null/empty or a placeholder
+    const email = (b.user_email || '').toLowerCase();
+    if (!email) return true;
+    if (email.includes('@trackman.local')) return true;
+    if (email.includes('@visitors.evenhouse.club')) return true;
+    if (email.startsWith('unmatched-')) return true;
+    if (email.startsWith('golfnow-')) return true;
+    if (email.startsWith('classpass-')) return true;
+    
+    return false;
+  });
 
   const handleOpenTrackman = (booking?: BookingRequest) => {
     if (booking) {

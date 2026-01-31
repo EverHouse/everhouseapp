@@ -2538,11 +2538,11 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         
         // CRITICAL: Create booking_request to block the time slot even for unmatched bookings
         // This ensures no double-booking regardless of member matching
-        const unmatchedPlaceholderEmail = `unmatched-${row.bookingId}@trackman.local`;
+        // Use null for userEmail - staff will manually assign via TrackmanLinkModal
         
         try {
           const unmatchedInsertResult = await db.insert(bookingRequests).values({
-            userEmail: unmatchedPlaceholderEmail,
+            userEmail: null,
             userName: row.userName,
             resourceId: parsedBayId,
             requestDate: bookingDate,

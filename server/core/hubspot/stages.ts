@@ -5,6 +5,7 @@ import { hubspotDeals, billingAuditLog } from '../../../shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { retryableHubSpotRequest } from './request';
 import { validateMembershipPipeline, isValidStage } from './pipeline';
+import { isPlaceholderEmail } from '../stripe/customers';
 import { 
   HUBSPOT_STAGE_IDS, 
   MINDBODY_TO_STAGE_MAP, 
@@ -128,6 +129,11 @@ export async function syncMemberToHubSpot(
   input: SyncMemberToHubSpotInput
 ): Promise<SyncMemberToHubSpotResult> {
   const { email, status, billingProvider, tier, memberSince, createIfMissing = true } = input;
+  
+  if (isPlaceholderEmail(email)) {
+    console.log(`[HubSpot Sync] Skipping sync for placeholder email: ${email}`);
+    return { success: false, error: 'Placeholder email skipped', updated: {} };
+  }
   
   try {
     const hubspot = await getHubSpotClient();

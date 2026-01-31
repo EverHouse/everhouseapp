@@ -7,6 +7,7 @@ import { retryableHubSpotRequest } from './request';
 import { HUBSPOT_STAGE_IDS, MEMBERSHIP_PIPELINE_ID, MINDBODY_TO_STAGE_MAP } from './constants';
 import { getProductMapping } from './products';
 import { addLineItemToDeal } from './lineItems';
+import { isPlaceholderEmail } from '../stripe/customers';
 
 export interface AddMemberInput {
   firstName: string;
@@ -70,6 +71,11 @@ export async function findOrCreateHubSpotContact(
   phone?: string,
   tier?: string
 ): Promise<{ contactId: string; isNew: boolean }> {
+  if (isPlaceholderEmail(email)) {
+    console.log(`[HubSpot] Skipping contact creation for placeholder email: ${email}`);
+    throw new Error(`Cannot create HubSpot contact for placeholder email: ${email}`);
+  }
+  
   const hubspot = await getHubSpotClient();
   
   try {

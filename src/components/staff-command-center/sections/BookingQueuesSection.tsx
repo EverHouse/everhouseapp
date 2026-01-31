@@ -92,8 +92,21 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
     const unmatchedBookingIds = new Set(unmatchedBookings.map(b => String(b.id)));
     
     const isUnmatchedBooking = (b: BookingRequest) => {
+      // A booking is unmatched if:
+      // 1. is_unmatched flag is true, OR
+      // 2. user_email is null/empty, OR  
+      // 3. user_email matches placeholder patterns
+      const email = b.user_email?.toLowerCase() || '';
+      const isPlaceholderEmail = !email || 
+        email.includes('@trackman.local') ||
+        email.includes('@visitors.evenhouse.club') ||
+        email.startsWith('unmatched-') ||
+        email.startsWith('golfnow-') ||
+        email.startsWith('classpass-') ||
+        email === 'unmatched@trackman.import';
+      
       return b.is_unmatched === true ||
-        b.user_email === 'unmatched@trackman.import' ||
+        isPlaceholderEmail ||
         (b.user_name || '').includes('Unknown (Trackman)');
     };
     
