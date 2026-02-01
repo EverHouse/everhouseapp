@@ -74,11 +74,21 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
 
   const useApiSearch = forceApiSearch || includeVisitors || includeFormer;
 
-  const excludeEmailsLower = useMemo(() => 
-    excludeEmails.map(e => e.toLowerCase()), 
+  // Create stable, collision-safe key for excludeEmails
+  const excludeEmailsKey = useMemo(() => 
+    JSON.stringify([...excludeEmails].map(e => e.toLowerCase()).sort()),
     [excludeEmails]
   );
+  
+  const excludeEmailsLower = useMemo(() => 
+    excludeEmails.map(e => e.toLowerCase()), 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [excludeEmailsKey]
+  );
 
+  // Create a stable filter key to detect when filters change
+  const filterKey = `${includeFormer}-${includeVisitors}-${excludeEmailsKey}`;
+  
   const searchApi = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) {
       setApiResults([]);
@@ -123,7 +133,8 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
       searchTimeoutRef.current = setTimeout(() => {
         searchApi(query);
       }, 250);
-    } else {
+    } else if (useApiSearch) {
+      // Clear results when query is empty
       setApiResults([]);
     }
     return () => {
@@ -131,7 +142,8 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [query, useApiSearch, searchApi]);
+    // Include filterKey to re-run search when filters change
+  }, [query, useApiSearch, filterKey, searchApi]);
 
   const filteredMembers = useMemo(() => {
     if (useApiSearch) {

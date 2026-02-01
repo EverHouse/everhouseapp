@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.61.2",
+    date: "2026-02-01",
+    title: "Navigation Bug Fix",
+    changes: [
+      "Fixed: Critical navigation issue where clicking sidebar buttons on the Financials page would change the URL but not update the page content",
+      "Fixed: Resolved infinite render loop in member search component that was blocking page updates",
+      "Improved: Member search now correctly handles filter changes without causing performance issues"
+    ]
+  },
+  {
     version: "9.61.1",
     date: "2026-02-01",
     title: "Bug Fixes for New User Drawer",

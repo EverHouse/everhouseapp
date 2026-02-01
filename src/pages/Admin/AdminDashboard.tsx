@@ -33,9 +33,6 @@ const AdminDashboard: React.FC = () => {
   
   const activeTab = getTabFromPathname(location.pathname);
   
-  // Debug: Log when component renders and what the current path/tab is
-  console.log('[AdminDashboard] Render - pathname:', location.pathname, 'activeTab:', activeTab);
-  
   const { pendingRequestsCount, refetch: refetchPendingCounts } = usePendingCounts();
   const { unreadNotifCount } = useUnreadNotifications(actualUser?.email);
 
