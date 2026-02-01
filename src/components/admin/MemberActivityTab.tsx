@@ -415,12 +415,12 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+      <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-2 -mx-1 px-1">
         {FILTER_TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveFilter(tab.id)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors min-w-[44px] sm:min-w-0 ${
               activeFilter === tab.id
                 ? isDark
                   ? 'bg-accent text-primary'
@@ -429,10 +429,11 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
                   ? 'bg-white/5 text-gray-400 hover:bg-white/10'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
+            title={tab.label}
           >
             <span className="material-symbols-outlined text-sm">{tab.icon}</span>
-            {tab.label}
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+            <span className="hidden sm:inline">{tab.label}</span>
+            <span className={`text-[10px] px-1 sm:px-1.5 py-0.5 rounded-full ${
               activeFilter === tab.id
                 ? isDark
                   ? 'bg-primary/20 text-primary'

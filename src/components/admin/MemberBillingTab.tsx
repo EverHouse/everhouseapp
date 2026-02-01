@@ -915,7 +915,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-20">
       {error && (
         <div className={`p-3 rounded-lg flex items-center gap-2 ${isDark ? 'bg-red-500/10 border border-red-500/30' : 'bg-red-50 border border-red-200'}`}>
           <span className="material-symbols-outlined text-red-500 text-base">error</span>
