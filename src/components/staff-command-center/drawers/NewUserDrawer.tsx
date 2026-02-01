@@ -1120,8 +1120,6 @@ function VisitorFlow({
 
   const labelClass = `block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`;
 
-  const selectedProduct = products.find(p => p.id === form.productId);
-
   const handleProceedToPayment = () => {
     if (!form.productId || !form.firstName || !form.lastName || !form.email || !form.phone) {
       setError('Please fill in all required fields');

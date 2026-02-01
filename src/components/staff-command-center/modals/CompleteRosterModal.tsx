@@ -3,7 +3,7 @@ import { useToast } from '../../Toast';
 import BookingMembersEditor from '../../admin/BookingMembersEditor';
 import { CheckinBillingModal } from './CheckinBillingModal';
 import SlideUpDrawer from '../../SlideUpDrawer';
-import { getApiErrorMessage, getNetworkErrorMessage } from '../../../../utils/errorHandling';
+import { getApiErrorMessage, getNetworkErrorMessage } from '../../../utils/errorHandling';
 
 interface BookingContext {
   bookingId: number;
