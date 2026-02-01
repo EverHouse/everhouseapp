@@ -1,5 +1,7 @@
 import { pool } from './db';
 import { logger } from './logger';
+import { getStripeClient } from './stripe/client';
+import { getHubSpotPrivateAppClient, getGoogleCalendarClient } from './integrations';
 
 export interface ServiceHealth {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -66,7 +68,7 @@ async function checkDatabase(): Promise<ServiceHealth> {
 
 async function checkStripe(): Promise<ServiceHealth> {
   try {
-    const stripe = (await import('../replit_integrations/stripe')).default;
+    const stripe = await getStripeClient();
     if (!stripe) {
       return {
         status: 'unhealthy',
@@ -75,7 +77,7 @@ async function checkStripe(): Promise<ServiceHealth> {
       };
     }
 
-    const { result, latencyMs, error } = await checkWithTimeout(
+    const { latencyMs, error } = await checkWithTimeout(
       () => stripe.balance.retrieve(),
       5000
     );
@@ -105,7 +107,7 @@ async function checkStripe(): Promise<ServiceHealth> {
 
 async function checkHubSpot(): Promise<ServiceHealth> {
   try {
-    const { hubspotClient } = await import('../replit_integrations/hubspot');
+    const hubspotClient = getHubSpotPrivateAppClient();
     if (!hubspotClient) {
       return {
         status: 'unhealthy',
@@ -114,7 +116,7 @@ async function checkHubSpot(): Promise<ServiceHealth> {
       };
     }
 
-    const { result, latencyMs, error } = await checkWithTimeout(
+    const { latencyMs, error } = await checkWithTimeout(
       () => hubspotClient.crm.owners.ownersApi.getPage(),
       5000
     );
@@ -153,7 +155,7 @@ async function checkResend(): Promise<ServiceHealth> {
       };
     }
 
-    const { result, latencyMs, error } = await checkWithTimeout(
+    const { latencyMs, error } = await checkWithTimeout(
       async () => {
         const response = await fetch('https://api.resend.com/domains', {
           headers: { Authorization: `Bearer ${resendApiKey}` }
@@ -189,8 +191,7 @@ async function checkResend(): Promise<ServiceHealth> {
 
 async function checkGoogleCalendar(): Promise<ServiceHealth> {
   try {
-    const { getCalendarClient } = await import('../replit_integrations/calendar');
-    const calendar = getCalendarClient();
+    const calendar = await getGoogleCalendarClient();
     
     if (!calendar) {
       return {
@@ -200,7 +201,7 @@ async function checkGoogleCalendar(): Promise<ServiceHealth> {
       };
     }
 
-    const { result, latencyMs, error } = await checkWithTimeout(
+    const { latencyMs, error } = await checkWithTimeout(
       () => calendar.calendarList.list({ maxResults: 1 }),
       5000
     );
