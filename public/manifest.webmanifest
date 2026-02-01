@@ -4,8 +4,8 @@
   "description": "Ever House Members Club - Golf, Wellness & Community",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#293515",
-  "theme_color": "#293515",
+  "background_color": "#F2F2EC",
+  "theme_color": "#F2F2EC",
   "orientation": "portrait",
   "icons": [
     {
