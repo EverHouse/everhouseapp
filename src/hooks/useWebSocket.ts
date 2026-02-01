@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useUserStore } from '../stores/userStore';
+import { useNotificationStore } from '../stores/notificationStore';
 import { apiRequest } from '../lib/apiRequest';
 import { bookingEvents } from '../lib/bookingEvents';
 
@@ -38,7 +39,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         `/api/notifications?user_email=${encodeURIComponent(emailToUse)}&unread_only=true`
       );
       if (ok && data) {
-        useUserStore.setState({ unreadNotifications: data.length });
+        useNotificationStore.getState().setUnreadCount(data.length);
       }
     } else {
       fetchNotifications();

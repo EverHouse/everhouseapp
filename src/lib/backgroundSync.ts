@@ -10,6 +10,7 @@
  * See: src/hooks/queries/ for the replacement hooks.
  */
 import { useUserStore } from '../stores/userStore';
+import { useNotificationStore } from '../stores/notificationStore';
 
 const SYNC_INTERVAL = 5 * 60 * 1000;
 const THROTTLE_MS = 60 * 1000;
@@ -124,7 +125,7 @@ const syncAll = async () => {
       'notifications', 
       `/api/notifications?user_email=${encodeURIComponent(user.email)}&unread_only=true`,
       (data: any[]) => {
-        useUserStore.setState({ unreadNotifications: data.length });
+        useNotificationStore.getState().setUnreadCount(data.length);
         window.dispatchEvent(new CustomEvent('notifications-read'));
       }
     );

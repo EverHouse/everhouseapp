@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { apiRequest } from '../lib/apiRequest';
+import { useNotificationStore } from './notificationStore';
 
 export interface UserProfile {
   id: string;
@@ -38,7 +39,6 @@ interface UserState {
   user: UserProfile | null;
   guestPasses: GuestPasses | null;
   bookings: UserBooking[];
-  unreadNotifications: number;
   isHydrated: boolean;
   
   setUser: (user: UserProfile | null) => void;
@@ -56,7 +56,6 @@ export const useUserStore = create<UserState>()(
       user: null,
       guestPasses: null,
       bookings: [],
-      unreadNotifications: 0,
       isHydrated: false,
 
       setUser: (user) => {
@@ -70,9 +69,9 @@ export const useUserStore = create<UserState>()(
         set({ 
           user: null, 
           guestPasses: null, 
-          bookings: [], 
-          unreadNotifications: 0 
+          bookings: []
         });
+        useNotificationStore.getState().setNotifications([]);
       },
 
       fetchGuestPasses: async () => {
@@ -103,12 +102,7 @@ export const useUserStore = create<UserState>()(
         const { user } = get();
         if (!user?.email) return;
         
-        const { ok, data } = await apiRequest<any[]>(
-          `/api/notifications?user_email=${encodeURIComponent(user.email)}&unread_only=true`
-        );
-        if (ok && data) {
-          set({ unreadNotifications: data.length });
-        }
+        await useNotificationStore.getState().fetchUnreadCount(user.email);
       },
 
       refreshAll: async () => {
@@ -124,8 +118,7 @@ export const useUserStore = create<UserState>()(
       name: 'eh_user_store',
       partialize: (state) => ({
         user: state.user,
-        guestPasses: state.guestPasses,
-        unreadNotifications: state.unreadNotifications
+        guestPasses: state.guestPasses
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {

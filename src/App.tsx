@@ -27,6 +27,7 @@ import { PageReadyProvider } from './contexts/PageReadyContext';
 import WalkingGolferLoader from './components/WalkingGolferLoader';
 import NavigationLoader from './components/NavigationLoader';
 import { useNotificationSounds } from './hooks/useNotificationSounds';
+import { useNotificationStore } from './stores/notificationStore';
 import { useEdgeSwipe } from './hooks/useEdgeSwipe';
 import { useKeyboardDetection } from './hooks/useKeyboardDetection';
 import { useUserStore } from './stores/userStore';
@@ -486,7 +487,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isStaffOrAdmin = actualUser?.role === 'admin' || actualUser?.role === 'staff';
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMemberMenuOpen, setIsMemberMenuOpen] = useState(false);
-  const unreadCount = useUserStore(state => state.unreadNotifications);
+  const unreadCount = useNotificationStore(state => state.unreadCount);
   useWebSocket({ effectiveEmail: user?.email });
   useSupabaseRealtime({ userEmail: user?.email });
   const [hasScrolledPastHero, setHasScrolledPastHero] = useState(false);
