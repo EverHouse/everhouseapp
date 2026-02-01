@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.62.3",
+    date: "2026-02-01",
+    title: "Member Profile Drawer UX Improvements",
+    changes: [
+      "Fixed: Billing tab now scrolls fully to bottom - added extra padding so all content is accessible",
+      "Improved: Activity tab filters are now responsive - shows icons only on mobile, icons + text on larger screens",
+      "Improved: Filter buttons have better touch targets and spacing on mobile devices"
+    ]
+  },
+  {
     version: "9.62.2",
     date: "2026-02-01",
     title: "Billing Emails Now Handled by Stripe",
