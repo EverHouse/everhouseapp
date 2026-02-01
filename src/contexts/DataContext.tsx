@@ -440,7 +440,8 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   }, []);
 
   const refreshMembers = useCallback(async (): Promise<{ success: boolean; count: number }> => {
-    if (!actualUser || (actualUser.role !== 'admin' && actualUser.role !== 'staff')) {
+    const currentUser = actualUserRef.current;
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'staff')) {
       return { success: false, count: 0 };
     }
     
@@ -477,7 +478,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       console.error('Failed to refresh members from database:', err);
       return { success: false, count: 0 };
     }
-  }, [actualUser]);
+  }, []);
 
   // Paginated member fetching with local cache that grows as pages are fetched
   const fetchMembersPaginated = useCallback(async (options: FetchMembersOptions = {}): Promise<PaginatedMembersResponse> => {
