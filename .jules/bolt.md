@@ -1,0 +1,3 @@
+## 2025-05-22 - [Optimizing Dashboard Render Performance]
+**Learning:** The Member Dashboard in this app was performing massive data transformations (sorting, filtering across multiple data sources) on every single render. Additionally, it relied on "now" timestamps calculated in the render body, which changed every second/minute, effectively making any memoization attempt useless unless the time state was stabilized.
+**Action:** Use `useState` and `setInterval` to create a stable `currentDate`/`currentTime` state that updates at a reasonable interval (e.g., 60s). This provides a stable dependency for `useMemo` and allows optimizations to actually work across renders. Always use `Set` for O(1) lookups when filtering one list against another to avoid O(N*M) bottlenecks.
