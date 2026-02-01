@@ -63,7 +63,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     } else {
       document.documentElement.classList.remove('dark');
     }
-    // Note: theme-color meta tag is managed by App.tsx for route-specific colors
+    // Note: theme-color meta tag removed - iOS Safari shows page content behind translucent status bar
   }, [effectiveTheme]);
 
   return (

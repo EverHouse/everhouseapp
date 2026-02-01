@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.59.3",
+    date: "2026-02-01",
+    title: "iOS Safari Translucent Toolbar",
+    changes: [
+      "iOS Safari: Removed theme-color meta tag to enable translucent bottom toolbar (frosted glass effect)",
+      "iOS Safari: Green header now extends behind the status bar at top of screen",
+      "PWA: No changes - installed app continues to show solid green status bar via manifest"
+    ]
+  },
+  {
     version: "9.59.2",
     date: "2026-01-31",
     title: "URL Routing Cleanup",

@@ -502,38 +502,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   });
 
   useEffect(() => {
-    const metaThemeColor = document.getElementById('theme-color-meta');
-    const isMember = ['/dashboard', '/book', '/member-events', '/member-wellness', '/profile', '/updates', '/history'].some(path => location.pathname.startsWith(path));
-    const isAdmin = location.pathname.startsWith('/admin');
-    const isFullBleedPage = location.pathname === '/' || location.pathname === '/private-hire';
-    const isDark = (isAdmin || isMember) && effectiveTheme === 'dark';
-    
-    const updateThemeColor = (scrolledPastHero: boolean) => {
-      if (!metaThemeColor) return;
-      
-      let themeColor: string;
-      if (location.pathname === '/') {
-        // Landing page: dark hero at top, light content when scrolled
-        themeColor = scrolledPastHero ? '#F2F2EC' : '#1a1610';
-      } else if (location.pathname === '/private-hire') {
-        // Private hire: keep dark green theme throughout
-        themeColor = '#293515';
-      } else if (isDark) {
-        // Member/staff pages in dark mode
-        themeColor = '#0f120a';
-      } else {
-        // All other pages (light mode)
-        themeColor = '#F2F2EC';
-      }
-      metaThemeColor.setAttribute('content', themeColor);
-    };
-    
+    // Track scroll position for landing page hero effects
     if (location.pathname === '/') {
       const handleScroll = () => {
         const heroThreshold = window.innerHeight * 0.6;
         const scrolledPast = window.scrollY > heroThreshold;
         setHasScrolledPastHero(scrolledPast);
-        updateThemeColor(scrolledPast);
       };
       
       handleScroll();
@@ -541,9 +515,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       return () => window.removeEventListener('scroll', handleScroll);
     } else {
       setHasScrolledPastHero(false);
-      updateThemeColor(false);
     }
-  }, [location.pathname, effectiveTheme]);
+  }, [location.pathname]);
   
   const isMemberRoute = ['/dashboard', '/book', '/member-events', '/member-wellness', '/profile', '/updates', '/history'].some(path => location.pathname.startsWith(path));
   const isAdminRoute = location.pathname.startsWith('/admin');
@@ -556,31 +529,18 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isPublicPage = !isMemberRoute && !isAdminRoute;
   
   useEffect(() => {
-    // Safari toolbar color: public pages = light, member/staff = match theme
+    // Add page-specific classes for CSS styling
     const html = document.documentElement;
-    const metaThemeColor = document.getElementById('theme-color-meta');
     
     // Remove all page-specific classes first
     html.classList.remove('page-public', 'page-dark', 'page-light');
     
-    let themeColor: string;
     if (isPublicPage) {
-      // All public pages use light bone color
       html.classList.add('page-public');
-      themeColor = '#F2F2EC';
     } else if (isDarkTheme) {
-      // Member/staff portal in dark mode
       html.classList.add('page-dark');
-      themeColor = '#0f120a';
     } else {
-      // Member/staff portal in light mode
       html.classList.add('page-light');
-      themeColor = '#F2F2EC';
-    }
-    
-    // Update Safari theme-color meta tag
-    if (metaThemeColor) {
-      metaThemeColor.setAttribute('content', themeColor);
     }
   }, [isPublicPage, isDarkTheme]);
 
