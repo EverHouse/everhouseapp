@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useToast } from '../../Toast';
-import { getApiErrorMessage, getNetworkErrorMessage } from '../../../../utils/errorHandling';
+import { getApiErrorMessage, getNetworkErrorMessage } from '../../../utils/errorHandling';
 
 interface AddUserModalProps {
   isOpen: boolean;
