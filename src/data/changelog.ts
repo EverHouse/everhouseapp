@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.60.1",
+    date: "2026-02-01",
+    title: "Member Profile Drawer Polish",
+    changes: [
+      "Style: Member profile drawer now matches the elegant public menu style",
+      "Style: Drawer background extends beyond the screen edge for a premium feel",
+      "Style: Added curved corner on the top-left for softer appearance",
+      "Animation: Close button now rotates 90 degrees on hover for visual feedback"
+    ]
+  },
+  {
     version: "9.60.0",
     date: "2026-02-01",
     title: "Smart Data Caching: Faster Navigation & Reduced Loading",

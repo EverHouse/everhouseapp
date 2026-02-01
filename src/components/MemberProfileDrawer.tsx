@@ -849,10 +849,14 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
       />
       
       <div 
-        className={`fixed -right-4 top-0 bottom-0 w-full max-w-xl pr-4 ${isDark ? 'bg-[#1a1d15]' : 'bg-white'} shadow-2xl transform transition-transform duration-300 flex flex-col`}
+        className={`fixed top-0 w-full max-w-xl rounded-tl-[2rem] ${isDark ? 'bg-[#1a1d15]' : 'bg-white'} shadow-2xl transform transition-transform duration-300 flex flex-col overflow-hidden`}
         style={{ 
           animation: 'slideInRight 0.4s var(--spring-bounce)',
-          paddingTop: 'env(safe-area-inset-top, 0px)'
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          right: '-100px',
+          paddingRight: '100px',
+          bottom: '-100px',
+          height: 'calc(100% + 100px)'
         }}
       >
         <div 
@@ -877,9 +881,10 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
             </div>
             <button
               onClick={onClose}
-              className={`p-2 rounded-full transition-colors ${isDark ? 'hover:bg-white/10 text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`}
+              aria-label="Close drawer"
+              className={`w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:rotate-90 transition-transform duration-300 active:scale-90 ${isDark ? 'hover:bg-white/10 text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`}
             >
-              <span className="material-symbols-outlined">close</span>
+              <span className="material-symbols-outlined text-2xl">close</span>
             </button>
           </div>
 
