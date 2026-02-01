@@ -13,6 +13,22 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.61.0",
+    date: "2026-02-01",
+    title: "New User Drawer: Unified Member & Visitor Creation",
+    isMajor: true,
+    changes: [
+      "New: Staff can now add both members and day pass visitors from a single, unified drawer interface",
+      "New: Member creation includes tier selection, family groups with automatic discount calculation, and optional discount codes",
+      "New: Member payment supports immediate card charging or sending an activation link via email",
+      "New: Day pass visitor creation with integrated Stripe payment and automatic visitor record creation",
+      "New: 'Book Now' handoff - after creating a visitor, staff can immediately book a session with one click",
+      "Improved: Day passes are now properly tracked and redeemed when used for bookings",
+      "Improved: Replaced scattered modals with consistent right-side drawer experience",
+      "Technical: Added staff checkout endpoints for day pass purchases with transactional safety"
+    ]
+  },
+  {
     version: "9.60.5",
     date: "2026-02-01",
     title: "Comprehensive Error Handling Improvements",

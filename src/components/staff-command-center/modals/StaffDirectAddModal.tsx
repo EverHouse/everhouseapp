@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { MemberSearchInput, SelectedMember } from '../../shared/MemberSearchInput';
-import { getApiErrorMessage, getNetworkErrorMessage } from '@/utils/errorHandling';
+import { getApiErrorMessage, getNetworkErrorMessage } from '../../../../utils/errorHandling';
 
 interface StaffDirectAddModalProps {
   isOpen: boolean;

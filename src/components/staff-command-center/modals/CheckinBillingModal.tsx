@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useToast } from '../../Toast';
 import { StripePaymentForm } from '../../stripe/StripePaymentForm';
 import SlideUpDrawer from '../../SlideUpDrawer';
-import { getApiErrorMessage, getNetworkErrorMessage } from '@/utils/errorHandling';
+import { getApiErrorMessage, getNetworkErrorMessage } from '../../../../utils/errorHandling';
 
 function formatTime12Hour(time: string | undefined): string {
   if (!time) return '';

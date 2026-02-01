@@ -89,6 +89,8 @@ export const dayPassPurchases = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+    redeemedAt: timestamp("redeemed_at", { withTimezone: true }),
+    bookingId: integer("booking_id"),
   },
   (table) => [
     index("idx_day_pass_purchases_user_id").on(table.userId),

@@ -5,7 +5,7 @@ import Input from '../../components/Input';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useNavigationLoading } from '../../contexts/NavigationLoadingContext';
 import { AnimatedPage } from '../../components/motion';
-import { getApiErrorMessage, getNetworkErrorMessage } from '@/utils/errorHandling';
+import { getApiErrorMessage, getNetworkErrorMessage } from '../../utils/errorHandling';
 
 const Contact: React.FC = () => {
   const navigate = useNavigate();

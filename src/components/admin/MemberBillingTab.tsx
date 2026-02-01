@@ -8,7 +8,7 @@ import { CompedBillingSection } from './billing/CompedBillingSection';
 import { TierChangeWizard } from './billing/TierChangeWizard';
 import { TIER_NAMES } from '../../../shared/constants/tiers';
 import GroupBillingManager from './GroupBillingManager';
-import { getApiErrorMessage, getNetworkErrorMessage, extractApiError } from '@/utils/errorHandling';
+import { getApiErrorMessage, getNetworkErrorMessage, extractApiError } from '../../utils/errorHandling';
 
 interface GuestHistoryItem {
   id: number;

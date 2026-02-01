@@ -7,8 +7,9 @@ import { logFromRequest } from '../../core/auditLog';
 import { logAndRespond } from '../../core/logger';
 import { formatDateDisplayWithDay, formatTime12Hour } from '../../utils/dateUtils';
 import { db } from '../../db';
-import { resources } from '../../../shared/schema';
+import { resources, dayPassPurchases, passRedemptionLogs } from '../../../shared/schema';
 import { eq } from 'drizzle-orm';
+import { getSessionUser } from '../../types/session';
 
 const router = Router();
 
@@ -23,7 +24,9 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
       duration_minutes,
       declared_player_count,
       request_participants,
-      trackman_external_id
+      trackman_external_id,
+      dayPassPurchaseId,
+      paymentStatus
     } = req.body;
     
     if (!user_email || !request_date || !start_time || !duration_minutes) {
@@ -74,10 +77,52 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
         .filter((p: any) => p.email || p.userId);
     }
     
+    const isDayPassPayment = paymentStatus === 'Paid (Day Pass)' && dayPassPurchaseId;
+    const sessionUser = getSessionUser(req);
+    const staffEmail = sessionUser?.email || 'staff';
+    
     const client = await pool.connect();
     let row: any;
+    let dayPassRedeemed = false;
+    
     try {
       await client.query('BEGIN');
+      
+      if (isDayPassPayment) {
+        const dayPassResult = await client.query(
+          `SELECT id, purchaser_email, redeemed_at, status, remaining_uses, booking_id
+           FROM day_pass_purchases 
+           WHERE id = $1
+           FOR UPDATE`,
+          [dayPassPurchaseId]
+        );
+        
+        if (dayPassResult.rows.length === 0) {
+          await client.query('ROLLBACK');
+          client.release();
+          return res.status(404).json({ error: 'Day pass not found' });
+        }
+        
+        const dayPass = dayPassResult.rows[0];
+        
+        if (dayPass.purchaser_email.toLowerCase() !== user_email.toLowerCase()) {
+          await client.query('ROLLBACK');
+          client.release();
+          return res.status(403).json({ error: 'Day pass belongs to a different user' });
+        }
+        
+        if (dayPass.redeemed_at !== null || dayPass.booking_id !== null) {
+          await client.query('ROLLBACK');
+          client.release();
+          return res.status(400).json({ error: 'Day pass has already been redeemed' });
+        }
+        
+        if (dayPass.status === 'redeemed' || (dayPass.remaining_uses !== null && dayPass.remaining_uses <= 0)) {
+          await client.query('ROLLBACK');
+          client.release();
+          return res.status(400).json({ error: 'Day pass has already been used' });
+        }
+      }
       
       await client.query(
         `SELECT id FROM booking_requests 
@@ -106,6 +151,8 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
         }
       }
       
+      const bookingStatus = isDayPassPayment ? 'approved' : 'pending';
+      
       const insertResult = await client.query(
         `INSERT INTO booking_requests (
           user_email, user_name, resource_id, 
@@ -113,7 +160,7 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
           declared_player_count, request_participants,
           trackman_external_id, origin,
           status, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
         RETURNING *`,
         [
           user_email.toLowerCase(),
@@ -126,13 +173,38 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
           declared_player_count && declared_player_count >= 1 && declared_player_count <= 4 ? declared_player_count : null,
           sanitizedParticipants.length > 0 ? JSON.stringify(sanitizedParticipants) : '[]',
           trackman_external_id,
-          'staff_manual'
+          'staff_manual',
+          bookingStatus
         ]
       );
       
+      const dbRow = insertResult.rows[0];
+      const bookingId = dbRow.id;
+      
+      if (isDayPassPayment) {
+        await client.query(
+          `UPDATE day_pass_purchases 
+           SET redeemed_at = NOW(),
+               booking_id = $1,
+               status = 'redeemed',
+               remaining_uses = 0,
+               updated_at = NOW()
+           WHERE id = $2`,
+          [bookingId, dayPassPurchaseId]
+        );
+        
+        await client.query(
+          `INSERT INTO pass_redemption_logs (purchase_id, redeemed_by, location, notes)
+           VALUES ($1, $2, 'staff_manual_booking', $3)`,
+          [dayPassPurchaseId, staffEmail, `Redeemed via manual booking #${bookingId}`]
+        );
+        
+        dayPassRedeemed = true;
+        console.log(`[StaffManualBooking] Day pass ${dayPassPurchaseId} redeemed for booking ${bookingId}`);
+      }
+      
       await client.query('COMMIT');
       
-      const dbRow = insertResult.rows[0];
       row = {
         id: dbRow.id,
         userEmail: dbRow.user_email,
@@ -186,9 +258,10 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
     }
     
     const playerCount = declared_player_count && declared_player_count > 1 ? ` (${declared_player_count} players)` : '';
+    const dayPassNote = dayPassRedeemed ? ' [Day Pass]' : '';
     
     const staffTitle = 'Staff Manual Booking Created';
-    const staffMessage = `${row.userName || row.userEmail}${playerCount} - ${resourceName} on ${formattedDate} at ${formattedTime12h} for ${durationDisplay} (Trackman: ${trackman_external_id})`;
+    const staffMessage = `${row.userName || row.userEmail}${playerCount} - ${resourceName} on ${formattedDate} at ${formattedTime12h} for ${durationDisplay}${dayPassNote} (Trackman: ${trackman_external_id})`;
     
     res.status(201).json({
       id: row.id,
@@ -205,7 +278,9 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
       trackman_external_id: row.trackmanExternalId,
       origin: row.origin,
       created_at: row.createdAt,
-      updated_at: row.updatedAt
+      updated_at: row.updatedAt,
+      day_pass_redeemed: dayPassRedeemed,
+      day_pass_id: dayPassRedeemed ? dayPassPurchaseId : undefined
     });
     
     try {
@@ -229,7 +304,9 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
         origin: 'staff_manual',
         resource_id: row.resourceId,
         request_date: row.requestDate,
-        start_time: row.startTime
+        start_time: row.startTime,
+        day_pass_id: dayPassRedeemed ? dayPassPurchaseId : undefined,
+        payment_status: isDayPassPayment ? 'paid_day_pass' : undefined
       });
     } catch (postCommitError) {
       console.error('[StaffManualBooking] Post-commit operations failed:', postCommitError);

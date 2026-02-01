@@ -4,8 +4,11 @@ import { dayPassPurchases, membershipTiers } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 import { getStripeClient } from '../core/stripe/client';
 import { getOrCreateStripeCustomer } from '../core/stripe/customers';
+import { createPaymentIntent } from '../core/stripe';
 import { upsertVisitor, linkPurchaseToUser } from '../core/visitors/matchingService';
 import { checkoutRateLimiter } from '../middleware/rateLimiting';
+import { isStaffOrAdmin } from '../core/middleware';
+import { getSessionUser } from '../types/session';
 
 const router = Router();
 
@@ -250,6 +253,178 @@ router.post('/api/day-passes/confirm', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('[DayPasses] Error confirming payment:', error);
+    res.status(500).json({ error: 'Failed to confirm payment' });
+  }
+});
+
+/**
+ * POST /api/day-passes/staff-checkout
+ * Staff-initiated day pass purchase - creates payment intent for in-person payment
+ */
+router.post('/api/day-passes/staff-checkout', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { productSlug, email, firstName, lastName, phone, dob, notes } = req.body;
+    const sessionUser = getSessionUser(req);
+    const staffEmail = sessionUser?.email || 'staff';
+
+    if (!productSlug || !email || !firstName || !lastName) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: productSlug, email, firstName, lastName' 
+      });
+    }
+
+    const [product] = await db.select()
+      .from(membershipTiers)
+      .where(eq(membershipTiers.slug, productSlug))
+      .limit(1);
+
+    if (!product) {
+      return res.status(404).json({ error: `Product not found: ${productSlug}` });
+    }
+
+    if (product.productType !== 'one_time') {
+      return res.status(400).json({ error: 'This endpoint is for one-time purchases only' });
+    }
+
+    if (!product.priceCents || product.priceCents < 50) {
+      return res.status(400).json({ error: 'Invalid product price' });
+    }
+
+    const { customerId } = await getOrCreateStripeCustomer(
+      email,
+      email,
+      `${firstName} ${lastName}`
+    );
+
+    const result = await createPaymentIntent({
+      userId: email,
+      email,
+      memberName: `${firstName} ${lastName}`,
+      amountCents: product.priceCents,
+      purpose: 'one_time_purchase',
+      description: `Day Pass: ${product.name}`,
+      stripeCustomerId: customerId,
+      productName: product.name,
+      metadata: {
+        staffInitiated: 'true',
+        staffEmail,
+        purpose: 'day_pass',
+        product_slug: productSlug,
+        purchaser_email: email,
+        purchaser_first_name: firstName,
+        purchaser_last_name: lastName,
+        purchaser_phone: phone || '',
+        purchaser_dob: dob || '',
+        notes: notes || ''
+      }
+    });
+
+    console.log(`[DayPasses] Staff checkout initiated for ${productSlug}: $${(product.priceCents / 100).toFixed(2)} by ${staffEmail}`);
+
+    res.json({
+      clientSecret: result.clientSecret,
+      paymentIntentId: result.paymentIntentId,
+      customerId,
+      amountCents: product.priceCents,
+      productName: product.name
+    });
+  } catch (error: any) {
+    console.error('[DayPasses] Error creating staff checkout:', error);
+    res.status(500).json({ error: 'Failed to create payment' });
+  }
+});
+
+/**
+ * POST /api/day-passes/staff-checkout/confirm
+ * Confirm staff-initiated day pass payment and create the purchase record
+ */
+router.post('/api/day-passes/staff-checkout/confirm', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { paymentIntentId } = req.body;
+    const sessionUser = getSessionUser(req);
+    const staffEmail = sessionUser?.email || 'staff';
+
+    if (!paymentIntentId) {
+      return res.status(400).json({ error: 'Missing paymentIntentId' });
+    }
+
+    const stripe = await getStripeClient();
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+    if (paymentIntent.status !== 'succeeded') {
+      return res.status(400).json({ 
+        error: `Payment status is ${paymentIntent.status}, not succeeded` 
+      });
+    }
+
+    const metadata = paymentIntent.metadata || {};
+    const productSlug = metadata.product_slug;
+    const email = metadata.purchaser_email;
+    const firstName = metadata.purchaser_first_name;
+    const lastName = metadata.purchaser_last_name;
+    const phone = metadata.purchaser_phone;
+
+    if (!productSlug || !email) {
+      return res.status(400).json({ 
+        error: 'Missing required metadata: product_slug, purchaser_email' 
+      });
+    }
+
+    const existingPurchase = await db.select()
+      .from(dayPassPurchases)
+      .where(eq(dayPassPurchases.stripePaymentIntentId, paymentIntentId))
+      .limit(1);
+
+    if (existingPurchase.length > 0) {
+      console.log(`[DayPasses] Purchase already recorded for payment ${paymentIntentId}`);
+      return res.json({
+        success: true,
+        purchaseId: existingPurchase[0].id,
+        userId: existingPurchase[0].userId,
+        alreadyRecorded: true
+      });
+    }
+
+    const user = await upsertVisitor({
+      email,
+      firstName,
+      lastName,
+      phone
+    });
+
+    const [purchase] = await db
+      .insert(dayPassPurchases)
+      .values({
+        userId: user.id,
+        productType: productSlug,
+        amountCents: paymentIntent.amount,
+        quantity: 1,
+        stripePaymentIntentId: paymentIntentId,
+        stripeCustomerId: paymentIntent.customer as string,
+        purchaserEmail: email,
+        purchaserFirstName: firstName,
+        purchaserLastName: lastName,
+        purchaserPhone: phone,
+        source: 'staff',
+        purchasedAt: new Date()
+      })
+      .returning();
+
+    if (user.id) {
+      await linkPurchaseToUser(purchase.id, user.id);
+    }
+
+    console.log(`[DayPasses] Staff checkout confirmed: ${purchase.id} for ${productSlug}: $${(paymentIntent.amount / 100).toFixed(2)} by ${staffEmail}`);
+
+    res.json({
+      success: true,
+      purchaseId: purchase.id,
+      userId: user.id,
+      userName: `${firstName} ${lastName}`,
+      userEmail: email
+    });
+  } catch (error: any) {
+    console.error('[DayPasses] Error confirming staff checkout:', error);
     res.status(500).json({ error: 'Failed to confirm payment' });
   }
 });

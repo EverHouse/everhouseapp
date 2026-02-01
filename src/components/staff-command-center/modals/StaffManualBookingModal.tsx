@@ -39,6 +39,7 @@ interface StaffManualBookingModalProps {
   defaultResourceId?: number;
   defaultStartTime?: string;
   defaultDate?: string;
+  defaultHostMember?: SelectedMember | null;
 }
 
 function generateNotesText(
@@ -91,7 +92,8 @@ export function StaffManualBookingModal({
   onSubmit,
   defaultResourceId,
   defaultStartTime,
-  defaultDate
+  defaultDate,
+  defaultHostMember
 }: StaffManualBookingModalProps) {
   const [mode, setMode] = useState<'member' | 'lesson'>('member');
   const [step, setStep] = useState<1 | 2>(1);
@@ -121,7 +123,7 @@ export function StaffManualBookingModal({
     if (isOpen) {
       setMode('member');
       setStep(1);
-      setHostMember(null);
+      setHostMember(defaultHostMember ?? null);
       setParticipants([]);
       setNotesText('');
       setCopied(false);
@@ -148,7 +150,7 @@ export function StaffManualBookingModal({
         .catch(err => console.error('Failed to load resources:', err))
         .finally(() => setLoadingResources(false));
     }
-  }, [isOpen, defaultResourceId, defaultStartTime, defaultDate]);
+  }, [isOpen, defaultResourceId, defaultStartTime, defaultDate, defaultHostMember]);
 
   useEffect(() => {
     const additionalSlots = Math.max(0, playerCount - 1);

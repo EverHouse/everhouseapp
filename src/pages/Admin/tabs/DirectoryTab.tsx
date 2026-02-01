@@ -8,7 +8,7 @@ import { usePageReady } from '../../../contexts/PageReadyContext';
 import TierBadge from '../../../components/TierBadge';
 import TagBadge from '../../../components/TagBadge';
 import MemberProfileDrawer from '../../../components/MemberProfileDrawer';
-import { AddMemberModal } from '../../../components/staff-command-center/modals/AddMemberModal';
+import { NewUserDrawer } from '../../../components/staff-command-center/drawers/NewUserDrawer';
 import { DirectoryTabSkeleton } from '../../../components/skeletons';
 import { formatPhoneNumber } from '../../../utils/formatting';
 import { getTierColor, getTagColor } from '../../../utils/tierUtils';
@@ -1756,10 +1756,11 @@ const DirectoryTab: React.FC = () => {
                 onViewAs={() => { if (selectedMember) handleViewAs(selectedMember); }}
             />
 
-            <AddMemberModal
+            <NewUserDrawer
                 isOpen={addMemberModalOpen}
                 onClose={() => setAddMemberModalOpen(false)}
                 onSuccess={() => { setAddMemberModalOpen(false); refreshMembers(); }}
+                defaultMode="member"
             />
 
             {assignTierModalOpen && memberToAssignTier && createPortal(

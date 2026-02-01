@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import TierBadge from '../TierBadge';
 import { MemberSearchInput, SelectedMember } from '../shared/MemberSearchInput';
-import { getApiErrorMessage, getNetworkErrorMessage } from '@/utils/errorHandling';
+import { getApiErrorMessage, getNetworkErrorMessage } from '../../utils/errorHandling';
 
 interface FamilyMemberInfo {
   id: number;

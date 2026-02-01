@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ModalShell } from '../../ModalShell';
 import { useTheme } from '../../../contexts/ThemeContext';
-import { getApiErrorMessage, getNetworkErrorMessage } from '@/utils/errorHandling';
+import { getApiErrorMessage, getNetworkErrorMessage } from '../../../utils/errorHandling';
 
 interface Tier {
   id: number;

@@ -23,11 +23,12 @@ import { AlertsCard } from './sections/AlertsCard';
 import { QuickActionsGrid } from './sections/QuickActionsGrid';
 import { CheckinBillingModal } from './modals/CheckinBillingModal';
 import { CompleteRosterModal } from './modals/CompleteRosterModal';
-import { AddMemberModal } from './modals/AddMemberModal';
 import QrScannerModal from './modals/QrScannerModal';
 import { TrackmanBookingModal } from './modals/TrackmanBookingModal';
 import { TrackmanLinkModal } from './modals/TrackmanLinkModal';
 import { StaffManualBookingModal, type StaffManualBookingData } from './modals/StaffManualBookingModal';
+import { NewUserDrawer } from './drawers/NewUserDrawer';
+import type { SelectedMember } from '../shared/MemberSearchInput';
 import { SlideUpDrawer } from '../SlideUpDrawer';
 import { tabToPath } from '../../pages/Admin/layout/types';
 import type { StaffCommandCenterProps, BookingRequest, RecentActivity, TabType } from './types';
@@ -60,9 +61,11 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   const [fabOpen, setFabOpen] = useState(false);
   const [billingModal, setBillingModal] = useState<{ isOpen: boolean; bookingId: number | null }>({ isOpen: false, bookingId: null });
   const [rosterModal, setRosterModal] = useState<{ isOpen: boolean; bookingId: number | null }>({ isOpen: false, bookingId: null });
-  const [addMemberModalOpen, setAddMemberModalOpen] = useState(false);
+  const [newUserDrawerOpen, setNewUserDrawerOpen] = useState(false);
+  const [newUserDrawerMode, setNewUserDrawerMode] = useState<'member' | 'visitor'>('member');
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
   const [manualBookingModalOpen, setManualBookingModalOpen] = useState(false);
+  const [prefillHostMember, setPrefillHostMember] = useState<SelectedMember | null>(null);
   const [announcementDrawerOpen, setAnnouncementDrawerOpen] = useState(false);
   const [noticeDrawerOpen, setNoticeDrawerOpen] = useState(false);
   const [trackmanModal, setTrackmanModal] = useState<{ isOpen: boolean; booking: BookingRequest | null }>({ isOpen: false, booking: null });
@@ -670,7 +673,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
             today={today}
             variant="mobile-cards"
           />
-          <QuickActionsGrid isAdmin={isAdmin} variant="mobile" onNewMember={() => setAddMemberModalOpen(true)} onScanQr={() => setQrScannerOpen(true)} />
+          <QuickActionsGrid isAdmin={isAdmin} variant="mobile" onNewMember={() => setNewUserDrawerOpen(true)} onScanQr={() => setQrScannerOpen(true)} />
           
           <div className="mt-6 mb-8 text-center">
             <p className="text-primary/40 dark:text-white/40 text-[10px]">
@@ -756,7 +759,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
             <button
               onClick={() => { 
                 setFabOpen(false); 
-                setAddMemberModalOpen(true);
+                setNewUserDrawerMode('member');
+                setNewUserDrawerOpen(true);
               }}
               className="flex flex-col items-center gap-2 p-4 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-xl transition-colors"
             >
@@ -836,19 +840,37 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         onBillingRequired={(id) => setBillingModal({ isOpen: true, bookingId: id })}
       />
       
-      <AddMemberModal
-        isOpen={addMemberModalOpen}
-        onClose={() => setAddMemberModalOpen(false)}
-        onSuccess={() => refresh()}
-        onSelectExisting={(user) => {
-          refresh();
+      <NewUserDrawer
+        isOpen={newUserDrawerOpen}
+        onClose={() => {
+          setNewUserDrawerOpen(false);
+          setPrefillHostMember(null);
         }}
+        onSuccess={(userData) => {
+          refresh();
+          showToast(`${userData.mode === 'member' ? 'Member' : 'Visitor'} ${userData.name} created successfully`, 'success');
+        }}
+        onBookNow={(visitorData) => {
+          setPrefillHostMember({
+            id: visitorData.id,
+            email: visitorData.email,
+            name: visitorData.name,
+            tier: null,
+            membershipStatus: 'visitor'
+          });
+          setManualBookingModalOpen(true);
+        }}
+        defaultMode={newUserDrawerMode}
       />
 
       <StaffManualBookingModal
         isOpen={manualBookingModalOpen}
-        onClose={() => setManualBookingModalOpen(false)}
+        onClose={() => {
+          setManualBookingModalOpen(false);
+          setPrefillHostMember(null);
+        }}
         onSubmit={handleManualBookingSubmit}
+        defaultHostMember={prefillHostMember}
       />
 
       <AnnouncementFormDrawer

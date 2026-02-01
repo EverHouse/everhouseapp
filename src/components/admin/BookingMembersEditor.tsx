@@ -4,7 +4,7 @@ import { MemberSearchInput, SelectedMember } from '../shared/MemberSearchInput';
 import { useData } from '../../contexts/DataContext';
 import { useToast } from '../Toast';
 import { StripePaymentForm } from '../stripe/StripePaymentForm';
-import { getApiErrorMessage, getNetworkErrorMessage } from '@/utils/errorHandling';
+import { getApiErrorMessage, getNetworkErrorMessage } from '../../utils/errorHandling';
 
 interface BookingMember {
   id: number;
