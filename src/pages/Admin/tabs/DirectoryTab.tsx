@@ -479,8 +479,9 @@ const DirectoryTab: React.FC = () => {
     });
     
     const membersWithoutTierCount = useMemo(() => {
+        if (!Array.isArray(members)) return 0;
         return members.filter(m => 
-            (!m.role || m.role === 'member') && 
+            m && (!m.role || m.role === 'member') && 
             (!m.rawTier || m.rawTier.trim() === '')
         ).length;
     }, [members]);
@@ -612,19 +613,22 @@ const DirectoryTab: React.FC = () => {
 
     const currentMembers = memberTab === 'active' ? (members || []) : (formerMembers || []);
     
-    const regularMembers = useMemo(() => 
-        (currentMembers || []).filter(m => !m.role || m.role === 'member'), 
-        [currentMembers]
-    );
+    const regularMembers = useMemo(() => {
+        if (!Array.isArray(currentMembers)) return [];
+        return currentMembers.filter(m => m && (!m.role || m.role === 'member'));
+    }, [currentMembers]);
 
     const allTags = useMemo(() => {
         const tagSet = new Set<string>();
+        if (!Array.isArray(regularMembers)) return [];
         regularMembers.forEach(m => {
-            m.tags?.forEach(tag => {
-                if (typeof tag === 'string') {
-                    tagSet.add(tag);
-                }
-            });
+            if (m?.tags && Array.isArray(m.tags)) {
+                m.tags.forEach(tag => {
+                    if (typeof tag === 'string') {
+                        tagSet.add(tag);
+                    }
+                });
+            }
         });
         return Array.from(tagSet).sort();
     }, [regularMembers]);
