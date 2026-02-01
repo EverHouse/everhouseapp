@@ -118,7 +118,7 @@ export function NewUserDrawer({
 }: NewUserDrawerProps) {
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === 'dark';
-  const { setIsBottomNavVisible } = useBottomNav();
+  const { setDrawerOpen } = useBottomNav();
   const { showToast } = useToast();
   
   const [mode, setMode] = useState<Mode>(defaultMode);
@@ -141,13 +141,13 @@ export function NewUserDrawer({
 
   useEffect(() => {
     if (isOpen) {
-      setIsBottomNavVisible(false);
+      setDrawerOpen(true);
       fetchInitialData();
     } else {
-      setIsBottomNavVisible(true);
+      setDrawerOpen(false);
       resetForm();
     }
-  }, [isOpen, setIsBottomNavVisible]);
+  }, [isOpen, setDrawerOpen]);
 
   const resetForm = useCallback(() => {
     setMode(defaultMode);
@@ -190,9 +190,9 @@ export function NewUserDrawer({
   };
 
   const handleClose = useCallback(() => {
-    setIsBottomNavVisible(true);
+    setDrawerOpen(false);
     onClose();
-  }, [onClose, setIsBottomNavVisible]);
+  }, [onClose, setDrawerOpen]);
 
   const handleModeChange = (newMode: Mode) => {
     setMode(newMode);
