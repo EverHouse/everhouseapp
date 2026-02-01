@@ -12,6 +12,13 @@ export function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
+/**
+ * Extract request ID from API response headers
+ */
+export function getRequestId(response: Response): string | null {
+  return response.headers.get('X-Request-Id');
+}
+
 export interface ApiError {
   status?: number;
   message?: string;
@@ -108,4 +115,45 @@ export async function extractApiError(response: Response, context?: string): Pro
     // Response body is not JSON or already consumed
   }
   return getApiErrorMessage(response, context);
+}
+
+export interface ApiErrorDetails {
+  message: string;
+  requestId: string | null;
+  status: number;
+}
+
+/**
+ * Extract full error details including request ID for support purposes
+ */
+export async function extractApiErrorDetails(response: Response, context?: string): Promise<ApiErrorDetails> {
+  const requestId = getRequestId(response);
+  let message = getApiErrorMessage(response, context);
+  
+  try {
+    const body = await response.clone().json();
+    if (body.error && typeof body.error === 'string') {
+      message = body.error;
+    } else if (body.message && typeof body.message === 'string') {
+      message = body.message;
+    }
+  } catch {
+    // Response body is not JSON or already consumed
+  }
+  
+  return {
+    message,
+    requestId,
+    status: response.status
+  };
+}
+
+/**
+ * Log error with request ID for debugging
+ */
+export function logApiError(context: string, details: ApiErrorDetails): void {
+  console.error(`[${context}] ${details.message}`, {
+    status: details.status,
+    requestId: details.requestId
+  });
 }

@@ -101,7 +101,9 @@ export type AuditAction =
   | 'update_settings'
   | 'bulk_action'
   // Data cleanup actions
-  | 'placeholder_accounts_deleted';
+  | 'placeholder_accounts_deleted'
+  // Health check actions
+  | 'health_check_viewed';
 
 export type ActorType = 'staff' | 'member' | 'system';
 

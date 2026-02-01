@@ -8,6 +8,7 @@ import { getStripeClient } from '../core/stripe/client';
 import { getHubSpotClientWithFallback } from '../core/integrations';
 import { retryableHubSpotRequest } from '../core/hubspot/request';
 import { logFromRequest } from '../core/auditLog';
+import { getSystemHealth } from '../core/healthCheck';
 import type { Request } from 'express';
 
 const router = Router();
@@ -475,6 +476,26 @@ router.post('/api/data-integrity/placeholder-accounts/delete', isAdmin, async (r
   } catch (error: any) {
     if (!isProduction) console.error('[DataIntegrity] Placeholder delete error:', error);
     res.status(500).json({ error: 'Failed to delete placeholder accounts', details: error.message });
+  }
+});
+
+router.get('/api/data-integrity/health', isAdmin, async (req, res) => {
+  try {
+    const health = await getSystemHealth();
+    
+    logFromRequest(
+      req,
+      'health_check_viewed',
+      'system',
+      undefined,
+      'System Health Check',
+      { overall: health.overall }
+    );
+    
+    res.json({ success: true, health });
+  } catch (error: any) {
+    if (!isProduction) console.error('[DataIntegrity] Health check error:', error);
+    res.status(500).json({ error: 'Failed to check system health', details: error.message });
   }
 });
 
