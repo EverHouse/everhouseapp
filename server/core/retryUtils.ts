@@ -136,4 +136,37 @@ export async function withResendRetry<T>(
   });
 }
 
+export async function withHubSpotRetry<T>(
+  fn: () => Promise<T>,
+  operation: string,
+  retries: number = 3
+): Promise<T> {
+  return withRetry(fn, {
+    retries,
+    context: `HubSpot:${operation}`
+  });
+}
+
+export async function withStripeRetry<T>(
+  fn: () => Promise<T>,
+  operation: string,
+  retries: number = 2
+): Promise<T> {
+  return withRetry(fn, {
+    retries,
+    context: `Stripe:${operation}`
+  });
+}
+
+export async function withDatabaseRetry<T>(
+  fn: () => Promise<T>,
+  operation: string,
+  retries: number = 2
+): Promise<T> {
+  return withRetry(fn, {
+    retries,
+    context: `Database:${operation}`
+  });
+}
+
 export { AbortError };

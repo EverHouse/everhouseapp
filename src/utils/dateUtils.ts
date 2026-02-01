@@ -46,10 +46,6 @@ export function formatDateShort(dateStr: string): string {
   return formatDateLocal(dateStr, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-export function formatDateFull(dateStr: string): string {
-  return formatDateLocal(dateStr, { weekday: 'long', month: 'long', day: 'numeric' });
-}
-
 export function formatDateDisplay(dateStr: string): string {
   const cleanDate = dateStr.split('T')[0];
   const [, month, day] = cleanDate.split('-').map(Number);
@@ -126,12 +122,6 @@ export function addDaysToPacificDate(dateStr: string, days: number): string {
   const [year, month, day] = dateStr.split('-').map(Number);
   const date = new Date(Date.UTC(year, month - 1, day + days));
   return date.toISOString().split('T')[0];
-}
-
-export function compareDates(dateStr1: string, dateStr2: string): number {
-  const clean1 = dateStr1.split('T')[0];
-  const clean2 = dateStr2.split('T')[0];
-  return clean1.localeCompare(clean2);
 }
 
 export function formatDateDisplayWithDay(dateStr: string | null | undefined): string {

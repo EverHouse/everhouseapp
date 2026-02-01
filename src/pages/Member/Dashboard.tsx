@@ -9,7 +9,6 @@ import { useNavigationLoading } from '../../contexts/NavigationLoadingContext';
 import { useToast } from '../../components/Toast';
 import { bookingEvents } from '../../lib/bookingEvents';
 import GlassRow from '../../components/GlassRow';
-import DateButton from '../../components/DateButton';
 import WelcomeBanner from '../../components/WelcomeBanner';
 import { formatDateShort, getTodayString, getPacificHour, CLUB_TIMEZONE, formatDateTimePacific, formatMemberSince, formatTime12Hour, getNowTimePacific } from '../../utils/dateUtils';
 import { downloadICalFile } from '../../utils/icalUtils';
@@ -762,11 +761,6 @@ const Dashboard: React.FC = () => {
       return 'bg-brand-green text-white';
     }
     return 'bg-gray-400 text-gray-900';
-  };
-
-  const formatLastVisit = (dateStr: string | undefined) => {
-    if (!dateStr) return null;
-    return formatDateTimePacific(dateStr);
   };
 
   if (error) {
