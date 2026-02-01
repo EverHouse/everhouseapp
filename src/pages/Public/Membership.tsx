@@ -337,27 +337,23 @@ const MembershipOverview: React.FC = () => {
 
       <BackToTop threshold={200} />
 
-      {/* Sticky Mobile CTA - Green bar with bone safe area filler for Safari toolbar */}
+      {/* Sticky Mobile CTA - Bone background for Safari toolbar */}
       <div 
-        className="fixed bottom-0 left-0 right-0 md:hidden"
-        style={{ zIndex: 50 }}
+        className="fixed bottom-0 left-0 right-0 md:hidden bg-[#F2F2EC]"
+        style={{ 
+          zIndex: 50,
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+        }}
       >
-        {/* Green content area */}
-        <div className="bg-[#293515] px-4 pt-3 pb-4 border-t border-white/10">
+        <div className="px-4 py-3">
           <button 
             onClick={() => setShowApplicationForm(true)}
-            className="w-full max-w-md mx-auto py-4 px-6 rounded-2xl bg-[#F2F2EC] text-[#293515] font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity border border-[#F2F2EC]/80 shadow-[0_4px_16px_rgba(0,0,0,0.15)]"
+            className="w-full max-w-md mx-auto py-4 px-6 rounded-2xl bg-[#293515] text-white font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity shadow-[0_4px_16px_rgba(0,0,0,0.15)]"
           >
             Apply for Membership
             <span className="material-symbols-outlined text-lg">arrow_forward</span>
           </button>
         </div>
-        {/* Bone safe area filler for Safari translucent toolbar */}
-        <div 
-          className="bg-[#F2F2EC]" 
-          style={{ height: 'env(safe-area-inset-bottom, 0px)' }}
-          aria-hidden="true"
-        />
       </div>
     </div>
     </AnimatedPage>

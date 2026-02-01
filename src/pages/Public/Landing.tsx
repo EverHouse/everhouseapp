@@ -580,19 +580,19 @@ const Landing: React.FC = () => {
 
       <BackToTop threshold={200} />
 
-      {/* Sticky Mobile CTA */}
+      {/* Sticky Mobile CTA - with bone background for Safari toolbar */}
       <div 
-        className={`fixed bottom-0 left-0 right-0 md:hidden transition-all duration-300 ${
+        className={`fixed bottom-0 left-0 right-0 md:hidden bg-[#F2F2EC] transition-all duration-300 ${
           showStickyMobileCta 
             ? 'translate-y-0 opacity-100' 
             : 'translate-y-full opacity-0 pointer-events-none'
         }`}
         style={{ 
           zIndex: 'var(--z-sticky)',
-          paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)'
         }}
       >
-        <div className="mx-4 mb-2 backdrop-blur-xl bg-white/80 border border-white/60 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.15),inset_0_1px_1px_rgba(255,255,255,0.6)] p-3">
+        <div className="mx-4 my-2 backdrop-blur-xl bg-white/80 border border-white/60 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.15),inset_0_1px_1px_rgba(255,255,255,0.6)] p-3">
           <Link 
             to="/membership" 
             className="w-full py-3 rounded-xl bg-[#293515] text-white font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
