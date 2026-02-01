@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.62.1",
+    date: "2026-02-01",
+    title: "Resend Email Webhook Integration",
+    changes: [
+      "New: Resend webhook endpoint at /api/webhooks/resend for real-time email event tracking",
+      "New: Automatic bounce detection - member accounts are flagged when their emails bounce",
+      "New: Spam complaint handling - members who mark emails as spam are automatically unsubscribed from marketing",
+      "New: Email delivery events are logged for debugging and analytics",
+      "Technical: Added email_events table to track all email delivery status changes"
+    ]
+  },
+  {
     version: "9.62.0",
     date: "2026-02-01",
     title: "System Health Monitoring & Error Resilience",
