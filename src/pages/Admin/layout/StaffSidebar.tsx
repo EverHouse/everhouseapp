@@ -112,7 +112,7 @@ export const StaffSidebar: React.FC<StaffSidebarProps> = ({
   };
 
   const sidebarContent = (
-    <aside className="hidden lg:flex flex-col w-64 h-screen fixed left-0 top-0 bg-[#293515]" style={{ zIndex: 'var(--z-sidebar, 40)' }}>
+    <aside className="hidden lg:flex flex-col w-64 h-screen fixed left-0 top-0 bg-[#293515]" style={{ zIndex: 'var(--z-nav, 8500)' }}>
       <button 
         onClick={() => { startNavigation(); navigate('/'); }}
         className="flex items-center gap-3 px-4 py-5 flex-shrink-0 hover:opacity-80 transition-opacity w-full text-left"
