@@ -157,9 +157,12 @@ async function checkResend(): Promise<ServiceHealth> {
 
     const { latencyMs, error } = await checkWithTimeout(
       async () => {
-        const response = await fetch('https://api.resend.com/domains', {
+        const response = await fetch('https://api.resend.com/api-keys', {
           headers: { Authorization: `Bearer ${resendApiKey}` }
         });
+        if (response.status === 401) {
+          throw new Error('API key invalid or expired');
+        }
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
       },
