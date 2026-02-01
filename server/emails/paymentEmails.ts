@@ -1,4 +1,7 @@
 import { getResendClient } from '../utils/resend';
+import { logger } from '../core/logger';
+
+const BILLING_EMAILS_DISABLED = true;
 
 const CLUB_COLORS = {
   deepGreen: '#293515',
@@ -395,6 +398,10 @@ export async function sendPaymentReceiptEmail(
   email: string, 
   params: PaymentReceiptParams
 ): Promise<{ success: boolean; error?: string }> {
+  if (BILLING_EMAILS_DISABLED) {
+    logger.info('[Payment Receipt Email] SKIPPED - billing emails disabled, use Stripe instead', { extra: { email } });
+    return { success: true };
+  }
   try {
     const { client, fromEmail } = await getResendClient();
     
@@ -417,6 +424,10 @@ export async function sendPaymentFailedEmail(
   email: string, 
   params: PaymentFailedParams
 ): Promise<{ success: boolean; error?: string }> {
+  if (BILLING_EMAILS_DISABLED) {
+    logger.info('[Payment Failed Email] SKIPPED - billing emails disabled, use Stripe instead', { extra: { email } });
+    return { success: true };
+  }
   try {
     const { client, fromEmail } = await getResendClient();
     
@@ -439,6 +450,10 @@ export async function sendOutstandingBalanceEmail(
   email: string, 
   params: OutstandingBalanceParams
 ): Promise<{ success: boolean; error?: string }> {
+  if (BILLING_EMAILS_DISABLED) {
+    logger.info('[Outstanding Balance Email] SKIPPED - billing emails disabled, use Stripe instead', { extra: { email } });
+    return { success: true };
+  }
   try {
     const { client, fromEmail } = await getResendClient();
     
@@ -461,6 +476,10 @@ export async function sendFeeWaivedEmail(
   email: string, 
   params: FeeWaivedParams
 ): Promise<{ success: boolean; error?: string }> {
+  if (BILLING_EMAILS_DISABLED) {
+    logger.info('[Fee Waived Email] SKIPPED - billing emails disabled, use Stripe instead', { extra: { email } });
+    return { success: true };
+  }
   try {
     const { client, fromEmail } = await getResendClient();
     
