@@ -11,7 +11,7 @@ const getClientKey = (req: Request): string => {
 
 export const globalRateLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 300,
+  max: 600, // Increased from 300 - staff portal makes many parallel API calls
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: getClientKey,
@@ -24,6 +24,10 @@ export const globalRateLimiter = rateLimit({
     // Skip rate limiting for health checks and non-API routes
     // Non-API routes should not be rate limited (they are proxied or static assets)
     if (req.path === '/healthz' || req.path === '/api/health') {
+      return true;
+    }
+    // Skip rate limiting for session checks - needed for navigation
+    if (req.path === '/api/auth/session') {
       return true;
     }
     // Only rate limit /api/ routes - skip everything else
