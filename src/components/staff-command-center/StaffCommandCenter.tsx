@@ -164,7 +164,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   
   // Filter unmatched bookings - check is_unmatched flag OR null/placeholder emails
   const unmatchedBookings = data.todaysBookings.filter(b => {
-    if ((b as any).is_unmatched === true) return true;
+    if (b.is_unmatched === true) return true;
     
     // Also consider booking unmatched if user_email is null/empty or a placeholder
     const email = (b.user_email || '').toLowerCase();
@@ -523,8 +523,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
                 timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
                 matchedBookingId: Number(booking.id),
                 isRelink: false,
-                importedName: (booking as any).user_name || (booking as any).userName,
-                notes: (booking as any).notes || (booking as any).note
+                importedName: booking.user_name || undefined,
+                notes: booking.notes || undefined
               })}
               variant="desktop-top"
             />
@@ -568,8 +568,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
                 timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
                 matchedBookingId: Number(booking.id),
                 isRelink: false,
-                importedName: (booking as any).user_name || (booking as any).userName,
-                notes: (booking as any).notes || (booking as any).note
+                importedName: booking.user_name || undefined,
+                notes: booking.notes || undefined
               })}
               variant="desktop-bottom"
             />
@@ -656,8 +656,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
                 timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
                 matchedBookingId: Number(booking.id),
                 isRelink: false,
-                importedName: (booking as any).user_name || (booking as any).userName,
-                notes: (booking as any).notes || (booking as any).note
+                importedName: booking.user_name || undefined,
+                notes: booking.notes || undefined
               })}
             variant="mobile"
           />

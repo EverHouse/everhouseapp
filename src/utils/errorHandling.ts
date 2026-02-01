@@ -2,6 +2,16 @@
  * Shared error handling utilities for consistent, user-friendly error messages
  */
 
+/**
+ * Safely extract error message from unknown error type
+ * Use this instead of 'catch (error: any)' pattern
+ */
+export function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return String(error);
+}
+
 export interface ApiError {
   status?: number;
   message?: string;
