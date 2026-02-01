@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.61.3",
+    date: "2026-02-01",
+    title: "Directory Page Scroll Improvements",
+    changes: [
+      "Improved: Active and Former member tabs now use full-page scrolling instead of a contained scroll area",
+      "Improved: The entire page scrolls naturally based on the number of members displayed"
+    ]
+  },
+  {
     version: "9.61.2",
     date: "2026-02-01",
     title: "Navigation Bug Fix",
