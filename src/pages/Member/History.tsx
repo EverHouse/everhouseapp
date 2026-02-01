@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useData } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePageReady } from '../../contexts/PageReadyContext';
-import { apiRequest } from '../../lib/apiRequest';
+import { fetchWithCredentials } from '../../hooks/queries/useFetch';
 import TabButton from '../../components/TabButton';
 import SwipeablePage from '../../components/SwipeablePage';
 import PullToRefresh from '../../components/PullToRefresh';
@@ -45,52 +46,30 @@ const History: React.FC = () => {
   const { effectiveTheme } = useTheme();
   const { setPageReady } = usePageReady();
   const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const isDark = effectiveTheme === 'dark';
   
   const initialTab = searchParams.get('tab') === 'payments' ? 'payments' : 'visits';
   const [activeTab, setActiveTab] = useState<'visits' | 'payments'>(initialTab);
-  const [visits, setVisits] = useState<UnifiedVisit[]>([]);
-  const [purchases, setPurchases] = useState<UnifiedPurchase[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [payingInvoice, setPayingInvoice] = useState<UnifiedPurchase | null>(null);
 
-  const fetchVisits = useCallback(async () => {
-    if (!user?.email) return;
-    try {
-      const { ok, data } = await apiRequest<UnifiedVisit[]>(
-        `/api/my-visits?user_email=${encodeURIComponent(user.email)}`
-      );
-      if (ok && data) {
-        setVisits(data);
-      }
-    } catch (err) {
-      console.error('[History] Failed to fetch visits:', err);
-    }
-  }, [user?.email]);
+  const { data: visits = [], isLoading: visitsLoading, refetch: refetchVisits } = useQuery({
+    queryKey: ['my-visits', user?.email],
+    queryFn: () => fetchWithCredentials<UnifiedVisit[]>(
+      `/api/my-visits?user_email=${encodeURIComponent(user?.email || '')}`
+    ),
+    enabled: !!user?.email,
+  });
 
-  const fetchPurchases = useCallback(async () => {
-    if (!user?.email) return;
-    try {
-      const { ok, data } = await apiRequest<UnifiedPurchase[]>(
-        `/api/my-unified-purchases?user_email=${encodeURIComponent(user.email)}`
-      );
-      if (ok && data) {
-        setPurchases(data);
-      }
-    } catch (err) {
-      console.error('[History] Failed to fetch purchases:', err);
-    }
-  }, [user?.email]);
+  const { data: purchases = [], isLoading: purchasesLoading, refetch: refetchPurchases } = useQuery({
+    queryKey: ['my-purchases', user?.email],
+    queryFn: () => fetchWithCredentials<UnifiedPurchase[]>(
+      `/api/my-unified-purchases?user_email=${encodeURIComponent(user?.email || '')}`
+    ),
+    enabled: !!user?.email,
+  });
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    await Promise.all([fetchVisits(), fetchPurchases()]);
-    setIsLoading(false);
-  }, [fetchVisits, fetchPurchases]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const isLoading = visitsLoading || purchasesLoading;
 
   useEffect(() => {
     if (!isLoading) {
@@ -100,18 +79,18 @@ const History: React.FC = () => {
 
   useEffect(() => {
     const handleBillingUpdate = () => {
-      fetchPurchases();
+      queryClient.invalidateQueries({ queryKey: ['my-purchases', user?.email] });
     };
 
     window.addEventListener('billing-update', handleBillingUpdate);
     return () => {
       window.removeEventListener('billing-update', handleBillingUpdate);
     };
-  }, [fetchPurchases]);
+  }, [queryClient, user?.email]);
 
   const handleRefresh = useCallback(async () => {
-    await loadData();
-  }, [loadData]);
+    await Promise.all([refetchVisits(), refetchPurchases()]);
+  }, [refetchVisits, refetchPurchases]);
 
   const getRoleBadgeStyle = (role: string): string => {
     switch (role) {
@@ -445,7 +424,7 @@ const History: React.FC = () => {
           userName={user.name || user.email?.split('@')[0] || 'Member'}
           onSuccess={async () => {
             setPayingInvoice(null);
-            await fetchPurchases();
+            queryClient.invalidateQueries({ queryKey: ['my-purchases', user?.email] });
           }}
           onClose={() => setPayingInvoice(null)}
         />

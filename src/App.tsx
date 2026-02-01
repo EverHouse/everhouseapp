@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useContext, ErrorInfo, useMemo, useRef, lazy, Suspense, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { BrowserRouter, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './lib/queryClient';
 import { DataProvider, useData } from './contexts/DataContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { SmoothScrollProvider } from './components/motion/SmoothScroll';
@@ -789,34 +791,36 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const App: React.FC = () => {
   return (
     <ErrorBoundary>
-      <ThemeProvider>
-        <DataProvider>
-          <ToastProvider>
-          <BottomNavProvider>
-          <AnnouncementBadgeProvider>
-          <NavigationLoadingProvider>
-          <PageReadyProvider>
-          <InitialLoadingScreen>
-            <OfflineBanner />
-            <StaffBookingToast />
-            <UpdateNotification />
-            <BrowserRouter>
-              <NavigationLoader />
-              <SmoothScrollProvider>
-                <ScrollToTop />
-                <Layout>
-                  <AnimatedRoutes />
-                </Layout>
-              </SmoothScrollProvider>
-            </BrowserRouter>
-          </InitialLoadingScreen>
-          </PageReadyProvider>
-          </NavigationLoadingProvider>
-          </AnnouncementBadgeProvider>
-          </BottomNavProvider>
-          </ToastProvider>
-        </DataProvider>
-      </ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <DataProvider>
+            <ToastProvider>
+            <BottomNavProvider>
+            <AnnouncementBadgeProvider>
+            <NavigationLoadingProvider>
+            <PageReadyProvider>
+            <InitialLoadingScreen>
+              <OfflineBanner />
+              <StaffBookingToast />
+              <UpdateNotification />
+              <BrowserRouter>
+                <NavigationLoader />
+                <SmoothScrollProvider>
+                  <ScrollToTop />
+                  <Layout>
+                    <AnimatedRoutes />
+                  </Layout>
+                </SmoothScrollProvider>
+              </BrowserRouter>
+            </InitialLoadingScreen>
+            </PageReadyProvider>
+            </NavigationLoadingProvider>
+            </AnnouncementBadgeProvider>
+            </BottomNavProvider>
+            </ToastProvider>
+          </DataProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   );
 };

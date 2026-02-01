@@ -1,22 +1,29 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useData, CafeItem } from '../../../contexts/DataContext';
 import { usePageReady } from '../../../contexts/PageReadyContext';
 import ModalShell from '../../../components/ModalShell';
 import FloatingActionButton from '../../../components/FloatingActionButton';
+import { useCafeMenu, useUploadCafeImage, useSeedCafeMenu, useAddCafeItem, useUpdateCafeItem, useDeleteCafeItem } from '../../../hooks/queries/useCafeQueries';
+import type { CafeItem } from '../../../types/data';
 
 const CafeTab: React.FC = () => {
     const { setPageReady } = usePageReady();
-    const { cafeMenu, addCafeItem, updateCafeItem, deleteCafeItem, refreshCafeMenu } = useData();
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Queries and mutations
+    const { data: cafeMenu = [] } = useCafeMenu();
+    const uploadImageMutation = useUploadCafeImage();
+    const seedMenuMutation = useSeedCafeMenu();
+    const addItemMutation = useAddCafeItem();
+    const updateItemMutation = useUpdateCafeItem();
+    const deleteItemMutation = useDeleteCafeItem();
+
+    // Local state
     const categories = useMemo(() => ['All', ...Array.from(new Set(cafeMenu.map(item => item.category)))], [cafeMenu]);
     const [activeCategory, setActiveCategory] = useState('All');
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<string | null>(null);
     const [newItem, setNewItem] = useState<Partial<CafeItem>>({ category: 'Coffee & Drinks' });
-    const [isSeeding, setIsSeeding] = useState(false);
-    const [seedMessage, setSeedMessage] = useState<string | null>(null);
-    const [isUploading, setIsUploading] = useState(false);
     const [uploadResult, setUploadResult] = useState<{ originalSize: number; optimizedSize: number } | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -39,51 +46,27 @@ const CafeTab: React.FC = () => {
     };
 
     const handleImageUpload = async (file: File) => {
-        setIsUploading(true);
-        setUploadResult(null);
         try {
-            const formData = new FormData();
-            formData.append('image', file);
-            const res = await fetch('/api/admin/upload-image', {
-                method: 'POST',
-                credentials: 'include',
-                body: formData
-            });
-            if (!res.ok) throw new Error('Upload failed');
-            const data = await res.json();
+            const data = await uploadImageMutation.mutateAsync(file);
             setNewItem(prev => ({ ...prev, image: data.url }));
             setUploadResult({ originalSize: data.originalSize, optimizedSize: data.optimizedSize });
         } catch (err) {
             console.error('Upload error:', err);
-        } finally {
-            setIsUploading(false);
         }
     };
 
     const handleSeedMenu = async () => {
-        if (isSeeding) return;
-        setIsSeeding(true);
-        setSeedMessage(null);
         try {
-            const res = await fetch('/api/admin/seed-cafe', { method: 'POST', credentials: 'include' });
-            const data = await res.json();
-            if (res.ok) {
-                setSeedMessage(`${data.message}`);
-                if (refreshCafeMenu) refreshCafeMenu();
-            } else {
-                setSeedMessage(data.error || 'Failed to seed menu');
-            }
+            await seedMenuMutation.mutateAsync();
         } catch (err) {
-            setSeedMessage('Network error');
-        } finally {
-            setIsSeeding(false);
+            console.error('Seed menu error:', err);
         }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!newItem.name || newItem.price === undefined || newItem.price === null) return;
         
-        const item: CafeItem = {
+        const itemData: CafeItem = {
             id: editId || Math.random().toString(36).substr(2, 9),
             name: newItem.name,
             price: Number(newItem.price),
@@ -93,13 +76,27 @@ const CafeTab: React.FC = () => {
             image: newItem.image || ''
         };
 
-        if (editId) {
-            updateCafeItem(item);
-        } else {
-            addCafeItem(item);
+        try {
+            if (editId) {
+                await updateItemMutation.mutateAsync(itemData);
+            } else {
+                await addItemMutation.mutateAsync(itemData);
+            }
+            setIsEditing(false);
+        } catch (err) {
+            console.error('Save error:', err);
         }
-        setIsEditing(false);
     };
+
+    const handleDelete = async (id: string) => {
+        try {
+            await deleteItemMutation.mutateAsync(id);
+        } catch (err) {
+            console.error('Delete error:', err);
+        }
+    };
+
+    const isLoading = uploadImageMutation.isPending || seedMenuMutation.isPending || addItemMutation.isPending || updateItemMutation.isPending || deleteItemMutation.isPending;
 
     return (
         <div className="animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
@@ -108,19 +105,14 @@ const CafeTab: React.FC = () => {
                 {cafeMenu.length === 0 && (
                     <button 
                         onClick={handleSeedMenu} 
-                        disabled={isSeeding}
+                        disabled={seedMenuMutation.isPending}
                         className="bg-accent text-primary px-3 py-2 rounded-lg font-bold flex items-center gap-2 shadow-md text-xs whitespace-nowrap disabled:opacity-50"
                     >
-                        <span aria-hidden="true" className="material-symbols-outlined text-sm">{isSeeding ? 'sync' : 'database'}</span> 
-                        {isSeeding ? 'Seeding...' : 'Seed Menu'}
+                        <span aria-hidden="true" className="material-symbols-outlined text-sm">{seedMenuMutation.isPending ? 'sync' : 'database'}</span> 
+                        {seedMenuMutation.isPending ? 'Seeding...' : 'Seed Menu'}
                     </button>
                 )}
             </div>
-            {seedMessage && (
-                <div className="mb-4 p-3 bg-accent/20 text-primary dark:text-white rounded-lg text-sm">
-                    {seedMessage}
-                </div>
-            )}
             <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide -mx-1 px-1 mb-4 animate-slide-up-stagger scroll-fade-right" style={{ '--stagger-index': 2 } as React.CSSProperties}>
                 {categories.map(cat => (
                     <button
@@ -164,11 +156,11 @@ const CafeTab: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
-                                disabled={isUploading}
+                                disabled={uploadImageMutation.isPending}
                                 className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white rounded-xl font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition-colors disabled:opacity-50"
                             >
-                                <span aria-hidden="true" className="material-symbols-outlined text-lg">{isUploading ? 'sync' : 'upload'}</span>
-                                {isUploading ? 'Uploading...' : 'Upload'}
+                                <span aria-hidden="true" className="material-symbols-outlined text-lg">{uploadImageMutation.isPending ? 'sync' : 'upload'}</span>
+                                {uploadImageMutation.isPending ? 'Uploading...' : 'Upload'}
                             </button>
                             <input
                                 className="flex-1 border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-sm"
@@ -198,7 +190,7 @@ const CafeTab: React.FC = () => {
                     <textarea className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none" placeholder="Description" rows={3} value={newItem.desc || ''} onChange={e => setNewItem({...newItem, desc: e.target.value})} />
                     <div className="flex gap-3 justify-end pt-2">
                         <button onClick={() => setIsEditing(false)} className="px-5 py-2.5 text-gray-500 dark:text-white/80 font-bold hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition-colors">Cancel</button>
-                        <button onClick={handleSave} className="px-6 py-2.5 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary/90 transition-colors">Save</button>
+                        <button onClick={handleSave} disabled={isLoading} className="px-6 py-2.5 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary/90 transition-colors disabled:opacity-50">Save</button>
                     </div>
                 </div>
             </ModalShell>
@@ -213,7 +205,7 @@ const CafeTab: React.FC = () => {
                             <div className="flex items-center gap-2">
                                 <h4 className="font-bold text-gray-900 dark:text-white truncate flex-1">{item.name}</h4>
                                 <span className="font-bold text-primary dark:text-white whitespace-nowrap">${item.price}</span>
-                                <button onClick={(e) => { e.stopPropagation(); deleteCafeItem(item.id); }} className="w-8 h-8 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors flex-shrink-0">
+                                <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }} disabled={deleteItemMutation.isPending} className="w-8 h-8 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors flex-shrink-0 disabled:opacity-50">
                                     <span aria-hidden="true" className="material-symbols-outlined">delete</span>
                                 </button>
                             </div>

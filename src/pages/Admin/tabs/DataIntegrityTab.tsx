@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../../components/Toast';
 import { getCheckMetadata, sortBySeverity, CheckSeverity } from '../../../data/integrityCheckMetadata';
+import { fetchWithCredentials, postWithCredentials, deleteWithCredentials } from '../../../hooks/queries/useFetch';
 
 interface SyncComparisonData {
   field: string;
@@ -135,27 +137,26 @@ interface BulkIgnoreModalState {
   issues: IntegrityIssue[];
 }
 
+interface CachedResultsResponse {
+  hasCached: boolean;
+  results: IntegrityCheckResult[];
+  meta: IntegrityMeta;
+}
+
+interface IntegrityRunResponse {
+  results: IntegrityCheckResult[];
+  meta: IntegrityMeta;
+}
+
 const DataIntegrityTab: React.FC = () => {
   const { showToast } = useToast();
+  const queryClient = useQueryClient();
   
-  const [isRunning, setIsRunning] = useState(false);
-  const [isLoadingCached, setIsLoadingCached] = useState(true);
-  const [results, setResults] = useState<IntegrityCheckResult[]>([]);
-  const [meta, setMeta] = useState<IntegrityMeta | null>(null);
-  const [isCached, setIsCached] = useState(false);
   const [expandedChecks, setExpandedChecks] = useState<Set<string>>(new Set());
   const [selectedCheck, setSelectedCheck] = useState<string | null>(null);
   
-  const [calendarStatus, setCalendarStatus] = useState<CalendarStatusResponse | null>(null);
-  const [isLoadingCalendars, setIsLoadingCalendars] = useState(true);
   const [showCalendars, setShowCalendars] = useState(true);
-  
-  const [historyData, setHistoryData] = useState<HistoryData | null>(null);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [showHistory, setShowHistory] = useState(true);
-
-  const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
-  const [isLoadingAuditLog, setIsLoadingAuditLog] = useState(true);
   const [showActivityLog, setShowActivityLog] = useState(true);
 
   const [syncingIssues, setSyncingIssues] = useState<Set<string>>(new Set());
@@ -164,47 +165,34 @@ const DataIntegrityTab: React.FC = () => {
   const [bulkIgnoreModal, setBulkIgnoreModal] = useState<BulkIgnoreModalState>({ isOpen: false, checkName: '', issues: [] });
   const [ignoreDuration, setIgnoreDuration] = useState<'24h' | '1w' | '30d'>('24h');
   const [ignoreReason, setIgnoreReason] = useState<string>('');
-  const [isIgnoring, setIsIgnoring] = useState(false);
-  const [isBulkIgnoring, setIsBulkIgnoring] = useState(false);
-  const [ignoredIssues, setIgnoredIssues] = useState<IgnoredIssueEntry[]>([]);
   const [showIgnoredIssues, setShowIgnoredIssues] = useState(false);
-  const [isLoadingIgnored, setIsLoadingIgnored] = useState(false);
 
   const [showDataTools, setShowDataTools] = useState(true);
   const [resyncEmail, setResyncEmail] = useState('');
-  const [isResyncing, setIsResyncing] = useState(false);
   const [resyncResult, setResyncResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const [guestFeeStartDate, setGuestFeeStartDate] = useState('');
   const [guestFeeEndDate, setGuestFeeEndDate] = useState('');
   const [unlinkedGuestFees, setUnlinkedGuestFees] = useState<any[]>([]);
-  const [isLoadingGuestFees, setIsLoadingGuestFees] = useState(false);
   const [availableSessions, setAvailableSessions] = useState<any[]>([]);
   const [selectedFeeId, setSelectedFeeId] = useState<number | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
-  const [isLinkingFee, setIsLinkingFee] = useState(false);
 
   const [attendanceSearchDate, setAttendanceSearchDate] = useState('');
   const [attendanceSearchEmail, setAttendanceSearchEmail] = useState('');
   const [attendanceBookings, setAttendanceBookings] = useState<any[]>([]);
-  const [isSearchingAttendance, setIsSearchingAttendance] = useState(false);
   const [updatingAttendanceId, setUpdatingAttendanceId] = useState<number | null>(null);
   const [attendanceNote, setAttendanceNote] = useState('');
 
   const [mindbodyStartDate, setMindbodyStartDate] = useState('');
   const [mindbodyEndDate, setMindbodyEndDate] = useState('');
-  const [isRunningMindbodyImport, setIsRunningMindbodyImport] = useState(false);
   const [mindbodyResult, setMindbodyResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  const [isSyncingToHubspot, setIsSyncingToHubspot] = useState(false);
   const [hubspotSyncResult, setHubspotSyncResult] = useState<{ success: boolean; message: string; members?: any[]; dryRun?: boolean } | null>(null);
-  const [isCleaningMindbodyIds, setIsCleaningMindbodyIds] = useState(false);
   const [mindbodyCleanupResult, setMindbodyCleanupResult] = useState<{ success: boolean; message: string; toClean?: number; dryRun?: boolean } | null>(null);
 
-  // CSV Upload state
   const [firstVisitFile, setFirstVisitFile] = useState<File | null>(null);
   const [salesFile, setSalesFile] = useState<File | null>(null);
-  const [isUploadingCSV, setIsUploadingCSV] = useState(false);
   const [csvUploadResult, setCsvUploadResult] = useState<{
     success: boolean;
     message: string;
@@ -212,7 +200,6 @@ const DataIntegrityTab: React.FC = () => {
     sales?: { total: number; imported: number; skipped: number; matchedByEmail: number; matchedByPhone: number; matchedByName: number; unmatched: number };
   } | null>(null);
 
-  const [isReconciling, setIsReconciling] = useState(false);
   const [reconcileResult, setReconcileResult] = useState<{
     success: boolean;
     groupsChecked: number;
@@ -223,33 +210,21 @@ const DataIntegrityTab: React.FC = () => {
     errors: string[];
   } | null>(null);
 
-  const [isSyncingStripeMetadata, setIsSyncingStripeMetadata] = useState(false);
   const [stripeMetadataResult, setStripeMetadataResult] = useState<{ success: boolean; message: string; synced?: number; failed?: number } | null>(null);
-  const [isBackfillingStripeCache, setIsBackfillingStripeCache] = useState(false);
   const [stripeCacheResult, setStripeCacheResult] = useState<{ success: boolean; message: string; stats?: any } | null>(null);
 
   const [showSyncTools, setShowSyncTools] = useState(true);
-  const [isRunningSubscriptionSync, setIsRunningSubscriptionSync] = useState(false);
   const [subscriptionStatusResult, setSubscriptionStatusResult] = useState<{ success: boolean; message: string; totalChecked?: number; mismatchCount?: number; updated?: any[]; dryRun?: boolean } | null>(null);
-  const [isRunningOrphanedStripeCleanup, setIsRunningOrphanedStripeCleanup] = useState(false);
   const [orphanedStripeResult, setOrphanedStripeResult] = useState<{ success: boolean; message: string; totalChecked?: number; orphanedCount?: number; cleared?: any[]; dryRun?: boolean } | null>(null);
-  const [isRunningStripeHubspotLink, setIsRunningStripeHubspotLink] = useState(false);
   const [stripeHubspotLinkResult, setStripeHubspotLinkResult] = useState<{ success: boolean; message: string; stripeOnlyMembers?: any[]; hubspotOnlyMembers?: any[]; linkedCount?: number; dryRun?: boolean } | null>(null);
-  const [isRunningPaymentStatusSync, setIsRunningPaymentStatusSync] = useState(false);
   const [paymentStatusResult, setPaymentStatusResult] = useState<{ success: boolean; message: string; totalChecked?: number; updatedCount?: number; updates?: any[]; dryRun?: boolean } | null>(null);
-  const [isRunningVisitCountSync, setIsRunningVisitCountSync] = useState(false);
   const [visitCountResult, setVisitCountResult] = useState<{ success: boolean; message: string; mismatchCount?: number; updatedCount?: number; sampleMismatches?: any[]; dryRun?: boolean } | null>(null);
-  const [isRunningGhostBookingFix, setIsRunningGhostBookingFix] = useState(false);
   const [ghostBookingResult, setGhostBookingResult] = useState<{ success: boolean; message: string; ghostBookings?: number; fixed?: number; dryRun?: boolean } | null>(null);
-  const [isRunningDuplicateDetection, setIsRunningDuplicateDetection] = useState(false);
   const [duplicateDetectionResult, setDuplicateDetectionResult] = useState<{ success: boolean; message: string; appDuplicates?: any[]; hubspotDuplicates?: any[] } | null>(null);
   const [expandedDuplicates, setExpandedDuplicates] = useState<{ app: boolean; hubspot: boolean }>({ app: false, hubspot: false });
-  const [isRunningDealStageRemediation, setIsRunningDealStageRemediation] = useState(false);
   const [dealStageRemediationResult, setDealStageRemediationResult] = useState<{ success: boolean; message: string; total?: number; fixed?: number; dryRun?: boolean } | null>(null);
 
   const [showPlaceholderCleanup, setShowPlaceholderCleanup] = useState(true);
-  const [isLoadingPlaceholders, setIsLoadingPlaceholders] = useState(false);
-  const [isDeletingPlaceholders, setIsDeletingPlaceholders] = useState(false);
   const [placeholderAccounts, setPlaceholderAccounts] = useState<{
     stripeCustomers: Array<{ id: string; email: string; name: string | null; created: number }>;
     hubspotContacts: Array<{ id: string; email: string; name: string }>;
@@ -263,146 +238,674 @@ const DataIntegrityTab: React.FC = () => {
   } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const updateIssueCountOptimistically = (checkName: string, reduction: number) => {
-    setResults(prev => prev.map(result => {
-      if (result.checkName === checkName) {
-        const newCount = Math.max(0, result.issueCount - reduction);
-        return {
-          ...result,
-          issueCount: newCount,
-          status: newCount === 0 ? 'pass' : result.status
-        };
-      }
-      return result;
-    }));
-    
-    setMeta(prev => {
-      if (!prev) return prev;
-      const newErrors = Math.max(0, prev.errors - reduction);
-      const newTotalIssues = Math.max(0, prev.totalIssues - reduction);
-      return {
-        ...prev,
-        errors: newErrors,
-        totalIssues: newTotalIssues
-      };
-    });
-  };
+  // ==================== REACT QUERY HOOKS ====================
 
+  // Cached Results Query
+  const { 
+    data: cachedData, 
+    isLoading: isLoadingCached,
+    refetch: refetchCached
+  } = useQuery({
+    queryKey: ['data-integrity', 'cached'],
+    queryFn: () => fetchWithCredentials<CachedResultsResponse>('/api/data-integrity/cached'),
+  });
+
+  // Calendar Status Query
+  const { 
+    data: calendarStatus, 
+    isLoading: isLoadingCalendars 
+  } = useQuery({
+    queryKey: ['data-integrity', 'calendars'],
+    queryFn: () => fetchWithCredentials<CalendarStatusResponse>('/api/admin/calendars'),
+  });
+
+  // History Query
+  const { 
+    data: historyData, 
+    isLoading: isLoadingHistory 
+  } = useQuery({
+    queryKey: ['data-integrity', 'history'],
+    queryFn: () => fetchWithCredentials<HistoryData>('/api/data-integrity/history'),
+  });
+
+  // Audit Log Query
+  const { 
+    data: auditLog = [], 
+    isLoading: isLoadingAuditLog 
+  } = useQuery({
+    queryKey: ['data-integrity', 'audit-log'],
+    queryFn: () => fetchWithCredentials<AuditLogEntry[]>('/api/data-integrity/audit-log?limit=10'),
+  });
+
+  // Ignored Issues Query
+  const { 
+    data: ignoredIssues = [], 
+    isLoading: isLoadingIgnored 
+  } = useQuery({
+    queryKey: ['data-integrity', 'ignores'],
+    queryFn: () => fetchWithCredentials<IgnoredIssueEntry[]>('/api/data-integrity/ignores'),
+  });
+
+  // Derive results and meta from cached data or run results
+  const results = cachedData?.hasCached ? sortBySeverity(cachedData.results) : [];
+  const meta = cachedData?.meta || null;
+  const isCached = cachedData?.hasCached || false;
+
+  // Run Integrity Checks Mutation
+  const runIntegrityMutation = useMutation({
+    mutationFn: () => fetchWithCredentials<IntegrityRunResponse>('/api/data-integrity/run'),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['data-integrity', 'cached'], {
+        hasCached: true,
+        results: data.results,
+        meta: data.meta,
+      });
+      queryClient.invalidateQueries({ queryKey: ['data-integrity', 'history'] });
+      showToast('Integrity checks completed', 'success');
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'Failed to run integrity checks', 'error');
+    },
+  });
+
+  // Trigger run if no cached data
   useEffect(() => {
-    fetchCachedResults();
-    fetchCalendarStatus();
-    fetchHistory();
-    fetchAuditLog();
-    fetchIgnoredIssues();
-  }, []);
-
-  const fetchCachedResults = async () => {
-    try {
-      setIsLoadingCached(true);
-      const res = await fetch('/api/data-integrity/cached', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.hasCached) {
-          setResults(sortBySeverity(data.results));
-          setMeta(data.meta);
-          setIsCached(true);
-          setIsLoadingCached(false);
-        } else {
-          setIsLoadingCached(false);
-          runIntegrityChecks();
-        }
-      } else {
-        console.error('Cached results endpoint returned error, falling back to fresh run');
-        setIsLoadingCached(false);
-        runIntegrityChecks();
-      }
-    } catch (err) {
-      console.error('Failed to fetch cached results:', err);
-      setIsLoadingCached(false);
-      runIntegrityChecks();
+    if (cachedData && !cachedData.hasCached && !runIntegrityMutation.isPending) {
+      runIntegrityMutation.mutate();
     }
-  };
+  }, [cachedData]);
 
   // Real-time updates via WebSocket
   useEffect(() => {
     const handleDataIntegrityUpdate = (event: CustomEvent) => {
-      const { action, source } = event.detail || {};
-      console.log('[DataIntegrity] Real-time update received:', action, source);
+      const { action } = event.detail || {};
+      console.log('[DataIntegrity] Real-time update received:', action);
       
-      // Refresh the integrity checks when data changes elsewhere
       if (action === 'data_changed' || action === 'issue_resolved') {
-        runIntegrityChecks();
-        fetchHistory();
-        fetchAuditLog();
+        runIntegrityMutation.mutate();
+        queryClient.invalidateQueries({ queryKey: ['data-integrity', 'history'] });
+        queryClient.invalidateQueries({ queryKey: ['data-integrity', 'audit-log'] });
       }
     };
 
     window.addEventListener('data-integrity-update', handleDataIntegrityUpdate as EventListener);
-    
     return () => {
       window.removeEventListener('data-integrity-update', handleDataIntegrityUpdate as EventListener);
     };
-  }, []);
+  }, [queryClient]);
 
-  const fetchCalendarStatus = async () => {
-    try {
-      setIsLoadingCalendars(true);
-      const res = await fetch('/api/admin/calendars', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setCalendarStatus(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch calendar status:', err);
-    } finally {
-      setIsLoadingCalendars(false);
-    }
-  };
+  // Ignore Issue Mutation
+  const ignoreIssueMutation = useMutation({
+    mutationFn: (params: { issueKey: string; duration: string; reason: string }) => 
+      postWithCredentials<{ success: boolean }>('/api/data-integrity/ignore', {
+        issue_key: params.issueKey,
+        duration: params.duration,
+        reason: params.reason,
+      }),
+    onSuccess: () => {
+      showToast('Issue ignored successfully', 'success');
+      closeIgnoreModal();
+      queryClient.invalidateQueries({ queryKey: ['data-integrity', 'ignores'] });
+      runIntegrityMutation.mutate();
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'Failed to ignore issue', 'error');
+    },
+  });
 
-  const fetchHistory = async () => {
-    try {
-      setIsLoadingHistory(true);
-      const res = await fetch('/api/data-integrity/history', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setHistoryData(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch history:', err);
-    } finally {
-      setIsLoadingHistory(false);
-    }
-  };
+  // Unignore Issue Mutation
+  const unignoreIssueMutation = useMutation({
+    mutationFn: (issueKey: string) => 
+      deleteWithCredentials<{ success: boolean }>(`/api/data-integrity/ignore/${encodeURIComponent(issueKey)}`),
+    onSuccess: () => {
+      showToast('Issue un-ignored successfully', 'success');
+      queryClient.invalidateQueries({ queryKey: ['data-integrity', 'ignores'] });
+      runIntegrityMutation.mutate();
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'Failed to un-ignore issue', 'error');
+    },
+  });
 
-  const fetchAuditLog = async () => {
-    try {
-      setIsLoadingAuditLog(true);
-      const res = await fetch('/api/data-integrity/audit-log?limit=10', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setAuditLog(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch audit log:', err);
-    } finally {
-      setIsLoadingAuditLog(false);
-    }
-  };
+  // Bulk Ignore Mutation
+  const bulkIgnoreMutation = useMutation({
+    mutationFn: (params: { issueKeys: string[]; duration: string; reason: string }) => 
+      postWithCredentials<{ total: number }>('/api/data-integrity/ignore-bulk', {
+        issue_keys: params.issueKeys,
+        duration: params.duration,
+        reason: params.reason,
+      }),
+    onSuccess: (data) => {
+      showToast(`${data.total} issues excluded successfully`, 'success');
+      closeBulkIgnoreModal();
+      queryClient.invalidateQueries({ queryKey: ['data-integrity', 'ignores'] });
+      runIntegrityMutation.mutate();
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'Failed to exclude issues', 'error');
+    },
+  });
 
-  const fetchIgnoredIssues = async () => {
-    try {
-      setIsLoadingIgnored(true);
-      const res = await fetch('/api/data-integrity/ignores', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setIgnoredIssues(data);
+  // Sync Push Mutation
+  const syncPushMutation = useMutation({
+    mutationFn: (params: { issueKey: string; target: string; userId?: number; hubspotContactId?: string }) => 
+      postWithCredentials<{ message: string }>('/api/data-integrity/sync-push', params),
+    onSuccess: (data, variables) => {
+      setSyncingIssues(prev => {
+        const next = new Set(prev);
+        next.delete(variables.issueKey);
+        return next;
+      });
+      showToast(data.message || 'Successfully pushed to external system', 'success');
+      runIntegrityMutation.mutate();
+    },
+    onError: (err: Error, variables) => {
+      setSyncingIssues(prev => {
+        const next = new Set(prev);
+        next.delete(variables.issueKey);
+        return next;
+      });
+      showToast(err.message || 'Failed to push sync', 'error');
+    },
+  });
+
+  // Sync Pull Mutation
+  const syncPullMutation = useMutation({
+    mutationFn: (params: { issueKey: string; target: string; userId?: number; hubspotContactId?: string }) => 
+      postWithCredentials<{ message: string }>('/api/data-integrity/sync-pull', params),
+    onSuccess: (data, variables) => {
+      setSyncingIssues(prev => {
+        const next = new Set(prev);
+        next.delete(variables.issueKey);
+        return next;
+      });
+      showToast(data.message || 'Successfully pulled from external system', 'success');
+      runIntegrityMutation.mutate();
+    },
+    onError: (err: Error, variables) => {
+      setSyncingIssues(prev => {
+        const next = new Set(prev);
+        next.delete(variables.issueKey);
+        return next;
+      });
+      showToast(err.message || 'Failed to pull sync', 'error');
+    },
+  });
+
+  // Resync Member Mutation
+  const resyncMemberMutation = useMutation({
+    mutationFn: (email: string) => 
+      postWithCredentials<{ message: string }>('/api/data-tools/resync-member', { email }),
+    onSuccess: (data) => {
+      setResyncResult({ success: true, message: data.message });
+      showToast(data.message, 'success');
+      setResyncEmail('');
+    },
+    onError: (err: Error) => {
+      setResyncResult({ success: false, message: err.message || 'Failed to resync member' });
+      showToast(err.message || 'Failed to resync member', 'error');
+    },
+  });
+
+  // Reconcile Group Billing Mutation
+  const reconcileGroupBillingMutation = useMutation({
+    mutationFn: () => 
+      postWithCredentials<{
+        success: boolean;
+        groupsChecked: number;
+        membersDeactivated: number;
+        membersReactivated: number;
+        membersCreated: number;
+        itemsRelinked: number;
+        errors: string[];
+      }>('/api/group-billing/reconcile', {}),
+    onSuccess: (data) => {
+      setReconcileResult(data);
+      const summary = `Checked ${data.groupsChecked} groups. Deactivated: ${data.membersDeactivated}, Reactivated: ${data.membersReactivated}, Created: ${data.membersCreated}, Relinked: ${data.itemsRelinked}`;
+      showToast(summary, data.success ? 'success' : 'info');
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'Failed to reconcile group billing', 'error');
+    },
+  });
+
+  // Search Unlinked Guest Fees Mutation
+  const searchGuestFeesMutation = useMutation({
+    mutationFn: (params: { startDate: string; endDate: string }) => 
+      fetchWithCredentials<any[]>(`/api/data-tools/unlinked-guest-fees?startDate=${params.startDate}&endDate=${params.endDate}`),
+    onSuccess: (data) => {
+      setUnlinkedGuestFees(data);
+    },
+    onError: () => {
+      showToast('Failed to search guest fees', 'error');
+    },
+  });
+
+  // Load Sessions For Fee Mutation
+  const loadSessionsMutation = useMutation({
+    mutationFn: (params: { date: string; memberEmail: string }) => 
+      fetchWithCredentials<any[]>(`/api/data-tools/available-sessions?date=${params.date}&memberEmail=${params.memberEmail || ''}`),
+    onSuccess: (data) => {
+      setAvailableSessions(data);
+    },
+    onError: () => {
+      console.error('Failed to load sessions');
+    },
+  });
+
+  // Link Guest Fee Mutation
+  const linkGuestFeeMutation = useMutation({
+    mutationFn: (params: { guestFeeId: number; bookingId: number }) => 
+      postWithCredentials<{ success: boolean }>('/api/data-tools/link-guest-fee', params),
+    onSuccess: () => {
+      showToast('Guest fee linked successfully', 'success');
+      setUnlinkedGuestFees(prev => prev.filter(f => f.id !== selectedFeeId));
+      setSelectedFeeId(null);
+      setSelectedSessionId(null);
+      setAvailableSessions([]);
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'Failed to link guest fee', 'error');
+    },
+  });
+
+  // Search Attendance Mutation
+  const searchAttendanceMutation = useMutation({
+    mutationFn: (params: { date?: string; memberEmail?: string }) => {
+      const searchParams = new URLSearchParams();
+      if (params.date) searchParams.append('date', params.date);
+      if (params.memberEmail) searchParams.append('memberEmail', params.memberEmail);
+      return fetchWithCredentials<any[]>(`/api/data-tools/bookings-search?${searchParams.toString()}`);
+    },
+    onSuccess: (data) => {
+      setAttendanceBookings(data);
+    },
+    onError: () => {
+      showToast('Failed to search bookings', 'error');
+    },
+  });
+
+  // Update Attendance Mutation
+  const updateAttendanceMutation = useMutation({
+    mutationFn: (params: { bookingId: number; attendanceStatus: string; notes: string }) => 
+      postWithCredentials<{ success: boolean }>('/api/data-tools/update-attendance', params),
+    onSuccess: (_, variables) => {
+      showToast(`Attendance updated to ${variables.attendanceStatus}`, 'success');
+      setAttendanceBookings(prev => prev.map(b => 
+        b.id === variables.bookingId 
+          ? { ...b, reconciliationStatus: variables.attendanceStatus, reconciliationNotes: variables.notes } 
+          : b
+      ));
+      setAttendanceNote('');
+      setUpdatingAttendanceId(null);
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'Failed to update attendance', 'error');
+      setUpdatingAttendanceId(null);
+    },
+  });
+
+  // Mindbody Reimport Mutation
+  const mindbodyReimportMutation = useMutation({
+    mutationFn: (params: { startDate: string; endDate: string }) => 
+      postWithCredentials<{ message: string }>('/api/data-tools/mindbody-reimport', params),
+    onSuccess: (data) => {
+      setMindbodyResult({ success: true, message: data.message });
+      showToast(data.message, 'success');
+    },
+    onError: (err: Error) => {
+      setMindbodyResult({ success: false, message: err.message || 'Failed to queue reimport' });
+      showToast(err.message || 'Failed to queue reimport', 'error');
+    },
+  });
+
+  // CSV Upload Mutation
+  const csvUploadMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      const response = await fetch('/api/legacy-purchases/admin/upload-csv', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Import failed');
       }
-    } catch (err) {
-      console.error('Failed to fetch ignored issues:', err);
-    } finally {
-      setIsLoadingIgnored(false);
-    }
-  };
+      return response.json();
+    },
+    onSuccess: (data) => {
+      const importedCount = data.results?.sales?.imported || 0;
+      const linkedCount = data.results?.firstVisit?.linked || 0;
+      setCsvUploadResult({
+        success: true,
+        message: `Import complete! ${importedCount} sales imported, ${linkedCount} clients linked.`,
+        firstVisit: data.results?.firstVisit,
+        sales: data.results?.sales,
+      });
+      showToast(`Successfully imported ${importedCount} sales records`, 'success');
+      setFirstVisitFile(null);
+      setSalesFile(null);
+    },
+    onError: (err: Error) => {
+      setCsvUploadResult({ success: false, message: err.message || 'Import failed' });
+      showToast(err.message || 'Failed to upload CSV files', 'error');
+    },
+  });
+
+  // Sync Stripe Metadata Mutation
+  const syncStripeMetadataMutation = useMutation({
+    mutationFn: () => 
+      postWithCredentials<{ message: string; synced?: number; failed?: number }>('/api/data-integrity/sync-stripe-metadata', {}),
+    onSuccess: (data) => {
+      setStripeMetadataResult({ success: true, message: data.message, synced: data.synced, failed: data.failed });
+      showToast(data.message, 'success');
+    },
+    onError: (err: Error) => {
+      setStripeMetadataResult({ success: false, message: err.message || 'Failed to sync metadata' });
+      showToast(err.message || 'Failed to sync metadata', 'error');
+    },
+  });
+
+  // Backfill Stripe Cache Mutation
+  const backfillStripeCacheMutation = useMutation({
+    mutationFn: () => 
+      postWithCredentials<{ stats?: any }>('/api/financials/backfill-stripe-cache', {}),
+    onSuccess: (data) => {
+      const msg = `Backfilled ${data.stats?.paymentIntents || 0} payments, ${data.stats?.charges || 0} charges, ${data.stats?.invoices || 0} invoices`;
+      setStripeCacheResult({ success: true, message: msg, stats: data.stats });
+      showToast(msg, 'success');
+    },
+    onError: (err: Error) => {
+      setStripeCacheResult({ success: false, message: err.message || 'Failed to backfill cache' });
+      showToast(err.message || 'Failed to backfill cache', 'error');
+    },
+  });
+
+  // Sync Members to HubSpot Mutation
+  const syncMembersToHubspotMutation = useMutation({
+    mutationFn: (dryRun: boolean) => 
+      postWithCredentials<{ message: string; members?: any[]; syncedCount?: number }>('/api/data-tools/sync-members-to-hubspot', { dryRun }),
+    onSuccess: (data, dryRun) => {
+      setHubspotSyncResult({ 
+        success: true, 
+        message: data.message,
+        members: data.members,
+        dryRun
+      });
+      showToast(dryRun ? 'Preview complete - no changes made' : data.message, dryRun ? 'info' : 'success');
+      if (!dryRun && data.syncedCount && data.syncedCount > 0) {
+        runIntegrityMutation.mutate();
+      }
+    },
+    onError: (err: Error) => {
+      setHubspotSyncResult({ success: false, message: err.message || 'Failed to sync to HubSpot' });
+      showToast(err.message || 'Failed to sync to HubSpot', 'error');
+    },
+  });
+
+  // Cleanup Mindbody IDs Mutation
+  const cleanupMindbodyIdsMutation = useMutation({
+    mutationFn: (dryRun: boolean) => 
+      postWithCredentials<{ message: string; toClean?: number }>('/api/data-tools/cleanup-mindbody-ids', { dryRun }),
+    onSuccess: (data, dryRun) => {
+      setMindbodyCleanupResult({ 
+        success: true, 
+        message: data.message,
+        toClean: data.toClean,
+        dryRun
+      });
+      showToast(dryRun ? 'Preview complete - no changes made' : data.message, dryRun ? 'info' : 'success');
+    },
+    onError: (err: Error) => {
+      setMindbodyCleanupResult({ success: false, message: err.message || 'Failed to cleanup Mind Body IDs' });
+      showToast(err.message || 'Failed to cleanup Mind Body IDs', 'error');
+    },
+  });
+
+  // Sync Subscription Status Mutation
+  const syncSubscriptionStatusMutation = useMutation({
+    mutationFn: (dryRun: boolean) => 
+      postWithCredentials<{ message?: string; totalChecked?: number; mismatchCount?: number; updated?: any[]; updatedCount?: number }>('/api/data-tools/sync-subscription-status', { dryRun }),
+    onSuccess: (data, dryRun) => {
+      setSubscriptionStatusResult({
+        success: true,
+        message: data.message || `Checked ${data.totalChecked} members, found ${data.mismatchCount} mismatches`,
+        totalChecked: data.totalChecked,
+        mismatchCount: data.mismatchCount,
+        updated: data.updated,
+        dryRun
+      });
+      showToast(dryRun ? 'Preview complete - no changes made' : (data.message || 'Subscription status sync complete'), dryRun ? 'info' : 'success');
+      if (!dryRun && data.updatedCount && data.updatedCount > 0) {
+        runIntegrityMutation.mutate();
+      }
+    },
+    onError: (err: Error) => {
+      setSubscriptionStatusResult({ success: false, message: err.message || 'Failed to sync subscription status' });
+      showToast(err.message || 'Failed to sync subscription status', 'error');
+    },
+  });
+
+  // Clear Orphaned Stripe IDs Mutation
+  const clearOrphanedStripeIdsMutation = useMutation({
+    mutationFn: (dryRun: boolean) => 
+      postWithCredentials<{ message?: string; totalChecked?: number; orphanedCount?: number; cleared?: any[]; clearedCount?: number }>('/api/data-tools/clear-orphaned-stripe-ids', { dryRun }),
+    onSuccess: (data, dryRun) => {
+      setOrphanedStripeResult({
+        success: true,
+        message: data.message || `Found ${data.orphanedCount} orphaned Stripe IDs`,
+        totalChecked: data.totalChecked,
+        orphanedCount: data.orphanedCount,
+        cleared: data.cleared,
+        dryRun
+      });
+      showToast(dryRun ? 'Preview complete - no changes made' : (data.message || 'Orphaned Stripe IDs cleared'), dryRun ? 'info' : 'success');
+      if (!dryRun && data.clearedCount && data.clearedCount > 0) {
+        runIntegrityMutation.mutate();
+      }
+    },
+    onError: (err: Error) => {
+      setOrphanedStripeResult({ success: false, message: err.message || 'Failed to clear orphaned Stripe IDs' });
+      showToast(err.message || 'Failed to clear orphaned Stripe IDs', 'error');
+    },
+  });
+
+  // Link Stripe HubSpot Mutation
+  const linkStripeHubspotMutation = useMutation({
+    mutationFn: (dryRun: boolean) => 
+      postWithCredentials<{ message?: string; stripeOnlyMembers?: any[]; hubspotOnlyMembers?: any[]; linkedCount?: number }>('/api/data-tools/link-stripe-hubspot', { dryRun }),
+    onSuccess: (data, dryRun) => {
+      setStripeHubspotLinkResult({
+        success: true,
+        message: data.message || 'Stripe-HubSpot link complete',
+        stripeOnlyMembers: data.stripeOnlyMembers,
+        hubspotOnlyMembers: data.hubspotOnlyMembers,
+        linkedCount: data.linkedCount,
+        dryRun
+      });
+      showToast(dryRun ? 'Preview complete - no changes made' : (data.message || 'Stripe-HubSpot link complete'), dryRun ? 'info' : 'success');
+    },
+    onError: (err: Error) => {
+      setStripeHubspotLinkResult({ success: false, message: err.message || 'Failed to link Stripe and HubSpot' });
+      showToast(err.message || 'Failed to link Stripe and HubSpot', 'error');
+    },
+  });
+
+  // Sync Payment Status Mutation
+  const syncPaymentStatusMutation = useMutation({
+    mutationFn: (dryRun: boolean) => 
+      postWithCredentials<{ message?: string; totalChecked?: number; updatedCount?: number; updates?: any[] }>('/api/data-tools/sync-payment-status', { dryRun }),
+    onSuccess: (data, dryRun) => {
+      setPaymentStatusResult({
+        success: true,
+        message: data.message || `Checked ${data.totalChecked} members, updated ${data.updatedCount}`,
+        totalChecked: data.totalChecked,
+        updatedCount: data.updatedCount,
+        updates: data.updates,
+        dryRun
+      });
+      showToast(dryRun ? 'Preview complete - no changes made' : (data.message || 'Payment status sync complete'), dryRun ? 'info' : 'success');
+    },
+    onError: (err: Error) => {
+      setPaymentStatusResult({ success: false, message: err.message || 'Failed to sync payment status' });
+      showToast(err.message || 'Failed to sync payment status', 'error');
+    },
+  });
+
+  // Sync Visit Counts Mutation
+  const syncVisitCountsMutation = useMutation({
+    mutationFn: (dryRun: boolean) => 
+      postWithCredentials<{ message?: string; mismatchCount?: number; updatedCount?: number; sampleMismatches?: any[] }>('/api/data-tools/sync-visit-counts', { dryRun }),
+    onSuccess: (data, dryRun) => {
+      setVisitCountResult({
+        success: true,
+        message: data.message || `Found ${data.mismatchCount} mismatches, updated ${data.updatedCount}`,
+        mismatchCount: data.mismatchCount,
+        updatedCount: data.updatedCount,
+        sampleMismatches: data.sampleMismatches,
+        dryRun
+      });
+      showToast(dryRun ? 'Preview complete - no changes made' : (data.message || 'Visit count sync complete'), dryRun ? 'info' : 'success');
+    },
+    onError: (err: Error) => {
+      setVisitCountResult({ success: false, message: err.message || 'Failed to sync visit counts' });
+      showToast(err.message || 'Failed to sync visit counts', 'error');
+    },
+  });
+
+  // Fix Ghost Bookings Mutation (preview)
+  const previewGhostBookingsMutation = useMutation({
+    mutationFn: () => fetchWithCredentials<{ message?: string; totalCount?: number }>('/api/admin/backfill-sessions/preview'),
+    onSuccess: (data) => {
+      setGhostBookingResult({
+        success: true,
+        message: data.message || `Found ${data.totalCount} bookings without sessions`,
+        ghostBookings: data.totalCount,
+        fixed: 0,
+        dryRun: true
+      });
+      showToast('Preview complete - no changes made', 'info');
+    },
+    onError: (err: Error) => {
+      setGhostBookingResult({ success: false, message: err.message || 'Failed to preview' });
+      showToast(err.message || 'Failed to preview', 'error');
+    },
+  });
+
+  // Fix Ghost Bookings Mutation (execute)
+  const fixGhostBookingsMutation = useMutation({
+    mutationFn: () => postWithCredentials<{ message?: string; sessionsCreated?: number }>('/api/admin/backfill-sessions', {}),
+    onSuccess: (data) => {
+      setGhostBookingResult({
+        success: true,
+        message: data.message || `Created ${data.sessionsCreated} sessions`,
+        ghostBookings: data.sessionsCreated,
+        fixed: data.sessionsCreated,
+        dryRun: false
+      });
+      showToast(data.message || `Created ${data.sessionsCreated} sessions`, 'success');
+      if (data.sessionsCreated && data.sessionsCreated > 0) {
+        runIntegrityMutation.mutate();
+      }
+    },
+    onError: (err: Error) => {
+      setGhostBookingResult({ success: false, message: err.message || 'Failed to create sessions' });
+      showToast(err.message || 'Failed to create sessions', 'error');
+    },
+  });
+
+  // Remediate Deal Stages Mutation
+  const remediateDealStagesMutation = useMutation({
+    mutationFn: (dryRun: boolean) => 
+      postWithCredentials<{ message?: string; total?: number; fixed?: number }>('/api/hubspot/remediate-deal-stages', { dryRun }),
+    onSuccess: (data, dryRun) => {
+      setDealStageRemediationResult({
+        success: true,
+        message: data.message || `Found ${data.total || 0} deals needing updates${!dryRun ? `, fixed ${data.fixed || 0}` : ''}`,
+        total: data.total,
+        fixed: data.fixed,
+        dryRun
+      });
+      showToast(dryRun ? 'Preview complete - no changes made' : (data.message || 'Deal stage remediation complete'), dryRun ? 'info' : 'success');
+    },
+    onError: (err: Error) => {
+      setDealStageRemediationResult({ success: false, message: err.message || 'Failed to remediate deal stages' });
+      showToast(err.message || 'Failed to remediate deal stages', 'error');
+    },
+  });
+
+  // Detect Duplicates Mutation
+  const detectDuplicatesMutation = useMutation({
+    mutationFn: () => 
+      postWithCredentials<{ message?: string; appDuplicates?: any[]; hubspotDuplicates?: any[] }>('/api/data-tools/detect-duplicates', {}),
+    onSuccess: (data) => {
+      const appCount = data.appDuplicates?.length || 0;
+      const hubspotCount = data.hubspotDuplicates?.length || 0;
+      setDuplicateDetectionResult({
+        success: true,
+        message: data.message || `Found ${appCount} app duplicates, ${hubspotCount} HubSpot duplicates`,
+        appDuplicates: data.appDuplicates,
+        hubspotDuplicates: data.hubspotDuplicates
+      });
+      setExpandedDuplicates({ app: false, hubspot: false });
+      showToast(data.message || 'Duplicate detection complete', 'success');
+    },
+    onError: (err: Error) => {
+      setDuplicateDetectionResult({ success: false, message: err.message || 'Failed to detect duplicates' });
+      showToast(err.message || 'Failed to detect duplicates', 'error');
+    },
+  });
+
+  // Scan Placeholders Mutation
+  const scanPlaceholdersMutation = useMutation({
+    mutationFn: () => 
+      fetchWithCredentials<{ success: boolean; stripeCustomers?: any[]; hubspotContacts?: any[]; totals?: { stripe: number; hubspot: number; total: number } }>('/api/data-integrity/placeholder-accounts'),
+    onSuccess: (data) => {
+      if (data.success) {
+        setPlaceholderAccounts({
+          stripeCustomers: data.stripeCustomers || [],
+          hubspotContacts: data.hubspotContacts || [],
+          totals: data.totals || { stripe: 0, hubspot: 0, total: 0 }
+        });
+        showToast(`Found ${data.totals?.total || 0} placeholder accounts`, data.totals?.total && data.totals.total > 0 ? 'info' : 'success');
+      } else {
+        showToast('Failed to scan for placeholders', 'error');
+      }
+      setPlaceholderDeleteResult(null);
+    },
+    onError: () => {
+      showToast('Failed to scan for placeholders', 'error');
+    },
+  });
+
+  // Delete Placeholders Mutation
+  const deletePlaceholdersMutation = useMutation({
+    mutationFn: (params: { stripeCustomerIds: string[]; hubspotContactIds: string[] }) => 
+      postWithCredentials<{ success: boolean; stripeDeleted?: number; stripeFailed?: number; hubspotDeleted?: number; hubspotFailed?: number }>('/api/data-integrity/placeholder-accounts/delete', params),
+    onSuccess: (data) => {
+      if (data.success) {
+        setPlaceholderDeleteResult({
+          stripeDeleted: data.stripeDeleted || 0,
+          stripeFailed: data.stripeFailed || 0,
+          hubspotDeleted: data.hubspotDeleted || 0,
+          hubspotFailed: data.hubspotFailed || 0
+        });
+        const totalDeleted = (data.stripeDeleted || 0) + (data.hubspotDeleted || 0);
+        const totalFailed = (data.stripeFailed || 0) + (data.hubspotFailed || 0);
+        showToast(`Deleted ${totalDeleted} placeholder accounts${totalFailed > 0 ? `, ${totalFailed} failed` : ''}`, totalFailed > 0 ? 'warning' : 'success');
+        setPlaceholderAccounts(null);
+      } else {
+        showToast('Failed to delete placeholder accounts', 'error');
+      }
+      setShowDeleteConfirm(false);
+    },
+    onError: () => {
+      showToast('Failed to delete placeholder accounts', 'error');
+      setShowDeleteConfirm(false);
+    },
+  });
+
+  // ==================== HELPER FUNCTIONS ====================
 
   const openIgnoreModal = (issue: IntegrityIssue, checkName: string) => {
     setIgnoreModal({ isOpen: true, issue, checkName });
@@ -416,60 +919,14 @@ const DataIntegrityTab: React.FC = () => {
     setIgnoreReason('');
   };
 
-  const handleIgnoreIssue = async () => {
+  const handleIgnoreIssue = () => {
     if (!ignoreModal.issue || !ignoreReason.trim()) return;
-    
     const issueKey = `${ignoreModal.issue.table}_${ignoreModal.issue.recordId}`;
-    
-    setIsIgnoring(true);
-    try {
-      const res = await fetch('/api/data-integrity/ignore', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          issue_key: issueKey,
-          duration: ignoreDuration,
-          reason: ignoreReason.trim()
-        })
-      });
-      
-      if (res.ok) {
-        showToast('Issue ignored successfully', 'success');
-        closeIgnoreModal();
-        fetchIgnoredIssues();
-        runIntegrityChecks();
-      } else {
-        const err = await res.json();
-        showToast(err.error || 'Failed to ignore issue', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to ignore issue:', err);
-      showToast('Failed to ignore issue', 'error');
-    } finally {
-      setIsIgnoring(false);
-    }
+    ignoreIssueMutation.mutate({ issueKey, duration: ignoreDuration, reason: ignoreReason.trim() });
   };
 
-  const handleUnignoreIssue = async (issueKey: string) => {
-    try {
-      const res = await fetch(`/api/data-integrity/ignore/${encodeURIComponent(issueKey)}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      
-      if (res.ok) {
-        showToast('Issue un-ignored successfully', 'success');
-        fetchIgnoredIssues();
-        runIntegrityChecks();
-      } else {
-        const err = await res.json();
-        showToast(err.error || 'Failed to un-ignore issue', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to un-ignore issue:', err);
-      showToast('Failed to un-ignore issue', 'error');
-    }
+  const handleUnignoreIssue = (issueKey: string) => {
+    unignoreIssueMutation.mutate(issueKey);
   };
 
   const openBulkIgnoreModal = (checkName: string, issues: IntegrityIssue[]) => {
@@ -485,142 +942,208 @@ const DataIntegrityTab: React.FC = () => {
     setIgnoreReason('');
   };
 
-  const handleBulkIgnore = async () => {
+  const handleBulkIgnore = () => {
     if (bulkIgnoreModal.issues.length === 0 || !ignoreReason.trim()) return;
-    
     const issueKeys = bulkIgnoreModal.issues.map(issue => `${issue.table}_${issue.recordId}`);
-    
-    setIsBulkIgnoring(true);
-    try {
-      const res = await fetch('/api/data-integrity/ignore-bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          issue_keys: issueKeys,
-          duration: ignoreDuration,
-          reason: ignoreReason.trim()
-        })
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        showToast(`${data.total} issues excluded successfully`, 'success');
-        closeBulkIgnoreModal();
-        fetchIgnoredIssues();
-        runIntegrityChecks();
-      } else {
-        const err = await res.json();
-        showToast(err.error || 'Failed to exclude issues', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to bulk ignore issues:', err);
-      showToast('Failed to exclude issues', 'error');
-    } finally {
-      setIsBulkIgnoring(false);
-    }
+    bulkIgnoreMutation.mutate({ issueKeys, duration: ignoreDuration, reason: ignoreReason.trim() });
   };
 
-  const handleSyncPush = async (issue: IntegrityIssue) => {
+  const handleSyncPush = (issue: IntegrityIssue) => {
     if (!issue.context?.syncType) return;
-    
     const issueKey = `${issue.table}_${issue.recordId}`;
     setSyncingIssues(prev => new Set(prev).add(issueKey));
-    
-    try {
-      const res = await fetch('/api/data-integrity/sync-push', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          issue_key: issueKey,
-          target: issue.context.syncType,
-          user_id: issue.context.userId,
-          hubspot_contact_id: issue.context.hubspotContactId
-        })
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        showToast(data.message || 'Successfully pushed to external system', 'success');
-        runIntegrityChecks();
-      } else {
-        const err = await res.json();
-        showToast(err.error || 'Failed to push sync', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to push sync:', err);
-      showToast('Failed to push sync', 'error');
-    } finally {
-      setSyncingIssues(prev => {
-        const next = new Set(prev);
-        next.delete(issueKey);
-        return next;
-      });
-    }
+    syncPushMutation.mutate({
+      issueKey,
+      target: issue.context.syncType,
+      userId: issue.context.userId,
+      hubspotContactId: issue.context.hubspotContactId
+    });
   };
 
-  const handleSyncPull = async (issue: IntegrityIssue) => {
+  const handleSyncPull = (issue: IntegrityIssue) => {
     if (!issue.context?.syncType) return;
-    
     const issueKey = `${issue.table}_${issue.recordId}`;
     setSyncingIssues(prev => new Set(prev).add(issueKey));
-    
-    try {
-      const res = await fetch('/api/data-integrity/sync-pull', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          issue_key: issueKey,
-          target: issue.context.syncType,
-          user_id: issue.context.userId,
-          hubspot_contact_id: issue.context.hubspotContactId
-        })
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        showToast(data.message || 'Successfully pulled from external system', 'success');
-        runIntegrityChecks();
-      } else {
-        const err = await res.json();
-        showToast(err.error || 'Failed to pull sync', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to pull sync:', err);
-      showToast('Failed to pull sync', 'error');
-    } finally {
-      setSyncingIssues(prev => {
-        const next = new Set(prev);
-        next.delete(issueKey);
-        return next;
-      });
+    syncPullMutation.mutate({
+      issueKey,
+      target: issue.context.syncType,
+      userId: issue.context.userId,
+      hubspotContactId: issue.context.hubspotContactId
+    });
+  };
+
+  const runIntegrityChecks = () => {
+    runIntegrityMutation.mutate();
+  };
+
+  const handleResyncMember = () => {
+    if (!resyncEmail.trim()) return;
+    setResyncResult(null);
+    resyncMemberMutation.mutate(resyncEmail.trim());
+  };
+
+  const handleReconcileGroupBilling = () => {
+    setReconcileResult(null);
+    reconcileGroupBillingMutation.mutate();
+  };
+
+  const handleSearchUnlinkedGuestFees = () => {
+    if (!guestFeeStartDate || !guestFeeEndDate) return;
+    searchGuestFeesMutation.mutate({ startDate: guestFeeStartDate, endDate: guestFeeEndDate });
+  };
+
+  const handleLoadSessionsForFee = (fee: any) => {
+    setSelectedFeeId(fee.id);
+    setSelectedSessionId(null);
+    loadSessionsMutation.mutate({ date: fee.saleDate, memberEmail: fee.memberEmail || '' });
+  };
+
+  const handleLinkGuestFee = () => {
+    if (!selectedFeeId || !selectedSessionId) return;
+    linkGuestFeeMutation.mutate({ guestFeeId: selectedFeeId, bookingId: selectedSessionId });
+  };
+
+  const handleSearchAttendance = () => {
+    if (!attendanceSearchDate && !attendanceSearchEmail) {
+      showToast('Please enter a date or member email', 'error');
+      return;
+    }
+    searchAttendanceMutation.mutate({ 
+      date: attendanceSearchDate || undefined, 
+      memberEmail: attendanceSearchEmail || undefined 
+    });
+  };
+
+  const handleUpdateAttendance = (bookingId: number, status: string) => {
+    setUpdatingAttendanceId(bookingId);
+    updateAttendanceMutation.mutate({ bookingId, attendanceStatus: status, notes: attendanceNote });
+  };
+
+  const handleMindbodyReimport = () => {
+    if (!mindbodyStartDate || !mindbodyEndDate) return;
+    setMindbodyResult(null);
+    mindbodyReimportMutation.mutate({ startDate: mindbodyStartDate, endDate: mindbodyEndDate });
+  };
+
+  const handleCSVUpload = () => {
+    if (!salesFile) {
+      showToast('Please select a Sales Report CSV file', 'error');
+      return;
+    }
+    setCsvUploadResult(null);
+    const formData = new FormData();
+    if (firstVisitFile) {
+      formData.append('firstVisitFile', firstVisitFile);
+    }
+    formData.append('salesFile', salesFile);
+    csvUploadMutation.mutate(formData);
+  };
+
+  const handleSyncStripeMetadata = () => {
+    setStripeMetadataResult(null);
+    syncStripeMetadataMutation.mutate();
+  };
+
+  const handleBackfillStripeCache = () => {
+    setStripeCacheResult(null);
+    backfillStripeCacheMutation.mutate();
+  };
+
+  const handleSyncMembersToHubspot = (dryRun: boolean = true) => {
+    setHubspotSyncResult(null);
+    syncMembersToHubspotMutation.mutate(dryRun);
+  };
+
+  const handleCleanupMindbodyIds = (dryRun: boolean = true) => {
+    setMindbodyCleanupResult(null);
+    cleanupMindbodyIdsMutation.mutate(dryRun);
+  };
+
+  const handleSyncSubscriptionStatus = (dryRun: boolean = true) => {
+    setSubscriptionStatusResult(null);
+    syncSubscriptionStatusMutation.mutate(dryRun);
+  };
+
+  const handleClearOrphanedStripeIds = (dryRun: boolean = true) => {
+    setOrphanedStripeResult(null);
+    clearOrphanedStripeIdsMutation.mutate(dryRun);
+  };
+
+  const handleLinkStripeHubspot = (dryRun: boolean = true) => {
+    setStripeHubspotLinkResult(null);
+    linkStripeHubspotMutation.mutate(dryRun);
+  };
+
+  const handleSyncPaymentStatus = (dryRun: boolean = true) => {
+    setPaymentStatusResult(null);
+    syncPaymentStatusMutation.mutate(dryRun);
+  };
+
+  const handleSyncVisitCounts = (dryRun: boolean = true) => {
+    setVisitCountResult(null);
+    syncVisitCountsMutation.mutate(dryRun);
+  };
+
+  const handleFixGhostBookings = (dryRun: boolean = true) => {
+    setGhostBookingResult(null);
+    if (dryRun) {
+      previewGhostBookingsMutation.mutate();
+    } else {
+      fixGhostBookingsMutation.mutate();
     }
   };
 
-  const runIntegrityChecks = async () => {
-    setIsRunning(true);
-    try {
-      const res = await fetch('/api/data-integrity/run', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setResults(sortBySeverity(data.results));
-        setMeta(data.meta);
-        setIsCached(false);
-        showToast('Integrity checks completed', 'success');
-        fetchHistory();
-      } else {
-        const err = await res.json();
-        showToast(err.error || 'Failed to run integrity checks', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to run integrity checks:', err);
-      showToast('Failed to run integrity checks', 'error');
-    } finally {
-      setIsRunning(false);
-    }
+  const handleRemediateDealStages = (dryRun: boolean = true) => {
+    setDealStageRemediationResult(null);
+    remediateDealStagesMutation.mutate(dryRun);
   };
+
+  const handleDetectDuplicates = () => {
+    setDuplicateDetectionResult(null);
+    setExpandedDuplicates({ app: false, hubspot: false });
+    detectDuplicatesMutation.mutate();
+  };
+
+  const handleScanPlaceholders = () => {
+    setPlaceholderAccounts(null);
+    setPlaceholderDeleteResult(null);
+    scanPlaceholdersMutation.mutate();
+  };
+
+  const handleDeletePlaceholders = () => {
+    if (!placeholderAccounts) return;
+    setShowDeleteConfirm(false);
+    deletePlaceholdersMutation.mutate({
+      stripeCustomerIds: placeholderAccounts.stripeCustomers.map(c => c.id),
+      hubspotContactIds: placeholderAccounts.hubspotContacts.map(c => c.id)
+    });
+  };
+
+  // Derived loading states
+  const isRunning = runIntegrityMutation.isPending;
+  const isIgnoring = ignoreIssueMutation.isPending;
+  const isBulkIgnoring = bulkIgnoreMutation.isPending;
+  const isResyncing = resyncMemberMutation.isPending;
+  const isReconciling = reconcileGroupBillingMutation.isPending;
+  const isLoadingGuestFees = searchGuestFeesMutation.isPending;
+  const isLinkingFee = linkGuestFeeMutation.isPending;
+  const isSearchingAttendance = searchAttendanceMutation.isPending;
+  const isRunningMindbodyImport = mindbodyReimportMutation.isPending;
+  const isUploadingCSV = csvUploadMutation.isPending;
+  const isSyncingStripeMetadata = syncStripeMetadataMutation.isPending;
+  const isBackfillingStripeCache = backfillStripeCacheMutation.isPending;
+  const isSyncingToHubspot = syncMembersToHubspotMutation.isPending;
+  const isCleaningMindbodyIds = cleanupMindbodyIdsMutation.isPending;
+  const isRunningSubscriptionSync = syncSubscriptionStatusMutation.isPending;
+  const isRunningOrphanedStripeCleanup = clearOrphanedStripeIdsMutation.isPending;
+  const isRunningStripeHubspotLink = linkStripeHubspotMutation.isPending;
+  const isRunningPaymentStatusSync = syncPaymentStatusMutation.isPending;
+  const isRunningVisitCountSync = syncVisitCountsMutation.isPending;
+  const isRunningGhostBookingFix = previewGhostBookingsMutation.isPending || fixGhostBookingsMutation.isPending;
+  const isRunningDealStageRemediation = remediateDealStagesMutation.isPending;
+  const isRunningDuplicateDetection = detectDuplicatesMutation.isPending;
+  const isLoadingPlaceholders = scanPlaceholdersMutation.isPending;
+  const isDeletingPlaceholders = deletePlaceholdersMutation.isPending;
 
   const formatTimeAgo = (date: Date | string) => {
     const now = new Date();
@@ -876,124 +1399,11 @@ const DataIntegrityTab: React.FC = () => {
           </div>
         );
 
-      case 'Stripe-HubSpot Link':
-      case 'Missing Stripe-HubSpot Link':
-      case 'Tier Reconciliation':
+      case 'Stale Mindbody IDs':
         return (
           <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 mb-4">
             <p className="text-xs text-purple-700 dark:text-purple-300 mb-2">
-              <strong>Quick Fix:</strong> Link Stripe customers with HubSpot contacts
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => handleLinkStripeHubspot(true)}
-                disabled={isRunningStripeHubspotLink}
-                className="px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
-              >
-                {isRunningStripeHubspotLink && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
-                <span className="material-symbols-outlined text-[14px]">visibility</span>
-                Preview
-              </button>
-              <button
-                onClick={() => handleLinkStripeHubspot(false)}
-                disabled={isRunningStripeHubspotLink}
-                className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
-              >
-                {isRunningStripeHubspotLink && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
-                <span className="material-symbols-outlined text-[14px]">link</span>
-                Link Records
-              </button>
-            </div>
-            {stripeHubspotLinkResult && (
-              <div className={`mt-2 p-2 rounded ${getResultStyle(stripeHubspotLinkResult)}`}>
-                {stripeHubspotLinkResult.dryRun && (
-                  <p className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400 mb-1">Preview Only - No Changes Made</p>
-                )}
-                <p className={`text-xs ${getTextStyle(stripeHubspotLinkResult)}`}>{stripeHubspotLinkResult.message}</p>
-              </div>
-            )}
-          </div>
-        );
-
-      case 'Payment Status Mismatch':
-        return (
-          <div className="bg-teal-50 dark:bg-teal-900/20 rounded-lg p-3 mb-4">
-            <p className="text-xs text-teal-700 dark:text-teal-300 mb-2">
-              <strong>Quick Fix:</strong> Sync payment status from Stripe to HubSpot
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => handleSyncPaymentStatus(true)}
-                disabled={isRunningPaymentStatusSync}
-                className="px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
-              >
-                {isRunningPaymentStatusSync && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
-                <span className="material-symbols-outlined text-[14px]">visibility</span>
-                Preview
-              </button>
-              <button
-                onClick={() => handleSyncPaymentStatus(false)}
-                disabled={isRunningPaymentStatusSync}
-                className="px-3 py-1.5 bg-teal-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
-              >
-                {isRunningPaymentStatusSync && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
-                <span className="material-symbols-outlined text-[14px]">sync</span>
-                Sync Status
-              </button>
-            </div>
-            {paymentStatusResult && (
-              <div className={`mt-2 p-2 rounded ${getResultStyle(paymentStatusResult)}`}>
-                {paymentStatusResult.dryRun && (
-                  <p className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400 mb-1">Preview Only - No Changes Made</p>
-                )}
-                <p className={`text-xs ${getTextStyle(paymentStatusResult)}`}>{paymentStatusResult.message}</p>
-              </div>
-            )}
-          </div>
-        );
-
-      case 'Visit Count Mismatch':
-        return (
-          <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-3 mb-4">
-            <p className="text-xs text-indigo-700 dark:text-indigo-300 mb-2">
-              <strong>Quick Fix:</strong> Update HubSpot visit counts with actual check-in data
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => handleSyncVisitCounts(true)}
-                disabled={isRunningVisitCountSync}
-                className="px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
-              >
-                {isRunningVisitCountSync && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
-                <span className="material-symbols-outlined text-[14px]">visibility</span>
-                Preview
-              </button>
-              <button
-                onClick={() => handleSyncVisitCounts(false)}
-                disabled={isRunningVisitCountSync}
-                className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
-              >
-                {isRunningVisitCountSync && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
-                <span className="material-symbols-outlined text-[14px]">sync</span>
-                Sync Counts
-              </button>
-            </div>
-            {visitCountResult && (
-              <div className={`mt-2 p-2 rounded ${getResultStyle(visitCountResult)}`}>
-                {visitCountResult.dryRun && (
-                  <p className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400 mb-1">Preview Only - No Changes Made</p>
-                )}
-                <p className={`text-xs ${getTextStyle(visitCountResult)}`}>{visitCountResult.message}</p>
-              </div>
-            )}
-          </div>
-        );
-
-      case 'Stale Mind Body IDs':
-        return (
-          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 mb-4">
-            <p className="text-xs text-red-700 dark:text-red-300 mb-2">
-              <strong>Quick Fix:</strong> Remove Mind Body IDs that don't exist in HubSpot
+              <strong>Quick Fix:</strong> Remove old Mindbody IDs from members no longer in Mindbody
             </p>
             <div className="flex flex-wrap gap-2">
               <button
@@ -1177,753 +1587,6 @@ const DataIntegrityTab: React.FC = () => {
 
   const hasIssues = results.some(r => r.issues.length > 0);
 
-  const handleResyncMember = async () => {
-    if (!resyncEmail.trim()) return;
-    
-    setIsResyncing(true);
-    setResyncResult(null);
-    try {
-      const res = await fetch('/api/data-tools/resync-member', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email: resyncEmail.trim() })
-      });
-      
-      const data = await res.json();
-      if (res.ok) {
-        setResyncResult({ success: true, message: data.message });
-        showToast(data.message, 'success');
-        setResyncEmail('');
-      } else {
-        setResyncResult({ success: false, message: data.error || 'Failed to resync member' });
-        showToast(data.error || 'Failed to resync member', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to resync member:', err);
-      setResyncResult({ success: false, message: 'Network error occurred' });
-      showToast('Failed to resync member', 'error');
-    } finally {
-      setIsResyncing(false);
-    }
-  };
-
-  const handleReconcileGroupBilling = async () => {
-    setIsReconciling(true);
-    setReconcileResult(null);
-    try {
-      const res = await fetch('/api/group-billing/reconcile', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      
-      const data = await res.json();
-      if (res.ok) {
-        setReconcileResult(data);
-        const summary = `Checked ${data.groupsChecked} groups. Deactivated: ${data.membersDeactivated}, Reactivated: ${data.membersReactivated}, Created: ${data.membersCreated}, Relinked: ${data.itemsRelinked}`;
-        showToast(summary, data.success ? 'success' : 'info');
-      } else {
-        showToast(data.error || 'Failed to reconcile', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to reconcile group billing:', err);
-      showToast('Failed to reconcile group billing', 'error');
-    } finally {
-      setIsReconciling(false);
-    }
-  };
-
-  const handleSearchUnlinkedGuestFees = async () => {
-    if (!guestFeeStartDate || !guestFeeEndDate) return;
-    
-    setIsLoadingGuestFees(true);
-    try {
-      const res = await fetch(`/api/data-tools/unlinked-guest-fees?startDate=${guestFeeStartDate}&endDate=${guestFeeEndDate}`, {
-        credentials: 'include'
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        setUnlinkedGuestFees(data);
-      } else {
-        showToast('Failed to search guest fees', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to search guest fees:', err);
-      showToast('Failed to search guest fees', 'error');
-    } finally {
-      setIsLoadingGuestFees(false);
-    }
-  };
-
-  const handleLoadSessionsForFee = async (fee: any) => {
-    setSelectedFeeId(fee.id);
-    setSelectedSessionId(null);
-    try {
-      const res = await fetch(`/api/data-tools/available-sessions?date=${fee.saleDate}&memberEmail=${fee.memberEmail || ''}`, {
-        credentials: 'include'
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        setAvailableSessions(data);
-      }
-    } catch (err) {
-      console.error('Failed to load sessions:', err);
-    }
-  };
-
-  const handleLinkGuestFee = async () => {
-    if (!selectedFeeId || !selectedSessionId) return;
-    
-    setIsLinkingFee(true);
-    try {
-      const res = await fetch('/api/data-tools/link-guest-fee', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ guestFeeId: selectedFeeId, bookingId: selectedSessionId })
-      });
-      
-      if (res.ok) {
-        showToast('Guest fee linked successfully', 'success');
-        setUnlinkedGuestFees(prev => prev.filter(f => f.id !== selectedFeeId));
-        setSelectedFeeId(null);
-        setSelectedSessionId(null);
-        setAvailableSessions([]);
-      } else {
-        const data = await res.json();
-        showToast(data.error || 'Failed to link guest fee', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to link guest fee:', err);
-      showToast('Failed to link guest fee', 'error');
-    } finally {
-      setIsLinkingFee(false);
-    }
-  };
-
-  const handleSearchAttendance = async () => {
-    if (!attendanceSearchDate && !attendanceSearchEmail) {
-      showToast('Please enter a date or member email', 'error');
-      return;
-    }
-    
-    setIsSearchingAttendance(true);
-    try {
-      const params = new URLSearchParams();
-      if (attendanceSearchDate) params.append('date', attendanceSearchDate);
-      if (attendanceSearchEmail) params.append('memberEmail', attendanceSearchEmail);
-      
-      const res = await fetch(`/api/data-tools/bookings-search?${params.toString()}`, {
-        credentials: 'include'
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        setAttendanceBookings(data);
-      } else {
-        showToast('Failed to search bookings', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to search bookings:', err);
-      showToast('Failed to search bookings', 'error');
-    } finally {
-      setIsSearchingAttendance(false);
-    }
-  };
-
-  const handleUpdateAttendance = async (bookingId: number, status: string) => {
-    setUpdatingAttendanceId(bookingId);
-    try {
-      const res = await fetch('/api/data-tools/update-attendance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ bookingId, attendanceStatus: status, notes: attendanceNote })
-      });
-      
-      if (res.ok) {
-        showToast(`Attendance updated to ${status}`, 'success');
-        setAttendanceBookings(prev => prev.map(b => 
-          b.id === bookingId ? { ...b, reconciliationStatus: status, reconciliationNotes: attendanceNote } : b
-        ));
-        setAttendanceNote('');
-      } else {
-        const data = await res.json();
-        showToast(data.error || 'Failed to update attendance', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to update attendance:', err);
-      showToast('Failed to update attendance', 'error');
-    } finally {
-      setUpdatingAttendanceId(null);
-    }
-  };
-
-  const handleMindbodyReimport = async () => {
-    if (!mindbodyStartDate || !mindbodyEndDate) return;
-    
-    setIsRunningMindbodyImport(true);
-    setMindbodyResult(null);
-    try {
-      const res = await fetch('/api/data-tools/mindbody-reimport', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ startDate: mindbodyStartDate, endDate: mindbodyEndDate })
-      });
-      
-      const data = await res.json();
-      if (res.ok) {
-        setMindbodyResult({ success: true, message: data.message });
-        showToast(data.message, 'success');
-      } else {
-        setMindbodyResult({ success: false, message: data.error || 'Failed to queue reimport' });
-        showToast(data.error || 'Failed to queue reimport', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to queue reimport:', err);
-      setMindbodyResult({ success: false, message: 'Network error occurred' });
-      showToast('Failed to queue reimport', 'error');
-    } finally {
-      setIsRunningMindbodyImport(false);
-    }
-  };
-
-  const handleCSVUpload = async () => {
-    if (!salesFile) {
-      showToast('Please select a Sales Report CSV file', 'error');
-      return;
-    }
-    
-    setIsUploadingCSV(true);
-    setCsvUploadResult(null);
-    
-    try {
-      const formData = new FormData();
-      if (firstVisitFile) {
-        formData.append('firstVisitFile', firstVisitFile);
-      }
-      formData.append('salesFile', salesFile);
-      
-      const res = await fetch('/api/legacy-purchases/admin/upload-csv', {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
-      
-      const data = await res.json();
-      
-      if (res.ok) {
-        const importedCount = data.results?.sales?.imported || 0;
-        const linkedCount = data.results?.firstVisit?.linked || 0;
-        setCsvUploadResult({
-          success: true,
-          message: `Import complete! ${importedCount} sales imported, ${linkedCount} clients linked.`,
-          firstVisit: data.results?.firstVisit,
-          sales: data.results?.sales,
-        });
-        showToast(`Successfully imported ${importedCount} sales records`, 'success');
-        // Clear file inputs
-        setFirstVisitFile(null);
-        setSalesFile(null);
-      } else {
-        setCsvUploadResult({ success: false, message: data.error || 'Import failed' });
-        showToast(data.error || 'Import failed', 'error');
-      }
-    } catch (err) {
-      console.error('CSV upload error:', err);
-      setCsvUploadResult({ success: false, message: 'Network error occurred' });
-      showToast('Failed to upload CSV files', 'error');
-    } finally {
-      setIsUploadingCSV(false);
-    }
-  };
-
-  const handleSyncStripeMetadata = async () => {
-    setIsSyncingStripeMetadata(true);
-    setStripeMetadataResult(null);
-    try {
-      const res = await fetch('/api/data-integrity/sync-stripe-metadata', {
-        method: 'POST',
-        credentials: 'include'
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setStripeMetadataResult({ success: true, message: data.message, synced: data.synced, failed: data.failed });
-        showToast(data.message, 'success');
-      } else {
-        setStripeMetadataResult({ success: false, message: data.error || 'Failed to sync metadata' });
-        showToast(data.error || 'Failed to sync metadata', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to sync Stripe metadata:', err);
-      setStripeMetadataResult({ success: false, message: 'Network error occurred' });
-      showToast('Failed to sync Stripe metadata', 'error');
-    } finally {
-      setIsSyncingStripeMetadata(false);
-    }
-  };
-
-  const handleBackfillStripeCache = async () => {
-    setIsBackfillingStripeCache(true);
-    setStripeCacheResult(null);
-    try {
-      const res = await fetch('/api/financials/backfill-stripe-cache', {
-        method: 'POST',
-        credentials: 'include'
-      });
-      const data = await res.json();
-      if (res.ok) {
-        const msg = `Backfilled ${data.stats?.paymentIntents || 0} payments, ${data.stats?.charges || 0} charges, ${data.stats?.invoices || 0} invoices`;
-        setStripeCacheResult({ success: true, message: msg, stats: data.stats });
-        showToast(msg, 'success');
-      } else {
-        setStripeCacheResult({ success: false, message: data.error || 'Failed to backfill cache' });
-        showToast(data.error || 'Failed to backfill cache', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to backfill Stripe cache:', err);
-      setStripeCacheResult({ success: false, message: 'Network error occurred' });
-      showToast('Failed to backfill Stripe cache', 'error');
-    } finally {
-      setIsBackfillingStripeCache(false);
-    }
-  };
-
-  const handleSyncMembersToHubspot = async (dryRun: boolean = true) => {
-    setIsSyncingToHubspot(true);
-    setHubspotSyncResult(null);
-    try {
-      const res = await fetch('/api/data-tools/sync-members-to-hubspot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ dryRun })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setHubspotSyncResult({ 
-          success: true, 
-          message: data.message,
-          members: data.members,
-          dryRun
-        });
-        showToast(dryRun ? 'Preview complete - no changes made' : data.message, dryRun ? 'info' : 'success');
-        if (!dryRun && data.syncedCount > 0) {
-          updateIssueCountOptimistically('HubSpot Sync Mismatch', data.syncedCount);
-        }
-      } else {
-        setHubspotSyncResult({ success: false, message: data.error || 'Failed to sync to HubSpot' });
-        showToast(data.error || 'Failed to sync to HubSpot', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to sync members to HubSpot:', err);
-      setHubspotSyncResult({ success: false, message: 'Network error occurred' });
-      showToast('Failed to sync members to HubSpot', 'error');
-    } finally {
-      setIsSyncingToHubspot(false);
-    }
-  };
-
-  const handleCleanupMindbodyIds = async (dryRun: boolean = true) => {
-    setIsCleaningMindbodyIds(true);
-    setMindbodyCleanupResult(null);
-    try {
-      const res = await fetch('/api/data-tools/cleanup-mindbody-ids', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ dryRun })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setMindbodyCleanupResult({ 
-          success: true, 
-          message: data.message,
-          toClean: data.toClean,
-          dryRun
-        });
-        showToast(dryRun ? 'Preview complete - no changes made' : data.message, dryRun ? 'info' : 'success');
-      } else {
-        setMindbodyCleanupResult({ success: false, message: data.error || 'Failed to cleanup Mind Body IDs' });
-        showToast(data.error || 'Failed to cleanup Mind Body IDs', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to cleanup Mind Body IDs:', err);
-      setMindbodyCleanupResult({ success: false, message: 'Network error occurred' });
-      showToast('Failed to cleanup Mind Body IDs', 'error');
-    } finally {
-      setIsCleaningMindbodyIds(false);
-    }
-  };
-
-  const handleSyncSubscriptionStatus = async (dryRun: boolean = true) => {
-    setIsRunningSubscriptionSync(true);
-    setSubscriptionStatusResult(null);
-    try {
-      const res = await fetch('/api/data-tools/sync-subscription-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ dryRun })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setSubscriptionStatusResult({
-          success: true,
-          message: data.message || `Checked ${data.totalChecked} members, found ${data.mismatchCount} mismatches`,
-          totalChecked: data.totalChecked,
-          mismatchCount: data.mismatchCount,
-          updated: data.updated,
-          dryRun
-        });
-        showToast(dryRun ? 'Preview complete - no changes made' : (data.message || 'Subscription status sync complete'), dryRun ? 'info' : 'success');
-        if (!dryRun && data.updatedCount > 0) {
-          updateIssueCountOptimistically('Stripe Subscription Sync', data.updatedCount);
-        }
-      } else {
-        setSubscriptionStatusResult({ success: false, message: data.error || 'Failed to sync subscription status' });
-        showToast(data.error || 'Failed to sync subscription status', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to sync subscription status:', err);
-      setSubscriptionStatusResult({ success: false, message: 'Network error occurred' });
-      showToast('Failed to sync subscription status', 'error');
-    } finally {
-      setIsRunningSubscriptionSync(false);
-    }
-  };
-
-  const handleClearOrphanedStripeIds = async (dryRun: boolean = true) => {
-    setIsRunningOrphanedStripeCleanup(true);
-    setOrphanedStripeResult(null);
-    try {
-      const res = await fetch('/api/data-tools/clear-orphaned-stripe-ids', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ dryRun })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setOrphanedStripeResult({
-          success: true,
-          message: data.message || `Found ${data.orphanedCount} orphaned Stripe IDs`,
-          totalChecked: data.totalChecked,
-          orphanedCount: data.orphanedCount,
-          cleared: data.cleared,
-          dryRun
-        });
-        showToast(dryRun ? 'Preview complete - no changes made' : (data.message || 'Orphaned Stripe IDs cleared'), dryRun ? 'info' : 'success');
-        if (!dryRun && data.clearedCount > 0) {
-          updateIssueCountOptimistically('Stripe Subscription Sync', data.clearedCount);
-        }
-      } else {
-        setOrphanedStripeResult({ success: false, message: data.error || 'Failed to clear orphaned Stripe IDs' });
-        showToast(data.error || 'Failed to clear orphaned Stripe IDs', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to clear orphaned Stripe IDs:', err);
-      setOrphanedStripeResult({ success: false, message: 'Network error occurred' });
-      showToast('Failed to clear orphaned Stripe IDs', 'error');
-    } finally {
-      setIsRunningOrphanedStripeCleanup(false);
-    }
-  };
-
-  const handleLinkStripeHubspot = async (dryRun: boolean = true) => {
-    setIsRunningStripeHubspotLink(true);
-    setStripeHubspotLinkResult(null);
-    try {
-      const res = await fetch('/api/data-tools/link-stripe-hubspot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ dryRun })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setStripeHubspotLinkResult({
-          success: true,
-          message: data.message || 'Stripe-HubSpot link complete',
-          stripeOnlyMembers: data.stripeOnlyMembers,
-          hubspotOnlyMembers: data.hubspotOnlyMembers,
-          linkedCount: data.linkedCount,
-          dryRun
-        });
-        showToast(dryRun ? 'Preview complete - no changes made' : (data.message || 'Stripe-HubSpot link complete'), dryRun ? 'info' : 'success');
-      } else {
-        setStripeHubspotLinkResult({ success: false, message: data.error || 'Failed to link Stripe and HubSpot' });
-        showToast(data.error || 'Failed to link Stripe and HubSpot', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to link Stripe and HubSpot:', err);
-      setStripeHubspotLinkResult({ success: false, message: 'Network error occurred' });
-      showToast('Failed to link Stripe and HubSpot', 'error');
-    } finally {
-      setIsRunningStripeHubspotLink(false);
-    }
-  };
-
-  const handleSyncPaymentStatus = async (dryRun: boolean = true) => {
-    setIsRunningPaymentStatusSync(true);
-    setPaymentStatusResult(null);
-    try {
-      const res = await fetch('/api/data-tools/sync-payment-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ dryRun })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setPaymentStatusResult({
-          success: true,
-          message: data.message || `Checked ${data.totalChecked} members, updated ${data.updatedCount}`,
-          totalChecked: data.totalChecked,
-          updatedCount: data.updatedCount,
-          updates: data.updates,
-          dryRun
-        });
-        showToast(dryRun ? 'Preview complete - no changes made' : (data.message || 'Payment status sync complete'), dryRun ? 'info' : 'success');
-      } else {
-        setPaymentStatusResult({ success: false, message: data.error || 'Failed to sync payment status' });
-        showToast(data.error || 'Failed to sync payment status', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to sync payment status:', err);
-      setPaymentStatusResult({ success: false, message: 'Network error occurred' });
-      showToast('Failed to sync payment status', 'error');
-    } finally {
-      setIsRunningPaymentStatusSync(false);
-    }
-  };
-
-  const handleSyncVisitCounts = async (dryRun: boolean = true) => {
-    setIsRunningVisitCountSync(true);
-    setVisitCountResult(null);
-    try {
-      const res = await fetch('/api/data-tools/sync-visit-counts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ dryRun })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setVisitCountResult({
-          success: true,
-          message: data.message || `Found ${data.mismatchCount} mismatches, updated ${data.updatedCount}`,
-          mismatchCount: data.mismatchCount,
-          updatedCount: data.updatedCount,
-          sampleMismatches: data.sampleMismatches,
-          dryRun
-        });
-        showToast(dryRun ? 'Preview complete - no changes made' : (data.message || 'Visit count sync complete'), dryRun ? 'info' : 'success');
-      } else {
-        setVisitCountResult({ success: false, message: data.error || 'Failed to sync visit counts' });
-        showToast(data.error || 'Failed to sync visit counts', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to sync visit counts:', err);
-      setVisitCountResult({ success: false, message: 'Network error occurred' });
-      showToast('Failed to sync visit counts', 'error');
-    } finally {
-      setIsRunningVisitCountSync(false);
-    }
-  };
-
-  const handleFixGhostBookings = async (dryRun: boolean = true) => {
-    setIsRunningGhostBookingFix(true);
-    setGhostBookingResult(null);
-    try {
-      if (dryRun) {
-        const res = await fetch('/api/admin/backfill-sessions/preview', {
-          method: 'GET',
-          credentials: 'include'
-        });
-        const data = await res.json();
-        if (res.ok) {
-          setGhostBookingResult({
-            success: true,
-            message: data.message || `Found ${data.totalCount} bookings without sessions`,
-            ghostBookings: data.totalCount,
-            fixed: 0,
-            dryRun: true
-          });
-          showToast('Preview complete - no changes made', 'info');
-        } else {
-          setGhostBookingResult({ success: false, message: data.error || 'Failed to preview' });
-          showToast(data.error || 'Failed to preview', 'error');
-        }
-      } else {
-        const res = await fetch('/api/admin/backfill-sessions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include'
-        });
-        const data = await res.json();
-        if (res.ok) {
-          setGhostBookingResult({
-            success: true,
-            message: data.message || `Created ${data.sessionsCreated} sessions`,
-            ghostBookings: data.sessionsCreated,
-            fixed: data.sessionsCreated,
-            dryRun: false
-          });
-          showToast(data.message || `Created ${data.sessionsCreated} sessions`, 'success');
-          if (data.sessionsCreated > 0) {
-            updateIssueCountOptimistically('Active Bookings Without Sessions', data.sessionsCreated);
-          }
-        } else {
-          setGhostBookingResult({ success: false, message: data.error || 'Failed to create sessions' });
-          showToast(data.error || 'Failed to create sessions', 'error');
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fix ghost bookings:', err);
-      setGhostBookingResult({ success: false, message: 'Network error occurred' });
-      showToast('Failed to fix ghost bookings', 'error');
-    } finally {
-      setIsRunningGhostBookingFix(false);
-    }
-  };
-
-  const handleRemediateDealStages = async (dryRun: boolean = true) => {
-    setIsRunningDealStageRemediation(true);
-    setDealStageRemediationResult(null);
-    try {
-      const res = await fetch('/api/hubspot/remediate-deal-stages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ dryRun })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setDealStageRemediationResult({
-          success: true,
-          message: data.message || `Found ${data.total || 0} deals needing updates${!dryRun ? `, fixed ${data.fixed || 0}` : ''}`,
-          total: data.total,
-          fixed: data.fixed,
-          dryRun
-        });
-        showToast(dryRun ? 'Preview complete - no changes made' : (data.message || 'Deal stage remediation complete'), dryRun ? 'info' : 'success');
-      } else {
-        setDealStageRemediationResult({ success: false, message: data.error || 'Failed to remediate deal stages' });
-        showToast(data.error || 'Failed to remediate deal stages', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to remediate deal stages:', err);
-      setDealStageRemediationResult({ success: false, message: 'Network error occurred' });
-      showToast('Failed to remediate deal stages', 'error');
-    } finally {
-      setIsRunningDealStageRemediation(false);
-    }
-  };
-
-  const handleDetectDuplicates = async () => {
-    setIsRunningDuplicateDetection(true);
-    setDuplicateDetectionResult(null);
-    setExpandedDuplicates({ app: false, hubspot: false });
-    try {
-      const res = await fetch('/api/data-tools/detect-duplicates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include'
-      });
-      const data = await res.json();
-      if (res.ok) {
-        const appCount = data.appDuplicates?.length || 0;
-        const hubspotCount = data.hubspotDuplicates?.length || 0;
-        setDuplicateDetectionResult({
-          success: true,
-          message: data.message || `Found ${appCount} app duplicates, ${hubspotCount} HubSpot duplicates`,
-          appDuplicates: data.appDuplicates,
-          hubspotDuplicates: data.hubspotDuplicates
-        });
-        showToast(data.message || 'Duplicate detection complete', 'success');
-      } else {
-        setDuplicateDetectionResult({ success: false, message: data.error || 'Failed to detect duplicates' });
-        showToast(data.error || 'Failed to detect duplicates', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to detect duplicates:', err);
-      setDuplicateDetectionResult({ success: false, message: 'Network error occurred' });
-      showToast('Failed to detect duplicates', 'error');
-    } finally {
-      setIsRunningDuplicateDetection(false);
-    }
-  };
-
-  const handleScanPlaceholders = async () => {
-    setIsLoadingPlaceholders(true);
-    setPlaceholderAccounts(null);
-    setPlaceholderDeleteResult(null);
-    try {
-      const res = await fetch('/api/data-integrity/placeholder-accounts', {
-        credentials: 'include'
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setPlaceholderAccounts({
-          stripeCustomers: data.stripeCustomers || [],
-          hubspotContacts: data.hubspotContacts || [],
-          totals: data.totals || { stripe: 0, hubspot: 0, total: 0 }
-        });
-        showToast(`Found ${data.totals?.total || 0} placeholder accounts`, data.totals?.total > 0 ? 'info' : 'success');
-      } else {
-        showToast(data.error || 'Failed to scan for placeholders', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to scan placeholders:', err);
-      showToast('Failed to scan for placeholders', 'error');
-    } finally {
-      setIsLoadingPlaceholders(false);
-    }
-  };
-
-  const handleDeletePlaceholders = async () => {
-    if (!placeholderAccounts) return;
-    
-    setIsDeletingPlaceholders(true);
-    setPlaceholderDeleteResult(null);
-    setShowDeleteConfirm(false);
-    try {
-      const res = await fetch('/api/data-integrity/placeholder-accounts/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          stripeCustomerIds: placeholderAccounts.stripeCustomers.map(c => c.id),
-          hubspotContactIds: placeholderAccounts.hubspotContacts.map(c => c.id)
-        })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setPlaceholderDeleteResult({
-          stripeDeleted: data.stripeDeleted || 0,
-          stripeFailed: data.stripeFailed || 0,
-          hubspotDeleted: data.hubspotDeleted || 0,
-          hubspotFailed: data.hubspotFailed || 0
-        });
-        const totalDeleted = (data.stripeDeleted || 0) + (data.hubspotDeleted || 0);
-        const totalFailed = (data.stripeFailed || 0) + (data.hubspotFailed || 0);
-        showToast(`Deleted ${totalDeleted} placeholder accounts${totalFailed > 0 ? `, ${totalFailed} failed` : ''}`, totalFailed > 0 ? 'warning' : 'success');
-        setPlaceholderAccounts(null);
-      } else {
-        showToast(data.error || 'Failed to delete placeholder accounts', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to delete placeholders:', err);
-      showToast('Failed to delete placeholder accounts', 'error');
-    } finally {
-      setIsDeletingPlaceholders(false);
-    }
-  };
-
   return (
     <div className="space-y-6 animate-slide-up-stagger pb-32" style={{ '--stagger-index': 0 } as React.CSSProperties}>
       <div className="mb-6 flex flex-col gap-3">
@@ -2097,1238 +1760,25 @@ const DataIntegrityTab: React.FC = () => {
                               {new Date(entry.runAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </span>
                             <div className="flex items-center gap-2">
-                              <span className={`font-medium ${entry.totalIssues > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'}`}>
+                              <span className={`text-xs font-medium ${entry.totalIssues === 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
                                 {entry.totalIssues} issues
                               </span>
-                              <span className="text-[10px] text-gray-400 dark:text-gray-500 uppercase">{entry.triggeredBy}</span>
+                              <span className="text-[10px] text-gray-500 dark:text-gray-500">
+                                {entry.triggeredBy}
+                              </span>
                             </div>
                           </div>
                         ))}
                       </div>
                     </div>
-
-                    {historyData.activeIssues.filter(i => i.daysUnresolved >= 7).length > 0 && (
-                      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                        <p className="text-xs font-medium text-amber-800 dark:text-amber-200 uppercase tracking-wide mb-2 flex items-center gap-1">
-                          <span aria-hidden="true" className="material-symbols-outlined text-[14px]">schedule</span>
-                          Long-standing Issues ({historyData.activeIssues.filter(i => i.daysUnresolved >= 7).length})
-                        </p>
-                        <div className="space-y-2">
-                          {historyData.activeIssues
-                            .filter(i => i.daysUnresolved >= 7)
-                            .sort((a, b) => b.daysUnresolved - a.daysUnresolved)
-                            .slice(0, 5)
-                            .map((issue) => (
-                              <div key={issue.issueKey} className="text-sm text-amber-700 dark:text-amber-300">
-                                <span className="font-medium">{issue.daysUnresolved} days:</span> {issue.description.substring(0, 60)}...
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                    No history yet. Run integrity checks to start tracking.
-                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No history available</p>
                 )}
               </>
             ) : (
               <p className="text-sm text-gray-500 dark:text-gray-400">Failed to load history</p>
             )}
-          </div>
-        )}
-      </div>
-
-      <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
-        <button
-          onClick={() => setShowPlaceholderCleanup(!showPlaceholderCleanup)}
-          className="flex items-center justify-between w-full text-left"
-        >
-          <div className="flex items-center gap-2">
-            <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">cleaning_services</span>
-            <span className="font-bold text-primary dark:text-white">Placeholder Account Cleanup</span>
-            {placeholderAccounts && placeholderAccounts.totals.total > 0 && (
-              <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
-                {placeholderAccounts.totals.total} accounts found
-              </span>
-            )}
-          </div>
-          <span aria-hidden="true" className={`material-symbols-outlined text-gray-500 dark:text-gray-400 transition-transform ${showPlaceholderCleanup ? 'rotate-180' : ''}`}>
-            expand_more
-          </span>
-        </button>
-        
-        {showPlaceholderCleanup && (
-          <div className="mt-4 space-y-4">
-            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-              <div className="flex items-start gap-2">
-                <span aria-hidden="true" className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-[18px] mt-0.5">warning</span>
-                <div className="text-sm text-amber-700 dark:text-amber-300">
-                  <p className="font-medium mb-1">About Placeholder Accounts</p>
-                  <p className="text-xs">This tool scans for and removes auto-generated accounts with placeholder emails (e.g., golfnow-*, unmatched-*, @visitors.evenhouse.club, @trackman.local). These are temporary records created during imports that can be safely cleaned up.</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex gap-2">
-              <button
-                onClick={handleScanPlaceholders}
-                disabled={isLoadingPlaceholders || isDeletingPlaceholders}
-                className="flex-1 py-2 px-4 bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515] rounded-lg font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                {isLoadingPlaceholders ? (
-                  <>
-                    <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
-                    Scanning...
-                  </>
-                ) : (
-                  <>
-                    <span aria-hidden="true" className="material-symbols-outlined text-[18px]">search</span>
-                    Scan for Placeholders
-                  </>
-                )}
-              </button>
-            </div>
-
-            {placeholderDeleteResult && (
-              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
-                <div className="flex items-start gap-2">
-                  <span aria-hidden="true" className="material-symbols-outlined text-green-600 dark:text-green-400 text-[18px]">check_circle</span>
-                  <div className="text-sm">
-                    <p className="font-medium text-green-700 dark:text-green-300">Deletion Complete</p>
-                    <div className="text-xs text-green-600 dark:text-green-400 mt-1 space-y-0.5">
-                      <p>Stripe: {placeholderDeleteResult.stripeDeleted} deleted{placeholderDeleteResult.stripeFailed > 0 ? `, ${placeholderDeleteResult.stripeFailed} failed` : ''}</p>
-                      <p>HubSpot: {placeholderDeleteResult.hubspotDeleted} deleted{placeholderDeleteResult.hubspotFailed > 0 ? `, ${placeholderDeleteResult.hubspotFailed} failed` : ''}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {placeholderAccounts && (
-              <>
-                {placeholderAccounts.totals.total === 0 ? (
-                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400 p-4 bg-green-50 dark:bg-green-500/10 rounded-lg">
-                    <span aria-hidden="true" className="material-symbols-outlined">check_circle</span>
-                    <span className="text-sm">No placeholder accounts found</span>
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {placeholderAccounts.stripeCustomers.length > 0 && (
-                        <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-3">
-                          <div className="flex items-center gap-2 mb-3">
-                            <span className="text-sm font-semibold text-primary dark:text-white">Stripe Customers</span>
-                            <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded-full">
-                              {placeholderAccounts.stripeCustomers.length}
-                            </span>
-                          </div>
-                          <div className="space-y-2 max-h-60 overflow-y-auto">
-                            {placeholderAccounts.stripeCustomers.map((customer) => (
-                              <div key={customer.id} className="text-sm p-2 bg-white dark:bg-white/5 rounded border border-gray-200 dark:border-white/10">
-                                <p className="font-medium text-primary dark:text-white truncate">{customer.email}</p>
-                                {customer.name && <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{customer.name}</p>}
-                                <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                                  Created: {new Date(customer.created * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {placeholderAccounts.hubspotContacts.length > 0 && (
-                        <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-3">
-                          <div className="flex items-center gap-2 mb-3">
-                            <span className="text-sm font-semibold text-primary dark:text-white">HubSpot Contacts</span>
-                            <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full">
-                              {placeholderAccounts.hubspotContacts.length}
-                            </span>
-                          </div>
-                          <div className="space-y-2 max-h-60 overflow-y-auto">
-                            {placeholderAccounts.hubspotContacts.map((contact) => (
-                              <div key={contact.id} className="text-sm p-2 bg-white dark:bg-white/5 rounded border border-gray-200 dark:border-white/10">
-                                <p className="font-medium text-primary dark:text-white truncate">{contact.email}</p>
-                                {contact.name && contact.name !== contact.email && (
-                                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{contact.name}</p>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="pt-2 border-t border-gray-200 dark:border-white/10">
-                      {!showDeleteConfirm ? (
-                        <button
-                          onClick={() => setShowDeleteConfirm(true)}
-                          disabled={isDeletingPlaceholders}
-                          className="w-full py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-                        >
-                          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">delete_forever</span>
-                          Delete All {placeholderAccounts.totals.total} Placeholder Accounts
-                        </button>
-                      ) : (
-                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-                          <p className="text-sm text-red-700 dark:text-red-300 mb-3">
-                            <span className="font-semibold">Are you sure?</span> This will permanently delete {placeholderAccounts.stripeCustomers.length} Stripe customers and {placeholderAccounts.hubspotContacts.length} HubSpot contacts.
-                          </p>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={handleDeletePlaceholders}
-                              disabled={isDeletingPlaceholders}
-                              className="flex-1 py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-                            >
-                              {isDeletingPlaceholders ? (
-                                <>
-                                  <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
-                                  Deleting...
-                                </>
-                              ) : (
-                                <>
-                                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">delete_forever</span>
-                                  Confirm Delete
-                                </>
-                              )}
-                            </button>
-                            <button
-                              onClick={() => setShowDeleteConfirm(false)}
-                              disabled={isDeletingPlaceholders}
-                              className="py-2 px-4 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-          </div>
-        )}
-      </div>
-
-      {results.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="font-bold text-primary dark:text-white text-lg">Check Results</h2>
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="w-full lg:w-[30%] bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl overflow-hidden">
-              <div className="p-3 border-b border-primary/10 dark:border-white/10 bg-white/80 dark:bg-white/10">
-                <h3 className="text-sm font-semibold text-primary dark:text-white">Integrity Checks</h3>
-              </div>
-              <div className="max-h-[500px] overflow-y-auto divide-y divide-primary/5 dark:divide-white/5">
-                {results.map((result) => {
-                  const metadata = getCheckMetadata(result.checkName);
-                  const displayTitle = metadata?.title || result.checkName;
-                  const severity = metadata?.severity;
-                  const isSelected = selectedCheck === result.checkName;
-                  
-                  return (
-                    <button
-                      key={result.checkName}
-                      onClick={() => setSelectedCheck(isSelected ? null : result.checkName)}
-                      className={`w-full p-3 text-left transition-colors ${
-                        isSelected 
-                          ? 'bg-accent/20 dark:bg-accent/30 border-l-4 border-accent' 
-                          : 'hover:bg-primary/5 dark:hover:bg-white/5'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${getStatusColor(result.status)}`}>
-                          {result.status}
-                        </span>
-                        {severity && (
-                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${getCheckSeverityColor(severity)}`}>
-                            {severity}
-                          </span>
-                        )}
-                        {result.issueCount > 0 && (
-                          <span className="text-xs text-primary/60 dark:text-white/60 ml-auto">{result.issueCount}</span>
-                        )}
-                      </div>
-                      <span className="font-medium text-sm text-primary dark:text-white block truncate">{displayTitle}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            
-            <div className="w-full lg:w-[70%] bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl overflow-hidden">
-              {selectedCheck ? (() => {
-                const result = results.find(r => r.checkName === selectedCheck);
-                if (!result) return null;
-                const metadata = getCheckMetadata(result.checkName);
-                const displayTitle = metadata?.title || result.checkName;
-                const description = metadata?.description;
-                const impact = metadata?.impact;
-                
-                return (
-                  <div className="h-full flex flex-col">
-                    <div className="p-4 border-b border-primary/10 dark:border-white/10 bg-white/80 dark:bg-white/10">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-bold text-primary dark:text-white">{displayTitle}</h3>
-                          {description && (
-                            <p className="text-xs text-primary/60 dark:text-white/60 mt-1">{description}</p>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => setSelectedCheck(null)}
-                          className="p-1 hover:bg-primary/10 dark:hover:bg-white/10 rounded transition-colors lg:hidden"
-                        >
-                          <span aria-hidden="true" className="material-symbols-outlined text-primary/60 dark:text-white/60">close</span>
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="flex-1 overflow-y-auto max-h-[500px] p-4 space-y-4">
-                      {impact && (
-                        <div className="bg-primary/5 dark:bg-white/5 rounded-lg p-3">
-                          <p className="text-xs font-medium text-primary/80 dark:text-white/80 uppercase tracking-wide mb-1">Business Impact</p>
-                          <p className="text-sm text-primary/70 dark:text-white/70">{impact}</p>
-                        </div>
-                      )}
-                      
-                      {result.issues.length === 0 ? (
-                        <div className="flex items-center gap-2 text-green-600 dark:text-green-400 p-4 bg-green-50 dark:bg-green-500/10 rounded-lg">
-                          <span aria-hidden="true" className="material-symbols-outlined">check_circle</span>
-                          <span className="text-sm">No issues found</span>
-                        </div>
-                      ) : (
-                        <>
-                          {renderCheckFixTools(result.checkName)}
-                          
-                          {result.issues.filter(i => !i.ignored).length > 1 && (
-                            <div className="flex justify-end">
-                              <button
-                                onClick={() => openBulkIgnoreModal(result.checkName, result.issues)}
-                                className="text-xs px-3 py-1.5 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded-lg font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center gap-1"
-                              >
-                                <span aria-hidden="true" className="material-symbols-outlined text-[14px]">block</span>
-                                Exclude All ({result.issues.filter(i => !i.ignored).length})
-                              </button>
-                            </div>
-                          )}
-                          
-                          <div className="overflow-x-auto rounded-lg border border-primary/10 dark:border-white/10">
-                            <table className="w-full text-sm">
-                              <thead className="bg-white/80 dark:bg-white/10 sticky top-0 z-10">
-                                <tr className="border-b border-primary/10 dark:border-white/10">
-                                  <th className="text-left py-2 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Severity</th>
-                                  <th className="text-left py-2 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Table</th>
-                                  <th className="text-left py-2 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide hidden md:table-cell">ID</th>
-                                  <th className="text-left py-2 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Description</th>
-                                  <th className="text-right py-2 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-primary/5 dark:divide-white/5">
-                                {result.issues.map((issue, idx) => {
-                                  const tracking = getIssueTracking(issue);
-                                  return (
-                                    <tr key={idx} className="bg-white/50 dark:bg-white/5 hover:bg-white/80 dark:hover:bg-white/10 transition-colors">
-                                      <td className="py-2 px-3">
-                                        <div className="flex items-center gap-1">
-                                          <span aria-hidden="true" className="material-symbols-outlined text-[16px]">{getSeverityIcon(issue.severity)}</span>
-                                          <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                                            issue.severity === 'error' ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' :
-                                            issue.severity === 'warning' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' :
-                                            'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                                          }`}>{issue.severity}</span>
-                                        </div>
-                                        {tracking && tracking.daysUnresolved > 0 && (
-                                          <span className={`text-[10px] mt-1 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 ${
-                                            tracking.daysUnresolved >= 7 
-                                              ? 'bg-red-200 dark:bg-red-800/50 text-red-700 dark:text-red-300' 
-                                              : 'bg-amber-200 dark:bg-amber-800/50 text-amber-700 dark:text-amber-300'
-                                          }`}>
-                                            <span aria-hidden="true" className="material-symbols-outlined text-[10px]">schedule</span>
-                                            {tracking.daysUnresolved}d
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td className="py-2 px-3">
-                                        <span className="text-xs font-mono bg-black/10 dark:bg-white/10 px-1.5 py-0.5 rounded">{issue.table}</span>
-                                      </td>
-                                      <td className="py-2 px-3 hidden md:table-cell">
-                                        <span className="text-xs font-mono text-primary/70 dark:text-white/70">{issue.recordId}</span>
-                                      </td>
-                                      <td className="py-2 px-3 text-primary dark:text-white">
-                                        <p className="text-sm truncate max-w-[250px]" title={issue.description}>{issue.description}</p>
-                                        {issue.suggestion && (
-                                          <p className="text-xs text-primary/50 dark:text-white/50 truncate max-w-[250px]" title={issue.suggestion}>{issue.suggestion}</p>
-                                        )}
-                                      </td>
-                                      <td className="py-2 px-3 text-right whitespace-nowrap">
-                                        <div className="flex gap-1 justify-end">
-                                          {issue.context?.syncComparison && issue.context.syncType === 'hubspot' && (
-                                            <>
-                                              <button
-                                                onClick={() => handleSyncPush(issue)}
-                                                disabled={syncingIssues.has(`${issue.table}_${issue.recordId}`)}
-                                                className="px-2 py-1 bg-blue-600 dark:bg-blue-500 text-white rounded text-xs hover:opacity-90 transition-opacity disabled:opacity-50"
-                                                title="Push to HubSpot"
-                                              >
-                                                <span aria-hidden="true" className="material-symbols-outlined text-sm">cloud_upload</span>
-                                              </button>
-                                              <button
-                                                onClick={() => handleSyncPull(issue)}
-                                                disabled={syncingIssues.has(`${issue.table}_${issue.recordId}`)}
-                                                className="px-2 py-1 bg-orange-600 dark:bg-orange-500 text-white rounded text-xs hover:opacity-90 transition-opacity disabled:opacity-50"
-                                                title="Pull from HubSpot"
-                                              >
-                                                <span aria-hidden="true" className="material-symbols-outlined text-sm">cloud_download</span>
-                                              </button>
-                                            </>
-                                          )}
-                                          {!issue.ignored ? (
-                                            <button
-                                              onClick={() => openIgnoreModal(issue, result.checkName)}
-                                              className="px-2 py-1 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded text-xs hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                                              title="Exclude"
-                                            >
-                                              <span aria-hidden="true" className="material-symbols-outlined text-sm">block</span>
-                                            </button>
-                                          ) : (
-                                            <button
-                                              onClick={() => handleUnignoreIssue(`${issue.table}_${issue.recordId}`)}
-                                              className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded text-xs hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
-                                              title="Remove Exclusion"
-                                            >
-                                              <span aria-hidden="true" className="material-symbols-outlined text-sm">do_not_disturb_off</span>
-                                            </button>
-                                          )}
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })() : (
-                <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center p-8">
-                  <span aria-hidden="true" className="material-symbols-outlined text-4xl text-primary/20 dark:text-white/20 mb-3">arrow_back</span>
-                  <p className="text-primary/60 dark:text-white/60">Select a check from the list to view details</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {results.length === 0 && !isRunning && (
-        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-8 text-center">
-          <span aria-hidden="true" className="material-symbols-outlined text-4xl text-primary/30 dark:text-white/30 mb-3 block">fact_check</span>
-          <p className="text-primary/60 dark:text-white/60">
-            Click "Run Integrity Checks" to scan your database for issues
-          </p>
-        </div>
-      )}
-
-      <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
-        <button
-          onClick={() => setShowDataTools(!showDataTools)}
-          className="flex items-center justify-between w-full text-left"
-        >
-          <div className="flex items-center gap-2">
-            <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">build</span>
-            <span className="font-bold text-primary dark:text-white">Data Tools</span>
-            <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded-full">Admin</span>
-          </div>
-          <span aria-hidden="true" className={`material-symbols-outlined text-gray-500 dark:text-gray-400 transition-transform ${showDataTools ? 'rotate-180' : ''}`}>
-            expand_more
-          </span>
-        </button>
-        
-        {showDataTools && (
-          <div className="mt-4 space-y-6">
-            <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
-              <h4 className="font-semibold text-primary dark:text-white mb-2 flex items-center gap-2">
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">sync</span>
-                Re-sync Member from HubSpot
-              </h4>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Pull the latest contact data from HubSpot for a specific member. Use this when a member's profile looks outdated or incorrect.</p>
-              <div className="flex gap-2">
-                <input
-                  type="email"
-                  value={resyncEmail}
-                  onChange={(e) => setResyncEmail(e.target.value)}
-                  placeholder="Enter member email"
-                  className="flex-1 px-3 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg text-sm text-primary dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4]"
-                />
-                <button
-                  onClick={handleResyncMember}
-                  disabled={!resyncEmail.trim() || isResyncing}
-                  className="px-4 py-2 bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515] rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                >
-                  {isResyncing && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                  Resync
-                </button>
-              </div>
-              {resyncResult && (
-                <p className={`text-sm mt-2 ${resyncResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                  {resyncResult.message}
-                </p>
-              )}
-            </div>
-
-            <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
-              <h4 className="font-semibold text-primary dark:text-white mb-2 flex items-center gap-2">
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">link</span>
-                Guest Fee Relinking
-              </h4>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Connect guest fee charges to their corresponding booking sessions. Fixes cases where guest fees were charged but not linked to the right visit.</p>
-              <div className="flex flex-wrap gap-2 mb-3">
-                <input
-                  type="date"
-                  value={guestFeeStartDate}
-                  onChange={(e) => setGuestFeeStartDate(e.target.value)}
-                  className="px-3 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg text-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4]"
-                />
-                <span className="flex items-center text-gray-500">to</span>
-                <input
-                  type="date"
-                  value={guestFeeEndDate}
-                  onChange={(e) => setGuestFeeEndDate(e.target.value)}
-                  className="px-3 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg text-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4]"
-                />
-                <button
-                  onClick={handleSearchUnlinkedGuestFees}
-                  disabled={!guestFeeStartDate || !guestFeeEndDate || isLoadingGuestFees}
-                  className="px-4 py-2 bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515] rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                >
-                  {isLoadingGuestFees && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                  Search
-                </button>
-              </div>
-              {unlinkedGuestFees.length > 0 && (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {unlinkedGuestFees.map((fee) => (
-                    <div key={fee.id} className={`p-3 rounded-lg border ${selectedFeeId === fee.id ? 'border-primary dark:border-[#CCB8E4] bg-primary/5 dark:bg-[#CCB8E4]/10' : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/5'}`}>
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <span className="text-sm font-medium text-primary dark:text-white">{fee.itemName}</span>
-                          <span className="text-xs text-gray-500 ml-2">${fee.itemTotal}</span>
-                        </div>
-                        <button
-                          onClick={() => handleLoadSessionsForFee(fee)}
-                          className="text-xs px-2 py-1 bg-primary/10 dark:bg-[#CCB8E4]/20 text-primary dark:text-[#CCB8E4] rounded"
-                        >
-                          {selectedFeeId === fee.id ? 'Selected' : 'Select'}
-                        </button>
-                      </div>
-                      <p className="text-xs text-gray-500">{fee.saleDate} • {fee.memberEmail || 'Unknown member'}</p>
-                      
-                      {selectedFeeId === fee.id && availableSessions.length > 0 && (
-                        <div className="mt-3 space-y-2">
-                          <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Link to session:</p>
-                          {availableSessions.map((session) => (
-                            <button
-                              key={session.id}
-                              onClick={() => setSelectedSessionId(session.id)}
-                              className={`w-full text-left p-2 rounded text-sm ${selectedSessionId === session.id ? 'bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515]' : 'bg-gray-100 dark:bg-white/10 text-primary dark:text-white hover:bg-gray-200 dark:hover:bg-white/20'}`}
-                            >
-                              {session.startTime} - {session.endTime} • {session.resourceName || 'Unknown'} • {session.userName}
-                            </button>
-                          ))}
-                          <button
-                            onClick={handleLinkGuestFee}
-                            disabled={!selectedSessionId || isLinkingFee}
-                            className="w-full px-3 py-2 bg-green-600 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
-                          >
-                            {isLinkingFee && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                            Link Fee to Session
-                          </button>
-                        </div>
-                      )}
-                      
-                      {selectedFeeId === fee.id && availableSessions.length === 0 && (
-                        <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">No sessions found for this date/member</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {unlinkedGuestFees.length === 0 && guestFeeStartDate && guestFeeEndDate && !isLoadingGuestFees && (
-                <p className="text-sm text-gray-500 text-center py-4">No unlinked guest fees found in this date range</p>
-              )}
-            </div>
-
-            <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
-              <h4 className="font-semibold text-primary dark:text-white mb-2 flex items-center gap-2">
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">how_to_reg</span>
-                Manual Attendance Correction
-              </h4>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Mark bookings as attended or no-show. Use this to fix attendance records that were missed or recorded incorrectly.</p>
-              <div className="flex flex-wrap gap-2 mb-3">
-                <input
-                  type="date"
-                  value={attendanceSearchDate}
-                  onChange={(e) => setAttendanceSearchDate(e.target.value)}
-                  placeholder="Date"
-                  className="px-3 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg text-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4]"
-                />
-                <input
-                  type="email"
-                  value={attendanceSearchEmail}
-                  onChange={(e) => setAttendanceSearchEmail(e.target.value)}
-                  placeholder="Member email (optional)"
-                  className="flex-1 min-w-[200px] px-3 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg text-sm text-primary dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4]"
-                />
-                <button
-                  onClick={handleSearchAttendance}
-                  disabled={(!attendanceSearchDate && !attendanceSearchEmail) || isSearchingAttendance}
-                  className="px-4 py-2 bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515] rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                >
-                  {isSearchingAttendance && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                  Search
-                </button>
-              </div>
-              {attendanceBookings.length > 0 && (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {attendanceBookings.map((booking) => (
-                    <div key={booking.id} className="p-3 bg-white dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <span className="text-sm font-medium text-primary dark:text-white">{booking.userName}</span>
-                          <span className="text-xs text-gray-500 ml-2">{booking.startTime} - {booking.endTime}</span>
-                        </div>
-                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
-                          booking.reconciliationStatus === 'attended' ? 'bg-green-100 dark:bg-green-900/30 text-green-600' :
-                          booking.reconciliationStatus === 'no_show' ? 'bg-red-100 dark:bg-red-900/30 text-red-600' :
-                          'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                        }`}>
-                          {booking.reconciliationStatus || 'Pending'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mb-2">{booking.requestDate} • {booking.resourceName || 'Unknown resource'}</p>
-                      <div className="flex flex-wrap gap-2">
-                        <input
-                          type="text"
-                          placeholder="Add note (optional)"
-                          value={updatingAttendanceId === booking.id ? attendanceNote : ''}
-                          onChange={(e) => { setUpdatingAttendanceId(booking.id); setAttendanceNote(e.target.value); }}
-                          className="flex-1 min-w-[150px] px-2 py-1 bg-gray-50 dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded text-xs text-primary dark:text-white placeholder:text-gray-400"
-                        />
-                        <button
-                          onClick={() => handleUpdateAttendance(booking.id, 'attended')}
-                          disabled={updatingAttendanceId === booking.id && !attendanceNote}
-                          className="px-3 py-1 bg-green-600 text-white rounded text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
-                        >
-                          {updatingAttendanceId === booking.id && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[12px]">progress_activity</span>}
-                          Attended
-                        </button>
-                        <button
-                          onClick={() => handleUpdateAttendance(booking.id, 'no_show')}
-                          disabled={updatingAttendanceId === booking.id && !attendanceNote}
-                          className="px-3 py-1 bg-red-600 text-white rounded text-xs font-medium hover:opacity-90 disabled:opacity-50"
-                        >
-                          No-Show
-                        </button>
-                      </div>
-                      {booking.reconciliationNotes && (
-                        <p className="text-xs text-gray-500 mt-2 italic">Note: {booking.reconciliationNotes}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {attendanceBookings.length === 0 && (attendanceSearchDate || attendanceSearchEmail) && !isSearchingAttendance && (
-                <p className="text-sm text-gray-500 text-center py-4">No bookings found</p>
-              )}
-            </div>
-
-            <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
-              <h4 className="font-semibold text-primary dark:text-white mb-3 flex items-center gap-2">
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">groups</span>
-                Group Billing Reconciliation
-              </h4>
-              <p className="text-xs text-gray-500 mb-3">
-                Sync group member billing with Stripe. This checks all billing groups and ensures local records match Stripe subscription items.
-                Members removed in Stripe will be deactivated, and missing links will be restored.
-              </p>
-              <button
-                onClick={handleReconcileGroupBilling}
-                disabled={isReconciling}
-                className="px-4 py-2 bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515] rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-              >
-                {isReconciling && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                {isReconciling ? 'Reconciling...' : 'Reconcile Group Billing'}
-              </button>
-              {reconcileResult && (
-                <div className={`mt-3 p-3 rounded-lg ${reconcileResult.success ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' : 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800'}`}>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="text-gray-600 dark:text-gray-300">Groups Checked:</div>
-                    <div className="font-medium text-primary dark:text-white">{reconcileResult.groupsChecked}</div>
-                    <div className="text-gray-600 dark:text-gray-300">Members Deactivated:</div>
-                    <div className="font-medium text-red-600 dark:text-red-400">{reconcileResult.membersDeactivated}</div>
-                    <div className="text-gray-600 dark:text-gray-300">Members Reactivated:</div>
-                    <div className="font-medium text-green-600 dark:text-green-400">{reconcileResult.membersReactivated}</div>
-                    <div className="text-gray-600 dark:text-gray-300">Members Created:</div>
-                    <div className="font-medium text-purple-600 dark:text-purple-400">{reconcileResult.membersCreated}</div>
-                    <div className="text-gray-600 dark:text-gray-300">Items Relinked:</div>
-                    <div className="font-medium text-blue-600 dark:text-blue-400">{reconcileResult.itemsRelinked}</div>
-                  </div>
-                  {reconcileResult.errors.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-amber-200 dark:border-amber-700">
-                      <p className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-1">Errors:</p>
-                      {reconcileResult.errors.map((err, idx) => (
-                        <p key={idx} className="text-xs text-amber-600 dark:text-amber-400">{err}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
-              <h4 className="font-semibold text-primary dark:text-white mb-3 flex items-center gap-2">
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">upload_file</span>
-                Mindbody CSV Import
-              </h4>
-              <p className="text-xs text-gray-500 mb-3">
-                Upload Mindbody CSV exports to import purchase history. The First Visit Report helps link customers to existing members by email/phone.
-              </p>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
-                    First Visit Report (optional - helps match customers)
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="file"
-                      accept=".csv"
-                      onChange={(e) => setFirstVisitFile(e.target.files?.[0] || null)}
-                      className="flex-1 text-sm text-gray-600 dark:text-gray-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 dark:file:bg-blue-900/30 dark:file:text-blue-400 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/50 cursor-pointer"
-                    />
-                    {firstVisitFile && (
-                      <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                        {firstVisitFile.name}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
-                    Sales Report (required)
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="file"
-                      accept=".csv"
-                      onChange={(e) => setSalesFile(e.target.files?.[0] || null)}
-                      className="flex-1 text-sm text-gray-600 dark:text-gray-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-teal-50 file:text-teal-700 dark:file:bg-teal-900/30 dark:file:text-teal-400 hover:file:bg-teal-100 dark:hover:file:bg-teal-900/50 cursor-pointer"
-                    />
-                    {salesFile && (
-                      <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                        {salesFile.name}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                
-                <button
-                  onClick={handleCSVUpload}
-                  disabled={!salesFile || isUploadingCSV}
-                  className="px-4 py-2 bg-teal-600 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                >
-                  {isUploadingCSV && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                  {isUploadingCSV ? 'Importing...' : 'Import CSV Data'}
-                </button>
-                
-                {csvUploadResult && (
-                  <div className={`p-3 rounded-lg ${csvUploadResult.success ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700' : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700'}`}>
-                    <p className={`text-sm font-medium ${csvUploadResult.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                      {csvUploadResult.message}
-                    </p>
-                    {csvUploadResult.success && csvUploadResult.sales && (
-                      <div className="mt-2 space-y-1">
-                        <p className="text-xs text-gray-600 dark:text-gray-400">
-                          <strong>Sales:</strong> {csvUploadResult.sales.imported} imported, {csvUploadResult.sales.skipped} skipped (duplicates), {csvUploadResult.sales.unmatched} unmatched
-                        </p>
-                        {(csvUploadResult.sales.matchedByEmail > 0 || csvUploadResult.sales.matchedByPhone > 0 || csvUploadResult.sales.matchedByName > 0) && (
-                          <p className="text-xs text-gray-600 dark:text-gray-400">
-                            <strong>Matched by:</strong> Email ({csvUploadResult.sales.matchedByEmail}), Phone ({csvUploadResult.sales.matchedByPhone}), Name ({csvUploadResult.sales.matchedByName})
-                          </p>
-                        )}
-                        {csvUploadResult.firstVisit && (
-                          <p className="text-xs text-gray-600 dark:text-gray-400">
-                            <strong>Clients:</strong> {csvUploadResult.firstVisit.linked} linked to members, {csvUploadResult.firstVisit.alreadyLinked} already linked
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
-              <h4 className="font-semibold text-primary dark:text-white mb-3 flex items-center gap-2">
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">cloud_sync</span>
-                Mindbody Data Re-import
-              </h4>
-              <p className="text-xs text-gray-500 mb-3">Re-import data for a specific date range. This will queue a background job to refresh data from Mindbody CSV exports.</p>
-              <div className="flex flex-wrap gap-2 mb-3">
-                <input
-                  type="date"
-                  value={mindbodyStartDate}
-                  onChange={(e) => setMindbodyStartDate(e.target.value)}
-                  className="px-3 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg text-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4]"
-                />
-                <span className="flex items-center text-gray-500">to</span>
-                <input
-                  type="date"
-                  value={mindbodyEndDate}
-                  onChange={(e) => setMindbodyEndDate(e.target.value)}
-                  className="px-3 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg text-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4]"
-                />
-                <button
-                  onClick={handleMindbodyReimport}
-                  disabled={!mindbodyStartDate || !mindbodyEndDate || isRunningMindbodyImport}
-                  className="px-4 py-2 bg-amber-600 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                >
-                  {isRunningMindbodyImport && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                  Queue Re-import
-                </button>
-              </div>
-              {mindbodyResult && (
-                <p className={`text-sm ${mindbodyResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                  {mindbodyResult.message}
-                </p>
-              )}
-            </div>
-
-            <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
-              <h4 className="font-semibold text-primary dark:text-white mb-3 flex items-center gap-2">
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">sync</span>
-                Stripe Data Sync
-              </h4>
-              <p className="text-xs text-gray-500 mb-4">
-                Sync member data with Stripe and cache payment history for faster loading.
-              </p>
-              
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                    <strong>Sync Customer Metadata:</strong> Updates all Stripe customers with their userId and current tier.
-                  </p>
-                  <button
-                    onClick={handleSyncStripeMetadata}
-                    disabled={isSyncingStripeMetadata}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {isSyncingStripeMetadata && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                    {isSyncingStripeMetadata ? 'Syncing...' : 'Sync Customer Metadata'}
-                  </button>
-                  {stripeMetadataResult && (
-                    <p className={`text-sm mt-2 ${stripeMetadataResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {stripeMetadataResult.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="border-t border-gray-200 dark:border-white/10 pt-4">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                    <strong>Backfill Transaction Cache:</strong> Loads the last 90 days of payments from Stripe into the local cache for faster POS loading.
-                  </p>
-                  <button
-                    onClick={handleBackfillStripeCache}
-                    disabled={isBackfillingStripeCache}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {isBackfillingStripeCache && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                    {isBackfillingStripeCache ? 'Backfilling...' : 'Backfill Transaction Cache'}
-                  </button>
-                  {stripeCacheResult && (
-                    <p className={`text-sm mt-2 ${stripeCacheResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {stripeCacheResult.message}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
-              <h4 className="font-semibold text-primary dark:text-white mb-3 flex items-center gap-2">
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">hub</span>
-                HubSpot Data Sync
-              </h4>
-              <p className="text-xs text-gray-500 mb-4">
-                Sync members to HubSpot and clean up stale Mind Body IDs.
-              </p>
-              
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                    <strong>Create HubSpot Contacts:</strong> Creates HubSpot contacts for members who don't have one yet.
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleSyncMembersToHubspot(true)}
-                      disabled={isSyncingToHubspot}
-                      className="px-4 py-2 bg-gray-500 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isSyncingToHubspot && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                      Preview
-                    </button>
-                    <button
-                      onClick={() => handleSyncMembersToHubspot(false)}
-                      disabled={isSyncingToHubspot}
-                      className="px-4 py-2 bg-orange-600 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isSyncingToHubspot && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                      Sync Now
-                    </button>
-                  </div>
-                  {hubspotSyncResult && (
-                    <div className="mt-2">
-                      <p className={`text-sm ${hubspotSyncResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {hubspotSyncResult.message}
-                      </p>
-                      {hubspotSyncResult.members && hubspotSyncResult.members.length > 0 && (
-                        <div className="mt-2 max-h-32 overflow-y-auto text-xs bg-white dark:bg-white/10 rounded p-2">
-                          {hubspotSyncResult.members.map((m: any, i: number) => (
-                            <div key={i} className="py-1 border-b border-gray-100 dark:border-white/10 last:border-0">
-                              {m.name || m.email} - {m.tier || 'No tier'} {m.mindbodyClientId && `(MB: ${m.mindbodyClientId})`}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="border-t border-gray-200 dark:border-white/10 pt-4">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                    <strong>Cleanup Stale Mind Body IDs:</strong> Removes Mind Body IDs that don't exist in HubSpot.
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleCleanupMindbodyIds(true)}
-                      disabled={isCleaningMindbodyIds}
-                      className="px-4 py-2 bg-gray-500 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isCleaningMindbodyIds && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                      Preview
-                    </button>
-                    <button
-                      onClick={() => handleCleanupMindbodyIds(false)}
-                      disabled={isCleaningMindbodyIds}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isCleaningMindbodyIds && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                      Clean Up
-                    </button>
-                  </div>
-                  {mindbodyCleanupResult && (
-                    <p className={`text-sm mt-2 ${mindbodyCleanupResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {mindbodyCleanupResult.message}
-                      {mindbodyCleanupResult.toClean !== undefined && mindbodyCleanupResult.toClean > 0 && (
-                        <span className="ml-2">({mindbodyCleanupResult.toClean} records to clean)</span>
-                      )}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4">
-              <h4 className="font-semibold text-primary dark:text-white mb-3 flex items-center gap-2">
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">sync_alt</span>
-                Cross-Platform Sync Tools
-              </h4>
-              <p className="text-xs text-gray-500 mb-4">
-                Sync data between the app, Stripe, and HubSpot to ensure consistency across all platforms.
-              </p>
-              
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                    <strong>Subscription Status Sync:</strong> Compares member status in the app with Stripe subscription status and fixes mismatches.
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleSyncSubscriptionStatus(true)}
-                      disabled={isRunningSubscriptionSync}
-                      className="px-4 py-2 bg-gray-500 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isRunningSubscriptionSync && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                      Preview
-                    </button>
-                    <button
-                      onClick={() => handleSyncSubscriptionStatus(false)}
-                      disabled={isRunningSubscriptionSync}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isRunningSubscriptionSync && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                      Execute
-                    </button>
-                  </div>
-                  {subscriptionStatusResult && (
-                    <div className={`mt-2 p-3 rounded-lg ${subscriptionStatusResult.success ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700' : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700'}`}>
-                      <p className={`text-sm font-medium ${subscriptionStatusResult.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                        {subscriptionStatusResult.message}
-                      </p>
-                      {subscriptionStatusResult.success && (
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                          Checked: {subscriptionStatusResult.totalChecked} | Mismatches: {subscriptionStatusResult.mismatchCount}
-                        </p>
-                      )}
-                      {subscriptionStatusResult.updated && subscriptionStatusResult.updated.length > 0 && (
-                        <div className="mt-2 max-h-32 overflow-y-auto text-xs bg-white dark:bg-white/10 rounded p-2">
-                          {subscriptionStatusResult.updated.map((u: any, i: number) => (
-                            <div key={i} className="py-1 border-b border-gray-100 dark:border-white/10 last:border-0">
-                              {u.email || u.name}: {u.oldStatus} → {u.newStatus}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="border-t border-gray-200 dark:border-white/10 pt-4">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                    <strong>Stripe-HubSpot Link Tool:</strong> Links Stripe customers with HubSpot contacts, creating missing records.
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleLinkStripeHubspot(true)}
-                      disabled={isRunningStripeHubspotLink}
-                      className="px-4 py-2 bg-gray-500 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isRunningStripeHubspotLink && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                      Preview
-                    </button>
-                    <button
-                      onClick={() => handleLinkStripeHubspot(false)}
-                      disabled={isRunningStripeHubspotLink}
-                      className="px-4 py-2 bg-orange-600 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isRunningStripeHubspotLink && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                      Execute
-                    </button>
-                  </div>
-                  {stripeHubspotLinkResult && (
-                    <div className={`mt-2 p-3 rounded-lg ${stripeHubspotLinkResult.success ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700' : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700'}`}>
-                      <p className={`text-sm font-medium ${stripeHubspotLinkResult.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                        {stripeHubspotLinkResult.message}
-                      </p>
-                      {stripeHubspotLinkResult.success && stripeHubspotLinkResult.linkedCount !== undefined && (
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                          Linked: {stripeHubspotLinkResult.linkedCount} | Stripe Only: {stripeHubspotLinkResult.stripeOnlyMembers?.length || 0} | HubSpot Only: {stripeHubspotLinkResult.hubspotOnlyMembers?.length || 0}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="border-t border-gray-200 dark:border-white/10 pt-4">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                    <strong>Payment Status Sync:</strong> Syncs payment status from Stripe to HubSpot for accurate reporting.
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleSyncPaymentStatus(true)}
-                      disabled={isRunningPaymentStatusSync}
-                      className="px-4 py-2 bg-gray-500 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isRunningPaymentStatusSync && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                      Preview
-                    </button>
-                    <button
-                      onClick={() => handleSyncPaymentStatus(false)}
-                      disabled={isRunningPaymentStatusSync}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isRunningPaymentStatusSync && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                      Execute
-                    </button>
-                  </div>
-                  {paymentStatusResult && (
-                    <div className={`mt-2 p-3 rounded-lg ${paymentStatusResult.success ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700' : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700'}`}>
-                      <p className={`text-sm font-medium ${paymentStatusResult.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                        {paymentStatusResult.message}
-                      </p>
-                      {paymentStatusResult.success && (
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                          Checked: {paymentStatusResult.totalChecked} | Updated: {paymentStatusResult.updatedCount}
-                        </p>
-                      )}
-                      {paymentStatusResult.updates && paymentStatusResult.updates.length > 0 && (
-                        <div className="mt-2 max-h-32 overflow-y-auto text-xs bg-white dark:bg-white/10 rounded p-2">
-                          {paymentStatusResult.updates.map((u: any, i: number) => (
-                            <div key={i} className="py-1 border-b border-gray-100 dark:border-white/10 last:border-0">
-                              {u.email || u.name}: {u.field} updated
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="border-t border-gray-200 dark:border-white/10 pt-4">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                    <strong>Visit Count Sync:</strong> Updates HubSpot total_visit_count with actual check-in data from the app.
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleSyncVisitCounts(true)}
-                      disabled={isRunningVisitCountSync}
-                      className="px-4 py-2 bg-gray-500 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isRunningVisitCountSync && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                      Preview
-                    </button>
-                    <button
-                      onClick={() => handleSyncVisitCounts(false)}
-                      disabled={isRunningVisitCountSync}
-                      className="px-4 py-2 bg-teal-600 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isRunningVisitCountSync && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                      Execute
-                    </button>
-                  </div>
-                  {visitCountResult && (
-                    <div className={`mt-2 p-3 rounded-lg ${visitCountResult.success ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700' : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700'}`}>
-                      <p className={`text-sm font-medium ${visitCountResult.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                        {visitCountResult.message}
-                      </p>
-                      {visitCountResult.success && (
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                          Mismatches: {visitCountResult.mismatchCount} | Updated: {visitCountResult.updatedCount}
-                        </p>
-                      )}
-                      {visitCountResult.sampleMismatches && visitCountResult.sampleMismatches.length > 0 && (
-                        <div className="mt-2 max-h-32 overflow-y-auto text-xs bg-white dark:bg-white/10 rounded p-2">
-                          {visitCountResult.sampleMismatches.map((m: any, i: number) => (
-                            <div key={i} className="py-1 border-b border-gray-100 dark:border-white/10 last:border-0">
-                              {m.email || m.name}: App {m.appCount} vs HubSpot {m.hubspotCount}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="border-t border-gray-200 dark:border-white/10 pt-4">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                    <strong>Ghost Booking Fix:</strong> Creates missing billing sessions for Trackman bookings that weren't properly set up.
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleFixGhostBookings(true)}
-                      disabled={isRunningGhostBookingFix}
-                      className="px-4 py-2 bg-gray-500 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isRunningGhostBookingFix && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                      Preview
-                    </button>
-                    <button
-                      onClick={() => handleFixGhostBookings(false)}
-                      disabled={isRunningGhostBookingFix}
-                      className="px-4 py-2 bg-amber-600 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isRunningGhostBookingFix && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                      Execute
-                    </button>
-                  </div>
-                  {ghostBookingResult && (
-                    <div className={`mt-2 p-3 rounded-lg ${ghostBookingResult.success ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700' : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700'}`}>
-                      <p className={`text-sm font-medium ${ghostBookingResult.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                        {ghostBookingResult.message}
-                      </p>
-                      {ghostBookingResult.success && (
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                          Ghost Bookings Found: {ghostBookingResult.ghostBookings} | Fixed: {ghostBookingResult.fixed}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="border-t border-gray-200 dark:border-white/10 pt-4">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                    <strong>Duplicate Detection:</strong> Detects duplicate contacts in the app and HubSpot for manual review.
-                  </p>
-                  <button
-                    onClick={handleDetectDuplicates}
-                    disabled={isRunningDuplicateDetection}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {isRunningDuplicateDetection && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                    {isRunningDuplicateDetection ? 'Detecting...' : 'Run Detection'}
-                  </button>
-                  {duplicateDetectionResult && (
-                    <div className={`mt-2 p-3 rounded-lg ${duplicateDetectionResult.success ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700' : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700'}`}>
-                      <p className={`text-sm font-medium ${duplicateDetectionResult.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                        {duplicateDetectionResult.message}
-                      </p>
-                      {duplicateDetectionResult.success && (
-                        <div className="mt-2 space-y-2">
-                          {duplicateDetectionResult.appDuplicates && duplicateDetectionResult.appDuplicates.length > 0 && (
-                            <div>
-                              <button
-                                onClick={() => setExpandedDuplicates(prev => ({ ...prev, app: !prev.app }))}
-                                className="flex items-center gap-1 text-xs font-medium text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-white"
-                              >
-                                <span aria-hidden="true" className={`material-symbols-outlined text-[14px] transition-transform ${expandedDuplicates.app ? 'rotate-90' : ''}`}>chevron_right</span>
-                                App Duplicates ({duplicateDetectionResult.appDuplicates.length})
-                              </button>
-                              {expandedDuplicates.app && (
-                                <div className="mt-1 max-h-40 overflow-y-auto text-xs bg-white dark:bg-white/10 rounded p-2">
-                                  {duplicateDetectionResult.appDuplicates.map((d: any, i: number) => (
-                                    <div key={i} className="py-1 border-b border-gray-100 dark:border-white/10 last:border-0">
-                                      {d.email} - {d.count} records
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          {duplicateDetectionResult.hubspotDuplicates && duplicateDetectionResult.hubspotDuplicates.length > 0 && (
-                            <div>
-                              <button
-                                onClick={() => setExpandedDuplicates(prev => ({ ...prev, hubspot: !prev.hubspot }))}
-                                className="flex items-center gap-1 text-xs font-medium text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-white"
-                              >
-                                <span aria-hidden="true" className={`material-symbols-outlined text-[14px] transition-transform ${expandedDuplicates.hubspot ? 'rotate-90' : ''}`}>chevron_right</span>
-                                HubSpot Duplicates ({duplicateDetectionResult.hubspotDuplicates.length})
-                              </button>
-                              {expandedDuplicates.hubspot && (
-                                <div className="mt-1 max-h-40 overflow-y-auto text-xs bg-white dark:bg-white/10 rounded p-2">
-                                  {duplicateDetectionResult.hubspotDuplicates.map((d: any, i: number) => (
-                                    <div key={i} className="py-1 border-b border-gray-100 dark:border-white/10 last:border-0">
-                                      {d.email} - {d.count} records
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
           </div>
         )}
       </div>
@@ -3341,11 +1791,6 @@ const DataIntegrityTab: React.FC = () => {
           <div className="flex items-center gap-2">
             <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">assignment</span>
             <span className="font-bold text-primary dark:text-white">Activity Log</span>
-            {auditLog.length > 0 && (
-              <span className="text-xs bg-primary/10 dark:bg-white/10 text-primary dark:text-white px-2 py-0.5 rounded-full">
-                {auditLog.length} entries
-              </span>
-            )}
           </div>
           <span aria-hidden="true" className={`material-symbols-outlined text-gray-500 dark:text-gray-400 transition-transform ${showActivityLog ? 'rotate-180' : ''}`}>
             expand_more
@@ -3359,315 +1804,648 @@ const DataIntegrityTab: React.FC = () => {
                 <span aria-hidden="true" className="material-symbols-outlined animate-spin text-gray-500">progress_activity</span>
               </div>
             ) : auditLog.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-64 overflow-y-auto">
                 {auditLog.map((entry) => (
-                  <div key={entry.id} className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
-                    <span aria-hidden="true" className={`material-symbols-outlined text-[20px] mt-0.5 ${
-                      entry.action === 'resolved' ? 'text-green-600 dark:text-green-400' :
-                      entry.action === 'ignored' ? 'text-amber-600 dark:text-amber-400' :
-                      'text-blue-600 dark:text-blue-400'
-                    }`}>
-                      {entry.action === 'resolved' ? 'check_circle' : entry.action === 'ignored' ? 'do_not_disturb' : 'refresh'}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                          entry.action === 'resolved' ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' :
-                          entry.action === 'ignored' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' :
-                          'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                        }`}>
-                          {entry.action}
-                        </span>
-                        {entry.resolutionMethod && (
-                          <span className="text-xs font-mono bg-black/10 dark:bg-white/10 px-1.5 py-0.5 rounded">
-                            {entry.resolutionMethod.replace('_', ' ')}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-primary dark:text-white font-medium truncate">{entry.issueKey}</p>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        <span>{entry.actionBy}</span>
-                        <span>•</span>
-                        <span>{new Date(entry.actionAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                      </div>
-                      {entry.notes && (
-                        <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 italic">"{entry.notes}"</p>
-                      )}
+                  <div key={entry.id} className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                        entry.action === 'resolved' 
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                          : entry.action === 'ignored'
+                          ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400'
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                      }`}>
+                        {entry.action}
+                      </span>
+                      <span className="text-[10px] text-gray-500 dark:text-gray-500">
+                        {new Date(entry.actionAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
                     </div>
+                    <p className="text-xs text-gray-700 dark:text-gray-300 font-mono truncate">{entry.issueKey}</p>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-500">by {entry.actionBy}</p>
+                    {entry.notes && (
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 italic">{entry.notes}</p>
+                    )}
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                No activity logged yet. Resolve issues to start tracking.
-              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">No activity logged yet</p>
             )}
           </div>
         )}
       </div>
 
-
-
-      {ignoredIssues.length > 0 && (
-        <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
-          <button
-            onClick={() => setShowIgnoredIssues(!showIgnoredIssues)}
-            className="flex items-center justify-between w-full text-left"
-          >
-            <div className="flex items-center gap-2">
-              <span aria-hidden="true" className="material-symbols-outlined text-gray-500 dark:text-gray-400">block</span>
-              <span className="font-bold text-primary dark:text-white">Excluded Issues</span>
-              <span className="text-xs px-2 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full">
-                {ignoredIssues.filter(i => !i.isExpired).length} active
-              </span>
-            </div>
-            <span aria-hidden="true" className={`material-symbols-outlined text-gray-500 dark:text-gray-400 transition-transform ${showIgnoredIssues ? 'rotate-180' : ''}`}>
-              expand_more
-            </span>
-          </button>
-          
-          {showIgnoredIssues && (
-            <div className="mt-4 space-y-2">
-              {isLoadingIgnored ? (
-                <div className="flex items-center justify-center py-4">
-                  <span aria-hidden="true" className="material-symbols-outlined animate-spin text-gray-500">progress_activity</span>
-                </div>
-              ) : ignoredIssues.length > 0 ? (
-                ignoredIssues.map((ignore) => (
-                  <div
-                    key={ignore.id}
-                    className={`p-3 rounded-lg border ${ignore.isExpired 
-                      ? 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700' 
-                      : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="text-xs font-mono bg-black/10 dark:bg-white/10 px-1.5 py-0.5 rounded">
-                            {ignore.issueKey}
-                          </span>
-                          {ignore.isExpired ? (
-                            <span className="text-xs px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded">
-                              Expired
-                            </span>
-                          ) : (
-                            <span className="text-xs px-1.5 py-0.5 bg-amber-200 dark:bg-amber-800 text-amber-700 dark:text-amber-300 rounded flex items-center gap-1">
-                              <span aria-hidden="true" className="material-symbols-outlined text-[12px]">schedule</span>
-                              Expires {new Date(ignore.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-700 dark:text-gray-300">{ignore.reason}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Excluded by {ignore.ignoredBy} on {new Date(ignore.ignoredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </p>
+      {results.length > 0 && (
+        <div className="space-y-3">
+          {results.map((result) => {
+            const metadata = getCheckMetadata(result.checkName);
+            const displayTitle = metadata?.title || result.checkName;
+            const description = metadata?.description;
+            const checkSeverity = metadata?.severity || 'medium';
+            const isExpanded = expandedChecks.has(result.checkName);
+            
+            return (
+              <div
+                key={result.checkName}
+                className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl overflow-hidden"
+              >
+                <button
+                  onClick={() => toggleCheck(result.checkName)}
+                  className="w-full p-4 flex items-center justify-between text-left"
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded ${getStatusColor(result.status)}`}>
+                      {result.status}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-primary dark:text-white truncate">{displayTitle}</span>
+                        <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded ${getCheckSeverityColor(checkSeverity)}`}>
+                          {checkSeverity}
+                        </span>
                       </div>
-                      <button
-                        onClick={() => handleUnignoreIssue(ignore.issueKey)}
-                        className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded font-medium hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shrink-0"
-                      >
-                        Remove
-                      </button>
+                      {description && (
+                        <p className="text-xs text-primary/60 dark:text-white/60 truncate">{description}</p>
+                      )}
                     </div>
+                    {result.issueCount > 0 && (
+                      <span className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 text-xs font-bold rounded-full shrink-0">
+                        {result.issueCount}
+                      </span>
+                    )}
                   </div>
-                ))
-              ) : (
-                <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                  No excluded issues.
-                </p>
-              )}
-            </div>
-          )}
+                  <span aria-hidden="true" className={`material-symbols-outlined text-gray-500 dark:text-gray-400 transition-transform ml-2 ${isExpanded ? 'rotate-180' : ''}`}>
+                    expand_more
+                  </span>
+                </button>
+                
+                {isExpanded && result.issues.length > 0 && (
+                  <div className="px-4 pb-4 space-y-3">
+                    {renderCheckFixTools(result.checkName)}
+                    
+                    {result.issues.filter(i => !i.ignored).length > 3 && (
+                      <div className="flex justify-end">
+                        <button
+                          onClick={() => openBulkIgnoreModal(result.checkName, result.issues)}
+                          className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">visibility_off</span>
+                          Exclude All ({result.issues.filter(i => !i.ignored).length})
+                        </button>
+                      </div>
+                    )}
+                    
+                    {Object.entries(groupByCategory(result.issues)).map(([category, categoryIssues]) => (
+                      <div key={category} className="space-y-2">
+                        <p className="text-xs font-medium text-primary/60 dark:text-white/60 uppercase tracking-wide">
+                          {getCategoryLabel(category)} ({categoryIssues.length})
+                        </p>
+                        {categoryIssues.map((issue, idx) => {
+                          const issueKey = `${issue.table}_${issue.recordId}`;
+                          const isSyncing = syncingIssues.has(issueKey);
+                          const tracking = getIssueTracking(issue);
+                          const contextStr = formatContextString(issue.context);
+                          
+                          return (
+                            <div
+                              key={idx}
+                              className={`p-3 rounded-lg border ${getSeverityColor(issue.severity)} ${issue.ignored ? 'opacity-50' : ''}`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                    <span aria-hidden="true" className="material-symbols-outlined text-[16px]">
+                                      {getSeverityIcon(issue.severity)}
+                                    </span>
+                                    <span className="font-medium text-sm">{issue.description}</span>
+                                    {issue.ignored && issue.ignoreInfo && (
+                                      <span className="text-[10px] bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+                                        Ignored until {new Date(issue.ignoreInfo.expiresAt).toLocaleDateString()}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {contextStr && (
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">{contextStr}</p>
+                                  )}
+                                  {issue.suggestion && (
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 italic">{issue.suggestion}</p>
+                                  )}
+                                  {tracking && tracking.daysUnresolved > 0 && (
+                                    <p className="text-[10px] text-orange-600 dark:text-orange-400 mt-1">
+                                      Unresolved for {tracking.daysUnresolved} day{tracking.daysUnresolved === 1 ? '' : 's'}
+                                    </p>
+                                  )}
+                                  
+                                  {issue.context?.syncComparison && issue.context.syncComparison.length > 0 && (
+                                    <div className="mt-2 bg-white/50 dark:bg-white/5 rounded p-2">
+                                      <p className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1">Field Differences</p>
+                                      <div className="space-y-1">
+                                        {issue.context.syncComparison.map((comp, compIdx) => (
+                                          <div key={compIdx} className="grid grid-cols-3 gap-2 text-[11px]">
+                                            <span className="font-medium text-gray-700 dark:text-gray-300">{comp.field}</span>
+                                            <span className="text-blue-600 dark:text-blue-400 truncate" title={String(comp.appValue)}>App: {String(comp.appValue)}</span>
+                                            <span className="text-orange-600 dark:text-orange-400 truncate" title={String(comp.externalValue)}>External: {String(comp.externalValue)}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {issue.context?.syncType && !issue.ignored && (
+                                    <>
+                                      <button
+                                        onClick={() => handleSyncPush(issue)}
+                                        disabled={isSyncing}
+                                        className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors disabled:opacity-50"
+                                        title="Push app data to external system"
+                                      >
+                                        {isSyncing ? (
+                                          <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                        ) : (
+                                          <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                                        )}
+                                      </button>
+                                      <button
+                                        onClick={() => handleSyncPull(issue)}
+                                        disabled={isSyncing}
+                                        className="p-1.5 text-orange-600 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900/30 rounded transition-colors disabled:opacity-50"
+                                        title="Pull external data to app"
+                                      >
+                                        {isSyncing ? (
+                                          <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                        ) : (
+                                          <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                                        )}
+                                      </button>
+                                    </>
+                                  )}
+                                  {!issue.ignored && (
+                                    <button
+                                      onClick={() => openIgnoreModal(issue, result.checkName)}
+                                      className="p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 rounded transition-colors"
+                                      title="Ignore this issue"
+                                    >
+                                      <span className="material-symbols-outlined text-[16px]">visibility_off</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {ignoreModal.isOpen && ignoreModal.issue && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-[#1a1a2e] rounded-2xl w-full max-w-md shadow-2xl animate-pop-in">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-primary dark:text-white">Exclude from Checks</h3>
+      {results.length > 0 && results.every(r => r.status === 'pass') && (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl p-8 text-center">
+          <span aria-hidden="true" className="material-symbols-outlined text-4xl text-green-600 dark:text-green-400 mb-2">check_circle</span>
+          <p className="text-lg font-bold text-green-700 dark:text-green-300">All Checks Passed!</p>
+          <p className="text-sm text-green-600 dark:text-green-400">No data integrity issues found.</p>
+        </div>
+      )}
+
+      <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+        <button
+          onClick={() => setShowIgnoredIssues(!showIgnoredIssues)}
+          className="flex items-center justify-between w-full text-left"
+        >
+          <div className="flex items-center gap-2">
+            <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">visibility_off</span>
+            <span className="font-bold text-primary dark:text-white">Ignored Issues</span>
+            {ignoredIssues.length > 0 && (
+              <span className="bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 text-xs font-bold rounded-full">
+                {ignoredIssues.filter(i => i.isActive).length}
+              </span>
+            )}
+          </div>
+          <span aria-hidden="true" className={`material-symbols-outlined text-gray-500 dark:text-gray-400 transition-transform ${showIgnoredIssues ? 'rotate-180' : ''}`}>
+            expand_more
+          </span>
+        </button>
+        
+        {showIgnoredIssues && (
+          <div className="mt-4">
+            {isLoadingIgnored ? (
+              <div className="flex items-center justify-center py-4">
+                <span aria-hidden="true" className="material-symbols-outlined animate-spin text-gray-500">progress_activity</span>
+              </div>
+            ) : ignoredIssues.filter(i => i.isActive).length > 0 ? (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {ignoredIssues.filter(i => i.isActive).map((entry) => (
+                  <div key={entry.id} className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate">{entry.issueKey}</p>
+                      <p className="text-[10px] text-gray-500 dark:text-gray-500">
+                        {entry.reason} • Expires {new Date(entry.expiresAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleUnignoreIssue(entry.issueKey)}
+                      className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors shrink-0"
+                      title="Un-ignore this issue"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">visibility</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">No ignored issues</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+        <button
+          onClick={() => setShowDataTools(!showDataTools)}
+          className="flex items-center justify-between w-full text-left"
+        >
+          <div className="flex items-center gap-2">
+            <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">build</span>
+            <span className="font-bold text-primary dark:text-white">Data Tools</span>
+          </div>
+          <span aria-hidden="true" className={`material-symbols-outlined text-gray-500 dark:text-gray-400 transition-transform ${showDataTools ? 'rotate-180' : ''}`}>
+            expand_more
+          </span>
+        </button>
+        
+        {showDataTools && (
+          <div className="mt-4 space-y-6">
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-primary dark:text-white">Resync Member</h4>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Force a full resync of a member's data from HubSpot and Stripe</p>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={resyncEmail}
+                  onChange={(e) => setResyncEmail(e.target.value)}
+                  placeholder="Enter member email"
+                  className="flex-1 px-3 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg text-sm"
+                />
                 <button
-                  onClick={closeIgnoreModal}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
+                  onClick={handleResyncMember}
+                  disabled={isResyncing || !resyncEmail.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
                 >
-                  <span aria-hidden="true" className="material-symbols-outlined text-gray-500">close</span>
+                  {isResyncing && <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                  Resync
                 </button>
               </div>
-              
-              <div className="mb-4 p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
-                <p className="text-sm text-primary/80 dark:text-white/80">{ignoreModal.issue.description}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {ignoreModal.issue.table} • ID: {ignoreModal.issue.recordId}
+              {resyncResult && (
+                <p className={`text-xs ${resyncResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {resyncResult.message}
+                </p>
+              )}
+            </div>
+
+            <div className="border-t border-gray-200 dark:border-white/10 pt-4 space-y-3">
+              <h4 className="text-sm font-medium text-primary dark:text-white">Reconcile Group Billing</h4>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Sync group billing members with Stripe subscription line items</p>
+              <button
+                onClick={handleReconcileGroupBilling}
+                disabled={isReconciling}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isReconciling && <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                Run Reconciliation
+              </button>
+              {reconcileResult && (
+                <div className={`p-3 rounded-lg ${reconcileResult.success ? 'bg-green-50 dark:bg-green-900/20' : 'bg-yellow-50 dark:bg-yellow-900/20'}`}>
+                  <p className="text-xs text-gray-700 dark:text-gray-300">
+                    Checked {reconcileResult.groupsChecked} groups • 
+                    Deactivated: {reconcileResult.membersDeactivated} • 
+                    Reactivated: {reconcileResult.membersReactivated} • 
+                    Created: {reconcileResult.membersCreated} • 
+                    Relinked: {reconcileResult.itemsRelinked}
+                  </p>
+                  {reconcileResult.errors.length > 0 && (
+                    <div className="mt-2 text-xs text-red-600 dark:text-red-400">
+                      {reconcileResult.errors.map((err, i) => <p key={i}>{err}</p>)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-gray-200 dark:border-white/10 pt-4 space-y-3">
+              <h4 className="text-sm font-medium text-primary dark:text-white">Sync Stripe Metadata</h4>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Update Stripe customer metadata with current app data</p>
+              <button
+                onClick={handleSyncStripeMetadata}
+                disabled={isSyncingStripeMetadata}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isSyncingStripeMetadata && <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                Sync Metadata
+              </button>
+              {stripeMetadataResult && (
+                <p className={`text-xs ${stripeMetadataResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {stripeMetadataResult.message}
+                </p>
+              )}
+            </div>
+
+            <div className="border-t border-gray-200 dark:border-white/10 pt-4 space-y-3">
+              <h4 className="text-sm font-medium text-primary dark:text-white">Backfill Stripe Cache</h4>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Fetch and cache recent Stripe payments, charges, and invoices</p>
+              <button
+                onClick={handleBackfillStripeCache}
+                disabled={isBackfillingStripeCache}
+                className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isBackfillingStripeCache && <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                Backfill Cache
+              </button>
+              {stripeCacheResult && (
+                <p className={`text-xs ${stripeCacheResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {stripeCacheResult.message}
+                </p>
+              )}
+            </div>
+
+            <div className="border-t border-gray-200 dark:border-white/10 pt-4 space-y-3">
+              <h4 className="text-sm font-medium text-primary dark:text-white">Detect Duplicates</h4>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Scan for duplicate members in the app and HubSpot</p>
+              <button
+                onClick={handleDetectDuplicates}
+                disabled={isRunningDuplicateDetection}
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isRunningDuplicateDetection && <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                Detect Duplicates
+              </button>
+              {duplicateDetectionResult && (
+                <div className={`p-3 rounded-lg ${duplicateDetectionResult.success ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
+                  <p className={`text-xs ${duplicateDetectionResult.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
+                    {duplicateDetectionResult.message}
+                  </p>
+                  {duplicateDetectionResult.appDuplicates && duplicateDetectionResult.appDuplicates.length > 0 && (
+                    <div className="mt-2">
+                      <button
+                        onClick={() => setExpandedDuplicates(prev => ({ ...prev, app: !prev.app }))}
+                        className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">{expandedDuplicates.app ? 'expand_less' : 'expand_more'}</span>
+                        App Duplicates ({duplicateDetectionResult.appDuplicates.length})
+                      </button>
+                      {expandedDuplicates.app && (
+                        <div className="mt-1 max-h-32 overflow-y-auto text-[11px] bg-white dark:bg-white/5 rounded p-2">
+                          {duplicateDetectionResult.appDuplicates.map((dup: any, i: number) => (
+                            <div key={i} className="py-1 border-b border-gray-100 dark:border-white/10 last:border-0">
+                              {dup.email}: {dup.count} records
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {duplicateDetectionResult.hubspotDuplicates && duplicateDetectionResult.hubspotDuplicates.length > 0 && (
+                    <div className="mt-2">
+                      <button
+                        onClick={() => setExpandedDuplicates(prev => ({ ...prev, hubspot: !prev.hubspot }))}
+                        className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">{expandedDuplicates.hubspot ? 'expand_less' : 'expand_more'}</span>
+                        HubSpot Duplicates ({duplicateDetectionResult.hubspotDuplicates.length})
+                      </button>
+                      {expandedDuplicates.hubspot && (
+                        <div className="mt-1 max-h-32 overflow-y-auto text-[11px] bg-white dark:bg-white/5 rounded p-2">
+                          {duplicateDetectionResult.hubspotDuplicates.map((dup: any, i: number) => (
+                            <div key={i} className="py-1 border-b border-gray-100 dark:border-white/10 last:border-0">
+                              {dup.email}: {dup.count} contacts
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+        <button
+          onClick={() => setShowPlaceholderCleanup(!showPlaceholderCleanup)}
+          className="flex items-center justify-between w-full text-left"
+        >
+          <div className="flex items-center gap-2">
+            <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">cleaning_services</span>
+            <span className="font-bold text-primary dark:text-white">Placeholder Cleanup</span>
+          </div>
+          <span aria-hidden="true" className={`material-symbols-outlined text-gray-500 dark:text-gray-400 transition-transform ${showPlaceholderCleanup ? 'rotate-180' : ''}`}>
+            expand_more
+          </span>
+        </button>
+        
+        {showPlaceholderCleanup && (
+          <div className="mt-4 space-y-4">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Scan for and remove placeholder accounts in Stripe and HubSpot (e.g., test@placeholder.com)
+            </p>
+            
+            <button
+              onClick={handleScanPlaceholders}
+              disabled={isLoadingPlaceholders}
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+            >
+              {isLoadingPlaceholders && <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+              Scan for Placeholders
+            </button>
+            
+            {placeholderAccounts && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2">
+                    <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{placeholderAccounts.totals.stripe}</p>
+                    <p className="text-[10px] text-blue-600/70 dark:text-blue-400/70 uppercase">Stripe</p>
+                  </div>
+                  <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-2">
+                    <p className="text-lg font-bold text-orange-600 dark:text-orange-400">{placeholderAccounts.totals.hubspot}</p>
+                    <p className="text-[10px] text-orange-600/70 dark:text-orange-400/70 uppercase">HubSpot</p>
+                  </div>
+                  <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-2">
+                    <p className="text-lg font-bold text-purple-600 dark:text-purple-400">{placeholderAccounts.totals.total}</p>
+                    <p className="text-[10px] text-purple-600/70 dark:text-purple-400/70 uppercase">Total</p>
+                  </div>
+                </div>
+                
+                {placeholderAccounts.totals.total > 0 && (
+                  <>
+                    {!showDeleteConfirm ? (
+                      <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="w-full px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:opacity-90 flex items-center justify-center gap-2"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">delete_forever</span>
+                        Delete All Placeholders
+                      </button>
+                    ) : (
+                      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-3">
+                        <p className="text-sm text-red-700 dark:text-red-400 mb-3">
+                          Are you sure you want to delete {placeholderAccounts.totals.total} placeholder accounts?
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setShowDeleteConfirm(false)}
+                            className="flex-1 px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleDeletePlaceholders}
+                            disabled={isDeletingPlaceholders}
+                            className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+                          >
+                            {isDeletingPlaceholders && <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                            Confirm Delete
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+            
+            {placeholderDeleteResult && (
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-3">
+                <p className="text-sm text-green-700 dark:text-green-400">
+                  Deleted: Stripe {placeholderDeleteResult.stripeDeleted}, HubSpot {placeholderDeleteResult.hubspotDeleted}
+                  {(placeholderDeleteResult.stripeFailed > 0 || placeholderDeleteResult.hubspotFailed > 0) && (
+                    <span className="text-red-600 dark:text-red-400">
+                      {' '}• Failed: Stripe {placeholderDeleteResult.stripeFailed}, HubSpot {placeholderDeleteResult.hubspotFailed}
+                    </span>
+                  )}
                 </p>
               </div>
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-primary dark:text-white mb-2">
-                  Exclusion Duration *
-                </label>
-                <div className="flex gap-2">
+            )}
+          </div>
+        )}
+      </div>
+
+      {ignoreModal.isOpen && ignoreModal.issue && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-md w-full p-6 space-y-4">
+            <h3 className="text-lg font-bold text-primary dark:text-white">Ignore Issue</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">{ignoreModal.issue.description}</p>
+            
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-primary dark:text-white">Duration</label>
+              <div className="flex gap-2">
+                {(['24h', '1w', '30d'] as const).map((dur) => (
                   <button
-                    onClick={() => setIgnoreDuration('24h')}
+                    key={dur}
+                    onClick={() => setIgnoreDuration(dur)}
                     className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                      ignoreDuration === '24h'
-                        ? 'bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515]'
-                        : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
+                      ignoreDuration === dur
+                        ? 'bg-primary dark:bg-white text-white dark:text-primary'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
                     }`}
                   >
-                    24 hours
+                    {dur === '24h' ? '24 Hours' : dur === '1w' ? '1 Week' : '30 Days'}
                   </button>
-                  <button
-                    onClick={() => setIgnoreDuration('1w')}
-                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                      ignoreDuration === '1w'
-                        ? 'bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515]'
-                        : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
-                    }`}
-                  >
-                    1 week
-                  </button>
-                  <button
-                    onClick={() => setIgnoreDuration('30d')}
-                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                      ignoreDuration === '30d'
-                        ? 'bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515]'
-                        : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
-                    }`}
-                  >
-                    30 days
-                  </button>
-                </div>
+                ))}
               </div>
-              
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-primary dark:text-white mb-2">
-                  Reason *
-                </label>
-                <textarea
-                  value={ignoreReason}
-                  onChange={(e) => setIgnoreReason(e.target.value)}
-                  placeholder="Explain why this issue is being excluded (e.g., Test account, intentional edge case, pending external fix)"
-                  rows={3}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-primary dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] resize-none"
-                />
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={closeIgnoreModal}
-                  className="flex-1 py-3 px-4 border-2 border-gray-200 dark:border-white/20 text-primary dark:text-white rounded-xl font-bold hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleIgnoreIssue}
-                  disabled={!ignoreReason.trim() || isIgnoring}
-                  className="flex-1 py-3 px-4 bg-amber-500 dark:bg-amber-600 text-white rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isIgnoring ? (
-                    <>
-                      <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
-                      Excluding...
-                    </>
-                  ) : (
-                    <>
-                      <span aria-hidden="true" className="material-symbols-outlined text-[18px]">block</span>
-                      Exclude Issue
-                    </>
-                  )}
-                </button>
-              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-primary dark:text-white">Reason</label>
+              <textarea
+                value={ignoreReason}
+                onChange={(e) => setIgnoreReason(e.target.value)}
+                placeholder="Why are you ignoring this issue?"
+                className="w-full px-3 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg text-sm resize-none"
+                rows={3}
+              />
+            </div>
+            
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={closeIgnoreModal}
+                className="flex-1 py-2 px-4 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleIgnoreIssue}
+                disabled={isIgnoring || !ignoreReason.trim()}
+                className="flex-1 py-2 px-4 bg-primary dark:bg-white text-white dark:text-primary rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isIgnoring && <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                Ignore Issue
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {bulkIgnoreModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-[#1a1a2e] rounded-2xl w-full max-w-md shadow-2xl animate-pop-in">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-primary dark:text-white">Exclude All Issues</h3>
-                <button
-                  onClick={closeBulkIgnoreModal}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
-                >
-                  <span aria-hidden="true" className="material-symbols-outlined text-gray-500">close</span>
-                </button>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-md w-full p-6 space-y-4">
+            <h3 className="text-lg font-bold text-primary dark:text-white">Exclude All Issues</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Exclude {bulkIgnoreModal.issues.length} issues from "{bulkIgnoreModal.checkName}"
+            </p>
+            
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-primary dark:text-white">Duration</label>
+              <div className="flex gap-2">
+                {(['24h', '1w', '30d'] as const).map((dur) => (
+                  <button
+                    key={dur}
+                    onClick={() => setIgnoreDuration(dur)}
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                      ignoreDuration === dur
+                        ? 'bg-primary dark:bg-white text-white dark:text-primary'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                    }`}
+                  >
+                    {dur === '24h' ? '24 Hours' : dur === '1w' ? '1 Week' : '30 Days'}
+                  </button>
+                ))}
               </div>
-              
-              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/30 rounded-xl p-4 mb-4">
-                <p className="text-sm text-amber-800 dark:text-amber-200">
-                  You are about to exclude <strong>{bulkIgnoreModal.issues.length}</strong> issues from <strong>{bulkIgnoreModal.checkName}</strong>.
-                  These issues will be hidden from future checks until the exclusion expires.
-                </p>
-              </div>
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-primary dark:text-white mb-2">
-                  Exclusion Duration
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { value: '24h', label: '24 Hours' },
-                    { value: '1w', label: '1 Week' },
-                    { value: '30d', label: '30 Days' }
-                  ].map(option => (
-                    <button
-                      key={option.value}
-                      onClick={() => setIgnoreDuration(option.value as '24h' | '1w' | '30d')}
-                      className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                        ignoreDuration === option.value
-                          ? 'bg-primary dark:bg-[#CCB8E4] text-white dark:text-[#293515]'
-                          : 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-primary dark:text-white mb-2">
-                  Reason *
-                </label>
-                <textarea
-                  value={ignoreReason}
-                  onChange={(e) => setIgnoreReason(e.target.value)}
-                  placeholder="Explain why these issues are being excluded (e.g., Legacy data from migration, known historical records)"
-                  rows={3}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-primary dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] resize-none"
-                />
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={closeBulkIgnoreModal}
-                  className="flex-1 py-3 px-4 border-2 border-gray-200 dark:border-white/20 text-primary dark:text-white rounded-xl font-bold hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleBulkIgnore}
-                  disabled={!ignoreReason.trim() || isBulkIgnoring}
-                  className="flex-1 py-3 px-4 bg-amber-500 dark:bg-amber-600 text-white rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isBulkIgnoring ? (
-                    <>
-                      <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
-                      Excluding...
-                    </>
-                  ) : (
-                    <>
-                      <span aria-hidden="true" className="material-symbols-outlined text-[18px]">block</span>
-                      Exclude All
-                    </>
-                  )}
-                </button>
-              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-primary dark:text-white">Reason</label>
+              <textarea
+                value={ignoreReason}
+                onChange={(e) => setIgnoreReason(e.target.value)}
+                placeholder="Why are you excluding these issues?"
+                className="w-full px-3 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg text-sm resize-none"
+                rows={3}
+              />
+            </div>
+            
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={closeBulkIgnoreModal}
+                className="flex-1 py-2 px-4 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkIgnore}
+                disabled={isBulkIgnoring || !ignoreReason.trim()}
+                className="flex-1 py-2 px-4 bg-primary dark:bg-white text-white dark:text-primary rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isBulkIgnoring && <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                Exclude All
+              </button>
             </div>
           </div>
         </div>

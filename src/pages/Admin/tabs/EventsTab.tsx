@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePageReady } from '../../../contexts/PageReadyContext';
 import { useData, MemberProfile } from '../../../contexts/DataContext';
 import { formatDateDisplayWithDay, formatDateTimePacific, getTodayPacific } from '../../../utils/dateUtils';
@@ -9,6 +10,7 @@ import FloatingActionButton from '../../../components/FloatingActionButton';
 import { SlideUpDrawer } from '../../../components/SlideUpDrawer';
 import TierBadge from '../../../components/TierBadge';
 import { AnimatedPage } from '../../../components/motion';
+import { fetchWithCredentials, postWithCredentials, deleteWithCredentials } from '../../../hooks/queries/useFetch';
 
 interface Participant {
     id: number;
@@ -141,63 +143,87 @@ const ParticipantDetailsModal: React.FC<ParticipantDetailsModalProps> = ({
 }) => {
     const { showToast } = useToast();
     const { members } = useData();
+    const queryClient = useQueryClient();
     const [isAdding, setIsAdding] = useState(false);
     const [newEmail, setNewEmail] = useState('');
     const [addError, setAddError] = useState<string | null>(null);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isSyncing, setIsSyncing] = useState(false);
     const [syncResult, setSyncResult] = useState<{ synced: number; matched: number } | null>(null);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [filteredMembers, setFilteredMembers] = useState<MemberProfile[]>([]);
-    const [deletingId, setDeletingId] = useState<number | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
-    const handleDeleteRsvp = async (rsvpId: number) => {
-        if (!eventId) return;
-        setDeletingId(rsvpId);
-        try {
-            const res = await fetch(`/api/events/${eventId}/rsvps/${rsvpId}`, {
-                method: 'DELETE',
-                credentials: 'include',
-            });
-            if (res.ok) {
-                showToast('RSVP removed successfully', 'success');
-                setConfirmDeleteId(null);
-                onRefresh?.();
-            } else {
-                const data = await res.json();
-                showToast(data.error || 'Failed to remove RSVP', 'error');
-            }
-        } catch (err) {
-            console.error('Failed to delete RSVP:', err);
-            showToast('Failed to remove RSVP', 'error');
-        } finally {
-            setDeletingId(null);
+    const deleteRsvpMutation = useMutation({
+        mutationFn: (rsvpId: number) => 
+            deleteWithCredentials(`/api/events/${eventId}/rsvps/${rsvpId}`),
+        onSuccess: () => {
+            showToast('RSVP removed successfully', 'success');
+            setConfirmDeleteId(null);
+            queryClient.invalidateQueries({ queryKey: ['event-rsvps', eventId] });
+            onRefresh?.();
+        },
+        onError: (error: Error) => {
+            showToast(error.message || 'Failed to remove RSVP', 'error');
         }
+    });
+
+    const deleteEnrollmentMutation = useMutation({
+        mutationFn: (userEmail: string) => 
+            deleteWithCredentials(`/api/wellness-enrollments/${classId}/${encodeURIComponent(userEmail)}`),
+        onSuccess: () => {
+            showToast('Enrollment removed successfully', 'success');
+            setConfirmDeleteId(null);
+            queryClient.invalidateQueries({ queryKey: ['class-enrollments', classId] });
+            onRefresh?.();
+        },
+        onError: (error: Error) => {
+            showToast(error.message || 'Failed to remove enrollment', 'error');
+        }
+    });
+
+    const syncEventbriteMutation = useMutation({
+        mutationFn: () => 
+            postWithCredentials<{ synced: number; matched: number }>(`/api/events/${eventId}/sync-eventbrite-attendees`, {}),
+        onSuccess: (data) => {
+            setSyncResult({ synced: data.synced, matched: data.matched });
+            showToast(`Synced ${data.synced} attendees, ${data.matched} matched to members`, 'success');
+            queryClient.invalidateQueries({ queryKey: ['event-rsvps', eventId] });
+            onRefresh?.();
+        },
+        onError: () => {
+            showToast('Failed to sync Eventbrite attendees', 'error');
+        }
+    });
+
+    const addParticipantMutation = useMutation({
+        mutationFn: (email: string) => {
+            const url = type === 'rsvp' 
+                ? `/api/events/${eventId}/rsvps/manual`
+                : `/api/wellness-classes/${classId}/enrollments/manual`;
+            return postWithCredentials(url, { email });
+        },
+        onSuccess: () => {
+            setNewEmail('');
+            setIsAdding(false);
+            if (type === 'rsvp') {
+                queryClient.invalidateQueries({ queryKey: ['event-rsvps', eventId] });
+            } else {
+                queryClient.invalidateQueries({ queryKey: ['class-enrollments', classId] });
+            }
+            onRefresh?.();
+        },
+        onError: (error: Error) => {
+            setAddError(error.message || `Failed to add ${type === 'rsvp' ? 'RSVP' : 'enrollment'}`);
+        }
+    });
+
+    const handleDeleteRsvp = (rsvpId: number) => {
+        if (!eventId) return;
+        deleteRsvpMutation.mutate(rsvpId);
     };
 
-    const handleDeleteEnrollment = async (enrollmentId: number, userEmail: string) => {
+    const handleDeleteEnrollment = (enrollmentId: number, userEmail: string) => {
         if (!classId) return;
-        setDeletingId(enrollmentId);
-        try {
-            const res = await fetch(`/api/wellness-enrollments/${classId}/${encodeURIComponent(userEmail)}`, {
-                method: 'DELETE',
-                credentials: 'include',
-            });
-            if (res.ok) {
-                showToast('Enrollment removed successfully', 'success');
-                setConfirmDeleteId(null);
-                onRefresh?.();
-            } else {
-                const data = await res.json();
-                showToast(data.error || 'Failed to remove enrollment', 'error');
-            }
-        } catch (err) {
-            console.error('Failed to delete enrollment:', err);
-            showToast('Failed to remove enrollment', 'error');
-        } finally {
-            setDeletingId(null);
-        }
+        deleteEnrollmentMutation.mutate(userEmail);
     };
 
     const handleEmailChange = (value: string) => {
@@ -228,36 +254,17 @@ const ParticipantDetailsModal: React.FC<ParticipantDetailsModalProps> = ({
         }, 200);
     };
 
-    const handleSyncEventbrite = async () => {
+    const handleSyncEventbrite = () => {
         if (!eventId) return;
-        setIsSyncing(true);
         setSyncResult(null);
-        try {
-            const res = await fetch(`/api/events/${eventId}/sync-eventbrite-attendees`, {
-                method: 'POST',
-                credentials: 'include',
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setSyncResult({ synced: data.synced, matched: data.matched });
-                showToast(`Synced ${data.synced} attendees, ${data.matched} matched to members`, 'success');
-                onRefresh?.();
-            } else {
-                showToast('Failed to sync Eventbrite attendees', 'error');
-            }
-        } catch (err) {
-            console.error('Failed to sync Eventbrite attendees:', err);
-            showToast('Failed to sync Eventbrite attendees', 'error');
-        } finally {
-            setIsSyncing(false);
-        }
+        syncEventbriteMutation.mutate();
     };
 
     const formatDate = (dateStr: string) => {
         return formatDateTimePacific(dateStr);
     };
 
-    const handleAdd = async () => {
+    const handleAdd = () => {
         if (!newEmail.trim()) {
             setAddError('Email is required');
             return;
@@ -266,35 +273,8 @@ const ParticipantDetailsModal: React.FC<ParticipantDetailsModalProps> = ({
             setAddError('Please enter a valid email');
             return;
         }
-
-        setIsSubmitting(true);
         setAddError(null);
-
-        try {
-            const url = type === 'rsvp' 
-                ? `/api/events/${eventId}/rsvps/manual`
-                : `/api/wellness-classes/${classId}/enrollments/manual`;
-            
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ email: newEmail.trim() })
-            });
-
-            if (res.ok) {
-                setNewEmail('');
-                setIsAdding(false);
-                onRefresh?.();
-            } else {
-                const data = await res.json();
-                setAddError(data.error || `Failed to add ${type === 'rsvp' ? 'RSVP' : 'enrollment'}`);
-            }
-        } catch (err) {
-            setAddError(`Failed to add ${type === 'rsvp' ? 'RSVP' : 'enrollment'}`);
-        } finally {
-            setIsSubmitting(false);
-        }
+        addParticipantMutation.mutate(newEmail.trim());
     };
 
     return (
@@ -357,16 +337,16 @@ const ParticipantDetailsModal: React.FC<ParticipantDetailsModalProps> = ({
                                     <button
                                         onClick={() => { setIsAdding(false); setNewEmail(''); setAddError(null); }}
                                         className="flex-1 py-2 px-3 rounded-lg border border-gray-200 dark:border-white/25 text-gray-600 dark:text-gray-400 text-sm font-medium"
-                                        disabled={isSubmitting}
+                                        disabled={addParticipantMutation.isPending}
                                     >
                                         Cancel
                                     </button>
                                     <button
                                         onClick={handleAdd}
-                                        disabled={isSubmitting}
+                                        disabled={addParticipantMutation.isPending}
                                         className="flex-1 py-2 px-3 rounded-lg bg-primary text-white text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-1"
                                     >
-                                        {isSubmitting && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
+                                        {addParticipantMutation.isPending && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
                                         Add
                                     </button>
                                 </div>
@@ -383,10 +363,10 @@ const ParticipantDetailsModal: React.FC<ParticipantDetailsModalProps> = ({
                                 {type === 'rsvp' && eventbriteId && (
                                     <button
                                         onClick={handleSyncEventbrite}
-                                        disabled={isSyncing}
+                                        disabled={syncEventbriteMutation.isPending}
                                         className="py-2.5 px-4 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-600 dark:text-orange-400 text-sm font-medium flex items-center justify-center gap-2 hover:bg-orange-500/20 transition-colors disabled:opacity-50"
                                     >
-                                        {isSyncing ? (
+                                        {syncEventbriteMutation.isPending ? (
                                             <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
                                         ) : (
                                             <span aria-hidden="true" className="material-symbols-outlined text-[18px]">sync</span>
@@ -484,11 +464,11 @@ const ParticipantDetailsModal: React.FC<ParticipantDetailsModalProps> = ({
                                                             <div className="flex items-center gap-1">
                                                                 <button
                                                                     onClick={() => type === 'rsvp' ? handleDeleteRsvp(primary.id) : handleDeleteEnrollment(primary.id, primary.userEmail)}
-                                                                    disabled={deletingId === primary.id}
+                                                                    disabled={deleteRsvpMutation.isPending || deleteEnrollmentMutation.isPending}
                                                                     className="p-1.5 rounded-lg bg-red-500 text-white text-xs font-medium min-w-[44px] min-h-[32px] flex items-center justify-center disabled:opacity-50"
                                                                     aria-label="Confirm remove"
                                                                 >
-                                                                    {deletingId === primary.id ? (
+                                                                    {(deleteRsvpMutation.isPending || deleteEnrollmentMutation.isPending) ? (
                                                                         <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
                                                                     ) : (
                                                                         'Yes'
@@ -567,13 +547,11 @@ interface NeedsReviewEvent {
 const EventsAdminContent: React.FC = () => {
     const { setPageReady } = usePageReady();
     const { showToast } = useToast();
-    const [events, setEvents] = useState<DBEvent[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [activeCategory, setActiveCategory] = useState('all');
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<number | null>(null);
     const [newItem, setNewItem] = useState<Partial<DBEvent>>({ category: 'Social' });
-    const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
 
@@ -586,17 +564,28 @@ const EventsAdminContent: React.FC = () => {
     const markTouched = (field: string) => setTouchedFields(prev => new Set(prev).add(field));
     const [isViewingRsvps, setIsViewingRsvps] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<DBEvent | null>(null);
-    const [rsvps, setRsvps] = useState<Participant[]>([]);
-    const [isLoadingRsvps, setIsLoadingRsvps] = useState(false);
-    const [deletingEventId, setDeletingEventId] = useState<number | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [eventToDelete, setEventToDelete] = useState<DBEvent | null>(null);
     const [eventCascadePreview, setEventCascadePreview] = useState<{ rsvps: number } | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     
-    const [needsReviewEvents, setNeedsReviewEvents] = useState<NeedsReviewEvent[]>([]);
     const [needsReviewExpanded, setNeedsReviewExpanded] = useState(true);
-    const [needsReviewLoading, setNeedsReviewLoading] = useState(true);
+
+    const { data: events = [], isLoading } = useQuery({
+        queryKey: ['admin-events'],
+        queryFn: () => fetchWithCredentials<DBEvent[]>('/api/events?include_past=true')
+    });
+
+    const { data: needsReviewEvents = [], isLoading: needsReviewLoading } = useQuery({
+        queryKey: ['events-needs-review'],
+        queryFn: () => fetchWithCredentials<NeedsReviewEvent[]>('/api/events/needs-review')
+    });
+
+    const { data: rsvps = [], isLoading: isLoadingRsvps, refetch: refetchRsvps } = useQuery({
+        queryKey: ['event-rsvps', selectedEvent?.id],
+        queryFn: () => fetchWithCredentials<Participant[]>(`/api/events/${selectedEvent!.id}/rsvps`),
+        enabled: !!selectedEvent && isViewingRsvps
+    });
 
     useEffect(() => {
         if (!isLoading) {
@@ -604,32 +593,48 @@ const EventsAdminContent: React.FC = () => {
         }
     }, [isLoading, setPageReady]);
 
-    const fetchEvents = async () => {
-        try {
-            const res = await fetch('/api/events?include_past=true');
-            const data = await res.json();
-            setEvents(data);
-        } catch (err) {
-            console.error('Failed to fetch events:', err);
-        } finally {
-            setIsLoading(false);
+    useEffect(() => {
+        if (needsReviewEvents.length > 0) {
+            setNeedsReviewExpanded(true);
         }
-    };
+    }, [needsReviewEvents.length]);
 
-    const fetchNeedsReview = async () => {
-        try {
-            const res = await fetch('/api/events/needs-review', { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setNeedsReviewEvents(data || []);
-                setNeedsReviewExpanded((data || []).length > 0);
-            }
-        } catch (err) {
-            console.error('Failed to fetch needs review:', err);
-        } finally {
-            setNeedsReviewLoading(false);
+    const saveEventMutation = useMutation({
+        mutationFn: async (payload: Record<string, unknown>) => {
+            const url = editId ? `/api/events/${editId}` : '/api/events';
+            const method = editId ? 'PUT' : 'POST';
+            return fetchWithCredentials<DBEvent>(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        },
+        onSuccess: () => {
+            setIsEditing(false);
+            showToast(editId ? 'Event updated successfully' : 'Event created successfully', 'success');
+            queryClient.invalidateQueries({ queryKey: ['admin-events'] });
+            queryClient.invalidateQueries({ queryKey: ['events-needs-review'] });
+        },
+        onError: () => {
+            setError('Failed to save event. Please try again.');
         }
-    };
+    });
+
+    const deleteEventMutation = useMutation({
+        mutationFn: (eventId: number) => 
+            deleteWithCredentials(`/api/events/${eventId}`),
+        onSuccess: () => {
+            setSuccess('Event archived');
+            showToast('Event archived successfully', 'success');
+            setTimeout(() => setSuccess(null), 3000);
+            queryClient.invalidateQueries({ queryKey: ['admin-events'] });
+        },
+        onError: () => {
+            setError('Failed to archive event');
+            showToast('Failed to archive event', 'error');
+            setTimeout(() => setError(null), 3000);
+        }
+    });
 
     const openEditForNeedsReview = (event: NeedsReviewEvent) => {
         setNewItem({
@@ -650,26 +655,22 @@ const EventsAdminContent: React.FC = () => {
     };
 
     useEffect(() => {
-        fetchEvents();
-        fetchNeedsReview();
-    }, []);
-
-    useEffect(() => {
         const handleOpenCreate = () => openCreate();
         window.addEventListener('openEventCreate', handleOpenCreate);
         return () => window.removeEventListener('openEventCreate', handleOpenCreate);
     }, []);
 
     useEffect(() => {
-        const handleRefresh = () => fetchEvents();
+        const handleRefresh = () => {
+            queryClient.invalidateQueries({ queryKey: ['admin-events'] });
+        };
         window.addEventListener('refreshEventsData', handleRefresh);
-        // Also refresh on booking-update for real-time RSVP updates
         window.addEventListener('booking-update', handleRefresh);
         return () => {
             window.removeEventListener('refreshEventsData', handleRefresh);
             window.removeEventListener('booking-update', handleRefresh);
         };
-    }, []);
+    }, [queryClient]);
 
     useEffect(() => {
         if (isEditing) {
@@ -704,7 +705,7 @@ const EventsAdminContent: React.FC = () => {
         setIsEditing(true);
     };
 
-    const handleSave = async () => {
+    const handleSave = () => {
         setError(null);
         
         if (!newItem.title?.trim()) {
@@ -737,107 +738,31 @@ const EventsAdminContent: React.FC = () => {
             block_conference_room: newItem.block_conference_room || false,
         };
 
-        setIsSaving(true);
-        try {
-            const res = editId 
-                ? await fetch(`/api/events/${editId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                })
-                : await fetch('/api/events', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                });
-            
-            if (!res.ok) {
-                throw new Error('Failed to save');
-            }
-
-            const savedItem = await res.json();
-            
-            // Optimistically update local state
-            if (editId) {
-                setEvents(prev => prev.map(e => e.id === editId ? savedItem : e));
-            } else {
-                setEvents(prev => [savedItem, ...prev]);
-            }
-            
-            setIsEditing(false);
-            showToast(editId ? 'Event updated successfully' : 'Event created successfully', 'success');
-            
-            // Refresh needs review list in case the edit resolved review status
-            fetchNeedsReview();
-        } catch (err) {
-            console.error('Failed to save event:', err);
-            setError('Failed to save event. Please try again.');
-        } finally {
-            setIsSaving(false);
-        }
+        saveEventMutation.mutate(payload);
     };
 
     const handleDelete = async (event: DBEvent) => {
         setEventToDelete(event);
         setEventCascadePreview(null);
         try {
-            const res = await fetch(`/api/events/${event.id}/cascade-preview`, { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setEventCascadePreview(data.relatedData || null);
-            }
+            const data = await fetchWithCredentials<{ relatedData?: { rsvps: number } }>(`/api/events/${event.id}/cascade-preview`);
+            setEventCascadePreview(data.relatedData || null);
         } catch (err) {
             console.error('Failed to fetch cascade preview:', err);
         }
         setShowDeleteConfirm(true);
     };
 
-    const confirmDelete = async () => {
+    const confirmDelete = () => {
         if (!eventToDelete) return;
-        
-        const snapshot = [...events];
-        const deletedId = eventToDelete.id;
-        
-        setEvents(prev => prev.filter(e => e.id !== deletedId));
         setShowDeleteConfirm(false);
+        deleteEventMutation.mutate(eventToDelete.id);
         setEventToDelete(null);
-        
-        try {
-            const res = await fetch(`/api/events/${deletedId}`, { method: 'DELETE', credentials: 'include' });
-            if (res.ok) {
-                setSuccess('Event archived');
-                showToast('Event archived successfully', 'success');
-                setTimeout(() => setSuccess(null), 3000);
-            } else {
-                setEvents(snapshot);
-                setError('Failed to archive event');
-                showToast('Failed to archive event', 'error');
-                setTimeout(() => setError(null), 3000);
-            }
-        } catch (err) {
-            console.error('Failed to archive event:', err);
-            setEvents(snapshot);
-            setError('Failed to archive event');
-            showToast('Failed to archive event', 'error');
-            setTimeout(() => setError(null), 3000);
-        }
     };
 
-    const handleViewRsvps = async (event: DBEvent) => {
+    const handleViewRsvps = (event: DBEvent) => {
         setSelectedEvent(event);
         setIsViewingRsvps(true);
-        setIsLoadingRsvps(true);
-        try {
-            const res = await fetch(`/api/events/${event.id}/rsvps`, { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setRsvps(data);
-            }
-        } catch (err) {
-            console.error('Failed to fetch RSVPs:', err);
-        } finally {
-            setIsLoadingRsvps(false);
-        }
     };
 
     const formatDate = (dateStr: string) => {
@@ -865,7 +790,6 @@ const EventsAdminContent: React.FC = () => {
     const NeedsReviewSection = () => {
         const count = needsReviewEvents.length;
         
-        // Hide section completely when there are no items to review
         if (!needsReviewLoading && count === 0) {
             return null;
         }
@@ -988,13 +912,9 @@ const EventsAdminContent: React.FC = () => {
 
     return (
         <AnimatedPage>
-            <p className="text-sm text-primary/80 dark:text-white/80 mb-4 animate-content-enter-delay-1">
-                Synced from Google Calendar: <span className="font-medium">Events</span>
-            </p>
-            
             <NeedsReviewSection />
-            
-            <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide -mx-4 px-4 animate-content-enter-delay-2 scroll-fade-right">
+
+            <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide -mx-4 px-4 scroll-fade-right">
                 {CATEGORY_TABS.map(tab => (
                     <button
                         key={tab.id}
@@ -1012,47 +932,59 @@ const EventsAdminContent: React.FC = () => {
             </div>
 
             {success && (
-                <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg text-green-700 dark:text-green-400 text-sm flex items-center gap-2">
-                    <span aria-hidden="true" className="material-symbols-outlined text-[18px]">check_circle</span>
+                <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg text-green-700 dark:text-green-400 text-sm">
                     {success}
+                </div>
+            )}
+
+            {error && !isEditing && (
+                <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-red-700 dark:text-red-400 text-sm">
+                    {error}
                 </div>
             )}
 
             <SlideUpDrawer 
                 isOpen={showDeleteConfirm} 
-                onClose={() => { setShowDeleteConfirm(false); setEventToDelete(null); setEventCascadePreview(null); }} 
+                onClose={() => { setShowDeleteConfirm(false); setEventToDelete(null); }} 
                 title="Archive Event"
+                maxHeight="small"
                 stickyFooter={
                     <div className="flex gap-3 p-4">
-                        <button 
-                            onClick={() => { setShowDeleteConfirm(false); setEventToDelete(null); setEventCascadePreview(null); }} 
-                            className="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
-                            disabled={deletingEventId !== null}
+                        <button
+                            onClick={() => { setShowDeleteConfirm(false); setEventToDelete(null); }}
+                            disabled={deleteEventMutation.isPending}
+                            className="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition-colors disabled:opacity-50"
                         >
                             Cancel
                         </button>
-                        <button 
-                            onClick={confirmDelete} 
-                            disabled={deletingEventId !== null}
-                            className="flex-1 py-3 rounded-xl bg-red-500 text-white font-medium shadow-md hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                        <button
+                            onClick={confirmDelete}
+                            disabled={deleteEventMutation.isPending}
+                            className="flex-1 py-3 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                         >
-                            {deletingEventId !== null && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
-                            {deletingEventId !== null ? 'Archiving...' : 'Archive'}
+                            {deleteEventMutation.isPending ? (
+                                <>
+                                    <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                                    Archiving...
+                                </>
+                            ) : (
+                                <>
+                                    <span aria-hidden="true" className="material-symbols-outlined text-sm">archive</span>
+                                    Archive
+                                </>
+                            )}
                         </button>
                     </div>
                 }
             >
                 <div className="p-5">
-                    <p className="text-gray-600 dark:text-gray-300 mb-4">
-                        Are you sure you want to archive <span className="font-bold text-primary dark:text-white">"{eventToDelete?.title}"</span>?
+                    <p className="text-gray-600 dark:text-gray-300">
+                        Are you sure you want to archive <span className="font-semibold text-primary dark:text-white">"{eventToDelete?.title}"</span>?
                     </p>
                     {eventCascadePreview && eventCascadePreview.rsvps > 0 && (
-                        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
-                            <p className="text-amber-700 dark:text-amber-400 text-sm font-medium flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[18px]">warning</span>
-                                This event has {eventCascadePreview.rsvps} RSVP{eventCascadePreview.rsvps !== 1 ? 's' : ''}
-                            </p>
-                        </div>
+                        <p className="text-amber-600 dark:text-amber-400 text-sm mt-2">
+                            This will also archive {eventCascadePreview.rsvps} RSVP{eventCascadePreview.rsvps !== 1 ? 's' : ''}.
+                        </p>
                     )}
                 </div>
             </SlideUpDrawer>
@@ -1060,31 +992,30 @@ const EventsAdminContent: React.FC = () => {
             <SlideUpDrawer 
                 isOpen={isEditing} 
                 onClose={() => { setIsEditing(false); setError(null); }} 
-                title={editId ? 'Edit Event' : 'Create Event'}
+                title={editId ? 'Edit Event' : 'Add Event'}
                 maxHeight="large"
                 stickyFooter={
                     <div className="flex gap-3 p-4">
-                        <button 
-                            onClick={() => { setIsEditing(false); setError(null); setTouchedFields(new Set()); }} 
-                            className="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 font-medium" 
-                            disabled={isSaving}
+                        <button
+                            onClick={() => { setIsEditing(false); setError(null); setTouchedFields(new Set()); }}
+                            className="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 font-medium"
                         >
                             Cancel
                         </button>
-                        <button 
-                            onClick={handleSave} 
-                            disabled={isSaving || !isEventFormValid} 
-                            className="flex-1 py-3 rounded-xl bg-primary text-white font-medium shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+                        <button
+                            onClick={handleSave}
+                            disabled={saveEventMutation.isPending || !isEventFormValid}
+                            className="flex-1 py-3 rounded-xl bg-brand-green text-white font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
                         >
-                            {isSaving && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
-                            {isSaving ? 'Saving...' : 'Save'}
+                            {saveEventMutation.isPending && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
+                            {saveEventMutation.isPending ? 'Saving...' : editId ? 'Save Changes' : 'Add Event'}
                         </button>
                     </div>
                 }
             >
                 <div className="p-5 space-y-4">
                     {error && (
-                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-2 rounded-lg text-sm">
+                        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-red-700 dark:text-red-400 text-sm">
                             {error}
                         </div>
                     )}
@@ -1326,10 +1257,10 @@ const EventsAdminContent: React.FC = () => {
                                                 )}
                                                 <button 
                                                     onClick={(e) => { e.stopPropagation(); handleDelete(event); }} 
-                                                    disabled={deletingEventId === event.id}
+                                                    disabled={deleteEventMutation.isPending}
                                                     className="text-primary/70 dark:text-white/70 text-xs font-bold uppercase tracking-wider hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 px-2 py-1 rounded transition-colors disabled:opacity-50 flex items-center gap-1"
                                                 >
-                                                    {deletingEventId === event.id && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
+                                                    {deleteEventMutation.isPending && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
                                                     Delete
                                                 </button>
                                             </div>
@@ -1392,10 +1323,9 @@ const EventsAdminContent: React.FC = () => {
                                                 )}
                                                 <button 
                                                     onClick={(e) => { e.stopPropagation(); handleDelete(event); }} 
-                                                    disabled={deletingEventId === event.id}
+                                                    disabled={deleteEventMutation.isPending}
                                                     className="text-primary/70 dark:text-white/70 text-xs font-bold uppercase tracking-wider hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 px-2 py-1 rounded transition-colors disabled:opacity-50 flex items-center gap-1"
                                                 >
-                                                    {deletingEventId === event.id && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
                                                     Delete
                                                 </button>
                                             </div>
@@ -1410,14 +1340,14 @@ const EventsAdminContent: React.FC = () => {
 
             <ParticipantDetailsModal
                 isOpen={isViewingRsvps}
-                onClose={() => { setIsViewingRsvps(false); setSelectedEvent(null); setRsvps([]); }}
+                onClose={() => { setIsViewingRsvps(false); setSelectedEvent(null); }}
                 title={selectedEvent?.title || 'Event RSVPs'}
                 subtitle={selectedEvent ? `${formatDate(selectedEvent.event_date)} at ${formatTime(selectedEvent.start_time)}` : undefined}
                 participants={rsvps}
                 isLoading={isLoadingRsvps}
                 type="rsvp"
                 eventId={selectedEvent?.id}
-                onRefresh={() => selectedEvent && handleViewRsvps(selectedEvent)}
+                onRefresh={() => refetchRsvps()}
                 eventbriteId={selectedEvent?.eventbrite_id}
             />
         </AnimatedPage>
@@ -1425,8 +1355,7 @@ const EventsAdminContent: React.FC = () => {
 };
 
 const WellnessAdminContent: React.FC = () => {
-    const [classes, setClasses] = useState<WellnessClass[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [activeCategory, setActiveCategory] = useState('all');
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<number | null>(null);
@@ -1440,12 +1369,9 @@ const WellnessAdminContent: React.FC = () => {
     const [success, setSuccess] = useState<string | null>(null);
     const [isViewingEnrollments, setIsViewingEnrollments] = useState(false);
     const [selectedClass, setSelectedClass] = useState<WellnessClass | null>(null);
-    const [enrollments, setEnrollments] = useState<Participant[]>([]);
-    const [isLoadingEnrollments, setIsLoadingEnrollments] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [classToDelete, setClassToDelete] = useState<WellnessClass | null>(null);
     const [deletingClassId, setDeletingClassId] = useState<number | null>(null);
-    const [needsReviewClasses, setNeedsReviewClasses] = useState<WellnessClass[]>([]);
     const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
     const { showToast } = useToast();
 
@@ -1463,10 +1389,64 @@ const WellnessAdminContent: React.FC = () => {
 
     const isWellnessFormValid = !wellnessValidation.instructor && !wellnessValidation.category && !wellnessValidation.capacity;
 
-    useEffect(() => {
-        fetchClasses();
-        fetchNeedsReviewClasses();
-    }, []);
+    const { data: classes = [], isLoading } = useQuery({
+        queryKey: ['wellness-classes'],
+        queryFn: () => fetchWithCredentials<WellnessClass[]>('/api/wellness-classes')
+    });
+
+    const { data: needsReviewClasses = [] } = useQuery({
+        queryKey: ['wellness-needs-review'],
+        queryFn: () => fetchWithCredentials<WellnessClass[]>('/api/wellness-classes/needs-review')
+    });
+
+    const { data: enrollments = [], isLoading: isLoadingEnrollments, refetch: refetchEnrollments } = useQuery({
+        queryKey: ['class-enrollments', selectedClass?.id],
+        queryFn: () => fetchWithCredentials<Participant[]>(`/api/wellness-classes/${selectedClass!.id}/enrollments`),
+        enabled: !!selectedClass && isViewingEnrollments
+    });
+
+    const saveClassMutation = useMutation({
+        mutationFn: async ({ url, method, payload }: { url: string; method: string; payload: Record<string, unknown> }) => {
+            return fetchWithCredentials<WellnessClass & { recurringUpdated?: number }>(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        },
+        onSuccess: (savedItem) => {
+            queryClient.invalidateQueries({ queryKey: ['wellness-classes'] });
+            queryClient.invalidateQueries({ queryKey: ['wellness-needs-review'] });
+            setIsEditing(false);
+            setFormData({ category: 'Classes', status: 'available', duration: '60 min' });
+            
+            const recurringCount = savedItem.recurringUpdated || 0;
+            const successMsg = editId 
+                ? (recurringCount > 0 
+                    ? `Class updated + ${recurringCount} future instances updated` 
+                    : 'Class updated successfully')
+                : 'Class created successfully';
+            setSuccess(successMsg);
+            showToast(successMsg, 'success');
+            setTimeout(() => setSuccess(null), 3000);
+        },
+        onError: (error: Error) => {
+            setError(error.message || 'Failed to save class');
+        }
+    });
+
+    const deleteClassMutation = useMutation({
+        mutationFn: (classId: number) => 
+            deleteWithCredentials(`/api/wellness-classes/${classId}`),
+        onSuccess: () => {
+            setSuccess('Class deleted');
+            setTimeout(() => setSuccess(null), 3000);
+            queryClient.invalidateQueries({ queryKey: ['wellness-classes'] });
+        },
+        onError: () => {
+            setError('Failed to delete class');
+            setTimeout(() => setError(null), 3000);
+        }
+    });
 
     useEffect(() => {
         const handleOpenCreate = () => openCreate();
@@ -1475,15 +1455,16 @@ const WellnessAdminContent: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        const handleRefresh = () => fetchClasses();
+        const handleRefresh = () => {
+            queryClient.invalidateQueries({ queryKey: ['wellness-classes'] });
+        };
         window.addEventListener('refreshWellnessData', handleRefresh);
-        // Also refresh on booking-update for real-time enrollment updates
         window.addEventListener('booking-update', handleRefresh);
         return () => {
             window.removeEventListener('refreshWellnessData', handleRefresh);
             window.removeEventListener('booking-update', handleRefresh);
         };
-    }, []);
+    }, [queryClient]);
 
     useEffect(() => {
         if (isEditing) {
@@ -1495,33 +1476,6 @@ const WellnessAdminContent: React.FC = () => {
             document.body.style.overflow = '';
         };
     }, [isEditing]);
-
-    const fetchClasses = async () => {
-        try {
-            setIsLoading(true);
-            const res = await fetch('/api/wellness-classes');
-            if (res.ok) {
-                const data = await res.json();
-                setClasses(data);
-            }
-        } catch (err) {
-            console.error('Error fetching wellness classes:', err);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const fetchNeedsReviewClasses = async () => {
-        try {
-            const res = await fetch('/api/wellness-classes/needs-review', { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setNeedsReviewClasses(data);
-            }
-        } catch (err) {
-            console.error('Error fetching needs review classes:', err);
-        }
-    };
 
     const convertTo24Hour = (timeStr: string): string => {
         if (!timeStr) return '';
@@ -1662,41 +1616,7 @@ const WellnessAdminContent: React.FC = () => {
                 waitlist_enabled: formData.waitlist_enabled || false,
             };
 
-            const res = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (res.ok) {
-                const savedItem = await res.json();
-                
-                // Optimistically update local state
-                if (editId) {
-                    setClasses(prev => prev.map(c => c.id === editId ? savedItem : c));
-                } else {
-                    setClasses(prev => [savedItem, ...prev]);
-                }
-                
-                // Refresh needs review list in case the saved class auto-exited needs review
-                fetchNeedsReviewClasses();
-                
-                setIsEditing(false);
-                setFormData({ category: 'Classes', status: 'available', duration: '60 min' });
-                
-                const recurringCount = savedItem.recurringUpdated || 0;
-                const successMsg = editId 
-                    ? (recurringCount > 0 
-                        ? `Class updated + ${recurringCount} future instances updated` 
-                        : 'Class updated successfully')
-                    : 'Class created successfully';
-                setSuccess(successMsg);
-                showToast(successMsg, 'success');
-                setTimeout(() => setSuccess(null), 3000);
-            } else {
-                const data = await res.json();
-                setError(data.error || 'Failed to save class');
-            }
+            saveClassMutation.mutate({ url, method, payload });
         } catch (err) {
             setError('Failed to save class');
         } finally {
@@ -1709,32 +1629,11 @@ const WellnessAdminContent: React.FC = () => {
         setShowDeleteConfirm(true);
     };
 
-    const confirmDelete = async () => {
+    const confirmDelete = () => {
         if (!classToDelete) return;
-        
-        const snapshot = [...classes];
-        const deletedId = classToDelete.id;
-        
-        setClasses(prev => prev.filter(c => c.id !== deletedId));
         setShowDeleteConfirm(false);
+        deleteClassMutation.mutate(classToDelete.id);
         setClassToDelete(null);
-        
-        try {
-            const res = await fetch(`/api/wellness-classes/${deletedId}`, { method: 'DELETE', credentials: 'include' });
-            if (res.ok) {
-                setSuccess('Class deleted');
-                setTimeout(() => setSuccess(null), 3000);
-            } else {
-                setClasses(snapshot);
-                setError('Failed to delete class');
-                setTimeout(() => setError(null), 3000);
-            }
-        } catch (err) {
-            console.error('Error deleting class:', err);
-            setClasses(snapshot);
-            setError('Failed to delete class');
-            setTimeout(() => setError(null), 3000);
-        }
     };
 
     const formatDate = (dateStr: string) => {
@@ -1743,21 +1642,9 @@ const WellnessAdminContent: React.FC = () => {
         return formatDateDisplayWithDay(datePart);
     };
 
-    const handleViewEnrollments = async (cls: WellnessClass) => {
+    const handleViewEnrollments = (cls: WellnessClass) => {
         setSelectedClass(cls);
         setIsViewingEnrollments(true);
-        setIsLoadingEnrollments(true);
-        try {
-            const res = await fetch(`/api/wellness-classes/${cls.id}/enrollments`, { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setEnrollments(data);
-            }
-        } catch (err) {
-            console.error('Failed to fetch enrollments:', err);
-        } finally {
-            setIsLoadingEnrollments(false);
-        }
     };
 
     const getCategoryIcon = (category: string) => {
@@ -1969,14 +1856,14 @@ const WellnessAdminContent: React.FC = () => {
 
             <ParticipantDetailsModal
                 isOpen={isViewingEnrollments}
-                onClose={() => { setIsViewingEnrollments(false); setSelectedClass(null); setEnrollments([]); }}
+                onClose={() => { setIsViewingEnrollments(false); setSelectedClass(null); }}
                 title={selectedClass?.title || 'Class Enrollments'}
                 subtitle={selectedClass ? `${formatDate(selectedClass.date)} at ${selectedClass.time}` : undefined}
                 participants={enrollments}
                 isLoading={isLoadingEnrollments}
                 type="enrollment"
                 classId={selectedClass?.id}
-                onRefresh={() => selectedClass && handleViewEnrollments(selectedClass)}
+                onRefresh={() => refetchEnrollments()}
             />
 
             <SlideUpDrawer 
@@ -1994,11 +1881,11 @@ const WellnessAdminContent: React.FC = () => {
                         </button>
                         <button
                             onClick={handleSave}
-                            disabled={isUploading || !isWellnessFormValid}
+                            disabled={isUploading || saveClassMutation.isPending || !isWellnessFormValid}
                             className="flex-1 py-3 rounded-xl bg-brand-green text-white font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
                         >
-                            {isUploading && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
-                            {isUploading ? 'Saving...' : editId ? 'Save Changes' : 'Add Class'}
+                            {(isUploading || saveClassMutation.isPending) && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
+                            {isUploading || saveClassMutation.isPending ? 'Saving...' : editId ? 'Save Changes' : 'Add Class'}
                         </button>
                     </div>
                 }
@@ -2080,8 +1967,52 @@ const WellnessAdminContent: React.FC = () => {
                             ))}
                         </select>
                         {touchedFields.has('category') && wellnessValidation.category && (
-                            <p className="text-xs text-red-500 mt-1">Category is required</p>
+                            <p className="text-xs text-red-500 mt-1">Please select a valid category</p>
                         )}
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Capacity *</label>
+                        <input
+                            type="number"
+                            value={formData.capacity || ''}
+                            onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || null })}
+                            onBlur={() => markTouched('capacity')}
+                            placeholder="e.g., 20"
+                            className={`w-full p-3 rounded-lg border bg-gray-50 dark:bg-black/30 text-primary dark:text-white ${
+                                touchedFields.has('capacity') && wellnessValidation.capacity 
+                                    ? 'border-red-500 dark:border-red-500' 
+                                    : 'border-gray-200 dark:border-white/25'
+                            }`}
+                        />
+                        {touchedFields.has('capacity') && wellnessValidation.capacity && (
+                            <p className="text-xs text-red-500 mt-1">Capacity must be greater than 0</p>
+                        )}
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700/50">
+                        <div className="flex-1">
+                            <label className="font-bold text-sm text-gray-700 dark:text-white flex items-center gap-2">
+                                <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-purple-600">format_list_numbered</span>
+                                Enable Waitlist
+                            </label>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Allow members to join a waitlist when class is full
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setFormData({...formData, waitlist_enabled: !formData.waitlist_enabled})}
+                            className={`relative w-12 h-6 rounded-full transition-colors ${
+                                formData.waitlist_enabled 
+                                    ? 'bg-purple-500' 
+                                    : 'bg-gray-300 dark:bg-white/20'
+                            }`}
+                        >
+                            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${
+                                formData.waitlist_enabled ? 'translate-x-6' : 'translate-x-0'
+                            }`} />
+                        </button>
                     </div>
 
                     <div>
@@ -2089,48 +2020,19 @@ const WellnessAdminContent: React.FC = () => {
                         <textarea
                             value={formData.description || ''}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            placeholder="A restorative session designed to improve flexibility..."
+                            placeholder="A gentle flow to start your day..."
                             rows={3}
                             className="w-full p-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white resize-none"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Image (optional)</label>
-                        <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                                const file = e.target.files?.[0] || null;
-                                setFormData({ ...formData, imageFile: file });
-                            }}
-                            className="w-full p-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-primary/10 file:text-primary dark:file:bg-white/10 dark:file:text-white file:font-medium file:cursor-pointer"
-                        />
-                        {(formData.imageFile || formData.image_url) && (
-                            <div className="mt-2 relative">
-                                <img
-                                    src={formData.imageFile ? URL.createObjectURL(formData.imageFile) : formData.image_url || ''}
-                                    alt="Preview"
-                                    className="w-full h-32 object-cover rounded-lg border border-gray-200 dark:border-white/25"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setFormData({ ...formData, imageFile: null, image_url: null })}
-                                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
-                                >
-                                    <span aria-hidden="true" className="material-symbols-outlined text-sm">close</span>
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">External URL (optional)</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">External Link (optional)</label>
                         <input
                             type="url"
                             value={formData.external_url || ''}
                             onChange={(e) => setFormData({ ...formData, external_url: e.target.value })}
-                            placeholder="https://example.com"
+                            placeholder="https://..."
                             className="w-full p-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white"
                         />
                     </div>
@@ -2140,10 +2042,10 @@ const WellnessAdminContent: React.FC = () => {
                         <div className="flex gap-2">
                             <button
                                 type="button"
-                                onClick={() => setFormData({ ...formData, visibility: 'public' })}
+                                onClick={() => setFormData({...formData, visibility: 'public'})}
                                 className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
                                     (formData.visibility || 'public') === 'public'
-                                        ? 'bg-[#CCB8E4] text-[#293515] shadow-md'
+                                        ? 'bg-primary text-white shadow-md'
                                         : 'bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-white/70 border border-gray-200 dark:border-white/25'
                                 }`}
                             >
@@ -2152,10 +2054,10 @@ const WellnessAdminContent: React.FC = () => {
                             </button>
                             <button
                                 type="button"
-                                onClick={() => setFormData({ ...formData, visibility: 'members' })}
+                                onClick={() => setFormData({...formData, visibility: 'members'})}
                                 className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
                                     formData.visibility === 'members'
-                                        ? 'bg-[#CCB8E4] text-[#293515] shadow-md'
+                                        ? 'bg-primary text-white shadow-md'
                                         : 'bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-white/70 border border-gray-200 dark:border-white/25'
                                 }`}
                             >
@@ -2163,9 +2065,6 @@ const WellnessAdminContent: React.FC = () => {
                                 Members Only
                             </button>
                         </div>
-                        <p className="text-xs text-gray-600 dark:text-gray-500 mt-1">
-                            {(formData.visibility || 'public') === 'public' ? 'Visible on public website and member portal' : 'Only visible to logged-in members'}
-                        </p>
                     </div>
 
                     <div className="space-y-3">
@@ -2181,7 +2080,7 @@ const WellnessAdminContent: React.FC = () => {
                             </div>
                             <button
                                 type="button"
-                                onClick={() => setFormData({ ...formData, block_simulators: !formData.block_simulators })}
+                                onClick={() => setFormData({...formData, block_simulators: !formData.block_simulators})}
                                 className={`relative w-12 h-6 rounded-full transition-colors ${
                                     formData.block_simulators 
                                         ? 'bg-amber-500' 
@@ -2205,7 +2104,7 @@ const WellnessAdminContent: React.FC = () => {
                             </div>
                             <button
                                 type="button"
-                                onClick={() => setFormData({ ...formData, block_conference_room: !formData.block_conference_room })}
+                                onClick={() => setFormData({...formData, block_conference_room: !formData.block_conference_room})}
                                 className={`relative w-12 h-6 rounded-full transition-colors ${
                                     formData.block_conference_room 
                                         ? 'bg-blue-500' 
@@ -2218,63 +2117,6 @@ const WellnessAdminContent: React.FC = () => {
                             </button>
                         </div>
                     </div>
-
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Spots *
-                            </label>
-                            <input
-                                type="number"
-                                min="1"
-                                placeholder="e.g., 12"
-                                value={formData.capacity || ''}
-                                onChange={(e) => setFormData({ ...formData, capacity: e.target.value ? parseInt(e.target.value) : null })}
-                                onBlur={() => markTouched('capacity')}
-                                className={`w-full px-4 py-3 rounded-lg border bg-white dark:bg-white/10 text-gray-900 dark:text-white placeholder-gray-400 ${
-                                    touchedFields.has('capacity') && wellnessValidation.capacity 
-                                        ? 'border-red-500 dark:border-red-500' 
-                                        : 'border-gray-200 dark:border-white/25'
-                                }`}
-                            />
-                            {touchedFields.has('capacity') && wellnessValidation.capacity && (
-                                <p className="text-xs text-red-500 mt-1">Number of spots is required</p>
-                            )}
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                Maximum enrollments allowed. Users can join waitlist when full.
-                            </p>
-                        </div>
-
-                        <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700/50">
-                            <div className="flex-1">
-                                <label className="font-bold text-sm text-gray-700 dark:text-white flex items-center gap-2">
-                                    <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-blue-600">playlist_add</span>
-                                    Enable Waitlist
-                                </label>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    Allow users to join a waitlist when class is full
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setFormData({ ...formData, waitlist_enabled: !formData.waitlist_enabled })}
-                                className={`relative w-12 h-6 rounded-full transition-colors ${
-                                    formData.waitlist_enabled 
-                                        ? 'bg-blue-500' 
-                                        : 'bg-gray-300 dark:bg-white/20'
-                                }`}
-                            >
-                                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${
-                                    formData.waitlist_enabled ? 'translate-x-6' : 'translate-x-0'
-                                }`} />
-                            </button>
-                        </div>
-                    </div>
-
-                    {error && (
-                        <p className="text-red-600 text-sm">{error}</p>
-                    )}
-
                 </div>
             </SlideUpDrawer>
 
@@ -2282,21 +2124,22 @@ const WellnessAdminContent: React.FC = () => {
                 isOpen={showDeleteConfirm} 
                 onClose={() => { setShowDeleteConfirm(false); setClassToDelete(null); }} 
                 title="Delete Class"
+                maxHeight="small"
                 stickyFooter={
                     <div className="flex gap-3 p-4">
                         <button
                             onClick={() => { setShowDeleteConfirm(false); setClassToDelete(null); }}
-                            disabled={deletingClassId !== null}
+                            disabled={deleteClassMutation.isPending}
                             className="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition-colors disabled:opacity-50"
                         >
                             Cancel
                         </button>
                         <button
                             onClick={confirmDelete}
-                            disabled={deletingClassId !== null}
+                            disabled={deleteClassMutation.isPending}
                             className="flex-1 py-3 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                         >
-                            {deletingClassId !== null ? (
+                            {deleteClassMutation.isPending ? (
                                 <>
                                     <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
                                     Deleting...
@@ -2323,6 +2166,7 @@ const WellnessAdminContent: React.FC = () => {
 
 const EventsTab: React.FC = () => {
     const { showToast } = useToast();
+    const queryClient = useQueryClient();
     const [searchParams] = useSearchParams();
     const subtabParam = searchParams.get('subtab');
     const [activeSubTab, setActiveSubTab] = useState<'events' | 'wellness'>(
@@ -2338,23 +2182,22 @@ const EventsTab: React.FC = () => {
             setActiveSubTab('events');
         }
     }, [subtabParam]);
-    
-    const handlePullRefresh = async () => {
-        setSyncMessage(null);
-        const maxRetries = 3;
-        const retryFetch = async (url: string, attempt = 1): Promise<Response> => {
-            try {
-                return await fetch(url, { method: 'POST', credentials: 'include' });
-            } catch (err: any) {
-                if (attempt < maxRetries && (err.message?.includes('fetch') || err.message?.includes('network'))) {
-                    await new Promise(r => setTimeout(r, 500 * attempt));
-                    return retryFetch(url, attempt + 1);
+
+    const syncMutation = useMutation({
+        mutationFn: async () => {
+            const maxRetries = 3;
+            const retryFetch = async (url: string, attempt = 1): Promise<Response> => {
+                try {
+                    return await fetch(url, { method: 'POST', credentials: 'include' });
+                } catch (err: any) {
+                    if (attempt < maxRetries && (err.message?.includes('fetch') || err.message?.includes('network'))) {
+                        await new Promise(r => setTimeout(r, 500 * attempt));
+                        return retryFetch(url, attempt + 1);
+                    }
+                    throw err;
                 }
-                throw err;
-            }
-        };
-        
-        try {
+            };
+            
             const [calRes, ebRes] = await Promise.all([
                 retryFetch('/api/calendars/sync-all'),
                 retryFetch('/api/eventbrite/sync')
@@ -2362,6 +2205,14 @@ const EventsTab: React.FC = () => {
             
             const calData = await calRes.json();
             const ebData = await ebRes.json();
+            
+            return { calRes, ebRes, calData, ebData };
+        },
+        onSuccess: ({ calRes, ebRes, calData, ebData }) => {
+            queryClient.invalidateQueries({ queryKey: ['admin-events'] });
+            queryClient.invalidateQueries({ queryKey: ['events-needs-review'] });
+            queryClient.invalidateQueries({ queryKey: ['wellness-classes'] });
+            queryClient.invalidateQueries({ queryKey: ['wellness-needs-review'] });
             
             window.dispatchEvent(new CustomEvent('refreshEventsData'));
             window.dispatchEvent(new CustomEvent('refreshWellnessData'));
@@ -2378,11 +2229,17 @@ const EventsTab: React.FC = () => {
             } else {
                 setSyncMessage(`Sync failed for: ${errors.join(', ')}`);
             }
-        } catch (err) {
-            console.error('Sync failed:', err);
+            setTimeout(() => setSyncMessage(null), 5000);
+        },
+        onError: () => {
             setSyncMessage('Network error - please try again');
+            setTimeout(() => setSyncMessage(null), 5000);
         }
-        setTimeout(() => setSyncMessage(null), 5000);
+    });
+    
+    const handlePullRefresh = async () => {
+        setSyncMessage(null);
+        syncMutation.mutate();
     };
 
     return (
@@ -2390,7 +2247,7 @@ const EventsTab: React.FC = () => {
             <div className="animate-pop-in">
                 {syncMessage && (
                     <div className={`mb-4 px-4 py-2 rounded-lg text-sm font-medium ${
-                        syncMessage.startsWith('Error') || syncMessage.startsWith('Failed') || syncMessage.startsWith('Some syncs')
+                        syncMessage.startsWith('Error') || syncMessage.startsWith('Failed') || syncMessage.startsWith('Some syncs') || syncMessage.includes('failed')
                             ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800' 
                             : 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800'
                     }`}>

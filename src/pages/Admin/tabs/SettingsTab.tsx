@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { fetchWithCredentials, postWithCredentials } from '../../../hooks/queries/useFetch';
 import Toggle from '../../../components/Toggle';
 import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 
@@ -30,9 +32,7 @@ const TIMEZONE_OPTIONS = [
 ];
 
 const SettingsTab: React.FC = () => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [success, setSuccess] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   
@@ -52,96 +52,71 @@ const SettingsTab: React.FC = () => {
     dataIntegrityAlerts: true,
     syncFailureAlerts: true,
   });
-  
-  const [originalSettings, setOriginalSettings] = useState<SettingsState | null>(null);
 
-  useEffect(() => {
-    fetchSettings();
-  }, []);
-  
-  useEffect(() => {
-    if (originalSettings) {
-      const changed = JSON.stringify(settings) !== JSON.stringify(originalSettings);
-      setHasChanges(changed);
-    }
-  }, [settings, originalSettings]);
-
-  const fetchSettings = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const res = await fetch('/api/settings', { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch settings');
-      
-      const data = await res.json();
+  const { data: fetchedSettings, isLoading, error } = useQuery({
+    queryKey: ['settings'],
+    queryFn: async () => {
+      const data = await fetchWithCredentials<any>('/api/settings');
       
       const categoryLabels: Record<string, string> = {};
       for (const key of CATEGORY_KEYS) {
         categoryLabels[key] = data[`category.${key}`]?.value || key.replace(/_/g, ' ');
       }
       
-      const loadedSettings: SettingsState = {
+      return {
         clubName: data['app.club_name']?.value || 'Ever House',
         supportEmail: data['app.support_email']?.value || 'support@everhouse.com',
         timezoneDisplay: data['app.timezone_display']?.value || 'America/Los_Angeles',
         categoryLabels,
         dataIntegrityAlerts: data['notifications.data_integrity_alerts']?.value !== 'false',
         syncFailureAlerts: data['notifications.sync_failure_alerts']?.value !== 'false',
-      };
-      
-      setSettings(loadedSettings);
-      setOriginalSettings(loadedSettings);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load settings');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      } as SettingsState;
+    },
+  });
 
-  const handleSave = async () => {
-    try {
-      setIsSaving(true);
-      setError(null);
-      
-      const settingsToSave: Record<string, string> = {
-        'app.club_name': settings.clubName,
-        'app.support_email': settings.supportEmail,
-        'app.timezone_display': settings.timezoneDisplay,
-        'notifications.data_integrity_alerts': String(settings.dataIntegrityAlerts),
-        'notifications.sync_failure_alerts': String(settings.syncFailureAlerts),
+  useEffect(() => {
+    if (fetchedSettings) {
+      setSettings(fetchedSettings);
+      setHasChanges(false);
+    }
+  }, [fetchedSettings]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (settingsToSave: SettingsState) => {
+      const payload: Record<string, string> = {
+        'app.club_name': settingsToSave.clubName,
+        'app.support_email': settingsToSave.supportEmail,
+        'app.timezone_display': settingsToSave.timezoneDisplay,
+        'notifications.data_integrity_alerts': String(settingsToSave.dataIntegrityAlerts),
+        'notifications.sync_failure_alerts': String(settingsToSave.syncFailureAlerts),
       };
       
-      for (const [key, label] of Object.entries(settings.categoryLabels)) {
-        settingsToSave[`category.${key}`] = label;
+      for (const [key, label] of Object.entries(settingsToSave.categoryLabels)) {
+        payload[`category.${key}`] = label;
       }
       
-      const res = await fetch('/api/admin/settings', {
+      return fetchWithCredentials('/api/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ settings: settingsToSave }),
+        body: JSON.stringify({ settings: payload }),
       });
-      
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to save settings');
-      }
-      
-      setOriginalSettings(settings);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
       setHasChanges(false);
       setSuccess('Settings saved successfully');
       setTimeout(() => setSuccess(null), 3000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to save settings');
-    } finally {
-      setIsSaving(false);
-    }
+    },
+  });
+
+  const handleSave = () => {
+    saveMutation.mutate(settings);
   };
 
   const handleReset = () => {
-    if (originalSettings) {
-      setSettings(originalSettings);
+    if (fetchedSettings) {
+      setSettings(fetchedSettings);
+      setHasChanges(false);
     }
   };
 
@@ -154,6 +129,8 @@ const SettingsTab: React.FC = () => {
     );
   }
 
+  const errorMessage = error instanceof Error ? error.message : (saveMutation.error instanceof Error ? saveMutation.error.message : null);
+
   return (
     <div className="animate-pop-in space-y-6 pb-32">
       {success && (
@@ -163,10 +140,10 @@ const SettingsTab: React.FC = () => {
         </div>
       )}
 
-      {error && (
+      {errorMessage && (
         <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-red-700 dark:text-red-400 text-sm flex items-center gap-2">
           <span aria-hidden="true" className="material-symbols-outlined text-lg">error</span>
-          {error}
+          {errorMessage}
         </div>
       )}
 
@@ -189,7 +166,10 @@ const SettingsTab: React.FC = () => {
             <input
               type="text"
               value={settings.clubName}
-              onChange={(e) => setSettings({ ...settings, clubName: e.target.value })}
+              onChange={(e) => {
+                setSettings({ ...settings, clubName: e.target.value });
+                setHasChanges(true);
+              }}
               className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent"
               placeholder="Club name"
             />
@@ -202,7 +182,10 @@ const SettingsTab: React.FC = () => {
             <input
               type="email"
               value={settings.supportEmail}
-              onChange={(e) => setSettings({ ...settings, supportEmail: e.target.value })}
+              onChange={(e) => {
+                setSettings({ ...settings, supportEmail: e.target.value });
+                setHasChanges(true);
+              }}
               className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent"
               placeholder="support@example.com"
             />
@@ -214,7 +197,10 @@ const SettingsTab: React.FC = () => {
             </label>
             <select
               value={settings.timezoneDisplay}
-              onChange={(e) => setSettings({ ...settings, timezoneDisplay: e.target.value })}
+              onChange={(e) => {
+                setSettings({ ...settings, timezoneDisplay: e.target.value });
+                setHasChanges(true);
+              }}
               className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent"
             >
               {TIMEZONE_OPTIONS.map(opt => (
@@ -247,13 +233,16 @@ const SettingsTab: React.FC = () => {
               <input
                 type="text"
                 value={settings.categoryLabels[key]}
-                onChange={(e) => setSettings({
-                  ...settings,
-                  categoryLabels: {
-                    ...settings.categoryLabels,
-                    [key]: e.target.value
-                  }
-                })}
+                onChange={(e) => {
+                  setSettings({
+                    ...settings,
+                    categoryLabels: {
+                      ...settings.categoryLabels,
+                      [key]: e.target.value
+                    }
+                  });
+                  setHasChanges(true);
+                }}
                 className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent text-sm"
                 placeholder="Display label"
               />
@@ -281,7 +270,10 @@ const SettingsTab: React.FC = () => {
             </div>
             <Toggle
               checked={settings.dataIntegrityAlerts}
-              onChange={(checked) => setSettings({ ...settings, dataIntegrityAlerts: checked })}
+              onChange={(checked) => {
+                setSettings({ ...settings, dataIntegrityAlerts: checked });
+                setHasChanges(true);
+              }}
               size="md"
             />
           </div>
@@ -293,7 +285,10 @@ const SettingsTab: React.FC = () => {
             </div>
             <Toggle
               checked={settings.syncFailureAlerts}
-              onChange={(checked) => setSettings({ ...settings, syncFailureAlerts: checked })}
+              onChange={(checked) => {
+                setSettings({ ...settings, syncFailureAlerts: checked });
+                setHasChanges(true);
+              }}
               size="md"
             />
           </div>
@@ -308,17 +303,17 @@ const SettingsTab: React.FC = () => {
           <div className="flex items-center gap-3">
             <button
               onClick={handleReset}
-              disabled={isSaving}
+              disabled={saveMutation.isPending}
               className="px-4 py-2 rounded-full text-primary dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-sm font-medium"
             >
               Reset
             </button>
             <button
               onClick={handleSave}
-              disabled={isSaving}
+              disabled={saveMutation.isPending}
               className="px-6 py-2 rounded-full bg-primary dark:bg-accent text-white dark:text-primary font-medium text-sm disabled:opacity-50 flex items-center gap-2"
             >
-              {isSaving ? (
+              {saveMutation.isPending ? (
                 <>
                   <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
                   Saving...

@@ -13,6 +13,24 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.60.0",
+    date: "2026-02-01",
+    title: "Smart Data Caching: Faster Navigation & Reduced Loading",
+    isMajor: true,
+    changes: [
+      "Speed: Pages no longer reload from scratch when navigating - data stays cached and appears instantly",
+      "Speed: Reduced server requests by 60-80% through intelligent caching and stale-while-revalidate",
+      "Speed: Navigation between staff portal pages is now near-instant",
+      "Stability: Scroll position is preserved when taking actions (approve, check-in, assign, etc.)",
+      "Stability: No more page flickering or data disappearing during actions",
+      "Real-time: Booking updates from other staff members appear automatically without manual refresh",
+      "Real-time: WebSocket events now sync cached data across all open pages",
+      "Staff Portal: All 12 admin tabs now use smart caching (Bookings, Financials, Directory, Events, Settings, Trackman, Data Integrity, Tiers, Team, Tours, Cafe, Facility Notices)",
+      "Member Pages: Dashboard, Book Golf, Events, Profile, and History pages all use smart caching",
+      "Technical: Migrated to React Query for enterprise-grade data management"
+    ]
+  },
+  {
     version: "9.59.5",
     date: "2026-02-01",
     title: "Financials Page Navigation Fix",

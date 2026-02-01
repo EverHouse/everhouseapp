@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useData } from '../../../contexts/DataContext';
 import ModalShell from '../../../components/ModalShell';
 import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
@@ -6,6 +7,7 @@ import FloatingActionButton from '../../../components/FloatingActionButton';
 import { formatPhoneNumber } from '../../../utils/formatting';
 import { AnimatedPage } from '../../../components/motion';
 import { useConfirmDialog } from '../../../components/ConfirmDialog';
+import { fetchWithCredentials, postWithCredentials, deleteWithCredentials } from '../../../hooks/queries/useFetch';
 
 type StaffRole = 'staff' | 'admin' | 'golf_instructor';
 
@@ -72,8 +74,7 @@ const validatePhone = (value: string): string | undefined => {
 const TeamTab: React.FC = () => {
   const { actualUser } = useData();
   const isAdmin = actualUser?.role === 'admin';
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [isViewingDetails, setIsViewingDetails] = useState(false);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
@@ -87,11 +88,81 @@ const TeamTab: React.FC = () => {
   const [addFieldErrors, setAddFieldErrors] = useState<TeamFieldErrors>({});
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
 
-  useEffect(() => {
-    fetchTeamMembers();
-  }, []);
+  // Fetch team members with React Query
+  const { data: teamMembers = [], isLoading, error: fetchError } = useQuery({
+    queryKey: ['staff-users'],
+    queryFn: () => fetchWithCredentials<TeamMember[]>('/api/staff-users?include_all=true'),
+    enabled: isAdmin,
+  });
 
-  useEffect(() => {
+  // Mutation for removing a team member
+  const removeTeamMemberMutation = useMutation({
+    mutationFn: (memberId: number) => deleteWithCredentials(`/api/staff-users/${memberId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['staff-users'] });
+      setSuccess('Team member removed');
+      setTimeout(() => setSuccess(null), 3000);
+    },
+    onError: (error: Error) => {
+      setError(error.message || 'Failed to remove team member');
+      setTimeout(() => setError(null), 3000);
+    },
+  });
+
+  // Mutation for updating a team member
+  const updateTeamMemberMutation = useMutation({
+    mutationFn: (member: TeamMember) =>
+      fetchWithCredentials<TeamMember>(`/api/staff-users/${member.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: member.name,
+          email: member.email,
+          first_name: member.first_name,
+          last_name: member.last_name,
+          phone: member.phone,
+          job_title: member.job_title,
+          role: member.role,
+        }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['staff-users'] });
+      setIsEditing(false);
+      setSelectedMember(null);
+      setSuccess('Team member updated');
+      setTimeout(() => setSuccess(null), 3000);
+    },
+    onError: (error: Error) => {
+      setError(error.message || 'Failed to update team member');
+    },
+  });
+
+  // Mutation for adding a new team member
+  const addTeamMemberMutation = useMutation({
+    mutationFn: (data: {
+      email: string;
+      name: string | null;
+      first_name: string | null;
+      last_name: string | null;
+      phone: string | null;
+      job_title: string | null;
+      role: StaffRole;
+      created_by: string | undefined;
+    }) => postWithCredentials<TeamMember>('/api/staff-users', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['staff-users'] });
+      setNewPerson({ firstName: '', lastName: '', email: '', phone: '', jobTitle: '', role: 'staff' });
+      setIsAddingPerson(false);
+      setSuccess('Team member added');
+      setTimeout(() => setSuccess(null), 3000);
+    },
+    onError: (error: Error) => {
+      setAddError(error.message || 'Failed to add team member');
+    },
+  });
+
+  // Handle body overflow for modals
+  React.useEffect(() => {
     if (isViewingDetails || isEditing || isAddingPerson) {
       document.body.style.overflow = 'hidden';
     } else {
@@ -101,26 +172,6 @@ const TeamTab: React.FC = () => {
       document.body.style.overflow = '';
     };
   }, [isViewingDetails, isEditing, isAddingPerson]);
-
-  const fetchTeamMembers = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const res = await fetch('/api/staff-users?include_all=true', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setTeamMembers(data);
-      } else {
-        const errorData = await res.json().catch(() => ({}));
-        setError(errorData.message || `Failed to load team (${res.status})`);
-      }
-    } catch (err) {
-      console.error('Error fetching team members:', err);
-      setError('Failed to connect to server');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const filteredMembers = useMemo(() => {
     if (!searchQuery.trim()) return teamMembers;
@@ -158,26 +209,7 @@ const TeamTab: React.FC = () => {
     });
     if (!confirmed) return;
 
-    try {
-      const res = await fetch(`/api/staff-users/${member.id}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-
-      if (res.ok) {
-        setTeamMembers(prev => prev.filter(m => m.id !== member.id));
-        setSuccess('Team member removed');
-        setTimeout(() => setSuccess(null), 3000);
-      } else {
-        const data = await res.json();
-        setError(data.error || 'Failed to remove team member');
-        setTimeout(() => setError(null), 3000);
-      }
-    } catch (err) {
-      console.error('Error removing team member:', err);
-      setError('Failed to remove team member');
-      setTimeout(() => setError(null), 3000);
-    }
+    removeTeamMemberMutation.mutate(member.id);
   };
 
   const openEditModal = (member: TeamMember) => {
@@ -220,37 +252,8 @@ const TeamTab: React.FC = () => {
       return;
     }
 
-    try {
-      setError(null);
-      const res = await fetch(`/api/staff-users/${selectedMember.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          name: selectedMember.name,
-          email: selectedMember.email,
-          first_name: selectedMember.first_name,
-          last_name: selectedMember.last_name,
-          phone: selectedMember.phone,
-          job_title: selectedMember.job_title,
-          role: selectedMember.role
-        })
-      });
-
-      if (res.ok) {
-        const updated = await res.json();
-        setTeamMembers(prev => prev.map(m => m.id === updated.id ? updated : m));
-        setIsEditing(false);
-        setSelectedMember(null);
-        setSuccess('Team member updated');
-        setTimeout(() => setSuccess(null), 3000);
-      } else {
-        const data = await res.json();
-        setError(data.error || 'Failed to update team member');
-      }
-    } catch (err) {
-      setError('Failed to update team member');
-    }
+    setError(null);
+    updateTeamMemberMutation.mutate(selectedMember);
   };
 
   const handleAddEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -280,41 +283,19 @@ const TeamTab: React.FC = () => {
       return;
     }
 
-    try {
-      setAddError(null);
-      const fullName = `${newPerson.firstName.trim()} ${newPerson.lastName.trim()}`.trim();
-      
-      const res = await fetch('/api/staff-users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          email: newPerson.email.trim(),
-          name: fullName || null,
-          first_name: newPerson.firstName.trim() || null,
-          last_name: newPerson.lastName.trim() || null,
-          phone: newPerson.phone.trim() || null,
-          job_title: newPerson.jobTitle.trim() || null,
-          role: newPerson.role,
-          created_by: actualUser?.email
-        })
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        setAddError(data.error || 'Failed to add team member');
-        return;
-      }
-
-      const newMember = await res.json();
-      setTeamMembers(prev => [newMember, ...prev]);
-      setNewPerson({ firstName: '', lastName: '', email: '', phone: '', jobTitle: '', role: 'staff' });
-      setIsAddingPerson(false);
-      setSuccess('Team member added');
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (err) {
-      setAddError('Failed to add team member');
-    }
+    setAddError(null);
+    const fullName = `${newPerson.firstName.trim()} ${newPerson.lastName.trim()}`.trim();
+    
+    addTeamMemberMutation.mutate({
+      email: newPerson.email.trim(),
+      name: fullName || null,
+      first_name: newPerson.firstName.trim() || null,
+      last_name: newPerson.lastName.trim() || null,
+      phone: newPerson.phone.trim() || null,
+      job_title: newPerson.jobTitle.trim() || null,
+      role: newPerson.role,
+      created_by: actualUser?.email
+    });
   };
 
   if (!isAdmin) {
@@ -362,9 +343,9 @@ const TeamTab: React.FC = () => {
           </div>
         )}
 
-        {error && (
+        {(error || (fetchError instanceof Error && fetchError.message)) && (
           <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-red-700 dark:text-red-400 text-sm">
-            {error}
+            {error || (fetchError instanceof Error ? fetchError.message : 'Failed to load team')}
           </div>
         )}
 

@@ -10,6 +10,7 @@ import ModalShell from '../../components/ModalShell';
 import MenuOverlay from '../../components/MenuOverlay';
 import PageErrorBoundary from '../../components/PageErrorBoundary';
 import { useStaffWebSocket } from '../../hooks/useStaffWebSocket';
+import { useWebSocketQuerySync } from '../../hooks/useWebSocketQuerySync';
 import StaffMobileSidebar from '../../components/StaffMobileSidebar';
 import { useConfirmDialog } from '../../components/ConfirmDialog';
 
@@ -44,6 +45,8 @@ const AdminDashboard: React.FC = () => {
     onBookingEvent: handleGlobalBookingEvent,
     debounceMs: 500
   });
+
+  useWebSocketQuerySync();
 
   useEffect(() => {
     const tabParam = searchParams.get('tab') as TabType | null;

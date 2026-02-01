@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import { usePageReady } from '../../../contexts/PageReadyContext';
-import { formatDateDisplayWithDay, formatTime12Hour, getRelativeDateLabel } from '../../../utils/dateUtils';
+import { formatDateDisplayWithDay, formatTime12Hour } from '../../../utils/dateUtils';
 import { formatPhoneNumber } from '../../../utils/formatting';
 import PullToRefresh from '../../../components/PullToRefresh';
 import ModalShell from '../../../components/ModalShell';
 import { AnimatedPage } from '../../../components/motion';
+import { useTourData, useSyncTours, useCheckInTour, useUpdateTourStatus } from '../../../hooks/queries';
 
 interface Tour {
   id: number;
@@ -25,109 +26,31 @@ interface Tour {
 
 const ToursTab: React.FC = () => {
   const { setPageReady } = usePageReady();
-  const [tours, setTours] = useState<Tour[]>([]);
-  const [todayTours, setTodayTours] = useState<Tour[]>([]);
-  const [pastTours, setPastTours] = useState<Tour[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: toursData, isLoading } = useTourData();
+  const syncMutation = useSyncTours();
+  const checkInMutation = useCheckInTour();
+  const updateStatusMutation = useUpdateTourStatus();
+
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [checkInModalOpen, setCheckInModalOpen] = useState(false);
   const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
   const typeformContainerRef = useRef<HTMLDivElement>(null);
 
   const [statusMenuTourId, setStatusMenuTourId] = useState<number | null>(null);
-  const [statusUpdating, setStatusUpdating] = useState<number | null>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     setPageReady(true);
   }, [setPageReady]);
 
-  const fetchTours = useCallback(async () => {
-    try {
-      const [todayRes, allToursRes] = await Promise.all([
-        fetch('/api/tours/today', { credentials: 'include' }),
-        fetch('/api/tours', { credentials: 'include' })
-      ]);
-      
-      if (todayRes.ok) {
-        const data = await todayRes.json();
-        setTodayTours(data);
-      }
-      
-      if (allToursRes.ok) {
-        const data = await allToursRes.json();
-        const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
-        
-        const upcoming: Tour[] = [];
-        const past: Tour[] = [];
-        
-        data.forEach((t: Tour) => {
-          if (t.tourDate === todayStr) return;
-          if (t.tourDate > todayStr) {
-            if (t.status !== 'cancelled') {
-              upcoming.push(t);
-            }
-          } else {
-            past.push(t);
-          }
-        });
-        
-        upcoming.sort((a, b) => a.tourDate.localeCompare(b.tourDate));
-        past.sort((a, b) => b.tourDate.localeCompare(a.tourDate));
-        
-        setTours(upcoming);
-        setPastTours(past);
-      }
-    } catch (err) {
-      console.error('Failed to fetch tours:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchTours();
-  }, [fetchTours]);
-
-  useEffect(() => {
-    const handleTourUpdate = () => {
-      fetchTours();
-    };
-    window.addEventListener('tour-update', handleTourUpdate);
-    return () => {
-      window.removeEventListener('tour-update', handleTourUpdate);
-    };
-  }, [fetchTours]);
-
-  const handlePullRefresh = useCallback(async () => {
+  const handlePullRefresh = async () => {
     setSyncMessage(null);
-    const maxRetries = 3;
-    
-    const attemptSync = async (attempt = 1): Promise<{ ok: boolean; data: any }> => {
-      try {
-        const res = await fetch('/api/tours/sync', { method: 'POST', credentials: 'include' });
-        const data = await res.json();
-        return { ok: res.ok, data };
-      } catch (err: any) {
-        if (attempt < maxRetries && (err.message?.includes('fetch') || err.message?.includes('network'))) {
-          await new Promise(r => setTimeout(r, 500 * attempt));
-          return attemptSync(attempt + 1);
-        }
-        throw err;
-      }
-    };
-    
     try {
-      const { ok, data } = await attemptSync();
-      if (ok) {
-        setSyncMessage(`Synced ${data.synced} tours (${data.created} new, ${data.updated} updated)`);
-      } else {
-        setSyncMessage(data.error || 'Sync failed');
-      }
+      const result = await syncMutation.mutateAsync();
+      setSyncMessage(`Synced ${result.synced} tours (${result.created} new, ${result.updated} updated)`);
     } catch (err) {
       setSyncMessage('Network error - please try again');
     }
-    await fetchTours();
-  }, [fetchTours]);
+  };
 
   const openCheckIn = (tour: Tour) => {
     setSelectedTour(tour);
@@ -136,80 +59,25 @@ const ToursTab: React.FC = () => {
 
   const handleCheckIn = async () => {
     if (!selectedTour) return;
-    
-    const previousTodayTours = [...todayTours];
-    const previousTours = [...tours];
-    const previousPastTours = [...pastTours];
-    
-    const updateTour = (t: Tour) => 
-      t.id === selectedTour.id ? { ...t, status: 'checked_in' as const } : t;
-    
-    setTodayTours(prev => prev.map(updateTour));
-    setTours(prev => prev.map(updateTour));
-    setPastTours(prev => prev.map(updateTour));
-    setCheckInModalOpen(false);
-    setSelectedTour(null);
-    
     try {
-      const res = await fetch(`/api/tours/${selectedTour.id}/checkin`, {
-        method: 'POST',
-        credentials: 'include'
-      });
-      if (res.ok) {
-        fetchTours();
-      } else {
-        setTodayTours(previousTodayTours);
-        setTours(previousTours);
-        setPastTours(previousPastTours);
-      }
+      await checkInMutation.mutateAsync({ tourId: selectedTour.id });
+      setCheckInModalOpen(false);
+      setSelectedTour(null);
     } catch (err) {
-      setTodayTours(previousTodayTours);
-      setTours(previousTours);
-      setPastTours(previousPastTours);
       console.error('Check-in failed:', err);
     }
   };
 
   const handleStatusUpdate = async (tourId: number, newStatus: string) => {
-    setStatusUpdating(tourId);
     setStatusMenuTourId(null);
-    
-    const previousTodayTours = [...todayTours];
-    const previousTours = [...tours];
-    const previousPastTours = [...pastTours];
-    
-    const updateTourStatus = (t: Tour) => 
-      t.id === tourId ? { ...t, status: newStatus } : t;
-    
-    setTodayTours(prev => prev.map(updateTourStatus));
-    setTours(prev => prev.map(updateTourStatus));
-    setPastTours(prev => prev.map(updateTourStatus));
-    
     try {
-      const res = await fetch(`/api/tours/${tourId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status: newStatus })
-      });
-      if (res.ok) {
-        await fetchTours();
-      } else {
-        setTodayTours(previousTodayTours);
-        setTours(previousTours);
-        setPastTours(previousPastTours);
-      }
+      await updateStatusMutation.mutateAsync({ tourId, status: newStatus });
     } catch (err) {
       console.error('Status update failed:', err);
-      setTodayTours(previousTodayTours);
-      setTours(previousTours);
-      setPastTours(previousPastTours);
-    } finally {
-      setStatusUpdating(null);
     }
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (checkInModalOpen && typeformContainerRef.current && selectedTour) {
       typeformContainerRef.current.innerHTML = '';
       const script = document.createElement('script');
@@ -231,7 +99,7 @@ const ToursTab: React.FC = () => {
     return formatDateDisplayWithDay(datePart);
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
@@ -251,7 +119,7 @@ const ToursTab: React.FC = () => {
   const TourCard = ({ tour, isToday = false, isPast = false }: { tour: Tour; isToday?: boolean; isPast?: boolean }) => {
     const config = statusConfig[tour.status] || statusConfig.scheduled;
     const isMenuOpen = statusMenuTourId === tour.id;
-    const isUpdating = statusUpdating === tour.id;
+    const isUpdating = updateStatusMutation.isPending;
     
     return (
       <div className={`p-4 rounded-2xl border ${tour.status === 'checked_in' 
@@ -358,42 +226,42 @@ const ToursTab: React.FC = () => {
         </div>
       )}
 
-      {todayTours.length > 0 && (
+      {toursData.todayTours.length > 0 && (
         <div>
           <h3 className="text-sm font-bold uppercase tracking-wider text-primary/70 dark:text-white/70 mb-3 flex items-center gap-2">
             <span aria-hidden="true" className="material-symbols-outlined text-lg">today</span>
-            Today's Tours ({todayTours.length})
+            Today's Tours ({toursData.todayTours.length})
           </h3>
           <div className="space-y-3">
-            {todayTours.map((tour) => (
+            {toursData.todayTours.map((tour) => (
               <TourCard key={tour.id} tour={tour} isToday />
             ))}
           </div>
         </div>
       )}
 
-      {todayTours.length === 0 && (
+      {toursData.todayTours.length === 0 && (
         <div className="text-center py-8 bg-white/40 dark:bg-white/5 rounded-2xl">
           <span aria-hidden="true" className="material-symbols-outlined text-4xl text-primary/30 dark:text-white/70 mb-2">event_available</span>
           <p className="text-primary/80 dark:text-white/80 text-sm">No tours scheduled for today</p>
         </div>
       )}
 
-      {tours.length > 0 && (
+      {toursData.upcomingTours.length > 0 && (
         <div>
           <h3 className="text-sm font-bold uppercase tracking-wider text-primary/70 dark:text-white/70 mb-3 flex items-center gap-2">
             <span aria-hidden="true" className="material-symbols-outlined text-lg">upcoming</span>
-            Upcoming Tours ({tours.length})
+            Upcoming Tours ({toursData.upcomingTours.length})
           </h3>
           <div className="space-y-3">
-            {tours.map((tour) => (
+            {toursData.upcomingTours.map((tour) => (
               <TourCard key={tour.id} tour={tour} />
             ))}
           </div>
         </div>
       )}
 
-      {todayTours.length === 0 && tours.length === 0 && pastTours.length === 0 && (
+      {toursData.todayTours.length === 0 && toursData.upcomingTours.length === 0 && toursData.pastTours.length === 0 && (
         <div className="text-center py-12">
           <span aria-hidden="true" className="material-symbols-outlined text-5xl text-primary/20 dark:text-white/20 mb-3">directions_walk</span>
           <p className="text-primary/70 dark:text-white/70">No tours found</p>
@@ -403,14 +271,14 @@ const ToursTab: React.FC = () => {
         </div>
       )}
 
-      {pastTours.length > 0 && (
+      {toursData.pastTours.length > 0 && (
         <div>
           <h3 className="text-sm font-bold uppercase tracking-wider text-primary/70 dark:text-white/70 mb-3 flex items-center gap-2">
             <span aria-hidden="true" className="material-symbols-outlined text-lg">history</span>
-            Past Tours ({pastTours.length})
+            Past Tours ({toursData.pastTours.length})
           </h3>
           <div className="space-y-3">
-            {pastTours.map((tour) => (
+            {toursData.pastTours.map((tour) => (
               <TourCard key={tour.id} tour={tour} isPast />
             ))}
           </div>

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePageReady } from '../../../contexts/PageReadyContext';
 import { useData } from '../../../contexts/DataContext';
 import { useToast } from '../../../components/Toast';
@@ -9,6 +10,7 @@ import PullToRefresh from '../../../components/PullToRefresh';
 import BookingMembersEditor from '../../../components/admin/BookingMembersEditor';
 import RosterManager from '../../../components/booking/RosterManager';
 import { TrackmanLinkModal } from '../../../components/staff-command-center/modals/TrackmanLinkModal';
+import { fetchWithCredentials } from '../../../hooks/queries/useFetch';
 
 const formatTime12Hour = (time: string | null | undefined): string => {
   if (!time) return '';
@@ -52,7 +54,22 @@ const formatImportLabel = (filename: string, createdAt?: string): string => {
   return cleaned.replace(/[_-]/g, ' ').replace(/\s+/g, ' ').trim() || 'Trackman Import';
 };
 
+interface UnmatchedResponse {
+  data: any[];
+  totalCount: number;
+}
+
+interface NeedsPlayersResponse {
+  data: any[];
+  totalCount: number;
+}
+
+interface FuzzyMatchesResponse {
+  matches: any[];
+}
+
 const TrackmanTab: React.FC = () => {
+  const queryClient = useQueryClient();
   const pageReadyContext = usePageReady();
   const dataContext = useData();
   const toastContext = useToast();
@@ -60,17 +77,11 @@ const TrackmanTab: React.FC = () => {
   const setPageReady = pageReadyContext?.setPageReady || (() => {});
   const actualUser = dataContext?.actualUser;
   const showToast = toastContext?.showToast || (() => {});
-  const [unmatchedBookings, setUnmatchedBookings] = useState<any[]>([]);
-  const [unmatchedTotalCount, setUnmatchedTotalCount] = useState<number>(0);
+  
   const [unmatchedPage, setUnmatchedPage] = useState(1);
-  const [needsPlayersBookings, setNeedsPlayersBookings] = useState<any[]>([]);
-  const [needsPlayersTotalCount, setNeedsPlayersTotalCount] = useState<number>(0);
   const [needsPlayersPage, setNeedsPlayersPage] = useState(1);
   const [needsPlayersSearchQuery, setNeedsPlayersSearchQuery] = useState('');
   const [fuzzyMatchModal, setFuzzyMatchModal] = useState<{ booking: any; matches: any[]; isLoading: boolean; selectedEmail: string; rememberEmail: boolean } | null>(null);
-  const [importRuns, setImportRuns] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
   const [assignPlayersModal, setAssignPlayersModal] = useState<{ booking: any; isOpen: boolean } | null>(null);
   const [managePlayersModal, setManagePlayersModal] = useState<{ 
@@ -86,10 +97,7 @@ const TrackmanTab: React.FC = () => {
       ownerName?: string;
     };
   } | null>(null);
-  const [members, setMembers] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [unmatchedSearchQuery, setUnmatchedSearchQuery] = useState('');
   const [fuzzySearchQuery, setFuzzySearchQuery] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -98,180 +106,72 @@ const TrackmanTab: React.FC = () => {
   const unmatchedSectionRef = useRef<HTMLDivElement>(null);
   const needsPlayersSectionRef = useRef<HTMLDivElement>(null);
 
-  const fetchUnmatched = async (page: number, search?: string) => {
-    try {
-      const offset = (page - 1) * ITEMS_PER_PAGE;
-      const cacheBuster = `_t=${Date.now()}`;
-      const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
-      const res = await fetch(`/api/admin/trackman/unmatched?resolved=false&limit=${ITEMS_PER_PAGE}&offset=${offset}${searchParam}&${cacheBuster}`, { credentials: 'include' });
-      if (res.ok) {
-        const result = await res.json();
-        setUnmatchedBookings(result.data || []);
-        setUnmatchedTotalCount(result.totalCount || 0);
-      }
-    } catch (err) {
-      console.error('Failed to fetch unmatched bookings:', err);
-    }
-  };
+  const unmatchedOffset = (unmatchedPage - 1) * ITEMS_PER_PAGE;
+  const needsPlayersOffset = (needsPlayersPage - 1) * ITEMS_PER_PAGE;
 
-  const fetchNeedsPlayers = async (page: number, search?: string) => {
-    try {
-      const offset = (page - 1) * ITEMS_PER_PAGE;
-      const cacheBuster = `_t=${Date.now()}`;
-      const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
-      const res = await fetch(`/api/admin/trackman/needs-players?limit=${ITEMS_PER_PAGE}&offset=${offset}${searchParam}&${cacheBuster}`, { credentials: 'include' });
-      if (res.ok) {
-        const result = await res.json();
-        setNeedsPlayersBookings(result.data || []);
-        setNeedsPlayersTotalCount(result.totalCount || 0);
-      }
-    } catch (err) {
-      console.error('Failed to fetch needs-players bookings:', err);
-    }
-  };
+  const { data: unmatchedData, isLoading: unmatchedLoading } = useQuery<UnmatchedResponse>({
+    queryKey: ['trackman', 'unmatched', unmatchedPage, unmatchedSearchQuery],
+    queryFn: () => {
+      const searchParam = unmatchedSearchQuery ? `&search=${encodeURIComponent(unmatchedSearchQuery)}` : '';
+      return fetchWithCredentials(`/api/admin/trackman/unmatched?resolved=false&limit=${ITEMS_PER_PAGE}&offset=${unmatchedOffset}${searchParam}`);
+    },
+  });
 
-  const handleOpenFuzzyMatchModal = async (booking: any) => {
-    setFuzzyMatchModal({ booking, matches: [], isLoading: true, selectedEmail: '', rememberEmail: true });
-    try {
-      const res = await fetch(`/api/admin/trackman/fuzzy-matches/${booking.id}`, { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setFuzzyMatchModal(prev => prev ? { ...prev, matches: data.matches || [], isLoading: false } : null);
-      } else {
-        setFuzzyMatchModal(prev => prev ? { ...prev, isLoading: false } : null);
-        showToast('Failed to fetch fuzzy matches', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to fetch fuzzy matches:', err);
+  const { data: importRuns = [], isLoading: runsLoading } = useQuery<any[]>({
+    queryKey: ['trackman', 'import-runs'],
+    queryFn: () => fetchWithCredentials('/api/admin/trackman/import-runs'),
+  });
+
+  const { data: membersData, isLoading: membersLoading } = useQuery<any>({
+    queryKey: ['hubspot', 'contacts', 'all'],
+    queryFn: () => fetchWithCredentials('/api/hubspot/contacts?status=all'),
+  });
+
+  const { data: needsPlayersData, isLoading: needsPlayersLoading } = useQuery<NeedsPlayersResponse>({
+    queryKey: ['trackman', 'needs-players', needsPlayersPage, needsPlayersSearchQuery],
+    queryFn: () => {
+      const searchParam = needsPlayersSearchQuery ? `&search=${encodeURIComponent(needsPlayersSearchQuery)}` : '';
+      return fetchWithCredentials(`/api/admin/trackman/needs-players?limit=${ITEMS_PER_PAGE}&offset=${needsPlayersOffset}${searchParam}`);
+    },
+  });
+
+  const { data: searchResults = [], isLoading: isSearching } = useQuery<any[]>({
+    queryKey: ['members', 'search', searchQuery],
+    queryFn: async () => {
+      const data = await fetchWithCredentials<any[]>(`/api/members/search?query=${encodeURIComponent(searchQuery)}&limit=20&includeFormer=true`);
+      return data.map((m: any) => {
+        const nameParts = (m.name || '').split(' ');
+        return {
+          ...m,
+          firstName: nameParts[0] || '',
+          lastName: nameParts.slice(1).join(' ') || '',
+        };
+      });
+    },
+    enabled: searchQuery.length >= 2,
+  });
+
+  const { data: fuzzyMatchesData, isLoading: fuzzyMatchesLoading, isError: fuzzyMatchesError } = useQuery<FuzzyMatchesResponse>({
+    queryKey: ['trackman', 'fuzzy-matches', fuzzyMatchModal?.booking?.id],
+    queryFn: () => fetchWithCredentials(`/api/admin/trackman/fuzzy-matches/${fuzzyMatchModal?.booking?.id}`),
+    enabled: !!fuzzyMatchModal?.booking?.id,
+  });
+
+  React.useEffect(() => {
+    if (fuzzyMatchesError && fuzzyMatchModal) {
       setFuzzyMatchModal(prev => prev ? { ...prev, isLoading: false } : null);
       showToast('Failed to fetch fuzzy matches', 'error');
     }
-  };
+  }, [fuzzyMatchesError, fuzzyMatchModal, showToast]);
 
-  const handleResolveFuzzyMatch = async () => {
-    if (!fuzzyMatchModal || !fuzzyMatchModal.selectedEmail) return;
-    try {
-      const res = await fetch(`/api/admin/trackman/unmatched/${fuzzyMatchModal.booking.id}/resolve`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ memberEmail: fuzzyMatchModal.selectedEmail })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const originalEmail = fuzzyMatchModal.booking?.originalEmail || fuzzyMatchModal.booking?.original_email;
-        const shouldRemember = fuzzyMatchModal.rememberEmail && originalEmail && 
-          originalEmail.toLowerCase() !== fuzzyMatchModal.selectedEmail.toLowerCase();
-        
-        if (shouldRemember) {
-          try {
-            await fetch('/api/admin/linked-emails', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({
-                primaryEmail: fuzzyMatchModal.selectedEmail,
-                linkedEmail: originalEmail
-              })
-            });
-          } catch (linkErr) {
-            console.warn('Failed to save email link:', linkErr);
-          }
-        }
-        
-        setFuzzyMatchModal(null);
-        setFuzzySearchQuery('');
-        if (data.autoResolved > 0) {
-          showToast(`Resolved ${data.resolved} booking(s) (${data.autoResolved} auto-resolved with same name)`, 'success', 5000);
-        } else {
-          showToast('Booking resolved successfully', 'success');
-        }
-        await new Promise(resolve => setTimeout(resolve, 300));
-        fetchData();
-      } else {
-        showToast('Failed to resolve booking', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to resolve booking:', err);
-      showToast('Failed to resolve booking', 'error');
+  React.useEffect(() => {
+    if (fuzzyMatchesData && fuzzyMatchModal) {
+      setFuzzyMatchModal(prev => prev ? { ...prev, matches: fuzzyMatchesData.matches || [], isLoading: false } : null);
     }
-  };
+  }, [fuzzyMatchesData, fuzzyMatchModal]);
 
-  const fetchData = async () => {
-    try {
-      const cacheBuster = `_t=${Date.now()}`;
-      const unmatchedOffset = (unmatchedPage - 1) * ITEMS_PER_PAGE;
-      const needsPlayersOffset = (needsPlayersPage - 1) * ITEMS_PER_PAGE;
-      const [unmatchedRes, runsRes, membersRes, needsPlayersRes] = await Promise.all([
-        fetch(`/api/admin/trackman/unmatched?resolved=false&limit=${ITEMS_PER_PAGE}&offset=${unmatchedOffset}&${cacheBuster}`, { credentials: 'include' }),
-        fetch(`/api/admin/trackman/import-runs?${cacheBuster}`, { credentials: 'include' }),
-        fetch('/api/hubspot/contacts?status=all', { credentials: 'include' }),
-        fetch(`/api/admin/trackman/needs-players?limit=${ITEMS_PER_PAGE}&offset=${needsPlayersOffset}&${cacheBuster}`, { credentials: 'include' })
-      ]);
-      
-      if (unmatchedRes.ok) {
-        const result = await unmatchedRes.json();
-        setUnmatchedBookings(result.data || []);
-        setUnmatchedTotalCount(result.totalCount || 0);
-      }
-      if (runsRes.ok) {
-        const data = await runsRes.json();
-        setImportRuns(data);
-      }
-      if (membersRes.ok) {
-        const data = await membersRes.json();
-        const membersArray = Array.isArray(data) ? data : (data?.contacts || []);
-        setMembers(membersArray);
-      }
-      if (needsPlayersRes.ok) {
-        const result = await needsPlayersRes.json();
-        setNeedsPlayersBookings(result.data || []);
-        setNeedsPlayersTotalCount(result.totalCount || 0);
-      }
-    } catch (err) {
-      console.error('Failed to fetch Trackman data:', err);
-    } finally {
-      setIsLoading(false);
-      setPageReady(true);
-    }
-  };
-
-  const unmatchedTotalPages = Math.ceil(unmatchedTotalCount / ITEMS_PER_PAGE);
-  const needsPlayersTotalPages = Math.ceil(needsPlayersTotalCount / ITEMS_PER_PAGE);
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    const debounceTimer = setTimeout(() => {
-      setUnmatchedPage(1);
-      fetchUnmatched(1, unmatchedSearchQuery);
-    }, 300);
-    return () => clearTimeout(debounceTimer);
-  }, [unmatchedSearchQuery]);
-
-  useEffect(() => {
-    const debounceTimer = setTimeout(() => {
-      setNeedsPlayersPage(1);
-      fetchNeedsPlayers(1, needsPlayersSearchQuery);
-    }, 300);
-    return () => clearTimeout(debounceTimer);
-  }, [needsPlayersSearchQuery]);
-
-  const handleFileUpload = async (file: File) => {
-    if (!file.name.endsWith('.csv')) {
-      setImportResult({ success: false, error: 'Please upload a CSV file' });
-      return;
-    }
-    
-    setIsImporting(true);
-    setImportResult(null);
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000);
-    
-    try {
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('file', file);
       
@@ -279,22 +179,110 @@ const TrackmanTab: React.FC = () => {
         method: 'POST',
         credentials: 'include',
         body: formData,
-        signal: controller.signal
       });
-      clearTimeout(timeoutId);
-      const data = await res.json();
+      return res.json();
+    },
+    onSuccess: (data) => {
       setImportResult(data);
-      fetchData();
-    } catch (err: any) {
-      clearTimeout(timeoutId);
-      if (err.name === 'AbortError') {
-        setImportResult({ success: false, error: 'Import timed out. The file may be too large or the server is busy. Please try again or use a smaller date range.' });
-      } else {
-        setImportResult({ success: false, error: err.message || 'Network error - please check your connection and try again' });
+      queryClient.invalidateQueries({ queryKey: ['trackman'] });
+    },
+    onError: (err: any) => {
+      setImportResult({ success: false, error: err.message || 'Network error - please check your connection and try again' });
+    },
+  });
+
+  const resolveMutation = useMutation({
+    mutationFn: async ({ bookingId, memberEmail }: { bookingId: number; memberEmail: string }) => {
+      const res = await fetch(`/api/admin/trackman/unmatched/${bookingId}/resolve`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ memberEmail })
+      });
+      if (!res.ok) throw new Error('Failed to resolve booking');
+      return res.json();
+    },
+    onSuccess: async (data) => {
+      const originalEmail = fuzzyMatchModal?.booking?.originalEmail || fuzzyMatchModal?.booking?.original_email;
+      const shouldRemember = fuzzyMatchModal?.rememberEmail && originalEmail && 
+        originalEmail.toLowerCase() !== fuzzyMatchModal?.selectedEmail?.toLowerCase();
+      
+      if (shouldRemember && fuzzyMatchModal?.selectedEmail) {
+        try {
+          await fetch('/api/admin/linked-emails', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              primaryEmail: fuzzyMatchModal.selectedEmail,
+              linkedEmail: originalEmail
+            })
+          });
+        } catch (linkErr) {
+          console.warn('Failed to save email link:', linkErr);
+        }
       }
-    } finally {
-      setIsImporting(false);
+      
+      setFuzzyMatchModal(null);
+      setFuzzySearchQuery('');
+      if (data.autoResolved > 0) {
+        showToast(`Resolved ${data.resolved} booking(s) (${data.autoResolved} auto-resolved with same name)`, 'success', 5000);
+      } else {
+        showToast('Booking resolved successfully', 'success');
+      }
+      await new Promise(resolve => setTimeout(resolve, 300));
+      queryClient.invalidateQueries({ queryKey: ['trackman'] });
+    },
+    onError: () => {
+      showToast('Failed to resolve booking', 'error');
+    },
+  });
+
+  const unmatchedBookings = unmatchedData?.data || [];
+  const unmatchedTotalCount = unmatchedData?.totalCount || 0;
+  const needsPlayersBookings = needsPlayersData?.data || [];
+  const needsPlayersTotalCount = needsPlayersData?.totalCount || 0;
+  const members = Array.isArray(membersData) ? membersData : (membersData?.contacts || []);
+
+  const isLoading = unmatchedLoading && runsLoading && membersLoading && needsPlayersLoading;
+
+  React.useEffect(() => {
+    if (!isLoading) {
+      setPageReady(true);
     }
+  }, [isLoading, setPageReady]);
+
+  React.useEffect(() => {
+    setUnmatchedPage(1);
+  }, [unmatchedSearchQuery]);
+
+  React.useEffect(() => {
+    setNeedsPlayersPage(1);
+  }, [needsPlayersSearchQuery]);
+
+  const handleOpenFuzzyMatchModal = (booking: any) => {
+    setFuzzyMatchModal({ booking, matches: [], isLoading: true, selectedEmail: '', rememberEmail: true });
+  };
+
+  const handleResolveFuzzyMatch = () => {
+    if (!fuzzyMatchModal || !fuzzyMatchModal.selectedEmail) return;
+    resolveMutation.mutate({
+      bookingId: fuzzyMatchModal.booking.id,
+      memberEmail: fuzzyMatchModal.selectedEmail
+    });
+  };
+
+  const unmatchedTotalPages = Math.ceil(unmatchedTotalCount / ITEMS_PER_PAGE);
+  const needsPlayersTotalPages = Math.ceil(needsPlayersTotalCount / ITEMS_PER_PAGE);
+
+  const handleFileUpload = async (file: File) => {
+    if (!file.name.endsWith('.csv')) {
+      setImportResult({ success: false, error: 'Please upload a CSV file' });
+      return;
+    }
+    
+    setImportResult(null);
+    uploadMutation.mutate(file);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -318,44 +306,14 @@ const TrackmanTab: React.FC = () => {
     if (file) handleFileUpload(file);
   };
 
-  useEffect(() => {
-    const searchMembers = async () => {
-      if (!searchQuery || searchQuery.length < 2) {
-        setSearchResults([]);
-        return;
-      }
-      setIsSearching(true);
-      try {
-        const res = await fetch(`/api/members/search?query=${encodeURIComponent(searchQuery)}&limit=20&includeFormer=true`, { credentials: 'include' });
-        if (res.ok) {
-          const data = await res.json();
-          setSearchResults(data.map((m: any) => {
-            const nameParts = (m.name || '').split(' ');
-            return {
-              ...m,
-              firstName: nameParts[0] || '',
-              lastName: nameParts.slice(1).join(' ') || '',
-            };
-          }));
-        }
-      } catch (err) {
-        console.error('Member search error:', err);
-      } finally {
-        setIsSearching(false);
-      }
-    };
-    const timeoutId = setTimeout(searchMembers, 300);
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery]);
-
-  const filteredMembers = searchQuery.length >= 2 ? searchResults : members.filter(m => {
+  const filteredMembers = searchQuery.length >= 2 ? searchResults : members.filter((m: any) => {
     const query = searchQuery.toLowerCase();
     const name = `${m.firstName || m.firstname || ''} ${m.lastName || m.lastname || ''}`.toLowerCase();
     const email = (m.email || '').toLowerCase();
     return name.includes(query) || email.includes(query);
   });
 
-  const fuzzyFilteredMembers = members.filter(m => {
+  const fuzzyFilteredMembers = members.filter((m: any) => {
     if (!fuzzySearchQuery.trim()) return false;
     const query = fuzzySearchQuery.toLowerCase();
     const name = `${m.firstName || m.firstname || ''} ${m.lastName || m.lastname || ''}`.toLowerCase();
@@ -364,7 +322,12 @@ const TrackmanTab: React.FC = () => {
   });
 
   const handlePullRefresh = async () => {
-    await fetchData();
+    await queryClient.invalidateQueries({ queryKey: ['trackman'] });
+    await queryClient.invalidateQueries({ queryKey: ['hubspot', 'contacts'] });
+  };
+
+  const invalidateTrackmanQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['trackman'] });
   };
 
   if (isLoading) {
@@ -400,16 +363,16 @@ const TrackmanTab: React.FC = () => {
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
-          onClick={() => !isImporting && fileInputRef.current?.click()}
+          onClick={() => !uploadMutation.isPending && fileInputRef.current?.click()}
           className={`
             border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all
             ${isDragging 
               ? 'border-accent bg-accent/10' 
               : 'border-primary/20 dark:border-white/20 hover:border-accent hover:bg-accent/5'}
-            ${isImporting ? 'pointer-events-none opacity-50' : ''}
+            ${uploadMutation.isPending ? 'pointer-events-none opacity-50' : ''}
           `}
         >
-          {isImporting ? (
+          {uploadMutation.isPending ? (
             <div className="flex flex-col items-center gap-3">
               <WalkingGolferSpinner size="lg" variant="dark" />
               <p className="text-sm font-medium text-primary dark:text-white">Processing import...</p>
@@ -631,14 +594,14 @@ const TrackmanTab: React.FC = () => {
                 </p>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => { setUnmatchedPage(p => Math.max(1, p - 1)); fetchUnmatched(unmatchedPage - 1, unmatchedSearchQuery); unmatchedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+                    onClick={() => { setUnmatchedPage(p => Math.max(1, p - 1)); unmatchedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
                     disabled={unmatchedPage <= 1}
                     className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 dark:bg-white/10 text-primary dark:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/20 dark:hover:bg-white/20 transition-colors"
                   >
                     Previous
                   </button>
                   <button
-                    onClick={() => { setUnmatchedPage(p => Math.min(unmatchedTotalPages, p + 1)); fetchUnmatched(unmatchedPage + 1, unmatchedSearchQuery); unmatchedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+                    onClick={() => { setUnmatchedPage(p => Math.min(unmatchedTotalPages, p + 1)); unmatchedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
                     disabled={unmatchedPage >= unmatchedTotalPages}
                     className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 dark:bg-white/10 text-primary dark:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/20 dark:hover:bg-white/20 transition-colors"
                   >
@@ -689,13 +652,13 @@ const TrackmanTab: React.FC = () => {
               const isComplete = assignedCount >= expectedCount;
               
               return (
-                <div key={booking.id} className="p-4 bg-white/50 dark:bg-white/5 rounded-xl flex justify-between items-start gap-3">
+                <div key={booking.id} className="flex items-center justify-between p-3 bg-white/50 dark:bg-white/5 rounded-xl border border-primary/10 dark:border-white/10">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-bold text-primary dark:text-white truncate">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-bold text-primary dark:text-white text-sm truncate">
                         {booking.userName || booking.user_name || 'Unknown'}
                       </p>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                         isComplete 
                           ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300' 
                           : 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300'
@@ -740,14 +703,14 @@ const TrackmanTab: React.FC = () => {
               </p>
               <div className="flex gap-2">
                 <button
-                  onClick={() => { setNeedsPlayersPage(p => Math.max(1, p - 1)); fetchNeedsPlayers(needsPlayersPage - 1, needsPlayersSearchQuery); needsPlayersSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+                  onClick={() => { setNeedsPlayersPage(p => Math.max(1, p - 1)); needsPlayersSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
                   disabled={needsPlayersPage <= 1}
                   className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 dark:bg-white/10 text-primary dark:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/20 dark:hover:bg-white/20 transition-colors"
                 >
                   Previous
                 </button>
                 <button
-                  onClick={() => { setNeedsPlayersPage(p => Math.min(needsPlayersTotalPages, p + 1)); fetchNeedsPlayers(needsPlayersPage + 1, needsPlayersSearchQuery); needsPlayersSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+                  onClick={() => { setNeedsPlayersPage(p => Math.min(needsPlayersTotalPages, p + 1)); needsPlayersSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
                   disabled={needsPlayersPage >= needsPlayersTotalPages}
                   className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 dark:bg-white/10 text-primary dark:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/20 dark:hover:bg-white/20 transition-colors"
                 >
@@ -773,7 +736,7 @@ const TrackmanTab: React.FC = () => {
               bookingContext={managePlayersModal.bookingContext}
               showHeader={true}
               onMemberLinked={() => {
-                fetchData();
+                invalidateTrackmanQueries();
               }}
             />
           </div>
@@ -871,7 +834,7 @@ const TrackmanTab: React.FC = () => {
                 isOwner={false}
                 isStaff={true}
                 onUpdate={() => {
-                  fetchData();
+                  invalidateTrackmanQueries();
                 }}
               />
             </div>
@@ -902,20 +865,20 @@ const TrackmanTab: React.FC = () => {
             </p>
           </div>
           
-          {fuzzyMatchModal?.isLoading ? (
+          {fuzzyMatchesLoading ? (
             <div className="flex flex-col items-center justify-center py-8 gap-3">
               <WalkingGolferSpinner size="md" variant="dark" />
               <p className="text-sm text-primary/70 dark:text-white/70">Finding matches...</p>
             </div>
           ) : (
             <>
-              {fuzzyMatchModal?.matches && fuzzyMatchModal.matches.length > 0 && (
+              {fuzzyMatchesData?.matches && fuzzyMatchesData.matches.length > 0 && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-primary dark:text-white mb-2">
                     Suggested Matches:
                   </label>
                   <div className="max-h-40 overflow-y-auto space-y-2 -mx-2 px-2">
-                    {fuzzyMatchModal.matches.map((match: any, idx: number) => (
+                    {fuzzyMatchesData.matches.map((match: any, idx: number) => (
                       <button
                         key={match.email || idx}
                         onClick={() => setFuzzyMatchModal(prev => prev ? { ...prev, selectedEmail: match.email } : null)}
@@ -950,7 +913,7 @@ const TrackmanTab: React.FC = () => {
               
               <div className="mb-4">
                 <label className="block text-sm font-medium text-primary dark:text-white mb-2">
-                  {fuzzyMatchModal?.matches && fuzzyMatchModal.matches.length > 0 ? 'Or search for a member:' : 'Search for a member:'}
+                  {fuzzyMatchesData?.matches && fuzzyMatchesData.matches.length > 0 ? 'Or search for a member:' : 'Search for a member:'}
                 </label>
                 <div className="relative">
                   <span aria-hidden="true" className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-primary/40 dark:text-white/40 text-lg">search</span>
@@ -988,7 +951,7 @@ const TrackmanTab: React.FC = () => {
                 </div>
               )}
               
-              {!fuzzyMatchModal?.matches?.length && !fuzzySearchQuery.trim() && (
+              {!fuzzyMatchesData?.matches?.length && !fuzzySearchQuery.trim() && (
                 <div className="py-6 text-center border-2 border-dashed border-primary/10 dark:border-white/25 rounded-xl mb-4">
                   <span aria-hidden="true" className="material-symbols-outlined text-3xl text-primary/20 dark:text-white/20 mb-2">person_add</span>
                   <p className="text-primary/70 dark:text-white/70 text-sm">No auto-suggestions available</p>
@@ -1027,10 +990,10 @@ const TrackmanTab: React.FC = () => {
             </button>
             <button
               onClick={handleResolveFuzzyMatch}
-              disabled={!fuzzyMatchModal?.selectedEmail}
+              disabled={!fuzzyMatchModal?.selectedEmail || resolveMutation.isPending}
               className="px-6 py-2.5 rounded-full bg-amber-500 text-white text-sm font-bold hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              Resolve with Selected Member
+              {resolveMutation.isPending ? 'Resolving...' : 'Resolve with Selected Member'}
             </button>
           </div>
         </div>
@@ -1068,7 +1031,7 @@ const TrackmanTab: React.FC = () => {
               }
             }
             await new Promise(r => setTimeout(r, 300));
-            fetchData();
+            invalidateTrackmanQueries();
           }}
           importedName={assignPlayersModal.booking.userName || assignPlayersModal.booking.user_name}
           notes={assignPlayersModal.booking.notes || assignPlayersModal.booking.note}

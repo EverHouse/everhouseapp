@@ -2,7 +2,7 @@ import React, { createContext, useState, useContext, ReactNode, useEffect, useCa
 import { flushSync } from 'react-dom';
 import { formatDateShort, formatTime12Hour } from '../utils/dateUtils';
 import { useUserStore } from '../stores/userStore';
-import { getCached, fetchAndCache, startBackgroundSync } from '../lib/backgroundSync';
+import { startBackgroundSync } from '../lib/backgroundSync';
 import type { CafeItem, EventSource, EventData, Announcement, MemberProfile, Booking } from '../types/data';
 import { 
   INITIAL_CAFE, 
@@ -586,41 +586,33 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     startBackgroundSync();
   }, []);
 
-  // Fetch cafe menu with background sync
+  // Fetch cafe menu (React Query is the primary source via useCafeMenu hook)
+  // This provides fallback data for any components still using DataContext
   useEffect(() => {
-    const formatCafeData = (data: any[]) => data.map((item: any) => ({
-      id: item.id.toString(),
-      category: item.category,
-      name: item.name,
-      price: parseFloat(item.price) || 0,
-      desc: item.description || '',
-      icon: item.icon || '',
-      image: item.image_url || ''
-    }));
-
-    const isValidCafeData = (data: any): data is any[] => {
-      return Array.isArray(data) && data.length > 0 && data[0]?.name;
-    };
-
-    const cached = getCached<any[]>('cafe_menu');
-    if (isValidCafeData(cached)) {
-      setCafeMenu(formatCafeData(cached));
-    }
-
-    fetchAndCache<any[]>('cafe_menu', '/api/cafe-menu', (data) => {
-      if (isValidCafeData(data)) {
-        setCafeMenu(formatCafeData(data));
+    const fetchCafeMenu = async () => {
+      try {
+        const res = await fetch('/api/cafe-menu');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setCafeMenu(data.map((item: any) => ({
+              id: item.id.toString(),
+              category: item.category,
+              name: item.name,
+              price: parseFloat(item.price) || 0,
+              desc: item.description || '',
+              icon: item.icon || '',
+              image: item.image_url || ''
+            })));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch cafe menu:', err);
+      } finally {
+        setCafeMenuLoaded(true);
       }
-      setCafeMenuLoaded(true);
-    }).then(() => {
-      setCafeMenuLoaded(true);
-    }).catch(() => {
-      setCafeMenuLoaded(true);
-    });
-
-    if (cached?.length) {
-      setCafeMenuLoaded(true);
-    }
+    };
+    fetchCafeMenu();
   }, []);
 
   // Function to refresh announcements
@@ -810,7 +802,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     };
   }, [actualUser?.role]);
 
-  // Fetch events with background sync
+  // Fetch events (Admin uses React Query, Member/Events still consumes from DataContext)
   useEffect(() => {
     const normalizeCategory = (cat: string | null | undefined): string => {
       if (!cat) return 'Social';
@@ -841,18 +833,22 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       ticketsSold: undefined
     })) as EventData[];
 
-    const cached = getCached<any[]>('events');
-    if (cached?.length) {
-      setEvents(formatEventData(cached));
-    }
-
-    fetchAndCache<any[]>('events', '/api/events', (data) => {
-      // Always set events from API response, even if empty - this clears hardcoded placeholder data
-      if (Array.isArray(data)) {
-        setEvents(data.length ? formatEventData(data) : []);
+    const fetchEvents = async () => {
+      try {
+        const res = await fetch('/api/events');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setEvents(data.length ? formatEventData(data) : []);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch events:', err);
+      } finally {
+        setEventsLoaded(true);
       }
-      setEventsLoaded(true);
-    });
+    };
+    fetchEvents();
   }, []);
 
   // Auth Logic - verify member email

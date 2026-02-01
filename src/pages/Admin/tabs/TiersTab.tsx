@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import SlideUpDrawer from '../../../components/SlideUpDrawer';
 import Toggle from '../../../components/Toggle';
 import FloatingActionButton from '../../../components/FloatingActionButton';
 import ProductsSubTab from './ProductsSubTab';
 import DiscountsSubTab from './DiscountsSubTab';
-import { apiRequest } from '../../../lib/apiRequest';
+import { fetchWithCredentials, postWithCredentials, deleteWithCredentials } from '../../../hooks/queries/useFetch';
 import { useConfirmDialog } from '../../../components/ConfirmDialog';
 
 type SubTab = 'tiers' | 'products' | 'fees' | 'discounts';
@@ -76,20 +77,13 @@ const BOOLEAN_FIELDS = [
 ] as const;
 
 const TiersTab: React.FC = () => {
+    const queryClient = useQueryClient();
     const [activeSubTab, setActiveSubTab] = useState<SubTab>('tiers');
-    const [tiers, setTiers] = useState<MembershipTier[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
     const [selectedTier, setSelectedTier] = useState<MembershipTier | null>(null);
-    const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
-    const [syncing, setSyncing] = useState(false);
-    const [stripePrices, setStripePrices] = useState<StripePrice[]>([]);
-    const [loadingPrices, setLoadingPrices] = useState(false);
-    const [tierFeatures, setTierFeatures] = useState<TierFeature[]>([]);
-    const [featuresLoading, setFeaturesLoading] = useState(false);
     const [editingLabelId, setEditingLabelId] = useState<number | null>(null);
     const [newFeatureForm, setNewFeatureForm] = useState({ key: '', label: '', type: 'boolean' as 'boolean' | 'number' | 'text' });
     const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
@@ -101,6 +95,37 @@ const TiersTab: React.FC = () => {
         { key: 'fees', label: 'Fees & Passes', icon: 'receipt_long' },
         { key: 'discounts', label: 'Discounts', icon: 'percent' },
     ];
+
+    const { data: tiers = [], isLoading } = useQuery({
+        queryKey: ['membership-tiers'],
+        queryFn: async () => {
+            const data = await fetchWithCredentials<MembershipTier[]>('/api/membership-tiers');
+            return data.map((t: any) => ({
+                ...t,
+                highlighted_features: Array.isArray(t.highlighted_features) ? t.highlighted_features : 
+                    (typeof t.highlighted_features === 'string' ? JSON.parse(t.highlighted_features || '[]') : []),
+                all_features: typeof t.all_features === 'object' && t.all_features !== null ? t.all_features :
+                    (typeof t.all_features === 'string' ? JSON.parse(t.all_features || '{}') : {})
+            }));
+        },
+    });
+
+    const { data: stripePrices = [], isLoading: loadingPrices } = useQuery({
+        queryKey: ['stripe-prices-recurring'],
+        queryFn: async () => {
+            const data = await fetchWithCredentials<{ prices: StripePrice[] }>('/api/stripe/prices/recurring');
+            return data.prices || [];
+        },
+    });
+
+    const { data: tierFeatures = [], isLoading: featuresLoading } = useQuery({
+        queryKey: ['tier-features'],
+        queryFn: async () => {
+            const data = await fetchWithCredentials<{ features: TierFeature[] }>('/api/tier-features');
+            return data.features || [];
+        },
+        enabled: isEditing || isCreating,
+    });
 
     const getDefaultTier = (): MembershipTier => ({
         id: 0,
@@ -133,60 +158,123 @@ const TiersTab: React.FC = () => {
         price_cents: null,
     });
 
-    const fetchStripePrices = async () => {
-        setLoadingPrices(true);
-        try {
-            const res = await fetch('/api/stripe/prices/recurring', { credentials: 'include' });
-            console.log('[TiersTab] Stripe prices response status:', res.status);
-            if (res.ok) {
-                const data = await res.json();
-                console.log('[TiersTab] Stripe prices received:', data.prices?.length || 0, 'prices');
-                setStripePrices(data.prices || []);
-            } else {
-                console.error('[TiersTab] Stripe prices fetch failed:', res.status);
-            }
-        } catch (err) {
-            console.error('Failed to fetch Stripe prices:', err);
-        } finally {
-            setLoadingPrices(false);
-        }
-    };
+    const saveTierMutation = useMutation({
+        mutationFn: async ({ tier, isNew }: { tier: MembershipTier; isNew: boolean }) => {
+            const url = isNew ? '/api/membership-tiers' : `/api/membership-tiers/${tier.id}`;
+            const payload = isNew ? {
+                ...tier,
+                slug: tier.name.toLowerCase().replace(/\s+/g, '-'),
+            } : tier;
+            return fetchWithCredentials<MembershipTier>(url, {
+                method: isNew ? 'POST' : 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['membership-tiers'] });
+            setSuccessMessage(`Tier ${isCreating ? 'created' : 'updated'} successfully`);
+            setTimeout(() => {
+                setIsEditing(false);
+                setIsCreating(false);
+                setSuccessMessage(null);
+            }, 1000);
+        },
+        onError: (err: Error) => {
+            setError(err.message || `Failed to ${isCreating ? 'create' : 'save'} tier`);
+        },
+    });
 
-    const fetchTierFeatures = async () => {
-        setFeaturesLoading(true);
-        try {
-            const res = await fetch('/api/tier-features', { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setTierFeatures(data.features || []);
-            }
-        } catch (err) {
-            console.error('Failed to fetch tier features:', err);
-        } finally {
-            setFeaturesLoading(false);
-        }
-    };
-
-    const updateFeatureValue = useCallback(async (featureId: number, tierId: number, value: any) => {
-        try {
-            const res = await fetch(`/api/tier-features/${featureId}/values/${tierId}`, {
+    const updateFeatureValueMutation = useMutation({
+        mutationFn: async ({ featureId, tierId, value }: { featureId: number; tierId: number; value: any }) => {
+            return fetchWithCredentials<{ value: any }>(`/api/tier-features/${featureId}/values/${tierId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ value })
+                body: JSON.stringify({ value }),
             });
-            if (res.ok) {
-                const data = await res.json();
-                setTierFeatures(prev => prev.map(f => 
-                    f.id === featureId 
-                        ? { ...f, values: { ...f.values, [tierId]: { tierId, value: data.value } } }
+        },
+        onSuccess: (data, variables) => {
+            queryClient.setQueryData(['tier-features'], (old: TierFeature[] | undefined) => {
+                if (!old) return old;
+                return old.map(f => 
+                    f.id === variables.featureId 
+                        ? { ...f, values: { ...f.values, [variables.tierId]: { tierId: variables.tierId, value: data.value } } }
                         : f
-                ));
+                );
+            });
+        },
+    });
+
+    const updateFeatureLabelMutation = useMutation({
+        mutationFn: async ({ featureId, displayLabel }: { featureId: number; displayLabel: string }) => {
+            return fetchWithCredentials<{ displayLabel: string }>(`/api/tier-features/${featureId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ displayLabel }),
+            });
+        },
+        onSuccess: (data, variables) => {
+            queryClient.setQueryData(['tier-features'], (old: TierFeature[] | undefined) => {
+                if (!old) return old;
+                return old.map(f => 
+                    f.id === variables.featureId ? { ...f, displayLabel: data.displayLabel } : f
+                );
+            });
+        },
+    });
+
+    const createFeatureMutation = useMutation({
+        mutationFn: async (featureData: { featureKey: string; displayLabel: string; valueType: string; sortOrder: number }) => {
+            return postWithCredentials<TierFeature>('/api/tier-features', featureData);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['tier-features'] });
+            setNewFeatureForm({ key: '', label: '', type: 'boolean' });
+        },
+    });
+
+    const deleteFeatureMutation = useMutation({
+        mutationFn: async (featureId: number) => {
+            return deleteWithCredentials<void>(`/api/tier-features/${featureId}`);
+        },
+        onSuccess: (_, featureId) => {
+            queryClient.setQueryData(['tier-features'], (old: TierFeature[] | undefined) => {
+                if (!old) return old;
+                return old.filter(f => f.id !== featureId);
+            });
+        },
+    });
+
+    const syncStripeMutation = useMutation({
+        mutationFn: async () => {
+            return postWithCredentials<{ success: boolean; synced: number; failed: number; skipped: number; details?: any[] }>('/api/admin/stripe/sync-products', {});
+        },
+        onSuccess: (data) => {
+            let message = `Synced ${data.synced} products to Stripe`;
+            if (data.failed > 0) {
+                message += `\n\nFailed: ${data.failed}`;
+                if (data.details) {
+                    const failedDetails = data.details.filter((d: any) => !d.success);
+                    if (failedDetails.length > 0) {
+                        message += '\n' + failedDetails.map((d: any) => `- ${d.tierName}: ${d.error}`).join('\n');
+                    }
+                }
             }
-        } catch (err) {
-            console.error('Failed to update feature value:', err);
-        }
-    }, []);
+            if (data.skipped > 0) {
+                message += `\n\nSkipped: ${data.skipped} (no price configured)`;
+            }
+            alert(message);
+            queryClient.invalidateQueries({ queryKey: ['membership-tiers'] });
+        },
+        onError: (err: Error) => {
+            const errorMsg = err.message || 'Unknown error';
+            if (errorMsg.includes('connection not found')) {
+                alert('Stripe sync failed: Stripe is not configured for this environment. Please set up Stripe live keys in Replit\'s Integrations panel before publishing.');
+            } else {
+                alert('Sync failed: ' + errorMsg);
+            }
+        },
+    });
 
     const debouncedUpdateFeatureValue = useCallback((featureId: number, tierId: number, value: any) => {
         const key = `${featureId}-${tierId}`;
@@ -194,51 +282,19 @@ const TiersTab: React.FC = () => {
             clearTimeout(debounceTimers.current[key]);
         }
         debounceTimers.current[key] = setTimeout(() => {
-            updateFeatureValue(featureId, tierId, value);
+            updateFeatureValueMutation.mutate({ featureId, tierId, value });
             delete debounceTimers.current[key];
         }, 500);
-    }, [updateFeatureValue]);
-
-    const updateFeatureLabel = async (featureId: number, displayLabel: string) => {
-        try {
-            const res = await fetch(`/api/tier-features/${featureId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ displayLabel })
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setTierFeatures(prev => prev.map(f => 
-                    f.id === featureId ? { ...f, displayLabel: data.displayLabel } : f
-                ));
-            }
-        } catch (err) {
-            console.error('Failed to update feature label:', err);
-        }
-    };
+    }, [updateFeatureValueMutation]);
 
     const createFeature = async () => {
         if (!newFeatureForm.key.trim() || !newFeatureForm.label.trim()) return;
-        try {
-            const res = await fetch('/api/tier-features', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    featureKey: newFeatureForm.key.trim(),
-                    displayLabel: newFeatureForm.label.trim(),
-                    valueType: newFeatureForm.type,
-                    sortOrder: tierFeatures.length
-                })
-            });
-            if (res.ok) {
-                await fetchTierFeatures();
-                setNewFeatureForm({ key: '', label: '', type: 'boolean' });
-            }
-        } catch (err) {
-            console.error('Failed to create feature:', err);
-        }
+        createFeatureMutation.mutate({
+            featureKey: newFeatureForm.key.trim(),
+            displayLabel: newFeatureForm.label.trim(),
+            valueType: newFeatureForm.type,
+            sortOrder: tierFeatures.length
+        });
     };
 
     const deleteFeature = async (featureId: number) => {
@@ -249,17 +305,7 @@ const TiersTab: React.FC = () => {
             variant: 'danger'
         });
         if (!confirmed) return;
-        try {
-            const res = await fetch(`/api/tier-features/${featureId}`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
-            if (res.ok) {
-                setTierFeatures(prev => prev.filter(f => f.id !== featureId));
-            }
-        } catch (err) {
-            console.error('Failed to delete feature:', err);
-        }
+        deleteFeatureMutation.mutate(featureId);
     };
 
     const openCreate = () => {
@@ -269,37 +315,6 @@ const TiersTab: React.FC = () => {
         setError(null);
         setSuccessMessage(null);
     };
-
-    const fetchTiers = async () => {
-        try {
-            const res = await fetch('/api/membership-tiers', { credentials: 'include' });
-            const data = await res.json();
-            setTiers(data.map((t: any) => ({
-                ...t,
-                highlighted_features: Array.isArray(t.highlighted_features) ? t.highlighted_features : 
-                    (typeof t.highlighted_features === 'string' ? JSON.parse(t.highlighted_features || '[]') : []),
-                all_features: typeof t.all_features === 'object' && t.all_features !== null ? t.all_features :
-                    (typeof t.all_features === 'string' ? JSON.parse(t.all_features || '{}') : {})
-            })));
-        } catch (err) {
-            console.error('Failed to fetch tiers:', err);
-            setError('Failed to load tiers');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchTiers();
-        fetchStripePrices();
-    }, []);
-
-
-    useEffect(() => {
-        if (isEditing || isCreating) {
-            fetchTierFeatures();
-        }
-    }, [isEditing, isCreating]);
 
     const openEdit = (tier: MembershipTier) => {
         setSelectedTier({
@@ -314,42 +329,8 @@ const TiersTab: React.FC = () => {
 
     const handleSave = async () => {
         if (!selectedTier) return;
-        setIsSaving(true);
         setError(null);
-        
-        try {
-            const url = isCreating ? '/api/membership-tiers' : `/api/membership-tiers/${selectedTier.id}`;
-            const method = isCreating ? 'POST' : 'PUT';
-            
-            const payload = isCreating ? {
-                ...selectedTier,
-                slug: selectedTier.name.toLowerCase().replace(/\s+/g, '-'),
-            } : selectedTier;
-            
-            const res = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify(payload)
-            });
-            
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.error || `Failed to ${isCreating ? 'create' : 'save'} tier`);
-            }
-            
-            await fetchTiers();
-            setSuccessMessage(`Tier ${isCreating ? 'created' : 'updated'} successfully`);
-            setTimeout(() => {
-                setIsEditing(false);
-                setIsCreating(false);
-                setSuccessMessage(null);
-            }, 1000);
-        } catch (err: any) {
-            setError(err.message || `Failed to ${isCreating ? 'create' : 'save'} tier`);
-        } finally {
-            setIsSaving(false);
-        }
+        saveTierMutation.mutate({ tier: selectedTier, isNew: isCreating });
     };
 
     const handleHighlightToggle = (feature: string) => {
@@ -370,41 +351,7 @@ const TiersTab: React.FC = () => {
     };
 
     const handleSyncStripe = async () => {
-        setSyncing(true);
-        try {
-            const res = await apiRequest('/api/admin/stripe/sync-products', { 
-                method: 'POST'
-            });
-            if (res.ok && res.data?.success) {
-                const data = res.data;
-                let message = `Synced ${data.synced} products to Stripe`;
-                if (data.failed > 0) {
-                    message += `\n\nFailed: ${data.failed}`;
-                    if (data.details) {
-                        const failedDetails = data.details.filter((d: any) => !d.success);
-                        if (failedDetails.length > 0) {
-                            message += '\n' + failedDetails.map((d: any) => `- ${d.tierName}: ${d.error}`).join('\n');
-                        }
-                    }
-                }
-                if (data.skipped > 0) {
-                    message += `\n\nSkipped: ${data.skipped} (no price configured)`;
-                }
-                alert(message);
-                await fetchTiers();
-            } else {
-                const errorMsg = res.data?.message || res.error || 'Unknown error';
-                if (errorMsg.includes('connection not found')) {
-                    alert('Stripe sync failed: Stripe is not configured for this environment. Please set up Stripe live keys in Replit\'s Integrations panel before publishing.');
-                } else {
-                    alert('Sync failed: ' + errorMsg);
-                }
-            }
-        } catch (err) {
-            alert('Sync failed: Network error');
-        } finally {
-            setSyncing(false);
-        }
+        syncStripeMutation.mutate();
     };
 
     if (isLoading) {
@@ -512,11 +459,11 @@ const TiersTab: React.FC = () => {
                         </button>
                         <button 
                             onClick={handleSave} 
-                            disabled={isSaving}
+                            disabled={saveTierMutation.isPending}
                             className="px-6 py-2.5 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
                         >
-                            {isSaving && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
-                            {isSaving ? 'Saving...' : 'Save Changes'}
+                            {saveTierMutation.isPending && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
+                            {saveTierMutation.isPending ? 'Saving...' : 'Save Changes'}
                         </button>
                     </div>
                 }
@@ -672,21 +619,43 @@ const TiersTab: React.FC = () => {
                                 <input
                                     type="number"
                                     className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
-                                        selectedTier?.stripe_price_id
-                                            ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed'
+                                        selectedTier?.stripe_price_id 
+                                            ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
                                             : 'bg-gray-50 dark:bg-black/30'
                                     }`}
                                     value={selectedTier?.price_cents || ''}
-                                    onChange={e => selectedTier && !selectedTier.stripe_price_id && setSelectedTier({...selectedTier, price_cents: parseInt(e.target.value) || null})}
+                                    onChange={e => selectedTier && setSelectedTier({...selectedTier, price_cents: parseInt(e.target.value) || null})}
                                     readOnly={!!selectedTier?.stripe_price_id}
-                                    placeholder="e.g., 19900 for $199"
+                                    placeholder="e.g., 19900 for $199.00"
                                 />
                             </div>
                         </div>
                     </div>
 
                     <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Limits & Quotas</h4>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Display Options</h4>
+                        <div className="space-y-2">
+                            <label className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25 cursor-pointer hover:bg-gray-100 dark:hover:bg-black/30 transition-colors">
+                                <span className="text-sm text-primary dark:text-white">Active</span>
+                                <Toggle
+                                    checked={selectedTier?.is_active || false}
+                                    onChange={(val) => selectedTier && setSelectedTier({...selectedTier, is_active: val})}
+                                    label="Active"
+                                />
+                            </label>
+                            <label className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25 cursor-pointer hover:bg-gray-100 dark:hover:bg-black/30 transition-colors">
+                                <span className="text-sm text-primary dark:text-white">Mark as Popular</span>
+                                <Toggle
+                                    checked={selectedTier?.is_popular || false}
+                                    onChange={(val) => selectedTier && setSelectedTier({...selectedTier, is_popular: val})}
+                                    label="Mark as Popular"
+                                />
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Booking Limits</h4>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Daily Sim Minutes</label>
@@ -698,7 +667,7 @@ const TiersTab: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Guest Passes / Month</label>
+                                <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Guest Passes/Month</label>
                                 <input 
                                     type="number"
                                     className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
@@ -711,8 +680,8 @@ const TiersTab: React.FC = () => {
                                 <input 
                                     type="number"
                                     className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
-                                    value={selectedTier?.booking_window_days || 0} 
-                                    onChange={e => selectedTier && setSelectedTier({...selectedTier, booking_window_days: parseInt(e.target.value) || 0})} 
+                                    value={selectedTier?.booking_window_days || 7} 
+                                    onChange={e => selectedTier && setSelectedTier({...selectedTier, booking_window_days: parseInt(e.target.value) || 7})} 
                                 />
                             </div>
                             <div>
@@ -728,15 +697,18 @@ const TiersTab: React.FC = () => {
                     </div>
 
                     <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Permissions</h4>
-                        <div className="grid grid-cols-2 gap-2">
-                            {selectedTier && BOOLEAN_FIELDS.map(({ key, label }) => (
-                                <label key={key} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25 cursor-pointer hover:bg-gray-100 dark:hover:bg-black/30 transition-colors">
-                                    <span className="text-sm text-primary dark:text-white pr-2">{label}</span>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Access Permissions</h4>
+                        <div className="space-y-2">
+                            {BOOLEAN_FIELDS.map(field => (
+                                <label 
+                                    key={field.key}
+                                    className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25 cursor-pointer hover:bg-gray-100 dark:hover:bg-black/30 transition-colors"
+                                >
+                                    <span className="text-sm text-primary dark:text-white">{field.label}</span>
                                     <Toggle
-                                        checked={!!selectedTier[key as keyof MembershipTier]}
-                                        onChange={(val) => setSelectedTier({...selectedTier, [key]: val})}
-                                        label={label}
+                                        checked={(selectedTier as any)?.[field.key] || false}
+                                        onChange={(val) => selectedTier && setSelectedTier({...selectedTier, [field.key]: val})}
+                                        label={field.label}
                                     />
                                 </label>
                             ))}
@@ -744,242 +716,175 @@ const TiersTab: React.FC = () => {
                     </div>
 
                     <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Tier Features</h4>
-                        {featuresLoading ? (
-                            <div className="flex items-center justify-center py-6">
-                                <span aria-hidden="true" className="material-symbols-outlined animate-spin text-2xl text-gray-400">progress_activity</span>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
-                                    {tierFeatures.filter(f => f.isActive).map(feature => {
-                                        const tierId = selectedTier?.id;
-                                        const currentValue = tierId && feature.values[tierId] ? feature.values[tierId].value : 
-                                            (feature.valueType === 'boolean' ? false : feature.valueType === 'number' ? 0 : '');
-                                        
-                                        return (
-                                            <div key={feature.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25">
-                                                <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                    <span aria-hidden="true" className="material-symbols-outlined text-gray-500 dark:text-gray-400 text-lg shrink-0">
-                                                        {feature.valueType === 'boolean' ? 'check_circle' : feature.valueType === 'number' ? 'tag' : 'text_fields'}
-                                                    </span>
-                                                    {editingLabelId === feature.id ? (
-                                                        <input
-                                                            type="text"
-                                                            className="flex-1 border border-primary bg-white dark:bg-black/30 px-2 py-1 rounded text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                                                            defaultValue={feature.displayLabel}
-                                                            autoFocus
-                                                            onBlur={(e) => {
-                                                                if (e.target.value.trim() && e.target.value !== feature.displayLabel) {
-                                                                    updateFeatureLabel(feature.id, e.target.value.trim());
-                                                                }
-                                                                setEditingLabelId(null);
-                                                            }}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === 'Enter') {
-                                                                    (e.target as HTMLInputElement).blur();
-                                                                } else if (e.key === 'Escape') {
-                                                                    setEditingLabelId(null);
-                                                                }
-                                                            }}
-                                                        />
-                                                    ) : (
-                                                        <span 
-                                                            className="text-sm text-primary dark:text-white font-medium truncate cursor-pointer hover:text-primary/80"
-                                                            onClick={() => setEditingLabelId(feature.id)}
-                                                            title="Click to edit label"
-                                                        >
-                                                            {feature.displayLabel}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center gap-2 shrink-0">
-                                                    {feature.valueType === 'boolean' && selectedTier?.id && (
-                                                        <Toggle
-                                                            checked={currentValue === true}
-                                                            onChange={(val) => updateFeatureValue(feature.id, selectedTier.id, val)}
-                                                            label={feature.displayLabel}
-                                                        />
-                                                    )}
-                                                    {feature.valueType === 'number' && selectedTier?.id && (
-                                                        <input
-                                                            type="number"
-                                                            className="w-20 border border-gray-200 dark:border-white/20 bg-white dark:bg-black/30 px-2 py-1 rounded-lg text-sm text-primary dark:text-white text-right focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                                                            defaultValue={typeof currentValue === 'number' ? currentValue : 0}
-                                                            onChange={(e) => debouncedUpdateFeatureValue(feature.id, selectedTier.id, parseFloat(e.target.value) || 0)}
-                                                        />
-                                                    )}
-                                                    {feature.valueType === 'text' && selectedTier?.id && (
-                                                        <input
-                                                            type="text"
-                                                            className="w-32 border border-gray-200 dark:border-white/20 bg-white dark:bg-black/30 px-2 py-1 rounded-lg text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                                                            defaultValue={typeof currentValue === 'string' ? currentValue : ''}
-                                                            onChange={(e) => debouncedUpdateFeatureValue(feature.id, selectedTier.id, e.target.value)}
-                                                            placeholder="Value..."
-                                                        />
-                                                    )}
-                                                    {!selectedTier?.id && (
-                                                        <span className="text-xs text-gray-400 italic">Save tier first</span>
-                                                    )}
-                                                    <button
-                                                        type="button"
-                                                        aria-label={`Delete ${feature.displayLabel}`}
-                                                        onClick={() => deleteFeature(feature.id)}
-                                                        className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                                                    >
-                                                        <span aria-hidden="true" className="material-symbols-outlined text-base">delete</span>
-                                                    </button>
-                                                </div>
+                        <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                Feature Values
+                                {featuresLoading && (
+                                    <span className="ml-2 text-gray-400">Loading...</span>
+                                )}
+                            </h4>
+                        </div>
+                        
+                        {tierFeatures.length > 0 && selectedTier && (
+                            <div className="space-y-3">
+                                {tierFeatures.map(feature => (
+                                    <div key={feature.id} className="p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25">
+                                        <div className="flex items-center justify-between mb-2">
+                                            {editingLabelId === feature.id ? (
+                                                <input
+                                                    className="flex-1 mr-2 text-sm font-medium border-b border-primary bg-transparent text-primary dark:text-white outline-none"
+                                                    value={feature.displayLabel}
+                                                    onChange={e => {
+                                                        const newLabel = e.target.value;
+                                                        queryClient.setQueryData(['tier-features'], (old: TierFeature[] | undefined) => {
+                                                            if (!old) return old;
+                                                            return old.map(f => f.id === feature.id ? { ...f, displayLabel: newLabel } : f);
+                                                        });
+                                                    }}
+                                                    onBlur={() => {
+                                                        updateFeatureLabelMutation.mutate({ featureId: feature.id, displayLabel: feature.displayLabel });
+                                                        setEditingLabelId(null);
+                                                    }}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter') {
+                                                            updateFeatureLabelMutation.mutate({ featureId: feature.id, displayLabel: feature.displayLabel });
+                                                            setEditingLabelId(null);
+                                                        }
+                                                    }}
+                                                    autoFocus
+                                                />
+                                            ) : (
+                                                <span 
+                                                    className="text-sm font-medium text-primary dark:text-white cursor-pointer hover:text-primary/70"
+                                                    onClick={() => setEditingLabelId(feature.id)}
+                                                >
+                                                    {feature.displayLabel}
+                                                </span>
+                                            )}
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-gray-400 uppercase">{feature.valueType}</span>
+                                                <button
+                                                    onClick={() => deleteFeature(feature.id)}
+                                                    className="text-gray-400 hover:text-red-500 transition-colors"
+                                                >
+                                                    <span aria-hidden="true" className="material-symbols-outlined text-sm">delete</span>
+                                                </button>
                                             </div>
-                                        );
-                                    })}
-                                    {tierFeatures.filter(f => f.isActive).length === 0 && (
-                                        <div className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">
-                                            No features defined yet. Add one below.
                                         </div>
-                                    )}
-                                </div>
-
-                                <div className="border-t border-gray-200 dark:border-white/10 pt-3 mt-3">
-                                    <p className="text-[10px] uppercase font-bold text-gray-600 dark:text-gray-500 mb-2">Add New Feature</p>
-                                    <div className="flex gap-2 items-start">
-                                        <div className="flex-1">
+                                        
+                                        {feature.valueType === 'boolean' ? (
+                                            <Toggle
+                                                checked={feature.values[selectedTier.id]?.value === true}
+                                                onChange={(val) => debouncedUpdateFeatureValue(feature.id, selectedTier.id, val)}
+                                                label={feature.displayLabel}
+                                            />
+                                        ) : feature.valueType === 'number' ? (
                                             <input
-                                                type="text"
-                                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 px-2 py-1.5 rounded-lg text-primary dark:text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-sm"
-                                                placeholder="Feature name (e.g., Priority Support)"
-                                                value={newFeatureForm.label}
+                                                type="number"
+                                                className="w-full border border-gray-200 dark:border-white/20 bg-white dark:bg-black/30 p-2 rounded-lg text-sm text-primary dark:text-white"
+                                                value={feature.values[selectedTier.id]?.value as number || ''}
                                                 onChange={e => {
-                                                    const label = e.target.value;
-                                                    const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-                                                    setNewFeatureForm(prev => ({ ...prev, label, key }));
+                                                    const newVal = parseInt(e.target.value) || 0;
+                                                    queryClient.setQueryData(['tier-features'], (old: TierFeature[] | undefined) => {
+                                                        if (!old) return old;
+                                                        return old.map(f => 
+                                                            f.id === feature.id 
+                                                                ? { ...f, values: { ...f.values, [selectedTier.id]: { tierId: selectedTier.id, value: newVal } } }
+                                                                : f
+                                                        );
+                                                    });
+                                                    debouncedUpdateFeatureValue(feature.id, selectedTier.id, newVal);
                                                 }}
                                             />
-                                        </div>
-                                        <div className="flex flex-col gap-1">
-                                            <select
-                                                className="border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 px-2 py-1.5 rounded-lg text-primary dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                                                value={newFeatureForm.type}
-                                                onChange={e => setNewFeatureForm(prev => ({ ...prev, type: e.target.value as 'boolean' | 'number' | 'text' }))}
-                                            >
-                                                <option value="boolean">Yes/No</option>
-                                                <option value="number">Number</option>
-                                                <option value="text">Custom Text</option>
-                                            </select>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={createFeature}
-                                            disabled={!newFeatureForm.label.trim()}
-                                            className="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                        >
-                                            <span aria-hidden="true" className="material-symbols-outlined text-sm">add</span>
-                                        </button>
+                                        ) : (
+                                            <input
+                                                type="text"
+                                                className="w-full border border-gray-200 dark:border-white/20 bg-white dark:bg-black/30 p-2 rounded-lg text-sm text-primary dark:text-white"
+                                                value={feature.values[selectedTier.id]?.value as string || ''}
+                                                onChange={e => {
+                                                    const newVal = e.target.value;
+                                                    queryClient.setQueryData(['tier-features'], (old: TierFeature[] | undefined) => {
+                                                        if (!old) return old;
+                                                        return old.map(f => 
+                                                            f.id === feature.id 
+                                                                ? { ...f, values: { ...f.values, [selectedTier.id]: { tierId: selectedTier.id, value: newVal } } }
+                                                                : f
+                                                        );
+                                                    });
+                                                    debouncedUpdateFeatureValue(feature.id, selectedTier.id, newVal);
+                                                }}
+                                            />
+                                        )}
                                     </div>
-                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1.5">
-                                        {newFeatureForm.type === 'boolean' && 'Shows a checkmark or dash for each tier'}
-                                        {newFeatureForm.type === 'number' && 'Enter a number value for each tier (e.g., 60 minutes)'}
-                                        {newFeatureForm.type === 'text' && 'Enter custom text for each tier (e.g., "Unlimited")'}
-                                    </p>
-                                </div>
-                            </>
+                                ))}
+                            </div>
                         )}
+
+                        <div className="mt-4 p-3 rounded-xl border-2 border-dashed border-gray-200 dark:border-white/20">
+                            <h5 className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">Add New Feature</h5>
+                            <div className="grid grid-cols-3 gap-2 mb-2">
+                                <input
+                                    className="border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2 rounded-lg text-sm text-primary dark:text-white placeholder:text-gray-400"
+                                    placeholder="Key"
+                                    value={newFeatureForm.key}
+                                    onChange={e => setNewFeatureForm(prev => ({ ...prev, key: e.target.value }))}
+                                />
+                                <input
+                                    className="border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2 rounded-lg text-sm text-primary dark:text-white placeholder:text-gray-400"
+                                    placeholder="Label"
+                                    value={newFeatureForm.label}
+                                    onChange={e => setNewFeatureForm(prev => ({ ...prev, label: e.target.value }))}
+                                />
+                                <select
+                                    className="border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2 rounded-lg text-sm text-primary dark:text-white"
+                                    value={newFeatureForm.type}
+                                    onChange={e => setNewFeatureForm(prev => ({ ...prev, type: e.target.value as any }))}
+                                >
+                                    <option value="boolean">Boolean</option>
+                                    <option value="number">Number</option>
+                                    <option value="text">Text</option>
+                                </select>
+                            </div>
+                            <button
+                                onClick={createFeature}
+                                disabled={!newFeatureForm.key.trim() || !newFeatureForm.label.trim() || createFeatureMutation.isPending}
+                                className="w-full py-2 text-sm font-medium text-primary dark:text-white bg-gray-100 dark:bg-white/10 rounded-lg hover:bg-gray-200 dark:hover:bg-white/20 transition-colors disabled:opacity-50"
+                            >
+                                {createFeatureMutation.isPending ? 'Adding...' : 'Add Feature'}
+                            </button>
+                        </div>
                     </div>
 
                     <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
-                            Highlighted Features 
-                            <span className="text-gray-600 font-normal ml-1">({selectedTier?.highlighted_features?.length || 0}/4)</span>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
+                            Highlighted Features
+                            <span className="ml-2 font-normal text-gray-400">({(selectedTier?.highlighted_features || []).length}/4)</span>
                         </h4>
-                        <p className="text-xs text-gray-600 dark:text-gray-500 mb-3">These appear as bullet points on the membership cards</p>
-                        
-                        <div className="space-y-2 mb-4">
-                            {selectedTier && (selectedTier.highlighted_features || []).map((highlight, idx) => (
-                                <div key={idx} className="flex items-center gap-2 p-3 rounded-xl bg-primary/10 dark:bg-primary/20 border border-primary">
-                                    <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center shrink-0 text-xs font-bold">{idx + 1}</span>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                            Select up to 4 features to highlight on the pricing card
+                        </p>
+                        <div className="space-y-2">
+                            {BOOLEAN_FIELDS.filter(f => (selectedTier as any)?.[f.key]).map(field => (
+                                <label 
+                                    key={field.key}
+                                    className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-colors ${
+                                        (selectedTier?.highlighted_features || []).includes(field.label)
+                                            ? 'bg-primary/10 dark:bg-primary/20 border border-primary/30'
+                                            : 'bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25 hover:bg-gray-100 dark:hover:bg-black/30'
+                                    }`}
+                                >
                                     <input
-                                        type="text"
-                                        value={highlight}
-                                        onChange={e => {
-                                            const newHighlights = [...(selectedTier.highlighted_features || [])];
-                                            newHighlights[idx] = e.target.value;
-                                            setSelectedTier({...selectedTier, highlighted_features: newHighlights});
-                                        }}
-                                        className="flex-1 bg-transparent border-none text-sm text-primary dark:text-white font-medium focus:outline-none focus:ring-0"
+                                        type="checkbox"
+                                        checked={(selectedTier?.highlighted_features || []).includes(field.label)}
+                                        onChange={() => handleHighlightToggle(field.label)}
+                                        disabled={(selectedTier?.highlighted_features || []).length >= 4 && !(selectedTier?.highlighted_features || []).includes(field.label)}
+                                        className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
                                     />
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const newHighlights = (selectedTier.highlighted_features || []).filter((_, i) => i !== idx);
-                                            setSelectedTier({...selectedTier, highlighted_features: newHighlights});
-                                        }}
-                                        className="text-primary/80 hover:text-red-500 transition-colors"
-                                    >
-                                        <span aria-hidden="true" className="material-symbols-outlined text-lg">close</span>
-                                    </button>
-                                </div>
+                                    <span className="text-sm text-primary dark:text-white">{field.label}</span>
+                                </label>
                             ))}
                         </div>
-
-                        {selectedTier && (selectedTier.highlighted_features?.length || 0) < 4 && (
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    className="flex-1 border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-sm"
-                                    placeholder="Add highlight (e.g., '60 min Daily Golf')..."
-                                    onKeyDown={e => {
-                                        if (e.key === 'Enter' && (e.target as HTMLInputElement).value.trim()) {
-                                            const val = (e.target as HTMLInputElement).value.trim();
-                                            setSelectedTier({
-                                                ...selectedTier, 
-                                                highlighted_features: [...(selectedTier.highlighted_features || []), val]
-                                            });
-                                            (e.target as HTMLInputElement).value = '';
-                                        }
-                                    }}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={e => {
-                                        const input = (e.currentTarget.previousElementSibling as HTMLInputElement);
-                                        if (input.value.trim()) {
-                                            setSelectedTier({
-                                                ...selectedTier, 
-                                                highlighted_features: [...(selectedTier.highlighted_features || []), input.value.trim()]
-                                            });
-                                            input.value = '';
-                                        }
-                                    }}
-                                    className="px-3 py-2 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
-                                >
-                                    <span aria-hidden="true" className="material-symbols-outlined text-sm">add</span>
-                                </button>
-                            </div>
-                        )}
-
-                        {selectedTier && (selectedTier.highlighted_features?.length || 0) < 4 && tierFeatures.filter(f => f.isActive).length > 0 && (
-                            <div className="mt-3">
-                                <p className="text-[10px] uppercase font-bold text-gray-600 dark:text-gray-500 mb-2">Quick add from features:</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {tierFeatures.filter(f => f.isActive).map(feature => {
-                                        const isAlreadyHighlighted = selectedTier.highlighted_features?.includes(feature.displayLabel);
-                                        if (isAlreadyHighlighted) return null;
-                                        return (
-                                            <button 
-                                                key={feature.id}
-                                                type="button"
-                                                onClick={() => handleHighlightToggle(feature.displayLabel)}
-                                                className="px-2.5 py-1 text-xs rounded-lg bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 hover:bg-primary/10 hover:text-primary dark:hover:text-white transition-colors"
-                                            >
-                                                + {feature.displayLabel}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
                     </div>
-
                 </div>
             </SlideUpDrawer>
 
@@ -987,17 +892,19 @@ const TiersTab: React.FC = () => {
                 const subscriptionTiers = tiers.filter(t => t.product_type !== 'one_time');
                 return (
                 <>
-                    <div className="flex justify-between items-center mb-6">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {subscriptionTiers.length} membership tier{subscriptionTiers.length !== 1 ? 's' : ''}
-                        </p>
-                        <button 
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                            Membership Tiers
+                        </h3>
+                        <button
                             onClick={handleSyncStripe}
-                            disabled={syncing}
-                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg transition-colors"
+                            disabled={syncStripeMutation.isPending}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50"
                         >
-                            <span className={`material-symbols-outlined ${syncing ? 'animate-spin' : ''}`}>sync</span>
-                            {syncing ? 'Syncing...' : 'Sync to Stripe'}
+                            <span aria-hidden="true" className={`material-symbols-outlined text-sm ${syncStripeMutation.isPending ? 'animate-spin' : ''}`}>
+                                {syncStripeMutation.isPending ? 'progress_activity' : 'sync'}
+                            </span>
+                            {syncStripeMutation.isPending ? 'Syncing...' : 'Sync to Stripe'}
                         </button>
                     </div>
                     {subscriptionTiers.length === 0 ? (

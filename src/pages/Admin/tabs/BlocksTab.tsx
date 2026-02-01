@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useData } from '../../../contexts/DataContext';
 import { useToast } from '../../../components/Toast';
 import { getTodayPacific, formatDateDisplayWithDay } from '../../../utils/dateUtils';
@@ -9,6 +10,7 @@ import FloatingActionButton from '../../../components/FloatingActionButton';
 import AvailabilityBlocksContent from '../components/AvailabilityBlocksContent';
 import { AnimatedPage } from '../../../components/motion';
 import { useConfirmDialog } from '../../../components/ConfirmDialog';
+import { fetchWithCredentials, postWithCredentials, deleteWithCredentials, putWithCredentials } from '../../../hooks/queries/useFetch';
 
 interface BlocksClosure {
     id: number;
@@ -58,29 +60,21 @@ interface ClosureReason {
 const BlocksTab: React.FC = () => {
     const { actualUser } = useData();
     const { showToast } = useToast();
+    const queryClient = useQueryClient();
     const [searchParams] = useSearchParams();
     const subtabParam = searchParams.get('subtab');
     const [activeSubTab, setActiveSubTab] = useState<'notices' | 'blocks'>(
         subtabParam === 'blocks' ? 'blocks' : 'notices'
     );
     
-    const [resources, setResources] = useState<{ id: number; name: string; type: string }[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    
-    const [closures, setClosures] = useState<BlocksClosure[]>([]);
-    const [closuresLoading, setClosuresLoading] = useState(true);
     const [isClosureModalOpen, setIsClosureModalOpen] = useState(false);
     const [editingClosureId, setEditingClosureId] = useState<number | null>(null);
     const [expandedNotices, setExpandedNotices] = useState<Set<number>>(new Set());
-    const [noticeTypes, setNoticeTypes] = useState<NoticeType[]>([]);
-    const [closureReasons, setClosureReasons] = useState<ClosureReason[]>([]);
     const [showClosureReasonsSection, setShowClosureReasonsSection] = useState(false);
     const [newReasonLabel, setNewReasonLabel] = useState('');
-    const [reasonSaving, setReasonSaving] = useState(false);
     
     const [showNoticeTypesSection, setShowNoticeTypesSection] = useState(false);
     const [newNoticeTypeName, setNewNoticeTypeName] = useState('');
-    const [noticeTypeSaving, setNoticeTypeSaving] = useState(false);
     
     const [isReasonDrawerOpen, setIsReasonDrawerOpen] = useState(false);
     const [reasonDrawerData, setReasonDrawerData] = useState<{ id: number; label: string; sortOrder: number } | null>(null);
@@ -102,9 +96,29 @@ const BlocksTab: React.FC = () => {
         notice_type: '',
         notify_members: false
     });
-    const [closureSaving, setClosureSaving] = useState(false);
     const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
     const { confirm, ConfirmDialogComponent } = useConfirmDialog();
+
+    // React Query hooks for data fetching
+    const { data: closures = [], isLoading: closuresLoading } = useQuery({
+        queryKey: ['closures'],
+        queryFn: () => fetchWithCredentials<BlocksClosure[]>('/api/closures')
+    });
+
+    const { data: resources = [], isLoading: isLoading } = useQuery({
+        queryKey: ['resources'],
+        queryFn: () => fetchWithCredentials<{ id: number; name: string; type: string }[]>('/api/resources')
+    });
+
+    const { data: noticeTypes = [] } = useQuery({
+        queryKey: ['noticeTypes'],
+        queryFn: () => fetchWithCredentials<NoticeType[]>('/api/notice-types')
+    });
+
+    const { data: closureReasons = [] } = useQuery({
+        queryKey: ['closureReasons'],
+        queryFn: () => fetchWithCredentials<ClosureReason[]>('/api/closure-reasons?includeInactive=true')
+    });
 
     const markTouched = (field: string) => {
         setTouchedFields(prev => new Set(prev).add(field));
@@ -118,80 +132,94 @@ const BlocksTab: React.FC = () => {
 
     const isClosureFormValid = !closureValidation.notice_type && !closureValidation.affected_areas && !closureValidation.visibility;
 
-
-    const fetchClosures = async () => {
-        try {
-            const res = await fetch('/api/closures');
-            if (res.ok) {
-                const data = await res.json();
-                setClosures(data);
-            }
-        } catch (err) {
-            console.error('Failed to fetch closures:', err);
-        } finally {
-            setClosuresLoading(false);
+    // Mutations for closure reasons
+    const addClosureReasonMutation = useMutation({
+        mutationFn: (label: string) => postWithCredentials<ClosureReason>('/api/closure-reasons', { label: label.trim() }),
+        onSuccess: () => {
+            setNewReasonLabel('');
+            queryClient.invalidateQueries({ queryKey: ['closureReasons'] });
+            showToast('Closure reason added', 'success');
+        },
+        onError: (error: any) => {
+            showToast(error.message || 'Failed to add reason', 'error');
         }
-    };
+    });
 
-    const fetchResources = async () => {
-        setIsLoading(true);
-        try {
-            const resourcesRes = await fetch('/api/resources');
-            if (resourcesRes.ok) setResources(await resourcesRes.json());
-        } catch (error) {
-            console.error('Failed to fetch resources:', error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const fetchNoticeTypes = async () => {
-        try {
-            const res = await fetch('/api/notice-types');
-            if (res.ok) {
-                const data = await res.json();
-                setNoticeTypes(data);
-            }
-        } catch (err) {
-            console.error('Failed to fetch notice types:', err);
-        }
-    };
-
-    const fetchClosureReasons = async () => {
-        try {
-            const res = await fetch('/api/closure-reasons?includeInactive=true');
-            if (res.ok) {
-                const data = await res.json();
-                setClosureReasons(data);
-            }
-        } catch (err) {
-            console.error('Failed to fetch closure reasons:', err);
-        }
-    };
-
-    const handleAddClosureReason = async () => {
+    const handleAddClosureReason = () => {
         if (!newReasonLabel.trim()) return;
-        setReasonSaving(true);
-        try {
-            const res = await fetch('/api/closure-reasons', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ label: newReasonLabel.trim() })
-            });
-            if (res.ok) {
-                setNewReasonLabel('');
-                fetchClosureReasons();
-                showToast('Closure reason added', 'success');
-            } else {
-                const error = await res.json().catch(() => ({}));
-                showToast(error.error || 'Failed to add reason', 'error');
-            }
-        } catch (err) {
-            showToast('Failed to add reason', 'error');
-        } finally {
-            setReasonSaving(false);
-        }
+        addClosureReasonMutation.mutate(newReasonLabel);
     };
+
+    const updateClosureReasonMutation = useMutation({
+        mutationFn: (data: { id: number; label: string; sortOrder: number }) =>
+            putWithCredentials(`/api/closure-reasons/${data.id}`, { label: data.label, sort_order: data.sortOrder }),
+        onSuccess: () => {
+            closeReasonDrawer();
+            queryClient.invalidateQueries({ queryKey: ['closureReasons'] });
+            showToast('Closure reason updated', 'success');
+        },
+        onError: (error: any) => {
+            showToast(error.message || 'Failed to update reason', 'error');
+        }
+    });
+
+    const deleteClosureReasonMutation = useMutation({
+        mutationFn: (id: number) => deleteWithCredentials(`/api/closure-reasons/${id}`),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['closureReasons'] });
+            showToast('Closure reason deleted', 'success');
+        },
+        onError: (error: any) => {
+            showToast(error.message || 'Failed to delete reason', 'error');
+        }
+    });
+
+    const reactivateClosureReasonMutation = useMutation({
+        mutationFn: (id: number) => putWithCredentials(`/api/closure-reasons/${id}`, { is_active: true }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['closureReasons'] });
+            showToast('Closure reason reactivated', 'success');
+        },
+        onError: (error: any) => {
+            showToast(error.message || 'Failed to reactivate reason', 'error');
+        }
+    });
+
+    const addNoticeTypeMutation = useMutation({
+        mutationFn: (name: string) => postWithCredentials<NoticeType>('/api/notice-types', { name: name.trim() }),
+        onSuccess: () => {
+            setNewNoticeTypeName('');
+            queryClient.invalidateQueries({ queryKey: ['noticeTypes'] });
+            showToast('Notice type added', 'success');
+        },
+        onError: (error: any) => {
+            showToast(error.message || 'Failed to add notice type', 'error');
+        }
+    });
+
+    const updateNoticeTypeMutation = useMutation({
+        mutationFn: (data: { id: number; name: string; sortOrder: number }) =>
+            putWithCredentials(`/api/notice-types/${data.id}`, { name: data.name, sort_order: data.sortOrder }),
+        onSuccess: () => {
+            closeNoticeTypeDrawer();
+            queryClient.invalidateQueries({ queryKey: ['noticeTypes'] });
+            showToast('Notice type updated', 'success');
+        },
+        onError: (error: any) => {
+            showToast(error.message || 'Failed to update notice type', 'error');
+        }
+    });
+
+    const deleteNoticeTypeMutation = useMutation({
+        mutationFn: (id: number) => deleteWithCredentials(`/api/notice-types/${id}`),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['noticeTypes'] });
+            showToast('Notice type deleted', 'success');
+        },
+        onError: (error: any) => {
+            showToast(error.message || 'Failed to delete notice type', 'error');
+        }
+    });
 
     const openReasonDrawer = (reason: ClosureReason) => {
         setReasonDrawerData({ id: reason.id, label: reason.label, sortOrder: reason.sortOrder });
@@ -203,28 +231,9 @@ const BlocksTab: React.FC = () => {
         setReasonDrawerData(null);
     };
 
-    const handleSaveReasonFromDrawer = async () => {
+    const handleSaveReasonFromDrawer = () => {
         if (!reasonDrawerData) return;
-        setReasonSaving(true);
-        try {
-            const res = await fetch(`/api/closure-reasons/${reasonDrawerData.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ label: reasonDrawerData.label, sort_order: reasonDrawerData.sortOrder })
-            });
-            if (res.ok) {
-                closeReasonDrawer();
-                fetchClosureReasons();
-                showToast('Closure reason updated', 'success');
-            } else {
-                const error = await res.json().catch(() => ({}));
-                showToast(error.error || 'Failed to update reason', 'error');
-            }
-        } catch (err) {
-            showToast('Failed to update reason', 'error');
-        } finally {
-            setReasonSaving(false);
-        }
+        updateClosureReasonMutation.mutate(reasonDrawerData);
     };
 
     const handleDeleteClosureReason = async (id: number) => {
@@ -235,59 +244,16 @@ const BlocksTab: React.FC = () => {
             variant: 'danger'
         });
         if (!confirmed) return;
-        try {
-            const res = await fetch(`/api/closure-reasons/${id}`, { method: 'DELETE' });
-            if (res.ok) {
-                fetchClosureReasons();
-                showToast('Closure reason deleted', 'success');
-            } else {
-                showToast('Failed to delete reason', 'error');
-            }
-        } catch (err) {
-            showToast('Failed to delete reason', 'error');
-        }
+        deleteClosureReasonMutation.mutate(id);
     };
 
-    const handleReactivateClosureReason = async (id: number) => {
-        try {
-            const res = await fetch(`/api/closure-reasons/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ is_active: true })
-            });
-            if (res.ok) {
-                fetchClosureReasons();
-                showToast('Closure reason reactivated', 'success');
-            } else {
-                showToast('Failed to reactivate reason', 'error');
-            }
-        } catch (err) {
-            showToast('Failed to reactivate reason', 'error');
-        }
+    const handleReactivateClosureReason = (id: number) => {
+        reactivateClosureReasonMutation.mutate(id);
     };
 
-    const handleAddNoticeType = async () => {
+    const handleAddNoticeType = () => {
         if (!newNoticeTypeName.trim()) return;
-        setNoticeTypeSaving(true);
-        try {
-            const res = await fetch('/api/notice-types', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: newNoticeTypeName.trim() })
-            });
-            if (res.ok) {
-                setNewNoticeTypeName('');
-                fetchNoticeTypes();
-                showToast('Notice type added', 'success');
-            } else {
-                const error = await res.json().catch(() => ({}));
-                showToast(error.error || 'Failed to add notice type', 'error');
-            }
-        } catch (err) {
-            showToast('Failed to add notice type', 'error');
-        } finally {
-            setNoticeTypeSaving(false);
-        }
+        addNoticeTypeMutation.mutate(newNoticeTypeName);
     };
 
     const openNoticeTypeDrawer = (noticeType: NoticeType) => {
@@ -300,28 +266,9 @@ const BlocksTab: React.FC = () => {
         setNoticeTypeDrawerData(null);
     };
 
-    const handleSaveNoticeTypeFromDrawer = async () => {
+    const handleSaveNoticeTypeFromDrawer = () => {
         if (!noticeTypeDrawerData) return;
-        setNoticeTypeSaving(true);
-        try {
-            const res = await fetch(`/api/notice-types/${noticeTypeDrawerData.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: noticeTypeDrawerData.name, sort_order: noticeTypeDrawerData.sortOrder })
-            });
-            if (res.ok) {
-                closeNoticeTypeDrawer();
-                fetchNoticeTypes();
-                showToast('Notice type updated', 'success');
-            } else {
-                const error = await res.json().catch(() => ({}));
-                showToast(error.error || 'Failed to update notice type', 'error');
-            }
-        } catch (err) {
-            showToast('Failed to update notice type', 'error');
-        } finally {
-            setNoticeTypeSaving(false);
-        }
+        updateNoticeTypeMutation.mutate(noticeTypeDrawerData);
     };
 
     const handleDeleteNoticeType = async (id: number) => {
@@ -332,19 +279,67 @@ const BlocksTab: React.FC = () => {
             variant: 'danger'
         });
         if (!confirmed) return;
-        try {
-            const res = await fetch(`/api/notice-types/${id}`, { method: 'DELETE' });
-            if (res.ok) {
-                fetchNoticeTypes();
-                showToast('Notice type deleted', 'success');
-            } else {
-                const error = await res.json().catch(() => ({}));
-                showToast(error.error || 'Failed to delete notice type', 'error');
-            }
-        } catch (err) {
-            showToast('Failed to delete notice type', 'error');
-        }
+        deleteNoticeTypeMutation.mutate(id);
     };
+
+    // Mutations for closures
+    const saveClosureMutation = useMutation({
+        mutationFn: (data: { form: BlocksClosureForm; isEdit: boolean; id?: number }) => {
+            const url = data.isEdit ? `/api/closures/${data.id}` : '/api/closures';
+            const payload = data.isEdit
+                ? { ...data.form }
+                : { ...data.form, created_by: actualUser?.email };
+            return data.isEdit
+                ? putWithCredentials(url, payload)
+                : postWithCredentials(url, payload);
+        },
+        onSuccess: (data: any) => {
+            setIsClosureModalOpen(false);
+            resetClosureForm();
+            queryClient.invalidateQueries({ queryKey: ['closures'] });
+
+            if (data.warnings && data.warnings.length > 0) {
+                showToast(
+                    `Notice ${editingClosureId ? 'updated' : 'created'}, but: ${data.warnings.join(', ')}`,
+                    'warning'
+                );
+            } else {
+                showToast(
+                    editingClosureId ? 'Notice updated successfully' : 'Notice created successfully',
+                    'success'
+                );
+            }
+        },
+        onError: (error: any) => {
+            showToast(error.message || 'Failed to save notice', 'error');
+        }
+    });
+
+    const deleteClosureMutation = useMutation({
+        mutationFn: (closureId: number) => deleteWithCredentials(`/api/closures/${closureId}`),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['closures'] });
+            showToast('Notice deleted', 'success');
+        },
+        onError: (error: any) => {
+            showToast(error.message || 'Failed to delete notice', 'error');
+        }
+    });
+
+    const syncClosuresMutation = useMutation({
+        mutationFn: async () => {
+            await postWithCredentials('/api/closures/sync', {});
+            // Then fetch updated closures
+            return queryClient.refetchQueries({ queryKey: ['closures'] });
+        },
+        onSuccess: () => {
+            showToast('Calendar synced & notices refreshed', 'success');
+        },
+        onError: (error: any) => {
+            console.error('Calendar sync failed:', error);
+            showToast('Failed to sync calendar', 'error');
+        }
+    });
 
     useEffect(() => {
         if (subtabParam === 'blocks') {
@@ -353,13 +348,6 @@ const BlocksTab: React.FC = () => {
             setActiveSubTab('notices');
         }
     }, [subtabParam]);
-
-    useEffect(() => {
-        fetchClosures();
-        fetchResources();
-        fetchNoticeTypes();
-        fetchClosureReasons();
-    }, []);
 
     useEffect(() => {
         const handleOpenNewClosure = () => {
@@ -387,51 +375,9 @@ const BlocksTab: React.FC = () => {
         setTouchedFields(new Set());
     };
 
-    const handleSaveClosure = async () => {
+    const handleSaveClosure = () => {
         if (!closureForm.start_date || !closureForm.affected_areas || !closureForm.visibility?.trim()) return;
-        setClosureSaving(true);
-        try {
-            const url = editingClosureId 
-                ? `/api/closures/${editingClosureId}` 
-                : '/api/closures';
-            const method = editingClosureId ? 'PUT' : 'POST';
-            
-            const payload = editingClosureId 
-                ? { ...closureForm }
-                : { ...closureForm, created_by: actualUser?.email };
-            
-            const res = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            if (res.ok) {
-                const data = await res.json().catch(() => ({}));
-                setIsClosureModalOpen(false);
-                resetClosureForm();
-                fetchClosures();
-                
-                if (data.warnings && data.warnings.length > 0) {
-                    showToast(
-                        `Notice ${editingClosureId ? 'updated' : 'created'}, but: ${data.warnings.join(', ')}`,
-                        'warning'
-                    );
-                } else {
-                    showToast(
-                        editingClosureId ? 'Notice updated successfully' : 'Notice created successfully',
-                        'success'
-                    );
-                }
-            } else {
-                const error = await res.json().catch(() => ({}));
-                showToast(error.error || 'Failed to save notice', 'error');
-            }
-        } catch (err) {
-            console.error('Failed to save closure:', err);
-            showToast('Failed to save notice', 'error');
-        } finally {
-            setClosureSaving(false);
-        }
+        saveClosureMutation.mutate({ form: closureForm, isEdit: !!editingClosureId, id: editingClosureId || undefined });
     };
 
     const handleEditClosure = (closure: BlocksClosure, e?: React.MouseEvent) => {
@@ -461,23 +407,7 @@ const BlocksTab: React.FC = () => {
             variant: 'danger'
         });
         if (!confirmed) return;
-        
-        const snapshot = [...closures];
-        setClosures(prev => prev.filter(c => c.id !== closureId));
-        
-        try {
-            const res = await fetch(`/api/closures/${closureId}`, { method: 'DELETE' });
-            if (res.ok) {
-                showToast('Notice deleted', 'success');
-            } else {
-                setClosures(snapshot);
-                showToast('Failed to delete notice', 'error');
-            }
-        } catch (err) {
-            console.error('Failed to delete closure:', err);
-            setClosures(snapshot);
-            showToast('Failed to delete notice', 'error');
-        }
+        deleteClosureMutation.mutate(closureId);
     };
 
     const openNewClosure = () => {
@@ -485,16 +415,8 @@ const BlocksTab: React.FC = () => {
         setIsClosureModalOpen(true);
     };
 
-    const handlePullRefresh = async () => {
-        try {
-            // Trigger Google Calendar sync first
-            await fetch('/api/closures/sync', { method: 'POST' });
-        } catch (err) {
-            console.error('Calendar sync failed:', err);
-        }
-        // Then fetch the updated closures
-        await fetchClosures();
-        showToast('Calendar synced & notices refreshed', 'success');
+    const handlePullRefresh = () => {
+        syncClosuresMutation.mutate();
     };
 
     const toggleNoticeExpand = (closureId: number) => {
@@ -804,7 +726,7 @@ const BlocksTab: React.FC = () => {
                             />
                             <button
                                 onClick={handleAddClosureReason}
-                                disabled={!newReasonLabel.trim() || reasonSaving}
+                                disabled={!newReasonLabel.trim() || addClosureReasonMutation.isPending}
                                 className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5"
                             >
                                 <span aria-hidden="true" className="material-symbols-outlined text-base">add</span>
@@ -899,7 +821,7 @@ const BlocksTab: React.FC = () => {
                             />
                             <button
                                 onClick={handleAddNoticeType}
-                                disabled={!newNoticeTypeName.trim() || noticeTypeSaving}
+                                disabled={!newNoticeTypeName.trim() || addNoticeTypeMutation.isPending}
                                 className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5"
                             >
                                 <span aria-hidden="true" className="material-symbols-outlined text-base">add</span>
@@ -1299,14 +1221,14 @@ const BlocksTab: React.FC = () => {
                         </button>
                         <button 
                             onClick={handleSaveClosure}
-                            disabled={!closureForm.start_date || closureSaving || !isClosureFormValid}
+                            disabled={!closureForm.start_date || saveClosureMutation.isPending || !isClosureFormValid}
                             className={`flex-1 py-3 rounded-xl font-medium text-white transition-colors ${
                                 isBlocking(closureForm.affected_areas)
                                     ? 'bg-red-500 hover:bg-red-600 disabled:bg-red-300'
                                     : 'bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300'
                             }`}
                         >
-                            {closureSaving ? 'Saving...' : editingClosureId ? 'Update' : 'Create'}
+                            {saveClosureMutation.isPending ? 'Saving...' : editingClosureId ? 'Update' : 'Create'}
                         </button>
                     </div>
                 }
@@ -1549,10 +1471,10 @@ const BlocksTab: React.FC = () => {
                         </button>
                         <button
                             onClick={handleSaveReasonFromDrawer}
-                            disabled={!reasonDrawerData?.label?.trim() || reasonSaving}
+                            disabled={!reasonDrawerData?.label?.trim() || updateClosureReasonMutation.isPending}
                             className="flex-1 py-3 rounded-xl font-medium text-white bg-primary hover:bg-primary/90 disabled:bg-primary/50 transition-colors"
                         >
-                            {reasonSaving ? 'Saving...' : 'Save'}
+                            {updateClosureReasonMutation.isPending ? 'Saving...' : 'Save'}
                         </button>
                     </div>
                 }
@@ -1596,10 +1518,10 @@ const BlocksTab: React.FC = () => {
                         </button>
                         <button
                             onClick={handleSaveNoticeTypeFromDrawer}
-                            disabled={!noticeTypeDrawerData?.name?.trim() || noticeTypeSaving}
+                            disabled={!noticeTypeDrawerData?.name?.trim() || updateNoticeTypeMutation.isPending}
                             className="flex-1 py-3 rounded-xl font-medium text-white bg-primary hover:bg-primary/90 disabled:bg-primary/50 transition-colors"
                         >
-                            {noticeTypeSaving ? 'Saving...' : 'Save'}
+                            {updateNoticeTypeMutation.isPending ? 'Saving...' : 'Save'}
                         </button>
                     </div>
                 }

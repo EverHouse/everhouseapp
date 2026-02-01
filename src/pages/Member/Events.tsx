@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useData, EventData } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useToast } from '../../components/Toast';
-import { apiRequest } from '../../lib/apiRequest';
+import { fetchWithCredentials, postWithCredentials, deleteWithCredentials } from '../../hooks/queries/useFetch';
 import { EventCardSkeleton, SkeletonList } from '../../components/skeletons';
 import TabButton from '../../components/TabButton';
 import SwipeablePage from '../../components/SwipeablePage';
@@ -26,39 +27,90 @@ const MemberEvents: React.FC = () => {
   const { effectiveTheme } = useTheme();
   const { setPageReady } = usePageReady();
   const { showToast } = useToast();
+  const queryClient = useQueryClient();
   const isDark = effectiveTheme === 'dark';
   const [filter, setFilter] = useState('All');
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
-  const [userRsvps, setUserRsvps] = useState<UserRsvp[]>([]);
   const [loadingRsvp, setLoadingRsvp] = useState<string | null>(null);
   const [showViewAsConfirm, setShowViewAsConfirm] = useState(false);
   const [pendingEvent, setPendingEvent] = useState<EventData | null>(null);
   
   const isAdminViewingAs = actualUser?.role === 'admin' && isViewingAs;
 
-  const fetchUserRsvps = useCallback(async () => {
-    if (!user?.email) return;
-    try {
-      const { ok, data } = await apiRequest(`/api/rsvps?user_email=${encodeURIComponent(user.email)}`);
-      if (ok && data) {
-        setUserRsvps(data.map((r: any) => ({ event_id: r.event_id, status: r.status })));
+  const { data: userRsvps = [], refetch: refetchRsvps } = useQuery({
+    queryKey: ['user-rsvps', user?.email],
+    queryFn: async () => {
+      if (!user?.email) return [];
+      const data = await fetchWithCredentials<any[]>(`/api/rsvps?user_email=${encodeURIComponent(user.email)}`);
+      return data.map((r: any) => ({ event_id: r.event_id, status: r.status }));
+    },
+    enabled: !!user?.email,
+  });
+
+  const rsvpMutation = useMutation({
+    mutationFn: async ({ eventId, userEmail }: { eventId: string; userEmail: string }) => {
+      return postWithCredentials('/api/rsvps', {
+        event_id: eventId,
+        user_email: userEmail
+      });
+    },
+    onMutate: async ({ eventId }) => {
+      await queryClient.cancelQueries({ queryKey: ['user-rsvps', user?.email] });
+      const previousRsvps = queryClient.getQueryData<UserRsvp[]>(['user-rsvps', user?.email]);
+      queryClient.setQueryData<UserRsvp[]>(['user-rsvps', user?.email], (old = []) => [
+        ...old,
+        { event_id: parseInt(eventId), status: 'confirmed' }
+      ]);
+      return { previousRsvps };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previousRsvps) {
+        queryClient.setQueryData(['user-rsvps', user?.email], context.previousRsvps);
       }
-    } catch (err) {
-      console.error('Failed to fetch RSVPs:', err);
+      showToast('Unable to RSVP. Please try again.', 'error');
+    },
+    onSuccess: () => {
+      showToast('You are on the list!', 'success');
+      queryClient.invalidateQueries({ queryKey: ['user-rsvps', user?.email] });
+    },
+    onSettled: () => {
+      setLoadingRsvp(null);
     }
-  }, [user?.email]);
+  });
 
-  useEffect(() => {
-    fetchUserRsvps();
-  }, [fetchUserRsvps]);
+  const cancelRsvpMutation = useMutation({
+    mutationFn: async ({ eventId, userEmail }: { eventId: string; userEmail: string }) => {
+      return deleteWithCredentials(`/api/rsvps/${eventId}/${encodeURIComponent(userEmail)}`);
+    },
+    onMutate: async ({ eventId }) => {
+      await queryClient.cancelQueries({ queryKey: ['user-rsvps', user?.email] });
+      const previousRsvps = queryClient.getQueryData<UserRsvp[]>(['user-rsvps', user?.email]);
+      queryClient.setQueryData<UserRsvp[]>(['user-rsvps', user?.email], (old = []) =>
+        old.filter(r => r.event_id !== parseInt(eventId))
+      );
+      return { previousRsvps };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previousRsvps) {
+        queryClient.setQueryData(['user-rsvps', user?.email], context.previousRsvps);
+      }
+      showToast('Unable to cancel. Please try again.', 'error');
+    },
+    onSuccess: () => {
+      showToast('RSVP cancelled', 'success');
+      queryClient.invalidateQueries({ queryKey: ['user-rsvps', user?.email] });
+    },
+    onSettled: () => {
+      setLoadingRsvp(null);
+    }
+  });
 
-  // Subscribe to real-time updates for RSVPs
   useEffect(() => {
     const unsubscribe = bookingEvents.subscribe(() => {
-      fetchUserRsvps();
+      refetchRsvps();
     });
     return unsubscribe;
-  }, [fetchUserRsvps]);
+  }, [refetchRsvps]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -96,53 +148,14 @@ const MemberEvents: React.FC = () => {
 
     if (user?.email) {
       setLoadingRsvp(event.id);
-      
-      // Optimistic UI: add RSVP immediately
-      const previousRsvps = [...userRsvps];
-      setUserRsvps(prev => [...prev, { event_id: parseInt(event.id), user_email: user.email, status: 'confirmed' } as any]);
-      
-      const { ok, error } = await apiRequest('/api/rsvps', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event_id: event.id,
-          user_email: user.email
-        })
-      });
-      
-      if (ok) {
-        showToast('You are on the list!', 'success');
-        fetchUserRsvps(); // Sync with server
-      } else {
-        // Revert on failure
-        setUserRsvps(previousRsvps);
-        showToast(error || 'Unable to RSVP. Please try again.', 'error');
-      }
-      setLoadingRsvp(null);
+      rsvpMutation.mutate({ eventId: event.id, userEmail: user.email });
     }
   };
 
   const cancelRSVP = async (event: EventData) => {
     if (user?.email) {
       setLoadingRsvp(event.id);
-      
-      // Optimistic UI: remove RSVP immediately
-      const previousRsvps = [...userRsvps];
-      setUserRsvps(prev => prev.filter(r => r.event_id !== parseInt(event.id)));
-      
-      const { ok, error } = await apiRequest(`/api/rsvps/${event.id}/${encodeURIComponent(user.email)}`, {
-        method: 'DELETE'
-      });
-      
-      if (ok) {
-        showToast('RSVP cancelled', 'success');
-        fetchUserRsvps(); // Sync with server
-      } else {
-        // Revert on failure
-        setUserRsvps(previousRsvps);
-        showToast(error || 'Unable to cancel. Please try again.', 'error');
-      }
-      setLoadingRsvp(null);
+      cancelRsvpMutation.mutate({ eventId: event.id, userEmail: user.email });
     }
   };
 
@@ -165,10 +178,8 @@ const MemberEvents: React.FC = () => {
   };
 
   const handleAddToCalendar = (event: EventData) => {
-    // Parse time formats: "9:30 AM", "7 PM", "19:00", "7:00 PM"
     const timeStr = (event.time || '12:00 PM').trim();
     
-    // Match patterns: "H:MM AM/PM", "H AM/PM", or "HH:MM" (24-hour)
     const match12Hour = timeStr.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
     const match24Hour = timeStr.match(/^(\d{1,2}):(\d{2})$/);
     
@@ -179,7 +190,6 @@ const MemberEvents: React.FC = () => {
       hours = parseInt(match12Hour[1]);
       minutes = match12Hour[2] ? parseInt(match12Hour[2]) : 0;
       const period = match12Hour[3].toUpperCase();
-      // Convert 12-hour to 24-hour: 12 AM = 0, 12 PM = 12, others add 12 for PM
       if (period === 'AM') {
         hours = hours === 12 ? 0 : hours;
       } else {
@@ -189,7 +199,6 @@ const MemberEvents: React.FC = () => {
       hours = parseInt(match24Hour[1]);
       minutes = parseInt(match24Hour[2]);
     } else {
-      // Default to noon
       hours = 12;
       minutes = 0;
     }
@@ -222,9 +231,9 @@ const MemberEvents: React.FC = () => {
     setPendingEvent(null);
   };
 
-  const handleRefresh = useCallback(async () => {
-    await fetchUserRsvps();
-  }, [fetchUserRsvps]);
+  const handleRefresh = async () => {
+    await refetchRsvps();
+  };
 
   return (
     <AnimatedPage>

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchWithCredentials } from '../../hooks/queries/useFetch';
 import { useData, Booking } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePageReady } from '../../contexts/PageReadyContext';
@@ -117,41 +119,43 @@ interface DBBookingRequest {
   overage_paid?: boolean;
 }
 
+interface GuestPasses {
+  passes_used: number;
+  passes_total: number;
+  passes_remaining: number;
+}
+
+interface BannerAnnouncement {
+  id: string;
+  title: string;
+  desc: string;
+  linkType?: string;
+  linkTarget?: string;
+}
+
 const formatDate = (dateStr: string): string => {
   return formatDateShort(dateStr);
 };
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, actualUser, isViewingAs, addBooking, deleteBooking } = useData();
   const { effectiveTheme } = useTheme();
   
-  // Check if admin is viewing as a member
   const isAdminViewingAs = actualUser?.role === 'admin' && isViewingAs;
   const { setPageReady } = usePageReady();
   const { startNavigation } = useNavigationLoading();
   const { showToast } = useToast();
   const isDark = effectiveTheme === 'dark';
   
-  const [dbBookings, setDbBookings] = useState<DBBooking[]>([]);
-  const [dbBookingRequests, setDbBookingRequests] = useState<DBBookingRequest[]>([]);
-  const [dbRSVPs, setDbRSVPs] = useState<DBRSVP[]>([]);
-  const [dbWellnessEnrollments, setDbWellnessEnrollments] = useState<DBWellnessEnrollment[]>([]);
-  const [dbConferenceRoomBookings, setDbConferenceRoomBookings] = useState<any[]>([]);
-  const [allWellnessClasses, setAllWellnessClasses] = useState<{ id: number; title: string; date: string; time: string }[]>([]);
-  const [allEvents, setAllEvents] = useState<{ id: number; title: string; event_date: string; start_time: string }[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
   const [selectedBooking, setSelectedBooking] = useState<DBBooking | null>(null);
   const [newDate, setNewDate] = useState<string>('');
   const [newTime, setNewTime] = useState<string | null>(null);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void } | null>(null);
-  const [guestPasses, setGuestPasses] = useState<{ passes_used: number; passes_total: number; passes_remaining: number } | null>(null);
   const [showGuestCheckin, setShowGuestCheckin] = useState(false);
   const [isCardOpen, setIsCardOpen] = useState(false);
-  const [bannerAnnouncement, setBannerAnnouncement] = useState<{ id: string; title: string; desc: string; linkType?: string; linkTarget?: string } | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [processingInviteId, setProcessingInviteId] = useState<number | null>(null);
   const [showBalancePaymentModal, setShowBalancePaymentModal] = useState(false);
@@ -162,91 +166,101 @@ const Dashboard: React.FC = () => {
   const isStaffOrAdminProfile = user?.role === 'admin' || user?.role === 'staff';
   const { permissions: tierPermissions } = useTierPermissions(user?.tier);
 
-  const fetchUserData = useCallback(async (showLoadingState = true) => {
-    if (!user?.email) return;
-    
-    if (showLoadingState) {
-      setIsLoading(true);
-    }
-    setError(null);
-    
-    try {
-      // Build conference room bookings URL with member name and email for proper filtering
-      const conferenceRoomParams = new URLSearchParams();
-      if (user.name) conferenceRoomParams.set('member_name', user.name);
-      if (user.email) conferenceRoomParams.set('member_email', user.email);
-      const conferenceRoomUrl = `/api/conference-room-bookings${conferenceRoomParams.toString() ? '?' + conferenceRoomParams.toString() : ''}`;
-      
-      const results = await Promise.allSettled([
-        fetch(`/api/bookings?user_email=${encodeURIComponent(user.email)}`, { credentials: 'include' }),
-        fetch(`/api/rsvps?user_email=${encodeURIComponent(user.email)}`, { credentials: 'include' }),
-        fetch(`/api/wellness-enrollments?user_email=${encodeURIComponent(user.email)}`, { credentials: 'include' }),
-        fetch(`/api/booking-requests?user_email=${encodeURIComponent(user.email)}`, { credentials: 'include' }),
-        fetch(conferenceRoomUrl, { credentials: 'include' }),
-        fetch('/api/wellness-classes', { credentials: 'include' }),
-        fetch('/api/events', { credentials: 'include' })
-      ]);
+  const conferenceRoomParams = new URLSearchParams();
+  if (user?.name) conferenceRoomParams.set('member_name', user.name);
+  if (user?.email) conferenceRoomParams.set('member_email', user.email);
+  const conferenceRoomUrl = `/api/conference-room-bookings${conferenceRoomParams.toString() ? '?' + conferenceRoomParams.toString() : ''}`;
 
-      const failedItems: string[] = [];
+  const { data: dbBookings = [], isLoading: bookingsLoading, error: bookingsError, refetch: refetchBookings } = useQuery({
+    queryKey: ['member', 'bookings', user?.email],
+    queryFn: () => fetchWithCredentials<DBBooking[]>(`/api/bookings?user_email=${encodeURIComponent(user?.email || '')}`),
+    enabled: !!user?.email,
+    refetchOnWindowFocus: true,
+    staleTime: 30000,
+  });
 
-      if (results[0].status === 'fulfilled' && results[0].value.ok) {
-        setDbBookings(await results[0].value.json());
-      } else {
-        console.error('Bookings failed to load');
-        failedItems.push('bookings');
-      }
+  const { data: dbRSVPs = [], isLoading: rsvpsLoading, error: rsvpsError, refetch: refetchRSVPs } = useQuery({
+    queryKey: ['member', 'rsvps', user?.email],
+    queryFn: () => fetchWithCredentials<DBRSVP[]>(`/api/rsvps?user_email=${encodeURIComponent(user?.email || '')}`),
+    enabled: !!user?.email,
+    refetchOnWindowFocus: true,
+    staleTime: 30000,
+  });
 
-      if (results[1].status === 'fulfilled' && results[1].value.ok) {
-        setDbRSVPs(await results[1].value.json());
-      } else {
-        failedItems.push('event RSVPs');
-      }
+  const { data: dbWellnessEnrollments = [], isLoading: wellnessLoading, error: wellnessError, refetch: refetchWellness } = useQuery({
+    queryKey: ['member', 'wellness-enrollments', user?.email],
+    queryFn: () => fetchWithCredentials<DBWellnessEnrollment[]>(`/api/wellness-enrollments?user_email=${encodeURIComponent(user?.email || '')}`),
+    enabled: !!user?.email,
+    refetchOnWindowFocus: true,
+    staleTime: 30000,
+  });
 
-      if (results[2].status === 'fulfilled' && results[2].value.ok) {
-        setDbWellnessEnrollments(await results[2].value.json());
-      } else {
-        failedItems.push('wellness enrollments');
-      }
-      
-      if (results[3].status === 'fulfilled' && results[3].value.ok) {
-        setDbBookingRequests(await results[3].value.json());
-      } else {
-        failedItems.push('booking requests');
-      }
-      
-      if (results[4].status === 'fulfilled' && results[4].value.ok) {
-        setDbConferenceRoomBookings(await results[4].value.json());
-      } else {
-        failedItems.push('conference room bookings');
-      }
-      
-      if (results[5].status === 'fulfilled' && results[5].value.ok) {
-        setAllWellnessClasses(await results[5].value.json());
-      } else {
-        failedItems.push('wellness classes');
-      }
-      
-      if (results[6].status === 'fulfilled' && results[6].value.ok) {
-        setAllEvents(await results[6].value.json());
-      } else {
-        failedItems.push('events');
-      }
+  const { data: dbBookingRequests = [], isLoading: requestsLoading, error: requestsError, refetch: refetchRequests } = useQuery({
+    queryKey: ['member', 'booking-requests', user?.email],
+    queryFn: () => fetchWithCredentials<DBBookingRequest[]>(`/api/booking-requests?user_email=${encodeURIComponent(user?.email || '')}`),
+    enabled: !!user?.email,
+    refetchOnWindowFocus: true,
+    staleTime: 30000,
+  });
 
-      if (failedItems.length > 0) {
-        setError(`Failed to load: ${failedItems.join(', ')}. Pull down to refresh.`);
-      }
-      
-    } catch (err) {
-      console.error('Critical error fetching user data:', err);
-      setError('Unable to connect to server. Please check your connection and try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user?.email]);
+  const { data: dbConferenceRoomBookings = [], isLoading: conferenceLoading, error: conferenceError, refetch: refetchConference } = useQuery({
+    queryKey: ['member', 'conference-room-bookings', user?.email, user?.name],
+    queryFn: () => fetchWithCredentials<any[]>(conferenceRoomUrl),
+    enabled: !!user?.email,
+    refetchOnWindowFocus: true,
+    staleTime: 30000,
+  });
 
-  useEffect(() => {
-    fetchUserData();
-  }, [fetchUserData]);
+  const { data: allWellnessClasses = [], isLoading: classesLoading, error: classesError } = useQuery({
+    queryKey: ['wellness-classes'],
+    queryFn: () => fetchWithCredentials<{ id: number; title: string; date: string; time: string }[]>('/api/wellness-classes'),
+    enabled: !!user?.email,
+    refetchOnWindowFocus: true,
+    staleTime: 60000,
+  });
+
+  const { data: allEvents = [], isLoading: eventsLoading, error: eventsError } = useQuery({
+    queryKey: ['events'],
+    queryFn: () => fetchWithCredentials<{ id: number; title: string; event_date: string; start_time: string }[]>('/api/events'),
+    enabled: !!user?.email,
+    refetchOnWindowFocus: true,
+    staleTime: 60000,
+  });
+
+  const { data: guestPasses, refetch: refetchGuestPasses } = useQuery({
+    queryKey: ['member', 'guest-passes', user?.email, user?.tier],
+    queryFn: () => fetchWithCredentials<GuestPasses>(`/api/guest-passes/${encodeURIComponent(user?.email || '')}?tier=${encodeURIComponent(user?.tier || 'Social')}`),
+    enabled: !!user?.email && !isStaffOrAdminProfile,
+    refetchOnWindowFocus: true,
+    staleTime: 60000,
+  });
+
+  const { data: bannerAnnouncement } = useQuery({
+    queryKey: ['announcements', 'banner'],
+    queryFn: () => fetchWithCredentials<BannerAnnouncement>('/api/announcements/banner'),
+    enabled: !!user?.email,
+    staleTime: 300000,
+  });
+
+  const isLoading = bookingsLoading || rsvpsLoading || wellnessLoading || requestsLoading || 
+                    conferenceLoading || classesLoading || eventsLoading;
+  
+  const failedItems: string[] = [];
+  if (bookingsError) failedItems.push('bookings');
+  if (rsvpsError) failedItems.push('event RSVPs');
+  if (wellnessError) failedItems.push('wellness enrollments');
+  if (requestsError) failedItems.push('booking requests');
+  if (conferenceError) failedItems.push('conference room bookings');
+  if (classesError) failedItems.push('wellness classes');
+  if (eventsError) failedItems.push('events');
+  
+  const error = failedItems.length > 0 ? `Failed to load: ${failedItems.join(', ')}. Pull down to refresh.` : null;
+
+  const refetchAllData = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['member'] });
+    queryClient.invalidateQueries({ queryKey: ['wellness-classes'] });
+    queryClient.invalidateQueries({ queryKey: ['events'] });
+  }, [queryClient]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -255,39 +269,24 @@ const Dashboard: React.FC = () => {
   }, [isLoading, setPageReady]);
 
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchUserData(false);
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [fetchUserData]);
-
-  useEffect(() => {
     const unsubscribe = bookingEvents.subscribe(() => {
-      fetchUserData(false);
+      refetchAllData();
     });
     return unsubscribe;
-  }, [fetchUserData]);
+  }, [refetchAllData]);
 
   useEffect(() => {
     const handleMemberStatsUpdated = (event: CustomEvent) => {
       const detail = event.detail;
       if (detail?.memberEmail?.toLowerCase() === user?.email?.toLowerCase() && detail?.guestPasses !== undefined) {
-        fetch(`/api/guest-passes/${encodeURIComponent(user?.email || '')}?tier=${encodeURIComponent(user?.tier || 'Social')}`, { credentials: 'include' })
-          .then(res => res.ok ? res.json() : null)
-          .then(data => data && setGuestPasses(data))
-          .catch(err => console.error('Error refreshing guest passes:', err));
+        queryClient.invalidateQueries({ queryKey: ['member', 'guest-passes'] });
       }
     };
 
     window.addEventListener('member-stats-updated', handleMemberStatsUpdated as EventListener);
     return () => window.removeEventListener('member-stats-updated', handleMemberStatsUpdated as EventListener);
-  }, [user?.email, user?.tier]);
+  }, [user?.email, queryClient]);
 
-  // Listen for billing-update events to refresh balance display in real-time
   useEffect(() => {
     const handleBillingUpdate = () => {
       setBalanceRefreshKey(prev => prev + 1);
@@ -298,45 +297,22 @@ const Dashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (user?.email && !isStaffOrAdminProfile) {
-      fetch(`/api/guest-passes/${encodeURIComponent(user.email)}?tier=${encodeURIComponent(user.tier || 'Social')}`, { credentials: 'include' })
-        .then(res => {
-          if (!res.ok) throw new Error('Failed to fetch guest passes');
-          return res.json();
-        })
-        .then(data => setGuestPasses(data))
-        .catch(err => console.error('Error fetching guest passes:', err));
-    }
-  }, [user?.email, user?.tier, isStaffOrAdminProfile]);
-
-  useEffect(() => {
-    if (user?.email) {
+    if (user?.email && bannerAnnouncement) {
       const dismissedKey = `eh_banner_dismissed_${user.email}`;
       const dismissedId = localStorage.getItem(dismissedKey);
-      
-      fetch('/api/announcements/banner', { credentials: 'include' })
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.id !== dismissedId) {
-            setBannerAnnouncement(data);
-            setBannerDismissed(false);
-          } else if (data && data.id === dismissedId) {
-            setBannerDismissed(true);
-          }
-        })
-        .catch(err => console.error('Error fetching banner announcement:', err));
+      if (bannerAnnouncement.id === dismissedId) {
+        setBannerDismissed(true);
+      }
     }
-  }, [user?.email]);
+  }, [user?.email, bannerAnnouncement]);
 
   const handleRefresh = useCallback(async () => {
-    await fetchUserData(false);
-  }, [fetchUserData]);
+    refetchAllData();
+  }, [refetchAllData]);
 
   const allItems = [
     ...dbBookings.map(b => {
-      // Check if current user is NOT the primary booker (i.e., is a linked member)
       const isLinkedMember = user?.email ? b.user_email?.toLowerCase() !== user.email.toLowerCase() : false;
-      // For linked members, show the primary booker's email (before @) as the booker name
       const primaryBookerName = isLinkedMember && b.user_email 
         ? b.user_email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
         : null;
@@ -413,11 +389,8 @@ const Dashboard: React.FC = () => {
       sortKey: `${w.date}T${w.time}`,
       raw: w
     })),
-    // Filter out calendar bookings that already exist as DB booking requests (avoid duplicates)
     ...dbConferenceRoomBookings
       .filter(c => {
-        // Check if this calendar event already exists as a DB booking (by calendar_event_id)
-        // Must check all active statuses, not just 'approved', to avoid duplicates when status changes
         const isDuplicate = dbBookingRequests.some(r => 
           r.calendar_event_id === c.calendar_event_id && 
           ['pending', 'pending_approval', 'approved', 'confirmed', 'attended'].includes(r.status)
@@ -444,7 +417,6 @@ const Dashboard: React.FC = () => {
   const todayStr = getTodayString();
   const nowTime = getNowTimePacific();
   
-  // Normalize time to HH:MM format for comparison
   const normalizeTime = (t: string) => {
     if (!t) return '';
     const parts = t.split(':');
@@ -466,12 +438,10 @@ const Dashboard: React.FC = () => {
     } else if (item.type === 'rsvp') {
       const raw = item.raw as DBRSVP;
       itemDate = raw.event_date.split('T')[0];
-      // Events typically last ~2 hours, use end_time if available or keep visible all day
       endTime = raw.end_time;
     } else if (item.type === 'wellness') {
       const raw = item.raw as DBWellnessEnrollment;
       itemDate = raw.date.split('T')[0];
-      // Wellness classes don't have end_time, keep visible until end of day
       endTime = undefined;
     } else if (item.type === 'conference_room_calendar') {
       const raw = item.raw as any;
@@ -481,14 +451,10 @@ const Dashboard: React.FC = () => {
     
     if (!itemDate) return false;
     
-    // Future dates are always included
     if (itemDate > todayStr) return true;
     
-    // Past dates are always excluded
     if (itemDate < todayStr) return false;
     
-    // For today's items, check if they've already ended
-    // Items without end_time stay visible all day
     if (endTime && normalizeTime(endTime) < nowTime) {
       return false;
     }
@@ -496,7 +462,6 @@ const Dashboard: React.FC = () => {
     return true;
   });
 
-  // Calculate minutes used today for metrics (from allItems, not upcomingItems, to include bookings that have already ended)
   const todayBookingsAll = allItems.filter(item => 
     item.rawDate === todayStr && 
     (item.type === 'booking' || item.type === 'booking_request' || item.type === 'conference_room_calendar')
@@ -509,7 +474,6 @@ const Dashboard: React.FC = () => {
       const end = raw.end_time?.split(':').map(Number) || [0, 0];
       const totalMinutes = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
       
-      // Split time among all players based on declared_player_count
       const playerCount = raw.declared_player_count || 1;
       const memberShare = Math.ceil(totalMinutes / playerCount);
       
@@ -523,14 +487,12 @@ const Dashboard: React.FC = () => {
       const end = raw.end_time?.split(':').map(Number) || [0, 0];
       const totalMinutes = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
       
-      // Split time among all players based on declared_player_count
       const playerCount = raw.declared_player_count || 1;
       const memberShare = Math.ceil(totalMinutes / playerCount);
       
       return sum + memberShare;
     }, 0);
 
-  // Calculate next upcoming event/wellness for metrics grid (from all events/classes, not just enrolled)
   const nextEvent = allEvents
     .filter(e => e.event_date.split('T')[0] >= todayStr)
     .sort((a, b) => a.event_date.localeCompare(b.event_date) || (a.start_time || '').localeCompare(b.start_time || ''))
@@ -540,8 +502,6 @@ const Dashboard: React.FC = () => {
     .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
     [0];
 
-  // Filter out pending invites from upcomingItems (show them in separate section)
-  // A pending invite is: is_linked_member=true AND invite_status='pending'
   const pendingInvites = dbBookingRequests.filter(r => 
     r.is_linked_member === true && 
     r.invite_status === 'pending' &&
@@ -550,12 +510,9 @@ const Dashboard: React.FC = () => {
   
   const pendingInviteIds = new Set(pendingInvites.map(p => p.id));
   
-  // Filter upcomingItems to exclude pending invites
-  // Check both 'booking' and 'booking_request' types since approved bookings have type='booking'
   const upcomingItemsFiltered = upcomingItems.filter(item => {
     if (item.type === 'booking_request' || item.type === 'booking') {
       const raw = item.raw as DBBookingRequest;
-      // Exclude if it's a pending invite (not yet accepted by linked member)
       if (raw && pendingInviteIds.has(raw.id)) {
         return false;
       }
@@ -563,14 +520,11 @@ const Dashboard: React.FC = () => {
     return true;
   });
 
-  // Separate bookings from events/wellness (include both confirmed bookings, approved requests, and calendar conference room bookings)
   const upcomingBookings = upcomingItemsFiltered.filter(item => item.type === 'booking' || item.type === 'booking_request' || item.type === 'conference_room_calendar');
   const upcomingEventsWellness = upcomingItemsFiltered.filter(item => item.type === 'rsvp' || item.type === 'wellness');
 
-  // Next booking card shows only golf/conference bookings
   const nextBooking = upcomingBookings[0];
   
-  // Upcoming section shows events and wellness enrollments
   const nextItem = upcomingItemsFiltered[0];
   const laterItems = upcomingItemsFiltered.slice(1);
 
@@ -593,23 +547,11 @@ const Dashboard: React.FC = () => {
       onConfirm: async () => {
         setConfirmModal(null);
         
-        // Store previous state
-        const previousBookings = [...dbBookings];
-        const previousBookingRequests = [...dbBookingRequests];
-
-        // Optimistic update - filter out cancelled item immediately for both types
-        if (bookingType === 'booking') {
-          setDbBookings(prev => prev.filter(b => b.id !== bookingId));
-        } else {
-          setDbBookingRequests(prev => prev.filter(r => r.id !== bookingId));
-        }
-
         try {
           let res;
           const headers = { 'Content-Type': 'application/json' };
           
           if (bookingType === 'booking') {
-            // Pass acting_as_email for admin "View As" mode
             res = await fetch(`/api/bookings/${bookingId}/member-cancel`, {
               method: 'PUT',
               headers,
@@ -617,7 +559,6 @@ const Dashboard: React.FC = () => {
               body: JSON.stringify(isAdminViewingAs ? { acting_as_email: user?.email } : {})
             });
           } else {
-            // Pass acting_as_email for admin "View As" mode
             res = await fetch(`/api/booking-requests/${bookingId}/member-cancel`, {
               method: 'PUT',
               headers,
@@ -628,20 +569,14 @@ const Dashboard: React.FC = () => {
 
           if (res.ok) {
             setSelectedBooking(null);
-            // Also update global DataContext to keep state in sync
             deleteBooking(String(bookingId));
             showToast('Booking cancelled successfully', 'success');
+            refetchAllData();
           } else {
-            // Revert on failure
-            setDbBookings(previousBookings);
-            setDbBookingRequests(previousBookingRequests);
             const data = await res.json().catch(() => ({}));
             showToast(data.error || 'Failed to cancel booking', 'error');
           }
         } catch (err) {
-          // Revert on error
-          setDbBookings(previousBookings);
-          setDbBookingRequests(previousBookingRequests);
           showToast('Failed to cancel booking', 'error');
         }
       }
@@ -659,7 +594,6 @@ const Dashboard: React.FC = () => {
         setConfirmModal(null);
         
         try {
-          // First, get the participant ID for the current user
           const participantsRes = await fetch(`/api/bookings/${bookingId}/participants`, { credentials: 'include' });
           if (!participantsRes.ok) {
             showToast('Failed to get booking details', 'error');
@@ -669,7 +603,6 @@ const Dashboard: React.FC = () => {
           const participantsData = await participantsRes.json();
           const participants = participantsData.participants || [];
           
-          // Find the current user's participant record
           const myParticipant = participants.find((p: any) => 
             p.email?.toLowerCase() === user.email.toLowerCase()
           );
@@ -679,7 +612,6 @@ const Dashboard: React.FC = () => {
             return;
           }
           
-          // Call the delete endpoint to remove ourselves
           const body = isAdminViewingAs && user?.email ? { onBehalfOf: user.email } : {};
           const res = await fetch(`/api/bookings/${bookingId}/participants/${myParticipant.id}`, {
             method: 'DELETE',
@@ -690,7 +622,7 @@ const Dashboard: React.FC = () => {
           
           if (res.ok) {
             showToast('You have left the booking', 'success');
-            await fetchUserData(false);
+            refetchAllData();
           } else {
             const data = await res.json().catch(() => ({}));
             showToast(data.error || 'Failed to leave booking', 'error');
@@ -712,12 +644,6 @@ const Dashboard: React.FC = () => {
       onConfirm: async () => {
         setConfirmModal(null);
         
-        // Store previous state
-        const previousRsvps = [...dbRSVPs];
-
-        // Optimistic update
-        setDbRSVPs(prev => prev.filter(r => r.event_id !== eventId));
-
         try {
           const res = await fetch(`/api/rsvps/${eventId}/${encodeURIComponent(user.email)}`, {
             method: 'DELETE',
@@ -725,14 +651,11 @@ const Dashboard: React.FC = () => {
           });
           if (res.ok) {
             showToast('RSVP cancelled', 'success');
+            refetchAllData();
           } else {
-            // Revert on failure
-            setDbRSVPs(previousRsvps);
             showToast('Failed to cancel RSVP', 'error');
           }
         } catch (err) {
-          // Revert on error
-          setDbRSVPs(previousRsvps);
           showToast('Failed to cancel RSVP', 'error');
         }
       }
@@ -749,12 +672,6 @@ const Dashboard: React.FC = () => {
       onConfirm: async () => {
         setConfirmModal(null);
         
-        // Store previous state
-        const previousWellness = [...dbWellnessEnrollments];
-
-        // Optimistic update
-        setDbWellnessEnrollments(prev => prev.filter(w => w.class_id !== classId));
-
         try {
           const res = await fetch(`/api/wellness-enrollments/${classId}/${encodeURIComponent(user.email)}`, {
             method: 'DELETE',
@@ -762,14 +679,11 @@ const Dashboard: React.FC = () => {
           });
           if (res.ok) {
             showToast('Enrollment cancelled', 'success');
+            refetchAllData();
           } else {
-            // Revert on failure
-            setDbWellnessEnrollments(previousWellness);
             showToast('Failed to cancel enrollment', 'error');
           }
         } catch (err) {
-          // Revert on error
-          setDbWellnessEnrollments(previousWellness);
           showToast('Failed to cancel enrollment', 'error');
         }
       }
@@ -779,7 +693,6 @@ const Dashboard: React.FC = () => {
   const handleAcceptInvite = async (bookingId: number) => {
     setProcessingInviteId(bookingId);
     try {
-      // When admin is viewing as a member, pass the member's email so the backend knows who to act for
       const body = isAdminViewingAs && user?.email ? { onBehalfOf: user.email } : {};
       
       const result = await apiRequest(`/api/bookings/${bookingId}/invite/accept`, {
@@ -790,7 +703,7 @@ const Dashboard: React.FC = () => {
       
       if (result.ok) {
         showToast('Invite accepted!', 'success');
-        await fetchUserData(false);
+        refetchAllData();
       } else {
         showToast(result.error || 'Failed to accept invite', 'error');
       }
@@ -811,7 +724,6 @@ const Dashboard: React.FC = () => {
         setProcessingInviteId(bookingId);
         
         try {
-          // When admin is viewing as a member, pass the member's email so the backend knows who to act for
           const body = isAdminViewingAs && user?.email ? { onBehalfOf: user.email } : {};
           
           const result = await apiRequest(`/api/bookings/${bookingId}/invite/decline`, {
@@ -822,7 +734,7 @@ const Dashboard: React.FC = () => {
           
           if (result.ok) {
             showToast('Invite declined', 'success');
-            await fetchUserData(false);
+            refetchAllData();
           } else {
             showToast(result.error || 'Failed to decline invite', 'error');
           }
@@ -866,7 +778,7 @@ const Dashboard: React.FC = () => {
         <ErrorState
           title="Unable to load dashboard"
           message={error}
-          onRetry={() => fetchUserData()}
+          onRetry={() => refetchAllData()}
         />
       </div>
     );
@@ -1156,7 +1068,6 @@ const Dashboard: React.FC = () => {
                   const endTime24 = 'end_time' in rawBooking ? rawBooking.end_time : '';
                   const isLinkedMember = (item as any).isLinkedMember || false;
                   
-                  // Check for unpaid overage fee
                   const hasUnpaidOverage = 'overage_fee_cents' in rawBooking && 
                     rawBooking.overage_fee_cents && 
                     rawBooking.overage_fee_cents > 0 && 
@@ -1165,7 +1076,6 @@ const Dashboard: React.FC = () => {
                   
                   const primaryBookerName = (item as any).primaryBookerName;
                   actions = [
-                    // Pay Now button for unpaid overage fees (appears first)
                     ...(hasUnpaidOverage && !isLinkedMember ? [{
                       icon: 'payment',
                       label: `Pay $${overageAmount}`,
@@ -1188,7 +1098,6 @@ const Dashboard: React.FC = () => {
                       { icon: 'event_repeat', label: 'Reschedule', onClick: () => { startNavigation(); navigate(`/book?reschedule=${item.dbId}&date=${item.rawDate}`); } },
                       { icon: 'close', label: 'Cancel', onClick: () => handleCancelBooking(item.dbId, item.type) }
                     ] : []),
-                    // Allow linked members (guests) to leave the booking
                     ...(isLinkedMember && isConfirmed ? [{
                       icon: 'logout',
                       label: 'Leave',
@@ -1226,7 +1135,6 @@ const Dashboard: React.FC = () => {
                     );
                   }
                   
-                  // Add payment status badge for confirmed bookings with fees
                   if ((status === 'confirmed' || status === 'attended') && !isLinked) {
                     const hasOverage = rawBooking.overage_fee_cents && rawBooking.overage_fee_cents > 0;
                     const overagePaid = rawBooking.overage_paid;
@@ -1280,7 +1188,7 @@ const Dashboard: React.FC = () => {
                           declaredPlayerCount={rawBookingData.declared_player_count || 1}
                           isOwner={isOwnerOfBooking}
                           isStaff={isStaffOrAdminProfile}
-                          onUpdate={() => fetchUserData(false)}
+                          onUpdate={() => refetchAllData()}
                         />
                       </div>
                     )}
@@ -1347,14 +1255,7 @@ const Dashboard: React.FC = () => {
         member_email: user?.email || ''
       }}
       onSuccess={async () => {
-        try {
-          const res = await fetch(`/api/guest-passes/${encodeURIComponent(user?.email || '')}?tier=${encodeURIComponent(user?.tier || 'Social')}`, { credentials: 'include' });
-          if (!res.ok) throw new Error('Failed to refresh guest passes');
-          const data = await res.json();
-          setGuestPasses(data);
-        } catch (err) {
-          console.error('Error refreshing guest passes:', err);
-        }
+        queryClient.invalidateQueries({ queryKey: ['member', 'guest-passes'] });
       }}
     />
 
@@ -1416,7 +1317,6 @@ const Dashboard: React.FC = () => {
                     throw new Error(err.error || 'Failed to create payment');
                   }
                   const data = await res.json();
-                  // Open Stripe checkout in new window
                   const stripe = await import('@stripe/stripe-js').then(mod => mod.loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || ''));
                   if (stripe && data.clientSecret) {
                     const { error: paymentError } = await stripe.confirmPayment({
@@ -1526,41 +1426,33 @@ const Dashboard: React.FC = () => {
                   {user.joinDate && (
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-base opacity-70" style={{ color: cardTextColor }}>event</span>
+                        <span className="material-symbols-outlined text-lg opacity-60" style={{ color: cardTextColor }}>badge</span>
                         <span className="text-sm opacity-80" style={{ color: cardTextColor }}>Member Since</span>
                       </div>
-                      <span className="text-sm font-semibold" style={{ color: cardTextColor }}>{formatMemberSince(user.joinDate)}</span>
-                    </div>
-                  )}
-
-                  {user.lastBookingDate && (
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-base opacity-70" style={{ color: cardTextColor }}>schedule</span>
-                        <span className="text-sm opacity-80" style={{ color: cardTextColor }}>Last Visited</span>
-                      </div>
-                      <span className="text-sm font-semibold" style={{ color: cardTextColor }}>{formatLastVisit(user.lastBookingDate)}</span>
+                      <span className="font-semibold text-sm" style={{ color: cardTextColor }}>{formatMemberSince(user.joinDate)}</span>
                     </div>
                   )}
                   
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="material-symbols-outlined text-base opacity-70" style={{ color: cardTextColor }}>calendar_month</span>
-                      <span className="text-sm opacity-80" style={{ color: cardTextColor }}>Advance Booking</span>
-                    </div>
-                    <span className="text-sm font-semibold" style={{ color: cardTextColor }}>
-                      {tierPermissions.unlimitedAccess ? 'Unlimited' : `${tierPermissions.advanceBookingDays} days`}
-                    </span>
-                  </div>
-                  
-                  {tierPermissions.canBookSimulators && (
+                  {tierPermissions.dailySimulatorMinutes > 0 && (
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-base opacity-70" style={{ color: cardTextColor }}>sports_golf</span>
-                        <span className="text-sm opacity-80" style={{ color: cardTextColor }}>Daily Sim Time</span>
+                        <span className="material-symbols-outlined text-lg opacity-60" style={{ color: cardTextColor }}>sports_golf</span>
+                        <span className="text-sm opacity-80" style={{ color: cardTextColor }}>Daily Simulator</span>
                       </div>
-                      <span className="text-sm font-semibold" style={{ color: cardTextColor }}>
-                        {tierPermissions.unlimitedAccess ? 'Unlimited' : `${tierPermissions.dailySimulatorMinutes} min`}
+                      <span className="font-semibold text-sm" style={{ color: cardTextColor }}>
+                        {tierPermissions.dailySimulatorMinutes === Infinity ? 'Unlimited' : `${tierPermissions.dailySimulatorMinutes} min`}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {tierPermissions.dailyConfRoomMinutes > 0 && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-lg opacity-60" style={{ color: cardTextColor }}>meeting_room</span>
+                        <span className="text-sm opacity-80" style={{ color: cardTextColor }}>Daily Conference</span>
+                      </div>
+                      <span className="font-semibold text-sm" style={{ color: cardTextColor }}>
+                        {tierPermissions.dailyConfRoomMinutes === Infinity ? 'Unlimited' : `${tierPermissions.dailyConfRoomMinutes} min`}
                       </span>
                     </div>
                   )}
@@ -1568,29 +1460,26 @@ const Dashboard: React.FC = () => {
                   {guestPasses && (
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-base opacity-70" style={{ color: cardTextColor }}>group_add</span>
+                        <span className="material-symbols-outlined text-lg opacity-60" style={{ color: cardTextColor }}>group_add</span>
                         <span className="text-sm opacity-80" style={{ color: cardTextColor }}>Guest Passes</span>
                       </div>
-                      <span className="text-sm font-semibold" style={{ color: cardTextColor }}>
-                        {guestPasses.passes_remaining} / {guestPasses.passes_total}
+                      <span className="font-semibold text-sm" style={{ color: cardTextColor }}>
+                        {guestPasses.passes_remaining} / {guestPasses.passes_total} remaining
                       </span>
                     </div>
                   )}
-
                 </div>
-
               </div>
             </div>
-
           </div>
         );
       })()}
     </ModalShell>
     </>
-    )}
-  </div>
-  </SmoothReveal>
-  </AnimatedPage>
+  )}
+    </div>
+    </SmoothReveal>
+    </AnimatedPage>
   );
 };
 

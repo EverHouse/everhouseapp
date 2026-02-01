@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useData } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useToast } from '../../components/Toast';
-import { apiRequest } from '../../lib/apiRequest';
 import { bookingEvents } from '../../lib/bookingEvents';
+import { fetchWithCredentials, postWithCredentials, putWithCredentials } from '../../hooks/queries/useFetch';
 import DateButton from '../../components/DateButton';
 import TabButton from '../../components/TabButton';
 import SwipeablePage from '../../components/SwipeablePage';
@@ -90,6 +91,45 @@ interface Closure {
   isActive: boolean;
 }
 
+interface GuestPassInfo {
+  passes_used: number;
+  passes_total: number;
+  passes_remaining: number;
+  passes_pending?: number;
+  passes_remaining_conservative?: number;
+}
+
+interface ExistingBookingCheck {
+  hasExisting: boolean;
+  bookings: Array<{ id: number; resourceName: string; startTime: string; endTime: string; status: string; isStaffCreated: boolean }>;
+  staffCreated: boolean;
+}
+
+interface FeeEstimateResponse {
+  totalFee: number;
+  feeBreakdown: {
+    overageFee: number;
+    guestFees: number;
+    guestCount: number;
+    overageMinutes: number;
+    guestsUsingPasses: number;
+    guestsCharged: number;
+    guestPassesRemaining: number;
+  };
+}
+
+const bookGolfKeys = {
+  all: ['bookGolf'] as const,
+  resources: (type: string) => [...bookGolfKeys.all, 'resources', type] as const,
+  availability: (resourceIds: number[], date: string, duration: number, ignoreId?: number) => 
+    [...bookGolfKeys.all, 'availability', resourceIds, date, duration, ignoreId] as const,
+  guestPasses: (email: string, tier: string) => [...bookGolfKeys.all, 'guestPasses', email, tier] as const,
+  myRequests: (email: string) => [...bookGolfKeys.all, 'myRequests', email] as const,
+  closures: () => [...bookGolfKeys.all, 'closures'] as const,
+  existingBookings: (date: string, resourceType: string) => [...bookGolfKeys.all, 'existingBookings', date, resourceType] as const,
+  feeEstimate: (params: string) => [...bookGolfKeys.all, 'feeEstimate', params] as const,
+};
+
 const generateDates = (advanceDays: number = 7): { label: string; date: string; day: string; dateNum: string }[] => {
   const dates = [];
   const { year, month, day } = getPacificDateParts();
@@ -146,6 +186,7 @@ const doesClosureAffectResource = (affectedAreas: string, resourceType: 'simulat
 
 const BookGolf: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const { addBooking, user, viewAsUser, actualUser, isViewingAs } = useData();
   const { effectiveTheme } = useTheme();
   const { setPageReady } = usePageReady();
@@ -156,18 +197,12 @@ const BookGolf: React.FC = () => {
   const [playerCount, setPlayerCount] = useState<number>(1);
   const [duration, setDuration] = useState<number>(60);
   const [memberNotes, setMemberNotes] = useState<string>('');
-  const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
-  const [resources, setResources] = useState<Resource[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isBooking, setIsBooking] = useState(false);
-  const isSubmittingRef = useRef(false); // Ref for immediate double-tap prevention
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const isSubmittingRef = useRef(false);
   const [showViewAsConfirm, setShowViewAsConfirm] = useState(false);
-  const [myRequests, setMyRequests] = useState<BookingRequest[]>([]);
-  const [closures, setClosures] = useState<Closure[]>([]);
   const [expandedHour, setExpandedHour] = useState<string | null>(null);
   const [hasUserSelectedDuration, setHasUserSelectedDuration] = useState(false);
   const [showPlayerTooltip, setShowPlayerTooltip] = useState(false);
@@ -186,20 +221,13 @@ const BookGolf: React.FC = () => {
   }>>>({});
   const [activeSearchIndex, setActiveSearchIndex] = useState<number | null>(null);
   const searchTimeoutRef = useRef<Record<number, NodeJS.Timeout>>({});
-  const [guestPassInfo, setGuestPassInfo] = useState<{ passes_used: number; passes_total: number; passes_remaining: number; passes_pending?: number; passes_remaining_conservative?: number } | null>(null);
   
   const [rescheduleBookingId, setRescheduleBookingId] = useState<number | null>(null);
   const [originalBooking, setOriginalBooking] = useState<BookingRequest | null>(null);
   const [existingDayBooking, setExistingDayBooking] = useState<BookingRequest | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [isCancelling, setIsCancelling] = useState(false);
   const [showGuardianConsent, setShowGuardianConsent] = useState(false);
   const [guardianConsentData, setGuardianConsentData] = useState<GuardianConsentData | null>(null);
-  const [existingBookingCheck, setExistingBookingCheck] = useState<{
-    hasExisting: boolean;
-    bookings: Array<{ id: number; resourceName: string; startTime: string; endTime: string; status: string; isStaffCreated: boolean }>;
-    staffCreated: boolean;
-  } | null>(null);
   
   const timeSlotsRef = useRef<HTMLDivElement>(null);
   const baySelectionRef = useRef<HTMLDivElement>(null);
@@ -253,6 +281,205 @@ const BookGolf: React.FC = () => {
     }
   }, [dates, selectedDateObj]);
 
+  // ============ REACT QUERY HOOKS ============
+
+  // Resources Query
+  const resourceType = activeTab === 'simulator' ? 'simulator' : 'conference_room';
+  const { data: resources = [], isLoading: resourcesLoading, error: resourcesError } = useQuery({
+    queryKey: bookGolfKeys.resources(resourceType),
+    queryFn: async () => {
+      const data = await fetchWithCredentials<APIResource[]>('/api/resources');
+      const typeMap: Record<string, string> = { simulator: 'simulator', conference: 'conference_room' };
+      return data
+        .filter(r => r.type === typeMap[activeTab])
+        .map(r => ({
+          id: `resource-${r.id}`,
+          dbId: r.id,
+          name: r.name,
+          meta: r.description || `Capacity: ${r.capacity}`,
+          badge: r.type === 'simulator' ? 'Indoor' : undefined,
+          icon: r.type === 'simulator' ? 'golf_course' : r.type === 'conference_room' ? 'meeting_room' : 'person'
+        }));
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Availability Query
+  const resourceIds = resources.map(r => r.dbId);
+  const { data: availableSlots = [], isLoading: availabilityLoading } = useQuery({
+    queryKey: bookGolfKeys.availability(resourceIds, selectedDateObj?.date || '', duration, rescheduleBookingId || undefined),
+    queryFn: async () => {
+      if (!selectedDateObj?.date || resourceIds.length === 0) return [];
+      
+      const batchResult = await postWithCredentials<Record<number, { slots: APISlot[] }>>(
+        '/api/availability/batch',
+        {
+          resource_ids: resourceIds,
+          date: selectedDateObj.date,
+          duration,
+          ignore_booking_id: rescheduleBookingId || undefined
+        }
+      );
+      
+      const allSlots: Map<string, { slot: TimeSlot; resourceIds: number[] }> = new Map();
+      
+      resources.forEach(resource => {
+        const resourceData = batchResult[resource.dbId];
+        if (!resourceData?.slots) return;
+        
+        resourceData.slots.forEach(slot => {
+          if (!slot.available) return;
+          const key = slot.start_time;
+          
+          if (allSlots.has(key)) {
+            allSlots.get(key)!.resourceIds.push(resource.dbId);
+          } else {
+            allSlots.set(key, { 
+              slot: {
+                id: `slot-${slot.start_time}`,
+                start: formatTime12Hour(slot.start_time),
+                end: formatTime12Hour(slot.end_time),
+                startTime24: slot.start_time,
+                endTime24: slot.end_time,
+                label: `${formatTime12Hour(slot.start_time)} – ${formatTime12Hour(slot.end_time)}`,
+                available: true,
+                availableResourceDbIds: []
+              }, 
+              resourceIds: [resource.dbId] 
+            });
+          }
+        });
+      });
+      
+      return Array.from(allSlots.values())
+        .map(({ slot, resourceIds: resIds }) => ({
+          ...slot,
+          availableResourceDbIds: resIds
+        }))
+        .sort((a, b) => a.startTime24.localeCompare(b.startTime24));
+    },
+    enabled: !!selectedDateObj?.date && resourceIds.length > 0,
+  });
+
+  // Guest Passes Query
+  const { data: guestPassInfo } = useQuery({
+    queryKey: bookGolfKeys.guestPasses(effectiveUser?.email || '', effectiveUser?.tier || ''),
+    queryFn: () => fetchWithCredentials<GuestPassInfo>(
+      `/api/guest-passes/${encodeURIComponent(effectiveUser!.email!)}?tier=${encodeURIComponent(effectiveUser!.tier!)}`
+    ),
+    enabled: !!effectiveUser?.email && !!effectiveUser?.tier,
+  });
+
+  // My Booking Requests Query
+  const { data: myRequests = [] } = useQuery({
+    queryKey: bookGolfKeys.myRequests(effectiveUser?.email || ''),
+    queryFn: () => fetchWithCredentials<BookingRequest[]>(
+      `/api/booking-requests?user_email=${encodeURIComponent(effectiveUser!.email!)}`
+    ),
+    enabled: !!effectiveUser?.email,
+  });
+
+  // Closures Query
+  const { data: closures = [] } = useQuery({
+    queryKey: bookGolfKeys.closures(),
+    queryFn: () => fetchWithCredentials<Closure[]>('/api/closures'),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Existing Bookings Check Query
+  const { data: existingBookingCheck } = useQuery({
+    queryKey: bookGolfKeys.existingBookings(selectedDateObj?.date || '', activeTab),
+    queryFn: () => fetchWithCredentials<ExistingBookingCheck>(
+      `/api/bookings/check-existing?date=${selectedDateObj!.date}&resource_type=${activeTab}`
+    ),
+    enabled: !!selectedDateObj?.date && activeTab === 'simulator' && !rescheduleBookingId,
+  });
+
+  // Fee Estimate Query (debounced via staleTime)
+  const guestCount = activeTab === 'simulator' ? playerSlots.filter(slot => slot.type === 'guest').length : 0;
+  const effectivePlayerCount = activeTab === 'simulator' ? playerCount : 1;
+  const feeEstimateParams = useMemo(() => {
+    if (!duration || !selectedDateObj?.date) return '';
+    const params = new URLSearchParams({
+      durationMinutes: duration.toString(),
+      guestCount: guestCount.toString(),
+      playerCount: effectivePlayerCount.toString(),
+      date: selectedDateObj.date,
+      resourceType: activeTab === 'conference' ? 'conference_room' : 'simulator'
+    });
+    if (effectiveUser?.email && isAdminViewingAs) {
+      params.set('email', effectiveUser.email);
+    }
+    return params.toString();
+  }, [duration, guestCount, effectivePlayerCount, selectedDateObj?.date, activeTab, effectiveUser?.email, isAdminViewingAs]);
+
+  const { data: feeEstimateData, isLoading: feeEstimateLoading } = useQuery({
+    queryKey: bookGolfKeys.feeEstimate(feeEstimateParams),
+    queryFn: () => fetchWithCredentials<FeeEstimateResponse>(`/api/fee-estimate?${feeEstimateParams}`),
+    enabled: !!feeEstimateParams,
+    staleTime: 1000 * 60,
+  });
+
+  const estimatedFees = useMemo(() => {
+    if (!feeEstimateData) {
+      return {
+        overageFee: 0, guestFees: 0, totalFee: 0, guestCount: 0, overageMinutes: 0,
+        guestsUsingPasses: 0, guestsCharged: 0, passesRemainingAfter: guestPassInfo?.passes_remaining ?? 0, isLoading: feeEstimateLoading
+      };
+    }
+    return {
+      overageFee: feeEstimateData.feeBreakdown.overageFee,
+      guestFees: feeEstimateData.feeBreakdown.guestFees,
+      totalFee: feeEstimateData.totalFee,
+      guestCount: feeEstimateData.feeBreakdown.guestCount,
+      overageMinutes: feeEstimateData.feeBreakdown.overageMinutes,
+      guestsUsingPasses: feeEstimateData.feeBreakdown.guestsUsingPasses,
+      guestsCharged: feeEstimateData.feeBreakdown.guestsCharged,
+      passesRemainingAfter: Math.max(0, feeEstimateData.feeBreakdown.guestPassesRemaining - feeEstimateData.feeBreakdown.guestCount),
+      isLoading: feeEstimateLoading
+    };
+  }, [feeEstimateData, feeEstimateLoading, guestPassInfo?.passes_remaining]);
+
+  // Create Booking Mutation
+  const createBookingMutation = useMutation({
+    mutationFn: async (bookingData: {
+      user_email: string;
+      user_name: string;
+      user_tier: string;
+      resource_id: number;
+      request_date: string;
+      start_time: string;
+      duration_minutes: number;
+      notes: string | null;
+      declared_player_count?: number;
+      member_notes?: string;
+      request_participants?: Array<{ email?: string; type: string; userId?: string; name?: string }>;
+      reschedule_booking_id?: number;
+      guardian_name?: string;
+      guardian_relationship?: string;
+      guardian_phone?: string;
+      guardian_consent?: boolean;
+    }) => postWithCredentials<{ id: number }>('/api/booking-requests', bookingData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: bookGolfKeys.all });
+    },
+  });
+
+  // Cancel Booking Mutation
+  const cancelBookingMutation = useMutation({
+    mutationFn: async ({ bookingId, actingAsEmail }: { bookingId: number; actingAsEmail?: string }) => 
+      putWithCredentials<{ success: boolean }>(`/api/bookings/${bookingId}/member-cancel`, { acting_as_email: actingAsEmail }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: bookGolfKeys.all });
+    },
+  });
+
+  // Derived loading state
+  const isLoading = resourcesLoading || availabilityLoading;
+  const error = resourcesError ? (resourcesError as Error).message : null;
+
+  // ============ END REACT QUERY HOOKS ============
+
   // Clear selected slot and resource when date or duration changes to prevent stale data
   useEffect(() => {
     const currentDate = selectedDateObj?.date ?? null;
@@ -299,171 +526,34 @@ const BookGolf: React.FC = () => {
     }
   }, [searchParams]);
 
+  // Find original booking when rescheduling
   useEffect(() => {
-    const fetchGuestPasses = async () => {
-      if (!effectiveUser?.email || !effectiveUser?.tier) return;
-      try {
-        const res = await fetch(
-          `/api/guest-passes/${encodeURIComponent(effectiveUser.email)}?tier=${encodeURIComponent(effectiveUser.tier)}`,
-          { credentials: 'include' }
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setGuestPassInfo(data);
+    if (rescheduleBookingId && myRequests.length > 0 && dates.length > 0) {
+      const booking = myRequests.find(b => b.id === rescheduleBookingId);
+      if (booking) {
+        setOriginalBooking(booking);
+        const dateParam = searchParams.get('date');
+        const matchingDate = dateParam ? dates.find(d => d.date === dateParam) : null;
+        if (matchingDate) {
+          setSelectedDateObj(matchingDate);
         }
-      } catch (err) {
-        console.error('[BookGolf] Failed to fetch guest passes:', err);
       }
-    };
-    fetchGuestPasses();
-  }, [effectiveUser?.email, effectiveUser?.tier]);
+    }
+  }, [rescheduleBookingId, myRequests, dates, searchParams]);
 
+  // Listen for real-time booking updates
   useEffect(() => {
-    const fetchOriginalBooking = async () => {
-      if (!rescheduleBookingId || !effectiveUser?.email || dates.length === 0) return;
-      
-      try {
-        const { ok, data } = await apiRequest<BookingRequest[]>(
-          `/api/booking-requests?user_email=${encodeURIComponent(effectiveUser.email)}`
-        );
-        if (ok && data) {
-          const booking = data.find(b => b.id === rescheduleBookingId);
-          if (booking) {
-            setOriginalBooking(booking);
-            const dateParam = searchParams.get('date');
-            const matchingDate = dateParam ? dates.find(d => d.date === dateParam) : null;
-            if (matchingDate) {
-              setSelectedDateObj(matchingDate);
-            }
-          }
-        }
-      } catch (err) {
-        console.error('[BookGolf] Failed to fetch original booking:', err);
+    const handleBookingUpdate = () => {
+      queryClient.invalidateQueries({ queryKey: bookGolfKeys.myRequests(effectiveUser?.email || '') });
+      if (selectedDateObj?.date && activeTab === 'simulator' && !rescheduleBookingId) {
+        queryClient.invalidateQueries({ queryKey: bookGolfKeys.existingBookings(selectedDateObj.date, activeTab) });
       }
     };
     
-    fetchOriginalBooking();
-  }, [rescheduleBookingId, effectiveUser?.email, dates, searchParams]);
+    window.addEventListener('booking-update', handleBookingUpdate);
+    return () => window.removeEventListener('booking-update', handleBookingUpdate);
+  }, [queryClient, effectiveUser?.email, selectedDateObj?.date, activeTab, rescheduleBookingId]);
 
-  const fetchResources = useCallback(async () => {
-    try {
-      const { ok, data, error } = await apiRequest<APIResource[]>('/api/resources');
-      
-      if (!ok || !data) {
-        showToast('Unable to load data. Please try again.', 'error');
-        setError(error || 'Unable to load resources');
-        setIsLoading(false);
-        return [];
-      }
-      
-      const typeMap: Record<string, string> = {
-        simulator: 'simulator',
-        conference: 'conference_room'
-      };
-      
-      const filtered = data
-        .filter(r => r.type === typeMap[activeTab])
-        .map(r => ({
-          id: `resource-${r.id}`,
-          dbId: r.id,
-          name: r.name,
-          meta: r.description || `Capacity: ${r.capacity}`,
-          badge: r.type === 'simulator' ? 'Indoor' : undefined,
-          icon: r.type === 'simulator' ? 'golf_course' : r.type === 'conference_room' ? 'meeting_room' : 'person'
-        }));
-      
-      setResources(filtered);
-      return filtered;
-    } catch (err) {
-      console.error('[BookGolf] Error fetching resources:', err);
-      setError('Unable to load resources');
-      setIsLoading(false);
-      return [];
-    }
-  }, [activeTab, showToast]);
-
-  useEffect(() => {
-    fetchResources();
-  }, [fetchResources, effectiveUser?.email, effectiveUser?.tier]);
-
-  const fetchAvailability = useCallback(async (resourceList?: Resource[]) => {
-    const resourcesToUse = resourceList || resources;
-    if (!resourcesToUse || resourcesToUse.length === 0 || !selectedDateObj?.date) {
-      return;
-    }
-    
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const allSlots: Map<string, { slot: TimeSlot; resourceIds: number[] }> = new Map();
-      
-      // Use batch endpoint for faster loading (single request instead of N requests)
-      const { ok, data: batchResult } = await apiRequest<Record<number, { slots: APISlot[] }>>(
-        '/api/availability/batch',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            resource_ids: resourcesToUse.map(r => r.dbId),
-            date: selectedDateObj.date,
-            duration,
-            ignore_booking_id: rescheduleBookingId || undefined
-          })
-        }
-      );
-      
-      if (ok && batchResult) {
-        resourcesToUse.forEach(resource => {
-          const resourceData = batchResult[resource.dbId];
-          if (!resourceData?.slots) return;
-          
-          resourceData.slots.forEach(slot => {
-            if (!slot.available) return;
-            
-            const key = slot.start_time;
-            
-            if (allSlots.has(key)) {
-              allSlots.get(key)!.resourceIds.push(resource.dbId);
-            } else {
-              allSlots.set(key, { 
-                slot: {
-                  id: `slot-${slot.start_time}`,
-                  start: formatTime12Hour(slot.start_time),
-                  end: formatTime12Hour(slot.end_time),
-                  startTime24: slot.start_time,
-                  endTime24: slot.end_time,
-                  label: `${formatTime12Hour(slot.start_time)} – ${formatTime12Hour(slot.end_time)}`,
-                  available: true,
-                  availableResourceDbIds: []
-                }, 
-                resourceIds: [resource.dbId] 
-              });
-            }
-          });
-        });
-      }
-      
-      const sortedSlots = Array.from(allSlots.values())
-        .map(({ slot, resourceIds }) => ({
-          ...slot,
-          availableResourceDbIds: resourceIds
-        }))
-        .sort((a, b) => a.startTime24.localeCompare(b.startTime24));
-      
-      setAvailableSlots(sortedSlots);
-    } catch (err) {
-      console.error('[BookGolf] Error fetching availability:', err);
-      showToast('Unable to load data. Please try again.', 'error');
-      setError('Unable to load availability');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [resources, selectedDateObj, duration, showToast, rescheduleBookingId]);
-
-  useEffect(() => {
-    fetchAvailability();
-  }, [fetchAvailability, effectiveUser?.email, effectiveUser?.tier]);
 
   // Reset playerSlots when playerCount changes
   useEffect(() => {
@@ -497,16 +587,14 @@ const BookGolf: React.FC = () => {
           ? `/api/members/search?query=${encodeURIComponent(query)}&limit=8`
           : `/api/guests/search?query=${encodeURIComponent(query)}&limit=8`;
         
-        const { ok, data } = await apiRequest<Array<{
+        const data = await fetchWithCredentials<Array<{
           id: string;
           name: string;
           emailRedacted: string;
           visitorType?: string;
         }>>(endpoint);
         
-        if (ok && data) {
-          setPlayerSearchResults(prev => ({ ...prev, [index]: data }));
-        }
+        setPlayerSearchResults(prev => ({ ...prev, [index]: data }));
       } catch (err) {
         console.error('Player search error:', err);
       }
@@ -545,75 +633,6 @@ const BookGolf: React.FC = () => {
     });
   }, []);
 
-  const fetchMyRequests = useCallback(async () => {
-    if (!effectiveUser?.email) return;
-    try {
-      const { ok, data } = await apiRequest<BookingRequest[]>(
-        `/api/booking-requests?user_email=${encodeURIComponent(effectiveUser.email)}`
-      );
-      if (ok && data) {
-        setMyRequests(data);
-      }
-    } catch (err) {
-      console.error('[BookGolf] Failed to fetch booking requests:', err);
-    }
-  }, [effectiveUser?.email]);
-
-  const fetchClosures = useCallback(async () => {
-    try {
-      const { ok, data } = await apiRequest<Closure[]>('/api/closures', {
-        credentials: 'include'
-      });
-      if (ok && data) {
-        setClosures(data);
-      }
-    } catch (err) {
-      console.error('[BookGolf] Failed to fetch closures:', err);
-    }
-  }, []);
-
-  const checkExistingBookings = useCallback(async (date: string, resourceType: 'simulator' | 'conference') => {
-    try {
-      const res = await fetch(`/api/bookings/check-existing?date=${date}&resource_type=${resourceType}`, {
-        credentials: 'include'
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setExistingBookingCheck(data);
-      } else {
-        setExistingBookingCheck(null);
-      }
-    } catch (err) {
-      console.error('[BookGolf] Failed to check existing bookings:', err);
-      setExistingBookingCheck(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchMyRequests();
-    fetchClosures();
-  }, [fetchMyRequests, fetchClosures, showConfirmation]);
-
-  useEffect(() => {
-    if (selectedDateObj?.date && activeTab === 'simulator' && !rescheduleBookingId) {
-      checkExistingBookings(selectedDateObj.date, 'simulator');
-    } else {
-      setExistingBookingCheck(null);
-    }
-  }, [selectedDateObj?.date, activeTab, rescheduleBookingId, checkExistingBookings]);
-
-  // Listen for real-time booking updates (e.g., when staff declines a booking)
-  useEffect(() => {
-    const handleBookingUpdate = () => {
-      fetchMyRequests();
-      if (selectedDateObj?.date && activeTab === 'simulator' && !rescheduleBookingId) {
-        checkExistingBookings(selectedDateObj.date, 'simulator');
-      }
-    };
-    
-    window.addEventListener('booking-update', handleBookingUpdate);
-    return () => window.removeEventListener('booking-update', handleBookingUpdate);
-  }, [fetchMyRequests, checkExistingBookings, selectedDateObj?.date, activeTab, rescheduleBookingId]);
 
   // Auto-scroll to time slots when duration is selected by user (not on initial load)
   useEffect(() => {
@@ -800,36 +819,19 @@ const BookGolf: React.FC = () => {
     const request = myRequests.find(r => r.id === id);
     const wasApproved = request?.status === 'approved';
     
-    const previousRequests = [...myRequests];
-    setMyRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'cancelled' } : r));
-    
     try {
-      const bodyData: any = {};
-      if (isAdminViewingAs && effectiveUser?.email) {
-        bodyData.acting_as_email = effectiveUser.email;
-      }
-      
-      const { ok, error } = await apiRequest(`/api/bookings/${id}/member-cancel`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyData)
+      await cancelBookingMutation.mutateAsync({
+        bookingId: id,
+        actingAsEmail: isAdminViewingAs ? effectiveUser?.email : undefined
       });
       
-      if (ok) {
-        haptic.success();
-        playSound('success');
-        showToast(wasApproved ? 'Booking cancelled successfully' : 'Request cancelled', 'success');
-        setTimeout(() => handleRefresh(), 500);
-      } else {
-        setMyRequests(previousRequests);
-        haptic.error();
-        showToast(error || 'Failed to cancel booking', 'error');
-      }
+      haptic.success();
+      playSound('success');
+      showToast(wasApproved ? 'Booking cancelled successfully' : 'Request cancelled', 'success');
     } catch (err) {
-      setMyRequests(previousRequests);
       console.error('[BookGolf] Failed to cancel request:', err);
       haptic.error();
-      showToast('Failed to cancel booking', 'error');
+      showToast((err as Error).message || 'Failed to cancel booking', 'error');
     }
   };
 
@@ -845,8 +847,7 @@ const BookGolf: React.FC = () => {
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
     
-    setIsBooking(true);
-    setError(null);
+    setBookingError(null);
     setShowViewAsConfirm(false);
     
     // Use passed consent data or existing state
@@ -861,7 +862,7 @@ const BookGolf: React.FC = () => {
         !slot.email.includes('@')
       );
       if (invalidGuestSlot) {
-        setError('Please enter a valid email address for each guest.');
+        setBookingError('Please enter a valid email address for each guest.');
         haptic.error();
         return;
       }
@@ -878,39 +879,26 @@ const BookGolf: React.FC = () => {
             }))
         : undefined;
 
-      const { ok, data, error } = await apiRequest('/api/booking-requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_email: effectiveUser.email,
-          user_name: effectiveUser.name,
-          user_tier: effectiveUser.tier,
-          resource_id: selectedResource.dbId,
-          request_date: selectedDateObj.date,
-          start_time: selectedSlot.startTime24,
-          duration_minutes: duration,
-          notes: activeTab === 'conference' ? 'Conference room booking' : null,
-          declared_player_count: activeTab === 'simulator' ? playerCount : undefined,
-          member_notes: memberNotes.trim() || undefined,
-          request_participants: requestParticipants,
-          ...(rescheduleBookingId ? { reschedule_booking_id: rescheduleBookingId } : {}),
-          ...(consent ? {
-            guardian_name: consent.guardianName,
-            guardian_relationship: consent.guardianRelationship,
-            guardian_phone: consent.guardianPhone,
-            guardian_consent: consent.acknowledged
-          } : {})
-        })
+      await createBookingMutation.mutateAsync({
+        user_email: effectiveUser.email,
+        user_name: effectiveUser.name,
+        user_tier: effectiveUser.tier,
+        resource_id: selectedResource.dbId,
+        request_date: selectedDateObj.date,
+        start_time: selectedSlot.startTime24,
+        duration_minutes: duration,
+        notes: activeTab === 'conference' ? 'Conference room booking' : null,
+        declared_player_count: activeTab === 'simulator' ? playerCount : undefined,
+        member_notes: memberNotes.trim() || undefined,
+        request_participants: requestParticipants,
+        ...(rescheduleBookingId ? { reschedule_booking_id: rescheduleBookingId } : {}),
+        ...(consent ? {
+          guardian_name: consent.guardianName,
+          guardian_relationship: consent.guardianRelationship,
+          guardian_phone: consent.guardianPhone,
+          guardian_consent: consent.acknowledged
+        } : {})
       });
-      
-      if (!ok) {
-        if (error?.includes('402') || error?.includes('payment')) {
-          setError('Please contact the front desk to complete your booking.');
-          haptic.error();
-          return;
-        }
-        throw new Error(error || 'Booking failed');
-      }
       
       addBooking({
         id: Date.now().toString(),
@@ -927,24 +915,30 @@ const BookGolf: React.FC = () => {
       haptic.success();
       playSound('bookingConfirmed');
       setShowConfirmation(true);
-      setTimeout(async () => {
+      setTimeout(() => {
         setShowConfirmation(false);
         setSelectedSlot(null);
         setSelectedResource(null);
         if (rescheduleBookingId) {
           cancelRescheduleMode();
         }
-        await handleRefresh();
       }, 2500);
     } catch (err: any) {
       haptic.error();
-      showToast(err.message || 'Booking failed. Please try again.', 'error');
-      setError(err.message || 'Booking failed. Please try again.');
+      const errorMessage = err.message || 'Booking failed. Please try again.';
+      if (errorMessage.includes('402') || errorMessage.includes('payment')) {
+        setBookingError('Please contact the front desk to complete your booking.');
+      } else {
+        showToast(errorMessage, 'error');
+        setBookingError(errorMessage);
+      }
     } finally {
-      setIsBooking(false);
       isSubmittingRef.current = false;
     }
   };
+
+  // Check if booking is in progress
+  const isBooking = createBookingMutation.isPending;
 
   const handleConfirm = async () => {
     if (!selectedSlot || !selectedResource || !effectiveUser || !selectedDateObj) return;
@@ -985,74 +979,6 @@ const BookGolf: React.FC = () => {
     (activeTab !== 'simulator' || !isAtDailyLimit || rescheduleBookingId)
   );
 
-  // Unified fee estimate from API - same calculation used by both members and staff
-  const [estimatedFees, setEstimatedFees] = useState<{
-    overageFee: number; guestFees: number; totalFee: number; guestCount: number; overageMinutes: number;
-    guestsUsingPasses: number; guestsCharged: number; passesRemainingAfter: number; isLoading: boolean;
-  }>({ overageFee: 0, guestFees: 0, totalFee: 0, guestCount: 0, overageMinutes: 0, guestsUsingPasses: 0, guestsCharged: 0, passesRemainingAfter: guestPassInfo?.passes_remaining ?? 0, isLoading: false });
-  const feeEstimateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Fetch fee estimate from unified API when booking params change
-  useEffect(() => {
-    if (!duration || !selectedDateObj?.date) {
-      setEstimatedFees(prev => ({ ...prev, overageFee: 0, guestFees: 0, totalFee: 0, guestCount: 0, overageMinutes: 0, guestsUsingPasses: 0, guestsCharged: 0, passesRemainingAfter: guestPassInfo?.passes_remaining ?? 0, isLoading: false }));
-      return;
-    }
-    
-    // For conference room: no guests, just time-based overage
-    const guestCount = activeTab === 'simulator' ? playerSlots.filter(slot => slot.type === 'guest').length : 0;
-    const effectivePlayerCount = activeTab === 'simulator' ? playerCount : 1;
-    
-    if (feeEstimateTimeoutRef.current) {
-      clearTimeout(feeEstimateTimeoutRef.current);
-    }
-    
-    setEstimatedFees(prev => ({ ...prev, isLoading: true }));
-    
-    feeEstimateTimeoutRef.current = setTimeout(async () => {
-      try {
-        const params = new URLSearchParams({
-          durationMinutes: duration.toString(),
-          guestCount: guestCount.toString(),
-          playerCount: effectivePlayerCount.toString(),
-          date: selectedDateObj.date,
-          resourceType: activeTab === 'conference' ? 'conference_room' : 'simulator'
-        });
-        
-        // When admin is viewing as a member, pass target email for accurate calculation
-        if (effectiveUser?.email && isAdminViewingAs) {
-          params.set('email', effectiveUser.email);
-        }
-        
-        const response = await apiRequest(`/api/fee-estimate?${params}`);
-        if (response.ok && response.data) {
-          const data = response.data;
-          // Use ONLY server-calculated values for complete consistency
-          setEstimatedFees({
-            overageFee: data.feeBreakdown.overageFee,
-            guestFees: data.feeBreakdown.guestFees,
-            totalFee: data.totalFee,
-            guestCount: data.feeBreakdown.guestCount,
-            overageMinutes: data.feeBreakdown.overageMinutes,
-            guestsUsingPasses: data.feeBreakdown.guestsUsingPasses,
-            guestsCharged: data.feeBreakdown.guestsCharged,
-            // Use server-calculated passes remaining for consistency
-            passesRemainingAfter: Math.max(0, data.feeBreakdown.guestPassesRemaining - data.feeBreakdown.guestCount),
-            isLoading: false
-          });
-        }
-      } catch (error) {
-        console.error('Failed to fetch fee estimate:', error);
-        setEstimatedFees(prev => ({ ...prev, isLoading: false }));
-      }
-    }, 300);
-    
-    return () => {
-      if (feeEstimateTimeoutRef.current) {
-        clearTimeout(feeEstimateTimeoutRef.current);
-      }
-    };
-  }, [activeTab, duration, playerCount, playerSlots, selectedDateObj?.date, guestPassInfo, effectiveUser?.email, isAdminViewingAs]);
 
   const activeClosures = useMemo(() => {
     if (!selectedDateObj?.date) return [];
@@ -1088,20 +1014,21 @@ const BookGolf: React.FC = () => {
   }, [slotsToDisplay]);
 
   const handleRefresh = useCallback(async () => {
+    // Preserve scroll position
+    const scrollY = window.scrollY;
+    
     setSelectedSlot(null);
     setSelectedResource(null);
     setExpandedHour(null);
-    setExistingBookingCheck(null);
-    const newResources = await fetchResources();
-    await Promise.all([
-      fetchAvailability(newResources),
-      fetchMyRequests(),
-      fetchClosures()
-    ]);
-    if (selectedDateObj?.date && activeTab === 'simulator' && !rescheduleBookingId) {
-      checkExistingBookings(selectedDateObj.date, 'simulator');
-    }
-  }, [fetchResources, fetchAvailability, fetchMyRequests, fetchClosures, selectedDateObj?.date, activeTab, rescheduleBookingId, checkExistingBookings]);
+    
+    // Invalidate all BookGolf-related queries to refetch data
+    await queryClient.invalidateQueries({ queryKey: bookGolfKeys.all });
+    
+    // Restore scroll position after data refresh
+    requestAnimationFrame(() => {
+      window.scrollTo(0, scrollY);
+    });
+  }, [queryClient]);
 
   return (
     <AnimatedPage>
@@ -1634,7 +1561,7 @@ const BookGolf: React.FC = () => {
                     <div className="flex gap-3">
                       <button
                         onClick={() => setShowCancelConfirm(false)}
-                        disabled={isCancelling}
+                        disabled={cancelBookingMutation.isPending}
                         className={`flex-1 py-3 rounded-xl font-bold text-sm border transition-colors ${
                           isDark 
                             ? 'border-white/20 text-white hover:bg-white/5' 
@@ -1646,18 +1573,16 @@ const BookGolf: React.FC = () => {
                       <button
                         onClick={async () => {
                           if (!existingDayBooking) return;
-                          setIsCancelling(true);
                           setExistingDayBooking(null);
                           setShowCancelConfirm(false);
                           await handleCancelRequest(existingDayBooking.id);
-                          setIsCancelling(false);
                         }}
-                        disabled={isCancelling}
+                        disabled={cancelBookingMutation.isPending}
                         className={`flex-1 py-3 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 ${
-                          isCancelling ? 'opacity-50 cursor-not-allowed' : ''
+                          cancelBookingMutation.isPending ? 'opacity-50 cursor-not-allowed' : ''
                         } ${isDark ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-red-600 text-white hover:bg-red-700'}`}
                       >
-                        {isCancelling ? (
+                        {cancelBookingMutation.isPending ? (
                           <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>
                         ) : (
                           <>

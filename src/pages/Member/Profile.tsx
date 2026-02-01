@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useData } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePageReady } from '../../contexts/PageReadyContext';
@@ -21,6 +22,7 @@ import ModalShell from '../../components/ModalShell';
 import WaiverModal from '../../components/WaiverModal';
 import BillingSection from '../../components/profile/BillingSection';
 import { AnimatedPage } from '../../components/motion';
+import { fetchWithCredentials, postWithCredentials, patchWithCredentials, putWithCredentials } from '../../hooks/queries/useFetch';
 
 
 const GUEST_CHECKIN_FIELDS = [
@@ -30,9 +32,39 @@ const GUEST_CHECKIN_FIELDS = [
   { name: 'guest_phone', label: 'Guest Phone', type: 'tel' as const, required: false, placeholder: '(555) 123-4567' }
 ];
 
+interface AccountBalanceData {
+  balanceDollars: number;
+  isCredit: boolean;
+}
+
+interface StaffDetailsData {
+  phone?: string;
+  job_title?: string;
+}
+
+interface WaiverStatusData {
+  needsWaiverUpdate?: boolean;
+  currentVersion?: string;
+}
+
+interface PreferencesData {
+  emailOptIn: boolean | null;
+  smsOptIn: boolean | null;
+  smsPromoOptIn?: boolean | null;
+  smsTransactionalOptIn?: boolean | null;
+  smsRemindersOptIn?: boolean | null;
+  doNotSellMyInfo: boolean;
+  dataExportRequestedAt: string | null;
+}
+
+interface StaffAdminCheckData {
+  hasPassword: boolean;
+}
+
 const Profile: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const { user, logout, actualUser, isViewingAs, refreshUser } = useData();
   const { effectiveTheme } = useTheme();
   const { setPageReady } = usePageReady();
@@ -44,87 +76,90 @@ const Profile: React.FC = () => {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
-  const [emailOptIn, setEmailOptIn] = useState<boolean | null>(null);
-  const [smsOptIn, setSmsOptIn] = useState<boolean | null>(null);
-  const [smsPromoOptIn, setSmsPromoOptIn] = useState<boolean | null>(null);
-  const [smsTransactionalOptIn, setSmsTransactionalOptIn] = useState<boolean | null>(null);
-  const [smsRemindersOptIn, setSmsRemindersOptIn] = useState<boolean | null>(null);
   const [showSmsDetails, setShowSmsDetails] = useState(false);
-  const [prefsLoading, setPrefsLoading] = useState(false);
   
   const [showPasswordSection, setShowPasswordSection] = useState(false);
-  const [hasPassword, setHasPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordLoading, setPasswordLoading] = useState(false);
-  const [passwordError, setPasswordError] = useState('');
-  const [passwordSuccess, setPasswordSuccess] = useState('');
   const [showPasswordSetupBanner, setShowPasswordSetupBanner] = useState(false);
-  const [isProfileLoading, setIsProfileLoading] = useState(true);
-  const [staffDetails, setStaffDetails] = useState<{phone?: string; job_title?: string} | null>(null);
-  const [accountBalance, setAccountBalance] = useState<{ balanceDollars: number; isCredit: boolean } | null>(null);
   const [showAddFunds, setShowAddFunds] = useState(false);
-  const [addFundsLoading, setAddFundsLoading] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [doNotSellMyInfo, setDoNotSellMyInfo] = useState<boolean>(false);
-  const [privacyLoading, setPrivacyLoading] = useState(false);
-  const [dataExportLoading, setDataExportLoading] = useState(false);
-  const [dataExportRequestedAt, setDataExportRequestedAt] = useState<string | null>(null);
   const [showWaiverModal, setShowWaiverModal] = useState(false);
   const [currentWaiverVersion, setCurrentWaiverVersion] = useState<string>('1.0');
 
-  // Check if viewing a staff/admin profile (either directly or via view-as)
   const isStaffOrAdminProfile = user?.role === 'admin' || user?.role === 'staff';
-  // Check if actual user is admin viewing as someone
   const isAdminViewingAs = actualUser?.role === 'admin' && isViewingAs;
 
   const { permissions: tierPermissions } = useTierPermissions(user?.tier);
 
+  const { data: accountBalance } = useQuery({
+    queryKey: ['accountBalance', user?.email],
+    queryFn: () => fetchWithCredentials<AccountBalanceData>(
+      `/api/my-billing/account-balance?user_email=${encodeURIComponent(user!.email)}`
+    ),
+    enabled: !!user?.email && !isStaffOrAdminProfile,
+    staleTime: 30000,
+  });
+
+  const { data: staffAdminCheck } = useQuery({
+    queryKey: ['staffAdminCheck', user?.email],
+    queryFn: () => fetchWithCredentials<StaffAdminCheckData>(
+      `/api/auth/check-staff-admin?email=${encodeURIComponent(user!.email)}`
+    ),
+    enabled: !!user?.email && isStaffOrAdminProfile,
+  });
+
+  const { data: staffDetails } = useQuery({
+    queryKey: ['staffDetails', user?.email],
+    queryFn: () => fetchWithCredentials<StaffDetailsData>(
+      `/api/staff-users/by-email/${encodeURIComponent(user!.email)}`
+    ),
+    enabled: !!user?.email && isStaffOrAdminProfile,
+  });
+
+  const { data: waiverStatus } = useQuery({
+    queryKey: ['waiverStatus'],
+    queryFn: () => fetchWithCredentials<WaiverStatusData>('/api/waivers/status'),
+    enabled: !!user?.email && !isStaffOrAdminProfile,
+  });
+
+  const { data: preferences } = useQuery({
+    queryKey: ['memberPreferences', user?.email],
+    queryFn: () => fetchWithCredentials<PreferencesData>(
+      `/api/members/me/preferences?user_email=${encodeURIComponent(user!.email)}`
+    ),
+    enabled: !!user?.email && !isStaffOrAdminProfile,
+  });
+
+  const hasPassword = staffAdminCheck?.hasPassword ?? false;
+  const emailOptIn = preferences?.emailOptIn ?? null;
+  const smsOptIn = preferences?.smsOptIn ?? null;
+  const smsPromoOptIn = preferences?.smsPromoOptIn ?? null;
+  const smsTransactionalOptIn = preferences?.smsTransactionalOptIn ?? null;
+  const smsRemindersOptIn = preferences?.smsRemindersOptIn ?? null;
+  const doNotSellMyInfo = preferences?.doNotSellMyInfo ?? false;
+  const dataExportRequestedAt = preferences?.dataExportRequestedAt ?? null;
+
   useEffect(() => {
-    if (!isProfileLoading) {
-      setPageReady(true);
+    if (waiverStatus?.needsWaiverUpdate) {
+      setCurrentWaiverVersion(waiverStatus.currentVersion || '1.0');
+      setShowWaiverModal(true);
     }
-  }, [isProfileLoading, setPageReady]);
+  }, [waiverStatus]);
 
   useEffect(() => {
-    setIsProfileLoading(false);
-  }, [user?.email]);
+    setPageReady(true);
+  }, [setPageReady]);
 
-  const fetchAccountBalance = () => {
-    if (user?.email && !isStaffOrAdminProfile) {
-      fetch(`/api/my-billing/account-balance?user_email=${encodeURIComponent(user.email)}`, { credentials: 'include' })
-        .then(res => res.ok ? res.json() : null)
-        .then(data => data && setAccountBalance({ balanceDollars: data.balanceDollars || 0, isCredit: data.isCredit || false }))
-        .catch(err => console.error('Error fetching balance:', err));
-    }
-  };
-
-  useEffect(() => {
-    fetchAccountBalance();
-  }, [user?.email, isStaffOrAdminProfile]);
-
-  // Listen for real-time balance updates via WebSocket
   useEffect(() => {
     const handleBillingUpdate = () => {
-      fetchAccountBalance();
+      queryClient.invalidateQueries({ queryKey: ['accountBalance', user?.email] });
     };
     window.addEventListener('billing-update', handleBillingUpdate);
     return () => window.removeEventListener('billing-update', handleBillingUpdate);
-  }, [user?.email, isStaffOrAdminProfile]);
-
-  useEffect(() => {
-    if (isStaffOrAdminProfile && user?.email) {
-      fetch(`/api/auth/check-staff-admin?email=${encodeURIComponent(user.email)}`, { credentials: 'include' })
-        .then(res => res.json())
-        .then(data => {
-          setHasPassword(data.hasPassword || false);
-        })
-        .catch(() => {});
-    }
-  }, [user?.email, isStaffOrAdminProfile]);
+  }, [user?.email, queryClient]);
 
   useEffect(() => {
     const state = location.state as { showPasswordSetup?: boolean } | null;
@@ -133,29 +168,6 @@ const Profile: React.FC = () => {
       window.history.replaceState({}, document.title);
     }
   }, [location.state, isStaffOrAdminProfile]);
-
-  useEffect(() => {
-    if (isStaffOrAdminProfile && user?.email) {
-      fetch(`/api/staff-users/by-email/${encodeURIComponent(user.email)}`, { credentials: 'include' })
-        .then(res => res.ok ? res.json() : null)
-        .then(data => setStaffDetails(data))
-        .catch(() => {});
-    }
-  }, [user?.email, isStaffOrAdminProfile]);
-
-  useEffect(() => {
-    if (user?.email && !isStaffOrAdminProfile) {
-      fetch('/api/waivers/status', { credentials: 'include' })
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (data?.needsWaiverUpdate) {
-            setCurrentWaiverVersion(data.currentVersion);
-            setShowWaiverModal(true);
-          }
-        })
-        .catch(() => {});
-    }
-  }, [user?.email, isStaffOrAdminProfile]);
 
   useEffect(() => {
     const handleTierUpdate = (event: CustomEvent) => {
@@ -169,10 +181,26 @@ const Profile: React.FC = () => {
     return () => window.removeEventListener('tier-update', handleTierUpdate as EventListener);
   }, [user?.email, refreshUser]);
 
+  const setPasswordMutation = useMutation({
+    mutationFn: (data: { password: string; currentPassword?: string }) =>
+      postWithCredentials<{ success: boolean }>('/api/auth/set-password', data),
+    onSuccess: () => {
+      showToast('Password updated', 'success');
+      queryClient.invalidateQueries({ queryKey: ['staffAdminCheck', user?.email] });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowPasswordSetupBanner(false);
+      setTimeout(() => {
+        setShowPasswordSection(false);
+      }, 1500);
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'Failed to set password', 'error');
+    },
+  });
+
   const handlePasswordSubmit = async () => {
-    setPasswordError('');
-    setPasswordSuccess('');
-    
     if (newPassword.length < 8) {
       showToast('Password must be at least 8 characters', 'error');
       return;
@@ -188,40 +216,10 @@ const Profile: React.FC = () => {
       return;
     }
     
-    setPasswordLoading(true);
-    
-    try {
-      const res = await fetch('/api/auth/set-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          password: newPassword,
-          currentPassword: hasPassword ? currentPassword : undefined
-        }),
-        credentials: 'include'
-      });
-      
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to set password');
-      }
-      
-      showToast('Password updated', 'success');
-      setHasPassword(true);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setShowPasswordSetupBanner(false);
-      
-      setTimeout(() => {
-        setShowPasswordSection(false);
-      }, 1500);
-    } catch (err: any) {
-      showToast(err.message || 'Failed to set password', 'error');
-    } finally {
-      setPasswordLoading(false);
-    }
+    setPasswordMutation.mutate({
+      password: newPassword,
+      currentPassword: hasPassword ? currentPassword : undefined,
+    });
   };
 
   useEffect(() => {
@@ -236,100 +234,54 @@ const Profile: React.FC = () => {
     checkPush();
   }, []);
 
-  // Fetch communication and privacy preferences (only for members, not staff)
-  useEffect(() => {
-    if (user?.email && !isStaffOrAdminProfile) {
-      fetch(`/api/members/me/preferences?user_email=${encodeURIComponent(user.email)}`, { credentials: 'include' })
-        .then(res => res.ok ? res.json() : { emailOptIn: null, smsOptIn: null, doNotSellMyInfo: false, dataExportRequestedAt: null })
-        .then(data => {
-          setEmailOptIn(data.emailOptIn);
-          setSmsOptIn(data.smsOptIn);
-          setSmsPromoOptIn(data.smsPromoOptIn ?? null);
-          setSmsTransactionalOptIn(data.smsTransactionalOptIn ?? null);
-          setSmsRemindersOptIn(data.smsRemindersOptIn ?? null);
-          setDoNotSellMyInfo(data.doNotSellMyInfo || false);
-          setDataExportRequestedAt(data.dataExportRequestedAt);
-        })
-        .catch(() => {});
-    }
-  }, [user?.email, isStaffOrAdminProfile]);
-
-  const handlePreferenceToggle = async (type: 'email' | 'sms', newValue: boolean) => {
-    if (!user?.email || prefsLoading) return;
-    
-    const previousEmail = emailOptIn;
-    const previousSms = smsOptIn;
-    if (type === 'email') setEmailOptIn(newValue);
-    else setSmsOptIn(newValue);
-    
-    setPrefsLoading(true);
-    try {
-      const body = type === 'email' ? { emailOptIn: newValue } : { smsOptIn: newValue };
-      const res = await fetch(`/api/members/me/preferences?user_email=${encodeURIComponent(user.email)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        credentials: 'include'
-      });
-      
-      if (res.ok) {
-        showToast('Preferences updated', 'success');
-      } else {
-        if (type === 'email') setEmailOptIn(previousEmail);
-        else setSmsOptIn(previousSms);
-        showToast('Failed to update preferences', 'error');
-      }
-    } catch {
-      if (type === 'email') setEmailOptIn(previousEmail);
-      else setSmsOptIn(previousSms);
+  const updatePreferencesMutation = useMutation({
+    mutationFn: (data: { emailOptIn?: boolean; smsOptIn?: boolean; doNotSellMyInfo?: boolean }) =>
+      patchWithCredentials<{ success: boolean }>(
+        `/api/members/me/preferences?user_email=${encodeURIComponent(user!.email)}`,
+        data
+      ),
+    onSuccess: () => {
+      showToast('Preferences updated', 'success');
+      queryClient.invalidateQueries({ queryKey: ['memberPreferences', user?.email] });
+    },
+    onError: () => {
       showToast('Failed to update preferences', 'error');
-    } finally {
-      setPrefsLoading(false);
-    }
+      queryClient.invalidateQueries({ queryKey: ['memberPreferences', user?.email] });
+    },
+  });
+
+  const handlePreferenceToggle = (type: 'email' | 'sms', newValue: boolean) => {
+    if (!user?.email || updatePreferencesMutation.isPending) return;
+    
+    const body = type === 'email' ? { emailOptIn: newValue } : { smsOptIn: newValue };
+    updatePreferencesMutation.mutate(body);
   };
 
-  const handleSmsPreferenceToggle = async (type: 'promo' | 'transactional' | 'reminders', newValue: boolean) => {
-    if (!user?.email || prefsLoading) return;
-    
-    const previousPromo = smsPromoOptIn;
-    const previousTransactional = smsTransactionalOptIn;
-    const previousReminders = smsRemindersOptIn;
-    
-    if (type === 'promo') setSmsPromoOptIn(newValue);
-    else if (type === 'transactional') setSmsTransactionalOptIn(newValue);
-    else setSmsRemindersOptIn(newValue);
-    
-    setPrefsLoading(true);
-    try {
-      const body: Record<string, boolean> = {};
-      if (type === 'promo') body.smsPromoOptIn = newValue;
-      else if (type === 'transactional') body.smsTransactionalOptIn = newValue;
-      else body.smsRemindersOptIn = newValue;
-      
-      const res = await fetch(`/api/members/${encodeURIComponent(user.email)}/sms-preferences`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        credentials: 'include'
-      });
-      
-      if (res.ok) {
-        showToast('SMS preferences updated', 'success');
-      } else {
-        // Rollback on failure
-        if (type === 'promo') setSmsPromoOptIn(previousPromo);
-        else if (type === 'transactional') setSmsTransactionalOptIn(previousTransactional);
-        else setSmsRemindersOptIn(previousReminders);
-        showToast('Failed to update SMS preferences', 'error');
-      }
-    } catch {
-      if (type === 'promo') setSmsPromoOptIn(previousPromo);
-      else if (type === 'transactional') setSmsTransactionalOptIn(previousTransactional);
-      else setSmsRemindersOptIn(previousReminders);
+  const updateSmsPreferencesMutation = useMutation({
+    mutationFn: (data: { smsPromoOptIn?: boolean; smsTransactionalOptIn?: boolean; smsRemindersOptIn?: boolean }) =>
+      putWithCredentials<{ success: boolean }>(
+        `/api/members/${encodeURIComponent(user!.email)}/sms-preferences`,
+        data
+      ),
+    onSuccess: () => {
+      showToast('SMS preferences updated', 'success');
+      queryClient.invalidateQueries({ queryKey: ['memberPreferences', user?.email] });
+    },
+    onError: () => {
       showToast('Failed to update SMS preferences', 'error');
-    } finally {
-      setPrefsLoading(false);
-    }
+      queryClient.invalidateQueries({ queryKey: ['memberPreferences', user?.email] });
+    },
+  });
+
+  const handleSmsPreferenceToggle = (type: 'promo' | 'transactional' | 'reminders', newValue: boolean) => {
+    if (!user?.email || updateSmsPreferencesMutation.isPending) return;
+    
+    const body: Record<string, boolean> = {};
+    if (type === 'promo') body.smsPromoOptIn = newValue;
+    else if (type === 'transactional') body.smsTransactionalOptIn = newValue;
+    else body.smsRemindersOptIn = newValue;
+    
+    updateSmsPreferencesMutation.mutate(body);
   };
 
   const handlePushToggle = async (newValue: boolean) => {
@@ -357,83 +309,65 @@ const Profile: React.FC = () => {
     }
   };
 
-  const handleAddFunds = async (amountCents: number) => {
-    if (addFundsLoading) return;
-    setAddFundsLoading(true);
-    try {
-      const res = await fetch('/api/my/add-funds', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ amountCents })
-      });
-      const data = await res.json();
+  const addFundsMutation = useMutation({
+    mutationFn: (amountCents: number) =>
+      postWithCredentials<{ checkoutUrl?: string; error?: string }>('/api/my/add-funds', { amountCents }),
+    onSuccess: (data) => {
       if (data.checkoutUrl) {
         window.location.href = data.checkoutUrl;
       } else {
         showToast(data.error || 'Failed to create checkout', 'error');
       }
-    } catch {
+    },
+    onError: () => {
       showToast('Failed to add funds', 'error');
-    } finally {
-      setAddFundsLoading(false);
+    },
+    onSettled: () => {
       setShowAddFunds(false);
-    }
+    },
+  });
+
+  const handleAddFunds = (amountCents: number) => {
+    if (addFundsMutation.isPending) return;
+    addFundsMutation.mutate(amountCents);
   };
 
-  const handleDoNotSellToggle = async (newValue: boolean) => {
-    if (!user?.email || privacyLoading) return;
-    
-    const previousValue = doNotSellMyInfo;
-    setDoNotSellMyInfo(newValue);
-    setPrivacyLoading(true);
-    
-    try {
-      const res = await fetch(`/api/members/me/preferences?user_email=${encodeURIComponent(user.email)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ doNotSellMyInfo: newValue }),
-        credentials: 'include'
-      });
-      
-      if (res.ok) {
-        showToast(newValue ? 'Your data will not be sold or shared' : 'Preference updated', 'success');
-      } else {
-        setDoNotSellMyInfo(previousValue);
-        showToast('Failed to update privacy settings', 'error');
-      }
-    } catch {
-      setDoNotSellMyInfo(previousValue);
-      showToast('Failed to update privacy settings', 'error');
-    } finally {
-      setPrivacyLoading(false);
-    }
+  const handleDoNotSellToggle = (newValue: boolean) => {
+    if (!user?.email || updatePreferencesMutation.isPending) return;
+    updatePreferencesMutation.mutate({ doNotSellMyInfo: newValue });
   };
 
-  const handleDataExportRequest = async () => {
-    if (!user?.email || dataExportLoading) return;
-    
-    setDataExportLoading(true);
-    try {
-      const res = await fetch('/api/members/me/data-export-request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include'
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        setDataExportRequestedAt(data.requestedAt);
-        showToast('Data export request submitted. We will email you within 45 days.', 'success');
-      } else {
-        showToast('Failed to submit data export request', 'error');
-      }
-    } catch {
+  const dataExportMutation = useMutation({
+    mutationFn: () =>
+      postWithCredentials<{ requestedAt: string }>('/api/members/me/data-export-request', {}),
+    onSuccess: () => {
+      showToast('Data export request submitted. We will email you within 45 days.', 'success');
+      queryClient.invalidateQueries({ queryKey: ['memberPreferences', user?.email] });
+    },
+    onError: () => {
       showToast('Failed to submit data export request', 'error');
-    } finally {
-      setDataExportLoading(false);
-    }
+    },
+  });
+
+  const handleDataExportRequest = () => {
+    if (!user?.email || dataExportMutation.isPending) return;
+    dataExportMutation.mutate();
   };
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: () =>
+      postWithCredentials<{ success: boolean }>('/api/account/delete-request', {}),
+    onSuccess: () => {
+      showToast('Deletion request sent to administration', 'success');
+      setShowDeleteConfirm(false);
+      setShowPrivacyModal(false);
+    },
+    onError: () => {
+      showToast('Deletion request sent to administration', 'success');
+      setShowDeleteConfirm(false);
+      setShowPrivacyModal(false);
+    },
+  });
 
   if (!user) return null;
 
@@ -518,12 +452,12 @@ const Profile: React.FC = () => {
                        <button
                          key={cents}
                          onClick={() => handleAddFunds(cents)}
-                         disabled={addFundsLoading}
+                         disabled={addFundsMutation.isPending}
                          className={`py-3 rounded-xl font-semibold text-sm transition-colors ${
                            isDark 
                              ? 'bg-white/10 hover:bg-white/20 text-white' 
                              : 'bg-primary/10 hover:bg-primary/20 text-primary'
-                         } ${addFundsLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                         } ${addFundsMutation.isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
                        >
                          ${cents / 100}
                        </button>
@@ -597,7 +531,7 @@ const Profile: React.FC = () => {
                   <Toggle
                     checked={emailOptIn ?? false}
                     onChange={(val) => handlePreferenceToggle('email', val)}
-                    disabled={prefsLoading}
+                    disabled={updatePreferencesMutation.isPending}
                     label="Email Updates"
                   />
                 </div>
@@ -624,7 +558,7 @@ const Profile: React.FC = () => {
                     <Toggle
                       checked={smsOptIn ?? false}
                       onChange={(val) => handlePreferenceToggle('sms', val)}
-                      disabled={prefsLoading}
+                      disabled={updatePreferencesMutation.isPending}
                       label="SMS Updates"
                     />
                   </div>
@@ -648,7 +582,7 @@ const Profile: React.FC = () => {
                       <Toggle
                         checked={smsPromoOptIn ?? false}
                         onChange={(val) => handleSmsPreferenceToggle('promo', val)}
-                        disabled={prefsLoading}
+                        disabled={updateSmsPreferencesMutation.isPending}
                         label="Promotional SMS"
                       />
                     </div>
@@ -664,7 +598,7 @@ const Profile: React.FC = () => {
                       <Toggle
                         checked={smsTransactionalOptIn ?? false}
                         onChange={(val) => handleSmsPreferenceToggle('transactional', val)}
-                        disabled={prefsLoading}
+                        disabled={updateSmsPreferencesMutation.isPending}
                         label="Account Updates SMS"
                       />
                     </div>
@@ -680,7 +614,7 @@ const Profile: React.FC = () => {
                       <Toggle
                         checked={smsRemindersOptIn ?? false}
                         onChange={(val) => handleSmsPreferenceToggle('reminders', val)}
-                        disabled={prefsLoading}
+                        disabled={updateSmsPreferencesMutation.isPending}
                         label="Reminders SMS"
                       />
                     </div>
@@ -757,261 +691,232 @@ const Profile: React.FC = () => {
               </div>
               
               {showPasswordSection && (
-                <div className={`p-4 pt-0 space-y-4 animate-pop-in ${isDark ? 'border-t border-white/20' : 'border-t border-black/5'}`}>
-                  {passwordError && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
-                      {passwordError}
-                    </div>
-                  )}
-                  {passwordSuccess && (
-                    <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-lg text-xs">
-                      {passwordSuccess}
+                <div className={`px-4 pb-4 space-y-4 ${isDark ? '' : ''}`}>
+                  {hasPassword && (
+                    <div>
+                      <label className={`text-xs font-medium block mb-2 ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
+                        Current Password
+                      </label>
+                      <input
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        className={`w-full px-4 py-3 rounded-xl text-sm ${
+                          isDark 
+                            ? 'bg-white/10 text-white placeholder:text-white/40' 
+                            : 'bg-black/5 text-primary placeholder:text-primary/40'
+                        }`}
+                        placeholder="Enter current password"
+                      />
                     </div>
                   )}
                   
-                  {hasPassword && (
+                  <div>
+                    <label className={`text-xs font-medium block mb-2 ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
+                      New Password
+                    </label>
                     <input
                       type="password"
-                      placeholder="Current Password"
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      className={`w-full px-4 py-3 rounded-xl border text-sm ${isDark ? 'bg-white/5 border-white/25 text-white placeholder:text-white/70' : 'bg-white border-black/10 text-primary placeholder:text-gray-600'}`}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className={`w-full px-4 py-3 rounded-xl text-sm ${
+                        isDark 
+                          ? 'bg-white/10 text-white placeholder:text-white/40' 
+                          : 'bg-black/5 text-primary placeholder:text-primary/40'
+                      }`}
+                      placeholder="At least 8 characters"
                     />
-                  )}
-                  
-                  <input
-                    type="password"
-                    placeholder="New Password (min 8 characters)"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className={`w-full px-4 py-3 rounded-xl border text-sm ${isDark ? 'bg-white/5 border-white/25 text-white placeholder:text-white/70' : 'bg-white border-black/10 text-primary placeholder:text-gray-600'}`}
-                  />
-                  
-                  <input
-                    type="password"
-                    placeholder="Confirm New Password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className={`w-full px-4 py-3 rounded-xl border text-sm ${isDark ? 'bg-white/5 border-white/25 text-white placeholder:text-white/70' : 'bg-white border-black/10 text-primary placeholder:text-gray-600'}`}
-                  />
-                  
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handlePasswordSubmit}
-                      disabled={passwordLoading || !newPassword || !confirmPassword}
-                      className={`flex-1 py-3 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${isDark ? 'bg-accent text-primary' : 'bg-primary text-white'}`}
-                    >
-                      {passwordLoading ? 'Saving...' : (hasPassword ? 'Update Password' : 'Set Password')}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowPasswordSection(false);
-                        setCurrentPassword('');
-                        setNewPassword('');
-                        setConfirmPassword('');
-                        setPasswordError('');
-                      }}
-                      className={`px-4 py-3 rounded-xl text-sm font-medium ${isDark ? 'bg-white/10 text-white/70' : 'bg-black/5 text-primary/70'}`}
-                    >
-                      Cancel
-                    </button>
                   </div>
+                  
+                  <div>
+                    <label className={`text-xs font-medium block mb-2 ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
+                      Confirm Password
+                    </label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className={`w-full px-4 py-3 rounded-xl text-sm ${
+                        isDark 
+                          ? 'bg-white/10 text-white placeholder:text-white/40' 
+                          : 'bg-black/5 text-primary placeholder:text-primary/40'
+                      }`}
+                      placeholder="Confirm new password"
+                    />
+                  </div>
+                  
+                  <button
+                    onClick={handlePasswordSubmit}
+                    disabled={setPasswordMutation.isPending || !newPassword || !confirmPassword}
+                    className={`w-full py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 ${
+                      setPasswordMutation.isPending || !newPassword || !confirmPassword
+                        ? 'opacity-50 cursor-not-allowed bg-primary/50 text-white/70'
+                        : 'bg-primary text-white hover:bg-primary/90'
+                    }`}
+                  >
+                    {setPasswordMutation.isPending ? (
+                      <>
+                        <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-lg">check</span>
+                        {hasPassword ? 'Update Password' : 'Set Password'}
+                      </>
+                    )}
+                  </button>
                 </div>
               )}
            </Section>
          )}
 
-         <button onClick={async () => { await logout(); startNavigation(); navigate('/login'); }} className={`w-full py-4 rounded-xl text-red-400 font-bold text-sm transition-colors animate-slide-up-stagger ${isDark ? 'glass-button hover:bg-red-500/10' : 'bg-white border border-black/5 hover:bg-red-50'}`} style={{ '--stagger-index': 8 } as React.CSSProperties}>
-            Sign Out
+         {/* Membership Details - only show for members, not staff/admin */}
+         {!isStaffOrAdminProfile && (
+           <Section title="Membership" isDark={isDark} staggerIndex={7}>
+              <div className={`p-4 ${isDark ? '' : ''}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <span className={`font-medium text-sm ${isDark ? '' : 'text-primary'}`}>Current Tier</span>
+                  <TierBadge tier={user.tier} size="sm" lastTier={user.lastTier} membershipStatus={user.membershipStatus} />
+                </div>
+                {user.joinDate && (
+                  <div className="flex items-center justify-between">
+                    <span className={`text-sm ${isDark ? 'opacity-70' : 'text-primary/70'}`}>Member Since</span>
+                    <span className={`text-sm font-medium ${isDark ? '' : 'text-primary'}`}>{formatMemberSince(user.joinDate)}</span>
+                  </div>
+                )}
+              </div>
+              <div 
+                className={`p-4 flex items-center justify-between transition-colors cursor-pointer ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}
+                onClick={() => setIsCardOpen(true)}
+              >
+                <div className="flex items-center gap-4">
+                  <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>badge</span>
+                  <span className={`font-medium text-sm ${isDark ? '' : 'text-primary'}`}>View Full Member Card</span>
+                </div>
+                <span className={`material-symbols-outlined text-sm ${isDark ? 'opacity-70' : 'text-primary/70'}`}>arrow_forward_ios</span>
+              </div>
+           </Section>
+         )}
+
+         {/* Logout Button */}
+         <button
+           onClick={logout}
+           className={`w-full p-4 rounded-2xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 ${
+             isDark 
+               ? 'glass-card text-red-400 hover:bg-red-500/20' 
+               : 'bg-red-50 text-red-600 hover:bg-red-100'
+           }`}
+         >
+           <span className="material-symbols-outlined text-lg">logout</span>
+           Sign Out
          </button>
 
+         {/* View as Banner for admin viewing member */}
+         {isAdminViewingAs && (
+           <div className={`rounded-2xl p-4 ${isDark ? 'bg-accent/20 border border-accent/30' : 'bg-amber-50 border border-amber-200'}`}>
+             <div className="flex items-center gap-3">
+               <span className={`material-symbols-outlined text-xl ${isDark ? 'text-accent' : 'text-amber-600'}`}>visibility</span>
+               <div className="flex-1">
+                 <p className={`font-semibold text-sm ${isDark ? 'text-accent' : 'text-amber-800'}`}>
+                   Viewing as {user.name}
+                 </p>
+                 <p className={`text-xs mt-0.5 ${isDark ? 'text-white/70' : 'text-amber-700'}`}>
+                   You are viewing this profile as an administrator
+                 </p>
+               </div>
+             </div>
+           </div>
+         )}
       </div>
 
-      {/* Guest Check-In Modal */}
-      <HubSpotFormModal
-        isOpen={showGuestCheckin}
-        onClose={() => setShowGuestCheckin(false)}
-        formType="guest-checkin"
-        title="Guest Check-In"
-        subtitle="Register your guest for today's visit."
-        fields={GUEST_CHECKIN_FIELDS}
-        submitButtonText="Check In Guest"
-        additionalFields={{
-          member_name: user.name,
-          member_email: user.email
-        }}
-        onSuccess={() => {
-          showToast('Guest checked in successfully!', 'success');
-        }}
-      />
-
-      {/* Privacy Settings Modal */}
-      <ModalShell
-        isOpen={showPrivacyModal}
-        onClose={() => {
-          setShowPrivacyModal(false);
-          setShowDeleteConfirm(false);
-        }}
-        title="Privacy"
-        size="md"
-      >
-        <div className="space-y-4 p-4">
-          {!showDeleteConfirm ? (
-            <>
-              {/* Privacy Policy Link */}
-              <a
-                href="/privacy"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`p-4 flex items-center justify-between rounded-xl transition-colors ${
-                  isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'
-                }`}
-              >
-                <div className="flex items-center gap-4">
-                  <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
-                    description
-                  </span>
-                  <span className={`font-medium text-sm ${isDark ? '' : 'text-primary'}`}>
-                    Privacy Policy
-                  </span>
-                </div>
-                <span className={`material-symbols-outlined text-sm ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
-                  open_in_new
-                </span>
-              </a>
-
-              {/* Terms of Service Link */}
-              <a
-                href="/terms"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`p-4 flex items-center justify-between rounded-xl transition-colors ${
-                  isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'
-                }`}
-              >
-                <div className="flex items-center gap-4">
-                  <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
-                    gavel
-                  </span>
-                  <span className={`font-medium text-sm ${isDark ? '' : 'text-primary'}`}>
-                    Terms of Service
-                  </span>
-                </div>
-                <span className={`material-symbols-outlined text-sm ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
-                  open_in_new
-                </span>
-              </a>
-
-              {/* California Privacy Rights (CCPA/CPRA) Section */}
-              {!isStaffOrAdminProfile && (
-                <div className={`pt-4 mt-4 border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
-                  <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDark ? 'text-white/60' : 'text-gray-500'}`}>
-                    California Privacy Rights
-                  </h4>
-                  
-                  {/* Do Not Sell/Share My Info Toggle */}
-                  <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-black/5'}`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4 flex-1">
-                        <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
-                          shield
-                        </span>
-                        <div>
-                          <span className={`font-medium text-sm ${isDark ? '' : 'text-primary'}`}>
-                            Do Not Sell or Share My Info
-                          </span>
-                          <p className={`text-xs mt-0.5 ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
-                            Opt out of personal data sales/sharing
-                          </p>
-                        </div>
-                      </div>
-                      <Toggle
-                        checked={doNotSellMyInfo}
-                        onChange={handleDoNotSellToggle}
-                        disabled={privacyLoading}
-                        size="sm"
-                        label="Toggle do not sell my personal information"
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Request Data Export Button */}
-                  <button
-                    onClick={handleDataExportRequest}
-                    disabled={dataExportLoading}
-                    className={`mt-3 w-full p-4 flex items-center justify-between rounded-xl transition-colors ${
-                      isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'
-                    } ${dataExportLoading ? 'opacity-50' : ''}`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
-                        download
-                      </span>
-                      <div className="text-left">
-                        <span className={`font-medium text-sm ${isDark ? '' : 'text-primary'}`}>
-                          Request Data Export
-                        </span>
-                        <p className={`text-xs mt-0.5 ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
-                          {dataExportRequestedAt 
-                            ? `Last requested: ${new Date(dataExportRequestedAt).toLocaleDateString()}`
-                            : 'Get a copy of your personal data'}
-                        </p>
-                      </div>
-                    </div>
-                    {dataExportLoading ? (
-                      <span className={`material-symbols-outlined text-sm animate-spin ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
-                        progress_activity
-                      </span>
-                    ) : (
-                      <span className={`material-symbols-outlined text-sm ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
-                        chevron_right
-                      </span>
-                    )}
-                  </button>
-                </div>
-              )}
-
-              {/* Danger Zone - Delete Account */}
-              <div className="pt-4 mt-4 border-t border-red-500/30">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-red-500 mb-3">
-                  Danger Zone
-                </h4>
-                <div className={`p-4 rounded-xl border border-red-500/30 ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
-                  <p className={`text-sm mb-4 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
-                    Permanently delete your account and all associated data.
-                  </p>
-                  <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
-                  >
-                    <span className="material-symbols-outlined text-lg">delete_forever</span>
-                    Delete Account
-                  </button>
-                </div>
+      {/* Privacy Modal */}
+      <ModalShell isOpen={showPrivacyModal} onClose={() => setShowPrivacyModal(false)} title="Privacy Settings">
+        <div className="space-y-6">
+          {/* Do Not Sell My Info */}
+          <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-black/5'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-3">
+                <span className={`material-symbols-outlined ${isDark ? 'text-white/70' : 'text-primary/70'}`}>security</span>
+                <span className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>Do Not Sell My Information</span>
               </div>
-            </>
-          ) : (
-            /* Delete Account Confirmation */
-            <div className="space-y-4">
-              <div className={`p-4 rounded-xl border border-red-500/50 ${isDark ? 'bg-red-500/20' : 'bg-red-50'}`}>
-                <div className="flex items-start gap-3">
-                  <span className="material-symbols-outlined text-red-500 text-2xl">warning</span>
-                  <div>
-                    <h4 className={`font-bold text-lg mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      Are you sure?
-                    </h4>
-                    <p className={`text-sm ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
-                      This will initiate the termination of your membership and deletion of your data. 
-                      This action cannot be undone.
-                    </p>
-                  </div>
+              <Toggle
+                checked={doNotSellMyInfo}
+                onChange={handleDoNotSellToggle}
+                disabled={updatePreferencesMutation.isPending}
+                label="Do Not Sell"
+              />
+            </div>
+            <p className={`text-sm ml-9 ${isDark ? 'text-white/60' : 'text-gray-600'}`}>
+              Opt out of having your personal information sold or shared with third parties for targeted advertising.
+            </p>
+          </div>
+
+          {/* Data Export */}
+          <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-black/5'}`}>
+            <div className="flex items-center gap-3 mb-2">
+              <span className={`material-symbols-outlined ${isDark ? 'text-white/70' : 'text-primary/70'}`}>download</span>
+              <span className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>Request Data Export</span>
+            </div>
+            <p className={`text-sm ml-9 mb-3 ${isDark ? 'text-white/60' : 'text-gray-600'}`}>
+              Request a copy of all personal data we have stored about you. We will email you within 45 days.
+            </p>
+            {dataExportRequestedAt ? (
+              <p className={`text-sm ml-9 ${isDark ? 'text-accent' : 'text-green-600'}`}>
+                ✓ Request submitted on {new Date(dataExportRequestedAt).toLocaleDateString()}
+              </p>
+            ) : (
+              <button
+                onClick={handleDataExportRequest}
+                disabled={dataExportMutation.isPending}
+                className={`ml-9 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isDark 
+                    ? 'bg-white/10 hover:bg-white/20 text-white' 
+                    : 'bg-primary/10 hover:bg-primary/20 text-primary'
+                } ${dataExportMutation.isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {dataExportMutation.isPending ? 'Submitting...' : 'Request Export'}
+              </button>
+            )}
+          </div>
+
+          {/* Delete Account */}
+          <div className={`p-4 rounded-xl border ${isDark ? 'border-red-500/30 bg-red-500/10' : 'border-red-200 bg-red-50'}`}>
+            <div className="flex items-center gap-3 mb-2">
+              <span className={`material-symbols-outlined ${isDark ? 'text-red-400' : 'text-red-600'}`}>delete_forever</span>
+              <span className={`font-medium ${isDark ? 'text-red-400' : 'text-red-700'}`}>Delete Account</span>
+            </div>
+            <p className={`text-sm ml-9 mb-3 ${isDark ? 'text-white/60' : 'text-gray-600'}`}>
+              Permanently delete your account and all associated data. This action cannot be undone.
+            </p>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="ml-9 px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition-colors"
+            >
+              Delete My Account
+            </button>
+          </div>
+
+          {/* Delete Confirmation */}
+          {showDeleteConfirm && (
+            <div className={`p-4 rounded-xl border-2 ${isDark ? 'border-red-500 bg-red-500/20' : 'border-red-300 bg-red-100'}`}>
+              <div className="flex items-start gap-3 mb-4">
+                <span className={`material-symbols-outlined text-2xl ${isDark ? 'text-red-400' : 'text-red-600'}`}>warning</span>
+                <div>
+                  <h4 className={`font-bold text-lg mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    Are you sure?
+                  </h4>
+                  <p className={`text-sm ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
+                    This will initiate the termination of your membership and deletion of your data. 
+                    This action cannot be undone.
+                  </p>
                 </div>
               </div>
 
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
-                  disabled={deleteLoading}
+                  disabled={deleteAccountMutation.isPending}
                   className={`flex-1 py-3 font-semibold rounded-xl transition-colors ${
                     isDark 
                       ? 'bg-white/10 hover:bg-white/20 text-white' 
@@ -1021,33 +926,11 @@ const Profile: React.FC = () => {
                   Cancel
                 </button>
                 <button
-                  onClick={async () => {
-                    setDeleteLoading(true);
-                    try {
-                      const res = await fetch('/api/account/delete-request', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include'
-                      });
-                      if (!res.ok) {
-                        const data = await res.json();
-                        throw new Error(data.error || 'Failed to submit deletion request');
-                      }
-                      showToast('Deletion request sent to administration', 'success');
-                      setShowDeleteConfirm(false);
-                      setShowPrivacyModal(false);
-                    } catch (err: any) {
-                      showToast('Deletion request sent to administration', 'success');
-                      setShowDeleteConfirm(false);
-                      setShowPrivacyModal(false);
-                    } finally {
-                      setDeleteLoading(false);
-                    }
-                  }}
-                  disabled={deleteLoading}
+                  onClick={() => deleteAccountMutation.mutate()}
+                  disabled={deleteAccountMutation.isPending}
                   className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  {deleteLoading ? (
+                  {deleteAccountMutation.isPending ? (
                     <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
                   ) : (
                     <>

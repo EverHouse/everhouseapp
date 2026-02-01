@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useData } from '../../../contexts/DataContext';
 import { usePageReady } from '../../../contexts/PageReadyContext';
 import { getTodayPacific, addDaysToPacificDate, formatDateDisplayWithDay, formatTime12Hour, getRelativeDateLabel, formatDuration, formatRelativeTime } from '../../../utils/dateUtils';
@@ -20,6 +21,24 @@ import { StaffManualBookingModal, type StaffManualBookingData } from '../../../c
 import { AnimatedPage } from '../../../components/motion';
 import FloatingActionButton from '../../../components/FloatingActionButton';
 import { useConfirmDialog } from '../../../components/ConfirmDialog';
+import {
+    useResources,
+    useBays,
+    useAllBookingRequests,
+    usePendingBookings,
+    useApprovedBookings,
+    useCalendarClosures,
+    useAvailabilityBlocks,
+    useMemberContacts,
+    useFeeEstimate,
+    useBayAvailability,
+    useApproveBookingRequest,
+    useDeclineBookingRequest,
+    useCancelBookingWithOptimistic,
+    useUpdateBookingStatus,
+    bookingsKeys,
+    simulatorKeys,
+} from '../../../hooks/queries/useBookingsQueries';
 
 interface BookingRequest {
     id: number | string;
@@ -671,6 +690,7 @@ const SimulatorTab: React.FC = () => {
     const navigate = useNavigate();
     const { setPageReady } = usePageReady();
     const { user, actualUser, members } = useData();
+    const queryClient = useQueryClient();
     
     const navigateToTab = useCallback((tab: TabType) => {
         if (tabToPath[tab]) {
@@ -684,21 +704,114 @@ const SimulatorTab: React.FC = () => {
         [members]
     );
     
-    // Map of all member emails to their status (for showing actual status of inactive members)
-    const [memberStatusMap, setMemberStatusMap] = useState<Record<string, string>>({});
-    // Map of all member emails to their proper formatted name from the directory
-    const [memberNameMap, setMemberNameMap] = useState<Record<string, string>>({});
     const { showToast } = useToast();
     const { effectiveTheme } = useTheme();
     const isDark = effectiveTheme === 'dark';
     const [activeView, setActiveView] = useState<'requests' | 'calendar'>('requests');
-    const [requests, setRequests] = useState<BookingRequest[]>([]);
-    const [bays, setBays] = useState<Bay[]>([]);
-    const [resources, setResources] = useState<Resource[]>([]);
-    const [approvedBookings, setApprovedBookings] = useState<BookingRequest[]>([]);
-    const [closures, setClosures] = useState<CalendarClosure[]>([]);
-    const [availabilityBlocks, setAvailabilityBlocks] = useState<AvailabilityBlock[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [calendarDate, setCalendarDate] = useState(() => getTodayPacific());
+
+    // React Query hooks for data fetching
+    const { data: resourcesData = [], isLoading: resourcesLoading } = useResources();
+    const { data: baysData = [], isLoading: baysLoading } = useBays();
+    const { data: bookingRequestsData = [], isLoading: requestsLoading } = useAllBookingRequests();
+    const { data: pendingBookingsData = [] } = usePendingBookings();
+    const { data: memberContactsData = [] } = useMemberContacts('all');
+    const { data: closuresData = [] } = useCalendarClosures();
+    
+    // Calculate date range for approved bookings
+    const today = getTodayPacific();
+    const baseDate = activeView === 'calendar' ? calendarDate : today;
+    const startDate = addDaysToPacificDate(baseDate, -60);
+    const endDate = addDaysToPacificDate(baseDate, 30);
+    
+    const { data: approvedBookingsData = [], isLoading: approvedLoading } = useApprovedBookings(startDate, endDate);
+    const { data: availabilityBlocksData = [] } = useAvailabilityBlocks(calendarDate);
+    
+    // Derive combined loading state
+    const isLoading = resourcesLoading || baysLoading || requestsLoading || approvedLoading;
+    
+    // Derive resources, bays, and closures from React Query
+    const resources: Resource[] = resourcesData;
+    const bays: Bay[] = baysData;
+    const closures: CalendarClosure[] = closuresData.filter((c: CalendarClosure) => 
+        c.startDate <= endDate && c.endDate >= startDate
+    );
+    
+    // Derive availability blocks with proper mapping
+    const availabilityBlocks: AvailabilityBlock[] = useMemo(() => 
+        availabilityBlocksData.map((b: any) => ({
+            id: b.id,
+            resourceId: b.resource_id || b.resourceId,
+            blockDate: b.block_date?.includes('T') ? b.block_date.split('T')[0] : (b.blockDate || b.block_date),
+            startTime: b.start_time || b.startTime,
+            endTime: b.end_time || b.endTime,
+            blockType: b.block_type || b.blockType,
+            notes: b.notes,
+            closureTitle: b.closure_title || b.closureTitle
+        })),
+        [availabilityBlocksData]
+    );
+    
+    // Combine booking requests and pending bookings
+    const requests: BookingRequest[] = useMemo(() => {
+        const fromRequests = bookingRequestsData.map((r: any) => ({ ...r, source: 'booking_request' as const }));
+        const fromPending = pendingBookingsData.map((b: any) => ({
+            id: b.id,
+            user_email: b.user_email,
+            user_name: b.first_name && b.last_name ? `${b.first_name} ${b.last_name}` : b.user_email,
+            resource_id: null,
+            bay_name: null,
+            resource_preference: b.resource_name || null,
+            request_date: b.booking_date,
+            start_time: b.start_time,
+            end_time: b.end_time,
+            duration_minutes: 60,
+            notes: b.notes,
+            status: b.status,
+            staff_notes: null,
+            suggested_time: null,
+            created_at: b.created_at,
+            source: 'booking' as const,
+            resource_name: b.resource_name
+        }));
+        return [...fromRequests, ...fromPending];
+    }, [bookingRequestsData, pendingBookingsData]);
+    
+    // Use approved bookings from React Query
+    const approvedBookings: BookingRequest[] = approvedBookingsData;
+    
+    // Build member status and name maps from React Query data
+    const { memberStatusMap, memberNameMap } = useMemo(() => {
+        const statusMap: Record<string, string> = {};
+        const nameMap: Record<string, string> = {};
+        memberContactsData.forEach((m: any) => {
+            const fullName = [m.firstName, m.lastName].filter(Boolean).join(' ');
+            if (m.email) {
+                const emailLower = m.email.toLowerCase();
+                statusMap[emailLower] = m.status || 'unknown';
+                if (fullName) {
+                    nameMap[emailLower] = fullName;
+                }
+            }
+            if (m.manuallyLinkedEmails && fullName) {
+                m.manuallyLinkedEmails.forEach((linkedEmail: string) => {
+                    if (linkedEmail) {
+                        const linkedEmailLower = linkedEmail.toLowerCase();
+                        statusMap[linkedEmailLower] = m.status || 'unknown';
+                        nameMap[linkedEmailLower] = fullName;
+                    }
+                });
+            }
+        });
+        return { memberStatusMap: statusMap, memberNameMap: nameMap };
+    }, [memberContactsData]);
+    
+    // Mutation hooks for booking actions
+    const approveBookingMutation = useApproveBookingRequest();
+    const declineBookingMutation = useDeclineBookingRequest();
+    const cancelBookingMutation = useCancelBookingWithOptimistic();
+    const updateStatusMutation = useUpdateBookingStatus();
+    
     const [selectedRequest, setSelectedRequest] = useState<BookingRequest | null>(null);
     const [actionModal, setActionModal] = useState<'approve' | 'decline' | null>(null);
     const [selectedBayId, setSelectedBayId] = useState<number | null>(null);
@@ -721,7 +834,6 @@ const SimulatorTab: React.FC = () => {
     const [scheduledFilter, setScheduledFilter] = useState<'all' | 'today' | 'tomorrow' | 'week'>('all');
     const [markStatusModal, setMarkStatusModal] = useState<{ booking: BookingRequest | null; confirmNoShow: boolean }>({ booking: null, confirmNoShow: false });
     
-    const [calendarDate, setCalendarDate] = useState(() => getTodayPacific());
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
@@ -823,48 +935,6 @@ const SimulatorTab: React.FC = () => {
     }, [selectedCalendarBooking]);
 
     useEffect(() => {
-        const fetchAllMemberStatuses = async () => {
-            try {
-                // Fetch all members (including inactive) for status and name maps
-                const res = await fetch('/api/hubspot/contacts?status=all', { credentials: 'include' });
-                if (res.ok) {
-                    const rawData = await res.json();
-                    const data = Array.isArray(rawData) ? rawData : (rawData.contacts || []);
-                    const statusMap: Record<string, string> = {};
-                    const nameMap: Record<string, string> = {};
-                    data.forEach((m: { email: string; status?: string; firstName?: string; lastName?: string; manuallyLinkedEmails?: string[] }) => {
-                        const fullName = [m.firstName, m.lastName].filter(Boolean).join(' ');
-                        if (m.email) {
-                            const emailLower = m.email.toLowerCase();
-                            statusMap[emailLower] = m.status || 'unknown';
-                            // Build proper formatted name from directory
-                            if (fullName) {
-                                nameMap[emailLower] = fullName;
-                            }
-                        }
-                        // Also add manually linked emails to the maps
-                        if (m.manuallyLinkedEmails && fullName) {
-                            m.manuallyLinkedEmails.forEach((linkedEmail: string) => {
-                                if (linkedEmail) {
-                                    const linkedEmailLower = linkedEmail.toLowerCase();
-                                    statusMap[linkedEmailLower] = m.status || 'unknown';
-                                    nameMap[linkedEmailLower] = fullName;
-                                }
-                            });
-                        }
-                    });
-                    setMemberStatusMap(statusMap);
-                    setMemberNameMap(nameMap);
-                }
-            } catch (err) {
-                console.error('Failed to fetch member statuses:', err);
-            }
-        };
-        
-        fetchAllMemberStatuses();
-    }, []);
-
-    useEffect(() => {
         if (!isLoading) {
             setPageReady(true);
         }
@@ -915,123 +985,12 @@ const SimulatorTab: React.FC = () => {
         };
     }, [actionModal, showTrackmanConfirm, selectedCalendarBooking, markStatusModal.booking]);
 
-    const fetchData = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const results = await Promise.allSettled([
-                fetch('/api/booking-requests?include_all=true'),
-                fetch('/api/pending-bookings'),
-                fetch('/api/bays'),
-                fetch('/api/resources')
-            ]);
-            
-            let allRequests: BookingRequest[] = [];
-            
-            if (results[0].status === 'fulfilled' && results[0].value.ok) {
-                const data = await results[0].value.json();
-                allRequests = data.map((r: any) => ({ ...r, source: 'booking_request' as const }));
-            }
-            
-            if (results[1].status === 'fulfilled' && results[1].value.ok) {
-                const pendingBookings = await results[1].value.json();
-                const mappedBookings = pendingBookings.map((b: any) => ({
-                    id: b.id,
-                    user_email: b.user_email,
-                    user_name: b.first_name && b.last_name ? `${b.first_name} ${b.last_name}` : b.user_email,
-                    resource_id: null,
-                    bay_name: null,
-                    resource_preference: b.resource_name || null,
-                    request_date: b.booking_date,
-                    start_time: b.start_time,
-                    end_time: b.end_time,
-                    duration_minutes: 60,
-                    notes: b.notes,
-                    status: b.status,
-                    staff_notes: null,
-                    suggested_time: null,
-                    created_at: b.created_at,
-                    source: 'booking' as const,
-                    resource_name: b.resource_name
-                }));
-                allRequests = [...allRequests, ...mappedBookings];
-            }
-            
-            setRequests(allRequests);
-            
-            if (results[2].status === 'fulfilled' && results[2].value.ok) {
-                const data = await results[2].value.json();
-                setBays(data);
-            }
-            
-            if (results[3].status === 'fulfilled' && results[3].value.ok) {
-                const data = await results[3].value.json();
-                setResources(data);
-            }
-        } catch (err) {
-            console.error('Failed to fetch data:', err);
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
-    const fetchCalendarData = useCallback(async () => {
-        const today = getTodayPacific();
-        const baseDate = activeView === 'calendar' ? calendarDate : today;
-        const startDate = addDaysToPacificDate(baseDate, -60);
-        const endDate = addDaysToPacificDate(baseDate, 30);
-        try {
-            const [bookingsRes, closuresRes, blocksRes] = await Promise.all([
-                fetch(`/api/approved-bookings?start_date=${startDate}&end_date=${endDate}`),
-                fetch('/api/closures'),
-                fetch(`/api/availability-blocks?start_date=${startDate}&end_date=${endDate}`)
-            ]);
-            
-            if (bookingsRes.ok) {
-                const data = await bookingsRes.json();
-                setApprovedBookings(data);
-            }
-            
-            if (closuresRes.ok) {
-                const closuresData = await closuresRes.json();
-                const activeClosures = closuresData.filter((c: CalendarClosure) => 
-                    c.startDate <= endDate && c.endDate >= startDate
-                );
-                setClosures(activeClosures);
-            }
-            
-            if (blocksRes.ok) {
-                const blocksData = await blocksRes.json();
-                const mappedBlocks: AvailabilityBlock[] = blocksData.map((b: any) => ({
-                    id: b.id,
-                    resourceId: b.resource_id,
-                    blockDate: b.block_date?.includes('T') ? b.block_date.split('T')[0] : b.block_date,
-                    startTime: b.start_time,
-                    endTime: b.end_time,
-                    blockType: b.block_type,
-                    notes: b.notes,
-                    closureTitle: b.closure_title
-                }));
-                setAvailabilityBlocks(mappedBlocks);
-            }
-        } catch (err) {
-            console.error('Failed to fetch calendar data:', err);
-        }
-    }, [activeView, calendarDate]);
-
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
-
-    useEffect(() => {
-        fetchCalendarData().then(() => {
-            setLastRefresh(new Date());
-        });
-    }, [fetchCalendarData]);
-
-    const handleRefresh = useCallback(async () => {
-        await Promise.all([fetchData(), fetchCalendarData()]);
+    // React Query handles data fetching - use invalidateQueries to refresh
+    const handleRefresh = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
+        queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
         setLastRefresh(new Date());
-    }, [fetchData, fetchCalendarData]);
+    }, [queryClient]);
 
     useEffect(() => {
         const handleBookingUpdate = () => {
@@ -1150,19 +1109,21 @@ const SimulatorTab: React.FC = () => {
         booking: BookingRequest,
         newStatus: 'attended' | 'no_show' | 'cancelled'
     ): Promise<boolean> => {
-        const previousRequests = [...requests];
-        const previousApproved = [...approvedBookings];
+        // Store previous data for rollback
+        const previousRequests = queryClient.getQueryData(bookingsKeys.allRequests());
+        const previousApproved = queryClient.getQueryData(bookingsKeys.approved(startDate, endDate));
         
-        setRequests(prev => prev.map(r => 
-            r.id === booking.id && r.source === booking.source 
-                ? { ...r, status: newStatus } 
-                : r
-        ));
-        setApprovedBookings(prev => prev.map(b => 
-            b.id === booking.id && b.source === booking.source 
-                ? { ...b, status: newStatus } 
-                : b
-        ));
+        // Optimistic update via React Query cache
+        queryClient.setQueryData(bookingsKeys.allRequests(), (old: any[] | undefined) => 
+            (old || []).map(r => 
+                r.id === booking.id ? { ...r, status: newStatus } : r
+            )
+        );
+        queryClient.setQueryData(bookingsKeys.approved(startDate, endDate), (old: any[] | undefined) => 
+            (old || []).map(b => 
+                b.id === booking.id ? { ...b, status: newStatus } : b
+            )
+        );
         
         try {
             const res = await fetch(`/api/bookings/${booking.id}/checkin`, {
@@ -1175,8 +1136,8 @@ const SimulatorTab: React.FC = () => {
             if (res.status === 402) {
                 const errorData = await res.json();
                 // Revert optimistic update
-                setRequests(previousRequests);
-                setApprovedBookings(previousApproved);
+                queryClient.setQueryData(bookingsKeys.allRequests(), previousRequests);
+                queryClient.setQueryData(bookingsKeys.approved(startDate, endDate), previousApproved);
                 
                 // Open the appropriate modal based on what's needed
                 const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
@@ -1220,12 +1181,12 @@ const SimulatorTab: React.FC = () => {
             showToast(`Booking ${statusLabel}`, 'success');
             return true;
         } catch (err: any) {
-            setRequests(previousRequests);
-            setApprovedBookings(previousApproved);
+            queryClient.setQueryData(bookingsKeys.allRequests(), previousRequests);
+            queryClient.setQueryData(bookingsKeys.approved(startDate, endDate), previousApproved);
             showToast(err.message || 'Failed to update booking', 'error');
             return false;
         }
-    }, [requests, approvedBookings, showToast]);
+    }, [queryClient, startDate, endDate, showToast]);
 
     const showCancelConfirmation = useCallback((booking: BookingRequest) => {
         const hasTrackman = !!(booking.trackman_booking_id) || 
@@ -1245,17 +1206,23 @@ const SimulatorTab: React.FC = () => {
         
         setCancelConfirmModal(prev => ({ ...prev, isCancelling: true }));
         
-        const previousRequests = [...requests];
-        const previousApproved = [...approvedBookings];
+        // Store previous data for rollback
+        const previousRequests = queryClient.getQueryData(bookingsKeys.allRequests());
+        const previousApproved = queryClient.getQueryData(bookingsKeys.approved(startDate, endDate));
         
-        setRequests(prev => prev.map(r => 
-            r.id === booking.id && r.source === booking.source 
-                ? { ...r, status: 'cancelled' } 
-                : r
-        ));
-        setApprovedBookings(prev => prev.filter(b => 
-            !(b.id === booking.id && b.source === booking.source)
-        ));
+        // Optimistic update via React Query cache
+        queryClient.setQueryData(bookingsKeys.allRequests(), (old: any[] | undefined) => 
+            (old || []).map(r => 
+                r.id === booking.id && r.source === booking.source 
+                    ? { ...r, status: 'cancelled' } 
+                    : r
+            )
+        );
+        queryClient.setQueryData(bookingsKeys.approved(startDate, endDate), (old: any[] | undefined) => 
+            (old || []).filter(b => 
+                !(b.id === booking.id && b.source === booking.source)
+            )
+        );
         
         try {
             const res = await fetch(`/api/bookings/${booking.id}`, {
@@ -1282,12 +1249,12 @@ const SimulatorTab: React.FC = () => {
                 setCancelConfirmModal({ isOpen: false, booking: null, hasTrackman: false, isCancelling: false, showSuccess: false });
             }
         } catch (err: any) {
-            setRequests(previousRequests);
-            setApprovedBookings(previousApproved);
+            queryClient.setQueryData(bookingsKeys.allRequests(), previousRequests);
+            queryClient.setQueryData(bookingsKeys.approved(startDate, endDate), previousApproved);
             showToast(err.message || 'Failed to cancel booking', 'error');
             setCancelConfirmModal({ isOpen: false, booking: null, hasTrackman: false, isCancelling: false, showSuccess: false });
         }
-    }, [cancelConfirmModal.booking, cancelConfirmModal.hasTrackman, requests, approvedBookings, actualUser?.email, showToast]);
+    }, [cancelConfirmModal.booking, cancelConfirmModal.hasTrackman, queryClient, startDate, endDate, actualUser?.email, showToast]);
 
     const cancelBookingOptimistic = useCallback(async (
         booking: BookingRequest
@@ -1437,7 +1404,6 @@ const SimulatorTab: React.FC = () => {
     
     // Include unmatched webhook bookings in the queue for staff visibility
     // Only show TODAY and FUTURE bookings - historical ones go to Trackman Admin panel
-    const today = getTodayPacific();
     const unmatchedWebhookBookings = approvedBookings.filter(b => {
         // A booking is unmatched if:
         // 1. is_unmatched flag is true, OR
@@ -1542,16 +1508,22 @@ const SimulatorTab: React.FC = () => {
         setIsProcessing(true);
         setError(null);
         
-        // Optimistic UI: update status immediately
-        const previousRequests = [...requests];
-        setRequests(prev => prev.map(r => 
-            r.id === selectedRequest.id && r.source === selectedRequest.source 
-                ? { ...r, status: 'confirmed' as const } 
-                : r
-        ));
+        // Store previous data for rollback
+        const previousRequests = queryClient.getQueryData(bookingsKeys.allRequests());
+        
+        // Optimistic UI: update status immediately via cache
+        queryClient.setQueryData(bookingsKeys.allRequests(), (old: any[] | undefined) => 
+            (old || []).map(r => 
+                r.id === selectedRequest.id && r.source === selectedRequest.source 
+                    ? { ...r, status: 'confirmed' } 
+                    : r
+            )
+        );
         setShowTrackmanConfirm(false);
         setActionModal(null);
         const approvedRequest = selectedRequest;
+        const approvedBayId = selectedBayId;
+        const approvedStaffNotes = staffNotes;
         setSelectedRequest(null);
         setSelectedBayId(null);
         setStaffNotes('');
@@ -1569,8 +1541,8 @@ const SimulatorTab: React.FC = () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         status: 'approved',
-                        resource_id: selectedBayId,
-                        staff_notes: staffNotes || null,
+                        resource_id: approvedBayId,
+                        staff_notes: approvedStaffNotes || null,
                         reviewed_by: user?.email
                     })
                 });
@@ -1578,16 +1550,18 @@ const SimulatorTab: React.FC = () => {
             
             if (!res.ok) {
                 // Revert on failure
-                setRequests(previousRequests);
+                queryClient.setQueryData(bookingsKeys.allRequests(), previousRequests);
                 const errData = await res.json();
                 setError(errData.message || errData.error || 'Failed to approve');
             } else {
                 window.dispatchEvent(new CustomEvent('booking-action-completed'));
-                setTimeout(() => handleRefresh(), 300);
+                // Invalidate to sync with server
+                queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
+                queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
             }
         } catch (err: any) {
             // Revert on error
-            setRequests(previousRequests);
+            queryClient.setQueryData(bookingsKeys.allRequests(), previousRequests);
             setError(err.message);
         } finally {
             setIsProcessing(false);
@@ -1603,14 +1577,20 @@ const SimulatorTab: React.FC = () => {
         const newStatus = selectedRequest.status === 'approved' ? 'cancelled' : 'declined';
         const wasPending = selectedRequest.status === 'pending' || selectedRequest.status === 'pending_approval';
         
-        // Optimistic UI: update status immediately
-        const previousRequests = [...requests];
-        setRequests(prev => prev.map(r => 
-            r.id === selectedRequest.id && r.source === selectedRequest.source 
-                ? { ...r, status: newStatus as 'declined' | 'cancelled' } 
-                : r
-        ));
+        // Store previous data for rollback
+        const previousRequests = queryClient.getQueryData(bookingsKeys.allRequests());
+        
+        // Optimistic UI: update status immediately via cache
+        queryClient.setQueryData(bookingsKeys.allRequests(), (old: any[] | undefined) => 
+            (old || []).map(r => 
+                r.id === selectedRequest.id && r.source === selectedRequest.source 
+                    ? { ...r, status: newStatus } 
+                    : r
+            )
+        );
         const declinedRequest = selectedRequest;
+        const declinedStaffNotes = staffNotes;
+        const declinedSuggestedTime = suggestedTime;
         setActionModal(null);
         setSelectedRequest(null);
         setStaffNotes('');
@@ -1631,8 +1611,8 @@ const SimulatorTab: React.FC = () => {
                     credentials: 'include',
                     body: JSON.stringify({
                         status: newStatus,
-                        staff_notes: staffNotes || null,
-                        suggested_time: suggestedTime ? suggestedTime + ':00' : null,
+                        staff_notes: declinedStaffNotes || null,
+                        suggested_time: declinedSuggestedTime ? declinedSuggestedTime + ':00' : null,
                         reviewed_by: actualUser?.email || user?.email,
                         cancelled_by: newStatus === 'cancelled' ? (actualUser?.email || user?.email) : undefined
                     })
@@ -1641,18 +1621,20 @@ const SimulatorTab: React.FC = () => {
             
             if (!res.ok) {
                 // Revert on failure
-                setRequests(previousRequests);
+                queryClient.setQueryData(bookingsKeys.allRequests(), previousRequests);
                 const errData = await res.json();
                 setError(errData.error || 'Failed to process request');
             } else {
                 if (wasPending) {
                     window.dispatchEvent(new CustomEvent('booking-action-completed'));
                 }
-                setTimeout(() => handleRefresh(), 300);
+                // Invalidate to sync with server
+                queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
+                queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
             }
         } catch (err: any) {
             // Revert on error
-            setRequests(previousRequests);
+            queryClient.setQueryData(bookingsKeys.allRequests(), previousRequests);
             setError(err.message);
         } finally {
             setIsProcessing(false);

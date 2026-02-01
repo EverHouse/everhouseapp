@@ -1,3 +1,14 @@
+/**
+ * @deprecated This module is deprecated in favor of React Query caching.
+ * All components have been migrated to use useQuery/useMutation hooks from @tanstack/react-query.
+ * React Query provides automatic caching, stale-while-revalidate, background refetching,
+ * and optimistic updates which replace all functionality here.
+ * 
+ * This file is retained for backward compatibility with DataContext but should not be used
+ * for new features. The notifications sync is the only remaining active use.
+ * 
+ * See: src/hooks/queries/ for the replacement hooks.
+ */
 import { useUserStore } from '../stores/userStore';
 
 const SYNC_INTERVAL = 5 * 60 * 1000;
@@ -107,26 +118,17 @@ export const fetchAndCache = async <T>(
 const syncAll = async () => {
   if (!isVisible() || !isOnline()) return;
 
-  const tasks = [
-    fetchAndCache('events', '/api/events'),
-    fetchAndCache('cafe_menu', '/api/cafe-menu'),
-  ];
-
   const user = useUserStore.getState().user;
   if (user?.email) {
-    tasks.push(
-      fetchAndCache(
-        'notifications', 
-        `/api/notifications?user_email=${encodeURIComponent(user.email)}&unread_only=true`,
-        (data: any[]) => {
-          useUserStore.setState({ unreadNotifications: data.length });
-          window.dispatchEvent(new CustomEvent('notifications-read'));
-        }
-      )
+    await fetchAndCache(
+      'notifications', 
+      `/api/notifications?user_email=${encodeURIComponent(user.email)}&unread_only=true`,
+      (data: any[]) => {
+        useUserStore.setState({ unreadNotifications: data.length });
+        window.dispatchEvent(new CustomEvent('notifications-read'));
+      }
     );
   }
-
-  await Promise.allSettled(tasks);
 };
 
 let intervalId: number | null = null;
