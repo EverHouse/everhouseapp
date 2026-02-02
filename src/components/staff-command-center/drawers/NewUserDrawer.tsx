@@ -61,6 +61,7 @@ interface ExistingBillingGroup {
   groupType: 'family' | 'corporate';
   isActive: boolean;
   primaryStripeSubscriptionId: string | null;
+  memberCount: number;
 }
 
 interface MemberFormData {
@@ -216,9 +217,10 @@ export function NewUserDrawer({
             primaryEmail: g.primaryEmail,
             primaryName: g.primaryName,
             groupName: g.groupName,
-            groupType: g.members?.some((m: any) => m.relationship === 'corporate') ? 'corporate' : 'family',
+            groupType: g.type || 'family',
             isActive: g.isActive,
             primaryStripeSubscriptionId: g.stripeSubscriptionId,
+            memberCount: g.members?.length || 0,
           }));
         setExistingBillingGroups(activeGroups);
       }

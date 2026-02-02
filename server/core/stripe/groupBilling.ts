@@ -14,6 +14,7 @@ export interface BillingGroupWithMembers {
   members: GroupMemberInfo[];
   totalMonthlyAmount: number;
   isActive: boolean;
+  type: 'family' | 'corporate';
 }
 
 export interface GroupMemberInfo {
@@ -204,6 +205,7 @@ export async function getBillingGroupByPrimaryEmail(primaryEmail: string): Promi
     members: memberInfos,
     totalMonthlyAmount,
     isActive: billingGroup.isActive ?? true,
+    type: (billingGroup.type as 'family' | 'corporate') || 'family',
   };
 }
 
