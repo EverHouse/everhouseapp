@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import TierBadge from '../TierBadge';
 import { MemberSearchInput, SelectedMember } from '../shared/MemberSearchInput';
+import { useToast } from '../Toast';
 import { getApiErrorMessage, getNetworkErrorMessage } from '../../utils/errorHandling';
 
 interface FamilyMemberInfo {
@@ -46,11 +47,11 @@ const RELATIONSHIP_OPTIONS = [
 ];
 
 const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }) => {
+  const { showToast } = useToast();
   const [familyGroup, setFamilyGroup] = useState<FamilyGroupData | null>(null);
   const [products, setProducts] = useState<FamilyAddOnProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -113,8 +114,7 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
   }, [fetchFamilyGroup, fetchProducts]);
 
   const showSuccess = (message: string) => {
-    setSuccessMessage(message);
-    setTimeout(() => setSuccessMessage(null), 3000);
+    showToast(message, 'success');
   };
 
   const handleCreateGroup = async () => {
@@ -288,13 +288,6 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
             >
               <span className="material-symbols-outlined text-red-500 text-base">close</span>
             </button>
-          </div>
-        )}
-
-        {successMessage && (
-          <div className="mb-4 p-3 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/30 rounded-lg flex items-center gap-2">
-            <span className="material-symbols-outlined text-green-500 text-base">check_circle</span>
-            <p className="text-sm text-green-600 dark:text-green-400">{successMessage}</p>
           </div>
         )}
 

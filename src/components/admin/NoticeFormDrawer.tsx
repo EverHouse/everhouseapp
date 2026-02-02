@@ -150,13 +150,20 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
           <button 
             onClick={handleSave}
             disabled={saving || !formData.start_date}
-            className={`flex-1 py-3 rounded-xl font-medium text-white transition-colors disabled:opacity-50 ${
+            className={`flex-1 py-3 rounded-xl font-medium text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${
               isBlocking
                 ? 'bg-red-500 hover:bg-red-600'
                 : 'bg-amber-500 hover:bg-amber-600'
             }`}
           >
-            {saving ? 'Saving...' : editItem?.id ? 'Update' : 'Create'}
+            {saving ? (
+              <>
+                <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
+                Saving...
+              </>
+            ) : (
+              editItem?.id ? 'Update' : 'Create'
+            )}
           </button>
         </div>
       }

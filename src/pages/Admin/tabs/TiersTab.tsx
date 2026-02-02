@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import EmptyState from '../../../components/EmptyState';
 import SlideUpDrawer from '../../../components/SlideUpDrawer';
 import Toggle from '../../../components/Toggle';
 import FloatingActionButton from '../../../components/FloatingActionButton';
@@ -974,13 +975,12 @@ const TiersTab: React.FC = () => {
                         </button>
                     </div>
                     {subscriptionTiers.length === 0 ? (
-                        <div className="text-center py-12 px-6 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-white/5">
-                            <span aria-hidden="true" className="material-symbols-outlined text-5xl mb-4 text-gray-500 dark:text-white/20">loyalty</span>
-                            <h3 className="text-lg font-bold mb-2 text-gray-600 dark:text-white/70">No tiers found</h3>
-                            <p className="text-sm text-gray-500 dark:text-white/70 max-w-xs mx-auto">
-                                Membership tiers will appear here once configured.
-                            </p>
-                        </div>
+                        <EmptyState
+                            icon="workspace_premium"
+                            title="No tiers found"
+                            description="Membership tiers will appear here once configured"
+                            variant="compact"
+                        />
                     ) : (
                         <div className="space-y-3 animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
                             {subscriptionTiers.map((tier, index) => (

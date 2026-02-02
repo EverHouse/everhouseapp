@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { usePageReady } from '../../../contexts/PageReadyContext';
+import EmptyState from '../../../components/EmptyState';
 import { formatDateDisplayWithDay, formatTime12Hour } from '../../../utils/dateUtils';
 import { formatPhoneNumber } from '../../../utils/formatting';
 import PullToRefresh from '../../../components/PullToRefresh';
@@ -262,13 +263,12 @@ const ToursTab: React.FC = () => {
       )}
 
       {toursData.todayTours.length === 0 && toursData.upcomingTours.length === 0 && toursData.pastTours.length === 0 && (
-        <div className="text-center py-12">
-          <span aria-hidden="true" className="material-symbols-outlined text-5xl text-primary/20 dark:text-white/20 mb-3">directions_walk</span>
-          <p className="text-primary/70 dark:text-white/70">No tours found</p>
-          <p className="text-sm text-primary/70 dark:text-white/70 mt-1">
-            Tours will appear here after syncing from Google Calendar
-          </p>
-        </div>
+        <EmptyState
+          icon="tour"
+          title="No tours found"
+          description="Tours will appear here after syncing from Google Calendar"
+          variant="compact"
+        />
       )}
 
       {toursData.pastTours.length > 0 && (

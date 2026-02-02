@@ -293,7 +293,7 @@ const ClosureAlert: React.FC = () => {
       </div>
       <button
         onClick={handleDismiss}
-        className={`p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full flex-shrink-0 transition-colors ${
+        className={`p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full flex-shrink-0 transition-colors ${
           isDark 
             ? 'text-white/70 hover:text-white hover:bg-white/10' 
             : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'

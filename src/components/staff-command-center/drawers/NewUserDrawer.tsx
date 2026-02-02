@@ -435,6 +435,15 @@ function MemberFlow({
   const [stripeLoading, setStripeLoading] = useState(false);
   const [stripeError, setStripeError] = useState<string | null>(null);
   const paymentInitiatedRef = useRef(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const getInputClass = (fieldName: string) => `w-full px-3 py-2.5 rounded-lg border ${
+    fieldErrors[fieldName]
+      ? 'border-red-500 focus:border-red-500 focus:ring-red-500 bg-red-50 dark:bg-red-900/10'
+      : isDark 
+        ? 'bg-white/5 border-white/20 focus:border-emerald-500' 
+        : 'bg-white border-gray-300 focus:border-emerald-500'
+  } ${isDark ? 'text-white placeholder-gray-500' : 'text-gray-900 placeholder-gray-400'} focus:outline-none focus:ring-1 transition-colors`;
 
   const inputClass = `w-full px-3 py-2.5 rounded-lg border ${
     isDark 
@@ -443,6 +452,7 @@ function MemberFlow({
   } focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors`;
 
   const labelClass = `block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`;
+  const errorMsgClass = 'text-red-500 text-xs mt-1 flex items-center gap-1';
 
   const selectedTier = tiers.find(t => t.id === form.tierId);
 
@@ -594,16 +604,18 @@ function MemberFlow({
   };
 
   const handleReviewCharges = () => {
-    if (!form.tierId || !form.firstName || !form.lastName || !form.email || !form.phone) {
+    const errors: Record<string, string> = {};
+    if (!form.tierId) errors.tierId = 'Please select a membership tier';
+    if (!form.firstName) errors.firstName = 'First name is required';
+    if (!form.lastName) errors.lastName = 'Last name is required';
+    if (!form.email) errors.email = 'Email is required';
+    else if (!EMAIL_REGEX.test(form.email)) errors.email = 'Please enter a valid email address';
+    if (!form.phone) errors.phone = 'Phone number is required';
+    if (form.joinExistingGroup && !form.existingGroupId) errors.existingGroupId = 'Please select a billing group to join';
+    
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
       setError('Please fill in all required fields');
-      return;
-    }
-    if (!EMAIL_REGEX.test(form.email)) {
-      setError('Please enter a valid email address');
-      return;
-    }
-    if (form.joinExistingGroup && !form.existingGroupId) {
-      setError('Please select a billing group to join');
       return;
     }
     setError(null);
@@ -866,14 +878,23 @@ function MemberFlow({
           <button
             onClick={handleSendActivationLink}
             disabled={isLoading}
-            className={`w-full py-3 rounded-lg font-medium transition-colors ${
+            className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${
               isDark 
                 ? 'bg-white/10 text-white hover:bg-white/20' 
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            <span className="material-symbols-outlined text-sm mr-1.5 align-middle">mail</span>
-            Send Activation Link Instead
+            {isLoading ? (
+              <>
+                <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
+                Sending...
+              </>
+            ) : (
+              <>
+                <span className="material-symbols-outlined text-sm">mail</span>
+                Send Activation Link Instead
+              </>
+            )}
           </button>
           <p className={`text-xs text-center mt-2 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
             Member will complete payment via email
@@ -895,12 +916,15 @@ function MemberFlow({
 
   return (
     <div className="space-y-4">
-      <div>
+      <div className="space-y-1">
         <label className={labelClass}>Membership Tier *</label>
         <select
           value={form.tierId || ''}
-          onChange={(e) => setForm(prev => ({ ...prev, tierId: Number(e.target.value) || null }))}
-          className={inputClass}
+          onChange={(e) => {
+            setForm(prev => ({ ...prev, tierId: Number(e.target.value) || null }));
+            if (fieldErrors.tierId) setFieldErrors(prev => ({ ...prev, tierId: '' }));
+          }}
+          className={getInputClass('tierId')}
         >
           <option value="">Select a tier...</option>
           {tiers.map(tier => (
@@ -909,51 +933,93 @@ function MemberFlow({
             </option>
           ))}
         </select>
+        {fieldErrors.tierId && (
+          <p className={errorMsgClass}>
+            <span className="material-symbols-outlined text-xs">error</span>
+            {fieldErrors.tierId}
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div>
+        <div className="space-y-1">
           <label className={labelClass}>First Name *</label>
           <input
             type="text"
             value={form.firstName}
-            onChange={(e) => setForm(prev => ({ ...prev, firstName: e.target.value }))}
+            onChange={(e) => {
+              setForm(prev => ({ ...prev, firstName: e.target.value }));
+              if (fieldErrors.firstName) setFieldErrors(prev => ({ ...prev, firstName: '' }));
+            }}
             placeholder="First name"
-            className={inputClass}
+            className={getInputClass('firstName')}
           />
+          {fieldErrors.firstName && (
+            <p className={errorMsgClass}>
+              <span className="material-symbols-outlined text-xs">error</span>
+              {fieldErrors.firstName}
+            </p>
+          )}
         </div>
-        <div>
+        <div className="space-y-1">
           <label className={labelClass}>Last Name *</label>
           <input
             type="text"
             value={form.lastName}
-            onChange={(e) => setForm(prev => ({ ...prev, lastName: e.target.value }))}
+            onChange={(e) => {
+              setForm(prev => ({ ...prev, lastName: e.target.value }));
+              if (fieldErrors.lastName) setFieldErrors(prev => ({ ...prev, lastName: '' }));
+            }}
             placeholder="Last name"
-            className={inputClass}
+            className={getInputClass('lastName')}
           />
+          {fieldErrors.lastName && (
+            <p className={errorMsgClass}>
+              <span className="material-symbols-outlined text-xs">error</span>
+              {fieldErrors.lastName}
+            </p>
+          )}
         </div>
       </div>
 
-      <div>
+      <div className="space-y-1">
         <label className={labelClass}>Email *</label>
         <input
           type="email"
           value={form.email}
-          onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
+          onChange={(e) => {
+            setForm(prev => ({ ...prev, email: e.target.value }));
+            if (fieldErrors.email) setFieldErrors(prev => ({ ...prev, email: '' }));
+          }}
           placeholder="email@example.com"
-          className={inputClass}
+          className={getInputClass('email')}
         />
+        {fieldErrors.email && (
+          <p className={errorMsgClass}>
+            <span className="material-symbols-outlined text-xs">error</span>
+            {fieldErrors.email}
+          </p>
+        )}
       </div>
 
-      <div>
+      <div className="space-y-1">
         <label className={labelClass}>Phone *</label>
         <input
           type="tel"
           value={form.phone}
-          onChange={(e) => setForm(prev => ({ ...prev, phone: e.target.value }))}
+          onChange={(e) => {
+            setForm(prev => ({ ...prev, phone: e.target.value }));
+            if (fieldErrors.phone) setFieldErrors(prev => ({ ...prev, phone: '' }));
+          }}
           placeholder="(555) 123-4567"
-          className={inputClass}
+          className={getInputClass('phone')}
         />
+        {fieldErrors.phone && (
+          <p className={errorMsgClass}>
+            <span className="material-symbols-outlined text-xs">error</span>
+            {fieldErrors.phone}
+          </p>
+        )}
       </div>
 
       <div>
@@ -1284,6 +1350,16 @@ function VisitorFlow({
     setStripeError(null);
   };
 
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const getInputClass = (fieldName: string) => `w-full px-3 py-2.5 rounded-lg border ${
+    fieldErrors[fieldName]
+      ? 'border-red-500 focus:border-red-500 focus:ring-red-500 bg-red-50 dark:bg-red-900/10'
+      : isDark 
+        ? 'bg-white/5 border-white/20 focus:border-emerald-500' 
+        : 'bg-white border-gray-300 focus:border-emerald-500'
+  } ${isDark ? 'text-white placeholder-gray-500' : 'text-gray-900 placeholder-gray-400'} focus:outline-none focus:ring-1 transition-colors`;
+
   const inputClass = `w-full px-3 py-2.5 rounded-lg border ${
     isDark 
       ? 'bg-white/5 border-white/20 text-white placeholder-gray-500 focus:border-emerald-500' 
@@ -1291,14 +1367,20 @@ function VisitorFlow({
   } focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors`;
 
   const labelClass = `block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`;
+  const errorMsgClass = 'text-red-500 text-xs mt-1 flex items-center gap-1';
 
   const handleProceedToPayment = () => {
-    if (!form.productId || !form.firstName || !form.lastName || !form.email || !form.phone) {
+    const errors: Record<string, string> = {};
+    if (!form.productId) errors.productId = 'Please select a day pass';
+    if (!form.firstName) errors.firstName = 'First name is required';
+    if (!form.lastName) errors.lastName = 'Last name is required';
+    if (!form.email) errors.email = 'Email is required';
+    else if (!EMAIL_REGEX.test(form.email)) errors.email = 'Please enter a valid email address';
+    if (!form.phone) errors.phone = 'Phone number is required';
+    
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
       setError('Please fill in all required fields');
-      return;
-    }
-    if (!EMAIL_REGEX.test(form.email)) {
-      setError('Please enter a valid email address');
       return;
     }
     setError(null);
@@ -1436,12 +1518,15 @@ function VisitorFlow({
 
   return (
     <div className="space-y-4">
-      <div>
+      <div className="space-y-1">
         <label className={labelClass}>Day Pass Product *</label>
         <select
           value={form.productId}
-          onChange={(e) => setForm(prev => ({ ...prev, productId: e.target.value }))}
-          className={inputClass}
+          onChange={(e) => {
+            setForm(prev => ({ ...prev, productId: e.target.value }));
+            if (fieldErrors.productId) setFieldErrors(prev => ({ ...prev, productId: '' }));
+          }}
+          className={getInputClass('productId')}
         >
           <option value="">Select a product...</option>
           {products.map(product => (
@@ -1450,6 +1535,12 @@ function VisitorFlow({
             </option>
           ))}
         </select>
+        {fieldErrors.productId && (
+          <p className={errorMsgClass}>
+            <span className="material-symbols-outlined text-xs">error</span>
+            {fieldErrors.productId}
+          </p>
+        )}
       </div>
 
       {selectedProduct && (
@@ -1466,48 +1557,84 @@ function VisitorFlow({
       )}
 
       <div className="grid grid-cols-2 gap-3">
-        <div>
+        <div className="space-y-1">
           <label className={labelClass}>First Name *</label>
           <input
             type="text"
             value={form.firstName}
-            onChange={(e) => setForm(prev => ({ ...prev, firstName: e.target.value }))}
+            onChange={(e) => {
+              setForm(prev => ({ ...prev, firstName: e.target.value }));
+              if (fieldErrors.firstName) setFieldErrors(prev => ({ ...prev, firstName: '' }));
+            }}
             placeholder="First name"
-            className={inputClass}
+            className={getInputClass('firstName')}
           />
+          {fieldErrors.firstName && (
+            <p className={errorMsgClass}>
+              <span className="material-symbols-outlined text-xs">error</span>
+              {fieldErrors.firstName}
+            </p>
+          )}
         </div>
-        <div>
+        <div className="space-y-1">
           <label className={labelClass}>Last Name *</label>
           <input
             type="text"
             value={form.lastName}
-            onChange={(e) => setForm(prev => ({ ...prev, lastName: e.target.value }))}
+            onChange={(e) => {
+              setForm(prev => ({ ...prev, lastName: e.target.value }));
+              if (fieldErrors.lastName) setFieldErrors(prev => ({ ...prev, lastName: '' }));
+            }}
             placeholder="Last name"
-            className={inputClass}
+            className={getInputClass('lastName')}
           />
+          {fieldErrors.lastName && (
+            <p className={errorMsgClass}>
+              <span className="material-symbols-outlined text-xs">error</span>
+              {fieldErrors.lastName}
+            </p>
+          )}
         </div>
       </div>
 
-      <div>
+      <div className="space-y-1">
         <label className={labelClass}>Email *</label>
         <input
           type="email"
           value={form.email}
-          onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
+          onChange={(e) => {
+            setForm(prev => ({ ...prev, email: e.target.value }));
+            if (fieldErrors.email) setFieldErrors(prev => ({ ...prev, email: '' }));
+          }}
           placeholder="email@example.com"
-          className={inputClass}
+          className={getInputClass('email')}
         />
+        {fieldErrors.email && (
+          <p className={errorMsgClass}>
+            <span className="material-symbols-outlined text-xs">error</span>
+            {fieldErrors.email}
+          </p>
+        )}
       </div>
 
-      <div>
+      <div className="space-y-1">
         <label className={labelClass}>Phone *</label>
         <input
           type="tel"
           value={form.phone}
-          onChange={(e) => setForm(prev => ({ ...prev, phone: e.target.value }))}
+          onChange={(e) => {
+            setForm(prev => ({ ...prev, phone: e.target.value }));
+            if (fieldErrors.phone) setFieldErrors(prev => ({ ...prev, phone: '' }));
+          }}
           placeholder="(555) 123-4567"
-          className={inputClass}
+          className={getInputClass('phone')}
         />
+        {fieldErrors.phone && (
+          <p className={errorMsgClass}>
+            <span className="material-symbols-outlined text-xs">error</span>
+            {fieldErrors.phone}
+          </p>
+        )}
       </div>
 
       <div>

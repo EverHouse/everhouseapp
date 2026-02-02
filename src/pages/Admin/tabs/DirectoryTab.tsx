@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import EmptyState from '../../../components/EmptyState';
 import { useNavigate } from 'react-router-dom';
 // Note: react-window List removed due to compatibility issues with React Query
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -1158,33 +1159,25 @@ const DirectoryTab: React.FC = () => {
                 )}
 
                 {!formerLoading && !formerError && memberTab === 'former' && formerMembers.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-16 px-6 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-white/5">
-                        <span aria-hidden="true" className="material-symbols-outlined text-6xl mb-4 text-gray-400 dark:text-white/30">group_off</span>
-                        <h3 className="text-lg font-bold mb-2 text-gray-600 dark:text-white/70">
-                            No former members found
-                        </h3>
-                        <p className="text-sm text-gray-500 dark:text-white/60 max-w-sm mx-auto text-center">
-                            When members leave or their membership expires, they will appear here.
-                        </p>
-                    </div>
+                    <EmptyState
+                        icon="group"
+                        title="No former members found"
+                        description="When members leave or their membership expires, they will appear here"
+                        variant="compact"
+                    />
                 )}
 
                 {!formerLoading && filteredList.length === 0 && memberTab !== 'visitors' && memberTab !== 'team' && (memberTab === 'active' || formerMembers.length > 0) && (
-                    <div className="flex flex-col items-center justify-center py-16 px-6 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-white/5">
-                        <span aria-hidden="true" className="material-symbols-outlined text-6xl mb-4 text-gray-400 dark:text-white/30">
-                            {searchQuery || tierFilter !== 'All' || tagFilter !== 'All' || statusFilter !== 'All' ? 'search_off' : 'person_off'}
-                        </span>
-                        <h3 className="text-lg font-bold mb-2 text-gray-600 dark:text-white/70">
-                            {searchQuery || tierFilter !== 'All' || tagFilter !== 'All' || statusFilter !== 'All' 
-                                ? 'No results found' 
-                                : memberTab === 'former' ? 'No former members' : 'No members yet'}
-                        </h3>
-                        <p className="text-sm text-gray-500 dark:text-white/60 max-w-sm mx-auto text-center">
-                            {searchQuery || tierFilter !== 'All' || tagFilter !== 'All' || statusFilter !== 'All'
-                                ? 'Try adjusting your search or filters to find what you\'re looking for.'
-                                : memberTab === 'former' ? 'Former members will appear here.' : 'Members will appear here once they sign up.'}
-                        </p>
-                    </div>
+                    <EmptyState
+                        icon={searchQuery || tierFilter !== 'All' || tagFilter !== 'All' || statusFilter !== 'All' ? 'search_off' : 'group'}
+                        title={searchQuery || tierFilter !== 'All' || tagFilter !== 'All' || statusFilter !== 'All' 
+                            ? 'No results found' 
+                            : memberTab === 'former' ? 'No former members' : 'No members yet'}
+                        description={searchQuery || tierFilter !== 'All' || tagFilter !== 'All' || statusFilter !== 'All'
+                            ? 'Try adjusting your search or filters to find what you\'re looking for'
+                            : memberTab === 'former' ? 'Former members will appear here' : 'Members will appear here once they sign up'}
+                        variant="compact"
+                    />
                 )}
 
                 {memberTab === 'visitors' && (
@@ -1268,17 +1261,14 @@ const DirectoryTab: React.FC = () => {
                 )}
 
                 {!visitorsLoading && !visitorsError && memberTab === 'visitors' && visitors.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-16 px-6 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-white/5">
-                        <span aria-hidden="true" className="material-symbols-outlined text-6xl mb-4 text-gray-400 dark:text-white/30">badge</span>
-                        <h3 className="text-lg font-bold mb-2 text-gray-600 dark:text-white/70">
-                            No contacts found
-                        </h3>
-                        <p className="text-sm text-gray-500 dark:text-white/60 max-w-sm mx-auto text-center">
-                            {visitorTypeFilter !== 'all' || visitorSourceFilter !== 'all'
-                                ? 'Try adjusting your filters to find contacts.'
-                                : 'Non-member contacts, day pass buyers, and leads will appear here.'}
-                        </p>
-                    </div>
+                    <EmptyState
+                        icon="group"
+                        title="No contacts found"
+                        description={visitorTypeFilter !== 'all' || visitorSourceFilter !== 'all'
+                            ? 'Try adjusting your filters to find contacts'
+                            : 'Non-member contacts, day pass buyers, and leads will appear here'}
+                        variant="compact"
+                    />
                 )}
 
                 {!visitorsLoading && !visitorsError && memberTab === 'visitors' && visitors.length > 0 && (
@@ -1483,15 +1473,12 @@ const DirectoryTab: React.FC = () => {
                 )}
 
                 {!teamLoading && !teamError && memberTab === 'team' && teamMembers.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-16 px-6 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-white/5">
-                        <span aria-hidden="true" className="material-symbols-outlined text-6xl mb-4 text-gray-400 dark:text-white/30">groups</span>
-                        <h3 className="text-lg font-bold mb-2 text-gray-600 dark:text-white/70">
-                            No team members found
-                        </h3>
-                        <p className="text-sm text-gray-500 dark:text-white/60 max-w-sm mx-auto text-center">
-                            Staff and admin accounts will appear here.
-                        </p>
-                    </div>
+                    <EmptyState
+                        icon="group"
+                        title="No team members found"
+                        description="Staff and admin accounts will appear here"
+                        variant="compact"
+                    />
                 )}
 
                 {!teamLoading && !teamError && memberTab === 'team' && filteredTeamMembers.length > 0 && (

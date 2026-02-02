@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import EmptyState from '../../../components/EmptyState';
 import { usePageReady } from '../../../contexts/PageReadyContext';
 import { useData } from '../../../contexts/DataContext';
 import { useToast } from '../../../components/Toast';
@@ -470,10 +471,12 @@ const TrackmanTab: React.FC = () => {
         </div>
         
         {unmatchedBookings.length === 0 && unmatchedTotalCount === 0 ? (
-          <div className="py-8 text-center border-2 border-dashed border-primary/10 dark:border-white/25 rounded-xl">
-            <span aria-hidden="true" className="material-symbols-outlined text-4xl text-primary/20 dark:text-white/20 mb-2">check_circle</span>
-            <p className="text-primary/70 dark:text-white/70">No unmatched bookings</p>
-          </div>
+          <EmptyState
+            icon="check_circle"
+            title="No unmatched bookings"
+            description="All bookings have been matched to members"
+            variant="compact"
+          />
         ) : (
           <div className="space-y-2">
             {/* Mobile card view */}
@@ -946,17 +949,22 @@ const TrackmanTab: React.FC = () => {
                     </button>
                   ))}
                   {fuzzyFilteredMembers.length === 0 && (
-                    <p className="text-center py-4 text-primary/70 dark:text-white/70 text-sm">No members found for "{fuzzySearchQuery}"</p>
+                    <EmptyState
+                      icon="group"
+                      title={`No members found for "${fuzzySearchQuery}"`}
+                      variant="compact"
+                    />
                   )}
                 </div>
               )}
               
               {!fuzzyMatchesData?.matches?.length && !fuzzySearchQuery.trim() && (
-                <div className="py-6 text-center border-2 border-dashed border-primary/10 dark:border-white/25 rounded-xl mb-4">
-                  <span aria-hidden="true" className="material-symbols-outlined text-3xl text-primary/20 dark:text-white/20 mb-2">person_add</span>
-                  <p className="text-primary/70 dark:text-white/70 text-sm">No auto-suggestions available</p>
-                  <p className="text-xs text-primary/50 dark:text-white/50 mt-1">Use the search above to find a member</p>
-                </div>
+                <EmptyState
+                  icon="person_add"
+                  title="No auto-suggestions available"
+                  description="Use the search above to find a member"
+                  variant="compact"
+                />
               )}
               
               {fuzzyMatchModal?.selectedEmail && (fuzzyMatchModal.booking?.originalEmail || fuzzyMatchModal.booking?.original_email) && 

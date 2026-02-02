@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.64.0",
+    date: "2026-02-02",
+    title: "UX/UI Polish & Accessibility Improvements",
+    isMajor: true,
+    changes: [
+      "Improved: Consistent empty state designs across all pages (no more plain 'No results found' text)",
+      "Improved: All submit buttons now show loading spinners while processing",
+      "Improved: Touch targets meet accessibility standards (minimum 44x44 pixels)",
+      "Improved: Better confirmation feedback with toast notifications for key actions",
+      "Improved: Form validation errors are now more visible with red borders and icons",
+      "Improved: Staff modals show success/error toasts when adding players or creating bookings"
+    ]
+  },
+  {
     version: "9.63.2",
     date: "2026-02-02",
     title: "Security & Data Integrity Improvements",

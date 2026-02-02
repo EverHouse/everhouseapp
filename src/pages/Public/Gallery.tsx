@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Footer } from '../../components/Footer';
+import EmptyState from '../../components/EmptyState';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { AnimatedPage } from '../../components/motion';
 
@@ -311,11 +312,12 @@ const Gallery: React.FC = () => {
 
         <div className="px-5 flex-1 animate-content-enter-delay-2">
           {filteredItems.length === 0 ? (
-            <div className="text-center py-20">
-              <span className="material-symbols-outlined text-5xl text-primary/30 mb-4">photo_library</span>
-              <p className="text-primary/60">No images found{filter !== 'All' ? ` in ${filter}` : ''}.</p>
-              <p className="text-primary/40 text-sm mt-2">Check back soon for new photos.</p>
-            </div>
+            <EmptyState
+              icon="photo_library"
+              title={`No images found${filter !== 'All' ? ` in ${filter}` : ''}`}
+              description="Check back soon for new photos."
+              variant="compact"
+            />
           ) : (
             <>
               <div className="columns-2 gap-4 space-y-4 animate-in fade-in duration-500">

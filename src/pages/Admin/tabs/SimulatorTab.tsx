@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
+import EmptyState from '../../../components/EmptyState';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useData } from '../../../contexts/DataContext';
@@ -505,7 +506,11 @@ const ManualBookingModal: React.FC<{
                                         </div>
                                     )}
                                     {searchQuery.length >= 2 && !isSearching && searchResults.length === 0 && (
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">No members found matching "{searchQuery}"</p>
+                                        <EmptyState
+                                            icon="group"
+                                            title={`No members found matching "${searchQuery}"`}
+                                            variant="compact"
+                                        />
                                     )}
                                 </>
                             )}

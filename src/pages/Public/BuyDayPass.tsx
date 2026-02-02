@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
 import Input from '../../components/Input';
+import EmptyState from '../../components/EmptyState';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useNavigationLoading } from '../../contexts/NavigationLoadingContext';
 
@@ -176,9 +177,13 @@ const BuyDayPass: React.FC = () => {
         </h2>
 
         {tiers.length === 0 ? (
-          <div className="bg-white rounded-2xl p-8 text-center border border-black/5">
-            <span className="material-symbols-outlined text-4xl text-primary/30 mb-3">confirmation_number</span>
-            <p className="text-primary/60">No day passes available at this time.</p>
+          <div className="bg-white rounded-2xl border border-black/5">
+            <EmptyState
+              icon="confirmation_number"
+              title="No day passes available"
+              description="Check back soon for available day passes."
+              variant="compact"
+            />
           </div>
         ) : (
           <div className="space-y-4">

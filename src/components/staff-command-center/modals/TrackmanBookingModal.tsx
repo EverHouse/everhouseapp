@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { ModalShell } from '../../ModalShell';
+import { useToast } from '../../Toast';
 import { formatTime12Hour, formatDateShort } from '../../../utils/dateUtils';
 import type { BookingRequest } from '../types';
 
@@ -82,6 +83,7 @@ export function TrackmanBookingModal({
   guests = [],
   onConfirm 
 }: TrackmanBookingModalProps) {
+  const { showToast } = useToast();
   const [externalId, setExternalId] = useState('');
   const [copied, setCopied] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -123,14 +125,17 @@ export function TrackmanBookingModal({
 
     try {
       await onConfirm(booking.id, trimmedId);
+      showToast(`Booking confirmed for ${booking.user_name}`, 'success');
       setExternalId('');
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Failed to confirm booking');
+      const errorMsg = err.message || 'Failed to confirm booking';
+      setError(errorMsg);
+      showToast(errorMsg, 'error');
     } finally {
       setIsSubmitting(false);
     }
-  }, [booking, externalId, onConfirm, onClose]);
+  }, [booking, externalId, onConfirm, onClose, showToast]);
 
   const handleClose = useCallback(() => {
     setExternalId('');

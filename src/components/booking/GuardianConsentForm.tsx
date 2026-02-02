@@ -72,20 +72,20 @@ export function GuardianConsentForm({ onSubmit, onCancel, memberName }: Guardian
     }
   };
 
-  const inputClass = `w-full px-4 py-3 rounded-xl border transition-colors focus:outline-none focus:ring-2 focus:ring-accent ${
-    isDark 
-      ? 'bg-black/20 border-white/20 text-white placeholder:text-white/40' 
-      : 'bg-white border-black/10 text-primary placeholder:text-primary/40'
-  }`;
+  const getInputClass = (hasError: boolean) => `w-full px-4 py-3 rounded-xl border transition-colors focus:outline-none focus:ring-2 ${
+    hasError 
+      ? 'border-red-500 focus:ring-red-500' 
+      : `focus:ring-accent ${isDark ? 'border-white/20' : 'border-black/10'}`
+  } ${isDark ? 'bg-black/20 text-white placeholder:text-white/40' : 'bg-white text-primary placeholder:text-primary/40'}`;
 
-  const selectClass = `w-full px-4 py-3 rounded-xl border transition-colors focus:outline-none focus:ring-2 focus:ring-accent appearance-none cursor-pointer ${
-    isDark 
-      ? 'bg-black/20 border-white/20 text-white' 
-      : 'bg-white border-black/10 text-primary'
-  }`;
+  const getSelectClass = (hasError: boolean) => `w-full px-4 py-3 rounded-xl border transition-colors focus:outline-none focus:ring-2 appearance-none cursor-pointer ${
+    hasError 
+      ? 'border-red-500 focus:ring-red-500' 
+      : `focus:ring-accent ${isDark ? 'border-white/20' : 'border-black/10'}`
+  } ${isDark ? 'bg-black/20 text-white' : 'bg-white text-primary'}`;
 
   const labelClass = `block text-sm font-medium mb-2 ${isDark ? 'text-white/80' : 'text-primary/80'}`;
-  const errorClass = 'text-red-500 text-xs mt-1';
+  const errorClass = 'text-red-500 text-xs mt-1 flex items-center gap-1';
 
   return (
     <form onSubmit={handleSubmit} className="p-6 space-y-5">
@@ -112,9 +112,14 @@ export function GuardianConsentForm({ onSubmit, onCancel, memberName }: Guardian
           value={guardianName}
           onChange={(e) => setGuardianName(e.target.value)}
           placeholder="Enter guardian's full name"
-          className={`${inputClass} ${errors.guardianName ? 'border-red-500' : ''}`}
+          className={getInputClass(!!errors.guardianName)}
         />
-        {errors.guardianName && <p className={errorClass}>{errors.guardianName}</p>}
+        {errors.guardianName && (
+          <p className={errorClass}>
+            <span className="material-symbols-outlined text-xs">error</span>
+            {errors.guardianName}
+          </p>
+        )}
       </div>
 
       <div>
@@ -123,7 +128,7 @@ export function GuardianConsentForm({ onSubmit, onCancel, memberName }: Guardian
           <select
             value={guardianRelationship}
             onChange={(e) => setGuardianRelationship(e.target.value)}
-            className={`${selectClass} ${errors.guardianRelationship ? 'border-red-500' : ''}`}
+            className={getSelectClass(!!errors.guardianRelationship)}
           >
             <option value="">Select relationship...</option>
             {RELATIONSHIP_OPTIONS.map(option => (
@@ -134,7 +139,12 @@ export function GuardianConsentForm({ onSubmit, onCancel, memberName }: Guardian
             expand_more
           </span>
         </div>
-        {errors.guardianRelationship && <p className={errorClass}>{errors.guardianRelationship}</p>}
+        {errors.guardianRelationship && (
+          <p className={errorClass}>
+            <span className="material-symbols-outlined text-xs">error</span>
+            {errors.guardianRelationship}
+          </p>
+        )}
       </div>
 
       <div>
@@ -144,9 +154,14 @@ export function GuardianConsentForm({ onSubmit, onCancel, memberName }: Guardian
           value={guardianPhone}
           onChange={(e) => setGuardianPhone(e.target.value)}
           placeholder="(555) 123-4567"
-          className={`${inputClass} ${errors.guardianPhone ? 'border-red-500' : ''}`}
+          className={getInputClass(!!errors.guardianPhone)}
         />
-        {errors.guardianPhone && <p className={errorClass}>{errors.guardianPhone}</p>}
+        {errors.guardianPhone && (
+          <p className={errorClass}>
+            <span className="material-symbols-outlined text-xs">error</span>
+            {errors.guardianPhone}
+          </p>
+        )}
       </div>
 
       <div className={`p-4 rounded-xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-200'}`}>
@@ -172,7 +187,12 @@ export function GuardianConsentForm({ onSubmit, onCancel, memberName }: Guardian
             I am the parent or legal guardian of {memberName}. I consent to this booking and acknowledge that I am responsible for supervising this minor during their time at the facility. I understand and accept the facility rules and safety guidelines.
           </span>
         </label>
-        {errors.acknowledged && <p className={`${errorClass} mt-2`}>{errors.acknowledged}</p>}
+        {errors.acknowledged && (
+          <p className={`${errorClass} mt-2`}>
+            <span className="material-symbols-outlined text-xs">error</span>
+            {errors.acknowledged}
+          </p>
+        )}
       </div>
 
       <div className="flex gap-3 pt-2">

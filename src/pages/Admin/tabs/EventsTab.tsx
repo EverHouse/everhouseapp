@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import EmptyState from '../../../components/EmptyState';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePageReady } from '../../../contexts/PageReadyContext';
 import { useData, MemberProfile } from '../../../contexts/DataContext';
@@ -1200,10 +1201,12 @@ const EventsAdminContent: React.FC = () => {
                     <span aria-hidden="true" className="material-symbols-outlined animate-spin text-2xl text-gray-600 dark:text-gray-500">progress_activity</span>
                 </div>
             ) : filteredEvents.length === 0 ? (
-                <div className="text-center py-12 text-gray-600 dark:text-gray-500">
-                    <span aria-hidden="true" className="material-symbols-outlined text-4xl mb-2 block">event_busy</span>
-                    <p>No {activeCategory === 'all' ? 'events' : activeCategory.toLowerCase()} found</p>
-                </div>
+                <EmptyState
+                    icon="event"
+                    title={`No ${activeCategory === 'all' ? 'events' : activeCategory.toLowerCase()} found`}
+                    description="Events will appear here once they are created"
+                    variant="compact"
+                />
             ) : (
                 <div key={activeCategory} className="space-y-6 animate-content-enter">
                     {upcomingEvents.length > 0 && (
@@ -1759,10 +1762,12 @@ const WellnessAdminContent: React.FC = () => {
                     <span aria-hidden="true" className="material-symbols-outlined animate-spin text-2xl text-gray-600 dark:text-gray-500">progress_activity</span>
                 </div>
             ) : filteredClasses.length === 0 ? (
-                <div className="text-center py-12 text-gray-600 dark:text-gray-500">
-                    <span aria-hidden="true" className="material-symbols-outlined text-4xl mb-2 block">spa</span>
-                    <p>No {activeCategory === 'all' ? 'wellness classes' : activeCategory.toLowerCase()} found</p>
-                </div>
+                <EmptyState
+                    icon="spa"
+                    title={`No ${activeCategory === 'all' ? 'wellness classes' : activeCategory.toLowerCase()} found`}
+                    description="Wellness classes will appear here once they are scheduled"
+                    variant="compact"
+                />
             ) : (
                 <div className="space-y-6">
                     {upcomingClasses.length > 0 && (

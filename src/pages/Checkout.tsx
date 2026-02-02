@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js';
 import Logo from '../components/Logo';
+import EmptyState from '../components/EmptyState';
 
 interface DayPassProduct {
   id: string;
@@ -512,8 +513,13 @@ function DayPassesSection() {
           ))}
 
           {products.length === 0 && (
-            <div className="col-span-3 text-center py-8 text-primary/70 dark:text-white/70">
-              No day passes available at this time.
+            <div className="col-span-3">
+              <EmptyState
+                icon="confirmation_number"
+                title="No day passes available"
+                description="Check back soon for available day passes."
+                variant="compact"
+              />
             </div>
           )}
         </div>

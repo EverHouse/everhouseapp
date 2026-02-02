@@ -88,9 +88,16 @@ export const AnnouncementFormDrawer: React.FC<AnnouncementFormDrawerProps> = ({
           <button 
             onClick={handleSave}
             disabled={saving || !formData.title}
-            className="flex-1 py-3 rounded-xl bg-primary text-white font-medium shadow-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+            className="flex-1 py-3 rounded-xl bg-primary text-white font-medium shadow-md hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {saving ? 'Saving...' : 'Post'}
+            {saving ? (
+              <>
+                <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
+                Saving...
+              </>
+            ) : (
+              'Post'
+            )}
           </button>
         </div>
       }

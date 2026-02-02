@@ -49,6 +49,7 @@ const EventInquiryForm: React.FC<EventInquiryFormProps> = ({
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   
   const [formData, setFormData] = useState({
     company: '',
@@ -79,17 +80,19 @@ const EventInquiryForm: React.FC<EventInquiryFormProps> = ({
   };
 
   const validateStep1 = () => {
-    if (!formData.firstname.trim()) return 'First name is required';
-    if (!formData.lastname.trim()) return 'Last name is required';
-    if (!formData.email.trim()) return 'Email is required';
-    if (!formData.phone.trim()) return 'Phone number is required';
-    return null;
+    const errors: Record<string, string> = {};
+    if (!formData.firstname.trim()) errors.firstname = 'First name is required';
+    if (!formData.lastname.trim()) errors.lastname = 'Last name is required';
+    if (!formData.email.trim()) errors.email = 'Email is required';
+    if (!formData.phone.trim()) errors.phone = 'Phone number is required';
+    return errors;
   };
 
   const handleNext = () => {
-    const validationError = validateStep1();
-    if (validationError) {
-      setError(validationError);
+    const errors = validateStep1();
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setError('Please fill in all required fields');
       return;
     }
     setError('');
@@ -178,8 +181,15 @@ const EventInquiryForm: React.FC<EventInquiryFormProps> = ({
     setStep(1);
     setSuccess(false);
     setError('');
+    setFieldErrors({});
     onClose();
   };
+
+  const getInputClass = (fieldName: string) => `w-full px-4 py-3 rounded-xl border transition-colors focus:outline-none focus:ring-2 ${
+    fieldErrors[fieldName] 
+      ? 'border-red-500 focus:ring-red-500 bg-red-50 dark:bg-red-900/10' 
+      : 'glass-input focus:ring-accent'
+  } text-primary dark:text-white placeholder:text-gray-400`;
 
   const renderFooter = () => {
     if (success) {
@@ -281,60 +291,96 @@ const EventInquiryForm: React.FC<EventInquiryFormProps> = ({
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
+                    <div className="space-y-1">
                       <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-1.5 pl-1">
                         First Name <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
                         value={formData.firstname}
-                        onChange={(e) => handleChange('firstname', e.target.value)}
+                        onChange={(e) => {
+                          handleChange('firstname', e.target.value);
+                          if (fieldErrors.firstname) setFieldErrors(prev => ({ ...prev, firstname: '' }));
+                        }}
                         placeholder="Jane"
                         required
-                        className="w-full px-4 py-3 glass-input text-primary dark:text-white placeholder:text-gray-400"
+                        className={getInputClass('firstname')}
                       />
+                      {fieldErrors.firstname && (
+                        <p className="text-sm text-red-500 flex items-center gap-1 pl-1">
+                          <span className="material-symbols-outlined text-sm">error</span>
+                          {fieldErrors.firstname}
+                        </p>
+                      )}
                     </div>
-                    <div>
+                    <div className="space-y-1">
                       <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-1.5 pl-1">
                         Last Name <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
                         value={formData.lastname}
-                        onChange={(e) => handleChange('lastname', e.target.value)}
+                        onChange={(e) => {
+                          handleChange('lastname', e.target.value);
+                          if (fieldErrors.lastname) setFieldErrors(prev => ({ ...prev, lastname: '' }));
+                        }}
                         placeholder="Doe"
                         required
-                        className="w-full px-4 py-3 glass-input text-primary dark:text-white placeholder:text-gray-400"
+                        className={getInputClass('lastname')}
                       />
+                      {fieldErrors.lastname && (
+                        <p className="text-sm text-red-500 flex items-center gap-1 pl-1">
+                          <span className="material-symbols-outlined text-sm">error</span>
+                          {fieldErrors.lastname}
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  <div>
+                  <div className="space-y-1">
                     <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-1.5 pl-1">
                       Email <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="email"
                       value={formData.email}
-                      onChange={(e) => handleChange('email', e.target.value)}
+                      onChange={(e) => {
+                        handleChange('email', e.target.value);
+                        if (fieldErrors.email) setFieldErrors(prev => ({ ...prev, email: '' }));
+                      }}
                       placeholder="jane.doe@example.com"
                       required
-                      className="w-full px-4 py-3 glass-input text-primary dark:text-white placeholder:text-gray-400"
+                      className={getInputClass('email')}
                     />
+                    {fieldErrors.email && (
+                      <p className="text-sm text-red-500 flex items-center gap-1 pl-1">
+                        <span className="material-symbols-outlined text-sm">error</span>
+                        {fieldErrors.email}
+                      </p>
+                    )}
                   </div>
 
-                  <div>
+                  <div className="space-y-1">
                     <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-1.5 pl-1">
                       Phone Number <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="tel"
                       value={formData.phone}
-                      onChange={(e) => handleChange('phone', e.target.value)}
+                      onChange={(e) => {
+                        handleChange('phone', e.target.value);
+                        if (fieldErrors.phone) setFieldErrors(prev => ({ ...prev, phone: '' }));
+                      }}
                       placeholder="+1 (555) 000-0000"
                       required
-                      className="w-full px-4 py-3 glass-input text-primary dark:text-white placeholder:text-gray-400"
+                      className={getInputClass('phone')}
                     />
+                    {fieldErrors.phone && (
+                      <p className="text-sm text-red-500 flex items-center gap-1 pl-1">
+                        <span className="material-symbols-outlined text-sm">error</span>
+                        {fieldErrors.phone}
+                      </p>
+                    )}
                   </div>
 
                   <div className="pt-2">

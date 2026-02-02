@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../../components/Toast';
+import EmptyState from '../../../components/EmptyState';
 import { getCheckMetadata, sortBySeverity, CheckSeverity } from '../../../data/integrityCheckMetadata';
 import { fetchWithCredentials, postWithCredentials, deleteWithCredentials } from '../../../hooks/queries/useFetch';
 
@@ -1909,7 +1910,12 @@ const DataIntegrityTab: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No history available</p>
+                  <EmptyState
+                    icon="history"
+                    title="No history available"
+                    description="Run an integrity check to start tracking history."
+                    variant="compact"
+                  />
                 )}
               </>
             ) : (
@@ -2143,10 +2149,13 @@ const DataIntegrityTab: React.FC = () => {
       )}
 
       {results.length > 0 && results.every(r => r.status === 'pass') && (
-        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl p-8 text-center">
-          <span aria-hidden="true" className="material-symbols-outlined text-4xl text-green-600 dark:text-green-400 mb-2">check_circle</span>
-          <p className="text-lg font-bold text-green-700 dark:text-green-300">All Checks Passed!</p>
-          <p className="text-sm text-green-600 dark:text-green-400">No data integrity issues found.</p>
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl">
+          <EmptyState
+            icon="verified"
+            title="All Checks Passed!"
+            description="No data integrity issues found."
+            variant="compact"
+          />
         </div>
       )}
 

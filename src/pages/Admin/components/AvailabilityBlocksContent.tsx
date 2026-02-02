@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { formatDateDisplayWithDay, getTodayPacific } from '../../../utils/dateUtils';
+import EmptyState from '../../../components/EmptyState';
 import { useToast } from '../../../components/Toast';
 import ModalShell from '../../../components/ModalShell';
 import FloatingActionButton from '../../../components/FloatingActionButton';
@@ -401,16 +402,18 @@ const AvailabilityBlocksContent: React.FC = () => {
                     <span aria-hidden="true" className="material-symbols-outlined animate-spin text-2xl text-gray-600 dark:text-gray-500">progress_activity</span>
                 </div>
             ) : upcomingBlocks.length === 0 && pastBlocks.length === 0 ? (
-                <div className="text-center py-12 text-gray-600 dark:text-gray-500">
-                    <span aria-hidden="true" className="material-symbols-outlined text-4xl mb-2 block">event_busy</span>
-                    <p>No availability blocks found</p>
-                    <p className="text-sm mt-1">Use the + button to add a new block</p>
-                </div>
+                <EmptyState
+                    icon="block"
+                    title="No availability blocks found"
+                    description="Use the + button to add a new block"
+                    variant="compact"
+                />
             ) : upcomingBlocks.length === 0 ? (
-                <div className="text-center py-8 text-gray-600 dark:text-gray-500 mb-4">
-                    <span aria-hidden="true" className="material-symbols-outlined text-3xl mb-2 block">event_available</span>
-                    <p>No upcoming blocks</p>
-                </div>
+                <EmptyState
+                    icon="event_available"
+                    title="No upcoming blocks"
+                    variant="compact"
+                />
             ) : (
                 <div className="space-y-3">
                     {groupedUpcoming.map(({ date, blocks: dayBlocks }, groupIndex) => {

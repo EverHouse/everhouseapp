@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { MemberSearchInput, SelectedMember } from '../../shared/MemberSearchInput';
+import { useToast } from '../../Toast';
 import { getApiErrorMessage, getNetworkErrorMessage } from '../../../utils/errorHandling';
 
 interface StaffDirectAddModalProps {
@@ -26,6 +27,7 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
   ownerTier,
   onSuccess
 }) => {
+  const { showToast } = useToast();
   const [mode, setMode] = useState<'member' | 'guest'>('member');
   const [selectedMember, setSelectedMember] = useState<SelectedMember | null>(null);
   const [guestName, setGuestName] = useState('');
@@ -138,14 +140,20 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
       });
 
       if (!res.ok) {
-        setError(getApiErrorMessage(res, 'add player'));
+        const errorMsg = getApiErrorMessage(res, 'add player');
+        setError(errorMsg);
+        showToast(errorMsg, 'error');
         return;
       }
+      const playerName = mode === 'member' ? selectedMember?.name : guestName.trim();
+      showToast(`${playerName || 'Player'} added successfully`, 'success');
       onSuccess();
       onClose();
       resetForm();
     } catch (err) {
-      setError(getNetworkErrorMessage());
+      const errorMsg = getNetworkErrorMessage();
+      setError(errorMsg);
+      showToast(errorMsg, 'error');
     } finally {
       setLoading(false);
     }

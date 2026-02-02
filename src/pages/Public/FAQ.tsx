@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Footer } from '../../components/Footer';
 import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
+import EmptyState from '../../components/EmptyState';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { AnimatedPage } from '../../components/motion';
 
@@ -110,9 +111,12 @@ const FAQ: React.FC = () => {
             <WalkingGolferSpinner size="md" />
           </div>
         ) : filteredFaqs.length === 0 ? (
-          <div className="text-center py-8 text-primary/50">
-            No questions found in this category.
-          </div>
+          <EmptyState
+            icon="help"
+            title="No questions found"
+            description="Try selecting a different category."
+            variant="compact"
+          />
         ) : (
           filteredFaqs.map((faq, index) => (
             <div key={faq.id} className={`animate-list-item-delay-${Math.min(index, 10)}`}>

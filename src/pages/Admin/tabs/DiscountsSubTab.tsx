@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ModalShell from '../../../components/ModalShell';
+import EmptyState from '../../../components/EmptyState';
 
 interface StripeCoupon {
   id: string;
@@ -253,20 +254,16 @@ const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
       </div>
 
       {coupons.length === 0 ? (
-        <div className="text-center py-12 px-6 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-white/5">
-          <span aria-hidden="true" className="material-symbols-outlined text-5xl mb-4 text-gray-500 dark:text-white/20">percent</span>
-          <h3 className="text-lg font-bold mb-2 text-gray-600 dark:text-white/70">No Coupons Found</h3>
-          <p className="text-sm text-gray-500 dark:text-white/70 max-w-xs mx-auto mb-4">
-            Create your first Stripe coupon to offer discounts on memberships and purchases.
-          </p>
-          <button 
-            onClick={openCreateModal}
-            data-create-coupon-btn
-            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-          >
-            Create Your First Coupon
-          </button>
-        </div>
+        <EmptyState
+          icon="local_offer"
+          title="No Coupons Found"
+          description="Create your first Stripe coupon to offer discounts on memberships and purchases"
+          action={{
+            label: "Create Your First Coupon",
+            onClick: openCreateModal
+          }}
+          variant="compact"
+        />
       ) : (
         <div className="space-y-3">
           {coupons.map((coupon, index) => (

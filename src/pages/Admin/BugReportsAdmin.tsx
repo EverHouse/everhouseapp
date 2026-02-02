@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { usePageReady } from '../../contexts/PageReadyContext';
+import EmptyState from '../../components/EmptyState';
 import { useTheme } from '../../contexts/ThemeContext';
 import ModalShell from '../../components/ModalShell';
 import { getBugReportStatusColor, formatStatusLabel, getRoleColor } from '../../utils/statusColors';
@@ -195,10 +196,12 @@ const BugReportsAdmin: React.FC = () => {
                         ))}
                     </div>
                 ) : reports.length === 0 ? (
-                    <div className="text-center py-16">
-                        <span className={`material-symbols-outlined text-4xl mb-3 block ${isDark ? 'text-white/70' : 'text-primary/70'}`} aria-hidden="true">inbox</span>
-                        <p className={`font-medium ${isDark ? 'text-white/80' : 'text-primary/80'}`}>No bug reports found</p>
-                    </div>
+                    <EmptyState
+                        icon="bug_report"
+                        title="No bug reports found"
+                        description="Bug reports submitted by users will appear here"
+                        variant="compact"
+                    />
                 ) : (
                     <div className="space-y-3">
                         {reports.map((report, idx) => (

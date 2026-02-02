@@ -181,7 +181,7 @@ export function SwipeableListItem({
                 <button
                   key={action.id}
                   onClick={() => handleActionClick(action)}
-                  className={`flex flex-col items-center justify-center gap-1 ${colorClasses[action.color]} tap-target transition-all duration-150 pointer-events-auto ${isExpanded ? 'scale-105' : ''}`}
+                  className={`flex flex-col items-center justify-center gap-1 min-h-[44px] ${colorClasses[action.color]} tap-target transition-all duration-150 pointer-events-auto ${isExpanded ? 'scale-105' : ''}`}
                   style={{ 
                     width: isExpanded ? actionWidth * 1.2 : actionWidth,
                     minWidth: actionWidth 
@@ -212,7 +212,7 @@ export function SwipeableListItem({
                 <button
                   key={action.id}
                   onClick={() => handleActionClick(action)}
-                  className={`flex flex-col items-center justify-center gap-1 ${colorClasses[action.color]} tap-target transition-all duration-150 pointer-events-auto ${isExpanded ? 'scale-105' : ''}`}
+                  className={`flex flex-col items-center justify-center gap-1 min-h-[44px] ${colorClasses[action.color]} tap-target transition-all duration-150 pointer-events-auto ${isExpanded ? 'scale-105' : ''}`}
                   style={{ 
                     width: isExpanded ? actionWidth * 1.2 : actionWidth,
                     minWidth: actionWidth 

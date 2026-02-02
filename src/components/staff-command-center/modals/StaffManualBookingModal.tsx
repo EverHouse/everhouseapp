@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { SlideUpDrawer } from '../../SlideUpDrawer';
 import { MemberSearchInput, type SelectedMember } from '../../shared/MemberSearchInput';
+import { useToast } from '../../Toast';
 import { getTodayPacific, formatTime12Hour, formatDateShort } from '../../../utils/dateUtils';
 
 const TRACKMAN_PORTAL_URL = 'https://portal.trackmangolf.com/facility/RmFjaWxpdHkKZGI4YWMyN2FhLTM2YWQtNDM4ZC04MjUzLWVmOWU5NzMwMjkxZg==';
@@ -95,6 +96,7 @@ export function StaffManualBookingModal({
   defaultDate,
   defaultHostMember
 }: StaffManualBookingModalProps) {
+  const { showToast } = useToast();
   const [mode, setMode] = useState<'member' | 'lesson'>('member');
   const [step, setStep] = useState<1 | 2>(1);
   const [resources, setResources] = useState<Resource[]>([]);
@@ -290,13 +292,16 @@ export function StaffManualBookingModal({
       };
 
       await onSubmit(data);
+      showToast(`Booking created for ${hostMember.name}`, 'success');
       handleClose();
     } catch (err: any) {
-      setError(err.message || 'Failed to create booking');
+      const errorMsg = err.message || 'Failed to create booking';
+      setError(errorMsg);
+      showToast(errorMsg, 'error');
     } finally {
       setIsSubmitting(false);
     }
-  }, [hostMember, resourceId, externalId, requestDate, startTime, durationMinutes, playerCount, participants, onSubmit]);
+  }, [hostMember, resourceId, externalId, requestDate, startTime, durationMinutes, playerCount, participants, onSubmit, showToast]);
 
   const handleClose = useCallback(() => {
     setStep(1);

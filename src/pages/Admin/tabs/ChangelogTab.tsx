@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { changelog } from '../../../data/changelog';
+import EmptyState from '../../../components/EmptyState';
 import { formatRelativeTime } from '../../../utils/dateUtils';
 import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 import PullToRefresh from '../../../components/PullToRefresh';
@@ -799,11 +800,12 @@ const ChangelogTab: React.FC = () => {
                 )}
 
                 {entries.length === 0 ? (
-                    <div className="text-center py-16 text-primary/70 dark:text-white/70">
-                        <span aria-hidden="true" className="material-symbols-outlined text-6xl mb-4 block opacity-30">history</span>
-                        <p className="text-lg font-medium">No activity found</p>
-                        <p className="text-sm mt-1 opacity-70">Staff actions will appear here as they occur.</p>
-                    </div>
+                    <EmptyState
+                        icon="history"
+                        title="No activity found"
+                        description="Staff actions will appear here as they occur"
+                        variant="compact"
+                    />
                 ) : (
                     <div className="space-y-3">
                         {entries.map((entry, index) => {
