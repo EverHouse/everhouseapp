@@ -29,7 +29,7 @@ interface MetricCardProps {
   ariaLabel: string;
 }
 
-const MetricCard: React.FC<MetricCardProps> = ({ icon, label, value, subtext, isDark, onClick, ariaLabel }) => (
+const MetricCard: React.FC<MetricCardProps> = React.memo(({ icon, label, value, subtext, isDark, onClick, ariaLabel }) => (
   <button
     type="button"
     onClick={onClick}
@@ -58,7 +58,7 @@ const MetricCard: React.FC<MetricCardProps> = ({ icon, label, value, subtext, is
       </div>
     )}
   </button>
-);
+));
 
 const formatMinutesUsage = (used: number, allowed: number): { value: string; subtext: string } => {
   if (allowed === 999) {
@@ -96,7 +96,7 @@ const truncateTitle = (title: string, maxLength: number = 18): string => {
   return title.substring(0, maxLength - 1) + '…';
 };
 
-const MetricsGrid: React.FC<MetricsGridProps> = ({
+const MetricsGrid: React.FC<MetricsGridProps> = React.memo(({
   simulatorMinutesUsed,
   simulatorMinutesAllowed,
   conferenceMinutesUsed,
@@ -181,6 +181,6 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({
       />
     </div>
   );
-};
+});
 
 export default MetricsGrid;
