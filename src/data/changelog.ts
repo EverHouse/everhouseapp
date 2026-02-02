@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.68.3",
+    date: "2026-02-02",
+    title: "Data Integrity Cleanup",
+    changes: [
+      "Fixed: 7 members missing tier now have tier copied from their alternate email or pulled from HubSpot",
+      "Added: Script to safely pull missing tiers from HubSpot (skips unknown tiers to prevent data corruption)"
+    ]
+  },
+  {
     version: "9.68.2",
     date: "2026-02-02",
     title: "HubSpot Tier Sync Safety",
