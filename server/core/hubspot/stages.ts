@@ -192,10 +192,12 @@ export async function syncMemberToHubSpot(
     }
     
     if (tier) {
-      const normalizedTier = tier.toLowerCase();
-      const hubspotTier = DB_TIER_TO_HUBSPOT[normalizedTier] || tier;
-      properties.membership_tier = hubspotTier;
-      updated.tier = true;
+      const { denormalizeTierForHubSpot } = await import('../../utils/tierUtils');
+      const hubspotTier = denormalizeTierForHubSpot(tier);
+      if (hubspotTier) {
+        properties.membership_tier = hubspotTier;
+        updated.tier = true;
+      }
     }
     
     if (memberSince) {

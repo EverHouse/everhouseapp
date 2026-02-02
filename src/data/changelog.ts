@@ -13,6 +13,28 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.68.2",
+    date: "2026-02-02",
+    title: "HubSpot Tier Sync Safety",
+    changes: [
+      "Fixed: Unknown/unrecognized tiers now safely skip HubSpot updates instead of setting incorrect values",
+      "Fixed: HubSpot contact/deal creation now builds properties conditionally to prevent empty tier fields",
+      "Added: Group Lessons tier support for HubSpot sync",
+      "Improved: Consistent null handling across all HubSpot tier sync points"
+    ]
+  },
+  {
+    version: "9.68.1",
+    date: "2026-02-02",
+    title: "HubSpot Tier Sync Improvements",
+    changes: [
+      "Improved: App is now source of truth for membership tiers - tier data pushed to HubSpot uses standardized format",
+      "Improved: Tier names normalized when syncing to HubSpot (e.g., 'Core' becomes 'Core Membership', founding member variations simplified)",
+      "Fixed: Removed orphaned Stripe customer IDs for deleted Stripe customers",
+      "Fixed: Data integrity check now correctly excludes MindBody-billed members from Stripe sync warnings"
+    ]
+  },
+  {
     version: "9.68.0",
     date: "2026-02-02",
     title: "Page Load Performance Boost",

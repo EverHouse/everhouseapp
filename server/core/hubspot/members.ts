@@ -122,18 +122,24 @@ export async function findOrCreateHubSpotContact(
   }
   
   try {
+    const { denormalizeTierForHubSpot } = await import('../../utils/tierUtils');
+    const hubspotTier = tier ? denormalizeTierForHubSpot(tier) : null;
+    
+    const properties: Record<string, string> = {
+      email: email.toLowerCase(),
+      firstname: firstName,
+      lastname: lastName,
+      phone: phone || '',
+      membership_status: 'Active',
+      lifecyclestage: 'customer'
+    };
+    
+    if (hubspotTier) {
+      properties.membership_tier = hubspotTier;
+    }
+    
     const createResponse = await retryableHubSpotRequest(() =>
-      hubspot.crm.contacts.basicApi.create({
-        properties: {
-          email: email.toLowerCase(),
-          firstname: firstName,
-          lastname: lastName,
-          phone: phone || '',
-          membership_tier: tier?.toLowerCase() || '',
-          membership_status: 'Active',
-          lifecyclestage: 'customer'
-        }
-      })
+      hubspot.crm.contacts.basicApi.create({ properties })
     );
     
     return { contactId: createResponse.id, isNew: true };
@@ -162,17 +168,22 @@ export async function createMembershipDeal(
   stage?: string
 ): Promise<string> {
   const hubspot = await getHubSpotClient();
+  const { denormalizeTierForHubSpot } = await import('../../utils/tierUtils');
+  const hubspotTier = tier ? denormalizeTierForHubSpot(tier) : null;
+  
+  const properties: Record<string, string> = {
+    dealname: dealName,
+    pipeline: MEMBERSHIP_PIPELINE_ID,
+    dealstage: stage || HUBSPOT_STAGE_IDS.CLOSED_WON_ACTIVE,
+    closedate: startDate || new Date().toISOString().split('T')[0]
+  };
+  
+  if (hubspotTier) {
+    properties.membership_tier = hubspotTier;
+  }
   
   const dealResponse = await retryableHubSpotRequest(() =>
-    hubspot.crm.deals.basicApi.create({
-      properties: {
-        dealname: dealName,
-        pipeline: MEMBERSHIP_PIPELINE_ID,
-        dealstage: stage || HUBSPOT_STAGE_IDS.CLOSED_WON_ACTIVE,
-        closedate: startDate || new Date().toISOString().split('T')[0],
-        membership_tier: tier?.toLowerCase() || ''
-      }
-    })
+    hubspot.crm.deals.basicApi.create({ properties })
   );
   
   const dealId = dealResponse.id;
@@ -818,31 +829,36 @@ export async function handleTierChange(
       };
     }
     
-    try {
-      const hubspot = await getHubSpotClient();
-      await retryableHubSpotRequest(() =>
-        hubspot.crm.deals.basicApi.update(hubspotDealId, {
-          properties: {
-            membership_tier: newTier
-          }
-        })
-      );
-    } catch (dealUpdateError) {
-      console.warn('[HubSpotDeals] Failed to update deal membership_tier property:', dealUpdateError);
-    }
+    const { denormalizeTierForHubSpot } = await import('../../utils/tierUtils');
+    const hubspotNewTier = denormalizeTierForHubSpot(newTier);
     
-    if (deal.hubspotContactId) {
+    if (hubspotNewTier) {
       try {
         const hubspot = await getHubSpotClient();
         await retryableHubSpotRequest(() =>
-          hubspot.crm.contacts.basicApi.update(deal.hubspotContactId!, {
+          hubspot.crm.deals.basicApi.update(hubspotDealId, {
             properties: {
-              membership_tier: newTier
+              membership_tier: hubspotNewTier
             }
           })
         );
-      } catch (contactUpdateError) {
-        console.warn('[HubSpotDeals] Failed to update contact membership_tier property:', contactUpdateError);
+      } catch (dealUpdateError) {
+        console.warn('[HubSpotDeals] Failed to update deal membership_tier property:', dealUpdateError);
+      }
+      
+      if (deal.hubspotContactId) {
+        try {
+          const hubspot = await getHubSpotClient();
+          await retryableHubSpotRequest(() =>
+            hubspot.crm.contacts.basicApi.update(deal.hubspotContactId!, {
+              properties: {
+                membership_tier: hubspotNewTier
+              }
+            })
+          );
+        } catch (contactUpdateError) {
+          console.warn('[HubSpotDeals] Failed to update contact membership_tier property:', contactUpdateError);
+        }
       }
     }
     
