@@ -9,7 +9,7 @@ import Avatar from '../../components/Avatar';
 import ModalShell from '../../components/ModalShell';
 import MenuOverlay from '../../components/MenuOverlay';
 import PageErrorBoundary from '../../components/PageErrorBoundary';
-import { useStaffWebSocket } from '../../hooks/useStaffWebSocket';
+import { useStaffWebSocketContext, useStaffWebSocketCallback } from '../../contexts/StaffWebSocketContext';
 import { useWebSocketQuerySync } from '../../hooks/useWebSocketQuerySync';
 import StaffMobileSidebar from '../../components/StaffMobileSidebar';
 import { useConfirmDialog } from '../../components/ConfirmDialog';
@@ -41,10 +41,8 @@ const AdminDashboard: React.FC = () => {
     refetchPendingCounts();
   }, [refetchPendingCounts]);
 
-  const { isConnected: staffWsConnected } = useStaffWebSocket({
-    onBookingEvent: handleGlobalBookingEvent,
-    debounceMs: 500
-  });
+  const { isConnected: staffWsConnected } = useStaffWebSocketContext();
+  useStaffWebSocketCallback('admin-dashboard', handleGlobalBookingEvent);
 
   useWebSocketQuerySync();
 

@@ -338,8 +338,10 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   // Fetch members from HubSpot for admin/staff users
   // Optimization: Only fetch first page (200 members) initially for faster load
   // Full member list loads on-demand via fetchMembersPaginated when accessing directory
+  // Wait for session to be checked before fetching to avoid "Failed to fetch" errors
   useEffect(() => {
     const fetchInitialMembers = async () => {
+      if (!sessionChecked) return;
       if (!actualUser || (actualUser.role !== 'admin' && actualUser.role !== 'staff')) return;
       
       try {
@@ -384,7 +386,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       }
     };
     fetchInitialMembers();
-  }, [actualUser]);
+  }, [sessionChecked, actualUser]);
 
   // Function to fetch former/inactive members on demand with 10-minute cache
   // Uses actualUserRef to avoid stale closure issues when session loads after mount
@@ -582,14 +584,19 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     }
   }, []);
 
-  // Start background sync
+  // Start background sync only after session is checked and user is authenticated
   useEffect(() => {
-    startBackgroundSync();
-  }, []);
+    if (sessionChecked && actualUser) {
+      startBackgroundSync();
+    }
+  }, [sessionChecked, actualUser]);
 
   // Fetch cafe menu (React Query is the primary source via useCafeMenu hook)
   // This provides fallback data for any components still using DataContext
+  // Wait for session to be checked before fetching to avoid "Failed to fetch" errors
   useEffect(() => {
+    if (!sessionChecked) return;
+    
     const fetchCafeMenu = async () => {
       try {
         const res = await fetch('/api/cafe-menu');
@@ -608,13 +615,16 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           }
         }
       } catch (err) {
-        console.error('Failed to fetch cafe menu:', err);
+        // Only log errors if user is logged in (authenticated API call failed)
+        if (actualUser) {
+          console.error('Failed to fetch cafe menu:', err);
+        }
       } finally {
         setCafeMenuLoaded(true);
       }
     };
     fetchCafeMenu();
-  }, []);
+  }, [sessionChecked, actualUser]);
 
   // Function to refresh announcements
   const refreshAnnouncements = useCallback(async () => {
@@ -632,7 +642,10 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   }, []);
 
   // Fetch announcements from API (active only - already filtered and priority-sorted by API)
+  // Wait for session to be checked before fetching to avoid "Failed to fetch" errors
   useEffect(() => {
+    if (!sessionChecked) return;
+    
     const fetchAnnouncements = async () => {
       try {
         const res = await fetch('/api/announcements?active_only=true');
@@ -643,13 +656,16 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           }
         }
       } catch (err) {
-        console.error('Failed to fetch announcements:', err);
+        // Only log errors if user is logged in (authenticated API call failed)
+        if (actualUser) {
+          console.error('Failed to fetch announcements:', err);
+        }
       } finally {
         setAnnouncementsLoaded(true);
       }
     };
     fetchAnnouncements();
-  }, []);
+  }, [sessionChecked, actualUser]);
 
   // Listen for real-time announcement updates via WebSocket
   useEffect(() => {
@@ -804,7 +820,10 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   }, [actualUser?.role]);
 
   // Fetch events (Admin uses React Query, Member/Events still consumes from DataContext)
+  // Wait for session to be checked before fetching to avoid "Failed to fetch" errors
   useEffect(() => {
+    if (!sessionChecked) return;
+    
     const normalizeCategory = (cat: string | null | undefined): string => {
       if (!cat) return 'Social';
       const lower = cat.toLowerCase();
@@ -844,13 +863,16 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           }
         }
       } catch (err) {
-        console.error('Failed to fetch events:', err);
+        // Only log errors if user is logged in (authenticated API call failed)
+        if (actualUser) {
+          console.error('Failed to fetch events:', err);
+        }
       } finally {
         setEventsLoaded(true);
       }
     };
     fetchEvents();
-  }, []);
+  }, [sessionChecked, actualUser]);
 
   // Auth Logic - verify member email
   const login = useCallback(async (email: string) => {

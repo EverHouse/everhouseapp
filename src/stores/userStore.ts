@@ -78,11 +78,16 @@ export const useUserStore = create<UserState>()(
         const { user } = get();
         if (!user?.email) return;
         
-        const { ok, data } = await apiRequest<GuestPasses>(
-          `/api/guest-passes/${encodeURIComponent(user.email)}?tier=${encodeURIComponent(user.tier || 'Social')}`
-        );
-        if (ok && data) {
-          set({ guestPasses: data });
+        try {
+          const { ok, data, error } = await apiRequest<GuestPasses>(
+            `/api/guest-passes/${encodeURIComponent(user.email)}?tier=${encodeURIComponent(user.tier || 'Social')}`
+          );
+          if (ok && data) {
+            set({ guestPasses: data });
+          }
+          // Silently ignore auth/network errors - session may not be ready
+        } catch {
+          // Silently fail - prevents "Failed to fetch" console spam
         }
       },
 
@@ -90,11 +95,16 @@ export const useUserStore = create<UserState>()(
         const { user } = get();
         if (!user?.email) return;
         
-        const { ok, data } = await apiRequest<UserBooking[]>(
-          `/api/bookings?user_email=${encodeURIComponent(user.email)}`
-        );
-        if (ok && data) {
-          set({ bookings: data });
+        try {
+          const { ok, data } = await apiRequest<UserBooking[]>(
+            `/api/bookings?user_email=${encodeURIComponent(user.email)}`
+          );
+          if (ok && data) {
+            set({ bookings: data });
+          }
+          // Silently ignore auth/network errors - session may not be ready
+        } catch {
+          // Silently fail - prevents "Failed to fetch" console spam
         }
       },
 
@@ -123,9 +133,9 @@ export const useUserStore = create<UserState>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.isHydrated = true;
-          if (state.user) {
-            state.refreshAll();
-          }
+          // NOTE: Do NOT call refreshAll here - the session may not be verified yet
+          // DataContext will trigger refreshAll after session verification completes
+          // This prevents "Failed to fetch" errors on initial page load
         }
       }
     }

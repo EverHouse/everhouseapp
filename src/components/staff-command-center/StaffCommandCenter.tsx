@@ -11,7 +11,7 @@ import { useToast } from '../Toast';
 import { getTodayPacific, formatTime12Hour, formatDateShort } from '../../utils/dateUtils';
 import { StaffCommandCenterSkeleton } from '../skeletons';
 import { AnimatedPage } from '../motion';
-import { useStaffWebSocket } from '../../hooks/useStaffWebSocket';
+import { useStaffWebSocketContext } from '../../contexts/StaffWebSocketContext';
 
 import { useCommandCenterData } from './hooks/useCommandCenterData';
 import { formatLastSynced, formatTodayDate } from './helpers';
@@ -45,7 +45,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   const { isAtBottom } = useBottomNav();
   const isMobile = useIsMobile();
   const { actualUser } = useData();
-  const { isConnected: wsConnected } = useStaffWebSocket({ onMessage: () => {} });
+  const { isConnected: wsConnected } = useStaffWebSocketContext();
   
   const navigateToTab = useCallback((tab: TabType) => {
     if (tabToPath[tab as keyof typeof tabToPath]) {

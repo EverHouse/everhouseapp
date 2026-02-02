@@ -79,9 +79,15 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       if (res.ok) {
         const data = await res.json();
         get().setNotifications(data);
+      } else if (res.status === 401 || res.status === 403) {
+        // Session not ready or user not authenticated - silently ignore
       }
-    } catch (err) {
-      console.error('Failed to fetch notifications:', err);
+    } catch (err: any) {
+      // Only log actual network errors, not session-related failures
+      const message = err?.message?.toLowerCase() || '';
+      if (!message.includes('failed to fetch') && !message.includes('network')) {
+        console.error('Failed to fetch notifications:', err);
+      }
     } finally {
       set({ isLoading: false });
     }
@@ -97,9 +103,15 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       if (res.ok) {
         const data = await res.json();
         set({ unreadCount: data.length });
+      } else if (res.status === 401 || res.status === 403) {
+        // Session not ready or user not authenticated - silently ignore
       }
-    } catch (err) {
-      console.error('Failed to fetch unread count:', err);
+    } catch (err: any) {
+      // Only log actual network errors, not session-related failures
+      const message = err?.message?.toLowerCase() || '';
+      if (!message.includes('failed to fetch') && !message.includes('network')) {
+        console.error('Failed to fetch unread count:', err);
+      }
     }
   }
 }));

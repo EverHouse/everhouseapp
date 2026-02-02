@@ -120,7 +120,13 @@ const syncAll = async () => {
   if (!isVisible() || !isOnline()) return;
 
   const user = useUserStore.getState().user;
-  if (user?.email) {
+  // Only sync if user is authenticated with a valid email
+  // This prevents "Failed to fetch" errors before session is verified
+  if (!user?.email) {
+    return;
+  }
+  
+  try {
     await fetchAndCache(
       'notifications', 
       `/api/notifications?user_email=${encodeURIComponent(user.email)}&unread_only=true`,
@@ -129,6 +135,8 @@ const syncAll = async () => {
         window.dispatchEvent(new CustomEvent('notifications-read'));
       }
     );
+  } catch (err) {
+    // Silently fail if session isn't ready - don't log console errors
   }
 };
 

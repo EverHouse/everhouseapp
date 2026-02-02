@@ -35,6 +35,7 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { useSupabaseRealtime } from './hooks/useSupabaseRealtime';
 import { StaffBookingToast } from './components/StaffBookingToast';
 import UpdateNotification from './components/UpdateNotification';
+import { StaffWebSocketProvider } from './contexts/StaffWebSocketContext';
 
 const MINIMUM_LOADER_DISPLAY_MS = 2000;
 
@@ -370,7 +371,9 @@ const AnimatedRoutes: React.FC = () => {
 
             <Route path="/admin" element={
               <AdminProtectedRoute>
-                <DirectionalPageTransition><PageErrorBoundary pageName="AdminDashboard"><AdminDashboard /></PageErrorBoundary></DirectionalPageTransition>
+                <StaffWebSocketProvider>
+                  <DirectionalPageTransition><PageErrorBoundary pageName="AdminDashboard"><AdminDashboard /></PageErrorBoundary></DirectionalPageTransition>
+                </StaffWebSocketProvider>
               </AdminProtectedRoute>
             }>
               <Route index element={<StaffCommandCenter />} />
