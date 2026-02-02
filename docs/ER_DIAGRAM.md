@@ -1,8 +1,321 @@
-# Database Entity Relationship Diagram
+# Database Entity Relationship Diagrams
 
-This document contains the complete ER diagram for all database tables and their relationships.
+This document provides focused views of the database schema for different audiences. Each diagram shows only the relevant tables for that particular domain.
 
-## Mermaid ER Diagram
+> **Note:** These focused diagrams intentionally show only a subset of tables. For the complete schema, see the "Full Schema Reference" section at the bottom. Some views include substitutions where requested tables don't exist in the current schema.
+
+---
+
+## 1. Core Business Diagram
+
+**Audience:** Non-technical stakeholders, product managers, operations team
+
+This is the cleanest view - showing only what business stakeholders care about: Who are the members, what do they book, and what activities are available?
+
+```mermaid
+erDiagram
+    users {
+        varchar id PK
+        varchar email UK
+        varchar name
+        integer tier_id FK
+        timestamp created_at
+    }
+    
+    membership_tiers {
+        integer id PK
+        varchar name UK
+        varchar slug UK
+        text description
+        integer monthly_price_cents
+        boolean is_active
+    }
+    
+    resources {
+        integer id PK
+        varchar name UK
+        varchar type
+        text description
+        boolean is_active
+    }
+    
+    booking_requests {
+        integer id PK
+        varchar user_id FK
+        integer resource_id FK
+        date request_date
+        time start_time
+        time end_time
+        varchar status
+    }
+    
+    booking_sessions {
+        integer id PK
+        integer resource_id FK
+        date session_date
+        time start_time
+        time end_time
+        varchar source
+    }
+    
+    events {
+        integer id PK
+        varchar title
+        text description
+        timestamp start_time
+        timestamp end_time
+        varchar location
+        integer max_capacity
+    }
+    
+    event_rsvps {
+        integer id PK
+        integer event_id FK
+        varchar user_email
+        varchar status
+    }
+
+    %% Relationships
+    users ||--o{ booking_requests : "makes"
+    users }o--|| membership_tiers : "has"
+    resources ||--o{ booking_requests : "booked"
+    booking_requests ||--o| booking_sessions : "generates"
+    events ||--o{ event_rsvps : "has"
+    users ||--o{ event_rsvps : "attends"
+```
+
+### What This Shows
+- **Members** belong to a membership tier that determines benefits
+- **Bookings** reserve simulator bays (resources) for specific time slots
+- **Sessions** represent actual usage of the bays
+- **Events** are club activities that members can RSVP to attend
+
+---
+
+## 2. Finance & Billing Diagram
+
+**Audience:** Developers working on payments, billing team, finance staff
+
+This view focuses purely on money flow: How members pay, billing group structures, and payment tracking.
+
+> **Schema Note:** There is no separate `invoices` table. Invoice management is handled directly in Stripe. The `stripe_payment_intents` table tracks payment attempts and the `booking_fee_snapshots` table captures calculated fees.
+
+```mermaid
+erDiagram
+    users {
+        varchar id PK
+        varchar email UK
+        varchar name
+    }
+    
+    billing_groups {
+        integer id PK
+        varchar primary_email UK
+        varchar primary_stripe_customer_id
+        varchar primary_stripe_subscription_id
+        varchar group_name
+        text type
+        boolean is_active
+    }
+    
+    stripe_payment_intents {
+        integer id PK
+        varchar stripe_payment_intent_id UK
+        varchar customer_email
+        integer amount_cents
+        varchar status
+        varchar payment_type
+        timestamp created_at
+    }
+    
+    stripe_products {
+        integer id PK
+        varchar stripe_product_id UK
+        varchar name
+        integer price_cents
+    }
+    
+    day_pass_purchases {
+        varchar id PK
+        varchar email
+        varchar stripe_payment_intent_id FK
+        varchar status
+        integer price_cents
+        timestamp purchased_at
+    }
+    
+    booking_fee_snapshots {
+        integer id PK
+        integer booking_id FK
+        integer total_cents
+        varchar stripe_payment_intent_id FK
+        varchar status
+    }
+
+    %% Relationships
+    users }o--o| billing_groups : "belongs to"
+    users ||--o{ stripe_payment_intents : "pays"
+    users ||--o{ day_pass_purchases : "purchases"
+    day_pass_purchases }o--|| stripe_payment_intents : "paid via"
+    booking_fee_snapshots }o--|| stripe_payment_intents : "charged via"
+```
+
+### What This Shows
+- **Billing Groups** handle family/corporate unified billing (one person pays for multiple members)
+- **Stripe Payment Intents** track all payment attempts and completions
+- **Booking Fee Snapshots** capture calculated fees at booking time (serves as "invoice" data)
+- **Day Passes** are one-time purchases for non-members
+
+---
+
+## 3. Integrations Diagram
+
+**Audience:** Developers working on external service connections
+
+This view shows how data maps to external services: HubSpot CRM, Trackman simulators, and Stripe.
+
+> **Schema Note:** There is no separate `stripe_customers` table. Stripe customer IDs are stored in `billing_groups.primary_stripe_customer_id`.
+
+```mermaid
+erDiagram
+    users {
+        varchar id PK
+        varchar email UK
+        varchar name
+    }
+    
+    billing_groups {
+        integer id PK
+        varchar primary_email UK
+        varchar primary_stripe_customer_id
+        varchar group_name
+    }
+    
+    hubspot_deals {
+        integer id PK
+        varchar hubspot_deal_id UK
+        varchar member_email
+        varchar deal_name
+        varchar stage
+        numeric amount
+        timestamp close_date
+    }
+    
+    resources {
+        integer id PK
+        varchar name UK
+        varchar type
+    }
+    
+    trackman_bay_slots {
+        integer id PK
+        integer resource_id FK
+        varchar trackman_bay_id
+        varchar bay_name
+    }
+    
+    trackman_import_runs {
+        integer id PK
+        timestamp started_at
+        timestamp completed_at
+        integer records_processed
+        integer records_matched
+        varchar status
+    }
+
+    %% Relationships
+    users ||--o{ hubspot_deals : "syncs to"
+    users }o--o| billing_groups : "has Stripe customer"
+    resources ||--o{ trackman_bay_slots : "maps to"
+```
+
+### What This Shows
+- **HubSpot Deals** track membership sales in CRM (synced from Stripe subscriptions)
+- **Billing Groups** store Stripe customer IDs for payment integration
+- **Trackman Bay Slots** map simulator bays to Trackman's booking system
+- **Trackman Import Runs** log CSV import history from Trackman exports
+
+---
+
+## 4. System Internals Diagram
+
+**Audience:** Backend engineers, DevOps, debugging infrastructure issues
+
+This view covers operational tables for debugging and monitoring.
+
+> **Schema Note:** There is no `error_logs` table. Error logging is handled via structured `console.error` calls that appear in server runtime logs.
+
+```mermaid
+erDiagram
+    job_queue {
+        integer id PK
+        varchar job_type
+        jsonb payload
+        varchar status
+        integer attempts
+        timestamp run_at
+        timestamp created_at
+    }
+    
+    rate_limits {
+        integer id PK
+        varchar key UK
+        integer count
+        timestamp window_start
+    }
+    
+    notifications {
+        integer id PK
+        varchar user_email
+        varchar type
+        varchar title
+        text message
+        boolean is_read
+        timestamp created_at
+    }
+    
+    app_settings {
+        integer id PK
+        varchar key UK
+        text value
+        varchar category
+        timestamp updated_at
+    }
+    
+    admin_audit_log {
+        integer id PK
+        varchar staff_email
+        varchar action
+        varchar resource_type
+        varchar resource_id
+        jsonb details
+        timestamp created_at
+    }
+    
+    webhook_processed_events {
+        integer id PK
+        varchar event_id UK
+        varchar source
+        timestamp processed_at
+    }
+```
+
+### What This Shows
+- **Job Queue** handles background tasks (emails, syncs, cleanup)
+- **Rate Limits** prevent API abuse by tracking request counts
+- **Notifications** are in-app alerts delivered to users
+- **App Settings** store configurable values (feature flags, etc.)
+- **Admin Audit Log** tracks all staff actions for compliance
+- **Webhook Events** ensures external events are processed exactly once
+
+---
+
+## Full Schema Reference
+
+For the complete database schema with all 70+ tables, see below. This is the authoritative reference for all tables and relationships.
+
+<details>
+<summary>Click to expand full schema</summary>
 
 ```mermaid
 erDiagram
@@ -729,35 +1042,28 @@ erDiagram
     users ||--o{ event_rsvps : "attends"
 ```
 
+</details>
+
+---
+
 ## Table Summary
 
-| Category | Tables |
-|----------|--------|
-| **Core Users & Membership** | users, staff_users, membership_tiers, tier_features, tier_feature_values, billing_groups, group_members, family_add_on_products |
-| **Resources & Availability** | resources, availability_blocks, trackman_bay_slots, facility_closures, closure_reasons |
-| **Bookings** | booking_requests, booking_sessions, booking_participants, booking_members, booking_guests, booking_fee_snapshots, booking_payment_audit |
-| **Guests & Passes** | guests, guest_passes, guest_check_ins, pass_redemption_logs |
-| **Day Passes** | day_pass_purchases |
-| **Events** | events, event_rsvps |
-| **Wellness** | wellness_classes, wellness_enrollments |
-| **Payments & Stripe** | stripe_payment_intents, stripe_products, stripe_transaction_cache, discount_rules |
-| **HubSpot Integration** | hubspot_deals, hubspot_line_items, hubspot_product_mappings, hubspot_form_configs, hubspot_sync_queue, dismissed_hubspot_meetings |
-| **Tours** | tours |
-| **Communication** | communication_logs, notifications, announcements, notice_types, user_dismissed_notices, push_subscriptions, email_events, member_notes |
-| **Authentication** | sessions, magic_links, user_linked_emails |
-| **TrackMan Integration** | trackman_import_runs, trackman_unmatched_bookings, trackman_webhook_events, trackman_webhook_dedup |
-| **Admin & Audit** | admin_audit_log, billing_audit_log, account_deletion_requests, data_export_requests, bug_reports, form_submissions |
-| **Content & Settings** | app_settings, system_settings, faqs, gallery_images, training_sections, cafe_items |
-| **System & Jobs** | job_queue, rate_limits, webhook_processed_events |
-| **Integrity & Legacy** | integrity_check_history, integrity_issues_tracking, integrity_ignores, integrity_audit_log, legacy_import_jobs, legacy_purchases, usage_ledger |
-
-## Key Relationships
-
-1. **Users → Membership Tiers**: Each user has a membership tier
-2. **Users → Billing Groups**: Users can belong to a billing group (family/corporate)
-3. **Booking Requests → Users, Resources**: Bookings link users to resources
-4. **Booking Sessions → Resources**: Sessions are hosted on resources
-5. **Booking Participants → Sessions**: Participants belong to booking sessions
-6. **Events → RSVPs → Users**: Event attendance tracking
-7. **Tier Features → Feature Values → Tiers**: Feature configuration per tier
-8. **Availability Blocks → Resources, Closures**: Availability management
+| Category | Tables | Count |
+|----------|--------|-------|
+| **Core Users & Membership** | users, staff_users, membership_tiers, tier_features, tier_feature_values, billing_groups, group_members, family_add_on_products | 8 |
+| **Resources & Availability** | resources, availability_blocks, trackman_bay_slots, facility_closures, closure_reasons | 5 |
+| **Bookings** | booking_requests, booking_sessions, booking_participants, booking_members, booking_guests, booking_fee_snapshots, booking_payment_audit | 7 |
+| **Guests & Passes** | guests, guest_passes, guest_check_ins, pass_redemption_logs | 4 |
+| **Day Passes** | day_pass_purchases | 1 |
+| **Events** | events, event_rsvps | 2 |
+| **Wellness** | wellness_classes, wellness_enrollments | 2 |
+| **Payments & Stripe** | stripe_payment_intents, stripe_products, stripe_transaction_cache, discount_rules | 4 |
+| **HubSpot Integration** | hubspot_deals, hubspot_line_items, hubspot_product_mappings, hubspot_form_configs, hubspot_sync_queue, dismissed_hubspot_meetings | 6 |
+| **Tours** | tours | 1 |
+| **Communication** | communication_logs, notifications, announcements, notice_types, user_dismissed_notices, push_subscriptions, email_events, member_notes | 8 |
+| **Authentication** | sessions, magic_links, user_linked_emails | 3 |
+| **TrackMan Integration** | trackman_import_runs, trackman_unmatched_bookings, trackman_webhook_events, trackman_webhook_dedup | 4 |
+| **Admin & Audit** | admin_audit_log, billing_audit_log, account_deletion_requests, data_export_requests, bug_reports, form_submissions | 6 |
+| **Content & Settings** | app_settings, system_settings, faqs, gallery_images, training_sections, cafe_items | 6 |
+| **System & Jobs** | job_queue, rate_limits, webhook_processed_events | 3 |
+| **Integrity & Legacy** | integrity_check_history, integrity_issues_tracking, integrity_ignores, integrity_audit_log, legacy_import_jobs, legacy_purchases, usage_ledger | 7 |
