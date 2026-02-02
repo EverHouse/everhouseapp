@@ -242,8 +242,9 @@ const checkOtpRequestLimit = async (email: string, ip: string): Promise<{ allowe
     }
     return { allowed: true };
   } catch (error) {
-    console.error('[RateLimit] Database error, allowing request:', error);
-    return { allowed: true };
+    // Fail-closed: deny requests when rate limiting is unavailable to prevent abuse
+    console.error('[RateLimit] Database error, denying request for safety:', error);
+    return { allowed: false, retryAfter: 60 };
   }
 };
 
@@ -277,8 +278,9 @@ const checkMagicLinkRequestLimit = async (email: string, ip: string): Promise<{ 
     }
     return { allowed: true };
   } catch (error) {
-    console.error('[RateLimit] Database error, allowing request:', error);
-    return { allowed: true };
+    // Fail-closed: deny requests when rate limiting is unavailable to prevent abuse
+    console.error('[RateLimit] Database error, denying request for safety:', error);
+    return { allowed: false, retryAfter: 60 };
   }
 };
 
@@ -308,8 +310,9 @@ const checkOtpVerifyAttempts = async (email: string): Promise<{ allowed: boolean
     
     return { allowed: true };
   } catch (error) {
-    console.error('[RateLimit] Database error, allowing request:', error);
-    return { allowed: true };
+    // Fail-closed: deny requests when rate limiting is unavailable to prevent abuse
+    console.error('[RateLimit] Database error, denying request for safety:', error);
+    return { allowed: false, retryAfter: 60 };
   }
 };
 

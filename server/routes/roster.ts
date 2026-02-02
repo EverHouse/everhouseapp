@@ -565,12 +565,14 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
     // For guests, mark the payment_status as 'paid' (via guest pass)
     let guestPassesRemaining: number | undefined;
     if (type === 'guest' && newParticipant) {
-      await db.update(bookingParticipants)
-        .set({ paymentStatus: 'paid' })
-        .where(eq(bookingParticipants.id, newParticipant.id));
+      // Use transaction client for participant update
+      await client.query(
+        `UPDATE booking_participants SET payment_status = 'paid' WHERE id = $1`,
+        [newParticipant.id]
+      );
       
-      // Get updated guest pass count for response
-      const passResult = await pool.query(
+      // Get updated guest pass count for response (using transaction client)
+      const passResult = await client.query(
         `SELECT passes_total - passes_used as remaining FROM guest_passes WHERE LOWER(member_email) = LOWER($1)`,
         [booking.owner_email]
       );
@@ -579,22 +581,22 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
 
     // For members, also add to booking_members so the booking shows on their schedule
     if (type === 'member' && memberInfo) {
-      // Get the next available slot number
-      const slotResult = await pool.query(
+      // Get the next available slot number (using transaction client)
+      const slotResult = await client.query(
         `SELECT COALESCE(MAX(slot_number), 0) + 1 as next_slot FROM booking_members WHERE booking_id = $1`,
         [bookingId]
       );
       const nextSlot = slotResult.rows[0]?.next_slot || 2;
       
       // Insert into booking_members (this makes the booking appear on member's schedule)
-      // Check if member already exists for this booking to avoid duplicate key errors
-      const existingMember = await pool.query(
+      // Check if member already exists for this booking to avoid duplicate key errors (using transaction client)
+      const existingMember = await client.query(
         `SELECT id FROM booking_members WHERE booking_id = $1 AND LOWER(user_email) = LOWER($2)`,
         [bookingId, memberInfo.email]
       );
       
       if (existingMember.rows.length === 0) {
-        await pool.query(
+        await client.query(
           `INSERT INTO booking_members (booking_id, user_email, slot_number, is_primary, linked_at, linked_by, created_at)
            VALUES ($1, $2, $3, false, NOW(), $4, NOW())`,
           [bookingId, memberInfo.email.toLowerCase(), nextSlot, userEmail]
@@ -632,37 +634,36 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
       
       // After member is successfully added, remove any matching guest to prevent duplicates
       if (matchingGuestId !== null) {
-        // Re-verify the guest still exists and belongs to this session before deleting
-        const [guestToRemove] = await db
-          .select()
-          .from(bookingParticipants)
-          .where(and(
-            eq(bookingParticipants.id, matchingGuestId),
-            eq(bookingParticipants.sessionId, sessionId),
-            eq(bookingParticipants.participantType, 'guest')
-          ))
-          .limit(1);
+        // Re-verify the guest still exists and belongs to this session before deleting (using transaction client)
+        const guestCheckResult = await client.query(
+          `SELECT id, display_name, used_guest_pass FROM booking_participants 
+           WHERE id = $1 AND session_id = $2 AND participant_type = 'guest' LIMIT 1`,
+          [matchingGuestId, sessionId]
+        );
         
-        if (guestToRemove) {
+        if (guestCheckResult.rows.length > 0) {
+          const guestToRemove = guestCheckResult.rows[0];
           logger.info('[roster] Removing matching guest after successful member add', {
             extra: {
               bookingId,
               sessionId,
               guestParticipantId: guestToRemove.id,
-              guestName: guestToRemove.displayName,
+              guestName: guestToRemove.display_name,
               memberEmail: memberInfo.email
             }
           });
           
-          await db
-            .delete(bookingParticipants)
-            .where(eq(bookingParticipants.id, guestToRemove.id));
+          // Use transaction client for guest deletion
+          await client.query(
+            `DELETE FROM booking_participants WHERE id = $1`,
+            [guestToRemove.id]
+          );
           
           // Only refund if guest pass was actually used for this participant
-          if (guestToRemove.usedGuestPass === true) {
+          if (guestToRemove.used_guest_pass === true) {
             const refundResult = await refundGuestPass(
               booking.owner_email,
-              guestToRemove.displayName || undefined,
+              guestToRemove.display_name || undefined,
               true
             );
             
@@ -671,7 +672,7 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
                 extra: { 
                   bookingId, 
                   ownerEmail: booking.owner_email,
-                  guestName: guestToRemove.displayName,
+                  guestName: guestToRemove.display_name,
                   remainingPasses: refundResult.remaining 
                 }
               });
@@ -877,14 +878,16 @@ router.delete('/api/bookings/:bookingId/participants/:participantId', async (req
       }
     }
 
-    await db
-      .delete(bookingParticipants)
-      .where(eq(bookingParticipants.id, participantId));
+    // Use transaction client for participant deletion
+    await client.query(
+      `DELETE FROM booking_participants WHERE id = $1`,
+      [participantId]
+    );
 
     // If it was a member, also remove from booking_members
     if (participant.participantType === 'member' && participant.userId) {
       // Get member email from userId (could be UUID or email for legacy data)
-      const memberResult = await pool.query(
+      const memberResult = await client.query(
         `SELECT email FROM users WHERE id = $1 OR LOWER(email) = LOWER($1) LIMIT 1`,
         [participant.userId]
       );
@@ -892,7 +895,7 @@ router.delete('/api/bookings/:bookingId/participants/:participantId', async (req
       if (memberResult.rows.length > 0) {
         const memberEmail = memberResult.rows[0].email.toLowerCase();
         // Use LOWER() on both sides to ensure case-insensitive matching
-        await pool.query(
+        await client.query(
           `DELETE FROM booking_members WHERE booking_id = $1 AND LOWER(user_email) = LOWER($2)`,
           [bookingId, memberEmail]
         );

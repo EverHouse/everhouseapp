@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.63.2",
+    date: "2026-02-02",
+    title: "Security & Data Integrity Improvements",
+    changes: [
+      "Security: Login rate limiting now blocks requests when the database is unavailable (prevents abuse during outages)",
+      "Fixed: Roster changes (adding/removing players) now use proper database transactions to prevent partial updates",
+      "Fixed: If something fails while adding a player, all changes are now properly rolled back",
+      "Improved: Booking member records are now part of the same transaction as participant changes"
+    ]
+  },
+  {
     version: "9.63.1",
     date: "2026-02-02",
     title: "Bug Fixes: Guest Passes, Notifications & Check-in",
