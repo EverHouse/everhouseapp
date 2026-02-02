@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.67.0",
+    date: "2026-02-02",
+    title: "Accessibility & UX Improvements",
+    changes: [
+      "Accessibility: Added descriptive alt text to all images across the app (WCAG compliance)",
+      "New: Unified Button component with primary, secondary, danger, and ghost variants",
+      "New: Breadcrumb navigation component for improved admin page hierarchy",
+      "Improved: Keyboard focus indicators added to TabButton and interactive elements",
+      "Fixed: Modal content now properly visible on small mobile screens (was cut off)",
+      "Improved: Theme color system expanded with primary and bone color variants"
+    ]
+  },
+  {
     version: "9.66.0",
     date: "2026-02-02",
     title: "Security Hardening Update",
