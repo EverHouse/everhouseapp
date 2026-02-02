@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.63.1",
+    date: "2026-02-02",
+    title: "Bug Fixes: Guest Passes, Notifications & Check-in",
+    changes: [
+      "Fixed: Guest pass lookups now work correctly regardless of email capitalization (e.g., John@Email.com vs john@email.com)",
+      "Fixed: Staff can now mark individual notifications as read for members they're helping (consistent with bulk actions)",
+      "Fixed: Check-in system no longer creates duplicate participant records if called multiple times",
+      "Fixed: Guest pass refunds now correctly match records regardless of email case"
+    ]
+  },
+  {
     version: "9.63.0",
     date: "2026-02-02",
     title: "Corporate Volume Pricing & 30-Day Cancellation Notice",

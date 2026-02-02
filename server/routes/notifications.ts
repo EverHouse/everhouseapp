@@ -90,11 +90,18 @@ router.get('/api/notifications/count', isAuthenticated, async (req, res) => {
 router.put('/api/notifications/:id/read', isAuthenticated, async (req, res) => {
   try {
     const { id } = req.params;
-    const sessionEmail = getSessionEmail(req);
+    const { user_email } = req.body;
+    
+    // Allow staff to mark notifications for any user (consistent with mark-all-read)
+    const effective = await getEffectiveEmail(req, user_email);
+    
+    if (!effective) {
+      return res.status(401).json(createErrorResponse(req, 'Authentication required', 'UNAUTHORIZED'));
+    }
     
     const result = await pool.query(
-      'UPDATE notifications SET is_read = true WHERE id = $1 AND LOWER(user_email) = $2 RETURNING *',
-      [id, sessionEmail]
+      'UPDATE notifications SET is_read = true WHERE id = $1 AND LOWER(user_email) = LOWER($2) RETURNING *',
+      [id, effective.email]
     );
     
     if (result.rows.length === 0) {
@@ -152,11 +159,18 @@ router.delete('/api/notifications/dismiss-all', isAuthenticated, async (req, res
 router.delete('/api/notifications/:id', isAuthenticated, async (req, res) => {
   try {
     const { id } = req.params;
-    const sessionEmail = getSessionEmail(req);
+    const { user_email } = req.body;
+    
+    // Allow staff to delete notifications for any user (consistent with dismiss-all)
+    const effective = await getEffectiveEmail(req, user_email);
+    
+    if (!effective) {
+      return res.status(401).json(createErrorResponse(req, 'Authentication required', 'UNAUTHORIZED'));
+    }
     
     const result = await pool.query(
-      'DELETE FROM notifications WHERE id = $1 AND LOWER(user_email) = $2 RETURNING id',
-      [id, sessionEmail]
+      'DELETE FROM notifications WHERE id = $1 AND LOWER(user_email) = LOWER($2) RETURNING id',
+      [id, effective.email]
     );
     
     if (result.rows.length === 0) {

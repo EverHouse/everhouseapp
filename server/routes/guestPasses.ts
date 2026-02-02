@@ -60,17 +60,20 @@ router.get('/api/guest-passes/:email', async (req, res) => {
     const tierLimits = actualTier ? await getTierLimits(actualTier) : null;
     const passesTotal = tierLimits?.guest_passes_per_month ?? 0;
     
+    // Always use lowercase email for guest passes to prevent case-sensitivity issues
+    const normalizedEmail = requestedEmail.toLowerCase();
+    
     let result = await withRetry(() => 
       db.select()
         .from(guestPasses)
-        .where(eq(guestPasses.memberEmail, email))
+        .where(sql`LOWER(${guestPasses.memberEmail}) = ${normalizedEmail}`)
     );
     
     if (result.length === 0) {
       await withRetry(() =>
         db.insert(guestPasses)
           .values({
-            memberEmail: email,
+            memberEmail: normalizedEmail,
             passesUsed: 0,
             passesTotal: passesTotal
           })
@@ -78,7 +81,7 @@ router.get('/api/guest-passes/:email', async (req, res) => {
       result = await withRetry(() =>
         db.select()
           .from(guestPasses)
-          .where(eq(guestPasses.memberEmail, email))
+          .where(sql`LOWER(${guestPasses.memberEmail}) = ${normalizedEmail}`)
       );
     } else if (result[0].passesTotal !== passesTotal) {
       // Update passes_total to match tier config (handles both upgrades AND downgrades)
@@ -87,7 +90,7 @@ router.get('/api/guest-passes/:email', async (req, res) => {
       await withRetry(() =>
         db.update(guestPasses)
           .set({ passesTotal: passesTotal, passesUsed: newPassesUsed })
-          .where(eq(guestPasses.memberEmail, email))
+          .where(sql`LOWER(${guestPasses.memberEmail}) = ${normalizedEmail}`)
       );
       result[0].passesTotal = passesTotal;
       result[0].passesUsed = newPassesUsed;
@@ -156,10 +159,13 @@ router.post('/api/guest-passes/:email/use', async (req, res) => {
     
     const { guest_name } = req.body;
     
+    // Use lowercase for consistent matching
+    const normalizedEmail = requestedEmail.toLowerCase();
+    
     const result = await db.update(guestPasses)
       .set({ passesUsed: sql`${guestPasses.passesUsed} + 1` })
       .where(and(
-        eq(guestPasses.memberEmail, email),
+        sql`LOWER(${guestPasses.memberEmail}) = ${normalizedEmail}`,
         lt(guestPasses.passesUsed, guestPasses.passesTotal)
       ))
       .returning();
@@ -175,20 +181,20 @@ router.post('/api/guest-passes/:email/use', async (req, res) => {
       : `Guest pass used. You have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`;
     
     await db.insert(notifications).values({
-      userEmail: email,
+      userEmail: normalizedEmail,
       title: 'Guest Pass Used',
       message: message,
       type: 'guest_pass',
       relatedType: 'guest_pass'
     });
     
-    sendPushNotification(email, {
+    sendPushNotification(normalizedEmail, {
       title: 'Guest Pass Used',
       body: message,
       url: '/member/profile'
     }).catch(err => console.error('Push notification failed:', err));
     
-    broadcastMemberStatsUpdated(email, { guestPasses: remaining });
+    broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining });
     
     res.json({
       passes_used: data.passesUsed,
@@ -214,11 +220,12 @@ router.put('/api/guest-passes/:email', async (req, res) => {
     }
     
     const email = decodeURIComponent(req.params.email);
+    const normalizedEmail = email.toLowerCase();
     const { passes_total } = req.body;
     
     const result = await db.update(guestPasses)
       .set({ passesTotal: passes_total })
-      .where(eq(guestPasses.memberEmail, email))
+      .where(sql`LOWER(${guestPasses.memberEmail}) = ${normalizedEmail}`)
       .returning();
     
     if (result.length === 0) {
@@ -228,7 +235,7 @@ router.put('/api/guest-passes/:email', async (req, res) => {
     const data = result[0];
     const passesRemaining = data.passesTotal - data.passesUsed;
     
-    broadcastMemberStatsUpdated(email, { guestPasses: passesRemaining });
+    broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: passesRemaining });
     
     res.json({
       passes_used: data.passesUsed,
@@ -246,10 +253,13 @@ export async function useGuestPass(
   sendNotification: boolean = true
 ): Promise<{ success: boolean; error?: string; remaining?: number }> {
   try {
+    // Normalize email for consistent matching
+    const normalizedEmail = memberEmail.toLowerCase();
+    
     const result = await db.update(guestPasses)
       .set({ passesUsed: sql`${guestPasses.passesUsed} + 1` })
       .where(and(
-        eq(guestPasses.memberEmail, memberEmail),
+        sql`LOWER(${guestPasses.memberEmail}) = ${normalizedEmail}`,
         lt(guestPasses.passesUsed, guestPasses.passesTotal)
       ))
       .returning();
@@ -267,21 +277,21 @@ export async function useGuestPass(
         : `Guest pass used. You have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`;
       
       await db.insert(notifications).values({
-        userEmail: memberEmail,
+        userEmail: normalizedEmail,
         title: 'Guest Pass Used',
         message: message,
         type: 'guest_pass',
         relatedType: 'guest_pass'
       });
       
-      sendPushNotification(memberEmail, {
+      sendPushNotification(normalizedEmail, {
         title: 'Guest Pass Used',
         body: message,
         url: '/member/profile'
       }).catch(err => console.error('Push notification failed:', err));
     }
     
-    broadcastMemberStatsUpdated(memberEmail, { guestPasses: remaining });
+    broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining });
     
     return { success: true, remaining };
   } catch (error) {
@@ -296,9 +306,12 @@ export async function refundGuestPass(
   sendNotification: boolean = true
 ): Promise<{ success: boolean; error?: string; remaining?: number }> {
   try {
+    // Normalize email for consistent matching
+    const normalizedEmail = memberEmail.toLowerCase();
+    
     const result = await db.update(guestPasses)
       .set({ passesUsed: sql`GREATEST(0, ${guestPasses.passesUsed} - 1)` })
-      .where(eq(guestPasses.memberEmail, memberEmail))
+      .where(sql`LOWER(${guestPasses.memberEmail}) = ${normalizedEmail}`)
       .returning();
     
     if (result.length === 0) {
@@ -314,7 +327,7 @@ export async function refundGuestPass(
         : `Guest pass refunded. You now have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`;
       
       await db.insert(notifications).values({
-        userEmail: memberEmail,
+        userEmail: normalizedEmail,
         title: 'Guest Pass Refunded',
         message: message,
         type: 'guest_pass',
@@ -322,21 +335,21 @@ export async function refundGuestPass(
       });
       
       // Send push notification
-      sendPushNotification(memberEmail, {
+      sendPushNotification(normalizedEmail, {
         title: 'Guest Pass Refunded',
         body: message,
         url: '/member/profile'
       }).catch(err => console.error('Push notification failed:', err));
       
       // Send WebSocket notification
-      sendNotificationToUser(memberEmail, {
+      sendNotificationToUser(normalizedEmail, {
         type: 'guest_pass',
         title: 'Guest Pass Refunded',
         message: message
       });
     }
     
-    broadcastMemberStatsUpdated(memberEmail, { guestPasses: remaining });
+    broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining });
     
     return { success: true, remaining };
   } catch (error) {
@@ -347,9 +360,12 @@ export async function refundGuestPass(
 
 export async function getGuestPassesRemaining(memberEmail: string, tier?: string): Promise<number> {
   try {
+    // Normalize email for consistent matching
+    const normalizedEmail = memberEmail.toLowerCase();
+    
     const result = await db.select()
       .from(guestPasses)
-      .where(eq(guestPasses.memberEmail, memberEmail));
+      .where(sql`LOWER(${guestPasses.memberEmail}) = ${normalizedEmail}`);
     
     if (result.length === 0) {
       const tierLimits = tier ? await getTierLimits(tier) : null;
@@ -365,17 +381,20 @@ export async function getGuestPassesRemaining(memberEmail: string, tier?: string
 
 export async function ensureGuestPassRecord(memberEmail: string, tier?: string): Promise<void> {
   try {
+    // Normalize email for consistent matching and storage
+    const normalizedEmail = memberEmail.toLowerCase();
+    
     const tierLimits = tier ? await getTierLimits(tier) : null;
     const passesTotal = tierLimits?.guest_passes_per_month ?? 0;
     
     const existing = await db.select()
       .from(guestPasses)
-      .where(eq(guestPasses.memberEmail, memberEmail));
+      .where(sql`LOWER(${guestPasses.memberEmail}) = ${normalizedEmail}`);
     
     if (existing.length === 0) {
       await db.insert(guestPasses)
         .values({
-          memberEmail,
+          memberEmail: normalizedEmail,
           passesUsed: 0,
           passesTotal
         });

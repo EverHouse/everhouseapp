@@ -125,22 +125,43 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
             // Update booking with session_id
             await pool.query(`UPDATE booking_requests SET session_id = $1 WHERE id = $2`, [sessionId, bookingId]);
             
-            // Create owner participant
+            // Create owner participant (with conflict handling to prevent duplicates)
             const userResult = await pool.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1)`, [bd.user_email]);
             const userId = userResult.rows[0]?.id || null;
             
-            await pool.query(`
-              INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
-              VALUES ($1, $2, 'owner', $3, 'pending')
-            `, [sessionId, userId, bd.user_name || 'Member']);
+            // Create owner participant - check first then insert to prevent duplicates
+            // Race condition is mitigated because session creation above uses ON CONFLICT DO NOTHING,
+            // meaning only one request can successfully create a session and reach this code
+            const existingOwner = await pool.query(`
+              SELECT id FROM booking_participants 
+              WHERE session_id = $1 AND participant_type = 'owner'
+              LIMIT 1
+            `, [sessionId]);
             
-            // Create guest participants
-            const playerCount = bd.declared_player_count || 1;
-            for (let i = 1; i < playerCount; i++) {
+            if (existingOwner.rows.length === 0) {
               await pool.query(`
                 INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
-                VALUES ($1, NULL, 'guest', $2, 'pending')
-              `, [sessionId, `Guest ${i + 1}`]);
+                VALUES ($1, $2, 'owner', $3, 'pending')
+              `, [sessionId, userId, bd.user_name || 'Member']);
+            }
+            
+            // Create guest participants with duplicate prevention
+            // Get current count to determine how many guests to create
+            const playerCount = bd.declared_player_count || 1;
+            const existingGuests = await pool.query(`
+              SELECT COUNT(*) as count FROM booking_participants 
+              WHERE session_id = $1 AND participant_type = 'guest'
+            `, [sessionId]);
+            const existingGuestCount = parseInt(existingGuests.rows[0]?.count || '0');
+            
+            // Only create guests if we don't already have them
+            if (existingGuestCount < playerCount - 1) {
+              for (let i = existingGuestCount + 1; i < playerCount; i++) {
+                await pool.query(`
+                  INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
+                  VALUES ($1, NULL, 'guest', $2, 'pending')
+                `, [sessionId, `Guest ${i + 1}`]);
+              }
             }
             
             // Calculate and cache fees
