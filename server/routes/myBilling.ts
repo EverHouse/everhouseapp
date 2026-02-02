@@ -34,7 +34,8 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
     const email = targetEmail;
     
     const result = await pool.query(
-      `SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, hubspot_id, mindbody_client_id, tier, billing_migration_requested_at
+      `SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, hubspot_id, mindbody_client_id, tier, billing_migration_requested_at,
+              cancellation_requested_at, cancellation_effective_date, cancellation_reason, contract_start_date
        FROM users WHERE LOWER(email) = $1`,
       [email.toLowerCase()]
     );
@@ -51,6 +52,12 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
       mindbodyClientId: member.mindbody_client_id,
       tier: member.tier,
       billingMigrationRequestedAt: member.billing_migration_requested_at,
+      contractStartDate: member.contract_start_date,
+      cancellation: member.cancellation_requested_at ? {
+        requestedAt: member.cancellation_requested_at,
+        effectiveDate: member.cancellation_effective_date,
+        reason: member.cancellation_reason,
+      } : null,
     };
     
     // Always fetch Stripe wallet data when member has stripe_customer_id
@@ -897,6 +904,118 @@ router.post('/api/member-billing/:email/backfill-cache', requireStaffAuth, async
   } catch (error: any) {
     console.error('[BackfillCache] Error:', error);
     res.status(500).json({ error: 'Failed to backfill cache' });
+  }
+});
+
+router.post('/api/my/billing/request-cancellation', requireAuth, async (req, res) => {
+  try {
+    const email = req.session.user.email;
+    const { reason } = req.body;
+    
+    const result = await pool.query(
+      `SELECT id, email, billing_provider, stripe_customer_id, cancellation_requested_at 
+       FROM users WHERE LOWER(email) = $1`,
+      [email.toLowerCase()]
+    );
+    
+    const member = result.rows[0];
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    if (member.cancellation_requested_at) {
+      return res.status(400).json({ 
+        error: 'Cancellation already requested',
+        cancellationRequestedAt: member.cancellation_requested_at
+      });
+    }
+    
+    if (member.billing_provider !== 'stripe' || !member.stripe_customer_id) {
+      return res.status(400).json({ error: 'Cancellation requests are only available for Stripe billing' });
+    }
+    
+    const stripe = await getStripeClient();
+    const subscriptions = await stripe.subscriptions.list({
+      customer: member.stripe_customer_id,
+      status: 'active',
+      limit: 1,
+    });
+    
+    if (subscriptions.data.length === 0) {
+      return res.status(400).json({ error: 'No active subscription found' });
+    }
+    
+    const subscription = subscriptions.data[0];
+    const now = new Date();
+    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+    const effectiveDate = thirtyDaysFromNow > currentPeriodEnd ? thirtyDaysFromNow : currentPeriodEnd;
+    const cancelAtTimestamp = Math.floor(effectiveDate.getTime() / 1000);
+    
+    await stripe.subscriptions.update(subscription.id, {
+      cancel_at: cancelAtTimestamp,
+    });
+    
+    await pool.query(
+      `UPDATE users SET 
+        cancellation_requested_at = NOW(),
+        cancellation_effective_date = $1,
+        cancellation_reason = $2,
+        updated_at = NOW()
+       WHERE LOWER(email) = $3`,
+      [effectiveDate.toISOString().split('T')[0], reason || null, email.toLowerCase()]
+    );
+    
+    try {
+      const { notifyAllStaffRequired } = await import('../core/staffNotifications');
+      await notifyAllStaffRequired(
+        'Member Cancellation Request',
+        `${email} has requested to cancel their membership. Effective date: ${effectiveDate.toLocaleDateString()}. Reason: ${reason || 'Not specified'}`,
+        { email }
+      );
+    } catch (notifyErr) {
+      console.warn('[MyBilling] Failed to notify staff of cancellation request:', notifyErr);
+    }
+    
+    console.log(`[MyBilling] Member ${email} requested cancellation, effective ${effectiveDate.toISOString()}`);
+    
+    res.json({
+      success: true,
+      message: 'Cancellation request submitted',
+      cancellationRequestedAt: now.toISOString(),
+      cancellationEffectiveDate: effectiveDate.toISOString(),
+      noticePeriodDays: 30,
+    });
+  } catch (error: any) {
+    console.error('[MyBilling] Cancellation request error:', error);
+    res.status(500).json({ error: 'Failed to submit cancellation request' });
+  }
+});
+
+router.get('/api/my/billing/cancellation-status', requireAuth, async (req, res) => {
+  try {
+    const email = req.session.user.email;
+    
+    const result = await pool.query(
+      `SELECT cancellation_requested_at, cancellation_effective_date, cancellation_reason
+       FROM users WHERE LOWER(email) = $1`,
+      [email.toLowerCase()]
+    );
+    
+    const member = result.rows[0];
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    res.json({
+      hasPendingCancellation: !!member.cancellation_requested_at,
+      cancellationRequestedAt: member.cancellation_requested_at,
+      cancellationEffectiveDate: member.cancellation_effective_date,
+      cancellationReason: member.cancellation_reason,
+    });
+  } catch (error: any) {
+    console.error('[MyBilling] Cancellation status error:', error);
+    res.status(500).json({ error: 'Failed to get cancellation status' });
   }
 });
 

@@ -348,6 +348,7 @@ router.post('/api/member-billing/:email/resume', isStaffOrAdmin, async (req, res
 router.post('/api/member-billing/:email/cancel', isStaffOrAdmin, async (req, res) => {
   try {
     const { email } = req.params;
+    const { reason, immediate } = req.body;
     const member = await getMemberByEmail(email);
 
     if (!member) {
@@ -369,26 +370,111 @@ router.post('/api/member-billing/:email/cancel', isStaffOrAdmin, async (req, res
       return res.status(400).json({ error });
     }
 
+    const now = new Date();
+    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+    
+    const effectiveDate = immediate ? currentPeriodEnd : 
+      (thirtyDaysFromNow > currentPeriodEnd ? thirtyDaysFromNow : currentPeriodEnd);
+    const cancelAtTimestamp = Math.floor(effectiveDate.getTime() / 1000);
+
     const updated = await stripe.subscriptions.update(subscription.id, {
-      cancel_at_period_end: true,
+      cancel_at: cancelAtTimestamp,
     });
 
-    console.log(`[MemberBilling] Set cancel at period end for subscription ${subscription.id}, email ${email}`);
+    await pool.query(
+      `UPDATE users SET 
+        cancellation_requested_at = NOW(),
+        cancellation_effective_date = $1,
+        cancellation_reason = $2,
+        updated_at = NOW()
+       WHERE LOWER(email) = $3`,
+      [effectiveDate.toISOString().split('T')[0], reason || null, email.toLowerCase()]
+    );
+
+    console.log(`[MemberBilling] Set cancel_at for subscription ${subscription.id}, email ${email}, effective ${effectiveDate.toISOString()}`);
     
     logFromRequest(req, 'cancel_subscription', 'subscription', subscription.id, {
       member_email: email,
-      reason: req.body.reason || 'Not specified'
+      reason: reason || 'Not specified',
+      effective_date: effectiveDate.toISOString(),
+      immediate: !!immediate
     });
     
     res.json({
       success: true,
       subscriptionId: subscription.id,
-      cancelAtPeriodEnd: true,
-      currentPeriodEnd: new Date(updated.current_period_end * 1000),
+      cancelAt: Math.floor(effectiveDate.getTime() / 1000),
+      cancellationRequestedAt: now.toISOString(),
+      cancellationEffectiveDate: effectiveDate.toISOString(),
+      noticePeriodDays: 30,
     });
   } catch (error: any) {
     console.error('[MemberBilling] Error canceling subscription:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to process cancellation request' });
+  }
+});
+
+router.post('/api/member-billing/:email/undo-cancellation', isStaffOrAdmin, async (req, res) => {
+  try {
+    const { email } = req.params;
+    const member = await getMemberByEmail(email);
+
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    if (member.billing_provider !== 'stripe') {
+      return res.status(400).json({ error: 'Undo cancellation is only available for Stripe billing' });
+    }
+
+    if (!member.stripe_customer_id) {
+      return res.status(400).json({ error: 'No Stripe customer ID found' });
+    }
+
+    const stripe = await getStripeClient();
+    const subscriptions = await stripe.subscriptions.list({
+      customer: member.stripe_customer_id,
+      limit: 10,
+    });
+
+    const pendingCancelSub = subscriptions.data.find(s => 
+      (s.status === 'active' || s.status === 'trialing') && (s.cancel_at || s.cancel_at_period_end)
+    );
+
+    if (!pendingCancelSub) {
+      return res.status(400).json({ error: 'No pending cancellation found' });
+    }
+
+    await stripe.subscriptions.update(pendingCancelSub.id, {
+      cancel_at: null,
+      cancel_at_period_end: false,
+    });
+
+    await pool.query(
+      `UPDATE users SET 
+        cancellation_requested_at = NULL,
+        cancellation_effective_date = NULL,
+        cancellation_reason = NULL,
+        updated_at = NOW()
+       WHERE LOWER(email) = $1`,
+      [email.toLowerCase()]
+    );
+
+    console.log(`[MemberBilling] Undid cancellation for subscription ${pendingCancelSub.id}, email ${email}`);
+    
+    logFromRequest(req, 'undo_cancel_subscription', 'subscription', pendingCancelSub.id, {
+      member_email: email
+    });
+    
+    res.json({
+      success: true,
+      subscriptionId: pendingCancelSub.id,
+      message: 'Cancellation has been reversed'
+    });
+  } catch (error: any) {
+    console.error('[MemberBilling] Error undoing cancellation:', error);
+    res.status(500).json({ error: 'Failed to undo cancellation' });
   }
 });
 
