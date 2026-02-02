@@ -209,12 +209,12 @@ erDiagram
         varchar status
     }
 
-    users ||--o{ booking_requests : "makes"
-    users }o--|| membership_tiers : "has"
-    resources ||--o{ booking_requests : "booked"
-    booking_requests ||--o| booking_sessions : "generates"
-    events ||--o{ event_rsvps : "has"
-    users ||--o{ event_rsvps : "attends"
+    users ||--o{ booking_requests : makes
+    users }o--|| membership_tiers : has
+    resources ||--o{ booking_requests : booked
+    booking_requests ||--o| booking_sessions : generates
+    events ||--o{ event_rsvps : has
+    users ||--o{ event_rsvps : attends
         </div>
         <div class="key-concepts">
             <h3>What This Shows</h3>
@@ -282,11 +282,11 @@ erDiagram
         varchar stripe_payment_intent_id FK
     }
 
-    users }o--o| billing_groups : "belongs to"
-    users ||--o{ stripe_payment_intents : "pays"
-    users ||--o{ day_pass_purchases : "purchases"
-    day_pass_purchases }o--|| stripe_payment_intents : "paid via"
-    booking_fee_snapshots }o--|| stripe_payment_intents : "charged via"
+    users }o--o| billing_groups : belongs_to
+    users ||--o{ stripe_payment_intents : pays
+    users ||--o{ day_pass_purchases : purchases
+    day_pass_purchases }o--|| stripe_payment_intents : paid_via
+    booking_fee_snapshots }o--|| stripe_payment_intents : charged_via
         </div>
         <div class="key-concepts">
             <h3>What This Shows</h3>
@@ -350,9 +350,9 @@ erDiagram
         varchar status
     }
 
-    users ||--o{ hubspot_deals : "syncs to"
-    users }o--o| billing_groups : "has Stripe customer"
-    resources ||--o{ trackman_bay_slots : "maps to"
+    users ||--o{ hubspot_deals : syncs_to
+    users }o--o| billing_groups : has_stripe_customer
+    resources ||--o{ trackman_bay_slots : maps_to
         </div>
         <div class="key-concepts">
             <h3>What This Shows</h3>
@@ -649,20 +649,20 @@ erDiagram
         text value
     }
 
-    users ||--o{ booking_requests : "makes"
-    users }o--|| membership_tiers : "has tier"
-    users }o--o| billing_groups : "belongs to"
-    membership_tiers ||--o{ tier_feature_values : "has"
-    tier_features ||--o{ tier_feature_values : "defines"
-    billing_groups ||--o{ group_members : "contains"
-    resources ||--o{ booking_requests : "booked for"
-    resources ||--o{ booking_sessions : "hosts"
-    resources ||--o{ availability_blocks : "has"
-    resources ||--o{ trackman_bay_slots : "has"
-    booking_sessions ||--o{ booking_participants : "contains"
-    events ||--o{ event_rsvps : "has"
-    users ||--o{ event_rsvps : "attends"
-    wellness_classes ||--o{ wellness_enrollments : "has"
+    users ||--o{ booking_requests : makes
+    users }o--|| membership_tiers : has_tier
+    users }o--o| billing_groups : belongs_to
+    membership_tiers ||--o{ tier_feature_values : has
+    tier_features ||--o{ tier_feature_values : defines
+    billing_groups ||--o{ group_members : contains
+    resources ||--o{ booking_requests : booked_for
+    resources ||--o{ booking_sessions : hosts
+    resources ||--o{ availability_blocks : has
+    resources ||--o{ trackman_bay_slots : has
+    booking_sessions ||--o{ booking_participants : contains
+    events ||--o{ event_rsvps : has
+    users ||--o{ event_rsvps : attends
+    wellness_classes ||--o{ wellness_enrollments : has
         </div>
     </div>
 
