@@ -247,8 +247,10 @@ const MemberUpdates: React.FC = () => {
       const res = await fetch(`/api/notifications?user_email=${encodeURIComponent(user.email)}`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
-        setNotifications(data);
-        setUnreadCount(data.filter((n: NotificationItem) => !n.read).length);
+        // Map is_read from API to read for frontend consistency
+        const mapped = data.map((n: any) => ({ ...n, read: n.is_read ?? n.read ?? false }));
+        setNotifications(mapped);
+        setUnreadCount(mapped.filter((n: NotificationItem) => !n.read).length);
       }
     } catch (err) {
       console.error('Failed to fetch notifications:', err);

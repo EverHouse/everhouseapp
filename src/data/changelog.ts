@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.65.2",
+    date: "2026-02-02",
+    title: "Notification System Fixes",
+    changes: [
+      "Fixed: Notifications no longer reappear as unread after marking all as read and returning to the page",
+      "Fixed: Wellness confirmation notifications are now automatically removed when you cancel your enrollment",
+      "Improved: Cleaner notification history without stale or outdated entries"
+    ]
+  },
+  {
     version: "9.65.1",
     date: "2026-02-02",
     title: "Member Navigation Polish",

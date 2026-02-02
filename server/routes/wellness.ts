@@ -1132,6 +1132,21 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res
       );
     });
     
+    // Delete the original "Wellness Class Confirmed" notification to avoid confusion
+    try {
+      await pool.query(
+        `DELETE FROM notifications 
+         WHERE LOWER(user_email) = LOWER($1) 
+         AND related_id = $2 
+         AND related_type = 'wellness_class' 
+         AND type = 'wellness_booking'`,
+        [user_email, parseInt(class_id)]
+      );
+    } catch (cleanupErr) {
+      // Non-critical - log but don't fail the cancellation
+      if (!isProduction) console.warn('Failed to cleanup wellness confirmation notification:', cleanupErr);
+    }
+    
     await notifyMember({
       userEmail: user_email,
       title: 'Wellness Enrollment Cancelled',
