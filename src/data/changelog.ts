@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.62.5",
+    date: "2026-02-02",
+    title: "Private Events Display Fix",
+    changes: [
+      "Fixed: Private events on Updates page now show properly formatted titles instead of raw values like 'private_event'",
+      "Fixed: Affected areas now display correctly (e.g., 'Bay 1, Bay 2') instead of showing raw JSON array format",
+      "Improved: Snake_case notice titles are now automatically converted to Title Case for better readability"
+    ]
+  },
+  {
     version: "9.62.4",
     date: "2026-02-01",
     title: "Directory Deletion Now Updates Immediately",

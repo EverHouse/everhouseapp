@@ -24,92 +24,94 @@ interface Closure {
   needsReview?: boolean;
 }
 
-const formatAffectedAreas = (areas: string): string => {
-  if (areas === 'entire_facility') return 'Entire Facility';
-  if (areas === 'all_bays') return 'All Simulator Bays';
-  if (areas === 'none') return 'No booking restrictions';
-  
-  // Handle JSON array format
-  if (areas.startsWith('[')) {
-    try {
-      const parsed = JSON.parse(areas);
-      if (Array.isArray(parsed)) {
-        const formatted = parsed.map(area => {
-          if (area === 'entire_facility') return 'Entire Facility';
-          if (area === 'all_bays') return 'All Simulator Bays';
-          if (area === 'conference_room' || area === 'Conference Room') return 'Conference Room';
-          if (area === 'none') return 'No booking restrictions';
-          if (area.startsWith('bay_')) {
-            const bayNum = area.replace('bay_', '');
-            return `Bay ${bayNum}`;
-          }
-          return area;
-        });
-        return formatted.join(', ');
-      }
-    } catch {
-      // Fall through to comma-separated parsing
-    }
-  }
-  
-  const areaList = areas.split(',').map(a => a.trim());
-  const formatted = areaList.map(area => {
-    if (area === 'entire_facility') return 'Entire Facility';
-    if (area === 'all_bays') return 'All Simulator Bays';
-    if (area === 'conference_room') return 'Conference Room';
-    if (area === 'Conference Room') return 'Conference Room';
-    if (area === 'none') return 'No booking restrictions';
-    if (area.startsWith('bay_')) {
-      const bayNum = area.replace('bay_', '');
-      return `Bay ${bayNum}`;
-    }
-    return area;
-  });
-  return formatted.join(', ');
-};
-
 const formatSingleArea = (area: string): string => {
-  if (area === 'entire_facility') return 'Entire Facility';
-  if (area === 'all_bays') return 'All Simulator Bays';
-  if (area === 'conference_room' || area === 'Conference Room') return 'Conference Room';
-  if (area === 'none') return '';
-  if (area.startsWith('bay_')) {
-    const bayNum = area.replace('bay_', '');
+  const trimmed = area.trim();
+  if (trimmed === 'entire_facility') return 'Entire Facility';
+  if (trimmed === 'all_bays') return 'All Simulator Bays';
+  if (trimmed === 'conference_room' || trimmed === 'Conference Room') return 'Conference Room';
+  if (trimmed === 'none') return '';
+  if (trimmed.startsWith('bay_')) {
+    const bayNum = trimmed.replace('bay_', '');
     return `Bay ${bayNum}`;
   }
-  return area;
+  return trimmed;
+};
+
+const parseAreasAsArray = (areas: string): string[] | null => {
+  const trimmed = areas.trim();
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
+const formatAffectedAreas = (areas: string): string => {
+  if (!areas) return 'No booking restrictions';
+  const trimmed = areas.trim();
+  if (trimmed === 'entire_facility') return 'Entire Facility';
+  if (trimmed === 'all_bays') return 'All Simulator Bays';
+  if (trimmed === 'none') return 'No booking restrictions';
+  
+  // Try JSON array format first
+  const jsonArray = parseAreasAsArray(trimmed);
+  if (jsonArray) {
+    return jsonArray.map(formatSingleArea).filter(a => a).join(', ');
+  }
+  
+  // Fall back to comma-separated format
+  return trimmed.split(',').map(a => formatSingleArea(a)).filter(a => a).join(', ');
 };
 
 const getAffectedAreasList = (areas: string): string[] => {
-  if (!areas || areas === 'none') return [];
-  if (areas === 'entire_facility') return ['Entire Facility'];
-  if (areas === 'all_bays') return ['All Simulator Bays'];
+  if (!areas) return [];
+  const trimmed = areas.trim();
+  if (trimmed === 'none') return [];
+  if (trimmed === 'entire_facility') return ['Entire Facility'];
+  if (trimmed === 'all_bays') return ['All Simulator Bays'];
   
-  // Handle JSON array format: ["bay_1","bay_2","bay_3"]
-  if (areas.startsWith('[')) {
-    try {
-      const parsed = JSON.parse(areas);
-      if (Array.isArray(parsed)) {
-        return parsed.map(formatSingleArea).filter(a => a);
-      }
-    } catch {
-      // Fall through to comma-separated parsing
-    }
+  // Try JSON array format first
+  const jsonArray = parseAreasAsArray(trimmed);
+  if (jsonArray) {
+    return jsonArray.map(formatSingleArea).filter(a => a);
   }
   
-  // Handle comma-separated format: bay_1,bay_2,bay_3
-  return areas.split(',').map(a => a.trim()).map(formatSingleArea).filter(a => a);
+  // Fall back to comma-separated format
+  return trimmed.split(',').map(a => formatSingleArea(a)).filter(a => a);
 };
 
 const formatTitleForDisplay = (title: string): string => {
+  if (!title) return 'Notice';
+  const trimmed = title.trim();
+  
   // Convert snake_case to Title Case (e.g., "private_event" → "Private Event")
-  if (title.includes('_')) {
-    return title
+  if (trimmed.includes('_')) {
+    return trimmed
       .split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ');
   }
-  return title;
+  
+  // Convert kebab-case to Title Case (e.g., "private-event" → "Private Event")
+  if (trimmed.includes('-')) {
+    return trimmed
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  }
+  
+  // Capitalize first letter if all lowercase
+  if (trimmed === trimmed.toLowerCase() && trimmed.length > 0) {
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  }
+  
+  return trimmed;
 };
 
 const getMemberNoticeTitle = (closure: Closure): string => {
