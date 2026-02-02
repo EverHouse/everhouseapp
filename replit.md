@@ -70,6 +70,16 @@ The application utilizes a React 19 frontend with Vite, styled using Tailwind CS
 - **Stripe Transaction Cache**: Transactions are cached locally in `stripe_transaction_cache`.
 - **Scheduled Maintenance**: Daily tasks for session cleanup, webhook log cleanup, Stripe reconciliation, and grace period checks.
 
+### Security Implementation (Audit: Feb 2026)
+- **Rate Limiting**: Comprehensive limiters - global (600/min), auth (10/15min per email+IP), payment (20/min), booking (30/min), checkout (5/min), sensitive actions (10/min).
+- **SQL Injection Prevention**: All queries use parameterized placeholders ($1, $2) or Drizzle ORM with safe SQL tagged templates.
+- **Webhook Signatures**: Stripe (via stripe-replit-sync library), HubSpot (HMAC-SHA256 with timing-safe comparison), Resend (Svix library).
+- **Session Security**: httpOnly: true, secure: true in production, sameSite: 'none', 30-day expiry, PostgreSQL session store.
+- **CORS**: Origin whitelist via getAllowedOrigins(), credentials enabled.
+- **Push Notifications**: All routes require isAuthenticated/isStaffOrAdmin middleware.
+- **Dependency Override**: fast-xml-parser forced to 5.3.4 via npm override to fix CVE-2026-25128 (HIGH severity DoS). No patched 4.x exists. @google-cloud/storage tested compatible.
+- **Known Residual**: 4 moderate esbuild/drizzle-kit vulnerabilities (dev-only, do not affect production).
+
 ## External Dependencies
 - **Stripe Payments**: For in-app payment collection, subscription management, and webhook processing.
 - **Resend**: For email-based OTP verification and automated alerts.
