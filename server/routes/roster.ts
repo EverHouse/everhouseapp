@@ -45,6 +45,7 @@ import { notifyMember } from '../core/notificationService';
 import { getStripeClient } from '../core/stripe/client';
 import { getOrCreateStripeCustomer } from '../core/stripe/customers';
 import { computeFeeBreakdown, getEffectivePlayerCount, invalidateCachedFees, recalculateSessionFees } from '../core/billing/unifiedFeeService';
+import { PRICING } from '../core/billing/pricingConfig';
 
 const router = Router();
 
@@ -1211,7 +1212,7 @@ router.post('/api/bookings/:bookingId/participants/preview-fees', async (req: Re
     
     // Calculate overage details
     const overageFee = Math.round(breakdown.totals.overageCents / 100);
-    const overageMinutes = overageFee > 0 ? Math.ceil(overageFee / 25) * 30 : 0;
+    const overageMinutes = overageFee > 0 ? Math.ceil(overageFee / PRICING.OVERAGE_RATE_DOLLARS) * PRICING.OVERAGE_BLOCK_MINUTES : 0;
     const minutesWithinAllowance = Math.max(0, totalOwnerResponsibleMinutes - overageMinutes);
 
     res.json({

@@ -17,6 +17,7 @@ import { getCalendarNameForBayAsync, isStaffOrAdminCheck } from './helpers';
 import { getCalendarIdByName, deleteCalendarEvent } from '../../core/calendar/index';
 import { getGuestPassesRemaining } from '../guestPasses';
 import { computeFeeBreakdown, getEffectivePlayerCount } from '../../core/billing/unifiedFeeService';
+import { PRICING } from '../../core/billing/pricingConfig';
 
 const router = Router();
 
@@ -1178,7 +1179,7 @@ async function calculateFeeEstimate(params: {
     
     // Calculate overage minutes from the breakdown
     const ownerLineItem = breakdown.participants.find(p => p.participantType === 'owner');
-    const overageMinutes = ownerLineItem?.overageCents ? Math.ceil((ownerLineItem.overageCents / 100) / 25) * 30 : 0;
+    const overageMinutes = ownerLineItem?.overageCents ? Math.ceil((ownerLineItem.overageCents / 100) / PRICING.OVERAGE_RATE_DOLLARS) * PRICING.OVERAGE_BLOCK_MINUTES : 0;
     
     return {
       ownerEmail,
