@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.65.1",
+    date: "2026-02-02",
+    title: "Member Navigation Polish",
+    changes: [
+      "Fixed: Removed jarring green loading screen flash when switching between tabs in member portal",
+      "Improved: Bottom navigation now switches instantly between Home, Book, Wellness, Events, and History"
+    ]
+  },
+  {
     version: "9.65.0",
     date: "2026-02-02",
     title: "Animation System Enhancements",
