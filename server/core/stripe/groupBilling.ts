@@ -274,7 +274,7 @@ export async function createBillingGroup(params: {
     return { success: true, groupId: result[0].id };
   } catch (err: any) {
     console.error('[GroupBilling] Error creating billing group:', err);
-    return { success: false, error: err.message };
+    return { success: false, error: 'Operation failed. Please try again.' };
   }
 }
 
@@ -304,7 +304,7 @@ export async function updateBillingGroupName(
     return { success: true };
   } catch (err: any) {
     console.error('[GroupBilling] Error updating billing group name:', err);
-    return { success: false, error: err.message };
+    return { success: false, error: 'Operation failed. Please try again.' };
   }
 }
 
@@ -345,7 +345,7 @@ export async function deleteBillingGroup(
     return { success: true };
   } catch (err: any) {
     console.error('[GroupBilling] Error deleting billing group:', err);
-    return { success: false, error: err.message };
+    return { success: false, error: 'Operation failed. Please try again.' };
   }
 }
 
@@ -491,7 +491,7 @@ export async function addGroupMember(params: {
     }
   } catch (err: any) {
     console.error('[GroupBilling] Error adding group member:', err);
-    return { success: false, error: err.message };
+    return { success: false, error: 'Operation failed. Please try again.' };
   } finally {
     client.release();
   }
@@ -557,9 +557,12 @@ export async function addCorporateMember(params: {
     const pricePerSeat = getCorporateVolumePrice(newMemberCount);
     
     let originalQuantity: number | null = null;
+    let originalPricePerSeat: number | null = null;
+    let originalProductId: string | null = null;
     let corporateItemId: string | null = null;
     let insertedMemberId: number | null = null;
     let stripeUpdated = false;
+    let priceTierChanged = false;
     
     try {
       await client.query('BEGIN');
@@ -600,17 +603,47 @@ export async function addCorporateMember(params: {
           
           if (corporateItem) {
             originalQuantity = corporateItem.quantity || 0;
+            originalPricePerSeat = corporateItem.price?.unit_amount || 35000;
+            originalProductId = corporateItem.price?.product as string;
             corporateItemId = corporateItem.id;
             
-            await stripe.subscriptionItems.update(corporateItem.id, {
-              quantity: newMemberCount,
-            });
+            const newPricePerSeat = getCorporateVolumePrice(newMemberCount);
+            
+            if (originalPricePerSeat !== newPricePerSeat) {
+              console.log(`[GroupBilling] Price tier change: ${originalPricePerSeat} -> ${newPricePerSeat} cents/seat for ${newMemberCount} members`);
+              
+              const newItem = await stripe.subscriptionItems.create({
+                subscription: group[0].primaryStripeSubscriptionId,
+                price_data: {
+                  currency: 'usd',
+                  product: originalProductId,
+                  unit_amount: newPricePerSeat,
+                  recurring: { interval: 'month' },
+                },
+                quantity: newMemberCount,
+                metadata: {
+                  corporate_membership: 'true',
+                },
+                proration_behavior: 'create_prorations',
+              });
+              
+              await stripe.subscriptionItems.del(corporateItem.id, {
+                proration_behavior: 'none',
+              });
+              
+              corporateItemId = newItem.id;
+              priceTierChanged = true;
+            } else {
+              await stripe.subscriptionItems.update(corporateItem.id, {
+                quantity: newMemberCount,
+              });
+            }
             stripeUpdated = true;
           }
         } catch (stripeErr: any) {
           console.error('[GroupBilling] Stripe API failed, rolling back DB reservation:', stripeErr);
           await client.query('ROLLBACK');
-          return { success: false, error: `Failed to update billing: ${stripeErr.message}` };
+          return { success: false, error: 'Failed to update billing. Please try again.' };
         }
       }
       
@@ -622,15 +655,46 @@ export async function addCorporateMember(params: {
       await client.query('ROLLBACK');
       console.error('[GroupBilling] DB transaction failed:', dbErr);
       
-      if (stripeUpdated && corporateItemId && originalQuantity !== null) {
+      if (stripeUpdated && originalQuantity !== null) {
         try {
           const stripe = await getStripeClient();
-          await stripe.subscriptionItems.update(corporateItemId, {
-            quantity: originalQuantity,
-          });
-          console.log(`[GroupBilling] Rolled back Stripe quantity to ${originalQuantity}`);
+          
+          if (priceTierChanged && originalPricePerSeat && originalProductId) {
+            const currentSub = await stripe.subscriptions.retrieve(group[0].primaryStripeSubscriptionId, {
+              expand: ['items.data'],
+            });
+            const currentCorporateItem = currentSub.items.data.find(
+              item => item.metadata?.corporate_membership === 'true'
+            );
+            if (currentCorporateItem) {
+              await stripe.subscriptionItems.create({
+                subscription: group[0].primaryStripeSubscriptionId,
+                price_data: {
+                  currency: 'usd',
+                  product: originalProductId,
+                  unit_amount: originalPricePerSeat,
+                  recurring: { interval: 'month' },
+                },
+                quantity: originalQuantity,
+                metadata: {
+                  corporate_membership: 'true',
+                },
+                proration_behavior: 'none',
+              });
+              
+              await stripe.subscriptionItems.del(currentCorporateItem.id, {
+                proration_behavior: 'none',
+              });
+              console.log(`[GroupBilling] Rolled back Stripe to original price ${originalPricePerSeat} and quantity ${originalQuantity}`);
+            }
+          } else if (corporateItemId) {
+            await stripe.subscriptionItems.update(corporateItemId, {
+              quantity: originalQuantity,
+            });
+            console.log(`[GroupBilling] Rolled back Stripe quantity to ${originalQuantity}`);
+          }
         } catch (rollbackErr: any) {
-          console.error(`[GroupBilling] CRITICAL: Failed to rollback Stripe quantity. Manual intervention required.`, rollbackErr);
+          console.error(`[GroupBilling] CRITICAL: Failed to rollback Stripe. Manual intervention required.`, rollbackErr);
         }
       }
       
@@ -638,7 +702,122 @@ export async function addCorporateMember(params: {
     }
   } catch (err: any) {
     console.error('[GroupBilling] Error adding corporate member:', err);
-    return { success: false, error: err.message };
+    return { success: false, error: 'Failed to add corporate member. Please try again.' };
+  } finally {
+    client.release();
+  }
+}
+
+export async function removeCorporateMember(params: {
+  billingGroupId: number;
+  memberEmail: string;
+  removedBy: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    const memberResult = await client.query(
+      `SELECT gm.id, gm.member_email, gm.is_active
+       FROM group_members gm
+       WHERE gm.billing_group_id = $1 AND LOWER(gm.member_email) = $2
+       FOR UPDATE`,
+      [params.billingGroupId, params.memberEmail.toLowerCase()]
+    );
+    
+    if (memberResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return { success: false, error: 'Member not found in this billing group' };
+    }
+    
+    const memberRecord = memberResult.rows[0];
+    
+    if (!memberRecord.is_active) {
+      await client.query('ROLLBACK');
+      return { success: false, error: 'Member is already inactive' };
+    }
+    
+    await client.query(
+      `UPDATE group_members SET is_active = false, removed_at = NOW() WHERE id = $1`,
+      [memberRecord.id]
+    );
+    
+    await client.query(
+      'UPDATE users SET billing_group_id = NULL WHERE LOWER(email) = $1',
+      [params.memberEmail.toLowerCase()]
+    );
+    
+    const group = await db.select()
+      .from(billingGroups)
+      .where(eq(billingGroups.id, params.billingGroupId))
+      .limit(1);
+    
+    if (group.length > 0 && group[0].primaryStripeSubscriptionId) {
+      try {
+        const remainingMembers = await db.select()
+          .from(groupMembers)
+          .where(and(
+            eq(groupMembers.billingGroupId, params.billingGroupId),
+            eq(groupMembers.isActive, true)
+          ));
+        
+        const newMemberCount = Math.max(remainingMembers.length, 5);
+        const newPricePerSeat = getCorporateVolumePrice(newMemberCount);
+        
+        const stripe = await getStripeClient();
+        const subscription = await stripe.subscriptions.retrieve(group[0].primaryStripeSubscriptionId, {
+          expand: ['items.data'],
+        });
+        
+        const corporateItem = subscription.items.data.find(
+          item => item.metadata?.corporate_membership === 'true'
+        );
+        
+        if (corporateItem) {
+          const oldPricePerSeat = corporateItem.price?.unit_amount || 35000;
+          
+          if (oldPricePerSeat !== newPricePerSeat) {
+            console.log(`[GroupBilling] Price tier change on removal: ${oldPricePerSeat} -> ${newPricePerSeat} cents/seat for ${newMemberCount} members`);
+            
+            await stripe.subscriptionItems.create({
+              subscription: group[0].primaryStripeSubscriptionId,
+              price_data: {
+                currency: 'usd',
+                product: corporateItem.price?.product as string,
+                unit_amount: newPricePerSeat,
+                recurring: { interval: 'month' },
+              },
+              quantity: newMemberCount,
+              metadata: {
+                corporate_membership: 'true',
+              },
+              proration_behavior: 'create_prorations',
+            });
+            
+            await stripe.subscriptionItems.del(corporateItem.id, {
+              proration_behavior: 'none',
+            });
+          } else {
+            await stripe.subscriptionItems.update(corporateItem.id, {
+              quantity: newMemberCount,
+            });
+          }
+        }
+      } catch (stripeErr: any) {
+        await client.query('ROLLBACK');
+        console.error('[GroupBilling] Failed to update Stripe on member removal:', stripeErr);
+        return { success: false, error: 'Failed to update billing. Please try again.' };
+      }
+    }
+    
+    await client.query('COMMIT');
+    console.log(`[GroupBilling] Successfully removed corporate member ${params.memberEmail}`);
+    return { success: true };
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('[GroupBilling] Error removing corporate member:', err);
+    return { success: false, error: 'Failed to remove member. Please try again.' };
   } finally {
     client.release();
   }
@@ -693,7 +872,7 @@ export async function removeGroupMember(params: {
         console.error('[GroupBilling] Failed to remove Stripe subscription item:', stripeErr);
         return { 
           success: false, 
-          error: `Cannot remove billing: ${stripeErr.message}. Member is still being charged.` 
+          error: 'Cannot remove billing. Member is still being charged. Please try again or contact support.' 
         };
       }
     }
@@ -704,7 +883,7 @@ export async function removeGroupMember(params: {
   } catch (err: any) {
     await client.query('ROLLBACK');
     console.error('[GroupBilling] Error removing group member:', err);
-    return { success: false, error: err.message };
+    return { success: false, error: 'Failed to remove member. Please try again.' };
   } finally {
     client.release();
   }
@@ -727,7 +906,7 @@ export async function linkStripeSubscriptionToBillingGroup(params: {
     return { success: true };
   } catch (err: any) {
     console.error('[GroupBilling] Error linking subscription:', err);
-    return { success: false, error: err.message };
+    return { success: false, error: 'Operation failed. Please try again.' };
   }
 }
 
@@ -798,7 +977,7 @@ export async function updateGroupAddOnPricing(params: {
     return { success: true };
   } catch (err: any) {
     console.error('[GroupBilling] Error updating pricing:', err);
-    return { success: false, error: err.message };
+    return { success: false, error: 'Operation failed. Please try again.' };
   }
 }
 

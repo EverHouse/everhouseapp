@@ -6,20 +6,14 @@ import { getStripeClient } from '../core/stripe/client';
 
 const router = Router();
 
-function getCorporatePrice(count: number): number {
-  if (count >= 50) return 24900;
-  if (count >= 20) return 27500;
-  if (count >= 10) return 29900;
-  if (count >= 5) return 32500;
-  return 35000;
-}
+const CORPORATE_BASE_RATE_CENTS = 35000;
+const CORPORATE_MIN_SEATS = 5;
 
 router.post('/api/checkout/sessions', async (req, res) => {
   try {
     const { 
       tier: tierSlug, 
       email, 
-      quantity = 1, 
       companyName, 
       jobTitle 
     } = req.body;
@@ -44,14 +38,6 @@ router.post('/api/checkout/sessions', async (req, res) => {
     const baseUrl = replitDomains ? `https://${replitDomains}` : 'http://localhost:5000';
 
     const isCorporate = tierData.tierType === 'corporate' || tierSlug === 'corporate';
-    const minQuantity = 5;
-    const actualQuantity = isCorporate ? Math.max(quantity, minQuantity) : 1;
-
-    if (isCorporate && quantity < minQuantity) {
-      return res.status(400).json({ 
-        error: `Corporate memberships require a minimum of ${minQuantity} employees` 
-      });
-    }
 
     let sessionParams: any = {
       mode: 'subscription',
@@ -60,28 +46,27 @@ router.post('/api/checkout/sessions', async (req, res) => {
       metadata: {
         company_name: companyName || '',
         job_title: jobTitle || '',
-        quantity: String(actualQuantity),
+        quantity: String(CORPORATE_MIN_SEATS),
         tier_type: tierData.tierType || 'individual',
         tier_slug: tierSlug,
       },
     };
 
     if (isCorporate) {
-      const unitAmount = getCorporatePrice(actualQuantity);
       sessionParams.line_items = [
         {
           price_data: {
             currency: 'usd',
             product_data: {
               name: `${tierData.name} - Corporate Membership`,
-              description: `${actualQuantity} employee seats at $${(unitAmount / 100).toFixed(2)}/seat/month`,
+              description: `${CORPORATE_MIN_SEATS} employee seats at $${(CORPORATE_BASE_RATE_CENTS / 100).toFixed(2)}/seat/month. Volume discounts applied as employees are added.`,
             },
-            unit_amount: unitAmount,
+            unit_amount: CORPORATE_BASE_RATE_CENTS,
             recurring: {
               interval: 'month',
             },
           },
-          quantity: actualQuantity,
+          quantity: CORPORATE_MIN_SEATS,
         },
       ];
     } else {
@@ -108,25 +93,29 @@ router.post('/api/checkout/sessions', async (req, res) => {
     });
   } catch (error: any) {
     console.error('[Checkout] Session creation error:', error);
-    res.status(500).json({ error: error.message || 'Failed to create checkout session' });
+    res.status(500).json({ error: 'Failed to create checkout session' });
   }
 });
 
 router.get('/api/checkout/session/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
+    
+    if (!sessionId || typeof sessionId !== 'string' || !sessionId.startsWith('cs_')) {
+      return res.status(400).json({ error: 'Invalid session ID' });
+    }
+    
     const stripe = await getStripeClient();
     
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     
     res.json({
       status: session.status,
-      customerEmail: session.customer_details?.email || session.customer_email,
       paymentStatus: session.payment_status,
     });
   } catch (error: any) {
     console.error('[Checkout] Session retrieval error:', error);
-    res.status(500).json({ error: error.message || 'Failed to retrieve session' });
+    res.status(500).json({ error: 'Failed to retrieve session' });
   }
 });
 
