@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database ER Diagram</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+        }
+        .header {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            padding: 20px 40px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+        .header p {
+            color: #94a3b8;
+            font-size: 0.95rem;
+        }
+        .stats {
+            display: flex;
+            gap: 30px;
+            margin-top: 15px;
+        }
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #60a5fa;
+        }
+        .stat-label {
+            font-size: 0.85rem;
+            color: #94a3b8;
+        }
+        .controls {
+            padding: 15px 40px;
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: #e0e0e0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        .btn.active {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: white;
+        }
+        .diagram-container {
+            padding: 40px;
+            overflow: auto;
+            min-height: calc(100vh - 180px);
+        }
+        .mermaid {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .legend {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .legend h3 {
+            margin-bottom: 15px;
+            color: #fff;
+        }
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 10px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 4px;
+        }
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+        .legend-text {
+            font-size: 0.85rem;
+            color: #cbd5e1;
+        }
+        @media (max-width: 768px) {
+            .header, .controls, .diagram-container {
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+            .stats {
+                flex-wrap: wrap;
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Database Entity Relationship Diagram</h1>
+        <p>Complete visualization of all database tables and their relationships</p>
+        <div class="stats">
+            <div class="stat">
+                <span class="stat-value">77</span>
+                <span class="stat-label">Tables</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value">17</span>
+                <span class="stat-label">Foreign Keys</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value">18</span>
+                <span class="stat-label">Categories</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button class="btn" onclick="zoomIn()">Zoom In (+)</button>
+        <button class="btn" onclick="zoomOut()">Zoom Out (-)</button>
+        <button class="btn" onclick="resetZoom()">Reset Zoom</button>
+        <button class="btn" onclick="downloadSVG()">Download SVG</button>
+    </div>
+
+    <div class="diagram-container">
+        <div class="mermaid" id="diagram">
+erDiagram
+    %% ========== CORE USER & MEMBERSHIP ==========
+    users {
+        varchar id PK
+        varchar email UK
+        varchar name
+        integer tier_id FK
+        integer family_group_id FK
+    }
+    
+    staff_users {
+        integer id PK
+        varchar email UK
+        varchar name
+        varchar role
+    }
+    
+    membership_tiers {
+        integer id PK
+        varchar name UK
+        varchar slug UK
+        integer monthly_price_cents
+    }
+    
+    tier_features {
+        integer id PK
+        varchar feature_key UK
+        varchar name
+    }
+    
+    tier_feature_values {
+        integer id PK
+        integer tier_id FK
+        integer feature_id FK
+        text value
+    }
+    
+    billing_groups {
+        integer id PK
+        varchar primary_email UK
+        varchar primary_stripe_customer_id
+        varchar group_name
+        text type
+    }
+    
+    group_members {
+        integer id PK
+        integer billing_group_id FK
+        varchar member_email
+        varchar relationship
+    }
+    
+    family_add_on_products {
+        integer id PK
+        varchar tier_name UK
+        varchar stripe_product_id
+    }
+    
+    %% ========== RESOURCES & AVAILABILITY ==========
+    resources {
+        integer id PK
+        varchar name UK
+        varchar type
+        boolean is_active
+    }
+    
+    availability_blocks {
+        integer id PK
+        integer resource_id FK
+        date block_date
+        time start_time
+        time end_time
+        integer closure_id FK
+    }
+    
+    trackman_bay_slots {
+        integer id PK
+        integer resource_id FK
+        varchar trackman_bay_id
+    }
+    
+    facility_closures {
+        integer id PK
+        date closure_date
+        varchar reason
+        boolean is_full_day
+    }
+    
+    closure_reasons {
+        integer id PK
+        varchar label UK
+        boolean is_active
+    }
+    
+    %% ========== BOOKINGS ==========
+    booking_requests {
+        integer id PK
+        varchar user_id FK
+        integer resource_id FK
+        date request_date
+        time start_time
+        varchar status
+        integer closure_id FK
+        integer session_id FK
+    }
+    
+    booking_sessions {
+        integer id PK
+        varchar trackman_booking_id UK
+        integer resource_id FK
+        date session_date
+        varchar source
+    }
+    
+    booking_participants {
+        integer id PK
+        integer session_id FK
+        varchar user_id
+        varchar participant_type
+        varchar payment_status
+    }
+    
+    booking_members {
+        integer id PK
+        integer booking_id FK
+        varchar user_email
+        integer slot_number
+    }
+    
+    booking_guests {
+        integer id PK
+        integer booking_id FK
+        varchar guest_name
+        varchar guest_email
+    }
+    
+    booking_fee_snapshots {
+        integer id PK
+        integer booking_id FK
+        integer session_id FK
+        integer total_cents
+        varchar status
+    }
+    
+    booking_payment_audit {
+        integer id PK
+        integer booking_id FK
+        varchar action
+        numeric amount_affected
+    }
+    
+    %% ========== GUESTS & PASSES ==========
+    guests {
+        integer id PK
+        varchar email
+        varchar name
+    }
+    
+    guest_passes {
+        integer id PK
+        varchar member_email UK
+        integer total_passes
+        integer used_passes
+    }
+    
+    guest_check_ins {
+        integer id PK
+        varchar member_email
+        varchar guest_name
+    }
+    
+    pass_redemption_logs {
+        integer id PK
+        varchar member_email
+        varchar pass_type
+    }
+    
+    %% ========== DAY PASSES ==========
+    day_pass_purchases {
+        varchar id PK
+        varchar email
+        integer booking_id FK
+        varchar status
+        integer price_cents
+    }
+    
+    %% ========== EVENTS ==========
+    events {
+        integer id PK
+        varchar title
+        timestamp start_time
+        varchar eventbrite_id UK
+        integer max_capacity
+    }
+    
+    event_rsvps {
+        integer id PK
+        integer event_id FK
+        varchar user_email
+        varchar matched_user_id FK
+        varchar status
+    }
+    
+    %% ========== WELLNESS ==========
+    wellness_classes {
+        integer id PK
+        varchar google_calendar_id UK
+        varchar title
+        timestamp start_time
+        integer max_capacity
+    }
+    
+    wellness_enrollments {
+        integer id PK
+        integer wellness_class_id
+        varchar user_email
+        varchar status
+    }
+    
+    %% ========== PAYMENTS & STRIPE ==========
+    stripe_payment_intents {
+        integer id PK
+        varchar stripe_payment_intent_id UK
+        varchar customer_email
+        integer amount_cents
+        varchar status
+    }
+    
+    stripe_products {
+        integer id PK
+        varchar stripe_product_id UK
+        varchar hubspot_product_id UK
+        varchar name
+    }
+    
+    stripe_transaction_cache {
+        integer id PK
+        varchar stripe_id UK
+        varchar type
+        jsonb data
+    }
+    
+    discount_rules {
+        integer id PK
+        varchar discount_tag UK
+        integer discount_percent
+    }
+    
+    %% ========== HUBSPOT INTEGRATION ==========
+    hubspot_deals {
+        integer id PK
+        varchar hubspot_deal_id UK
+        varchar member_email
+        varchar stage
+    }
+    
+    hubspot_line_items {
+        integer id PK
+        varchar hubspot_line_item_id UK
+        varchar hubspot_deal_id
+        varchar product_name
+    }
+    
+    hubspot_product_mappings {
+        integer id PK
+        varchar hubspot_product_id UK
+        varchar internal_product_type
+    }
+    
+    hubspot_form_configs {
+        integer id PK
+        varchar form_type UK
+        varchar hubspot_form_id
+    }
+    
+    hubspot_sync_queue {
+        integer id PK
+        varchar entity_type
+        varchar action
+        varchar status
+    }
+    
+    dismissed_hubspot_meetings {
+        integer id PK
+        varchar hubspot_meeting_id UK
+    }
+    
+    %% ========== TOURS ==========
+    tours {
+        integer id PK
+        varchar google_calendar_id UK
+        varchar hubspot_meeting_id UK
+        varchar visitor_email
+        varchar status
+    }
+    
+    %% ========== COMMUNICATION ==========
+    communication_logs {
+        integer id PK
+        varchar member_email
+        varchar type
+        varchar subject
+    }
+    
+    notifications {
+        integer id PK
+        varchar user_email
+        varchar type
+        varchar title
+        boolean is_read
+    }
+    
+    announcements {
+        integer id PK
+        varchar title
+        varchar priority
+        boolean is_active
+    }
+    
+    notice_types {
+        integer id PK
+        varchar name UK
+    }
+    
+    user_dismissed_notices {
+        integer id PK
+        varchar user_email
+        varchar notice_type
+    }
+    
+    push_subscriptions {
+        integer id PK
+        varchar endpoint UK
+        varchar user_email
+    }
+    
+    email_events {
+        integer id PK
+        varchar event_id UK
+        varchar email
+        varchar event_type
+    }
+    
+    member_notes {
+        integer id PK
+        varchar member_email
+        text note
+    }
+    
+    %% ========== AUTHENTICATION ==========
+    sessions {
+        varchar sid PK
+        jsonb sess
+        timestamp expire
+    }
+    
+    magic_links {
+        integer id PK
+        varchar token UK
+        varchar email
+    }
+    
+    user_linked_emails {
+        integer id PK
+        varchar primary_email
+        varchar linked_email
+    }
+    
+    %% ========== TRACKMAN ==========
+    trackman_import_runs {
+        integer id PK
+        varchar status
+        integer records_processed
+    }
+    
+    trackman_unmatched_bookings {
+        integer id PK
+        varchar trackman_booking_id
+        varchar status
+    }
+    
+    trackman_webhook_events {
+        integer id PK
+        varchar event_type
+        varchar status
+    }
+    
+    trackman_webhook_dedup {
+        integer id PK
+        varchar trackman_booking_id UK
+    }
+    
+    %% ========== ADMIN & AUDIT ==========
+    admin_audit_log {
+        integer id PK
+        varchar staff_email
+        varchar action
+        varchar resource_type
+    }
+    
+    billing_audit_log {
+        integer id PK
+        varchar member_email
+        varchar action_type
+    }
+    
+    account_deletion_requests {
+        integer id PK
+        varchar email
+        varchar status
+    }
+    
+    data_export_requests {
+        integer id PK
+        varchar user_email
+        varchar status
+    }
+    
+    bug_reports {
+        integer id PK
+        varchar user_email
+        varchar status
+    }
+    
+    form_submissions {
+        integer id PK
+        varchar form_type
+        varchar email
+    }
+    
+    %% ========== CONTENT & SETTINGS ==========
+    app_settings {
+        integer id PK
+        varchar key UK
+        text value
+        varchar category
+    }
+    
+    system_settings {
+        varchar key PK
+        text value
+    }
+    
+    faqs {
+        integer id PK
+        varchar question
+        varchar category
+    }
+    
+    gallery_images {
+        integer id PK
+        varchar title
+        text url
+    }
+    
+    training_sections {
+        integer id PK
+        varchar title UK
+        varchar guide_id UK
+    }
+    
+    cafe_items {
+        integer id PK
+        varchar name UK
+        numeric price
+    }
+    
+    %% ========== SYSTEM & JOBS ==========
+    job_queue {
+        integer id PK
+        varchar job_type
+        varchar status
+    }
+    
+    rate_limits {
+        integer id PK
+        varchar key UK
+        integer count
+    }
+    
+    webhook_processed_events {
+        integer id PK
+        varchar event_id UK
+        varchar source
+    }
+    
+    %% ========== INTEGRITY & LEGACY ==========
+    integrity_check_history {
+        integer id PK
+        integer issues_found
+    }
+    
+    integrity_issues_tracking {
+        integer id PK
+        varchar issue_key UK
+        varchar status
+    }
+    
+    integrity_ignores {
+        integer id PK
+        varchar issue_key UK
+    }
+    
+    integrity_audit_log {
+        integer id PK
+        varchar action
+        varchar issue_key
+    }
+    
+    legacy_import_jobs {
+        integer id PK
+        varchar import_type
+        varchar status
+    }
+    
+    legacy_purchases {
+        integer id PK
+        varchar email
+        varchar product_type
+    }
+    
+    usage_ledger {
+        integer id PK
+        varchar user_email
+        varchar usage_type
+    }
+
+    %% ========== RELATIONSHIPS ==========
+    users ||--o{ booking_requests : "makes"
+    users }o--|| membership_tiers : "has tier"
+    users }o--o| billing_groups : "belongs to"
+    
+    membership_tiers ||--o{ tier_feature_values : "has"
+    tier_features ||--o{ tier_feature_values : "defines"
+    
+    billing_groups ||--o{ group_members : "contains"
+    
+    resources ||--o{ booking_requests : "booked for"
+    resources ||--o{ booking_sessions : "hosts"
+    resources ||--o{ availability_blocks : "has"
+    resources ||--o{ trackman_bay_slots : "has"
+    
+    facility_closures ||--o{ booking_requests : "affects"
+    facility_closures ||--o{ availability_blocks : "creates"
+    
+    booking_requests ||--o{ day_pass_purchases : "paid via"
+    booking_requests ||--o{ booking_fee_snapshots : "has"
+    
+    booking_sessions ||--o{ booking_fee_snapshots : "has"
+    booking_sessions ||--o{ booking_participants : "contains"
+    
+    events ||--o{ event_rsvps : "has"
+    users ||--o{ event_rsvps : "attends"
+        </div>
+        
+        <div class="legend">
+            <h3>Table Categories</h3>
+            <div class="legend-grid">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #3b82f6;"></div>
+                    <span class="legend-text">Core Users & Membership (8 tables)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #10b981;"></div>
+                    <span class="legend-text">Resources & Availability (5 tables)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #f59e0b;"></div>
+                    <span class="legend-text">Bookings (7 tables)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ef4444;"></div>
+                    <span class="legend-text">Guests & Passes (4 tables)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #8b5cf6;"></div>
+                    <span class="legend-text">Events & Wellness (4 tables)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ec4899;"></div>
+                    <span class="legend-text">Payments & Stripe (4 tables)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #14b8a6;"></div>
+                    <span class="legend-text">HubSpot Integration (6 tables)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #f97316;"></div>
+                    <span class="legend-text">Communication (8 tables)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #6366f1;"></div>
+                    <span class="legend-text">TrackMan Integration (4 tables)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #84cc16;"></div>
+                    <span class="legend-text">Admin & Audit (6 tables)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #06b6d4;"></div>
+                    <span class="legend-text">Content & Settings (6 tables)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #a855f7;"></div>
+                    <span class="legend-text">System, Jobs & Legacy (10 tables)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentZoom = 1;
+        
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            er: {
+                diagramPadding: 20,
+                layoutDirection: 'TB',
+                minEntityWidth: 100,
+                minEntityHeight: 75,
+                entityPadding: 15,
+                useMaxWidth: false
+            },
+            securityLevel: 'loose'
+        });
+
+        function zoomIn() {
+            currentZoom += 0.1;
+            applyZoom();
+        }
+
+        function zoomOut() {
+            currentZoom = Math.max(0.3, currentZoom - 0.1);
+            applyZoom();
+        }
+
+        function resetZoom() {
+            currentZoom = 1;
+            applyZoom();
+        }
+
+        function applyZoom() {
+            const diagram = document.getElementById('diagram');
+            diagram.style.transform = `scale(${currentZoom})`;
+            diagram.style.transformOrigin = 'top left';
+        }
+
+        function downloadSVG() {
+            const svg = document.querySelector('#diagram svg');
+            if (svg) {
+                const serializer = new XMLSerializer();
+                const source = serializer.serializeToString(svg);
+                const blob = new Blob([source], { type: 'image/svg+xml' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'er-diagram.svg';
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+        }
+    </script>
+</body>
+</html>
