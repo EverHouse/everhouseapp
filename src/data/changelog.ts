@@ -13,6 +13,21 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.65.0",
+    date: "2026-02-02",
+    title: "Animation System Enhancements",
+    isMajor: true,
+    changes: [
+      "New: Smooth tab transition animations when switching between admin tabs",
+      "New: Animated success checkmark component for visual confirmation",
+      "New: Notification badge now pulses to draw attention to unread items",
+      "New: Animated counters for metrics - numbers animate when values change",
+      "New: Card removal animations - items slide out smoothly when deleted",
+      "New: Standardized skeleton loading shimmer effects across all pages",
+      "New: Confetti celebration component for achievements and milestones"
+    ]
+  },
+  {
     version: "9.64.0",
     date: "2026-02-02",
     title: "UX/UI Polish & Accessibility Improvements",

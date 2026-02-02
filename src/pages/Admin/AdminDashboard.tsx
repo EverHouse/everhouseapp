@@ -13,6 +13,7 @@ import { useStaffWebSocketContext, useStaffWebSocketCallback } from '../../conte
 import { useWebSocketQuerySync } from '../../hooks/useWebSocketQuerySync';
 import StaffMobileSidebar from '../../components/StaffMobileSidebar';
 import { useConfirmDialog } from '../../components/ConfirmDialog';
+import { TabTransition } from '../../components/motion';
 
 import { TabType, StaffBottomNav, StaffSidebar, usePendingCounts, useUnreadNotifications, getTabFromPathname, tabToPath } from './layout';
 
@@ -127,7 +128,7 @@ const AdminDashboard: React.FC = () => {
         >
           <span aria-hidden="true" className="material-symbols-outlined text-[24px]">campaign</span>
           {unreadNotifCount > 0 && (
-            <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+            <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-badge-pulse">
               {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
             </span>
           )}
@@ -161,7 +162,7 @@ const AdminDashboard: React.FC = () => {
       {createPortal(headerContent, document.body)}
 
       <main className="flex-1 px-4 md:px-8 pt-[max(112px,calc(env(safe-area-inset-top)+96px))] relative z-0 lg:ml-64 w-full lg:w-auto">
-        <div className="animate-content-enter">
+        <TabTransition activeKey={activeTab} className="animate-content-enter">
           {activeTab === 'training' ? (
             <StaffTrainingGuide key="training" />
           ) : (
@@ -171,7 +172,7 @@ const AdminDashboard: React.FC = () => {
               </Suspense>
             </PageErrorBoundary>
           )}
-        </div>
+        </TabTransition>
         <BottomSentinel />
       </main>
 

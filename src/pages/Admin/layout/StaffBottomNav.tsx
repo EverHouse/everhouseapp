@@ -64,7 +64,7 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({
                 {item.icon}
               </span>
               {item.id === 'simulator' && pendingRequestsCount > 0 && (
-                <span className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full shadow-sm">
+                <span className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full shadow-sm animate-badge-pulse">
                   {pendingRequestsCount > 99 ? '99+' : pendingRequestsCount}
                 </span>
               )}

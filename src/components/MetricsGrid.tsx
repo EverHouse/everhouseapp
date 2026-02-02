@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { getTodayString } from '../utils/dateUtils';
+import AnimatedCounter from './AnimatedCounter';
 
 interface NextItem {
   title: string;
@@ -21,7 +22,7 @@ interface MetricsGridProps {
 interface MetricCardProps {
   icon: string;
   label: string;
-  value: string;
+  value: React.ReactNode;
   subtext?: string;
   isDark: boolean;
   onClick: () => void;
@@ -125,12 +126,27 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({
     ? formatCountdown(nextEvent.date)
     : undefined;
 
+  const renderMinutesValue = (used: number, allowed: number) => {
+    if (allowed === 999) {
+      return (
+        <>
+          <AnimatedCounter value={used} /> min
+        </>
+      );
+    }
+    return (
+      <>
+        <AnimatedCounter value={used} />/{allowed} min
+      </>
+    );
+  };
+
   return (
     <div className={`grid grid-cols-2 gap-3 ${className || ''}`}>
       <MetricCard
         icon="sports_golf"
         label="Golf Sims"
-        value={simUsage.value}
+        value={renderMinutesValue(simulatorMinutesUsed, simulatorMinutesAllowed)}
         subtext={simUsage.subtext}
         isDark={isDark}
         onClick={() => onNavigate('/book')}
@@ -139,7 +155,7 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({
       <MetricCard
         icon="meeting_room"
         label="Conference Room"
-        value={confUsage.value}
+        value={renderMinutesValue(conferenceMinutesUsed, conferenceMinutesAllowed)}
         subtext={confUsage.subtext}
         isDark={isDark}
         onClick={() => onNavigate('/book?tab=conference')}

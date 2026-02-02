@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Skeleton from './SkeletonPrimitive';
 
 interface SkeletonCardProps {
   className?: string;
@@ -12,6 +13,8 @@ interface SkeletonCrossfadeProps {
   className?: string;
   duration?: number;
 }
+
+export { default as Skeleton } from './SkeletonPrimitive';
 
 export const SkeletonCrossfade: React.FC<SkeletonCrossfadeProps> = ({ 
   loading, 
@@ -51,7 +54,7 @@ export const SkeletonCrossfade: React.FC<SkeletonCrossfadeProps> = ({
   );
 };
 
-const shimmerClass = "relative overflow-hidden before:content-[''] before:absolute before:inset-0 before:bg-[repeating-linear-gradient(90deg,transparent_0%,transparent_30%,rgba(255,255,255,0.3)_50%,transparent_70%,transparent_100%)] before:bg-[length:200%_100%] before:bg-repeat before:animate-[shimmer_2s_linear_infinite]";
+const shimmerClass = "skeleton-shimmer";
 const bgLight = "bg-gray-200";
 const bgDark = "bg-white/10";
 const bgAuto = "bg-gray-200 dark:bg-white/10";

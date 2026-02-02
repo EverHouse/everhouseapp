@@ -17,6 +17,7 @@ interface SwipeableListItemProps {
   onSwipeEnd?: () => void;
   disabled?: boolean;
   threshold?: number;
+  isRemoving?: boolean;
 }
 
 const colorClasses = {
@@ -36,7 +37,8 @@ export function SwipeableListItem({
   onSwipeStart,
   onSwipeEnd,
   disabled = false,
-  threshold = 80
+  threshold = 80,
+  isRemoving = false
 }: SwipeableListItemProps) {
   const [translateX, setTranslateX] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -166,7 +168,7 @@ export function SwipeableListItem({
   // Use a wrapper div that doesn't clip the border, with the action containers inside
   // The action containers use their own overflow-hidden to clip themselves
   return (
-    <div className="relative">
+    <div className={`relative ${isRemoving ? 'animate-card-remove' : ''}`}>
       {/* Action containers positioned behind the card, clipped independently */}
       {leftActions.length > 0 && (
         <div 
