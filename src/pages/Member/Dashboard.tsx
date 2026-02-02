@@ -183,6 +183,8 @@ const Dashboard: React.FC = () => {
   const todayStr = currentTime.today;
   const nowTime = currentTime.now;
 
+  // Stable normalized time calculation
+
   const conferenceRoomParams = new URLSearchParams();
   if (user?.name) conferenceRoomParams.set('member_name', user.name);
   if (user?.email) conferenceRoomParams.set('member_email', user.email);
