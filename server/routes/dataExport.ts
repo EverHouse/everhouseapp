@@ -4,6 +4,7 @@ import { db } from '../db';
 import { dataExportRequests } from '../../shared/schema';
 import { eq, desc } from 'drizzle-orm';
 import { logFromRequest } from '../core/auditLog';
+import { isAuthenticated } from '../core/middleware';
 
 const router = Router();
 
@@ -24,12 +25,8 @@ interface MemberDataExport {
   preferences: any;
 }
 
-router.get('/api/account/my-data', async (req: Request, res: Response) => {
+router.get('/api/account/my-data', isAuthenticated, async (req: any, res: Response) => {
   const userEmail = req.session?.user?.email;
-  
-  if (!userEmail) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
 
   try {
     const exportData = await gatherMemberData(userEmail);
@@ -52,12 +49,8 @@ router.get('/api/account/my-data', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/api/account/my-data/preview', async (req: Request, res: Response) => {
+router.get('/api/account/my-data/preview', isAuthenticated, async (req: any, res: Response) => {
   const userEmail = req.session?.user?.email;
-  
-  if (!userEmail) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
 
   try {
     const exportData = await gatherMemberData(userEmail);
@@ -87,12 +80,8 @@ router.get('/api/account/my-data/preview', async (req: Request, res: Response) =
   }
 });
 
-router.get('/api/account/export-history', async (req: Request, res: Response) => {
+router.get('/api/account/export-history', isAuthenticated, async (req: any, res: Response) => {
   const userEmail = req.session?.user?.email;
-  
-  if (!userEmail) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
 
   try {
     const history = await db.select()

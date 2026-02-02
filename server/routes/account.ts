@@ -3,15 +3,12 @@ import { pool } from '../core/db';
 import { notifyAllStaff } from '../core/notificationService';
 import { getResendClient } from '../utils/resend';
 import { logAndRespond } from '../core/logger';
+import { isAuthenticated } from '../core/middleware';
 
 const router = Router();
 
-router.post('/api/account/delete-request', async (req: Request, res: Response) => {
+router.post('/api/account/delete-request', isAuthenticated, async (req: any, res: Response) => {
   const userEmail = req.session?.user?.email;
-  
-  if (!userEmail) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
 
   try {
     const userResult = await pool.query(

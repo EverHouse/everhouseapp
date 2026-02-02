@@ -12,6 +12,40 @@ interface State {
   retryCount: number;
 }
 
+const RELOAD_COUNT_KEY = 'error_reload_count';
+const RELOAD_TIMESTAMP_KEY = 'error_reload_timestamp';
+const MAX_AUTO_RELOADS = 2;
+const RELOAD_WINDOW_MS = 60000;
+
+function getReloadCount(): number {
+  const timestamp = sessionStorage.getItem(RELOAD_TIMESTAMP_KEY);
+  const count = sessionStorage.getItem(RELOAD_COUNT_KEY);
+  
+  if (!timestamp || !count) return 0;
+  
+  const elapsed = Date.now() - parseInt(timestamp, 10);
+  if (elapsed > RELOAD_WINDOW_MS) {
+    sessionStorage.removeItem(RELOAD_COUNT_KEY);
+    sessionStorage.removeItem(RELOAD_TIMESTAMP_KEY);
+    return 0;
+  }
+  
+  return parseInt(count, 10) || 0;
+}
+
+function incrementReloadCount(): number {
+  const currentCount = getReloadCount();
+  const newCount = currentCount + 1;
+  sessionStorage.setItem(RELOAD_COUNT_KEY, newCount.toString());
+  sessionStorage.setItem(RELOAD_TIMESTAMP_KEY, Date.now().toString());
+  return newCount;
+}
+
+function clearReloadCount(): void {
+  sessionStorage.removeItem(RELOAD_COUNT_KEY);
+  sessionStorage.removeItem(RELOAD_TIMESTAMP_KEY);
+}
+
 function isChunkLoadError(error: Error | null): boolean {
   if (!error) return false;
   const message = error.message?.toLowerCase() || '';
@@ -35,9 +69,15 @@ class PageErrorBoundary extends Component<Props, State> {
     console.error(`[PageErrorBoundary${this.props.pageName ? ` - ${this.props.pageName}` : ''}] Error:`, error, errorInfo);
     
     if (isChunkLoadError(error)) {
-      console.log('[PageErrorBoundary] Detected stale chunk error, reloading page...');
-      sessionStorage.setItem('chunk_reload_attempted', Date.now().toString());
-      window.location.reload();
+      const reloadCount = getReloadCount();
+      
+      if (reloadCount < MAX_AUTO_RELOADS) {
+        console.log(`[PageErrorBoundary] Detected stale chunk error, auto-reload ${reloadCount + 1}/${MAX_AUTO_RELOADS}...`);
+        incrementReloadCount();
+        window.location.reload();
+      } else {
+        console.log('[PageErrorBoundary] Max auto-reloads reached, showing error UI');
+      }
     }
   }
 
@@ -50,7 +90,26 @@ class PageErrorBoundary extends Component<Props, State> {
   };
 
   handleHardReload = () => {
-    sessionStorage.setItem('chunk_reload_attempted', Date.now().toString());
+    clearReloadCount();
+    window.location.reload();
+  };
+
+  handleClearCacheAndReload = async () => {
+    clearReloadCount();
+    
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(key => caches.delete(key)));
+      }
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map(reg => reg.unregister()));
+      }
+    } catch (err) {
+      console.error('Failed to clear caches:', err);
+    }
+    
     window.location.reload();
   };
 
@@ -65,36 +124,67 @@ class PageErrorBoundary extends Component<Props, State> {
                               this.state.error?.message?.toLowerCase().includes('network') ||
                               this.state.error?.message?.toLowerCase().includes('load failed');
       const canRetry = this.state.retryCount < 3;
+      const reloadCount = getReloadCount();
+      const hitReloadLimit = reloadCount >= MAX_AUTO_RELOADS;
 
-      if (isChunkError) {
-        const lastReloadAttempt = sessionStorage.getItem('chunk_reload_attempted');
-        const recentlyReloaded = lastReloadAttempt && (Date.now() - parseInt(lastReloadAttempt)) < 30000;
-        
-        if (recentlyReloaded) {
-          return (
-            <div className="flex items-center justify-center min-h-[50vh] p-6">
-              <div className="text-center max-w-sm">
-                <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-amber-500/10 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-2xl text-amber-400">
-                    update
-                  </span>
-                </div>
-                <h2 className="text-lg font-semibold mb-2 text-primary dark:text-white">
-                  App Updated
-                </h2>
-                <p className="text-gray-600 dark:text-white/60 text-sm mb-4">
-                  A new version is available. Please refresh to continue.
-                </p>
+      if (isChunkError && hitReloadLimit) {
+        return (
+          <div className="flex items-center justify-center min-h-[50vh] p-6">
+            <div className="text-center max-w-sm">
+              <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-amber-500/10 flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl text-amber-400">
+                  update
+                </span>
+              </div>
+              <h2 className="text-lg font-semibold mb-2 text-primary dark:text-white">
+                App Update Required
+              </h2>
+              <p className="text-gray-600 dark:text-white/60 text-sm mb-4">
+                A new version is available but couldn't load automatically. Try clearing the cache or contact support if the issue persists.
+              </p>
+              <div className="flex flex-col gap-2">
                 <button
-                  onClick={this.handleHardReload}
+                  onClick={this.handleClearCacheAndReload}
                   className="px-5 py-2.5 bg-accent text-brand-green rounded-xl font-medium text-sm hover:opacity-90 transition-opacity"
                 >
-                  Refresh Now
+                  Clear Cache & Refresh
                 </button>
+                <a
+                  href="mailto:support@everhouse.com?subject=App Loading Issue"
+                  className="px-5 py-2.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/80 rounded-xl font-medium text-sm hover:bg-gray-200 dark:hover:bg-white/20 transition-colors text-center"
+                >
+                  Contact Support
+                </a>
               </div>
             </div>
-          );
-        }
+          </div>
+        );
+      }
+
+      if (isChunkError && !hitReloadLimit) {
+        return (
+          <div className="flex items-center justify-center min-h-[50vh] p-6">
+            <div className="text-center max-w-sm">
+              <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-amber-500/10 flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl text-amber-400">
+                  update
+                </span>
+              </div>
+              <h2 className="text-lg font-semibold mb-2 text-primary dark:text-white">
+                App Updated
+              </h2>
+              <p className="text-gray-600 dark:text-white/60 text-sm mb-4">
+                A new version is available. Please refresh to continue.
+              </p>
+              <button
+                onClick={this.handleHardReload}
+                className="px-5 py-2.5 bg-accent text-brand-green rounded-xl font-medium text-sm hover:opacity-90 transition-opacity"
+              >
+                Refresh Now
+              </button>
+            </div>
+          </div>
+        );
       }
 
       return (
@@ -113,14 +203,32 @@ class PageErrorBoundary extends Component<Props, State> {
                 ? 'Please check your connection and try again.'
                 : 'Something went wrong loading this section.'}
             </p>
-            {canRetry && (
-              <button
-                onClick={this.handleRetry}
-                className="px-5 py-2.5 bg-accent text-brand-green rounded-xl font-medium text-sm hover:opacity-90 transition-opacity"
-              >
-                Try Again
-              </button>
-            )}
+            <div className="flex flex-col gap-2">
+              {canRetry && (
+                <button
+                  onClick={this.handleRetry}
+                  className="px-5 py-2.5 bg-accent text-brand-green rounded-xl font-medium text-sm hover:opacity-90 transition-opacity"
+                >
+                  Try Again
+                </button>
+              )}
+              {!canRetry && (
+                <>
+                  <button
+                    onClick={this.handleHardReload}
+                    className="px-5 py-2.5 bg-accent text-brand-green rounded-xl font-medium text-sm hover:opacity-90 transition-opacity"
+                  >
+                    Refresh Page
+                  </button>
+                  <a
+                    href="mailto:support@everhouse.com?subject=App Error Report"
+                    className="px-5 py-2.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/80 rounded-xl font-medium text-sm hover:bg-gray-200 dark:hover:bg-white/20 transition-colors text-center"
+                  >
+                    Contact Support
+                  </a>
+                </>
+              )}
+            </div>
           </div>
         </div>
       );

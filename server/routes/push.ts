@@ -6,6 +6,7 @@ import { pushSubscriptions, users, notifications, events, eventRsvps, bookingReq
 import { eq, inArray, and, sql, or, isNull } from 'drizzle-orm';
 import { formatTime12Hour, getTodayPacific } from '../utils/dateUtils';
 import { sendNotificationToUser } from '../core/websocket';
+import { isAuthenticated, isStaffOrAdmin } from '../core/middleware';
 
 const router = Router();
 
@@ -190,12 +191,13 @@ router.get('/api/push/vapid-public-key', (req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
 });
 
-router.post('/api/push/subscribe', async (req, res) => {
+router.post('/api/push/subscribe', isAuthenticated, async (req: any, res) => {
   try {
-    const { subscription, user_email } = req.body;
+    const { subscription } = req.body;
+    const userEmail = req.session?.user?.email;
     
-    if (!subscription || !user_email) {
-      return res.status(400).json({ error: 'subscription and user_email are required' });
+    if (!subscription) {
+      return res.status(400).json({ error: 'subscription is required' });
     }
     
     const { endpoint, keys } = subscription;
@@ -207,7 +209,7 @@ router.post('/api/push/subscribe', async (req, res) => {
          user_email = $1,
          p256dh = $3,
          auth = $4`,
-      [user_email, endpoint, keys.p256dh, keys.auth]
+      [userEmail, endpoint, keys.p256dh, keys.auth]
     );
     
     res.json({ success: true });
@@ -217,15 +219,16 @@ router.post('/api/push/subscribe', async (req, res) => {
   }
 });
 
-router.post('/api/push/unsubscribe', async (req, res) => {
+router.post('/api/push/unsubscribe', isAuthenticated, async (req: any, res) => {
   try {
     const { endpoint } = req.body;
+    const userEmail = req.session?.user?.email;
     
     if (!endpoint) {
       return res.status(400).json({ error: 'endpoint is required' });
     }
     
-    await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [endpoint]);
+    await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1 AND user_email = $2', [endpoint, userEmail]);
     
     res.json({ success: true });
   } catch (error: any) {
@@ -234,18 +237,14 @@ router.post('/api/push/unsubscribe', async (req, res) => {
   }
 });
 
-router.post('/api/push/test', async (req, res) => {
+router.post('/api/push/test', isAuthenticated, async (req: any, res) => {
   try {
-    const { user_email } = req.body;
+    const userEmail = req.session?.user?.email;
     
-    if (!user_email) {
-      return res.status(400).json({ error: 'user_email is required' });
-    }
-    
-    await sendPushNotification(user_email, {
+    await sendPushNotification(userEmail, {
       title: 'Test Notification',
       body: 'This is a test push notification from Ever House!',
-      url: '/admin'
+      url: '/profile'
     });
     
     res.json({ success: true });
@@ -404,7 +403,7 @@ export async function sendDailyReminders() {
   };
 }
 
-router.post('/api/push/send-daily-reminders', async (req, res) => {
+router.post('/api/push/send-daily-reminders', isStaffOrAdmin, async (req, res) => {
   try {
     const result = await sendDailyReminders();
     res.json(result);
@@ -561,7 +560,7 @@ export async function sendMorningClosureNotifications() {
   }
 }
 
-router.post('/api/push/send-morning-closure-notifications', async (req, res) => {
+router.post('/api/push/send-morning-closure-notifications', isStaffOrAdmin, async (req, res) => {
   try {
     const result = await sendMorningClosureNotifications();
     res.json(result);

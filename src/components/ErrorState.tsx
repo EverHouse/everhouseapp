@@ -5,13 +5,15 @@ interface ErrorStateProps {
   message?: string;
   onRetry?: () => void;
   variant?: 'default' | 'compact' | 'inline';
+  showSupport?: boolean;
 }
 
 const ErrorState: React.FC<ErrorStateProps> = ({
   title = 'Something went wrong',
   message = 'We encountered an error loading this content. Please try again.',
   onRetry,
-  variant = 'default'
+  variant = 'default',
+  showSupport = false
 }) => {
   if (variant === 'inline') {
     return (
@@ -50,34 +52,51 @@ const ErrorState: React.FC<ErrorStateProps> = ({
         {message}
       </p>
 
-      {onRetry && (
-        <button
-          onClick={onRetry}
-          className={`
-            inline-flex items-center gap-2 
-            ${isCompact ? 'px-4 py-2 text-sm' : 'px-6 py-3 text-base'}
-            bg-red-500 hover:bg-red-600
-            text-white 
-            rounded-2xl font-semibold 
-            hover:scale-[1.02] active:scale-[0.98] 
-            transition-all duration-300
-            shadow-lg hover:shadow-xl
-          `}
-        >
-          <span className="material-symbols-outlined text-lg">refresh</span>
-          Try Again
-        </button>
-      )}
+      <div className="flex flex-col gap-2">
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            className={`
+              inline-flex items-center gap-2 
+              ${isCompact ? 'px-4 py-2 text-sm' : 'px-6 py-3 text-base'}
+              bg-red-500 hover:bg-red-600
+              text-white 
+              rounded-2xl font-semibold 
+              hover:scale-[1.02] active:scale-[0.98] 
+              transition-all duration-300
+              shadow-lg hover:shadow-xl
+            `}
+          >
+            <span className="material-symbols-outlined text-lg">refresh</span>
+            Try Again
+          </button>
+        )}
+        {showSupport && (
+          <a
+            href="mailto:support@everhouse.com?subject=App Error Report"
+            className={`
+              inline-flex items-center justify-center gap-2
+              ${isCompact ? 'px-4 py-2 text-xs' : 'px-6 py-2 text-sm'}
+              text-gray-500 dark:text-white/50 hover:text-gray-700 dark:hover:text-white/70
+              transition-colors
+            `}
+          >
+            <span className="material-symbols-outlined text-sm">mail</span>
+            Contact Support
+          </a>
+        )}
+      </div>
     </div>
   );
 };
 
-export const NetworkError: React.FC<{ onRetry?: () => void }> = ({ onRetry }) => (
+export const NetworkError: React.FC<{ onRetry?: () => void; showSupport?: boolean }> = ({ onRetry, showSupport = false }) => (
   <ErrorState
     title="Connection Error"
     message="Unable to connect to the server. Please check your internet connection and try again."
     onRetry={onRetry}
     variant="compact"
+    showSupport={showSupport}
   />
 );
 
@@ -85,6 +104,15 @@ export const NotFoundError: React.FC<{ item?: string }> = ({ item = 'content' })
   <ErrorState
     title="Not Found"
     message={`The ${item} you're looking for doesn't exist or has been removed.`}
+    variant="compact"
+  />
+);
+
+export const LoadingError: React.FC<{ section?: string; onRetry?: () => void }> = ({ section = 'content', onRetry }) => (
+  <ErrorState
+    title={`Unable to load ${section}`}
+    message="There was a problem loading this content. Please try again."
+    onRetry={onRetry}
     variant="compact"
   />
 );
