@@ -29,6 +29,29 @@ const formatAffectedAreas = (areas: string): string => {
   if (areas === 'all_bays') return 'All Simulator Bays';
   if (areas === 'none') return 'No booking restrictions';
   
+  // Handle JSON array format
+  if (areas.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(areas);
+      if (Array.isArray(parsed)) {
+        const formatted = parsed.map(area => {
+          if (area === 'entire_facility') return 'Entire Facility';
+          if (area === 'all_bays') return 'All Simulator Bays';
+          if (area === 'conference_room' || area === 'Conference Room') return 'Conference Room';
+          if (area === 'none') return 'No booking restrictions';
+          if (area.startsWith('bay_')) {
+            const bayNum = area.replace('bay_', '');
+            return `Bay ${bayNum}`;
+          }
+          return area;
+        });
+        return formatted.join(', ');
+      }
+    } catch {
+      // Fall through to comma-separated parsing
+    }
+  }
+  
   const areaList = areas.split(',').map(a => a.trim());
   const formatted = areaList.map(area => {
     if (area === 'entire_facility') return 'Entire Facility';
@@ -45,31 +68,59 @@ const formatAffectedAreas = (areas: string): string => {
   return formatted.join(', ');
 };
 
+const formatSingleArea = (area: string): string => {
+  if (area === 'entire_facility') return 'Entire Facility';
+  if (area === 'all_bays') return 'All Simulator Bays';
+  if (area === 'conference_room' || area === 'Conference Room') return 'Conference Room';
+  if (area === 'none') return '';
+  if (area.startsWith('bay_')) {
+    const bayNum = area.replace('bay_', '');
+    return `Bay ${bayNum}`;
+  }
+  return area;
+};
+
 const getAffectedAreasList = (areas: string): string[] => {
   if (!areas || areas === 'none') return [];
   if (areas === 'entire_facility') return ['Entire Facility'];
   if (areas === 'all_bays') return ['All Simulator Bays'];
   
-  return areas.split(',').map(a => a.trim()).map(area => {
-    if (area === 'entire_facility') return 'Entire Facility';
-    if (area === 'all_bays') return 'All Simulator Bays';
-    if (area === 'conference_room') return 'Conference Room';
-    if (area === 'Conference Room') return 'Conference Room';
-    if (area === 'none') return '';
-    if (area.startsWith('bay_')) {
-      const bayNum = area.replace('bay_', '');
-      return `Bay ${bayNum}`;
+  // Handle JSON array format: ["bay_1","bay_2","bay_3"]
+  if (areas.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(areas);
+      if (Array.isArray(parsed)) {
+        return parsed.map(formatSingleArea).filter(a => a);
+      }
+    } catch {
+      // Fall through to comma-separated parsing
     }
-    return area;
-  }).filter(a => a);
+  }
+  
+  // Handle comma-separated format: bay_1,bay_2,bay_3
+  return areas.split(',').map(a => a.trim()).map(formatSingleArea).filter(a => a);
+};
+
+const formatTitleForDisplay = (title: string): string => {
+  // Convert snake_case to Title Case (e.g., "private_event" → "Private Event")
+  if (title.includes('_')) {
+    return title
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  }
+  return title;
 };
 
 const getMemberNoticeTitle = (closure: Closure): string => {
   if (closure.noticeType && closure.noticeType.trim() && closure.noticeType.toLowerCase() !== 'closure') {
-    return closure.noticeType;
+    return formatTitleForDisplay(closure.noticeType);
   }
   if (closure.reason && closure.reason.trim()) {
-    return closure.reason;
+    return formatTitleForDisplay(closure.reason);
+  }
+  if (closure.title && closure.title.trim()) {
+    return formatTitleForDisplay(closure.title);
   }
   return closure.affectedAreas && closure.affectedAreas !== 'none' 
     ? formatAffectedAreas(closure.affectedAreas) 
@@ -78,15 +129,15 @@ const getMemberNoticeTitle = (closure: Closure): string => {
 
 const getNoticeDisplayText = (closure: Closure): string => {
   if (closure.noticeType && closure.noticeType.trim()) {
-    return closure.noticeType;
+    return formatTitleForDisplay(closure.noticeType);
   }
   if (closure.reason && closure.reason.trim()) {
-    return closure.reason;
+    return formatTitleForDisplay(closure.reason);
   }
   if (closure.affectedAreas) {
     return formatAffectedAreas(closure.affectedAreas);
   }
-  return closure.title || 'Notice';
+  return closure.title ? formatTitleForDisplay(closure.title) : 'Notice';
 };
 
 const formatTime12HourShort = (timeStr: string): string => {
