@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.67.1",
+    date: "2026-02-02",
+    title: "Data Integrity Check Improvement",
+    changes: [
+      "Fixed: Stripe subscription sync check now excludes MindBody-billed members - no longer flags them as missing Stripe subscriptions",
+      "Improved: Clearer error messages in data integrity checks to distinguish billing providers"
+    ]
+  },
+  {
     version: "9.67.0",
     date: "2026-02-02",
     title: "Accessibility & UX Improvements",

@@ -907,11 +907,12 @@ async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResult> {
   }
   
   const appMembersResult = await db.execute(sql`
-    SELECT id, email, first_name, last_name, tier, membership_status, stripe_customer_id
+    SELECT id, email, first_name, last_name, tier, membership_status, stripe_customer_id, billing_provider
     FROM users 
     WHERE stripe_customer_id IS NOT NULL
       AND membership_status IS NOT NULL
       AND role = 'member'
+      AND (billing_provider IS NULL OR billing_provider != 'mindbody')
     LIMIT 100
   `);
   const appMembers = appMembersResult.rows as any[];
@@ -973,8 +974,8 @@ async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResult> {
             severity: 'error',
             table: 'users',
             recordId: member.id,
-            description: `Member "${memberName}" shows as active in database but has no Stripe subscription`,
-            suggestion: 'Verify member payment status or update membership status',
+            description: `Member "${memberName}" shows as active in database but has no Stripe subscription (billing via Stripe)`,
+            suggestion: 'Verify member payment status or update membership status. Note: MindBody-billed members are excluded from this check.',
             context: {
               memberName,
               memberEmail: member.email || undefined,
