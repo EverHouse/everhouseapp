@@ -380,7 +380,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       
       try {
         // Fetch all active members from database (up to 500)
-        const res = await fetch('/api/members/directory?status=active', { credentials: 'include' });
+        const res = await fetch(`/api/members/directory?status=active&_t=${Date.now()}`, { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
           const contacts = Array.isArray(data) ? data : (data.contacts || []);
