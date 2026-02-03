@@ -2619,18 +2619,17 @@ router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => 
         await client.query(`SAVEPOINT ${savepointName}`);
         
         // First check if an existing session already covers this time slot
+        // Match on start_time only since actual session duration may differ from request
         const existingSessionResult = await client.query(`
           SELECT id FROM booking_sessions
           WHERE resource_id = $1
             AND session_date = $2
             AND start_time = $3
-            AND end_time = $4
           LIMIT 1
         `, [
           booking.resource_id,
           booking.request_date,
-          booking.start_time,
-          booking.end_time
+          booking.start_time
         ]);
         
         let sessionId: number;

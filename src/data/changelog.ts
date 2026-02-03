@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.2.6",
+    date: "2026-02-03",
+    title: "Session Backfill Matches on Start Time",
+    changes: [
+      "Fixed: Backfill now matches sessions by start time only (not exact duration)",
+      "Fixed: Bookings with different durations than actual sessions now link correctly",
+      "Example: A 14:00-19:00 booking request now links to a 14:00-18:00 session"
+    ]
+  },
+  {
     version: "69.2.5",
     date: "2026-02-03",
     title: "Session Backfill Links Existing Sessions",
