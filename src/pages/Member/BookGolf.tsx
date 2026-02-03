@@ -192,8 +192,19 @@ const BookGolf: React.FC = () => {
   const { setPageReady } = usePageReady();
   const { showToast } = useToast();
   const isDark = effectiveTheme === 'dark';
-  const initialTab = searchParams.get('tab') === 'conference' ? 'conference' : 'simulator';
-  const [activeTab, setActiveTab] = useState<'simulator' | 'conference'>(initialTab);
+  const activeTab: 'simulator' | 'conference' = searchParams.get('tab') === 'conference' ? 'conference' : 'simulator';
+  
+  const setActiveTab = (tab: 'simulator' | 'conference') => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      if (tab === 'simulator') {
+        newParams.delete('tab');
+      } else {
+        newParams.set('tab', tab);
+      }
+      return newParams;
+    }, { replace: true });
+  };
   const [playerCount, setPlayerCount] = useState<number>(1);
   const [duration, setDuration] = useState<number>(60);
   const [memberNotes, setMemberNotes] = useState<string>('');
@@ -510,13 +521,6 @@ const BookGolf: React.FC = () => {
   }, [isLoading, setPageReady]);
 
   useEffect(() => {
-    const tab = searchParams.get('tab');
-    if (tab === 'conference') {
-      setActiveTab('conference');
-    } else if (tab === 'simulator') {
-      setActiveTab('simulator');
-    }
-    
     const rescheduleParam = searchParams.get('reschedule');
     if (rescheduleParam) {
       const bookingId = parseInt(rescheduleParam, 10);

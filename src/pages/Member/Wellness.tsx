@@ -64,28 +64,33 @@ const formatTimeTo12Hour = (timeStr: string): { time: string; period: string } =
 };
 
 const Wellness: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useData();
   const { effectiveTheme } = useTheme();
   const { setPageReady } = usePageReady();
   const { showToast } = useToast();
   const isDark = effectiveTheme === 'dark';
-  const initialTab = searchParams.get('tab') === 'medspa' ? 'medspa' : 'classes';
-  const [activeTab, setActiveTab] = useState<'classes' | 'medspa'>(initialTab);
+  const activeTab: 'classes' | 'medspa' = searchParams.get('tab') === 'medspa' ? 'medspa' : 'classes';
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState('Booking confirmed.');
+
+  const setActiveTab = (tab: 'classes' | 'medspa') => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      if (tab === 'classes') {
+        newParams.delete('tab');
+      } else {
+        newParams.set('tab', tab);
+      }
+      return newParams;
+    }, { replace: true });
+  };
 
   useEffect(() => {
     if (activeTab === 'medspa') {
       setPageReady(true);
     }
   }, [activeTab, setPageReady]);
-
-  useEffect(() => {
-    const tab = searchParams.get('tab');
-    if (tab === 'medspa') setActiveTab('medspa');
-    else if (tab === 'classes') setActiveTab('classes');
-  }, [searchParams]);
 
   const convertTo24Hour = (time12: string): string => {
     const match = time12.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
