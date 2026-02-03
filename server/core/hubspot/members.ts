@@ -974,7 +974,7 @@ export async function syncTierToHubSpot(params: {
   
   // Determine lifecycle stage based on membership status
   const isActive = membershipStatus && ['active', 'trialing', 'past_due'].includes(membershipStatus.toLowerCase());
-  const lifecyclestage = isActive ? 'customer' : 'other';
+  const lifecyclestage = isActive ? 'member' : 'other';
   
   try {
     const hubspot = await getHubSpotClient();
