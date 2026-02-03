@@ -31,11 +31,11 @@ const MAIN_NAV_ITEMS: NavItem[] = [
 const RESOURCES_ITEMS: NavItem[] = [
   { id: 'cafe', icon: 'local_cafe', label: 'Cafe Menu' },
   { id: 'training', icon: 'school', label: 'Training Guide' },
-  { id: 'team', icon: 'badge', label: 'Team' },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
   { id: 'tiers', icon: 'settings', label: 'Stripe Config' },
+  { id: 'team', icon: 'badge', label: 'Manage Team' },
   { id: 'gallery', icon: 'photo_library', label: 'Gallery' },
   { id: 'faqs', icon: 'help_outline', label: 'FAQs' },
   { id: 'inquiries', icon: 'mail', label: 'Inquiries' },
