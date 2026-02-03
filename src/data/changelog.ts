@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.69.3",
+    date: "2026-02-03",
+    title: "Tier Sync Reliability",
+    changes: [
+      "Fixed: HubSpot sync failures now queue for automatic retry instead of being lost",
+      "Fixed: First-time tier assignments correctly show 'None' as previous tier (not 'Social')",
+      "Fixed: Rapid tier changes no longer get out of order - improved sync deduplication",
+      "Improved: Auto-fix now prefers primary user's tier when copying from linked emails",
+      "Improved: Falls back to most recently updated alternate email tier if no primary"
+    ]
+  },
+  {
     version: "9.69.2",
     date: "2026-02-03",
     title: "Staff Tier Assignment",
