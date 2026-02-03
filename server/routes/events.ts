@@ -13,6 +13,23 @@ import { sendNotificationToUser, broadcastToStaff } from '../core/websocket';
 import { getSessionUser } from '../types/session';
 import { logFromRequest } from '../core/auditLog';
 
+async function getMemberDisplayName(email: string): Promise<string> {
+  try {
+    const normalizedEmail = email.toLowerCase();
+    const result = await db.select({ firstName: users.firstName, lastName: users.lastName })
+      .from(users)
+      .where(sql`LOWER(${users.email}) = ${normalizedEmail}`)
+      .limit(1);
+    
+    if (result.length > 0 && (result[0].firstName || result[0].lastName)) {
+      return [result[0].firstName, result[0].lastName].filter(Boolean).join(' ');
+    }
+  } catch (err) {
+    if (!isProduction) console.warn('Failed to lookup member name:', err);
+  }
+  return email.split('@')[0];
+}
+
 async function createEventAvailabilityBlocks(
   eventId: number, 
   eventDate: string, 
@@ -909,7 +926,7 @@ router.post('/api/rsvps', async (req, res) => {
     const formattedDate = formatDateDisplayWithDay(evt.eventDate);
     const formattedTime = evt.startTime?.substring(0, 5) || '';
     const memberMessage = `You're confirmed for ${evt.title} on ${formattedDate}${formattedTime ? ` at ${formattedTime}` : ''}${evt.location ? ` - ${evt.location}` : ''}.`;
-    const memberName = user_email.split('@')[0];
+    const memberName = await getMemberDisplayName(user_email);
     const staffMessage = `${memberName} RSVP'd for ${evt.title} on ${formattedDate}`;
     
     const result = await db.transaction(async (tx) => {
@@ -1001,7 +1018,7 @@ router.delete('/api/rsvps/:event_id/:user_email', async (req, res) => {
     
     const evt = eventData[0];
     const formattedDate = formatDateDisplayWithDay(evt.eventDate);
-    const memberName = user_email.split('@')[0];
+    const memberName = await getMemberDisplayName(user_email);
     const staffMessage = `${memberName} cancelled their RSVP for ${evt.title} on ${formattedDate}`;
     
     await db.transaction(async (tx) => {

@@ -13,6 +13,23 @@ import { sendNotificationToUser, broadcastToStaff, broadcastWaitlistUpdate } fro
 import { getSessionUser } from '../types/session';
 import { logFromRequest } from '../core/auditLog';
 
+async function getMemberDisplayName(email: string): Promise<string> {
+  try {
+    const normalizedEmail = email.toLowerCase();
+    const result = await db.select({ firstName: users.firstName, lastName: users.lastName })
+      .from(users)
+      .where(sql`LOWER(${users.email}) = ${normalizedEmail}`)
+      .limit(1);
+    
+    if (result.length > 0 && (result[0].firstName || result[0].lastName)) {
+      return [result[0].firstName, result[0].lastName].filter(Boolean).join(' ');
+    }
+  } catch (err) {
+    if (!isProduction) console.warn('Failed to lookup member name:', err);
+  }
+  return email.split('@')[0];
+}
+
 async function createWellnessAvailabilityBlocks(
   wellnessClassId: number, 
   classDate: string, 
@@ -977,7 +994,7 @@ router.post('/api/wellness-enrollments', async (req, res) => {
       ? cls.date.toISOString().split('T')[0] 
       : (typeof cls.date === 'string' ? cls.date.split('T')[0] : String(cls.date));
     const formattedDate = formatDateDisplayWithDay(dateStr);
-    const memberName = user_email.split('@')[0];
+    const memberName = await getMemberDisplayName(user_email);
     
     // Check capacity and determine if this should be a waitlist enrollment
     const capacity = cls.capacity;
@@ -1113,7 +1130,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res
       ? cls.date.toISOString().split('T')[0] 
       : (typeof cls.date === 'string' ? cls.date.split('T')[0] : String(cls.date));
     const formattedDate = formatDateDisplayWithDay(dateStr);
-    const memberName = user_email.split('@')[0];
+    const memberName = await getMemberDisplayName(user_email);
     const staffMessage = `${memberName} cancelled their enrollment for ${cls.title} on ${formattedDate}`;
     
     await db.transaction(async (tx) => {
@@ -1176,7 +1193,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res
         if (waitlistedResult.rows.length > 0) {
           const promotedUserRow = waitlistedResult.rows[0];
           const promotedEmail = promotedUserRow.user_email;
-          const promotedName = promotedEmail.split('@')[0];
+          const promotedName = await getMemberDisplayName(promotedEmail);
           
           // Promote from waitlist
           await db.update(wellnessEnrollments)

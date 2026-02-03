@@ -60,6 +60,19 @@ export interface NotificationResult {
 }
 
 async function insertNotificationToDatabase(payload: NotificationPayload): Promise<{ id: number } | null> {
+  if (!payload?.userEmail || !payload?.title || !payload?.message || !payload?.type) {
+    logger.error('[Notification] Cannot insert notification - missing required fields', {
+      extra: {
+        event: 'notification.insert_missing_fields',
+        hasUserEmail: !!payload?.userEmail,
+        hasTitle: !!payload?.title,
+        hasMessage: !!payload?.message,
+        hasType: !!payload?.type
+      }
+    });
+    return null;
+  }
+  
   try {
     const [result] = await db.insert(notifications).values({
       userEmail: payload.userEmail,
@@ -276,6 +289,23 @@ export async function notifyMember(
   payload: NotificationPayload,
   options: { sendPush?: boolean; sendWebSocket?: boolean; sendEmail?: boolean; emailSubject?: string; emailHtml?: string } = {}
 ): Promise<NotificationResult> {
+  if (!payload?.userEmail || !payload?.title || !payload?.message || !payload?.type) {
+    logger.error('[Notification] Invalid payload - missing required fields', {
+      extra: {
+        event: 'notification.invalid_payload',
+        hasUserEmail: !!payload?.userEmail,
+        hasTitle: !!payload?.title,
+        hasMessage: !!payload?.message,
+        hasType: !!payload?.type
+      }
+    });
+    return {
+      notificationId: undefined,
+      deliveryResults: [{ channel: 'database', success: false, error: 'Invalid payload - missing required fields' }],
+      allSucceeded: false
+    };
+  }
+  
   const { sendPush = true, sendWebSocket = true, sendEmail = false, emailSubject, emailHtml } = options;
   const deliveryResults: DeliveryResult[] = [];
   
@@ -338,6 +368,21 @@ export async function notifyAllStaff(
     url?: string;
   } = {}
 ): Promise<{ staffCount: number; deliveryResults: DeliveryResult[] }> {
+  if (!title || !message || !type) {
+    logger.error('[Notification] Invalid staff notification - missing required fields', {
+      extra: {
+        event: 'notification.invalid_staff_payload',
+        hasTitle: !!title,
+        hasMessage: !!message,
+        hasType: !!type
+      }
+    });
+    return { 
+      staffCount: 0, 
+      deliveryResults: [{ channel: 'database', success: false, error: 'Invalid payload - missing required fields' }] 
+    };
+  }
+  
   const { sendPush = true, sendWebSocket = true } = options;
   const deliveryResults: DeliveryResult[] = [];
   
