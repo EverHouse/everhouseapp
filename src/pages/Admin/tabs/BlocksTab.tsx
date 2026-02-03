@@ -619,8 +619,8 @@ const BlocksTab: React.FC = () => {
                             : 'bg-white dark:bg-white/10 text-gray-600 dark:text-white/80 border border-gray-200 dark:border-white/25'
                     }`}
                 >
-                    <span aria-hidden="true" className="material-symbols-outlined text-[18px]">notifications</span>
-                    Notices
+                    <span aria-hidden="true" className="material-symbols-outlined text-[18px]">calendar_today</span>
+                    Internal Calendar
                 </button>
                 <button
                     onClick={() => setActiveSubTab('blocks')}
