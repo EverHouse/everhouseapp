@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.3.2",
+    date: "2026-02-03",
+    title: "MindBody Member Billing Separation",
+    changes: [
+      "Changed: MindBody members can add a payment method for overage fees without requesting migration",
+      "Changed: Only staff can migrate MindBody members to Stripe subscription billing",
+      "Changed: Member billing messaging now focuses on overage fees, not migration"
+    ]
+  },
+  {
     version: "69.3.1",
     date: "2026-02-03",
     title: "Account Balance in Profile Drawer",

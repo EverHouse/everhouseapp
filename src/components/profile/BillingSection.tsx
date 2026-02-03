@@ -132,10 +132,10 @@ export default function BillingSection({ isDark }: Props) {
     }
   };
 
-  const handleMigrateToStripe = async () => {
+  const handleAddPaymentMethod = async () => {
     setMigratingPayment(true);
     try {
-      const res = await fetch('/api/my/billing/migrate-to-stripe', {
+      const res = await fetch('/api/my/billing/add-payment-method-for-extras', {
         method: 'POST',
         credentials: 'include',
       });
@@ -143,7 +143,7 @@ export default function BillingSection({ isDark }: Props) {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        showToast(data.error || 'Unable to update payment method', 'error');
+        showToast(data.error || 'Unable to add payment method', 'error');
       }
     } catch {
       showToast('Failed to open payment portal', 'error');
@@ -377,7 +377,7 @@ export default function BillingSection({ isDark }: Props) {
   }
 
   if (billingInfo.billingProvider === 'mindbody') {
-    const hasMigrationPending = !!billingInfo.billingMigrationRequestedAt;
+    const hasPaymentMethod = billingInfo.paymentMethods && billingInfo.paymentMethods.length > 0;
     
     return (
       <div className={`rounded-2xl overflow-hidden ${isDark ? 'bg-white/5' : 'bg-white'}`}>
@@ -394,26 +394,26 @@ export default function BillingSection({ isDark }: Props) {
             </div>
           </div>
           
-          {hasMigrationPending ? (
+          {hasPaymentMethod ? (
             <div className={`p-3 rounded-lg mb-4 ${isDark ? 'bg-green-900/20 border border-green-500/30' : 'bg-green-50 border border-green-200'}`}>
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-green-500 text-lg">check_circle</span>
                 <span className={`text-sm font-medium ${isDark ? 'text-green-400' : 'text-green-700'}`}>
-                  Payment method updated
+                  Payment method on file
                 </span>
               </div>
               <p className={`text-sm mt-1 ${isDark ? 'text-green-300/80' : 'text-green-700'}`}>
-                Our team is transitioning your billing. You'll receive a confirmation once complete.
+                Your card ending in {billingInfo.paymentMethods[0].last4} will be used for any additional charges.
               </p>
             </div>
           ) : (
             <p className={`text-sm mb-4 ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
-              Update your payment method to enable billing through the app and avoid payment issues.
+              Add a payment method for overage fees, guest passes, and other club purchases.
             </p>
           )}
           
           <button
-            onClick={handleMigrateToStripe}
+            onClick={handleAddPaymentMethod}
             disabled={migratingPayment}
             className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium text-sm transition-all disabled:opacity-50 ${
               isDark 
@@ -426,7 +426,7 @@ export default function BillingSection({ isDark }: Props) {
             ) : (
               <span className="material-symbols-outlined text-lg">credit_card</span>
             )}
-            {migratingPayment ? 'Opening...' : hasMigrationPending ? 'Update Payment Method' : 'Update Payment Method'}
+            {migratingPayment ? 'Opening...' : hasPaymentMethod ? 'Update Payment Method' : 'Add Payment Method'}
           </button>
           
           {/* Show Stripe payments for overage fees, guest passes, etc. */}

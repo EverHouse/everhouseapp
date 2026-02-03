@@ -310,6 +310,74 @@ router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
   }
 });
 
+// Add payment method for extras (overage fees, etc) - does NOT trigger migration
+// MindBody members use this to add a card for overage fees without requesting migration
+router.post('/api/my/billing/add-payment-method-for-extras', requireAuth, async (req, res) => {
+  try {
+    const email = req.session.user.email;
+    
+    const sessionRole = req.session.user.role;
+    if (sessionRole === 'staff' || sessionRole === 'admin') {
+      return res.status(400).json({ error: 'Staff accounts do not use billing' });
+    }
+    
+    const result = await pool.query(
+      `SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id
+       FROM users WHERE LOWER(email) = $1`,
+      [email.toLowerCase()]
+    );
+    
+    const member = result.rows[0];
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    const stripe = await getStripeClient();
+    let customerId = member.stripe_customer_id;
+    
+    // Create or find Stripe customer (but don't mark for migration)
+    if (!customerId) {
+      const customers = await stripe.customers.list({ email: member.email, limit: 1 });
+      if (customers.data.length > 0) {
+        customerId = customers.data[0].id;
+      } else {
+        const fullName = [member.first_name, member.last_name].filter(Boolean).join(' ') || undefined;
+        const customer = await stripe.customers.create({
+          email: member.email,
+          name: fullName,
+        });
+        customerId = customer.id;
+      }
+      
+      // Save customer ID but NOT billing_migration_requested_at
+      await pool.query(
+        `UPDATE users SET stripe_customer_id = $1 WHERE id = $2`,
+        [customerId, member.id]
+      );
+    }
+    
+    const returnUrl = process.env.REPLIT_DEV_DOMAIN
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}/profile`
+      : process.env.REPLIT_DEPLOYMENT_DOMAIN
+        ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}/profile`
+        : 'https://everhouse.com/profile';
+    
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: returnUrl,
+      flow_data: {
+        type: 'payment_method_update',
+      },
+    });
+    
+    console.log(`[MyBilling] Payment method setup (for extras) initiated for ${member.email}`);
+    res.json({ url: session.url });
+  } catch (error: any) {
+    console.error('[MyBilling] Add payment method for extras error:', error);
+    res.status(500).json({ error: 'Failed to open payment portal' });
+  }
+});
+
 router.post('/api/my/billing/migrate-to-stripe', requireAuth, async (req, res) => {
   try {
     const email = req.session.user.email;
