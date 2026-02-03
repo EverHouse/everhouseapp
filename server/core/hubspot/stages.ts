@@ -182,6 +182,11 @@ export async function syncMemberToHubSpot(
       const hubspotStatus = DB_STATUS_TO_HUBSPOT_STATUS[normalizedStatus] || 'Inactive';
       properties.membership_status = hubspotStatus;
       updated.status = true;
+      
+      // Set lifecycle stage based on membership status
+      // Active members should be 'customer', inactive/terminated should be 'other'
+      const isActive = ['active', 'trialing', 'past_due'].includes(normalizedStatus);
+      properties.lifecyclestage = isActive ? 'customer' : 'other';
     }
     
     if (billingProvider) {

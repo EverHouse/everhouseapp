@@ -949,7 +949,7 @@ export async function syncTierToHubSpot(params: {
   }
   
   const userResult = await pool.query(
-    'SELECT hubspot_id FROM users WHERE LOWER(email) = $1',
+    'SELECT hubspot_id, billing_provider, membership_status FROM users WHERE LOWER(email) = $1',
     [normalizedEmail]
   );
   
@@ -959,19 +959,40 @@ export async function syncTierToHubSpot(params: {
   }
   
   const hubspotContactId = userResult.rows[0].hubspot_id;
+  const billingProvider = userResult.rows[0].billing_provider;
+  const membershipStatus = userResult.rows[0].membership_status;
+  
+  // Map billing provider to HubSpot value
+  const DB_BILLING_PROVIDER_TO_HUBSPOT: Record<string, string> = {
+    'stripe': 'Stripe',
+    'mindbody': 'MindBody',
+    'hubspot': 'HubSpot',
+    'manual': 'Manual',
+    'comped': 'Comped'
+  };
+  const hubspotBillingProvider = billingProvider ? (DB_BILLING_PROVIDER_TO_HUBSPOT[billingProvider.toLowerCase()] || 'Manual') : undefined;
+  
+  // Determine lifecycle stage based on membership status
+  const isActive = membershipStatus && ['active', 'trialing', 'past_due'].includes(membershipStatus.toLowerCase());
+  const lifecyclestage = isActive ? 'customer' : 'other';
   
   try {
     const hubspot = await getHubSpotClient();
     
+    const properties: Record<string, string> = {
+      membership_tier: hubspotTier,
+      lifecyclestage: lifecyclestage
+    };
+    
+    if (hubspotBillingProvider) {
+      properties.billing_provider = hubspotBillingProvider;
+    }
+    
     await retryableHubSpotRequest(() =>
-      hubspot.crm.contacts.basicApi.update(hubspotContactId, {
-        properties: {
-          membership_tier: hubspotTier
-        }
-      })
+      hubspot.crm.contacts.basicApi.update(hubspotContactId, { properties })
     );
     
-    console.log(`[HubSpot TierSync] Updated contact ${normalizedEmail} tier to "${hubspotTier}"`);
+    console.log(`[HubSpot TierSync] Updated contact ${normalizedEmail}: tier="${hubspotTier}", lifecycle="${lifecyclestage}", billing="${hubspotBillingProvider || 'not set'}"`);
     
     const dealResult = await db.select()
       .from(hubspotDeals)

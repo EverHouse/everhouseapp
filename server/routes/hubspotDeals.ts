@@ -247,6 +247,54 @@ router.post('/api/hubspot/sync-communication-logs', isStaffOrAdmin, async (req, 
   }
 });
 
+// Push member data (tier, billing_provider, lifecycle) TO HubSpot for all active members
+router.post('/api/hubspot/push-members-to-hubspot', isStaffOrAdmin, async (req, res) => {
+  try {
+    console.log('[HubSpotDeals] Push members to HubSpot triggered');
+    const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
+    
+    // Get all active members with HubSpot IDs
+    const membersResult = await pool.query(`
+      SELECT email, membership_tier, billing_provider, membership_status
+      FROM users
+      WHERE role = 'member'
+        AND hubspot_id IS NOT NULL
+        AND membership_status IN ('active', 'trialing', 'past_due')
+    `);
+    
+    const members = membersResult.rows;
+    console.log(`[HubSpotDeals] Found ${members.length} active members to sync to HubSpot`);
+    
+    let synced = 0;
+    let errors = 0;
+    const errorDetails: string[] = [];
+    
+    for (const member of members) {
+      try {
+        await syncMemberToHubSpot({
+          email: member.email,
+          status: member.membership_status,
+          tier: member.membership_tier,
+          billingProvider: member.billing_provider
+        });
+        synced++;
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error: any) {
+        errors++;
+        errorDetails.push(`${member.email}: ${error.message}`);
+        console.error(`[HubSpotDeals] Error syncing ${member.email}:`, error.message);
+      }
+    }
+    
+    console.log(`[HubSpotDeals] Push complete - Synced: ${synced}, Errors: ${errors}`);
+    res.json({ success: true, total: members.length, synced, errors, errorDetails: errorDetails.slice(0, 10) });
+  } catch (error: any) {
+    console.error('Error pushing members to HubSpot:', error);
+    res.status(500).json({ error: 'Failed to push members to HubSpot' });
+  }
+});
+
 router.post('/api/hubspot/remediate-deal-stages', isStaffOrAdmin, async (req, res) => {
   try {
     const sessionUser = getSessionUser(req);
