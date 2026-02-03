@@ -125,7 +125,11 @@ router.get('/api/data-integrity/audit-log', isAdmin, async (req, res) => {
 
 router.post('/api/data-integrity/sync-push', isAdmin, async (req: Request, res) => {
   try {
-    const { issue_key, target, user_id, hubspot_contact_id } = req.body;
+    // Accept both camelCase and snake_case parameter names
+    const issue_key = req.body.issue_key || req.body.issueKey;
+    const target = req.body.target;
+    const user_id = req.body.user_id || req.body.userId;
+    const hubspot_contact_id = req.body.hubspot_contact_id || req.body.hubspotContactId;
     
     if (!issue_key) {
       return res.status(400).json({ error: 'issue_key is required' });
@@ -154,7 +158,11 @@ router.post('/api/data-integrity/sync-push', isAdmin, async (req: Request, res) 
 
 router.post('/api/data-integrity/sync-pull', isAdmin, async (req: Request, res) => {
   try {
-    const { issue_key, target, user_id, hubspot_contact_id } = req.body;
+    // Accept both camelCase and snake_case parameter names
+    const issue_key = req.body.issue_key || req.body.issueKey;
+    const target = req.body.target;
+    const user_id = req.body.user_id || req.body.userId;
+    const hubspot_contact_id = req.body.hubspot_contact_id || req.body.hubspotContactId;
     
     if (!issue_key) {
       return res.status(400).json({ error: 'issue_key is required' });

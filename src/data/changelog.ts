@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.2.7",
+    date: "2026-02-03",
+    title: "Data Integrity Sync Fix",
+    changes: [
+      "Fixed: HubSpot sync push/pull now works correctly from Data Integrity page",
+      "Fixed: 'issue_key is required' error no longer appears when syncing"
+    ]
+  },
+  {
     version: "69.2.6",
     date: "2026-02-03",
     title: "Session Backfill Matches on Start Time",
