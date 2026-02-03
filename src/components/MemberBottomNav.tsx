@@ -1,5 +1,5 @@
-import React, { useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useCallback, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { SafeAreaBottomOverlay } from './layout/SafeAreaBottomOverlay';
 import { prefetchRoute, prefetchAdjacentRoutes } from '../lib/prefetch';
 import { haptic } from '../utils/haptics';
@@ -25,20 +25,36 @@ interface MemberBottomNavProps {
 
 const MemberBottomNav: React.FC<MemberBottomNavProps> = ({ currentPath, isDarkTheme }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isNavigatingRef = useRef(false);
+  const lastNavigationTimeRef = useRef(0);
   
   useEffect(() => {
     prefetchAdjacentRoutes(currentPath);
   }, [currentPath]);
   
+  useEffect(() => {
+    isNavigatingRef.current = false;
+  }, [location.pathname]);
+  
   const handleNavigation = useCallback((path: string, label: string) => {
-    if (path === currentPath) return;
+    const actualCurrentPath = location.pathname;
+    if (path === actualCurrentPath) return;
+    
+    const now = Date.now();
+    if (isNavigatingRef.current && now - lastNavigationTimeRef.current < 1000) {
+      return;
+    }
+    
+    isNavigatingRef.current = true;
+    lastNavigationTimeRef.current = now;
     
     haptic.light();
     if (import.meta.env.DEV) {
-      console.log(`[MemberNav] navigating to "${label}"`);
+      console.log(`[MemberNav] navigating to "${label}" from "${actualCurrentPath}"`);
     }
     navigate(path);
-  }, [navigate, currentPath]);
+  }, [navigate, location.pathname]);
   
   const activeIndex = MEMBER_NAV_ITEMS.findIndex(item => item.path === currentPath);
   const itemCount = MEMBER_NAV_ITEMS.length;
