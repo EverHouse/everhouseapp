@@ -2187,3 +2187,61 @@ export async function runDataCleanup(): Promise<{
 
   return { orphanedNotifications, orphanedBookings, normalizedEmails };
 }
+
+export async function autoFixMissingTiers(): Promise<{
+  fixedFromAlternateEmail: number;
+  remainingWithoutTier: number;
+}> {
+  let fixedFromAlternateEmail = 0;
+  
+  try {
+    const fixResult = await db.execute(sql`
+      WITH tier_fixes AS (
+        SELECT 
+          u1.id as id_to_fix,
+          u1.email as email_to_fix,
+          u2.tier as tier_to_copy
+        FROM users u1
+        JOIN users u2 ON u1.hubspot_id = u2.hubspot_id AND u1.email != u2.email
+        WHERE u1.role = 'member' 
+          AND u1.membership_status = 'active' 
+          AND u1.tier IS NULL
+          AND u2.tier IS NOT NULL
+          AND u1.email NOT LIKE '%test%'
+          AND u1.email NOT LIKE '%example.com'
+      )
+      UPDATE users u
+      SET tier = tf.tier_to_copy, updated_at = NOW()
+      FROM tier_fixes tf
+      WHERE u.id = tf.id_to_fix
+      RETURNING u.email, u.tier
+    `);
+    
+    fixedFromAlternateEmail = (fixResult as any).rowCount || 0;
+    
+    if (fixedFromAlternateEmail > 0) {
+      console.log(`[AutoFix] Fixed ${fixedFromAlternateEmail} members missing tier by copying from alternate email`);
+    }
+    
+    const remainingResult = await db.execute(sql`
+      SELECT COUNT(*) as count
+      FROM users 
+      WHERE role = 'member' 
+        AND membership_status = 'active' 
+        AND tier IS NULL
+        AND email NOT LIKE '%test%'
+        AND email NOT LIKE '%example.com'
+    `);
+    
+    const remainingWithoutTier = parseInt((remainingResult.rows[0] as any)?.count || '0', 10);
+    
+    if (remainingWithoutTier > 0) {
+      console.log(`[AutoFix] ${remainingWithoutTier} members still without tier (may need manual assignment or HubSpot sync)`);
+    }
+    
+    return { fixedFromAlternateEmail, remainingWithoutTier };
+  } catch (error: any) {
+    console.error('[AutoFix] Error fixing missing tiers:', error.message);
+    return { fixedFromAlternateEmail: 0, remainingWithoutTier: -1 };
+  }
+}

@@ -25,3 +25,19 @@ export async function queueMemberCreation(params: AddMemberInput): Promise<void>
     maxRetries: 5
   });
 }
+
+export interface TierSyncParams {
+  email: string;
+  newTier: string;
+  oldTier?: string;
+  changedBy?: string;
+  changedByName?: string;
+}
+
+export async function queueTierSync(params: TierSyncParams): Promise<void> {
+  await enqueueHubSpotSync('sync_tier', params, {
+    priority: 2,
+    idempotencyKey: `tier_sync_${params.email}_${Date.now()}`,
+    maxRetries: 5
+  });
+}

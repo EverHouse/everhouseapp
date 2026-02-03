@@ -1,7 +1,7 @@
 import { db } from '../db';
 import { systemSettings } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
-import { runAllIntegrityChecks } from '../core/dataIntegrity';
+import { runAllIntegrityChecks, autoFixMissingTiers } from '../core/dataIntegrity';
 import { sendIntegrityAlertEmail } from '../emails/integrityAlertEmail';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
 import { alertOnScheduledTaskFailure } from '../core/dataAlerts';
@@ -103,9 +103,23 @@ async function checkAndRunIntegrityCheck(): Promise<void> {
   }
 }
 
+async function runPeriodicAutoFix(): Promise<void> {
+  try {
+    const result = await autoFixMissingTiers();
+    if (result.fixedFromAlternateEmail > 0) {
+      console.log(`[Auto-Fix] Fixed ${result.fixedFromAlternateEmail} members, ${result.remainingWithoutTier} still without tier`);
+    }
+  } catch (err) {
+    console.error('[Auto-Fix] Periodic tier fix failed:', err);
+  }
+}
+
 export function startIntegrityScheduler(): void {
   setInterval(checkAndRunIntegrityCheck, 30 * 60 * 1000);
+  setInterval(runPeriodicAutoFix, 4 * 60 * 60 * 1000);
+  runPeriodicAutoFix().catch(() => {});
   console.log('[Startup] Daily integrity check scheduler enabled (runs at midnight Pacific)');
+  console.log('[Startup] Periodic auto-fix scheduler enabled (runs every 4 hours)');
 }
 
 export async function runManualIntegrityCheck(): Promise<{

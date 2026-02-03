@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.69.0",
+    date: "2026-02-03",
+    title: "Tier Data Automation",
+    changes: [
+      "New: Member creation now requires a valid tier - prevents members from being created without tier assignment",
+      "New: Real-time HubSpot sync - tier changes now queue immediately to HubSpot instead of waiting for batch sync",
+      "New: Scheduled auto-fix runs every 4 hours - automatically copies tiers from alternate emails (same HubSpot ID)",
+      "Improved: Visitor records automatically upgrade to member when assigned a tier"
+    ]
+  },
+  {
     version: "9.68.3",
     date: "2026-02-02",
     title: "Data Integrity Cleanup",

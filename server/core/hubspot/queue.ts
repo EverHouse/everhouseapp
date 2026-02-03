@@ -6,6 +6,7 @@ export type HubSpotOperation =
   | 'update_contact'
   | 'create_deal'
   | 'sync_member'
+  | 'sync_tier'
   | 'sync_company'
   | 'sync_day_pass'
   | 'sync_payment';
@@ -218,6 +219,11 @@ async function executeHubSpotOperation(operation: string, payload: any): Promise
     case 'sync_member':
       // Sync a newly created member to HubSpot (contact + deal)
       await members.syncNewMemberToHubSpot(payload);
+      break;
+      
+    case 'sync_tier':
+      // Sync tier change to HubSpot contact and deal
+      await members.syncTierToHubSpot(payload);
       break;
       
     case 'sync_company':

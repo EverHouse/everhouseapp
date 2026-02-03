@@ -367,14 +367,40 @@ export async function createMemberLocally(input: AddMemberInput): Promise<Create
   const { firstName, lastName, email, phone, tier, startDate, discountReason } = input;
   const normalizedEmail = email.toLowerCase().trim();
   
+  if (!tier || tier.trim() === '') {
+    return { success: false, error: 'Membership tier is required when creating a member' };
+  }
+  
   try {
     const existingUser = await pool.query(
-      'SELECT id, email FROM users WHERE LOWER(email) = $1',
+      `SELECT id, email, role, membership_status FROM users WHERE LOWER(email) = $1`,
       [normalizedEmail]
     );
     
     if (existingUser.rows.length > 0) {
-      return { success: false, error: 'A member with this email already exists' };
+      const existing = existingUser.rows[0];
+      if (existing.role === 'member' && existing.membership_status === 'active') {
+        return { success: false, error: 'A member with this email already exists' };
+      }
+      
+      const updateResult = await pool.query(
+        `UPDATE users SET 
+          first_name = COALESCE(NULLIF($2, ''), first_name),
+          last_name = COALESCE(NULLIF($3, ''), last_name),
+          phone = COALESCE(NULLIF($4, ''), phone),
+          role = 'member',
+          tier = $5,
+          membership_status = 'active',
+          billing_provider = COALESCE(billing_provider, 'hubspot'),
+          join_date = COALESCE(join_date, $6),
+          updated_at = NOW()
+        WHERE id = $1
+        RETURNING id`,
+        [existing.id, firstName, lastName, phone || null, tier, startDate || new Date().toISOString().split('T')[0]]
+      );
+      
+      console.log(`[AddMember] Converted existing visitor ${normalizedEmail} to member with tier ${tier}`);
+      return { success: true, userId: updateResult.rows[0].id };
     }
     
     const tags = discountReason ? [discountReason] : [];
@@ -901,5 +927,76 @@ export async function handleTierChange(
   } catch (error: any) {
     console.error('[HubSpotDeals] Error handling tier change:', error);
     return { success: false, error: error.message || 'Failed to handle tier change' };
+  }
+}
+
+export async function syncTierToHubSpot(params: {
+  email: string;
+  newTier: string;
+  oldTier?: string;
+  changedBy?: string;
+  changedByName?: string;
+}): Promise<void> {
+  const { email, newTier, oldTier, changedBy, changedByName } = params;
+  const normalizedEmail = email.toLowerCase().trim();
+  
+  const { denormalizeTierForHubSpot } = await import('../../utils/tierUtils');
+  const hubspotTier = denormalizeTierForHubSpot(newTier);
+  
+  if (!hubspotTier) {
+    console.log(`[HubSpot TierSync] Unknown tier "${newTier}" for ${normalizedEmail}, skipping HubSpot sync`);
+    return;
+  }
+  
+  const userResult = await pool.query(
+    'SELECT hubspot_id FROM users WHERE LOWER(email) = $1',
+    [normalizedEmail]
+  );
+  
+  if (userResult.rows.length === 0 || !userResult.rows[0].hubspot_id) {
+    console.log(`[HubSpot TierSync] No HubSpot ID for ${normalizedEmail}, skipping sync`);
+    return;
+  }
+  
+  const hubspotContactId = userResult.rows[0].hubspot_id;
+  
+  try {
+    const hubspot = await getHubSpotClient();
+    
+    await retryableHubSpotRequest(() =>
+      hubspot.crm.contacts.basicApi.update(hubspotContactId, {
+        properties: {
+          membership_tier: hubspotTier
+        }
+      })
+    );
+    
+    console.log(`[HubSpot TierSync] Updated contact ${normalizedEmail} tier to "${hubspotTier}"`);
+    
+    const dealResult = await db.select()
+      .from(hubspotDeals)
+      .where(and(
+        eq(hubspotDeals.memberEmail, normalizedEmail),
+        eq(hubspotDeals.isPrimary, true)
+      ))
+      .limit(1);
+    
+    if (dealResult.length > 0 && dealResult[0].hubspotDealId) {
+      try {
+        await retryableHubSpotRequest(() =>
+          hubspot.crm.deals.basicApi.update(dealResult[0].hubspotDealId!, {
+            properties: {
+              membership_tier: hubspotTier
+            }
+          })
+        );
+        console.log(`[HubSpot TierSync] Updated deal ${dealResult[0].hubspotDealId} tier to "${hubspotTier}"`);
+      } catch (dealError) {
+        console.warn(`[HubSpot TierSync] Failed to update deal tier for ${normalizedEmail}:`, dealError);
+      }
+    }
+  } catch (error) {
+    console.error(`[HubSpot TierSync] Failed to sync tier for ${normalizedEmail}:`, error);
+    throw error;
   }
 }

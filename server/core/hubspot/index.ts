@@ -50,6 +50,7 @@ export {
   createMemberWithDeal,
   createMemberLocally,
   syncNewMemberToHubSpot,
+  syncTierToHubSpot,
   getMemberPaymentStatus,
   handleTierChange,
   type AddMemberInput,
@@ -87,5 +88,7 @@ export {
 export {
   queuePaymentSyncToHubSpot,
   queueDayPassSyncToHubSpot,
-  queueMemberCreation
+  queueMemberCreation,
+  queueTierSync,
+  type TierSyncParams
 } from './queueHelpers';
