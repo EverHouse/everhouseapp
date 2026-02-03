@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.4.0",
+    date: "2026-02-03",
+    title: "Conference Room Booking Improvements",
+    changes: [
+      "New: Conference room bookings now have dedicated confirmation flow",
+      "New: Manual confirm button allows staff to approve without waiting for calendar sync",
+      "New: Check Calendar button verifies if MindBody booking shows on Google Calendar",
+      "Improved: Calendar events auto-link to existing confirmed bookings when sync runs"
+    ]
+  },
+  {
     version: "69.3.7",
     date: "2026-02-03",
     title: "Assign Players Bug Fix",

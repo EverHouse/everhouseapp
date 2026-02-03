@@ -216,4 +216,116 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
   }
 });
 
+router.post('/api/conference-room/verify-calendar/:id', isStaffOrAdmin, async (req, res) => {
+  try {
+    const bookingId = parseInt(req.params.id, 10);
+    
+    if (isNaN(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
+    
+    const result = await db.select({
+      booking: bookingRequests,
+      resourceType: resources.type
+    })
+      .from(bookingRequests)
+      .leftJoin(resources, eq(bookingRequests.resourceId, resources.id))
+      .where(eq(bookingRequests.id, bookingId));
+    
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    
+    const { booking, resourceType } = result[0];
+    
+    if (resourceType !== 'conference_room') {
+      return res.status(400).json({ error: 'This feature is only for conference room bookings' });
+    }
+    
+    if (!['pending', 'approved'].includes(booking.status)) {
+      return res.status(400).json({ error: `Cannot verify calendar for booking with status: ${booking.status}` });
+    }
+    
+    if (!booking.startTime || !booking.endTime || !booking.requestDate) {
+      return res.status(400).json({ error: 'Booking is missing required time/date information' });
+    }
+    
+    const calendarEvents = await getConferenceRoomBookingsFromCalendar(
+      booking.userName || undefined,
+      booking.userEmail || undefined
+    );
+    
+    const bookingStartMins = safeParseTimeToMinutes(booking.startTime);
+    const bookingEndMins = safeParseTimeToMinutes(booking.endTime);
+    
+    if (bookingStartMins === null || bookingEndMins === null) {
+      return res.status(400).json({ error: 'Invalid booking time format' });
+    }
+    
+    let matchedEvent = null;
+    for (const event of calendarEvents) {
+      if (event.date !== booking.requestDate) continue;
+      
+      const eventStartMins = safeParseTimeToMinutes(event.startTime);
+      const eventEndMins = safeParseTimeToMinutes(event.endTime);
+      
+      if (eventStartMins === null || eventEndMins === null) continue;
+      
+      if (eventStartMins < bookingEndMins && eventEndMins > bookingStartMins) {
+        matchedEvent = event;
+        break;
+      }
+    }
+    
+    if (matchedEvent) {
+      if (booking.calendarEventId) {
+        return res.json({
+          matched: true,
+          eventSummary: matchedEvent.summary,
+          eventId: matchedEvent.id,
+          message: 'Calendar event already linked to this booking'
+        });
+      }
+      
+      const updateData: { calendarEventId: string; updatedAt: Date; status?: string } = {
+        calendarEventId: matchedEvent.id,
+        updatedAt: new Date()
+      };
+      
+      if (booking.status === 'pending') {
+        updateData.status = 'approved';
+      }
+      
+      await db.update(bookingRequests)
+        .set(updateData)
+        .where(eq(bookingRequests.id, bookingId));
+      
+      return res.json({
+        matched: true,
+        eventSummary: matchedEvent.summary,
+        eventId: matchedEvent.id,
+        message: 'Calendar event found and linked to booking'
+      });
+    }
+    
+    return res.json({
+      matched: false,
+      found: false,
+      message: 'No matching calendar event found for this booking time'
+    });
+  } catch (error: any) {
+    logAndRespond(req, res, 500, 'Failed to verify calendar event', error);
+  }
+});
+
+function safeParseTimeToMinutes(time: string | null): number | null {
+  if (!time) return null;
+  const parts = time.split(':');
+  if (parts.length < 2) return null;
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (isNaN(h) || isNaN(m)) return null;
+  return h * 60 + m;
+}
+
 export default router;

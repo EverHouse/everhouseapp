@@ -314,6 +314,81 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
     }
   };
 
+  const handleManualConfirm = async (request: BookingRequest) => {
+    const apiId = typeof request.id === 'string' ? parseInt(String(request.id).replace('cal_', '')) : request.id;
+    setActionInProgress(`confirm-${request.id}`);
+    
+    const previousPendingRequests = [...data.pendingRequests];
+    updatePendingRequests(prev => prev.filter(r => r.id !== request.id));
+    
+    const newActivity: RecentActivity = {
+      id: `confirm-${apiId}-${Date.now()}`,
+      type: 'booking_approved',
+      timestamp: new Date().toISOString(),
+      primary_text: request.user_name || 'Member',
+      secondary_text: 'Conference Room',
+      icon: 'meeting_room'
+    };
+    updateRecentActivity(prev => [newActivity, ...prev]);
+    
+    try {
+      const res = await fetch(`/api/booking-requests/${apiId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: 'approved' })
+      });
+      if (res.ok) {
+        showToast('Conference room booking confirmed', 'success');
+        window.dispatchEvent(new CustomEvent('booking-action-completed'));
+        refresh();
+      } else {
+        updatePendingRequests(() => previousPendingRequests);
+        updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
+        const error = await res.json().catch(() => ({}));
+        showToast(error.error || 'Failed to confirm booking', 'error');
+      }
+    } catch (err) {
+      updatePendingRequests(() => previousPendingRequests);
+      updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
+      showToast('Failed to confirm booking', 'error');
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handleVerifyCalendar = async (request: BookingRequest) => {
+    const apiId = typeof request.id === 'string' ? parseInt(String(request.id).replace('cal_', '')) : request.id;
+    setActionInProgress(`verify-${request.id}`);
+    
+    try {
+      const res = await fetch(`/api/conference-room/verify-calendar/${apiId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok) {
+        if (data.matched) {
+          showToast(`Found matching calendar event: ${data.eventSummary || 'Event found'}`, 'success');
+          refresh();
+        } else if (data.found) {
+          showToast(`Calendar event exists but not yet linked. ${data.eventSummary || ''}`, 'info');
+        } else {
+          showToast('No matching calendar event found yet', 'warning');
+        }
+      } else {
+        showToast(data.error || 'Failed to verify calendar', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to verify calendar', 'error');
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
   const handleCheckIn = async (booking: BookingRequest) => {
     const id = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
     setActionInProgress(`checkin-${id}`);
@@ -525,6 +600,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
                 importedName: booking.user_name || undefined,
                 notes: booking.notes || undefined
               })}
+              onManualConfirm={handleManualConfirm}
+              onVerifyCalendar={handleVerifyCalendar}
               variant="desktop-top"
             />
             <TodayScheduleSection
@@ -570,6 +647,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
                 importedName: booking.user_name || undefined,
                 notes: booking.notes || undefined
               })}
+              onManualConfirm={handleManualConfirm}
+              onVerifyCalendar={handleVerifyCalendar}
               variant="desktop-bottom"
             />
             <TodayScheduleSection
@@ -658,6 +737,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
                 importedName: booking.user_name || undefined,
                 notes: booking.notes || undefined
               })}
+            onManualConfirm={handleManualConfirm}
+            onVerifyCalendar={handleVerifyCalendar}
             variant="mobile"
           />
           {/* Upcoming Events & Wellness */}
