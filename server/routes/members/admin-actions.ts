@@ -365,6 +365,10 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
     await pool.query('DELETE FROM booking_members WHERE user_email = $1', [normalizedEmail]);
     deletionLog.push('booking_members');
     
+    // Clear user_id from booking_participants (marks them as guests instead of deleting)
+    await pool.query('UPDATE booking_participants SET user_id = NULL WHERE user_id = $1', [userId]);
+    deletionLog.push('booking_participants (unlinked)');
+    
     await pool.query("DELETE FROM sessions WHERE sess->'user'->>'email' = $1", [normalizedEmail]);
     deletionLog.push('sessions');
     
@@ -470,6 +474,13 @@ router.post('/api/members/:email/anonymize', isStaffOrAdmin, async (req, res) =>
       SET user_name = 'Deleted Member',
           user_email = ${anonymizedEmail}
       WHERE LOWER(user_email) = ${normalizedEmail}
+    `);
+    
+    // Clear user_id from booking_participants (marks them as guests)
+    await db.execute(sql`
+      UPDATE booking_participants 
+      SET user_id = NULL
+      WHERE user_id = ${userId}
     `);
     
     console.log(`[Privacy] Member ${normalizedEmail} anonymized by ${anonymizedBy} at ${now.toISOString()}`);

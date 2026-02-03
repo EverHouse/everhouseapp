@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.3.5",
+    date: "2026-02-03",
+    title: "Orphaned Booking Participant Fix",
+    changes: [
+      "Fixed: Deleted 9 orphaned test booking participants referencing non-existent users",
+      "Fixed: Member deletion now properly unlinks booking participants (marks as guests)",
+      "Fixed: Member anonymization now also unlinks booking participants",
+      "Improved: These orphan errors will no longer occur in production"
+    ]
+  },
+  {
     version: "69.3.4",
     date: "2026-02-03",
     title: "MindBody Data Quality Check Improvement",
