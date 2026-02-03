@@ -798,6 +798,7 @@ const BookGolf: React.FC = () => {
       if (invalidGuestSlot) {
         setBookingError('Please enter a valid email address for each guest.');
         haptic.error();
+        isSubmittingRef.current = false; // Explicitly reset before returning
         return;
       }
       
@@ -1055,6 +1056,7 @@ const BookGolf: React.FC = () => {
             <div className={`flex gap-2 p-1 rounded-xl border ${isDark ? 'bg-black/20 border-white/20' : 'bg-black/5 border-black/5'}`}>
               {[1, 2, 3, 4].map(count => (
                 <button
+                  type="button"
                   key={count}
                   onClick={() => { haptic.selection(); setPlayerCount(count); }}
                   aria-pressed={playerCount === count}
@@ -1276,6 +1278,7 @@ const BookGolf: React.FC = () => {
                     
                     return (
                       <button
+                        type="button"
                         key={mins}
                         onClick={() => { haptic.selection(); setDuration(mins); setExpandedHour(null); setHasUserSelectedDuration(true); }}
                         aria-pressed={duration === mins}
@@ -1510,6 +1513,7 @@ const BookGolf: React.FC = () => {
                       style={{ '--stagger-index': groupIndex, animationFillMode: 'both' } as React.CSSProperties}
                     >
                       <button
+                        type="button"
                         onClick={() => {
                           haptic.light();
                           setExpandedHour(isExpanded ? null : hourGroup.hour24);
@@ -1547,6 +1551,7 @@ const BookGolf: React.FC = () => {
                       }`}>
                         {hourGroup.slots.map((slot, slotIndex) => (
                           <button
+                            type="button"
                             key={slot.id}
                             onClick={() => {
                               haptic.light();

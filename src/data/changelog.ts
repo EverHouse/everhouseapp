@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.5.2",
+    date: "2026-02-03",
+    title: "Golf Bay Booking Form Stability Fix",
+    changes: [
+      "Fixed: Booking form validation no longer locks the submit button if guest email is invalid",
+      "Improved: Added explicit button types to all booking page buttons for better browser behavior",
+      "Improved: Time slot, duration, and player count buttons now properly marked as type='button'"
+    ]
+  },
+  {
     version: "69.5.1",
     date: "2026-02-03",
     title: "Data Integrity Check Reliability Improvement",
