@@ -2607,9 +2607,16 @@ router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => 
     
     let sessionsCreated = 0;
     const errors: Array<{ bookingId: number; error: string }> = [];
+    let savepointCounter = 0;
     
     for (const booking of bookings) {
+      // Use savepoint for each booking so individual failures don't abort entire transaction
+      savepointCounter++;
+      const savepointName = `sp_${savepointCounter}`;
+      
       try {
+        await client.query(`SAVEPOINT ${savepointName}`);
+        
         // Determine source based on origin or presence of trackman_booking_id
         let source = 'member_request';
         if (booking.trackman_booking_id) {
@@ -2674,9 +2681,19 @@ router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => 
           WHERE id = $2
         `, [sessionId, booking.id]);
         
+        // Release savepoint on success
+        await client.query(`RELEASE SAVEPOINT ${savepointName}`);
         sessionsCreated++;
       } catch (bookingError: any) {
-        console.error(`[Backfill] Error processing booking ${booking.id}:`, bookingError);
+        // Rollback to savepoint so we can continue with next booking
+        try {
+          await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+        } catch (rollbackError) {
+          // If rollback fails, log but continue
+          console.error(`[Backfill] Failed to rollback savepoint for booking ${booking.id}`);
+        }
+        
+        console.error(`[Backfill] Error processing booking ${booking.id}:`, bookingError.message || bookingError);
         errors.push({
           bookingId: booking.id,
           error: bookingError.message || 'Unknown error'

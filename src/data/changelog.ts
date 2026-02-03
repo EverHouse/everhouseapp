@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.2.4",
+    date: "2026-02-03",
+    title: "Session Backfill Resilience",
+    changes: [
+      "Fixed: Session backfill now continues processing even when individual bookings fail",
+      "Fixed: One problematic booking no longer stops the entire batch from being processed",
+      "Fixed: Uses database savepoints to isolate failures and maximize successful session creation"
+    ]
+  },
+  {
     version: "69.2.3",
     date: "2026-02-03",
     title: "Session Backfill Fix",
