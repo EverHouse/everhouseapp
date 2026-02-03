@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "9.69.1",
+    date: "2026-02-03",
+    title: "Tier Auto-Fix Enhancement",
+    changes: [
+      "Improved: Scheduled auto-fix now also pulls tiers from HubSpot for MindBody-billed members",
+      "Improved: Members with HubSpot ID but no local tier will have tier fetched directly from HubSpot"
+    ]
+  },
+  {
     version: "9.69.0",
     date: "2026-02-03",
     title: "Tier Data Automation",

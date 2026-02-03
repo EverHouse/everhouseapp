@@ -21,6 +21,8 @@ import { isProduction } from './db';
 import { getTodayPacific } from '../utils/dateUtils';
 import { getStripeClient } from './stripe/client';
 import { alertOnCriticalIntegrityIssues, alertOnHighIntegrityIssues } from './dataAlerts';
+import { retryableHubSpotRequest } from './hubspot/request';
+import { normalizeTierSlug, TIER_SLUGS } from '../utils/tierUtils';
 
 const severityMap: Record<string, 'critical' | 'high' | 'medium' | 'low'> = {
   'HubSpot Sync Status': 'critical',
@@ -2190,9 +2192,11 @@ export async function runDataCleanup(): Promise<{
 
 export async function autoFixMissingTiers(): Promise<{
   fixedFromAlternateEmail: number;
+  fixedFromHubSpot: number;
   remainingWithoutTier: number;
 }> {
   let fixedFromAlternateEmail = 0;
+  let fixedFromHubSpot = 0;
   
   try {
     const fixResult = await db.execute(sql`
@@ -2223,6 +2227,55 @@ export async function autoFixMissingTiers(): Promise<{
       console.log(`[AutoFix] Fixed ${fixedFromAlternateEmail} members missing tier by copying from alternate email`);
     }
     
+    const membersNeedingHubSpotTier = await db.execute(sql`
+      SELECT id, email, hubspot_id
+      FROM users 
+      WHERE role = 'member' 
+        AND membership_status = 'active' 
+        AND tier IS NULL
+        AND hubspot_id IS NOT NULL
+        AND email NOT LIKE '%test%'
+        AND email NOT LIKE '%example.com'
+      LIMIT 20
+    `);
+    
+    if (membersNeedingHubSpotTier.rows.length > 0) {
+      try {
+        const hubspot = await getHubSpotClient();
+        
+        for (const row of membersNeedingHubSpotTier.rows as any[]) {
+          try {
+            const contact = await retryableHubSpotRequest(() =>
+              hubspot.crm.contacts.basicApi.getById(row.hubspot_id, ['membership_tier'])
+            );
+            
+            const hubspotTier = contact.properties?.membership_tier;
+            if (hubspotTier && typeof hubspotTier === 'string') {
+              const normalizedTier = normalizeTierSlug(hubspotTier);
+              if (TIER_SLUGS.includes(normalizedTier)) {
+                await db.execute(sql`
+                  UPDATE users SET tier = ${normalizedTier}, updated_at = NOW()
+                  WHERE id = ${row.id} AND tier IS NULL
+                `);
+                fixedFromHubSpot++;
+                console.log(`[AutoFix] Pulled tier '${normalizedTier}' from HubSpot for ${row.email}`);
+              }
+            }
+          } catch (contactErr: any) {
+            if (contactErr?.code !== 404) {
+              console.error(`[AutoFix] Failed to fetch HubSpot contact ${row.hubspot_id}:`, contactErr?.message);
+            }
+          }
+        }
+        
+        if (fixedFromHubSpot > 0) {
+          console.log(`[AutoFix] Fixed ${fixedFromHubSpot} members by pulling tier from HubSpot`);
+        }
+      } catch (hubspotErr: any) {
+        console.error('[AutoFix] HubSpot client error:', hubspotErr?.message);
+      }
+    }
+    
     const remainingResult = await db.execute(sql`
       SELECT COUNT(*) as count
       FROM users 
@@ -2236,12 +2289,12 @@ export async function autoFixMissingTiers(): Promise<{
     const remainingWithoutTier = parseInt((remainingResult.rows[0] as any)?.count || '0', 10);
     
     if (remainingWithoutTier > 0) {
-      console.log(`[AutoFix] ${remainingWithoutTier} members still without tier (may need manual assignment or HubSpot sync)`);
+      console.log(`[AutoFix] ${remainingWithoutTier} members still without tier (may need manual assignment in HubSpot)`);
     }
     
-    return { fixedFromAlternateEmail, remainingWithoutTier };
+    return { fixedFromAlternateEmail, fixedFromHubSpot, remainingWithoutTier };
   } catch (error: any) {
     console.error('[AutoFix] Error fixing missing tiers:', error.message);
-    return { fixedFromAlternateEmail: 0, remainingWithoutTier: -1 };
+    return { fixedFromAlternateEmail: 0, fixedFromHubSpot: 0, remainingWithoutTier: -1 };
   }
 }
