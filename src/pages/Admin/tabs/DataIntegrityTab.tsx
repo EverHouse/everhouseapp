@@ -1017,20 +1017,23 @@ const DataIntegrityTab: React.FC = () => {
     setLoadingMemberEmail(email);
     try {
       const response = await fetchWithCredentials<any>(`/api/members/${encodeURIComponent(email)}/details`);
+      if (!response || !response.id) {
+        throw new Error('Invalid response from server');
+      }
       const profile: MemberProfile = {
         id: response.id,
         name: [response.firstName, response.lastName].filter(Boolean).join(' ') || response.email,
         tier: response.tier || '',
         rawTier: response.tier,
-        membershipStatus: response.membershipStatus,
+        membershipStatus: response.membershipStatus || null,
         tags: response.tags || [],
         status: response.membershipStatus || 'Inactive',
         email: response.email,
         phone: response.phone || '',
-        jobTitle: response.jobTitle,
         role: response.role,
         mindbodyClientId: response.mindbodyClientId,
         stripeCustomerId: response.stripeCustomerId,
+        hubspotId: response.hubspotId,
         dateOfBirth: response.dateOfBirth,
         billingProvider: response.billingProvider,
         streetAddress: response.streetAddress,
@@ -1038,6 +1041,8 @@ const DataIntegrityTab: React.FC = () => {
         state: response.state,
         zipCode: response.zipCode,
         companyName: response.companyName,
+        lifetimeVisits: response.lifetimeVisits,
+        lastBookingDate: response.lastBookingDate,
       };
       setSelectedMember(profile);
       setIsProfileDrawerOpen(true);
