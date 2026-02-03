@@ -1500,6 +1500,123 @@ async function checkDuplicateStripeCustomers(): Promise<IntegrityCheckResult> {
   };
 }
 
+async function checkMindBodyStaleSyncMembers(): Promise<IntegrityCheckResult> {
+  const issues: IntegrityIssue[] = [];
+  
+  // Find active MindBody-billed members whose records haven't been updated in 30+ days
+  // This may indicate stale data that needs verification
+  const staleSyncResult = await db.execute(sql`
+    SELECT id, email, first_name, last_name, tier, membership_status, updated_at, mindbody_client_id
+    FROM users 
+    WHERE billing_provider = 'mindbody'
+      AND membership_status = 'active'
+      AND role = 'member'
+      AND updated_at < NOW() - INTERVAL '30 days'
+    ORDER BY updated_at ASC
+    LIMIT 50
+  `);
+  const staleMembers = staleSyncResult.rows as any[];
+  
+  for (const member of staleMembers) {
+    const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || 'Unknown';
+    const lastUpdate = member.updated_at 
+      ? new Date(member.updated_at).toLocaleDateString()
+      : 'unknown';
+    
+    issues.push({
+      category: 'sync_mismatch',
+      severity: 'warning',
+      table: 'users',
+      recordId: member.id,
+      description: `MindBody member "${memberName}" shows as active but record unchanged since ${lastUpdate}`,
+      suggestion: 'Verify member is still active in MindBody or update their record',
+      context: {
+        memberName,
+        memberEmail: member.email,
+        memberTier: member.tier,
+        lastUpdate: member.updated_at || undefined,
+        mindbodyClientId: member.mindbody_client_id || undefined,
+        userId: member.id
+      }
+    });
+  }
+  
+  return {
+    checkName: 'MindBody Stale Sync',
+    status: issues.length === 0 ? 'pass' : issues.length > 10 ? 'fail' : 'warning',
+    issueCount: issues.length,
+    issues,
+    lastRun: new Date()
+  };
+}
+
+async function checkMindBodyStatusMismatch(): Promise<IntegrityCheckResult> {
+  const issues: IntegrityIssue[] = [];
+  
+  // Find MindBody-billed members with potential data issues:
+  // 1. Active status but no MindBody client ID
+  // 2. Has MindBody client ID but no tier assigned
+  const mismatchResult = await db.execute(sql`
+    SELECT u.id, u.email, u.first_name, u.last_name, u.tier, u.membership_status, 
+           u.billing_provider, u.mindbody_client_id
+    FROM users u
+    WHERE u.billing_provider = 'mindbody'
+      AND u.role = 'member'
+      AND (
+        -- Active member without MindBody client ID
+        (u.membership_status = 'active' AND (u.mindbody_client_id IS NULL OR u.mindbody_client_id = ''))
+        OR
+        -- Has MindBody ID but no tier (data incomplete)
+        (u.mindbody_client_id IS NOT NULL AND u.mindbody_client_id != '' AND (u.tier IS NULL OR u.tier = ''))
+      )
+    ORDER BY u.updated_at DESC
+    LIMIT 50
+  `);
+  const mismatches = mismatchResult.rows as any[];
+  
+  for (const member of mismatches) {
+    const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || 'Unknown';
+    const hasMindBodyId = member.mindbody_client_id && member.mindbody_client_id !== '';
+    const hasTier = member.tier && member.tier !== '';
+    
+    let description: string;
+    let suggestion: string;
+    
+    if (!hasMindBodyId && member.membership_status === 'active') {
+      description = `MindBody member "${memberName}" is active but has no MindBody Client ID`;
+      suggestion = 'Add MindBody Client ID or verify billing provider is correct';
+    } else {
+      description = `MindBody member "${memberName}" has MindBody ID but no tier assigned`;
+      suggestion = 'Assign a membership tier to this member';
+    }
+    
+    issues.push({
+      category: 'data_quality',
+      severity: 'warning',
+      table: 'users',
+      recordId: member.id,
+      description,
+      suggestion,
+      context: {
+        memberName,
+        memberEmail: member.email,
+        memberTier: member.tier || 'none',
+        memberStatus: member.membership_status,
+        mindbodyClientId: member.mindbody_client_id || 'none',
+        userId: member.id
+      }
+    });
+  }
+  
+  return {
+    checkName: 'MindBody Data Quality',
+    status: issues.length === 0 ? 'pass' : issues.length > 5 ? 'fail' : 'warning',
+    issueCount: issues.length,
+    issues,
+    lastRun: new Date()
+  };
+}
+
 async function storeCheckHistory(results: IntegrityCheckResult[], triggeredBy: 'manual' | 'scheduled' = 'manual'): Promise<void> {
   const totalIssues = results.reduce((sum, r) => sum + r.issueCount, 0);
   
@@ -1588,10 +1705,8 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
     checkBookingResourceRelationships(),
     checkParticipantUserRelationships(),
     checkHubSpotSyncMismatch(),
-    checkDuplicateTourSources(),
     checkNeedsReviewItems(),
     checkBookingTimeValidity(),
-    checkStalePastTours(),
     checkMembersWithoutEmail(),
     checkDealsWithoutLineItems(),
     checkDealStageDrift(),
@@ -1599,7 +1714,9 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
     checkStuckTransitionalMembers(),
     checkTierReconciliation(),
     checkBookingsWithoutSessions(),
-    checkDuplicateStripeCustomers()
+    checkDuplicateStripeCustomers(),
+    checkMindBodyStaleSyncMembers(),
+    checkMindBodyStatusMismatch()
   ]);
   
   const now = new Date();

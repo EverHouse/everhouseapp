@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.2.9",
+    date: "2026-02-03",
+    title: "MindBody Integrity Checks Added",
+    changes: [
+      "Added: MindBody Stale Sync check - finds active MindBody members with stale records (30+ days unchanged)",
+      "Added: MindBody Data Quality check - finds members missing MindBody ID or tier",
+      "Removed: Stale Past Tours check (not needed)",
+      "Removed: Duplicate Tour Sources check (not needed)"
+    ]
+  },
+  {
     version: "69.2.8",
     date: "2026-02-03",
     title: "Data Integrity Billing Provider Filters",
