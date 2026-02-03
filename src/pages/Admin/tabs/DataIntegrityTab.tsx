@@ -5,6 +5,7 @@ import EmptyState from '../../../components/EmptyState';
 import { getCheckMetadata, sortBySeverity, CheckSeverity } from '../../../data/integrityCheckMetadata';
 import { fetchWithCredentials, postWithCredentials, deleteWithCredentials } from '../../../hooks/queries/useFetch';
 import MemberProfileDrawer from '../../../components/MemberProfileDrawer';
+import { TrackmanLinkModal } from '../../../components/staff-command-center/modals/TrackmanLinkModal';
 import type { MemberProfile } from '../../../types/data';
 
 interface SyncComparisonData {
@@ -47,6 +48,7 @@ interface IssueContext {
   eventDate?: string;
   tourDate?: string;
   guestName?: string;
+  trackmanBookingId?: string;
   syncType?: 'hubspot' | 'calendar';
   syncComparison?: SyncComparisonData[];
   hubspotContactId?: string;
@@ -250,6 +252,18 @@ const DataIntegrityTab: React.FC = () => {
   const [selectedMember, setSelectedMember] = useState<MemberProfile | null>(null);
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [loadingMemberEmail, setLoadingMemberEmail] = useState<string | null>(null);
+  
+  // Trackman Link Modal state for viewing unmatched bookings
+  const [trackmanLinkModal, setTrackmanLinkModal] = useState<{
+    isOpen: boolean;
+    bookingId: number | null;
+    bayName?: string;
+    bookingDate?: string;
+    timeSlot?: string;
+    memberName?: string;
+    memberEmail?: string;
+    trackmanBookingId?: string;
+  }>({ isOpen: false, bookingId: null });
 
   const [showPlaceholderCleanup, setShowPlaceholderCleanup] = useState(true);
   const [placeholderAccounts, setPlaceholderAccounts] = useState<{
@@ -2225,13 +2239,24 @@ const DataIntegrityTab: React.FC = () => {
                                   )}
                                   {issue.table === 'booking_requests' && !issue.ignored && (
                                     <>
-                                      <a
-                                        href={`/staff/simulator?date=${issue.context?.bookingDate || ''}`}
-                                        className="p-1.5 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 rounded transition-colors"
-                                        title="View in Simulator"
-                                      >
-                                        <span className="material-symbols-outlined text-[16px]">calendar_month</span>
-                                      </a>
+                                      {issue.context?.trackmanBookingId && (
+                                        <button
+                                          onClick={() => setTrackmanLinkModal({
+                                            isOpen: true,
+                                            bookingId: issue.recordId as number,
+                                            bayName: issue.context?.resourceName,
+                                            bookingDate: issue.context?.bookingDate,
+                                            timeSlot: issue.context?.startTime,
+                                            memberName: issue.context?.memberName,
+                                            memberEmail: issue.context?.memberEmail,
+                                            trackmanBookingId: issue.context?.trackmanBookingId
+                                          })}
+                                          className="p-1.5 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 rounded transition-colors"
+                                          title="Review Unmatched Booking"
+                                        >
+                                          <span className="material-symbols-outlined text-[16px]">calendar_month</span>
+                                        </button>
+                                      )}
                                       <button
                                         onClick={() => handleCancelBooking(issue.recordId as number)}
                                         disabled={cancellingBookings.has(issue.recordId as number)}
@@ -2734,6 +2759,22 @@ const DataIntegrityTab: React.FC = () => {
         onMemberDeleted={() => {
           setIsProfileDrawerOpen(false);
           setSelectedMember(null);
+          runIntegrityMutation.mutate();
+        }}
+      />
+
+      <TrackmanLinkModal
+        isOpen={trackmanLinkModal.isOpen}
+        onClose={() => setTrackmanLinkModal({ isOpen: false, bookingId: null })}
+        trackmanBookingId={trackmanLinkModal.trackmanBookingId || null}
+        bayName={trackmanLinkModal.bayName}
+        bookingDate={trackmanLinkModal.bookingDate}
+        timeSlot={trackmanLinkModal.timeSlot}
+        matchedBookingId={trackmanLinkModal.bookingId || undefined}
+        currentMemberName={trackmanLinkModal.memberName}
+        currentMemberEmail={trackmanLinkModal.memberEmail}
+        onSuccess={() => {
+          setTrackmanLinkModal({ isOpen: false, bookingId: null });
           runIntegrityMutation.mutate();
         }}
       />
