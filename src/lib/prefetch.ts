@@ -77,8 +77,8 @@ const staffRouteImports: Record<string, () => Promise<any>> = {
 
 const staffRouteAPIs: Record<string, string[]> = {
   '/admin': ['/api/admin/dashboard-summary'],
-  '/admin/bookings': ['/api/admin/todays-bookings'],
-  '/admin/directory': ['/api/admin/members'],
+  '/admin/bookings': ['/api/approved-bookings', '/api/booking-requests'],
+  '/admin/directory': ['/api/members/directory'],
   '/admin/financials': ['/api/admin/financials/summary'],
 };
 
