@@ -859,7 +859,8 @@ router.post('/api/rsvps', async (req, res) => {
       title: events.title,
       eventDate: events.eventDate,
       startTime: events.startTime,
-      location: events.location
+      location: events.location,
+      maxAttendees: events.maxAttendees
     }).from(events).where(eq(events.id, event_id));
     
     if (eventData.length === 0) {
@@ -874,6 +875,19 @@ router.post('/api/rsvps', async (req, res) => {
     const staffMessage = `${memberName} RSVP'd for ${evt.title} on ${formattedDate}`;
     
     const result = await db.transaction(async (tx) => {
+      // Check capacity before inserting - prevents overbooking and handles race conditions
+      if (evt.maxAttendees && evt.maxAttendees > 0) {
+        const rsvpCountResult = await tx.select({ count: sql<number>`count(*)::int` })
+          .from(eventRsvps)
+          .where(eq(eventRsvps.eventId, event_id));
+        
+        const rsvpCount = rsvpCountResult[0]?.count || 0;
+        
+        if (rsvpCount >= evt.maxAttendees) {
+          throw new Error('Event is at capacity');
+        }
+      }
+      
       const rsvpResult = await tx.insert(eventRsvps).values({
         eventId: event_id,
         userEmail: user_email,
@@ -926,6 +940,9 @@ router.post('/api/rsvps', async (req, res) => {
     
     res.status(201).json(result);
   } catch (error: any) {
+    if (error.message === 'Event is at capacity') {
+      return res.status(400).json({ error: 'Event is at capacity' });
+    }
     if (!isProduction) console.error('RSVP creation error:', error);
     res.status(500).json({ error: 'Failed to create RSVP. Staff notification is required.' });
   }

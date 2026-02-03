@@ -5,6 +5,7 @@ import { eq, and, gt, ilike, sql, desc } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../core/middleware';
 import { sendRedemptionConfirmationEmail } from '../emails/passEmails';
 import { broadcastDayPassUpdate } from '../core/websocket';
+import { getStripeClient } from '../core/stripe/client';
 
 const router = Router();
 
@@ -298,6 +299,7 @@ router.post('/api/staff/passes/:passId/refund', isStaffOrAdmin, async (req: Requ
         purchaserLastName: dayPassPurchases.purchaserLastName,
         productType: dayPassPurchases.productType,
         quantity: dayPassPurchases.quantity,
+        stripePaymentIntentId: dayPassPurchases.stripePaymentIntentId,
       })
       .from(dayPassPurchases)
       .where(eq(dayPassPurchases.id, passId))
@@ -315,6 +317,24 @@ router.post('/api/staff/passes/:passId/refund', isStaffOrAdmin, async (req: Requ
       });
     }
 
+    // Process Stripe refund BEFORE updating database
+    try {
+      const stripe = await getStripeClient();
+      const refund = await stripe.refunds.create({
+        payment_intent: pass.stripePaymentIntentId,
+        reason: 'requested_by_customer'
+      });
+      console.log(`[Passes] Stripe refund created for pass ${passId}: ${refund.id}`);
+    } catch (stripeError: any) {
+      console.error(`[Passes] Stripe refund failed for pass ${passId}:`, stripeError.message);
+      return res.status(400).json({ 
+        error: 'Failed to process refund with payment processor',
+        errorCode: 'STRIPE_REFUND_FAILED',
+        details: stripeError.message
+      });
+    }
+
+    // Only update database status AFTER Stripe refund succeeds
     await db
       .update(dayPassPurchases)
       .set({

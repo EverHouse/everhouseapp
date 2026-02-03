@@ -1160,26 +1160,28 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res
     // If a regular enrollment was cancelled and there are waitlisted users, promote the first one
     if (wasNotWaitlisted && parseInt(cls.waitlist_count) > 0) {
       try {
-        // Get the first person on waitlist (oldest entry)
-        const waitlistedUsers = await db.select()
-          .from(wellnessEnrollments)
-          .where(and(
-            eq(wellnessEnrollments.classId, parseInt(class_id)),
-            eq(wellnessEnrollments.status, 'confirmed'),
-            eq(wellnessEnrollments.isWaitlisted, true)
-          ))
-          .orderBy(asc(wellnessEnrollments.createdAt))
-          .limit(1);
+        // Get the first person on waitlist (oldest entry) with row locking to prevent race conditions
+        // FOR UPDATE SKIP LOCKED ensures concurrent processes pick different users
+        const waitlistedResult = await pool.query(
+          `SELECT * FROM wellness_enrollments 
+           WHERE class_id = $1 
+             AND status = 'confirmed' 
+             AND is_waitlisted = true
+           ORDER BY created_at ASC
+           LIMIT 1
+           FOR UPDATE SKIP LOCKED`,
+          [parseInt(class_id)]
+        );
         
-        if (waitlistedUsers.length > 0) {
-          const promotedUser = waitlistedUsers[0];
-          const promotedEmail = promotedUser.userEmail;
+        if (waitlistedResult.rows.length > 0) {
+          const promotedUserRow = waitlistedResult.rows[0];
+          const promotedEmail = promotedUserRow.user_email;
           const promotedName = promotedEmail.split('@')[0];
           
           // Promote from waitlist
           await db.update(wellnessEnrollments)
             .set({ isWaitlisted: false })
-            .where(eq(wellnessEnrollments.id, promotedUser.id));
+            .where(eq(wellnessEnrollments.id, promotedUserRow.id));
           
           const promotedMessage = `A spot opened up! You've been moved from the waitlist and are now enrolled in ${cls.title} with ${cls.instructor} on ${formattedDate} at ${cls.time}.`;
           
