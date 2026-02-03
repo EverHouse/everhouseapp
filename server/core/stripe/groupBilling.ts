@@ -374,6 +374,24 @@ export async function addGroupMember(params: {
       return { success: false, error: 'This member is already part of a billing group' };
     }
     
+    // Check if user is already in a billing group via the users table
+    const userResult = await pool.query(
+      'SELECT billing_group_id FROM users WHERE LOWER(email) = $1',
+      [params.memberEmail.toLowerCase()]
+    );
+    
+    if (userResult.rows.length > 0) {
+      const userBillingGroupId = userResult.rows[0].billing_group_id;
+      
+      // If user is already in a different billing group, prevent the operation
+      if (userBillingGroupId !== null && userBillingGroupId !== params.billingGroupId) {
+        return { 
+          success: false, 
+          error: 'User is already in a billing group. Remove them first.' 
+        };
+      }
+    }
+    
     const addOnProduct = await db.select()
       .from(familyAddOnProducts)
       .where(eq(familyAddOnProducts.tierName, params.memberTier))
@@ -537,6 +555,24 @@ export async function addCorporateMember(params: {
     
     if (existingMember.length > 0) {
       return { success: false, error: 'This member is already part of a billing group' };
+    }
+    
+    // Check if user is already in a billing group via the users table
+    const userResult = await pool.query(
+      'SELECT billing_group_id FROM users WHERE LOWER(email) = $1',
+      [params.memberEmail.toLowerCase()]
+    );
+    
+    if (userResult.rows.length > 0) {
+      const userBillingGroupId = userResult.rows[0].billing_group_id;
+      
+      // If user is already in a different billing group, prevent the operation
+      if (userBillingGroupId !== null && userBillingGroupId !== params.billingGroupId) {
+        return { 
+          success: false, 
+          error: 'User is already in a billing group. Remove them first.' 
+        };
+      }
     }
     
     const group = await db.select()

@@ -13,6 +13,28 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.2.0",
+    date: "2026-02-03",
+    title: "Guest Pass Atomicity Hardening",
+    changes: [
+      "Fixed: Guest pass deduction now happens inside same database transaction as session creation",
+      "Fixed: Both booking request flow (holds conversion) and staff/trackman flow (direct deduction) are now atomic",
+      "Fixed: Passes now verified before deduction - insufficient passes fail the booking instead of allowing free sessions",
+      "Technical: Uses FOR UPDATE row locking to prevent concurrent access issues"
+    ]
+  },
+  {
+    version: "69.1.0",
+    date: "2026-02-03",
+    title: "Critical Billing Accuracy Fixes",
+    changes: [
+      "Fixed: Fee estimates now match actual charges - declared player count used consistently in billing",
+      "Fixed: All session minutes now billed correctly - remainder minutes distributed fairly instead of lost",
+      "Fixed: Guest pass deduction now properly fails booking if passes unavailable (with automatic compensation on session creation failure)",
+      "Fixed: Adding member to billing group now checks existing group membership - prevents silent removal from family plans"
+    ]
+  },
+  {
     version: "69.0.0",
     date: "2026-02-03",
     title: "Security Hardening & Bug Fix Release",

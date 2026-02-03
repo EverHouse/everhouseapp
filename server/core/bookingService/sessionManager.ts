@@ -12,7 +12,7 @@ import {
   BookingSession,
   BookingParticipant
 } from '../../../shared/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 import { logger } from '../logger';
 import { getMemberTierByEmail } from '../tierService';
 
@@ -523,6 +523,8 @@ export interface OrchestratedSessionRequest {
   durationMinutes: number;
   participants: ParticipantInput[];
   trackmanBookingId?: string;
+  declaredPlayerCount?: number;
+  bookingId?: number;
 }
 
 export interface OrchestratedSessionResult {
@@ -597,7 +599,8 @@ export async function createSessionWithUsageTracking(
       request.sessionDate,
       request.durationMinutes,
       billingParticipants,
-      request.ownerEmail
+      request.ownerEmail,
+      request.declaredPlayerCount || request.participants.length
     );
     
     // Step 5: Execute database writes - either within external transaction or our own
@@ -651,38 +654,106 @@ export async function createSessionWithUsageTracking(
         }
       }
       
+      // Step 5c: Deduct guest passes INSIDE the transaction for atomicity
+      if (billingResult.guestPassesUsed > 0) {
+        const emailLower = request.ownerEmail.toLowerCase().trim();
+        const passesNeeded = billingResult.guestPassesUsed;
+        
+        if (request.bookingId) {
+          // Path 1: Booking request flow - convert holds to usage
+          const holdResult = await tx.execute(sql`
+            SELECT id, passes_held FROM guest_pass_holds 
+            WHERE booking_id = ${request.bookingId} AND LOWER(member_email) = ${emailLower}
+            FOR UPDATE
+          `);
+          
+          if (holdResult.rows && holdResult.rows.length > 0) {
+            const passesToConvert = (holdResult.rows[0] as any).passes_held || 0;
+            
+            if (passesToConvert > 0) {
+              // Verify we don't exceed total passes available
+              const passCheck = await tx.execute(sql`
+                SELECT passes_total, passes_used FROM guest_passes 
+                WHERE LOWER(member_email) = ${emailLower}
+                FOR UPDATE
+              `);
+              
+              if (passCheck.rows && passCheck.rows.length > 0) {
+                const { passes_total, passes_used } = passCheck.rows[0] as any;
+                if (passes_used + passesToConvert > passes_total) {
+                  throw new Error(
+                    `Insufficient guest passes: have ${passes_total - passes_used}, need ${passesToConvert}. ` +
+                    `Transaction rolled back.`
+                  );
+                }
+              }
+              
+              // Convert hold to actual usage
+              await tx.execute(sql`
+                UPDATE guest_passes 
+                SET passes_used = passes_used + ${passesToConvert}
+                WHERE LOWER(member_email) = ${emailLower}
+              `);
+            }
+            
+            // Delete the hold
+            await tx.execute(sql`
+              DELETE FROM guest_pass_holds WHERE booking_id = ${request.bookingId}
+            `);
+            
+            logger.info('[createSessionWithUsageTracking] Converted guest pass holds to usage (atomic)', {
+              extra: { bookingId: request.bookingId, ownerEmail: request.ownerEmail, passesConverted: passesToConvert }
+            });
+          } else {
+            throw new Error(
+              `No guest pass holds found for booking ${request.bookingId}. ` +
+              `Expected ${passesNeeded} passes. Transaction rolled back.`
+            );
+          }
+        } else {
+          // Path 2: Staff/Trackman flow without holds - direct atomic deduction
+          const passCheck = await tx.execute(sql`
+            SELECT id, passes_total, passes_used FROM guest_passes 
+            WHERE LOWER(member_email) = ${emailLower}
+            FOR UPDATE
+          `);
+          
+          if (passCheck.rows && passCheck.rows.length > 0) {
+            const { passes_total, passes_used } = passCheck.rows[0] as any;
+            const available = passes_total - passes_used;
+            
+            if (available < passesNeeded) {
+              throw new Error(
+                `Insufficient guest passes for ${request.ownerEmail}: have ${available}, need ${passesNeeded}. ` +
+                `Transaction rolled back.`
+              );
+            }
+            
+            await tx.execute(sql`
+              UPDATE guest_passes 
+              SET passes_used = passes_used + ${passesNeeded}
+              WHERE LOWER(member_email) = ${emailLower}
+            `);
+            
+            logger.info('[createSessionWithUsageTracking] Deducted guest passes (atomic, no holds)', {
+              extra: { ownerEmail: request.ownerEmail, passesDeducted: passesNeeded }
+            });
+          } else {
+            throw new Error(
+              `No guest pass record found for ${request.ownerEmail}. ` +
+              `Expected ${passesNeeded} passes. Transaction rolled back.`
+            );
+          }
+        }
+      }
+      
       return { session, linkedParticipants, ledgerEntriesCreated };
     };
     
-    // Use external transaction if provided, otherwise create our own
+    // Step 5: Execute database writes - either within external transaction or our own
     const txResult = externalTx 
       ? await executeDbWrites(externalTx)
       : await db.transaction(executeDbWrites);
-    
-    // Step 6: Deduct guest passes AFTER session is confirmed
-    // This happens outside the Drizzle transaction because deductGuestPasses uses its own
-    // pg connection with FOR UPDATE row-level locking. If deduction fails after session
-    // creation, the session remains valid but passes aren't deducted (acceptable - minor issue).
-    // The alternative (deducting before) would be worse: passes deducted but no session.
-    if (billingResult.guestPassesUsed > 0) {
-      const deductResult = await deductGuestPasses(
-        request.ownerEmail, 
-        billingResult.guestPassesUsed,
-        ownerTier || undefined
-      );
-
-      if (!deductResult.success) {
-        // Log warning but don't fail the booking - session is already created
-        // Staff can manually adjust passes if needed
-        logger.warn('[createSessionWithUsageTracking] Guest pass deduction failed after session creation', {
-          extra: {
-            sessionId: txResult.session.id,
-            ownerEmail: request.ownerEmail,
-            passesNeeded: billingResult.guestPassesUsed
-          }
-        });
-      }
-    }
     
     logger.info('[createSessionWithUsageTracking] Session created with new billing', {
       extra: {

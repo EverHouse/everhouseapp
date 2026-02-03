@@ -200,7 +200,9 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                   participantType: 'owner',
                   displayName: updatedRow.userName || updatedRow.userEmail
                 }],
-                trackmanBookingId: updatedRow.trackmanBookingId || undefined
+                trackmanBookingId: updatedRow.trackmanBookingId || undefined,
+                declaredPlayerCount: updatedRow.declaredPlayerCount || undefined,
+                bookingId: bookingId
               },
               'member_request',
               tx

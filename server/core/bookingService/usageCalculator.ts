@@ -213,7 +213,13 @@ export async function calculateSessionBilling(
   const guestPassInfo = await getGuestPassInfo(hostEmail, hostTier || undefined);
   let guestPassesRemaining = guestPassInfo.remaining;
   
-  for (const participant of participants) {
+  // Use proper allocation helper to distribute remainder minutes correctly
+  const allocations = computeUsageAllocation(sessionDuration, participants);
+  const allocationMap = new Map(allocations.map((a, idx) => [idx, a]));
+  
+  for (let idx = 0; idx < participants.length; idx++) {
+    const participant = participants[idx];
+    const allocation = allocationMap.get(idx)!;
     let billing: ParticipantBilling;
     
     if (participant.participantType === 'guest') {
@@ -232,7 +238,7 @@ export async function calculateSessionBilling(
         displayName: participant.displayName,
         participantType: 'guest',
         tierName: null,
-        minutesAllocated: Math.floor(sessionDuration / participants.length),
+        minutesAllocated: allocation.minutesAllocated,
         dailyAllowance: 0,
         usedMinutesToday: 0,
         remainingMinutesBefore: 0,
@@ -261,7 +267,7 @@ export async function calculateSessionBilling(
         ? 999
         : Math.max(0, dailyAllowance - usedMinutesToday);
       
-      const minutesAllocated = Math.floor(sessionDuration / participants.length);
+      const minutesAllocated = allocation.minutesAllocated;
       
       let overageMinutes = 0;
       let overageFee = 0;
@@ -319,6 +325,7 @@ export async function calculateFullSessionBilling(
   sessionDuration: number,
   participants: Participant[],
   hostEmail: string,
+  declaredPlayerCount: number = 1,
   options?: {
     excludeSessionId?: number;
   }
@@ -330,6 +337,10 @@ export async function calculateFullSessionBilling(
   
   const guestCount = participants.filter(p => p.participantType === 'guest').length;
   const memberCount = participants.filter(p => p.participantType !== 'guest').length;
+  
+  // Calculate effective player count using Math.max to match unifiedFeeService logic
+  // This fixes the "bait-and-switch" fee bug where declared player count differs from actual participants
+  const effectivePlayerCount = Math.max(declaredPlayerCount, participants.length);
   
   const hostTier = await getMemberTierByEmail(hostEmail);
   const guestPassInfo = await getGuestPassInfo(hostEmail, hostTier || undefined);
@@ -357,9 +368,16 @@ export async function calculateFullSessionBilling(
     hostOverageFee = Math.max(0, hostOverageResult.overageFee - hostPriorOverage.overageFee);
   }
   
-  for (const participant of participants) {
+  // Use proper allocation helper to distribute remainder minutes correctly for non-owner participants
+  const allocations = computeUsageAllocation(sessionDuration, participants, {
+    declaredSlots: effectivePlayerCount
+  });
+  const allocationMap = new Map(allocations.map((a, idx) => [idx, a]));
+  
+  for (let idx = 0; idx < participants.length; idx++) {
+    const participant = participants[idx];
+    const allocation = allocationMap.get(idx)!;
     let billing: ParticipantBilling;
-    const minutesAllocated = Math.floor(sessionDuration / participants.length);
     
     if (participant.participantType === 'guest') {
       let guestFee = PRICING.GUEST_FEE_DOLLARS;
@@ -377,7 +395,7 @@ export async function calculateFullSessionBilling(
         displayName: participant.displayName,
         participantType: 'guest',
         tierName: null,
-        minutesAllocated,
+        minutesAllocated: allocation.minutesAllocated,
         dailyAllowance: 0,
         usedMinutesToday: 0,
         remainingMinutesBefore: 0,
@@ -429,6 +447,8 @@ export async function calculateFullSessionBilling(
       const remainingMinutesBefore = unlimitedAccess || dailyAllowance >= 999
         ? 999
         : Math.max(0, dailyAllowance - usedMinutesToday);
+      
+      const minutesAllocated = allocation.minutesAllocated;
       
       let overageMinutes = 0;
       let overageFee = 0;

@@ -432,7 +432,8 @@ export async function createBookingForMember(
               slotDate,
               durationMinutes,
               participants,
-              member.email
+              member.email,
+              playerCount
             );
             
             for (const billing of billingResult.billingBreakdown) {
