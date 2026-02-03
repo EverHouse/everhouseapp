@@ -341,11 +341,15 @@ router.get('/api/data-integrity/placeholder-accounts', isAdmin, async (req, res)
         FROM users 
         WHERE email LIKE '%@visitors.evenhouse.club%'
            OR email LIKE '%@trackman.local%'
+           OR email LIKE '%@trackman.import%'
            OR email LIKE 'unmatched-%'
+           OR email LIKE 'unmatched@%'
            OR email LIKE 'golfnow-%'
            OR email LIKE 'classpass-%'
            OR email LIKE 'lesson-%'
            OR email LIKE 'anonymous-%'
+           OR email LIKE 'private-event@%'
+           OR email LIKE '%@resolved%'
            OR email LIKE '%@placeholder.%'
            OR email LIKE '%@test.local%'
            OR email LIKE '%@example.com%'
@@ -497,23 +501,104 @@ router.post('/api/data-integrity/placeholder-accounts/delete', isAdmin, async (r
       }
     }
     
-    // Delete local database placeholder users
+    // Delete local database placeholder users and their related data
     if (localDatabaseUserIds?.length > 0) {
-      for (const userId of localDatabaseUserIds) {
+      for (const odUserId of localDatabaseUserIds) {
+        const client = await pool.connect();
         try {
-          const deleteResult = await pool.query(
+          await client.query('BEGIN');
+          
+          // First get the user's email for cleaning up related records
+          const userResult = await client.query(
+            'SELECT id, email FROM users WHERE id = $1',
+            [odUserId]
+          );
+          
+          if (userResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            results.localDatabaseFailed++;
+            results.localDatabaseErrors.push(`${odUserId}: User not found`);
+            continue;
+          }
+          
+          const userId = userResult.rows[0].id;
+          const userEmail = userResult.rows[0].email;
+          
+          // Delete notifications for this user
+          await client.query(
+            'DELETE FROM notifications WHERE user_id = $1',
+            [userId]
+          );
+          
+          // Delete booking sessions for this user
+          await client.query(
+            'DELETE FROM booking_sessions WHERE user_id = $1',
+            [userId]
+          );
+          
+          // Delete booking guests where this user is the guest
+          await client.query(
+            'DELETE FROM booking_guests WHERE LOWER(guest_email) = LOWER($1)',
+            [userEmail]
+          );
+          
+          // Delete related bookings for this placeholder user (by email and user_id)
+          await client.query(
+            'DELETE FROM booking_requests WHERE LOWER(user_email) = LOWER($1) OR user_id = $2',
+            [userEmail, userId]
+          );
+          
+          // Delete booking members entries
+          await client.query(
+            'DELETE FROM booking_members WHERE LOWER(user_email) = LOWER($1)',
+            [userEmail]
+          );
+          
+          // Delete event RSVPs
+          await client.query(
+            'DELETE FROM event_rsvps WHERE LOWER(user_email) = LOWER($1)',
+            [userEmail]
+          );
+          
+          // Delete wellness enrollments
+          await client.query(
+            'DELETE FROM wellness_enrollments WHERE LOWER(user_email) = LOWER($1)',
+            [userEmail]
+          );
+          
+          // Delete pending fees
+          await client.query(
+            'DELETE FROM pending_fees WHERE user_id = $1',
+            [userId]
+          );
+          
+          // Delete user notes
+          await client.query(
+            'DELETE FROM user_notes WHERE user_id = $1',
+            [userId]
+          );
+          
+          // Now delete the user
+          const deleteResult = await client.query(
             'DELETE FROM users WHERE id = $1 RETURNING email',
             [userId]
           );
+          
+          await client.query('COMMIT');
+          
           if (deleteResult.rowCount && deleteResult.rowCount > 0) {
             results.localDatabaseDeleted++;
+            console.log(`[DataIntegrity] Deleted placeholder user ${userEmail} and all related records`);
           } else {
             results.localDatabaseFailed++;
-            results.localDatabaseErrors.push(`${userId}: User not found`);
+            results.localDatabaseErrors.push(`${odUserId}: Failed to delete user`);
           }
         } catch (error: any) {
+          await client.query('ROLLBACK');
           results.localDatabaseFailed++;
-          results.localDatabaseErrors.push(`${userId}: ${error.message}`);
+          results.localDatabaseErrors.push(`${odUserId}: ${error.message}`);
+        } finally {
+          client.release();
         }
       }
     }

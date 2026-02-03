@@ -5,11 +5,15 @@ import { alertOnExternalServiceError } from '../errorAlerts';
 const PLACEHOLDER_EMAIL_PATTERNS = [
   '@visitors.evenhouse.club',
   '@trackman.local',
+  '@trackman.import',
   'unmatched-',
+  'unmatched@',
   'golfnow-',
   'classpass-',
   'lesson-',
   'anonymous-',
+  'private-event@',
+  '@resolved',
   '@placeholder.',
   '@test.local',
   '@example.com'
