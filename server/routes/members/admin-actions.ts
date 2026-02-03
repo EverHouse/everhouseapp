@@ -7,7 +7,7 @@ import { isStaffOrAdmin, isAdmin } from '../../core/middleware';
 import { getSessionUser } from '../../types/session';
 import { TIER_NAMES } from '../../../shared/constants/tiers';
 import { getTierRank } from './helpers';
-import { createMemberLocally, queueMemberCreation, getAllDiscountRules, handleTierChange } from '../../core/hubspot';
+import { createMemberLocally, queueMemberCreation, getAllDiscountRules, handleTierChange, queueTierSync } from '../../core/hubspot';
 import { changeSubscriptionTier, pauseSubscription } from '../../core/stripe';
 import { notifyMember } from '../../core/notificationService';
 import { broadcastTierUpdate } from '../../core/websocket';
@@ -50,8 +50,8 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
     
     const member = userResult[0];
     const actualTier = member.tier;
-    const oldTierDisplay = actualTier || 'Social';
-    const newTierDisplay = normalizedTier || 'No Tier';
+    const oldTierDisplay = actualTier || null;
+    const newTierDisplay = normalizedTier || null;
     
     if (actualTier === normalizedTier) {
       return res.json({ 
@@ -70,16 +70,29 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
       ? `${sessionUser.firstName} ${sessionUser.lastName || ''}`.trim() 
       : sessionUser?.email?.split('@')[0] || 'Staff';
     
-    const hubspotResult = await handleTierChange(
-      normalizedEmail,
-      oldTierDisplay,
-      newTierDisplay,
-      performedBy,
-      performedByName
-    );
+    let hubspotResult = { success: true, oldLineItemRemoved: false, newLineItemAdded: false };
     
-    if (!hubspotResult.success && hubspotResult.error) {
-      console.warn(`[Members] HubSpot tier change failed for ${normalizedEmail}: ${hubspotResult.error}`);
+    if (normalizedTier) {
+      hubspotResult = await handleTierChange(
+        normalizedEmail,
+        oldTierDisplay || 'None',
+        normalizedTier,
+        performedBy,
+        performedByName
+      );
+      
+      if (!hubspotResult.success && hubspotResult.error) {
+        console.warn(`[Members] HubSpot tier change failed for ${normalizedEmail}, queuing for retry: ${hubspotResult.error}`);
+        await queueTierSync({
+          email: normalizedEmail,
+          newTier: normalizedTier,
+          oldTier: oldTierDisplay || 'None',
+          changedBy: performedBy,
+          changedByName: performedByName
+        });
+      }
+    } else {
+      console.log(`[Members] Tier cleared for ${normalizedEmail}, skipping HubSpot sync (no product mapping for cleared tier)`);
     }
     
     let stripeSync = { success: true, warning: null as string | null };
@@ -91,7 +104,7 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
         .limit(1);
       
       if (tierRecord.length > 0 && tierRecord[0].stripePriceId) {
-        const isUpgrade = getTierRank(normalizedTier) > getTierRank(oldTierDisplay);
+        const isUpgrade = getTierRank(normalizedTier) > getTierRank(oldTierDisplay || '');
         const stripeResult = await changeSubscriptionTier(
           member.stripeSubscriptionId,
           tierRecord[0].stripePriceId,
@@ -110,14 +123,17 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
       stripeSync = { success: true, warning: null };
     }
     
-    const isUpgrade = normalizedTier ? getTierRank(normalizedTier) > getTierRank(oldTierDisplay) : false;
-    const changeType = normalizedTier ? (isUpgrade ? 'upgraded' : 'changed') : 'cleared';
+    const isUpgrade = normalizedTier ? getTierRank(normalizedTier) > getTierRank(oldTierDisplay || '') : false;
+    const isFirstTier = !oldTierDisplay && normalizedTier;
+    const changeType = isFirstTier ? 'set' : (normalizedTier ? (isUpgrade ? 'upgraded' : 'changed') : 'cleared');
     await notifyMember({
       userEmail: normalizedEmail,
-      title: normalizedTier ? (isUpgrade ? 'Membership Upgraded' : 'Membership Updated') : 'Membership Cleared',
-      message: normalizedTier 
-        ? `Your membership has been ${changeType} from ${oldTierDisplay} to ${newTierDisplay}`
-        : `Your membership tier has been cleared (was ${oldTierDisplay})`,
+      title: isFirstTier ? 'Membership Tier Assigned' : (normalizedTier ? (isUpgrade ? 'Membership Upgraded' : 'Membership Updated') : 'Membership Cleared'),
+      message: isFirstTier
+        ? `Your membership tier has been set to ${newTierDisplay}`
+        : (normalizedTier 
+          ? `Your membership has been ${changeType} from ${oldTierDisplay} to ${newTierDisplay}`
+          : `Your membership tier has been cleared (was ${oldTierDisplay})`),
       type: 'system',
       url: '/member/profile'
     });
@@ -132,7 +148,9 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
     
     res.json({
       success: true,
-      message: `Member tier updated from ${oldTierDisplay} to ${newTierDisplay}`,
+      message: isFirstTier 
+        ? `Member tier set to ${newTierDisplay}` 
+        : `Member tier updated from ${oldTierDisplay || 'None'} to ${newTierDisplay || 'None'}`,
       member: {
         id: member.id,
         email: member.email,
@@ -646,7 +664,7 @@ router.post('/api/members/admin/bulk-tier-update', isStaffOrAdmin, async (req, r
         
         const user = userResult[0];
         const actualTier = user.tier;
-        const oldTierDisplay = actualTier || 'Social';
+        const oldTierDisplay = actualTier || null;
         const memberName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || normalizedEmail;
         
         if (actualTier === normalizedTier) {
@@ -676,10 +694,10 @@ router.post('/api/members/admin/bulk-tier-update', isStaffOrAdmin, async (req, r
           .where(sql`LOWER(${users.email}) = ${normalizedEmail}`);
         
         let hubspotSynced = false;
-        if (syncToHubspot) {
+        if (syncToHubspot && normalizedTier) {
           const hubspotResult = await handleTierChange(
             normalizedEmail,
-            oldTierDisplay,
+            oldTierDisplay || 'None',
             normalizedTier,
             performedBy,
             performedByName
@@ -687,14 +705,21 @@ router.post('/api/members/admin/bulk-tier-update', isStaffOrAdmin, async (req, r
           hubspotSynced = hubspotResult.success;
           
           if (!hubspotResult.success && hubspotResult.error) {
-            console.warn(`[BulkTierUpdate] HubSpot sync failed for ${normalizedEmail}: ${hubspotResult.error}`);
+            console.warn(`[BulkTierUpdate] HubSpot sync failed for ${normalizedEmail}, queuing for retry: ${hubspotResult.error}`);
+            await queueTierSync({
+              email: normalizedEmail,
+              newTier: normalizedTier,
+              oldTier: oldTierDisplay || 'None',
+              changedBy: performedBy,
+              changedByName: performedByName
+            });
           }
         }
         
         results.updated.push({ 
           email: normalizedEmail, 
           name: memberName, 
-          oldTier: oldTierDisplay, 
+          oldTier: oldTierDisplay || 'None', 
           newTier: normalizedTier,
           hubspotSynced
         });

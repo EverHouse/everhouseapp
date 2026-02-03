@@ -35,9 +35,11 @@ export interface TierSyncParams {
 }
 
 export async function queueTierSync(params: TierSyncParams): Promise<void> {
+  const oldTierKey = (params.oldTier || 'none').replace(/\s+/g, '_');
+  const newTierKey = (params.newTier || 'none').replace(/\s+/g, '_');
   await enqueueHubSpotSync('sync_tier', params, {
     priority: 2,
-    idempotencyKey: `tier_sync_${params.email}_${Date.now()}`,
+    idempotencyKey: `tier_sync_${params.email}_${oldTierKey}_to_${newTierKey}`,
     maxRetries: 5
   });
 }
