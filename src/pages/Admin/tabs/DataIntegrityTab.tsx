@@ -182,6 +182,7 @@ const DataIntegrityTab: React.FC = () => {
   const [showActivityLog, setShowActivityLog] = useState(true);
 
   const [syncingIssues, setSyncingIssues] = useState<Set<string>>(new Set());
+  const [cancellingBookings, setCancellingBookings] = useState<Set<number>>(new Set());
 
   const [ignoreModal, setIgnoreModal] = useState<IgnoreModalState>({ isOpen: false, issue: null, checkName: '' });
   const [bulkIgnoreModal, setBulkIgnoreModal] = useState<BulkIgnoreModalState>({ isOpen: false, checkName: '', issues: [] });
@@ -476,6 +477,37 @@ const DataIntegrityTab: React.FC = () => {
     onError: (err: Error) => {
       setResyncResult({ success: false, message: err.message || 'Failed to resync member' });
       showToast(err.message || 'Failed to resync member', 'error');
+    },
+  });
+
+  // Cancel Booking Mutation (for ghost bookings without sessions)
+  const cancelBookingMutation = useMutation({
+    mutationFn: (bookingId: number) => 
+      fetch(`/api/booking-requests/${bookingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: 'cancelled', cancelled_by: 'staff' })
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to cancel booking');
+        return res.json();
+      }),
+    onSuccess: (_, bookingId) => {
+      setCancellingBookings(prev => {
+        const next = new Set(prev);
+        next.delete(bookingId);
+        return next;
+      });
+      showToast('Booking cancelled successfully', 'success');
+      runIntegrityMutation.mutate();
+    },
+    onError: (err: Error, bookingId) => {
+      setCancellingBookings(prev => {
+        const next = new Set(prev);
+        next.delete(bookingId);
+        return next;
+      });
+      showToast(err.message || 'Failed to cancel booking', 'error');
     },
   });
 
@@ -1010,6 +1042,12 @@ const DataIntegrityTab: React.FC = () => {
       userId: issue.context.userId,
       hubspotContactId: issue.context.hubspotContactId
     });
+  };
+
+  const handleCancelBooking = (bookingId: number) => {
+    if (cancellingBookings.has(bookingId)) return;
+    setCancellingBookings(prev => new Set(prev).add(bookingId));
+    cancelBookingMutation.mutate(bookingId);
   };
 
   const handleViewProfile = useCallback(async (email: string) => {
@@ -2184,6 +2222,29 @@ const DataIntegrityTab: React.FC = () => {
                                         <span className="material-symbols-outlined text-[16px]">person</span>
                                       )}
                                     </button>
+                                  )}
+                                  {issue.table === 'booking_requests' && !issue.ignored && (
+                                    <>
+                                      <a
+                                        href={`/staff/simulator?date=${issue.context?.bookingDate || ''}`}
+                                        className="p-1.5 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 rounded transition-colors"
+                                        title="View in Simulator"
+                                      >
+                                        <span className="material-symbols-outlined text-[16px]">calendar_month</span>
+                                      </a>
+                                      <button
+                                        onClick={() => handleCancelBooking(issue.recordId as number)}
+                                        disabled={cancellingBookings.has(issue.recordId as number)}
+                                        className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
+                                        title="Cancel this booking"
+                                      >
+                                        {cancellingBookings.has(issue.recordId as number) ? (
+                                          <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                        ) : (
+                                          <span className="material-symbols-outlined text-[16px]">cancel</span>
+                                        )}
+                                      </button>
+                                    </>
                                   )}
                                   {!issue.ignored && (
                                     <button
