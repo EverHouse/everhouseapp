@@ -13,12 +13,13 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "9.69.1",
+    version: "9.69.2",
     date: "2026-02-03",
-    title: "Tier Auto-Fix Enhancement",
+    title: "Staff Tier Assignment",
     changes: [
-      "Improved: Scheduled auto-fix now also pulls tiers from HubSpot for MindBody-billed members",
-      "Improved: Members with HubSpot ID but no local tier will have tier fetched directly from HubSpot"
+      "New: Staff can now assign tiers directly in the app for MindBody-billed members without a tier",
+      "New: Yellow warning appears on member profile when no tier is assigned",
+      "Improved: App is source of truth for tiers - removed HubSpot pull, tier changes sync from app to HubSpot"
     ]
   },
   {

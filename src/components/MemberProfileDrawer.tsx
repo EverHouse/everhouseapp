@@ -11,6 +11,7 @@ import type { MemberProfile } from '../types/data';
 import MemberBillingTab from './admin/MemberBillingTab';
 import MemberActivityTab from './admin/MemberActivityTab';
 import MemberSearchInput, { SelectedMember } from './shared/MemberSearchInput';
+import { TIER_NAMES } from '../../shared/constants/tiers';
 
 const stripHtml = (html: string) => html?.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() || '';
 
@@ -161,6 +162,8 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
   const [membershipTiers, setMembershipTiers] = useState<{id: number; name: string; priceCents: number; billingInterval: string; hasStripePrice: boolean}[]>([]);
   const [selectedTierId, setSelectedTierId] = useState<number | null>(null);
   const [sendingPaymentLink, setSendingPaymentLink] = useState(false);
+  const [assigningTier, setAssigningTier] = useState(false);
+  const [selectedAssignTier, setSelectedAssignTier] = useState<string>('');
   const [removingEmail, setRemovingEmail] = useState<string | null>(null);
   const [newNoteContent, setNewNoteContent] = useState('');
   const [newNotePinned, setNewNotePinned] = useState(false);
@@ -962,6 +965,59 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
               >
                 <span className="material-symbols-outlined text-lg">delete_forever</span>
               </button>
+            </div>
+          )}
+
+          {isAdmin && !visitorMode && !displayedTier && member.membershipStatus === 'active' && (
+            <div className={`mt-4 p-3 rounded-xl border ${isDark ? 'bg-yellow-900/20 border-yellow-500/30' : 'bg-yellow-50 border-yellow-200'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="material-symbols-outlined text-yellow-500">warning</span>
+                <span className={`text-sm font-medium ${isDark ? 'text-yellow-300' : 'text-yellow-700'}`}>
+                  No tier assigned {member.billingProvider === 'mindbody' && '(MindBody member)'}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={selectedAssignTier}
+                  onChange={(e) => setSelectedAssignTier(e.target.value)}
+                  className={`flex-1 px-3 py-2 rounded-lg border text-sm ${isDark ? 'bg-[#1a1d12] border-white/20 text-white' : 'bg-white border-gray-200 text-gray-800'}`}
+                  aria-label="Select tier to assign"
+                >
+                  <option value="">Select tier...</option>
+                  {TIER_NAMES.map(tier => (
+                    <option key={tier} value={tier}>{tier}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={async () => {
+                    if (!selectedAssignTier) return;
+                    setAssigningTier(true);
+                    try {
+                      const res = await fetch(`/api/members/${encodeURIComponent(member.email)}/tier`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ tier: selectedAssignTier })
+                      });
+                      const data = await res.json();
+                      if (res.ok && data.success) {
+                        setDisplayedTier(selectedAssignTier);
+                        setSelectedAssignTier('');
+                      } else {
+                        alert(data.error || 'Failed to assign tier');
+                      }
+                    } catch {
+                      alert('Failed to assign tier');
+                    } finally {
+                      setAssigningTier(false);
+                    }
+                  }}
+                  disabled={!selectedAssignTier || assigningTier}
+                  className="px-4 py-2 rounded-lg bg-brand-green text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {assigningTier ? 'Saving...' : 'Assign'}
+                </button>
+              </div>
             </div>
           )}
 
