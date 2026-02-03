@@ -713,9 +713,28 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   }, [refreshCafeMenu]);
 
   // Listen for real-time directory updates via WebSocket (staff-only, for member sync)
+  // Debounce to prevent multiple rapid refreshes during WebSocket reconnections
+  const directoryRefreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastDirectoryRefreshRef = useRef<number>(0);
+  
   useEffect(() => {
     const handleDirectoryUpdate = () => {
-      refreshMembers();
+      const now = Date.now();
+      // Skip if we refreshed within the last 5 seconds
+      if (now - lastDirectoryRefreshRef.current < 5000) {
+        return;
+      }
+      
+      // Clear any pending refresh
+      if (directoryRefreshTimeoutRef.current) {
+        clearTimeout(directoryRefreshTimeoutRef.current);
+      }
+      
+      // Debounce the refresh by 500ms to batch rapid events
+      directoryRefreshTimeoutRef.current = setTimeout(() => {
+        lastDirectoryRefreshRef.current = Date.now();
+        refreshMembers();
+      }, 500);
     };
     
     window.addEventListener('directory-update', handleDirectoryUpdate);
@@ -723,6 +742,9 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     return () => {
       window.removeEventListener('directory-update', handleDirectoryUpdate);
       window.removeEventListener('member-data-updated', handleDirectoryUpdate);
+      if (directoryRefreshTimeoutRef.current) {
+        clearTimeout(directoryRefreshTimeoutRef.current);
+      }
     };
   }, [refreshMembers]);
 

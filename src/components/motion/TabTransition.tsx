@@ -11,29 +11,26 @@ export const TabTransition: React.FC<TabTransitionProps> = ({
   children, 
   className = '' 
 }) => {
-  const [displayedChildren, setDisplayedChildren] = useState(children);
   const [animationPhase, setAnimationPhase] = useState<'idle' | 'exiting' | 'entering'>('idle');
   const prevKeyRef = useRef(activeKey);
   const isFirstRender = useRef(true);
+  const frozenChildrenRef = useRef<React.ReactNode>(null);
 
   useEffect(() => {
-    // Skip animation on first render
     if (isFirstRender.current) {
       isFirstRender.current = false;
+      prevKeyRef.current = activeKey;
       return;
     }
 
     if (activeKey !== prevKeyRef.current) {
-      // Start exit animation with current (old) content
+      frozenChildrenRef.current = null;
       setAnimationPhase('exiting');
       
-      // After exit animation completes, switch to new content and enter
       const exitTimer = setTimeout(() => {
-        setDisplayedChildren(children);
         setAnimationPhase('entering');
         prevKeyRef.current = activeKey;
         
-        // Clear entering state after animation completes
         const enterTimer = setTimeout(() => {
           setAnimationPhase('idle');
         }, 250);
@@ -42,11 +39,8 @@ export const TabTransition: React.FC<TabTransitionProps> = ({
       }, 150);
       
       return () => clearTimeout(exitTimer);
-    } else {
-      // Same key, just update children without animation
-      setDisplayedChildren(children);
     }
-  }, [activeKey, children]);
+  }, [activeKey]);
 
   const animationClass = 
     animationPhase === 'exiting' ? 'animate-tab-exit' :
@@ -54,7 +48,7 @@ export const TabTransition: React.FC<TabTransitionProps> = ({
 
   return (
     <div className={`${animationClass} ${className}`}>
-      {displayedChildren}
+      {children}
     </div>
   );
 };
