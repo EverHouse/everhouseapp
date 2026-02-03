@@ -1584,6 +1584,9 @@ router.put('/api/bookings/:id/assign-with-players', isStaffOrAdmin, async (req, 
         throw { statusCode: 404, error: 'Booking not found' };
       }
       
+      // Build the note to append
+      const newNote = ` [Assigned by staff: ${owner.name} with ${totalPlayerCount} players]`;
+      
       const [updated] = await tx.update(bookingRequests)
         .set({
           userEmail: owner.email.toLowerCase(),
@@ -1593,7 +1596,8 @@ router.put('/api/bookings/:id/assign-with-players', isStaffOrAdmin, async (req, 
           status: 'approved',
           declaredPlayerCount: totalPlayerCount,
           guestCount: guestCount,
-          staffNotes: sql`COALESCE(${bookingRequests.staffNotes}, '') || ' [Assigned by staff: ' || ${owner.name} || ' with ' || ${totalPlayerCount.toString()} || ' players]'`,
+          // Use atomic SQL append to avoid overwriting concurrent changes
+          staffNotes: sql`COALESCE(${bookingRequests.staffNotes}, '') || ${newNote}`,
           updatedAt: new Date()
         })
         .where(eq(bookingRequests.id, bookingId))
@@ -1710,6 +1714,18 @@ router.put('/api/bookings/:id/assign-with-players', isStaffOrAdmin, async (req, 
     if (error.statusCode) {
       return res.status(error.statusCode).json({ error: error.error });
     }
+    // Log additional error details for debugging
+    logger.error('[assign-with-players] Database error details', {
+      extra: {
+        bookingId: req.params.id,
+        owner: req.body.owner,
+        errorMessage: error.message,
+        errorCode: error.code,
+        errorDetail: error.detail,
+        errorConstraint: error.constraint,
+        errorStack: error.stack?.split('\n').slice(0, 5).join('\n')
+      }
+    });
     logAndRespond(req, res, 500, 'Failed to assign players to booking', error, 'ASSIGN_PLAYERS_ERROR');
   }
 });

@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.3.7",
+    date: "2026-02-03",
+    title: "Assign Players Bug Fix",
+    changes: [
+      "Fixed: Assign players to booking feature now works correctly",
+      "Fixed: SQL query generation issue when updating staff notes",
+      "Improved: Better error logging for booking assignment failures"
+    ]
+  },
+  {
     version: "69.3.6",
     date: "2026-02-03",
     title: "HubSpot Status Sync Fix",
