@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchWithCredentials } from '../../hooks/queries/useFetch';
@@ -174,6 +174,18 @@ const Dashboard: React.FC = () => {
   const [overagePaymentBooking, setOveragePaymentBooking] = useState<{ id: number; amount: number; minutes: number } | null>(null);
   const [isPayingOverage, setIsPayingOverage] = useState(false);
 
+  // Stable time/date states updated via interval to prevent redundant expensive calculations on every render
+  const [currentDate, setCurrentDate] = useState(() => getTodayString());
+  const [currentTime, setCurrentTime] = useState(() => getNowTimePacific());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentDate(getTodayString());
+      setCurrentTime(getNowTimePacific());
+    }, 60000); // Update every minute
+    return () => clearInterval(timer);
+  }, []);
+
   const isStaffOrAdminProfile = user?.role === 'admin' || user?.role === 'staff';
   const { permissions: tierPermissions } = useTierPermissions(user?.tier);
 
@@ -251,7 +263,15 @@ const Dashboard: React.FC = () => {
     refetchAllData();
   }, [refetchAllData]);
 
-  const allItems = [
+  // Optimize deduplication of conference room bookings using a Set for O(N+M) complexity
+  const bookingRequestEventIds = useMemo(() => new Set(
+    dbBookingRequests
+      .filter(r => ['pending', 'pending_approval', 'approved', 'confirmed', 'attended'].includes(r.status))
+      .map(r => r.calendar_event_id)
+      .filter(Boolean)
+  ), [dbBookingRequests]);
+
+  const allItems = useMemo(() => [
     ...dbBookings.map(b => {
       const isLinkedMember = user?.email ? b.user_email?.toLowerCase() !== user.email.toLowerCase() : false;
       const primaryBookerName = isLinkedMember && b.user_email 
@@ -331,13 +351,7 @@ const Dashboard: React.FC = () => {
       raw: w
     })),
     ...dbConferenceRoomBookings
-      .filter(c => {
-        const isDuplicate = dbBookingRequests.some(r => 
-          r.calendar_event_id === c.calendar_event_id && 
-          ['pending', 'pending_approval', 'approved', 'confirmed', 'attended'].includes(r.status)
-        );
-        return !isDuplicate;
-      })
+      .filter(c => !bookingRequestEventIds.has(c.calendar_event_id))
       .map(c => ({
         id: c.id,
         dbId: c.id,
@@ -353,10 +367,18 @@ const Dashboard: React.FC = () => {
         raw: c,
         source: 'calendar'
       }))
-  ].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  ].sort((a, b) => a.sortKey.localeCompare(b.sortKey)), [
+    dbBookings,
+    dbBookingRequests,
+    dbRSVPs,
+    dbWellnessEnrollments,
+    dbConferenceRoomBookings,
+    user?.email,
+    bookingRequestEventIds
+  ]);
 
-  const todayStr = getTodayString();
-  const nowTime = getNowTimePacific();
+  const todayStr = currentDate;
+  const nowTime = currentTime;
   
   const normalizeTime = (t: string) => {
     if (!t) return '';
@@ -364,7 +386,7 @@ const Dashboard: React.FC = () => {
     return `${parts[0].padStart(2, '0')}:${parts[1]?.padStart(2, '0') || '00'}`;
   };
   
-  const upcomingItems = allItems.filter(item => {
+  const upcomingItems = useMemo(() => allItems.filter(item => {
     let itemDate: string | undefined;
     let endTime: string | undefined;
     
@@ -401,13 +423,14 @@ const Dashboard: React.FC = () => {
     }
     
     return true;
-  });
+  }), [allItems, todayStr, nowTime]);
 
-  const todayBookingsAll = allItems.filter(item => 
+  const todayBookingsAll = useMemo(() => allItems.filter(item =>
     item.rawDate === todayStr && 
     (item.type === 'booking' || item.type === 'booking_request' || item.type === 'conference_room_calendar')
-  );
-  const simMinutesToday = todayBookingsAll
+  ), [allItems, todayStr]);
+
+  const simMinutesToday = useMemo(() => todayBookingsAll
     .filter(b => b.resourceType === 'simulator')
     .reduce((sum, b) => {
       const raw = b.raw as any;
@@ -419,8 +442,9 @@ const Dashboard: React.FC = () => {
       const memberShare = Math.ceil(totalMinutes / playerCount);
       
       return sum + memberShare;
-    }, 0);
-  const confMinutesToday = todayBookingsAll
+    }, 0), [todayBookingsAll]);
+
+  const confMinutesToday = useMemo(() => todayBookingsAll
     .filter(b => b.resourceType === 'conference_room')
     .reduce((sum, b) => {
       const raw = b.raw as any;
@@ -432,26 +456,27 @@ const Dashboard: React.FC = () => {
       const memberShare = Math.ceil(totalMinutes / playerCount);
       
       return sum + memberShare;
-    }, 0);
+    }, 0), [todayBookingsAll]);
 
-  const nextEvent = allEvents
+  const nextEvent = useMemo(() => allEvents
     .filter(e => e.event_date.split('T')[0] >= todayStr)
     .sort((a, b) => a.event_date.localeCompare(b.event_date) || (a.start_time || '').localeCompare(b.start_time || ''))
-    [0];
-  const nextWellnessClass = allWellnessClasses
+    [0], [allEvents, todayStr]);
+
+  const nextWellnessClass = useMemo(() => allWellnessClasses
     .filter(w => w.date.split('T')[0] >= todayStr)
     .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
-    [0];
+    [0], [allWellnessClasses, todayStr]);
 
-  const pendingInvites = dbBookingRequests.filter(r => 
+  const pendingInvites = useMemo(() => dbBookingRequests.filter(r =>
     r.is_linked_member === true && 
     r.invite_status === 'pending' &&
     ['pending', 'pending_approval', 'approved', 'confirmed'].includes(r.status)
-  );
+  ), [dbBookingRequests]);
   
-  const pendingInviteIds = new Set(pendingInvites.map(p => p.id));
+  const pendingInviteIds = useMemo(() => new Set(pendingInvites.map(p => p.id)), [pendingInvites]);
   
-  const upcomingItemsFiltered = upcomingItems.filter(item => {
+  const upcomingItemsFiltered = useMemo(() => upcomingItems.filter(item => {
     if (item.type === 'booking_request' || item.type === 'booking') {
       const raw = item.raw as DBBookingRequest;
       if (raw && pendingInviteIds.has(raw.id)) {
@@ -459,10 +484,10 @@ const Dashboard: React.FC = () => {
       }
     }
     return true;
-  });
+  }), [upcomingItems, pendingInviteIds]);
 
-  const upcomingBookings = upcomingItemsFiltered.filter(item => item.type === 'booking' || item.type === 'booking_request' || item.type === 'conference_room_calendar');
-  const upcomingEventsWellness = upcomingItemsFiltered.filter(item => item.type === 'rsvp' || item.type === 'wellness');
+  const upcomingBookings = useMemo(() => upcomingItemsFiltered.filter(item => item.type === 'booking' || item.type === 'booking_request' || item.type === 'conference_room_calendar'), [upcomingItemsFiltered]);
+  const upcomingEventsWellness = useMemo(() => upcomingItemsFiltered.filter(item => item.type === 'rsvp' || item.type === 'wellness'), [upcomingItemsFiltered]);
 
   const nextBooking = upcomingBookings[0];
   
