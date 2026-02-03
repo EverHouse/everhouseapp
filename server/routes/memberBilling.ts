@@ -502,10 +502,8 @@ router.post('/api/member-billing/:email/credit', isStaffOrAdmin, async (req, res
       return res.status(400).json({ error: 'Cannot add credits to placeholder accounts' });
     }
 
-    if (member.billing_provider !== 'stripe') {
-      return res.status(400).json({ error: 'Credits are only available for Stripe billing' });
-    }
-
+    // Allow credits for any member who has (or can have) a Stripe customer ID
+    // This includes MindBody members who use Stripe for one-off charges and credits
     const stripe = await getStripeClient();
     
     let stripeCustomerId = member.stripe_customer_id;
