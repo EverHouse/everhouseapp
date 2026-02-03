@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.3.4",
+    date: "2026-02-03",
+    title: "MindBody Data Quality Check Improvement",
+    changes: [
+      "Fixed: MindBody Data Quality check now only flags active members missing a tier",
+      "Fixed: Inactive members (terminated, expired, declined) no longer show in this check"
+    ]
+  },
+  {
     version: "69.3.3",
     date: "2026-02-03",
     title: "HubSpot Billing Source Sync Improvement",

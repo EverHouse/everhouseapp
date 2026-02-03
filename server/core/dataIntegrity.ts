@@ -1586,8 +1586,8 @@ async function checkMindBodyStatusMismatch(): Promise<IntegrityCheckResult> {
         -- Active member without MindBody client ID
         (u.membership_status = 'active' AND (u.mindbody_client_id IS NULL OR u.mindbody_client_id = ''))
         OR
-        -- Has MindBody ID but no tier (data incomplete)
-        (u.mindbody_client_id IS NOT NULL AND u.mindbody_client_id != '' AND (u.tier IS NULL OR u.tier = ''))
+        -- Active member with MindBody ID but no tier (data incomplete)
+        (u.membership_status = 'active' AND u.mindbody_client_id IS NOT NULL AND u.mindbody_client_id != '' AND (u.tier IS NULL OR u.tier = ''))
       )
     ORDER BY u.updated_at DESC
     LIMIT 50
