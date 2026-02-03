@@ -2173,21 +2173,22 @@ const WellnessAdminContent: React.FC = () => {
 const EventsTab: React.FC = () => {
     const { showToast } = useToast();
     const queryClient = useQueryClient();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const subtabParam = searchParams.get('subtab');
-    const [activeSubTab, setActiveSubTab] = useState<'events' | 'wellness'>(
-        subtabParam === 'wellness' ? 'wellness' : 'events'
-    );
+    const activeSubTab: 'events' | 'wellness' = subtabParam === 'wellness' ? 'wellness' : 'events';
     const [syncMessage, setSyncMessage] = useState<string | null>(null);
     
-    
-    useEffect(() => {
-        if (subtabParam === 'wellness') {
-            setActiveSubTab('wellness');
-        } else if (subtabParam === 'events' || subtabParam === null) {
-            setActiveSubTab('events');
-        }
-    }, [subtabParam]);
+    const setActiveSubTab = (tab: 'events' | 'wellness') => {
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            if (tab === 'events') {
+                newParams.delete('subtab');
+            } else {
+                newParams.set('subtab', tab);
+            }
+            return newParams;
+        }, { replace: true });
+    };
 
     const syncMutation = useMutation({
         mutationFn: async () => {
@@ -2263,7 +2264,9 @@ const EventsTab: React.FC = () => {
 
                 <div className="flex gap-2 mb-4 animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
                     <button
+                        type="button"
                         onClick={() => setActiveSubTab('events')}
+                        style={{ touchAction: 'manipulation' }}
                         className={`flex-1 py-2.5 px-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-1.5 ${
                             activeSubTab === 'events'
                                 ? 'bg-primary text-white shadow-md'
@@ -2274,7 +2277,9 @@ const EventsTab: React.FC = () => {
                         Events
                     </button>
                     <button
+                        type="button"
                         onClick={() => setActiveSubTab('wellness')}
+                        style={{ touchAction: 'manipulation' }}
                         className={`flex-1 py-2.5 px-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-1.5 ${
                             activeSubTab === 'wellness'
                                 ? 'bg-[#CCB8E4] text-[#293515] shadow-md'
