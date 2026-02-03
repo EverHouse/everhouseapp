@@ -373,6 +373,9 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
     });
     
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.removeHeader('ETag');
     
     if (isPaginated) {
       const totalPages = Math.ceil(total / limit);
