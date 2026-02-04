@@ -289,14 +289,11 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
           <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Description</label>
           <textarea 
             className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none" 
-            placeholder="Additional details (shown on Google Calendar)..." 
+            placeholder="Additional details shown to members..." 
             rows={2} 
             value={formData.description} 
             onChange={e => setFormData({...formData, description: e.target.value})} 
           />
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Appears below the metadata on the Internal Calendar
-          </p>
         </div>
 
         <div className="flex items-center justify-between py-2">

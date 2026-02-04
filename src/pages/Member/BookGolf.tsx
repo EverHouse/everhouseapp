@@ -244,7 +244,6 @@ const BookGolf: React.FC = () => {
   const isFirstRenderRef = useRef(true);
   const prevDateRef = useRef<string | null>(null);
   const prevDurationRef = useRef<number | null>(null);
-  const prevTabRef = useRef<string | null>(null);
 
   const effectiveUser = viewAsUser || user;
   
@@ -502,17 +501,15 @@ const BookGolf: React.FC = () => {
     
     const dateChanged = currentDate !== prevDateRef.current;
     const durationChanged = duration !== prevDurationRef.current;
-    const tabChanged = activeTab !== prevTabRef.current;
     
-    if (dateChanged || durationChanged || tabChanged) {
+    if (dateChanged || durationChanged) {
       setSelectedSlot(null);
       setSelectedResource(null);
     }
     
     prevDateRef.current = currentDate;
     prevDurationRef.current = duration;
-    prevTabRef.current = activeTab;
-  }, [selectedDateObj, duration, activeTab]);
+  }, [selectedDateObj, duration]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -801,7 +798,6 @@ const BookGolf: React.FC = () => {
       if (invalidGuestSlot) {
         setBookingError('Please enter a valid email address for each guest.');
         haptic.error();
-        isSubmittingRef.current = false; // Explicitly reset before returning
         return;
       }
       
@@ -908,7 +904,6 @@ const BookGolf: React.FC = () => {
     selectedSlot && 
     selectedResource && 
     !isBooking && 
-    !feeEstimateLoading && // Wait for fee calculation to complete to avoid surprise billing
     (activeTab !== 'simulator' || !isAtDailyLimit)
   );
 
@@ -1060,7 +1055,6 @@ const BookGolf: React.FC = () => {
             <div className={`flex gap-2 p-1 rounded-xl border ${isDark ? 'bg-black/20 border-white/20' : 'bg-black/5 border-black/5'}`}>
               {[1, 2, 3, 4].map(count => (
                 <button
-                  type="button"
                   key={count}
                   onClick={() => { haptic.selection(); setPlayerCount(count); }}
                   aria-pressed={playerCount === count}
@@ -1282,7 +1276,6 @@ const BookGolf: React.FC = () => {
                     
                     return (
                       <button
-                        type="button"
                         key={mins}
                         onClick={() => { haptic.selection(); setDuration(mins); setExpandedHour(null); setHasUserSelectedDuration(true); }}
                         aria-pressed={duration === mins}
@@ -1517,14 +1510,10 @@ const BookGolf: React.FC = () => {
                       style={{ '--stagger-index': groupIndex, animationFillMode: 'both' } as React.CSSProperties}
                     >
                       <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        onClick={() => {
                           haptic.light();
                           setExpandedHour(isExpanded ? null : hourGroup.hour24);
                         }}
-                        onTouchEnd={(e) => e.stopPropagation()}
-                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                         className={`w-full p-4 rounded-xl border text-left transition-all active:scale-[0.99] flex items-center justify-between ${
                           hasSelectedSlot
                             ? 'bg-accent/20 border-accent/50'
@@ -1558,22 +1547,19 @@ const BookGolf: React.FC = () => {
                       }`}>
                         {hourGroup.slots.map((slot, slotIndex) => (
                           <button
-                            type="button"
                             key={slot.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
+                            onClick={() => {
                               haptic.light();
                               setSelectedSlot(slot);
                               setSelectedResource(null);
                             }}
-                            onTouchEnd={(e) => e.stopPropagation()}
                             aria-pressed={selectedSlot?.id === slot.id}
                             className={`p-3 rounded-xl border text-left transition-all active:scale-[0.98] focus:ring-2 focus:ring-accent focus:outline-none ${
                               selectedSlot?.id === slot.id
                               ? 'bg-accent text-[#293515] border-accent shadow-glow'
                               : (isDark ? 'glass-card text-white hover:bg-white/10 border-white/25' : 'bg-white text-primary hover:bg-black/5 border-black/10 shadow-sm')
                             }`}
-                            style={{ '--stagger-index': slotIndex, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' } as React.CSSProperties}
+                            style={{ '--stagger-index': slotIndex } as React.CSSProperties}
                           >
                             <div className="font-bold text-sm">{slot.start}</div>
                             <div className={`text-[10px] font-bold uppercase tracking-wide ${selectedSlot?.id === slot.id ? 'opacity-80' : 'opacity-40'}`}>

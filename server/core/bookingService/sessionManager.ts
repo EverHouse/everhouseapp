@@ -121,10 +121,12 @@ export async function linkParticipants(
       }
       
       // Skip if displayName matches owner (catches name-only duplicates)
-      // CRITICAL: Use strict equality only - loose .includes() matching can wrongly filter
-      // guests like "Johnson" when host is "John", or "Johnathan" when host is "John"
       const participantName = p.displayName?.toLowerCase().trim();
-      if (ownerDisplayName && participantName && participantName === ownerDisplayName) {
+      if (ownerDisplayName && participantName && (
+        participantName === ownerDisplayName ||
+        ownerDisplayName.includes(participantName) ||
+        participantName.includes(ownerDisplayName)
+      )) {
         logger.warn('[linkParticipants] Skipping duplicate owner (by name)', {
           extra: { sessionId, ownerName: ownerDisplayName, duplicateName: participantName }
         });
@@ -167,14 +169,9 @@ export async function recordUsage(
 ): Promise<{ success: boolean; alreadyRecorded?: boolean }> {
   const dbCtx = tx || db;
   try {
-    // Idempotency guard: Check if entry already exists for this session/member/source/fee-type combination
-    // CRITICAL: Allow multiple entries for the same user if they represent different fee types
-    // (e.g., one entry for guest fees, another for usage minutes)
-    const hasGuestFee = input.guestFee && input.guestFee > 0;
-    const hasMinutes = input.minutesCharged && input.minutesCharged > 0;
-    
+    // Idempotency guard: Check if entry already exists for this session/member/source combination
     const existingEntry = await dbCtx
-      .select({ id: usageLedger.id, guestFee: usageLedger.guestFee, minutesCharged: usageLedger.minutesCharged })
+      .select({ id: usageLedger.id })
       .from(usageLedger)
       .where(
         and(
@@ -184,22 +181,12 @@ export async function recordUsage(
             : isNull(usageLedger.memberId),
           eq(usageLedger.source, source)
         )
-      );
+      )
+      .limit(1);
 
-    // Check for true duplicates - same fee type being recorded twice
-    const isDuplicate = existingEntry.some(entry => {
-      const existingHasGuestFee = parseFloat(entry.guestFee || '0') > 0;
-      const existingHasMinutes = (entry.minutesCharged || 0) > 0;
-      
-      // Skip if recording same type of entry (guest fee vs minutes)
-      if (hasGuestFee && existingHasGuestFee) return true;
-      if (hasMinutes && !hasGuestFee && existingHasMinutes && !existingHasGuestFee) return true;
-      return false;
-    });
-
-    if (isDuplicate) {
+    if (existingEntry.length > 0) {
       logger.info(`[UsageLedger] Entry already exists for session ${sessionId}, member ${input.memberId} - skipping duplicate`, {
-        extra: { sessionId, memberId: input.memberId, source, hasGuestFee, hasMinutes }
+        extra: { sessionId, memberId: input.memberId, source }
       });
       return { success: true, alreadyRecorded: true };
     }

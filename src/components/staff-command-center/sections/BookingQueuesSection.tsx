@@ -21,8 +21,6 @@ interface BookingQueuesSectionProps {
   onRosterClick?: (bookingId: number) => void;
   onAssignMember?: (booking: BookingRequest) => void;
   onEditBooking?: (booking: BookingRequest) => void;
-  onManualConfirm?: (request: BookingRequest) => void;
-  onVerifyCalendar?: (request: BookingRequest) => void;
   variant: 'desktop' | 'desktop-top' | 'desktop-bottom' | 'mobile';
 }
 
@@ -40,8 +38,6 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
   onRosterClick,
   onAssignMember,
   onEditBooking,
-  onManualConfirm,
-  onVerifyCalendar,
   variant
 }) => {
   const navigate = useNavigate();
@@ -304,52 +300,13 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
                   </div>
                 )}
                 <div className="flex gap-2 ml-[56px]">
-                  {request.resource_type === 'conference_room' ? (
-                    <>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onManualConfirm?.(request); }}
-                        disabled={isActionLoading(`confirm-${request.id}`)}
-                        className="flex-1 py-1.5 px-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
-                      >
-                        {isActionLoading(`confirm-${request.id}`) ? (
-                          <>
-                            <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-                            Confirming...
-                          </>
-                        ) : (
-                          <>
-                            <span className="material-symbols-outlined text-sm">check_circle</span>
-                            Confirm
-                          </>
-                        )}
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onVerifyCalendar?.(request); }}
-                        disabled={isActionLoading(`verify-${request.id}`)}
-                        className="flex-1 py-1.5 px-3 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs font-medium rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
-                      >
-                        {isActionLoading(`verify-${request.id}`) ? (
-                          <>
-                            <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-                            Checking...
-                          </>
-                        ) : (
-                          <>
-                            <span className="material-symbols-outlined text-sm">event</span>
-                            Check Calendar
-                          </>
-                        )}
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onOpenTrackman(request); }}
-                      className="flex-1 py-1.5 px-3 bg-[#E55A22]/10 text-[#E55A22] dark:bg-[#E55A22]/20 dark:text-[#FF7A44] text-xs font-medium rounded-lg hover:bg-[#E55A22]/20 dark:hover:bg-[#E55A22]/30 transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      <span className="material-symbols-outlined text-sm">sports_golf</span>
-                      Book on Trackman
-                    </button>
-                  )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onOpenTrackman(request); }}
+                    className="flex-1 py-1.5 px-3 bg-[#E55A22]/10 text-[#E55A22] dark:bg-[#E55A22]/20 dark:text-[#FF7A44] text-xs font-medium rounded-lg hover:bg-[#E55A22]/20 dark:hover:bg-[#E55A22]/30 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-sm">sports_golf</span>
+                    Book on Trackman
+                  </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); executeDeny(request); }}
                     disabled={isDenying}

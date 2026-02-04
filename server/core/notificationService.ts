@@ -1,4 +1,4 @@
-import { eq, inArray, and } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import webpush from 'web-push';
 import { db } from '../db';
 import { notifications, staffUsers, pushSubscriptions, users } from '../../shared/schema';
@@ -485,8 +485,6 @@ async function deliverPushToStaff(payload: { title: string; body: string; url?: 
   }
   
   try {
-    // CRITICAL: Only send push notifications to ACTIVE staff members
-    // Check both users.role AND staff_users.isActive to prevent data leaks to deactivated staff
     const staffSubscriptions = await db
       .selectDistinct({
         userEmail: pushSubscriptions.userEmail,
@@ -496,13 +494,7 @@ async function deliverPushToStaff(payload: { title: string; body: string; url?: 
       })
       .from(pushSubscriptions)
       .innerJoin(users, eq(pushSubscriptions.userEmail, users.email))
-      .innerJoin(staffUsers, eq(pushSubscriptions.userEmail, staffUsers.email))
-      .where(
-        and(
-          inArray(users.role, ['admin', 'staff']),
-          eq(staffUsers.isActive, true)
-        )
-      );
+      .where(inArray(users.role, ['admin', 'staff']));
     
     if (staffSubscriptions.length === 0) {
       return {

@@ -871,40 +871,26 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
       }
     }
     
-    // Handle pending payment intents from stripe_payment_intents table
-    // CRITICAL: For late cancellations (within 1 hour), CAPTURE instead of cancel to enforce policy
+    // Cancel pending payment intents from stripe_payment_intents table
     try {
       const pendingIntents = await pool.query(
-        `SELECT stripe_payment_intent_id, status 
+        `SELECT stripe_payment_intent_id 
          FROM stripe_payment_intents 
-         WHERE booking_id = $1 AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation', 'requires_capture')`,
+         WHERE booking_id = $1 AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')`,
         [bookingId]
       );
       if (pendingIntents.rows.length > 0) {
-        const stripe = await getStripeClient();
         for (const row of pendingIntents.rows) {
           try {
-            if (shouldSkipRefund && row.status === 'requires_capture') {
-              // Late cancellation: capture the payment hold to enforce cancellation policy
-              await stripe.paymentIntents.capture(row.stripe_payment_intent_id);
-              console.log(`[Member Cancel] LATE CANCEL - Captured payment intent ${row.stripe_payment_intent_id} for booking ${bookingId} (cancellation fee applied)`);
-              refundSkippedDueToLateCancel = true;
-            } else if (!shouldSkipRefund) {
-              // Normal cancellation: cancel/release the payment hold
-              await cancelPaymentIntent(row.stripe_payment_intent_id);
-              console.log(`[Member Cancel] Cancelled payment intent ${row.stripe_payment_intent_id} for booking ${bookingId}`);
-            } else {
-              // Late cancellation but payment not capturable (requires_payment_method etc.)
-              // These can't be captured, so we log and continue
-              console.log(`[Member Cancel] LATE CANCEL - Payment intent ${row.stripe_payment_intent_id} status is ${row.status}, cannot capture`);
-            }
-          } catch (intentErr: any) {
-            console.error(`[Member Cancel] Failed to handle payment intent ${row.stripe_payment_intent_id}:`, intentErr.message);
+            await cancelPaymentIntent(row.stripe_payment_intent_id);
+            console.log(`[Member Cancel] Cancelled payment intent ${row.stripe_payment_intent_id} for booking ${bookingId}`);
+          } catch (cancelErr: any) {
+            console.error(`[Member Cancel] Failed to cancel payment intent ${row.stripe_payment_intent_id}:`, cancelErr.message);
           }
         }
       }
     } catch (cancelIntentsErr) {
-      console.error('[Member Cancel] Failed to handle pending payment intents (non-blocking):', cancelIntentsErr);
+      console.error('[Member Cancel] Failed to cancel pending payment intents (non-blocking):', cancelIntentsErr);
     }
     
     // Refund participant payments (guest fees paid via Stripe)

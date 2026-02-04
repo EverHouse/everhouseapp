@@ -92,28 +92,9 @@ export async function alertOnLowMatchRate(
 
 export interface IntegrityCheckSummary {
   checkName: string;
-  status: 'pass' | 'warning' | 'fail' | 'error';
+  status: 'pass' | 'warning' | 'fail';
   issueCount: number;
   severity?: 'critical' | 'high' | 'medium' | 'low';
-}
-
-export async function alertOnErroredChecks(
-  checks: IntegrityCheckSummary[]
-): Promise<void> {
-  const erroredChecks = checks.filter(check => check.status === 'error');
-  
-  if (erroredChecks.length === 0) return;
-  
-  const checkNames = erroredChecks.map(c => c.checkName).join(', ');
-  const title = `Data Integrity Check Failures`;
-  const message = `${erroredChecks.length} integrity check(s) failed to run: ${checkNames}. ` +
-    `This may indicate database connectivity issues or code errors. Please investigate.`;
-  
-  if (!isProduction) {
-    console.log(`[DataAlerts] ${erroredChecks.length} integrity check(s) errored: ${checkNames}`);
-  }
-  
-  await notifyAllStaff(title, message, 'system', { url: '/admin/data-integrity' });
 }
 
 export async function alertOnCriticalIntegrityIssues(
@@ -148,7 +129,7 @@ export async function alertOnHighIntegrityIssues(
 ): Promise<void> {
   const highChecks = checks.filter(check => {
     const severity = severityMap[check.checkName] || 'medium';
-    return severity === 'high' && (check.status === 'fail' || check.status === 'error') && check.issueCount >= threshold;
+    return severity === 'high' && check.status === 'fail' && check.issueCount >= threshold;
   });
 
   if (highChecks.length === 0) return;

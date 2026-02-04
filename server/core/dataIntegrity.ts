@@ -20,7 +20,7 @@ import { getHubSpotClient } from './integrations';
 import { isProduction } from './db';
 import { getTodayPacific } from '../utils/dateUtils';
 import { getStripeClient } from './stripe/client';
-import { alertOnCriticalIntegrityIssues, alertOnHighIntegrityIssues, alertOnErroredChecks } from './dataAlerts';
+import { alertOnCriticalIntegrityIssues, alertOnHighIntegrityIssues } from './dataAlerts';
 
 const severityMap: Record<string, 'critical' | 'high' | 'medium' | 'low'> = {
   'HubSpot Sync Status': 'critical',
@@ -110,12 +110,10 @@ export interface IntegrityIssue {
 
 export interface IntegrityCheckResult {
   checkName: string;
-  status: 'pass' | 'warning' | 'fail' | 'error';
+  status: 'pass' | 'warning' | 'fail';
   issueCount: number;
   issues: IntegrityIssue[];
   lastRun: Date;
-  message?: string;
-  severity?: 'low' | 'medium' | 'high' | 'critical';
 }
 
 export interface IntegritySummary {
@@ -127,7 +125,7 @@ export interface IntegritySummary {
   lastRun: Date;
   checks: Array<{
     checkName: string;
-    status: 'pass' | 'warning' | 'fail' | 'error';
+    status: 'pass' | 'warning' | 'fail';
     issueCount: number;
   }>;
 }
@@ -1718,50 +1716,30 @@ async function updateIssueTracking(results: IntegrityCheckResult[]): Promise<voi
 }
 
 export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' = 'manual'): Promise<IntegrityCheckResult[]> {
-  const checkPromises = [
-    { name: 'Orphan Booking Participants', fn: checkOrphanBookingParticipants },
-    { name: 'Empty Booking Sessions', fn: checkEmptyBookingSessions },
-    { name: 'Unmatched Trackman Bookings', fn: checkUnmatchedTrackmanBookings },
-    { name: 'Orphan Wellness Enrollments', fn: checkOrphanWellnessEnrollments },
-    { name: 'Orphan Event RSVPs', fn: checkOrphanEventRsvps },
-    { name: 'Booking Resource Relationships', fn: checkBookingResourceRelationships },
-    { name: 'Participant User Relationships', fn: checkParticipantUserRelationships },
-    { name: 'HubSpot Sync Mismatch', fn: checkHubSpotSyncMismatch },
-    { name: 'Needs Review Items', fn: checkNeedsReviewItems },
-    { name: 'Booking Time Validity', fn: checkBookingTimeValidity },
-    { name: 'Members Without Email', fn: checkMembersWithoutEmail },
-    { name: 'Deals Without Line Items', fn: checkDealsWithoutLineItems },
-    { name: 'Deal Stage Drift', fn: checkDealStageDrift },
-    { name: 'Stripe Subscription Sync', fn: checkStripeSubscriptionSync },
-    { name: 'Stuck Transitional Members', fn: checkStuckTransitionalMembers },
-    { name: 'Tier Reconciliation', fn: checkTierReconciliation },
-    { name: 'Bookings Without Sessions', fn: checkBookingsWithoutSessions },
-    { name: 'Duplicate Stripe Customers', fn: checkDuplicateStripeCustomers },
-    { name: 'MindBody Stale Sync Members', fn: checkMindBodyStaleSyncMembers },
-    { name: 'MindBody Status Mismatch', fn: checkMindBodyStatusMismatch }
-  ];
-
-  const results = await Promise.allSettled(checkPromises.map(c => c.fn()));
+  const checks = await Promise.all([
+    checkOrphanBookingParticipants(),
+    checkEmptyBookingSessions(),
+    checkUnmatchedTrackmanBookings(),
+    checkOrphanWellnessEnrollments(),
+    checkOrphanEventRsvps(),
+    checkBookingResourceRelationships(),
+    checkParticipantUserRelationships(),
+    checkHubSpotSyncMismatch(),
+    checkNeedsReviewItems(),
+    checkBookingTimeValidity(),
+    checkMembersWithoutEmail(),
+    checkDealsWithoutLineItems(),
+    checkDealStageDrift(),
+    checkStripeSubscriptionSync(),
+    checkStuckTransitionalMembers(),
+    checkTierReconciliation(),
+    checkBookingsWithoutSessions(),
+    checkDuplicateStripeCustomers(),
+    checkMindBodyStaleSyncMembers(),
+    checkMindBodyStatusMismatch()
+  ]);
   
   const now = new Date();
-  const checks: IntegrityCheckResult[] = results.map((result, index) => {
-    if (result.status === 'fulfilled') {
-      return result.value;
-    } else {
-      const errorMessage = result.reason instanceof Error ? result.reason.message : String(result.reason);
-      console.error(`[DataIntegrity] Check "${checkPromises[index].name}" failed:`, errorMessage);
-      return {
-        checkName: checkPromises[index].name,
-        status: 'error' as const,
-        message: `Check failed: ${errorMessage}`,
-        issues: [],
-        issueCount: 0,
-        lastRun: now,
-        severity: 'critical' as const
-      };
-    }
-  });
-  
   const activeIgnores = await db.select()
     .from(integrityIgnores)
     .where(and(
@@ -1796,7 +1774,6 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
       status: c.status,
       issueCount: c.issueCount
     }));
-    await alertOnErroredChecks(checkSummaries);
     await alertOnCriticalIntegrityIssues(checkSummaries, severityMap);
     await alertOnHighIntegrityIssues(checkSummaries, severityMap);
   } catch (err) {

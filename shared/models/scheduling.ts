@@ -127,7 +127,6 @@ export const facilityClosures = pgTable("facility_closures", {
   id: serial("id").primaryKey(),
   title: varchar("title").notNull(),
   reason: text("reason"),
-  description: text("description"),
   noticeType: varchar("notice_type"),
   startDate: date("start_date").notNull(),
   startTime: time("start_time"),

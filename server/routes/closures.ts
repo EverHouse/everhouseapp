@@ -571,7 +571,6 @@ router.post('/api/closures', isStaffOrAdmin, async (req, res) => {
     const { 
       title, 
       reason,
-      description,
       notice_type,
       start_date, 
       start_time,
@@ -591,7 +590,6 @@ router.post('/api/closures', isStaffOrAdmin, async (req, res) => {
     const [result] = await db.insert(facilityClosures).values({
       title: title || 'Facility Closure',
       reason,
-      description: description || null,
       noticeType: notice_type || null,
       startDate: start_date,
       startTime: start_time || null,
@@ -633,8 +631,7 @@ router.post('/api/closures', isStaffOrAdmin, async (req, res) => {
         const typePrefix = notice_type ? `[${notice_type.toUpperCase()}]` : `[${defaultType}]`;
         const eventTitle = `${typePrefix}: ${title || 'Facility Notice'}`;
         const baseReason = reason || 'Scheduled notice';
-        // Include description after metadata if provided
-        const eventDescription = baseReason + formatClosureMetadata(affected_areas, !!notify_members) + (description ? `\n\n${description}` : '');
+        const eventDescription = baseReason + formatClosureMetadata(affected_areas, !!notify_members);
         
         internalEventIds = await createClosureCalendarEvents(
           internalCalendarId,
@@ -818,7 +815,6 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
     const { 
       title, 
       reason,
-      description,
       notice_type,
       start_date, 
       start_time,
@@ -853,7 +849,6 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
       .set({
         title: title || existing.title,
         reason: reason !== undefined ? reason : existing.reason,
-        description: description !== undefined ? description : existing.description,
         noticeType: notice_type !== undefined ? notice_type : existing.noticeType,
         startDate: start_date || existing.startDate,
         startTime: normalizedStartTime,
@@ -912,10 +907,9 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
       }
     }
     
-    // Update Internal Calendar event if dates/times/title/description changed
+    // Update Internal Calendar event if dates/times/title changed
     // Only update Internal Calendar - availability blocking is handled by the availability_blocks table
-    const descriptionChanged = description !== undefined && description !== existing.description;
-    const shouldUpdateCalendar = datesChanged || timesChanged || title !== existing.title || reason !== existing.reason || areasChanged || descriptionChanged;
+    const shouldUpdateCalendar = datesChanged || timesChanged || title !== existing.title || reason !== existing.reason || areasChanged;
     if (shouldUpdateCalendar) {
       try {
         const internalCalendarId = await getCalendarIdByName(CALENDAR_CONFIG.internal.name);
@@ -942,9 +936,7 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
           const typePrefix = effectiveNoticeType ? `[${effectiveNoticeType.toUpperCase()}]` : `[${defaultType}]`;
           const eventTitle = `${typePrefix}: ${title || existing.title}`;
           const baseReason = reason !== undefined ? reason : existing.reason || 'Scheduled notice';
-          const effectiveDescription = description !== undefined ? description : existing.description;
-          // Include description after metadata if provided
-          const eventDescription = baseReason + formatClosureMetadata(newAffectedAreas, shouldNotifyMembers) + (effectiveDescription ? `\n\n${effectiveDescription}` : '');
+          const eventDescription = baseReason + formatClosureMetadata(newAffectedAreas, shouldNotifyMembers);
           const newStartDate = start_date || existing.startDate;
           const newEndDate = end_date || existing.endDate;
           const newStartTime = start_time !== undefined ? start_time : existing.startTime;
