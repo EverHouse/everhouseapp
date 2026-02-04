@@ -216,12 +216,20 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
   const handleConfirmAll = async () => {
     if (!context) return;
     
+    // Check if there are anonymous participants with fees - block bulk confirm
+    const hasAnonymousFees = context.participants.some(p => p.isAnonymous && p.totalFee > 0);
+    if (hasAnonymousFees) {
+      showToast('Cannot confirm all payments - some roster slots are unfilled', 'error');
+      return;
+    }
+    
     const previousContext = context;
     
+    // Only mark non-anonymous participants as paid
     setContext({
       ...context,
       participants: context.participants.map(p =>
-        p.paymentStatus === 'pending' && p.totalFee > 0 ? { ...p, paymentStatus: 'paid' } : p
+        p.paymentStatus === 'pending' && p.totalFee > 0 && !p.isAnonymous ? { ...p, paymentStatus: 'paid' } : p
       ),
       totalOutstanding: 0,
       hasUnpaidBalance: false
@@ -446,6 +454,12 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
   const anonymousParticipants = context?.participants.filter(p => p.isAnonymous) || [];
   const hasPendingPayments = unpaidParticipants.length > 0;
   
+  // Calculate chargeable total (excludes anonymous fees that can't be processed)
+  const chargeableTotal = unpaidParticipants.reduce((sum, p) => sum + p.totalFee, 0);
+  
+  // Calculate anonymous fees total (for display warning)
+  const anonymousFees = anonymousParticipants.reduce((sum, p) => sum + p.totalFee, 0);
+  
   const hasUnreviewedWaivers = context?.participants.some(p => p.waiverNeedsReview) || false;
 
   const drawerTitle = context 
@@ -470,16 +484,24 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
         </button>
       ) : (
         <div className="flex flex-col gap-2">
+          {anonymousFees > 0 && (
+            <div className="mb-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+              <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                <span className="material-symbols-outlined text-sm">warning</span>
+                ${anonymousFees.toFixed(2)} in fees pending for {anonymousParticipants.length} unfilled roster slot{anonymousParticipants.length !== 1 ? 's' : ''}. Complete roster to collect.
+              </p>
+            </div>
+          )}
           {hasPendingPayments ? (
             <>
-              {context?.totalOutstanding && context.totalOutstanding > 0 && (
+              {chargeableTotal > 0 && (
                 <button
                   onClick={handleShowStripePayment}
                   disabled={actionInProgress !== null}
                   className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <span className="material-symbols-outlined">credit_card</span>
-                  Pay with Card (${context.totalOutstanding.toFixed(2)})
+                  Pay with Card (${chargeableTotal.toFixed(2)})
                 </button>
               )}
               <button
