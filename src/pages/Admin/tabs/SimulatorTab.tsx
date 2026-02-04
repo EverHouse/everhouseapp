@@ -3238,10 +3238,21 @@ const SimulatorTab: React.FC = () => {
                         <BookingMembersEditor 
                             key={`members-editor-${selectedCalendarBooking.id}-${membersEditorKey}`}
                             bookingId={selectedCalendarBooking.id}
+                            bookingStatus={selectedCalendarBooking.status}
                             onMemberLinked={() => {
                                 handleRefresh();
                             }}
                             onCollectPayment={(bookingId) => setBillingModal({isOpen: true, bookingId})}
+                            onCheckIn={async (bookingId) => {
+                                const booking = selectedCalendarBooking;
+                                if (!booking) return;
+                                await updateBookingStatusOptimistic(booking, 'attended', () => setSelectedCalendarBooking(null));
+                            }}
+                            onNoShow={async (bookingId) => {
+                                const booking = selectedCalendarBooking;
+                                if (!booking) return;
+                                await updateBookingStatusOptimistic(booking, 'no_show', () => setSelectedCalendarBooking(null));
+                            }}
                         />
                     )}
                     
@@ -3311,76 +3322,6 @@ const SimulatorTab: React.FC = () => {
                                 )}
                                 Cancel
                             </button>
-                        {(() => {
-                            if (!selectedCalendarBooking) return null;
-                            const status = selectedCalendarBooking.status;
-                            const bookingId = typeof selectedCalendarBooking.id === 'string' 
-                                ? parseInt(String(selectedCalendarBooking.id).replace('cal_', '')) 
-                                : selectedCalendarBooking.id as number;
-                            
-                            if (status === 'attended') {
-                                return (
-                                    <div className="w-full py-3 px-4 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium flex items-center justify-center gap-2">
-                                        <span aria-hidden="true" className="material-symbols-outlined text-sm">check_circle</span>
-                                        Checked In
-                                    </div>
-                                );
-                            }
-                            
-                            if (status === 'no_show') {
-                                return (
-                                    <div className="w-full py-3 px-4 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-medium flex items-center justify-center gap-2">
-                                        <span aria-hidden="true" className="material-symbols-outlined text-sm">person_off</span>
-                                        No Show
-                                    </div>
-                                );
-                            }
-                            
-                            if (status === 'approved' || status === 'confirmed') {
-                                return (
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={async (e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                const booking = selectedCalendarBooking;
-                                                if (!booking) {
-                                                    showToast('Booking not found', 'error');
-                                                    return;
-                                                }
-                                                console.log('[SimulatorTab] Calendar modal Check In clicked for booking:', booking.id);
-                                                await updateBookingStatusOptimistic(booking, 'attended', () => setSelectedCalendarBooking(null));
-                                            }}
-                                            className="flex-1 py-3 px-4 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium flex items-center justify-center gap-2"
-                                        >
-                                            <span aria-hidden="true" className="material-symbols-outlined text-sm">check_circle</span>
-                                            Check In
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={async (e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                const booking = selectedCalendarBooking;
-                                                if (!booking) {
-                                                    showToast('Booking not found', 'error');
-                                                    return;
-                                                }
-                                                console.log('[SimulatorTab] Calendar modal No Show clicked for booking:', booking.id);
-                                                await updateBookingStatusOptimistic(booking, 'no_show', () => setSelectedCalendarBooking(null));
-                                            }}
-                                            className="flex-1 py-3 px-4 rounded-lg bg-red-500 hover:bg-red-600 text-white font-medium flex items-center justify-center gap-2"
-                                        >
-                                            <span aria-hidden="true" className="material-symbols-outlined text-sm">person_off</span>
-                                            No Show
-                                        </button>
-                                    </div>
-                                );
-                            }
-                            
-                            return null;
-                        })()}
                         <button
                             onClick={() => setSelectedCalendarBooking(null)}
                             className="w-full py-2 px-4 rounded-lg text-gray-500 dark:text-gray-400 text-sm font-medium hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
