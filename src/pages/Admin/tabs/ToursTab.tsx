@@ -1,13 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { usePageReady } from '../../../contexts/PageReadyContext';
 import EmptyState from '../../../components/EmptyState';
 import { formatDateDisplayWithDay, formatTime12Hour } from '../../../utils/dateUtils';
 import { formatPhoneNumber } from '../../../utils/formatting';
 import PullToRefresh from '../../../components/PullToRefresh';
-import ModalShell from '../../../components/ModalShell';
 import { AnimatedPage } from '../../../components/motion';
 import { useTourData, useSyncTours, useCheckInTour, useUpdateTourStatus } from '../../../hooks/queries';
 import { ToursTabSkeleton } from '../../../components/skeletons';
+import { useConfirmDialog } from '../../../components/ConfirmDialog';
 
 interface Tour {
   id: number;
@@ -32,12 +32,9 @@ const ToursTab: React.FC = () => {
   const syncMutation = useSyncTours();
   const checkInMutation = useCheckInTour();
   const updateStatusMutation = useUpdateTourStatus();
+  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
 
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
-  const [checkInModalOpen, setCheckInModalOpen] = useState(false);
-  const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
-  const typeformContainerRef = useRef<HTMLDivElement>(null);
-
   const [statusMenuTourId, setStatusMenuTourId] = useState<number | null>(null);
 
   React.useEffect(() => {
@@ -54,19 +51,21 @@ const ToursTab: React.FC = () => {
     }
   };
 
-  const openCheckIn = (tour: Tour) => {
-    setSelectedTour(tour);
-    setCheckInModalOpen(true);
-  };
-
-  const handleCheckIn = async () => {
-    if (!selectedTour) return;
-    try {
-      await checkInMutation.mutateAsync({ tourId: selectedTour.id });
-      setCheckInModalOpen(false);
-      setSelectedTour(null);
-    } catch (err) {
-      console.error('Check-in failed:', err);
+  const handleCheckIn = async (tour: Tour) => {
+    const confirmed = await confirm({
+      title: 'Check In Guest',
+      message: `Mark ${tour.guestName || 'this guest'} as checked in for their tour?`,
+      confirmText: 'Check In',
+      cancelText: 'Cancel',
+      variant: 'info'
+    });
+    
+    if (confirmed) {
+      try {
+        await checkInMutation.mutateAsync({ tourId: tour.id });
+      } catch (err) {
+        console.error('Check-in failed:', err);
+      }
     }
   };
 
@@ -78,23 +77,6 @@ const ToursTab: React.FC = () => {
       console.error('Status update failed:', err);
     }
   };
-
-  React.useEffect(() => {
-    if (checkInModalOpen && typeformContainerRef.current && selectedTour) {
-      typeformContainerRef.current.innerHTML = '';
-      const script = document.createElement('script');
-      script.src = '//embed.typeform.com/next/embed.js';
-      script.async = true;
-      
-      const formDiv = document.createElement('div');
-      formDiv.setAttribute('data-tf-live', '01KDGXG8YBRCC5S8Z1YZWDBQB8');
-      formDiv.style.width = '100%';
-      formDiv.style.height = '500px';
-      
-      typeformContainerRef.current.appendChild(formDiv);
-      typeformContainerRef.current.appendChild(script);
-    }
-  }, [checkInModalOpen, selectedTour]);
 
   const formatDate = (dateStr: string) => {
     const datePart = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
@@ -158,10 +140,15 @@ const ToursTab: React.FC = () => {
           <div className="flex-shrink-0 relative">
             {isToday && tour.status === 'scheduled' ? (
               <button
-                onClick={() => openCheckIn(tour)}
-                className="px-4 py-2 rounded-full bg-accent text-primary text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1"
+                onClick={() => handleCheckIn(tour)}
+                disabled={checkInMutation.isPending}
+                className="px-4 py-2 rounded-full bg-accent text-primary text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1 disabled:opacity-50"
               >
-                <span aria-hidden="true" className="material-symbols-outlined text-sm">how_to_reg</span>
+                {checkInMutation.isPending ? (
+                  <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                ) : (
+                  <span aria-hidden="true" className="material-symbols-outlined text-sm">how_to_reg</span>
+                )}
                 Check In
               </button>
             ) : (
@@ -282,27 +269,7 @@ const ToursTab: React.FC = () => {
         </div>
       )}
 
-      <ModalShell isOpen={checkInModalOpen && !!selectedTour} onClose={() => setCheckInModalOpen(false)} title={`Check In: ${selectedTour?.guestName || selectedTour?.title || ''}`} showCloseButton={true} size="full">
-        <div className="p-6 space-y-4">
-          <p className="text-sm text-primary/80 dark:text-white/80">Complete the check-in form below</p>
-          <div ref={typeformContainerRef} className="min-h-[500px]"></div>
-          <div className="flex justify-end gap-3 pt-4 border-t border-primary/10 dark:border-white/25">
-            <button
-              onClick={() => setCheckInModalOpen(false)}
-              className="px-4 py-2 rounded-full text-sm font-medium text-primary/70 dark:text-white/70 hover:bg-primary/10 dark:hover:bg-white/10 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleCheckIn}
-              className="px-6 py-2 rounded-full bg-accent text-primary text-sm font-bold hover:opacity-90 transition-opacity flex items-center gap-2"
-            >
-              <span aria-hidden="true" className="material-symbols-outlined text-sm">check_circle</span>
-              Mark as Checked In
-            </button>
-          </div>
-        </div>
-      </ModalShell>
+      <ConfirmDialogComponent />
       </AnimatedPage>
     </PullToRefresh>
   );
