@@ -2860,7 +2860,7 @@ const SimulatorTab: React.FC = () => {
                                 created_at: new Date().toISOString(),
                                 source: 'booking'
                             };
-                            setApprovedBookings(prev => [...prev, newBooking]);
+                            queryClient.invalidateQueries({ queryKey: bookingsKeys.approved(startDate, endDate) });
                         }
                         
                         window.dispatchEvent(new CustomEvent('booking-action-completed'));
@@ -3344,7 +3344,8 @@ const SimulatorTab: React.FC = () => {
                                             console.error('Failed to create cancellation notification:', notifErr);
                                         }
                                         
-                                        setApprovedBookings(prev => prev.filter(b => b.id !== selectedCalendarBooking.id));
+                                        queryClient.invalidateQueries({ queryKey: bookingsKeys.approved(startDate, endDate) });
+                                        queryClient.invalidateQueries({ queryKey: bookingsKeys.allRequests() });
                                         setSelectedCalendarBooking(null);
                                     } catch (err: any) {
                                         console.error('Failed to cancel booking:', err);
