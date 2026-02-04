@@ -1106,12 +1106,8 @@ const SimulatorTab: React.FC = () => {
 
     const updateBookingStatusOptimistic = useCallback(async (
         booking: BookingRequest,
-        newStatus: 'attended' | 'no_show' | 'cancelled',
-        onSuccess?: () => void
+        newStatus: 'attended' | 'no_show' | 'cancelled'
     ): Promise<boolean> => {
-        const bookingId = parseBookingId(booking.id);
-        console.log('[Check-in] updateBookingStatusOptimistic called', { bookingId: booking?.id, parsedId: bookingId, newStatus });
-        
         // Store previous data for rollback
         const previousRequests = queryClient.getQueryData(bookingsKeys.allRequests());
         const previousApproved = queryClient.getQueryData(bookingsKeys.approved(startDate, endDate));
@@ -1129,34 +1125,71 @@ const SimulatorTab: React.FC = () => {
         );
         
         try {
-            // Use the shared check-in hook with parsed booking ID
-            const bookingForApi = { ...booking, id: bookingId };
-            console.log('[Check-in] About to call performCheckIn with:', { bookingForApi, statusArg: newStatus === 'cancelled' ? 'attended' : newStatus });
-            const result = await performCheckIn(bookingForApi, newStatus === 'cancelled' ? 'attended' : newStatus);
-            console.log('[Check-in] performCheckIn returned:', result);
+            const res = await fetch(`/api/bookings/${booking.id}/checkin`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ status: newStatus, source: booking.source })
+            });
             
-            if (result.success) {
-                onSuccess?.();
-                return true;
+            if (res.status === 402) {
+                const errorData = await res.json();
+                // Revert optimistic update
+                queryClient.setQueryData(bookingsKeys.allRequests(), previousRequests);
+                queryClient.setQueryData(bookingsKeys.approved(startDate, endDate), previousApproved);
+                
+                // Open the appropriate modal based on what's needed
+                const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
+                if (errorData.requiresRoster) {
+                    setRosterModal({ isOpen: true, bookingId });
+                } else {
+                    setBillingModal({ isOpen: true, bookingId });
+                }
+                return false;
             }
             
-            // Revert optimistic update on failure
-            queryClient.setQueryData(bookingsKeys.allRequests(), previousRequests);
-            queryClient.setQueryData(bookingsKeys.approved(startDate, endDate), previousApproved);
-            
-            if (result.requiresRoster) {
-                setRosterModal({ isOpen: true, bookingId });
-            } else if (result.requiresBilling) {
-                setBillingModal({ isOpen: true, bookingId });
+            if (res.status === 400) {
+                const errorData = await res.json();
+                // If billing session not generated, allow user to proceed anyway
+                if (errorData.requiresSync) {
+                    // Retry with skipPaymentCheck to bypass the billing session check
+                    const retryRes = await fetch(`/api/bookings/${booking.id}/checkin`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ status: newStatus, skipPaymentCheck: true })
+                    });
+                    
+                    if (retryRes.ok) {
+                        showToast('Checked in (billing session pending)', 'success');
+                        return true;
+                    }
+                }
+                
+                // Revert optimistic update
+                queryClient.setQueryData(bookingsKeys.allRequests(), previousRequests);
+                queryClient.setQueryData(bookingsKeys.approved(startDate, endDate), previousApproved);
+                showToast(errorData.error || 'Failed to update status', 'error');
+                return false;
             }
             
-            return false;
+            if (!res.ok) {
+                const err = await res.json();
+                queryClient.setQueryData(bookingsKeys.allRequests(), previousRequests);
+                queryClient.setQueryData(bookingsKeys.approved(startDate, endDate), previousApproved);
+                showToast(err.error || 'Failed to update status', 'error');
+                return false;
+            }
+            
+            showToast(newStatus === 'attended' ? 'Checked in' : 'Marked as no show', 'success');
+            return true;
         } catch (err: any) {
             queryClient.setQueryData(bookingsKeys.allRequests(), previousRequests);
             queryClient.setQueryData(bookingsKeys.approved(startDate, endDate), previousApproved);
+            showToast('Failed to update status', 'error');
             return false;
         }
-    }, [queryClient, startDate, endDate, performCheckIn, parseBookingId]);
+    }, [queryClient, startDate, endDate, showToast]);
 
     const showCancelConfirmation = useCallback((booking: BookingRequest) => {
         const hasTrackman = !!(booking.trackman_booking_id) || 
@@ -2136,45 +2169,10 @@ const SimulatorTab: React.FC = () => {
                                                                     </button>
                                                                 ) : !isConferenceRoom && isToday ? (
                                                                     <button
-                                                                        type="button"
-                                                                        onClick={async (e) => {
-                                                                            e.preventDefault();
-                                                                            e.stopPropagation();
-                                                                            const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
-                                                                            
-                                                                            // Optimistic update
-                                                                            queryClient.setQueryData(bookingsKeys.allRequests(), (old: any[] | undefined) => 
-                                                                                (old || []).map(r => r.id === booking.id ? { ...r, status: 'attended' } : r)
-                                                                            );
-                                                                            queryClient.setQueryData(bookingsKeys.approved(startDate, endDate), (old: any[] | undefined) => 
-                                                                                (old || []).map(b => b.id === booking.id ? { ...b, status: 'attended' } : b)
-                                                                            );
-                                                                            
-                                                                            try {
-                                                                                const res = await fetch(`/api/bookings/${bookingId}/checkin`, {
-                                                                                    method: 'PUT',
-                                                                                    headers: { 'Content-Type': 'application/json' },
-                                                                                    credentials: 'include',
-                                                                                    body: JSON.stringify({ status: 'attended' })
-                                                                                });
-                                                                                if (res.ok) {
-                                                                                    showToast('Checked in successfully', 'success');
-                                                                                    queryClient.invalidateQueries({ queryKey: bookingsKeys.allRequests() });
-                                                                                    queryClient.invalidateQueries({ queryKey: bookingsKeys.approved(startDate, endDate) });
-                                                                                } else {
-                                                                                    const err = await res.json();
-                                                                                    showToast(err.error || 'Check-in failed', 'error');
-                                                                                    queryClient.invalidateQueries({ queryKey: bookingsKeys.allRequests() });
-                                                                                    queryClient.invalidateQueries({ queryKey: bookingsKeys.approved(startDate, endDate) });
-                                                                                }
-                                                                            } catch (err: any) {
-                                                                                showToast('Check-in failed', 'error');
-                                                                                queryClient.invalidateQueries({ queryKey: bookingsKeys.allRequests() });
-                                                                            }
-                                                                        }}
-                                                                        className="flex-1 py-2.5 bg-green-500 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-green-600 active:scale-95 transition-all duration-200"
+                                                                        onClick={() => updateBookingStatusOptimistic(booking, 'attended')}
+                                                                        className="flex-1 py-2.5 bg-accent text-primary rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 hover:shadow-md active:scale-95 transition-all duration-200"
                                                                     >
-                                                                        <span aria-hidden="true" className="material-symbols-outlined text-lg">check</span>
+                                                                        <span aria-hidden="true" className="material-symbols-outlined text-lg">how_to_reg</span>
                                                                         Check In
                                                                     </button>
                                                                 ) : null}
