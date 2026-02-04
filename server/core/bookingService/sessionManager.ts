@@ -735,10 +735,45 @@ export async function createSessionWithUsageTracking(
               extra: { bookingId: request.bookingId, ownerEmail: request.ownerEmail, passesConverted: passesToConvert }
             });
           } else {
-            throw new Error(
-              `No guest pass holds found for booking ${request.bookingId}. ` +
-              `Expected ${passesNeeded} passes. Transaction rolled back.`
-            );
+            // No holds exist - fall back to direct deduction (handles anonymous guests scenario)
+            // This occurs when declared_player_count > named guests, or holds expired/weren't created
+            logger.info('[createSessionWithUsageTracking] No guest pass holds found, attempting direct deduction', {
+              extra: { bookingId: request.bookingId, ownerEmail: request.ownerEmail, passesNeeded }
+            });
+
+            const passCheck = await tx.execute(sql`
+              SELECT id, passes_total, passes_used FROM guest_passes
+              WHERE LOWER(member_email) = ${emailLower}
+              FOR UPDATE
+            `);
+
+            if (passCheck.rows && passCheck.rows.length > 0) {
+              const { passes_total, passes_used } = passCheck.rows[0] as any;
+              const available = passes_total - passes_used;
+
+              if (available >= passesNeeded) {
+                // Sufficient passes available - deduct directly
+                await tx.execute(sql`
+                  UPDATE guest_passes
+                  SET passes_used = passes_used + ${passesNeeded}
+                  WHERE LOWER(member_email) = ${emailLower}
+                `);
+
+                logger.info('[createSessionWithUsageTracking] Deducted guest passes directly (no holds)', {
+                  extra: { bookingId: request.bookingId, ownerEmail: request.ownerEmail, passesDeducted: passesNeeded }
+                });
+              } else {
+                // Not enough passes - proceed without using passes (guests will be charged fees)
+                logger.warn('[createSessionWithUsageTracking] Insufficient guest passes, proceeding without pass usage', {
+                  extra: { bookingId: request.bookingId, ownerEmail: request.ownerEmail, available, needed: passesNeeded }
+                });
+              }
+            } else {
+              // No guest pass record exists - proceed without using passes
+              logger.warn('[createSessionWithUsageTracking] No guest pass record found, proceeding without pass usage', {
+                extra: { bookingId: request.bookingId, ownerEmail: request.ownerEmail, passesNeeded }
+              });
+            }
           }
         } else {
           // Path 2: Staff/Trackman flow without holds - direct atomic deduction

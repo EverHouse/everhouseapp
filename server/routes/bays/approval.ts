@@ -863,7 +863,7 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
     const newStatus = validStatuses.includes(targetStatus) ? targetStatus : 'attended';
     
     const existingResult = await pool.query(`
-      SELECT br.status, br.user_email, br.session_id
+      SELECT br.status, br.user_email, br.session_id, br.declared_player_count, br.trackman_player_count
       FROM booking_requests br
       WHERE br.id = $1
     `, [bookingId]);
