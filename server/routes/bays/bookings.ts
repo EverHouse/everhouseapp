@@ -522,9 +522,7 @@ router.post('/api/booking-requests', async (req, res) => {
       const minutesPerPlayer = Math.ceil(duration_minutes / totalPlayers);
       
       // Check the HOST's limit against their allocated time, not total session time
-      // CRITICAL FIX: Pass reschedule_booking_id to exclude original booking when rescheduling
-      // Without this, users hit "deadlock" when trying to move bookings (old + new = over limit)
-      const limitCheck = await checkDailyBookingLimit(user_email, request_date, minutesPerPlayer, user_tier, reschedule_booking_id);
+      const limitCheck = await checkDailyBookingLimit(user_email, request_date, minutesPerPlayer, user_tier, undefined);
       if (!limitCheck.allowed) {
         await client.query('ROLLBACK');
         client.release();
