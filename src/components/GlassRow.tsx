@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface Action {
@@ -18,7 +18,7 @@ interface GlassRowProps {
   badge?: React.ReactNode;
 }
 
-const GlassRow: React.FC<GlassRowProps> = ({ title, subtitle, icon, color, actions, staggerIndex, onClick, badge }) => {
+const GlassRow: React.FC<GlassRowProps> = memo(({ title, subtitle, icon, color, actions, staggerIndex, onClick, badge }) => {
    const { effectiveTheme } = useTheme();
    const isDark = effectiveTheme === 'dark';
    
@@ -54,6 +54,6 @@ const GlassRow: React.FC<GlassRowProps> = ({ title, subtitle, icon, color, actio
         )}
      </div>
    );
-};
+});
 
 export default GlassRow;
