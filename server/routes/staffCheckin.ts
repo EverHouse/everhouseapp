@@ -37,7 +37,7 @@ interface ParticipantFee {
   participantId: number;
   displayName: string;
   participantType: 'owner' | 'member' | 'guest';
-  userId: string | null;
+  userId: string | null | undefined;
   paymentStatus: 'pending' | 'paid' | 'waived';
   overageFee: number;
   guestFee: number;
@@ -49,6 +49,7 @@ interface ParticipantFee {
   guestPassUsed?: boolean;
   prepaidOnline?: boolean;
   cachedFeeCents?: number | null;
+  isAnonymous?: boolean; // True for unfilled roster slots that still incur guest fees
 }
 
 interface CheckinContext {
@@ -354,6 +355,32 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
         if (p.payment_status !== 'paid' && p.payment_status !== 'waived') {
           totalOutstanding += totalFee;
         }
+      }
+      
+      // CRITICAL FIX: Include anonymous guest fees that don't have database participants
+      // These are generated when declared_player_count > actual filled roster slots
+      const anonymousGuests = breakdown.participants.filter(p => !p.participantId);
+      for (const anonGuest of anonymousGuests) {
+        const guestFee = anonGuest.guestCents / 100;
+        participants.push({
+          participantId: -(participants.length + 1), // Negative ID indicates virtual/anonymous
+          displayName: anonGuest.displayName,
+          participantType: 'guest',
+          userId: undefined,
+          paymentStatus: 'pending',
+          overageFee: 0,
+          guestFee,
+          totalFee: guestFee,
+          tierAtBooking: null,
+          dailyAllowance: undefined,
+          minutesUsed: undefined,
+          waiverNeedsReview: false,
+          guestPassUsed: anonGuest.guestPassUsed || false,
+          prepaidOnline: false,
+          cachedFeeCents: null,
+          isAnonymous: true // Flag to indicate this is an unfilled roster slot
+        });
+        totalOutstanding += guestFee;
       }
     }
 
