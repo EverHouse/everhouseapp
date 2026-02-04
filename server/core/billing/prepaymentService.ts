@@ -36,11 +36,11 @@ export async function createPrepaymentIntent(
 
   try {
     const existingIntent = await pool.query(
-      `SELECT stripe_payment_intent_id 
+      `SELECT stripe_payment_intent_id, status 
        FROM stripe_payment_intents 
        WHERE session_id = $1 
        AND purpose = 'prepayment' 
-       AND status IN ('pending', 'requires_payment_method', 'requires_action')
+       AND status NOT IN ('canceled', 'cancelled', 'refunded', 'failed')
        LIMIT 1`,
       [sessionId]
     );
