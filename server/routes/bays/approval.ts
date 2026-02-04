@@ -1317,9 +1317,10 @@ router.post('/api/admin/bookings/:id/dev-confirm', isStaffOrAdmin, async (req, r
     let sessionId = booking.session_id;
     let totalFeeCents = 0;
     
-    // Create or find session with exact time matching
+    // Create or find session - first try exact match, then overlapping, then create new
     if (!sessionId && booking.resource_id) {
-      const existingSession = await pool.query(`
+      // First: Check for exact time match
+      const exactSession = await pool.query(`
         SELECT id FROM booking_sessions 
         WHERE resource_id = $1 
           AND session_date = $2 
@@ -1328,17 +1329,33 @@ router.post('/api/admin/bookings/:id/dev-confirm', isStaffOrAdmin, async (req, r
         LIMIT 1
       `, [booking.resource_id, booking.request_date, booking.start_time, booking.end_time]);
       
-      if (existingSession.rows.length > 0) {
-        sessionId = existingSession.rows[0].id;
+      if (exactSession.rows.length > 0) {
+        sessionId = exactSession.rows[0].id;
       } else {
-        const sessionResult = await pool.query(`
-          INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, source, created_by)
-          VALUES ($1, $2, $3, $4, 'staff_manual', 'dev_confirm')
-          RETURNING id
+        // Second: Check for overlapping session (to avoid double-booking trigger)
+        const overlappingSession = await pool.query(`
+          SELECT id FROM booking_sessions 
+          WHERE resource_id = $1 
+            AND session_date = $2 
+            AND start_time < $4 
+            AND end_time > $3
+          LIMIT 1
         `, [booking.resource_id, booking.request_date, booking.start_time, booking.end_time]);
         
-        if (sessionResult.rows.length > 0) {
-          sessionId = sessionResult.rows[0].id;
+        if (overlappingSession.rows.length > 0) {
+          // Use existing overlapping session
+          sessionId = overlappingSession.rows[0].id;
+        } else {
+          // Third: Create new session
+          const sessionResult = await pool.query(`
+            INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, source, created_by)
+            VALUES ($1, $2, $3, $4, 'staff_manual', 'dev_confirm')
+            RETURNING id
+          `, [booking.resource_id, booking.request_date, booking.start_time, booking.end_time]);
+          
+          if (sessionResult.rows.length > 0) {
+            sessionId = sessionResult.rows[0].id;
+          }
         }
       }
       
