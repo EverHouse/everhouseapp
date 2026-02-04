@@ -2170,7 +2170,7 @@ const SimulatorTab: React.FC = () => {
                                                                         <span aria-hidden="true" className="material-symbols-outlined text-lg">payments</span>
                                                                         ${(booking.total_owed || 0).toFixed(0)} Due
                                                                     </button>
-                                                                ) : !isConferenceRoom && ((booking as any).declared_player_count || 1) > ((booking as any).filled_player_count || 0) ? (
+                                                                ) : !isConferenceRoom && (booking as any).declared_player_count > 0 && (booking as any).declared_player_count > ((booking as any).filled_player_count || 0) ? (
                                                                     <button
                                                                         onClick={() => {
                                                                             const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
