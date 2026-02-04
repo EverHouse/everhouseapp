@@ -1031,21 +1031,48 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
           console.error(`[Check-in Auto-Heal] Failed to create session for booking ${bookingId}:`, autoHealErr);
         }
         
-        // Final check - if we still don't have a session, allow check-in but log warning
-        // Without a session, we cannot calculate fees, so staff should review manually if needed
+        // Final check - if we still don't have a session and fees might be owed, BLOCK check-in
         if (!existing.session_id) {
-          const declaredPlayers = existing.declared_player_count || existing.trackman_player_count || 1;
-          
-          // Allow check-in regardless of player count since we can't calculate fees anyway
-          // Log warning so staff can manually review if fees are expected
-          console.warn(`[Check-in] Allowing check-in for booking ${bookingId} without billing session. Players: ${declaredPlayers}. Manual fee review may be required.`);
-          
-          // Update booking with note about missing session
-          await pool.query(`
-            UPDATE booking_requests 
-            SET staff_notes = COALESCE(staff_notes, '') || ' [Check-in without billing session - may need manual fee review]'
-            WHERE id = $1 AND (staff_notes IS NULL OR staff_notes NOT LIKE '%without billing session%')
+          // Check if there's a conflicting session we need to resolve
+          const bookingDetails = await pool.query(`
+            SELECT br.resource_id, br.request_date, br.start_time, br.end_time, br.user_email
+            FROM booking_requests br WHERE br.id = $1
           `, [bookingId]);
+          
+          if (bookingDetails.rows.length > 0) {
+            const bd = bookingDetails.rows[0];
+            
+            // Look for conflicting sessions on same bay/date/time
+            const conflictCheck = await pool.query(`
+              SELECT bs.id, bs.trackman_booking_id, bs.start_time, bs.end_time
+              FROM booking_sessions bs
+              WHERE bs.resource_id = $1 AND bs.session_date = $2
+              AND bs.start_time < $4 AND bs.end_time > $3
+              LIMIT 1
+            `, [bd.resource_id, bd.request_date, bd.start_time, bd.end_time]);
+            
+            if (conflictCheck.rows.length > 0) {
+              const conflict = conflictCheck.rows[0];
+              console.error(`[Check-in] BLOCKED: Booking ${bookingId} has conflicting session ${conflict.id} (Trackman: ${conflict.trackman_booking_id})`);
+              return res.status(409).json({
+                error: 'Conflicting billing session exists',
+                message: `Cannot check in: There's a conflicting billing session (${conflict.start_time}-${conflict.end_time}) on this bay. Please resolve the billing conflict first or contact support.`,
+                conflictingSession: conflict.id
+              });
+            }
+          }
+          
+          // No conflict found but still no session - block if skipPaymentCheck not explicitly set
+          if (!skipPaymentCheck) {
+            console.error(`[Check-in] BLOCKED: Cannot create billing session for booking ${bookingId}. Fees cannot be calculated.`);
+            return res.status(400).json({
+              error: 'Billing session required',
+              message: 'Cannot check in: Unable to create a billing session to calculate fees. Please try refreshing or contact support.'
+            });
+          }
+          
+          // Only allow if explicitly skipping payment check
+          console.warn(`[Check-in] Allowing check-in for booking ${bookingId} without billing session (skipPaymentCheck=true)`);
         }
       }
     }
