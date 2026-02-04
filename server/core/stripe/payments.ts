@@ -26,7 +26,7 @@ export function generatePaymentIdempotencyKey(
   return crypto.createHash('sha256').update(data).digest('hex').substring(0, 32);
 }
 
-export type PaymentPurpose = 'guest_fee' | 'overage_fee' | 'one_time_purchase';
+export type PaymentPurpose = 'guest_fee' | 'overage_fee' | 'one_time_purchase' | 'prepayment';
 
 export interface CreatePaymentIntentParams {
   userId: string;

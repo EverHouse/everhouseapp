@@ -32,6 +32,7 @@ import { sendPushNotificationToStaff } from '../push';
 import { createSessionWithUsageTracking } from '../../core/bookingService/sessionManager';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { logSystemAction } from '../../core/auditLog';
+import { createPrepaymentIntent } from '../../core/billing/prepaymentService';
 
 export async function tryAutoApproveBooking(
   customerEmail: string,
@@ -130,6 +131,24 @@ export async function tryAutoApproveBooking(
                 totalCents: breakdown.totals.totalCents 
               }
             });
+            
+            if (breakdown.totals.totalCents > 0) {
+              try {
+                await createPrepaymentIntent({
+                  sessionId: createdSessionId,
+                  bookingId,
+                  userId: pendingBooking.user_id || null,
+                  userEmail: pendingBooking.user_email,
+                  userName: pendingBooking.user_name || pendingBooking.user_email,
+                  totalFeeCents: breakdown.totals.totalCents,
+                  feeBreakdown: { overageCents: breakdown.totals.overageCents, guestCents: breakdown.totals.guestCents }
+                });
+              } catch (prepayError) {
+                logger.warn('[Trackman Webhook] Failed to create prepayment intent', {
+                  extra: { sessionId: createdSessionId, error: prepayError }
+                });
+              }
+            }
           } catch (feeError) {
             logger.warn('[Trackman Webhook] Failed to calculate fees for auto-approved session', {
               extra: { sessionId: createdSessionId, error: feeError }

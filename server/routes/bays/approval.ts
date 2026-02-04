@@ -21,6 +21,7 @@ import { cancelPaymentIntent, getStripeClient } from '../../core/stripe';
 import { getCalendarNameForBayAsync } from './helpers';
 import { getCalendarIdByName, createCalendarEventOnCalendar, deleteCalendarEvent, CALENDAR_CONFIG } from '../../core/calendar/index';
 import { releaseGuestPassHold } from '../../core/billing/guestPassHoldService';
+import { createPrepaymentIntent } from '../../core/billing/prepaymentService';
 
 const router = Router();
 
@@ -343,17 +344,48 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
           }
         }
         
+        let breakdown: { totals: { totalCents: number; overageCents: number; guestCents: number } } | null = null;
         if (createdSessionId && createdParticipantIds.length > 0) {
           try {
-            const breakdown = await recalculateSessionFees(createdSessionId, 'approval');
+            breakdown = await recalculateSessionFees(createdSessionId, 'approval');
             console.log(`[Booking Approval] Applied unified fees for session ${createdSessionId}: $${(breakdown.totals.totalCents/100).toFixed(2)}, overage: $${(breakdown.totals.overageCents/100).toFixed(2)}`);
+            
+            if (breakdown.totals.totalCents > 0) {
+              try {
+                let ownerUserId = updatedRow.userId;
+                if (!ownerUserId && updatedRow.userEmail) {
+                  const userResult = await tx.select({ id: users.id })
+                    .from(users)
+                    .where(eq(users.email, updatedRow.userEmail.toLowerCase()))
+                    .limit(1);
+                  if (userResult.length > 0) {
+                    ownerUserId = userResult[0].id;
+                  }
+                }
+                
+                await createPrepaymentIntent({
+                  sessionId: createdSessionId,
+                  bookingId: bookingId,
+                  userId: ownerUserId || null,
+                  userEmail: updatedRow.userEmail,
+                  userName: updatedRow.userName || updatedRow.userEmail,
+                  totalFeeCents: breakdown.totals.totalCents,
+                  feeBreakdown: { overageCents: breakdown.totals.overageCents, guestCents: breakdown.totals.guestCents }
+                });
+              } catch (prepayError) {
+                console.error('[Booking Approval] Failed to create prepayment intent:', prepayError);
+              }
+            }
           } catch (feeError) {
             console.error('[Booking Approval] Failed to compute/apply fees:', feeError);
           }
         }
         
         const resourceTypeName = isConferenceRoom ? 'conference room' : 'simulator';
-        const approvalMessage = `Your ${resourceTypeName} booking for ${formatNotificationDateTime(updatedRow.requestDate, updatedRow.startTime)} has been approved.`;
+        const feeMessage = breakdown?.totals?.totalCents && breakdown.totals.totalCents > 0 
+          ? ` Estimated fees: $${(breakdown.totals.totalCents / 100).toFixed(2)}.` 
+          : '';
+        const approvalMessage = `Your ${resourceTypeName} booking for ${formatNotificationDateTime(updatedRow.requestDate, updatedRow.startTime)} has been approved.${feeMessage}`;
         
         await tx.insert(notifications).values({
           userEmail: updatedRow.userEmail,

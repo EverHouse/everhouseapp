@@ -10,6 +10,7 @@ import { recordUsage, createSessionWithUsageTracking } from '../../core/bookingS
 import { getMemberTierByEmail } from '../../core/tierService';
 import { linkAndNotifyParticipants } from '../../core/bookingEvents';
 import { calculateDurationMinutes, NormalizedBookingFields } from './webhook-helpers';
+import { createPrepaymentIntent } from '../../core/billing/prepaymentService';
 
 export async function updateBaySlotCache(
   trackmanBookingId: string,
@@ -261,10 +262,26 @@ export async function createBookingForMember(
               `, [newSessionId, `Guest ${i + 1}`, slotDuration]);
             }
             
-            await recalculateSessionFees(newSessionId);
+            const feeBreakdown = await recalculateSessionFees(newSessionId);
             logger.info('[Trackman Webhook] Created session and participants for linked booking', {
               extra: { bookingId: pendingBookingId, sessionId: newSessionId, playerCount, slotDuration }
             });
+            
+            if (feeBreakdown.totals.totalCents > 0) {
+              try {
+                await createPrepaymentIntent({
+                  sessionId: newSessionId,
+                  bookingId: pendingBookingId,
+                  userId: userId || null,
+                  userEmail: member.email,
+                  userName: memberName,
+                  totalFeeCents: feeBreakdown.totals.totalCents,
+                  feeBreakdown: { overageCents: feeBreakdown.totals.overageCents, guestCents: feeBreakdown.totals.guestCents }
+                });
+              } catch (prepayError) {
+                logger.warn('[Trackman Webhook] Failed to create prepayment intent', { extra: { sessionId: newSessionId, error: prepayError } });
+              }
+            }
           }
         } catch (sessionErr) {
           // Recovery: try to find/link existing session even if INSERT failed
@@ -301,6 +318,22 @@ export async function createBookingForMember(
       });
       
       const bayNameForNotification = `Bay ${resourceId}`;
+      
+      let feeInfo = '';
+      if (sessionCheck.rows[0]?.session_id || newSessionId) {
+        try {
+          const sessionIdToCheck = newSessionId || sessionCheck.rows[0]?.session_id;
+          const participantFees = await pool.query(
+            `SELECT COALESCE(SUM(cached_fee_cents), 0) as total_fees FROM booking_participants WHERE session_id = $1`,
+            [sessionIdToCheck]
+          );
+          const totalFees = participantFees.rows[0]?.total_fees || 0;
+          if (totalFees > 0) {
+            feeInfo = ` Estimated fees: $${(totalFees / 100).toFixed(2)}.`;
+          }
+        } catch (e) {}
+      }
+      
       broadcastToStaff({
         type: 'booking_auto_confirmed',
         title: 'Booking Auto-Confirmed',
@@ -316,13 +349,15 @@ export async function createBookingForMember(
         }
       });
       
+      const confirmMessage = `Your simulator booking for ${slotDate} at ${startTime} (${bayNameForNotification}) has been confirmed.${feeInfo}`;
+      
       await pool.query(
         `INSERT INTO notifications (user_id, title, message, type, link, created_at)
          VALUES ($1, $2, $3, $4, $5, NOW())`,
         [
           member.id,
           'Booking Confirmed',
-          `Your simulator booking for ${slotDate} at ${startTime} (${bayNameForNotification}) has been confirmed.`,
+          confirmMessage,
           'booking',
           '/bookings'
         ]
@@ -331,7 +366,7 @@ export async function createBookingForMember(
       sendNotificationToUser(member.email, {
         type: 'booking_confirmed',
         title: 'Booking Confirmed',
-        message: `Your simulator booking for ${slotDate} at ${startTime} (${bayNameForNotification}) has been confirmed.`,
+        message: confirmMessage,
         data: { bookingId: pendingBookingId },
       });
       
