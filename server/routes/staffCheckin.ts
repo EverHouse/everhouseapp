@@ -484,6 +484,15 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
       if (!participantId) {
         return res.status(400).json({ error: 'participantId required for individual payment action' });
       }
+      
+      // GUARD: Reject actions on anonymous/virtual participants (negative IDs)
+      // These are unfilled roster slots that don't exist in the database
+      if (participantId < 0) {
+        return res.status(400).json({ 
+          error: 'Cannot perform payment actions on unfilled roster slots. Please complete the roster first.',
+          code: 'ANONYMOUS_PARTICIPANT'
+        });
+      }
 
       const newStatus = action === 'confirm' ? 'paid' : 'waived';
       

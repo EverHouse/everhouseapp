@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.25.0",
+    date: "2026-02-04",
+    title: "Anonymous Guest Fee Fix & Queue Button Improvements",
+    changes: [
+      "Fixed: Staff check-in now shows fees for unfilled roster slots (anonymous guests)",
+      "Fixed: When a member declares 4 players but only adds themselves, staff now see the $75 guest fees for the 3 empty slots",
+      "Fixed: Queue action buttons (Check In, Assign Member, etc.) now reliably respond to clicks",
+      "Added: Server-side protection prevents payment actions on unfilled roster slots"
+    ]
+  },
+  {
     version: "69.24.0",
     date: "2026-02-04",
     title: "Booking Details Check-In Button Restored",
