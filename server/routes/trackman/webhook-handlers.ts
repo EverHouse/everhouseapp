@@ -95,6 +95,32 @@ export async function tryAutoApproveBooking(
     
     if (!pendingBooking.session_id && resourceId) {
       try {
+        // CRITICAL FIX: Fetch all participants from booking, not just the owner
+        // Otherwise guests are dropped and their fees are never generated
+        const participantsResult = await pool.query(
+          `SELECT bp.user_id, bp.user_email, bp.display_name, bp.participant_type
+           FROM booking_participants bp
+           WHERE bp.booking_request_id = $1
+           UNION
+           SELECT bm.user_id, bm.user_email, bm.display_name, bm.participant_type
+           FROM booking_members bm
+           WHERE bm.booking_id = $1`,
+          [bookingId]
+        );
+        
+        // Build participants array - if no explicit participants found, use owner as fallback
+        const sessionParticipants = participantsResult.rows.length > 0
+          ? participantsResult.rows.map(row => ({
+              userId: row.user_id || undefined,
+              participantType: row.participant_type || 'guest',
+              displayName: row.display_name || row.user_email || 'Unknown Guest'
+            }))
+          : [{
+              userId: pendingBooking.user_id || undefined,
+              participantType: 'owner' as const,
+              displayName: pendingBooking.user_name || pendingBooking.user_email
+            }];
+        
         const sessionResult = await createSessionWithUsageTracking(
           {
             ownerEmail: pendingBooking.user_email,
@@ -103,11 +129,7 @@ export async function tryAutoApproveBooking(
             startTime: pendingBooking.start_time,
             endTime: pendingBooking.end_time,
             durationMinutes: pendingBooking.duration_minutes || 60,
-            participants: [{
-              userId: pendingBooking.user_id || undefined,
-              participantType: 'owner',
-              displayName: pendingBooking.user_name || pendingBooking.user_email
-            }],
+            participants: sessionParticipants,
             trackmanBookingId: trackmanBookingId
           },
           'trackman_webhook'

@@ -611,6 +611,41 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
     lineItems.push(lineItem);
   }
   
+  // CRITICAL FIX: Generate "Anonymous Guest" fee line items if declared_player_count > actual participants
+  // This closes the "Anonymous Guest" loophole where a user declares 4 players but only fills in 1
+  const anonymousGuestCount = Math.max(0, effectivePlayerCount - participants.length);
+  if (anonymousGuestCount > 0) {
+    logger.info('[FeeBreakdown] Generating fees for anonymous (undeclared) guests', {
+      extra: { declaredPlayerCount, actualParticipants: participants.length, anonymousGuestCount }
+    });
+    
+    for (let i = 0; i < anonymousGuestCount; i++) {
+      const anonymousGuestItem: FeeLineItem = {
+        displayName: `Anonymous Guest ${i + 1}`,
+        participantType: 'guest',
+        minutesAllocated: minutesPerParticipant,
+        overageCents: 0,
+        guestCents: 0,
+        totalCents: 0,
+        guestPassUsed: false
+      };
+      
+      // Apply guest pass or charge guest fee
+      if (guestPassInfo.hasGuestPassBenefit && guestPassesRemaining > 0) {
+        anonymousGuestItem.guestPassUsed = true;
+        guestPassesRemaining--;
+        guestPassesUsed++;
+        anonymousGuestItem.guestCents = 0;
+      } else {
+        anonymousGuestItem.guestCents = PRICING.GUEST_FEE_CENTS;
+        totalGuestCents += PRICING.GUEST_FEE_CENTS;
+      }
+      
+      anonymousGuestItem.totalCents = anonymousGuestItem.guestCents;
+      lineItems.push(anonymousGuestItem);
+    }
+  }
+  
   return {
     totals: {
       totalCents: totalOverageCents + totalGuestCents,

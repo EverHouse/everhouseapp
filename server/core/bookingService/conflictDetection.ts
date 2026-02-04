@@ -91,7 +91,10 @@ export async function findConflictingBookings(
       FROM booking_requests br
       LEFT JOIN resources r ON br.resource_id = r.id
       WHERE LOWER(br.user_email) = LOWER($1)
-        AND br.request_date = $2
+        AND (
+          br.request_date = $2
+          OR (br.request_date = ($2::date - INTERVAL '1 day')::date AND br.end_time < br.start_time)
+        )
         AND br.status IN (${statusPlaceholders})
         ${excludeBookingId ? `AND br.id != $${excludeIdPlaceholder}` : ''}
     `;
@@ -132,7 +135,10 @@ export async function findConflictingBookings(
         JOIN booking_requests br ON br.session_id = bs.id
         LEFT JOIN resources r ON bs.resource_id = r.id
         WHERE bp.user_id = $1
-          AND bs.session_date = $2
+          AND (
+            bs.session_date = $2
+            OR (bs.session_date = ($2::date - INTERVAL '1 day')::date AND bs.end_time < bs.start_time)
+          )
           AND bp.invite_status IN ('pending', 'accepted')
           AND br.status IN (${statusPlaceholders})
           ${excludeBookingId ? `AND br.id != $${excludeIdPlaceholder}` : ''}
@@ -175,7 +181,10 @@ export async function findConflictingBookings(
       JOIN booking_requests br ON bm.booking_id = br.id
       LEFT JOIN resources r ON br.resource_id = r.id
       WHERE LOWER(bm.user_email) = LOWER($1)
-        AND br.request_date = $2
+        AND (
+          br.request_date = $2
+          OR (br.request_date = ($2::date - INTERVAL '1 day')::date AND br.end_time < br.start_time)
+        )
         AND br.status IN (${statusPlaceholders})
         ${excludeBookingId ? `AND br.id != $${excludeIdPlaceholder}` : ''}
     `;

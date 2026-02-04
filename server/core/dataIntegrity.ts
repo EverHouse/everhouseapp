@@ -443,6 +443,12 @@ async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> {
   
   // FIX: Use ORDER BY RANDOM() to ensure all members are eventually checked over time
   // Previously, LIMIT 100 without ordering always checked the same 100 members
+  // Also count total records to inform user this is a sample, not exhaustive check
+  const totalMembersResult = await db.execute(sql`
+    SELECT COUNT(*)::int as count FROM users WHERE hubspot_id IS NOT NULL
+  `);
+  const totalMembersWithHubspot = (totalMembersResult.rows[0] as any)?.count || 0;
+  
   const appMembersResult = await db.execute(sql`
     SELECT id, email, first_name, last_name, membership_tier, hubspot_id
     FROM users 
@@ -451,6 +457,7 @@ async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> {
     LIMIT 100
   `);
   const appMembers = appMembersResult.rows as any[];
+  const sampleSize = appMembers.length;
   
   for (const member of appMembers) {
     if (!member.hubspot_id) continue;
@@ -535,12 +542,24 @@ async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> {
     }
   }
   
+  // CRITICAL FIX: Indicate sampling info so "pass" isn't misinterpreted as "all clean"
+  const isSampled = sampleSize < totalMembersWithHubspot;
+  const samplingNote = isSampled 
+    ? `Checked ${sampleSize} of ${totalMembersWithHubspot} members (random sample)` 
+    : `Checked all ${totalMembersWithHubspot} members`;
+  
   return {
     checkName: 'HubSpot Sync Mismatch',
     status: issues.length === 0 ? 'pass' : issues.some(i => i.severity === 'error') ? 'fail' : 'warning',
     issueCount: issues.length,
     issues,
-    lastRun: new Date()
+    lastRun: new Date(),
+    metadata: {
+      samplingNote,
+      totalRecords: totalMembersWithHubspot,
+      checkedRecords: sampleSize,
+      isSampled
+    }
   };
 }
 

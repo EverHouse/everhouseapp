@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.12.0",
+    date: "2026-02-04",
+    title: "Anonymous Guest Fees, Auto-Approve & Conflict Detection Fixes",
+    changes: [
+      "Fixed: Anonymous guest fees now charged when declared player count exceeds identified participants (closes revenue loophole)",
+      "Fixed: Auto-approve via Trackman now copies all guests from booking to session (guest fees properly generated)",
+      "Fixed: Staff invite payment now immediately invalidates cache (member sees active status without delay)",
+      "Fixed: Conflict detection now catches cross-midnight bookings from the previous day",
+      "Improved: Data integrity checks now show sampling info (e.g., 'Checked 100 of 500 members')"
+    ]
+  },
+  {
     version: "69.11.0",
     date: "2026-02-04",
     title: "Booking Visibility, Tier Sync & Pass Protection Fixes",

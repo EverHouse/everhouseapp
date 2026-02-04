@@ -1566,6 +1566,10 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: any):
           [customerId, email]
         );
         
+        // CRITICAL FIX: Invalidate cache so user sees updated status immediately after payment
+        MemberService.invalidateCache(email);
+        console.log(`[Stripe Webhook] Cache invalidated for ${email} after staff invite payment`);
+        
         // Sync to HubSpot for existing user update
         try {
           const { syncMemberToHubSpot } = await import('../hubspot/stages');
@@ -1603,6 +1607,10 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: any):
         );
         
         console.log(`[Stripe Webhook] Created user ${email} with tier ${tierSlug || 'none'}`);
+        
+        // CRITICAL FIX: Invalidate cache so user sees updated status immediately after payment
+        MemberService.invalidateCache(email);
+        console.log(`[Stripe Webhook] Cache invalidated for ${email} after staff invite payment`);
       }
       
       // Sync to HubSpot with proper tier name and billing provider
