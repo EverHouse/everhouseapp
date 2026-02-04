@@ -13,13 +13,14 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "69.19.0",
+    version: "69.20.0",
     date: "2026-02-04",
-    title: "Anti-Spam Booking Limit",
+    title: "Reschedule Feature Removal & Anti-Spam",
     changes: [
+      "Removed: Staff reschedule functionality - all booking changes now done via cancel + create new",
       "Added: Members limited to 1 pending booking request per resource type (simulator or conference room)",
       "Added: Staff bypass this limit when creating bookings on behalf of members",
-      "UX: Clear error message guides members to wait for staff review before making additional requests"
+      "Cleanup: Removed unused reschedule code from booking endpoints"
     ]
   },
   {
