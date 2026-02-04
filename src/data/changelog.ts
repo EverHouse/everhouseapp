@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.4.1",
+    date: "2026-02-04",
+    title: "Critical: Session Duration & Fee Calculation Fix",
+    isMajor: true,
+    changes: [
+      "Fixed: Booking sessions now use EXACT time matching instead of overlap matching - prevents reusing sessions with wrong duration",
+      "Fixed: Simulate confirmation now creates sessions with correct duration matching the booking request",
+      "Fixed: Participant slot_duration now properly reflects actual booking length (was incorrectly hard-coded to 60 minutes)",
+      "Fixed: Fee calculations now see the correct session duration for accurate overage charges",
+      "Fixed: Corporate member 180-minute bookings now correctly show overage fees beyond 90-minute allowance",
+      "Previously: 3-hour bookings could be linked to existing 90-minute sessions, causing $0 fee when fees should apply"
+    ]
+  },
+  {
     version: "69.4.0",
     date: "2026-02-04",
     title: "Staff Can Charge Member's Card on File",

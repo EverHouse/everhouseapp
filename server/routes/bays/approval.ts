@@ -996,19 +996,27 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
     // Auto-fix: If session is missing, create it now so check-in can proceed
     if (newStatus === 'attended' && !existing.session_id && existing.resource_id) {
       try {
-        // 1. Check for existing overlapping session (Trackman or other source)
+        // Calculate booking duration from times
+        const bookingDuration = Math.round(
+          (new Date(`2000-01-01T${existing.end_time}`).getTime() - 
+           new Date(`2000-01-01T${existing.start_time}`).getTime()) / 60000
+        );
+        
+        // 1. Check for existing session with EXACT matching times (not just overlap)
+        // This prevents reusing sessions with different durations
         const existingSession = await pool.query(`
           SELECT id FROM booking_sessions 
           WHERE resource_id = $1 
             AND session_date = $2 
-            AND tsrange((session_date + start_time)::timestamp, (session_date + end_time)::timestamp, '[)') && 
-                tsrange(($2::date + $3::time)::timestamp, ($2::date + $4::time)::timestamp, '[)')
+            AND start_time = $3 
+            AND end_time = $4
           LIMIT 1
         `, [existing.resource_id, existing.request_date, existing.start_time, existing.end_time]);
 
         let newSessionId: number;
         if (existingSession.rows.length > 0) {
           newSessionId = existingSession.rows[0].id;
+          console.log(`[Checkin] Using existing session ${newSessionId} with exact times for booking ${bookingId}`);
         } else {
           // 2. Create new session with valid source enum
           const sessionResult = await pool.query(`
@@ -1033,15 +1041,16 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
           `, [newSessionId]);
           
           if (existingOwner.rows.length === 0) {
+            // Use actual booking duration for slot_duration, not hard-coded 60
             await pool.query(`
               INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
               VALUES ($1, $2, 'owner', $3, 'pending', $4)
-            `, [newSessionId, userId, existing.user_name || 'Member', 60]);
+            `, [newSessionId, userId, existing.user_name || 'Member', bookingDuration]);
           }
 
           // 5. Calculate Fees
           await recalculateSessionFees(newSessionId, 'checkin_auto');
-          console.log(`[Checkin] Auto-created session ${newSessionId} for booking ${bookingId}`);
+          console.log(`[Checkin] Auto-created session ${newSessionId} for booking ${bookingId} (${bookingDuration} min)`);
         }
       } catch (err) {
         console.error('[Checkin] Failed to auto-create session:', err);

@@ -1145,19 +1145,20 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
     let sessionId = booking.session_id;
     if (!sessionId && booking.resource_id) {
       try {
-        // First check for existing session that overlaps with this booking's time
+        // Check for existing session with EXACT matching times (not just overlap)
+        // This prevents reusing sessions with different durations
         const existingSession = await pool.query(`
           SELECT id FROM booking_sessions 
           WHERE resource_id = $1 
             AND session_date = $2 
-            AND start_time < $4 
-            AND end_time > $3
+            AND start_time = $3 
+            AND end_time = $4
           LIMIT 1
         `, [booking.resource_id, booking.request_date, booking.start_time, booking.end_time]);
         
         if (existingSession.rows.length > 0) {
           sessionId = existingSession.rows[0].id;
-          logger.info('[Simulate Confirm] Using existing session', { bookingId, sessionId });
+          logger.info('[Simulate Confirm] Using existing session with exact times', { bookingId, sessionId });
         } else {
           const sessionResult = await pool.query(`
             INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
@@ -1172,33 +1173,49 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
         
         if (sessionId) {
           const isNewSession = !existingSession.rows.length;
+          const playerCount = booking.declared_player_count || 1;
+          const sessionDuration = Math.round(
+            (new Date(`2000-01-01T${booking.end_time}`).getTime() - 
+             new Date(`2000-01-01T${booking.start_time}`).getTime()) / 60000
+          );
           
-          if (isNewSession) {
-            const playerCount = booking.declared_player_count || 1;
-            
-            const userResult = await pool.query(
-              `SELECT id FROM users WHERE LOWER(email) = LOWER($1)`,
-              [booking.user_email]
-            );
-            const userId = userResult.rows[0]?.id || null;
-            
+          // Get user ID for owner
+          const userResult = await pool.query(
+            `SELECT id FROM users WHERE LOWER(email) = LOWER($1)`,
+            [booking.user_email]
+          );
+          const userId = userResult.rows[0]?.id || null;
+          
+          // Check if owner participant already exists for this session
+          const existingOwner = await pool.query(`
+            SELECT id FROM booking_participants 
+            WHERE session_id = $1 AND (participant_type = 'owner' OR user_id = $2)
+          `, [sessionId, userId]);
+          
+          if (existingOwner.rows.length === 0) {
+            // Create owner with proper slot_duration
             await pool.query(`
-              INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
-              VALUES ($1, $2, 'owner', $3, 'pending')
-            `, [sessionId, userId, booking.user_name || 'Member']);
+              INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+              VALUES ($1, $2, 'owner', $3, 'pending', $4)
+            `, [sessionId, userId, booking.user_name || 'Member', sessionDuration]);
             
+            // Create guest participants
             for (let i = 1; i < playerCount; i++) {
               await pool.query(`
-                INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
-                VALUES ($1, NULL, 'guest', $2, 'pending')
-              `, [sessionId, `Guest ${i + 1}`]);
+                INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+                VALUES ($1, NULL, 'guest', $2, 'pending', $3)
+              `, [sessionId, `Guest ${i + 1}`, sessionDuration]);
             }
             
-            logger.info('[Simulate Confirm] Created session and participants', {
+            logger.info('[Simulate Confirm] Created participants', {
               bookingId,
               sessionId,
-              playerCount
+              playerCount,
+              sessionDuration,
+              isNewSession
             });
+          } else {
+            logger.info('[Simulate Confirm] Owner participant already exists', { bookingId, sessionId });
           }
           
           // Always recalculate fees whether new or existing session
