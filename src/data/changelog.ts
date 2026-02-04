@@ -13,18 +13,6 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "69.9.0",
-    date: "2026-02-04",
-    title: "Booking & Billing Accuracy Fixes",
-    changes: [
-      "Fixed: Same-user split billing loophole - overage fees now calculated correctly when same user appears in multiple slots",
-      "Fixed: Pre-paid session packs no longer count against daily minutes (prevents double-billing)",
-      "Fixed: Group bookings now correctly calculate per-player minutes when checking daily limits",
-      "Fixed: Trackman webhook now adopts existing unmatched bookings instead of creating duplicates",
-      "Improved: Clearer error messages show per-player allocation for group bookings"
-    ]
-  },
-  {
     version: "69.8.0",
     date: "2026-02-04",
     title: "Billing, Security & Data Integrity Fixes",

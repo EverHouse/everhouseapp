@@ -1153,69 +1153,6 @@ export async function handleBookingUpdate(payload: TrackmanWebhookPayload): Prom
       return { success: true, matchedBookingId };
     }
     
-    // CRITICAL: Check if an unmatched booking already exists with this trackman_booking_id
-    // If so, adopt it instead of creating a new one (prevents unique constraint crash)
-    const existingUnmatchedResult = await pool.query(
-      `SELECT br.id, br.user_email, br.is_unmatched 
-       FROM booking_requests br 
-       WHERE br.trackman_booking_id = $1 
-       LIMIT 1`,
-      [normalized.trackmanBookingId]
-    );
-    
-    if (existingUnmatchedResult.rows.length > 0) {
-      const existingBooking = existingUnmatchedResult.rows[0];
-      
-      // Adopt the existing booking by updating it with the member's info
-      if (existingBooking.is_unmatched || !existingBooking.user_email) {
-        logger.info('[Trackman Webhook] Adopting existing unmatched booking for identified member', {
-          extra: { 
-            bookingId: existingBooking.id, 
-            oldEmail: existingBooking.user_email,
-            newEmail: member.email,
-            trackmanBookingId: normalized.trackmanBookingId
-          }
-        });
-        
-        await pool.query(
-          `UPDATE booking_requests 
-           SET user_email = $1, user_id = $2, is_unmatched = false, updated_at = NOW()
-           WHERE id = $3`,
-          [member.email, member.id, existingBooking.id]
-        );
-        
-        matchedBookingId = existingBooking.id;
-        
-        const memberName = [member.firstName, member.lastName].filter(Boolean).join(' ') || member.email;
-        
-        await notifyMemberBookingConfirmed(
-          member.email,
-          existingBooking.id,
-          startParsed.date,
-          startParsed.time,
-          normalized.bayName
-        );
-        
-        await notifyStaffBookingCreated(
-          'auto_adopted',
-          memberName,
-          member.email,
-          startParsed.date,
-          startParsed.time,
-          normalized.bayName,
-          existingBooking.id
-        );
-        
-        return { success: true, matchedBookingId };
-      } else {
-        // Booking already linked to someone else - just return success
-        logger.info('[Trackman Webhook] Booking already linked to member', {
-          extra: { bookingId: existingBooking.id, linkedEmail: existingBooking.user_email }
-        });
-        return { success: true, matchedBookingId: existingBooking.id };
-      }
-    }
-    
     const createResult = await createBookingForMember(
       member,
       normalized.trackmanBookingId,

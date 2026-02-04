@@ -352,8 +352,7 @@ async function createBookingSessionForAutoMatch(
   booking: UnmatchedBookingDetails,
   userId: number,
   email: string,
-  displayName: string,
-  options?: { skipUsageTracking?: boolean; paymentMethod?: 'prepaid' | 'included' }
+  displayName: string
 ): Promise<number | null> {
   const client = await pool.connect();
   try {
@@ -401,34 +400,28 @@ async function createBookingSessionForAutoMatch(
     
     // Check if user is an active member and record initial usage
     // Note: Actual fees will be calculated at check-in based on daily usage
-    // CRITICAL: Skip usage tracking for purchase-matched sessions to prevent double-billing
     const memberTier = await getMemberTierByEmail(email);
-    const shouldSkipUsage = options?.skipUsageTracking === true;
-    const paymentMethod = options?.paymentMethod || (shouldSkipUsage ? 'prepaid' : 'included');
     
     if (memberTier) {
       // Member: record usage with tier - fees calculated at check-in based on daily allowance
-      // If skipUsageTracking is true, record 0 minutes (purchase already paid for session)
       await recordUsage(sessionId, {
         memberId: userId,
-        minutesCharged: shouldSkipUsage ? 0 : booking.durationMinutes,
+        minutesCharged: booking.durationMinutes,
         overageFee: 0, // Initial - actual overage calculated at check-in
         guestFee: 0,
-        tierAtBooking: memberTier,
-        paymentMethod
+        tierAtBooking: memberTier
       }, 'trackman');
-      console.log(`[AutoMatch] Created session ${sessionId} for member ${email} (${memberTier})${shouldSkipUsage ? ' [prepaid - no minutes deducted]' : ''}`);
+      console.log(`[AutoMatch] Created session ${sessionId} for member ${email} (${memberTier})`);
     } else {
       // Non-member (visitor): record usage without tier - visitor fees apply at check-in
       await recordUsage(sessionId, {
         memberId: userId,
-        minutesCharged: shouldSkipUsage ? 0 : booking.durationMinutes,
+        minutesCharged: booking.durationMinutes,
         overageFee: 0,
         guestFee: 0,
-        tierAtBooking: undefined,
-        paymentMethod
+        tierAtBooking: undefined
       }, 'trackman');
-      console.log(`[AutoMatch] Created session ${sessionId} for visitor ${email}${shouldSkipUsage ? ' [prepaid - no minutes deducted]' : ''}`);
+      console.log(`[AutoMatch] Created session ${sessionId} for visitor ${email}`);
     }
     
     await client.query('COMMIT');
@@ -463,15 +456,9 @@ export async function autoMatchSingleBooking(
     const parsed = parseBookingNotes(notes);
     
     // Helper to create session for future bookings
-    // Options allow skipping usage tracking for purchase-matched sessions (to prevent double-billing)
-    const maybeCreateSession = async (
-      userId: number, 
-      email: string, 
-      displayName: string,
-      options?: { skipUsageTracking?: boolean; paymentMethod?: 'prepaid' | 'included' }
-    ): Promise<number | null> => {
+    const maybeCreateSession = async (userId: number, email: string, displayName: string): Promise<number | null> => {
       if (!isFuture || !bookingDetails) return null;
-      return createBookingSessionForAutoMatch(bookingDetails, userId, email, displayName, options);
+      return createBookingSessionForAutoMatch(bookingDetails, userId, email, displayName);
     };
     
     // Try email from notes first
@@ -510,12 +497,7 @@ export async function autoMatchSingleBooking(
       }
       
       // For future bookings, create session first so we can link purchase correctly
-      // CRITICAL: When matching to a purchase, don't create session with usage tracking
-      // The purchase itself IS the payment - we should NOT also deduct daily minutes
-      const sessionId = await maybeCreateSession(userId, purchaseMatch.email, displayName, {
-        skipUsageTracking: true,  // Purchase-matched sessions should NOT record minutes
-        paymentMethod: 'prepaid'  // Mark as prepaid to prevent double-billing
-      });
+      const sessionId = await maybeCreateSession(userId, purchaseMatch.email, displayName);
       
       await resolveBookingWithUser(bookingId, userId, purchaseMatch.email, staffEmail, sessionId);
       

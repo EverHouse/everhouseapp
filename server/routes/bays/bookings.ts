@@ -455,19 +455,12 @@ router.post('/api/booking-requests', async (req, res) => {
         }
       }
       
-      // CRITICAL: For group bookings, calculate per-player minutes before checking limit
-      // A 2-hour foursome uses only 30 minutes per player, not 120 minutes
-      const participantCount = request_participants?.length || 0;
-      const totalPlayers = 1 + participantCount; // host + guests
-      const minutesPerPlayer = Math.ceil(duration_minutes / totalPlayers);
-      
-      // Check the HOST's limit against their allocated time, not total session time
-      const limitCheck = await checkDailyBookingLimit(user_email, request_date, minutesPerPlayer, user_tier);
+      const limitCheck = await checkDailyBookingLimit(user_email, request_date, duration_minutes, user_tier);
       if (!limitCheck.allowed) {
         await client.query('ROLLBACK');
         client.release();
         return res.status(403).json({ 
-          error: `${limitCheck.reason} (Your share: ${minutesPerPlayer} minutes of ${duration_minutes} minute session)`,
+          error: limitCheck.reason,
           remainingMinutes: limitCheck.remainingMinutes
         });
       }
