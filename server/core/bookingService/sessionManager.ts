@@ -865,7 +865,7 @@ export async function ensureBookingSession(
     const sessionResult = await pool.query(`
       INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, source, created_by)
       VALUES ($1, $2, $3, $4, 'staff_manual', $5)
-      ON CONFLICT DO NOTHING
+      ON CONFLICT (resource_id, session_date, start_time, end_time) DO NOTHING
       RETURNING id
     `, [bd.resource_id, bd.request_date, bd.start_time, bd.end_time, source]);
 

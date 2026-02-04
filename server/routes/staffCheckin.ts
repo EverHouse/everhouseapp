@@ -13,6 +13,7 @@ import { consumeGuestPassForParticipant, canUseGuestPass } from '../core/billing
 import { logFromRequest } from '../core/auditLog';
 import { enforceSocialTierRules, type ParticipantForValidation } from '../core/bookingService/tierRules';
 import { broadcastMemberStatsUpdated } from '../core/websocket';
+import { ensureBookingSession } from '../core/bookingService/sessionManager';
 
 const router = Router();
 
@@ -116,80 +117,14 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
     const participants: ParticipantFee[] = [];
     let totalOutstanding = 0;
     
-    // If booking has no session, try to create one on-the-fly for fee calculation
     let sessionId = booking.session_id;
     if (!sessionId && booking.resource_id) {
-      try {
-        // Get booking details for session creation
-        const bookingDetails = await pool.query(`
-          SELECT resource_id, request_date, start_time, end_time, declared_player_count, user_email, user_name
-          FROM booking_requests WHERE id = $1
-        `, [bookingId]);
-        
-        if (bookingDetails.rows.length > 0) {
-          const bd = bookingDetails.rows[0];
-          
-          // Create session without trackman_booking_id (to avoid conflicts)
-          const sessionResult = await pool.query(`
-            INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, source, created_by)
-            VALUES ($1, $2, $3, $4, 'staff_manual', 'checkin_context')
-            ON CONFLICT DO NOTHING
-            RETURNING id
-          `, [bd.resource_id, bd.request_date, bd.start_time, bd.end_time]);
-          
-          if (sessionResult.rows.length > 0) {
-            sessionId = sessionResult.rows[0].id;
-            
-            // Update booking with session_id
-            await pool.query(`UPDATE booking_requests SET session_id = $1 WHERE id = $2`, [sessionId, bookingId]);
-            
-            // Create owner participant (with conflict handling to prevent duplicates)
-            const userResult = await pool.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1)`, [bd.user_email]);
-            const userId = userResult.rows[0]?.id || null;
-            
-            // Create owner participant - check first then insert to prevent duplicates
-            // Race condition is mitigated because session creation above uses ON CONFLICT DO NOTHING,
-            // meaning only one request can successfully create a session and reach this code
-            const existingOwner = await pool.query(`
-              SELECT id FROM booking_participants 
-              WHERE session_id = $1 AND participant_type = 'owner'
-              LIMIT 1
-            `, [sessionId]);
-            
-            if (existingOwner.rows.length === 0) {
-              await pool.query(`
-                INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
-                VALUES ($1, $2, 'owner', $3, 'pending')
-              `, [sessionId, userId, bd.user_name || 'Member']);
-            }
-            
-            // Create guest participants with duplicate prevention
-            // Get current count to determine how many guests to create
-            const playerCount = bd.declared_player_count || 1;
-            const existingGuests = await pool.query(`
-              SELECT COUNT(*) as count FROM booking_participants 
-              WHERE session_id = $1 AND participant_type = 'guest'
-            `, [sessionId]);
-            const existingGuestCount = parseInt(existingGuests.rows[0]?.count || '0');
-            
-            // Only create guests if we don't already have them
-            if (existingGuestCount < playerCount - 1) {
-              for (let i = existingGuestCount + 1; i < playerCount; i++) {
-                await pool.query(`
-                  INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
-                  VALUES ($1, NULL, 'guest', $2, 'pending')
-                `, [sessionId, `Guest ${i + 1}`]);
-              }
-            }
-            
-            // Calculate and cache fees
-            await recalculateSessionFees(sessionId);
-            
-            console.log(`[Checkin Context] Created session ${sessionId} for booking ${bookingId}`);
-          }
-        }
-      } catch (sessionError: any) {
-        console.warn(`[Checkin Context] Failed to create session for booking ${bookingId}:`, sessionError.message);
+      const sessionResult = await ensureBookingSession(bookingId, 'checkin_context');
+      if (sessionResult.sessionId) {
+        sessionId = sessionResult.sessionId;
+        console.log(`[Checkin Context] ${sessionResult.created ? 'Created' : 'Found'} session ${sessionId} for booking ${bookingId}`);
+      } else {
+        console.warn(`[Checkin Context] Failed to create session for booking ${bookingId}: ${sessionResult.error}`);
       }
     }
 
