@@ -1995,6 +1995,12 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
         
         // Create booking_participants and cache fees
         try {
+          // Calculate slot duration from booking times
+          const slotDuration = booking.startTime && booking.endTime
+            ? Math.round((new Date(`2000-01-01T${booking.endTime}`).getTime() - 
+                         new Date(`2000-01-01T${booking.startTime}`).getTime()) / 60000)
+            : booking.durationMinutes || 60;
+          
           const userResult = await pool.query(
             `SELECT id FROM users WHERE LOWER(email) = LOWER($1)`,
             [booking.userEmail]
@@ -2002,16 +2008,16 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
           const userId = userResult.rows[0]?.id || null;
           
           await pool.query(`
-            INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
-            VALUES ($1, $2, 'owner', $3, 'pending')
+            INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+            VALUES ($1, $2, 'owner', $3, 'pending', $4)
             ON CONFLICT (session_id, user_id) WHERE user_id IS NOT NULL DO NOTHING
-          `, [sessionId, userId, booking.userName || booking.userEmail]);
+          `, [sessionId, userId, booking.userName || booking.userEmail, slotDuration]);
           
           for (let i = 1; i < booking.playerCount; i++) {
             await pool.query(`
-              INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
-              VALUES ($1, NULL, 'guest', $2, 'pending')
-            `, [sessionId, `Guest ${i + 1}`]);
+              INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+              VALUES ($1, NULL, 'guest', $2, 'pending', $3)
+            `, [sessionId, `Guest ${i + 1}`, slotDuration]);
           }
           
           await recalculateSessionFees(sessionId);

@@ -390,13 +390,20 @@ async function createBookingSessionForAutoMatch(
     
     const sessionId = sessionResult.rows[0].id;
     
+    // Calculate slot duration from booking times
+    const slotDuration = booking.durationMinutes || 
+      (booking.startTime && booking.endTime
+        ? Math.round((new Date(`2000-01-01T${booking.endTime}`).getTime() - 
+                     new Date(`2000-01-01T${booking.startTime}`).getTime()) / 60000)
+        : 60);
+    
     // Add participant as owner
     await client.query(`
-      INSERT INTO booking_participants (session_id, user_id, display_name, participant_type)
-      VALUES ($1, $2, $3, 'owner')
+      INSERT INTO booking_participants (session_id, user_id, display_name, participant_type, slot_duration)
+      VALUES ($1, $2, $3, 'owner', $4)
       ON CONFLICT (session_id, participant_type) WHERE participant_type = 'owner'
-      DO UPDATE SET user_id = EXCLUDED.user_id, display_name = EXCLUDED.display_name
-    `, [sessionId, userId, displayName]);
+      DO UPDATE SET user_id = EXCLUDED.user_id, display_name = EXCLUDED.display_name, slot_duration = EXCLUDED.slot_duration
+    `, [sessionId, userId, displayName, slotDuration]);
     
     // Check if user is an active member and record initial usage
     // Note: Actual fees will be calculated at check-in based on daily usage
@@ -962,13 +969,20 @@ async function autoMatchBookingRequests(
           if (sessionResult.rows.length > 0) {
             sessionId = sessionResult.rows[0].id;
             
+            // Calculate slot duration
+            const slotDuration = row.duration_minutes || 
+              (row.start_time && row.end_time
+                ? Math.round((new Date(`2000-01-01T${row.end_time}`).getTime() - 
+                             new Date(`2000-01-01T${row.start_time}`).getTime()) / 60000)
+                : 60);
+            
             // Add participant
             await pool.query(`
-              INSERT INTO booking_participants (session_id, user_id, display_name, participant_type)
-              VALUES ($1, $2, $3, 'owner')
+              INSERT INTO booking_participants (session_id, user_id, display_name, participant_type, slot_duration)
+              VALUES ($1, $2, $3, 'owner', $4)
               ON CONFLICT (session_id, participant_type) WHERE participant_type = 'owner'
-              DO UPDATE SET user_id = EXCLUDED.user_id, display_name = EXCLUDED.display_name
-            `, [sessionId, visitor.id, userName]);
+              DO UPDATE SET user_id = EXCLUDED.user_id, display_name = EXCLUDED.display_name, slot_duration = EXCLUDED.slot_duration
+            `, [sessionId, visitor.id, userName, slotDuration]);
             
             // Record usage for visitor
             await recordUsage(sessionId, {

@@ -235,6 +235,12 @@ export async function createBookingForMember(
           if (newSessionId) {
             await pool.query(`UPDATE booking_requests SET session_id = $1 WHERE id = $2`, [newSessionId, pendingBookingId]);
             
+            // Calculate slot duration from Trackman times
+            const slotDuration = startTime && endTime
+              ? Math.round((new Date(`2000-01-01T${endTime}`).getTime() - 
+                           new Date(`2000-01-01T${startTime}`).getTime()) / 60000)
+              : 60;
+            
             const userResult = await pool.query(
               `SELECT id FROM users WHERE LOWER(email) = LOWER($1)`,
               [member.email]
@@ -243,21 +249,21 @@ export async function createBookingForMember(
             const memberName = customerName || [member.firstName, member.lastName].filter(Boolean).join(' ') || member.email;
             
             await pool.query(`
-              INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
-              VALUES ($1, $2, 'owner', $3, 'pending')
+              INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+              VALUES ($1, $2, 'owner', $3, 'pending', $4)
               ON CONFLICT (session_id, user_id) WHERE user_id IS NOT NULL DO NOTHING
-            `, [newSessionId, userId, memberName]);
+            `, [newSessionId, userId, memberName, slotDuration]);
             
             for (let i = 1; i < playerCount; i++) {
               await pool.query(`
-                INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
-                VALUES ($1, NULL, 'guest', $2, 'pending')
-              `, [newSessionId, `Guest ${i + 1}`]);
+                INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+                VALUES ($1, NULL, 'guest', $2, 'pending', $3)
+              `, [newSessionId, `Guest ${i + 1}`, slotDuration]);
             }
             
             await recalculateSessionFees(newSessionId);
             logger.info('[Trackman Webhook] Created session and participants for linked booking', {
-              extra: { bookingId: pendingBookingId, sessionId: newSessionId, playerCount }
+              extra: { bookingId: pendingBookingId, sessionId: newSessionId, playerCount, slotDuration }
             });
           }
         } catch (sessionErr) {
@@ -471,6 +477,12 @@ export async function createBookingForMember(
             });
             
             try {
+              // Calculate slot duration from Trackman times
+              const slotDuration = startTime && endTime
+                ? Math.round((new Date(`2000-01-01T${endTime}`).getTime() - 
+                             new Date(`2000-01-01T${startTime}`).getTime()) / 60000)
+                : 60;
+              
               const userResult = await pool.query(
                 `SELECT id FROM users WHERE LOWER(email) = LOWER($1)`,
                 [member.email]
@@ -478,21 +490,21 @@ export async function createBookingForMember(
               const userId = userResult.rows[0]?.id || null;
               
               await pool.query(`
-                INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
-                VALUES ($1, $2, 'owner', $3, 'pending')
+                INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+                VALUES ($1, $2, 'owner', $3, 'pending', $4)
                 ON CONFLICT (session_id, user_id) WHERE user_id IS NOT NULL DO NOTHING
-              `, [sessionId, userId, memberName]);
+              `, [sessionId, userId, memberName, slotDuration]);
               
               for (let i = 1; i < playerCount; i++) {
                 await pool.query(`
-                  INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
-                  VALUES ($1, NULL, 'guest', $2, 'pending')
-                `, [sessionId, `Guest ${i + 1}`]);
+                  INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+                  VALUES ($1, NULL, 'guest', $2, 'pending', $3)
+                `, [sessionId, `Guest ${i + 1}`, slotDuration]);
               }
               
               await recalculateSessionFees(sessionId);
               logger.info('[Trackman Webhook] Created participants and cached fees', {
-                extra: { sessionId, playerCount }
+                extra: { sessionId, playerCount, slotDuration }
               });
             } catch (participantErr) {
               logger.warn('[Trackman Webhook] Failed to create participants (non-blocking)', { 

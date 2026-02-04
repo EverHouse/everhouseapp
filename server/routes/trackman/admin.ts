@@ -729,6 +729,12 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
         }
         
         if (sessionId) {
+          // Calculate slot duration from booking times
+          const slotDuration = booking.start_time && booking.end_time
+            ? Math.round((new Date(`2000-01-01T${booking.end_time}`).getTime() - 
+                         new Date(`2000-01-01T${booking.start_time}`).getTime()) / 60000)
+            : booking.duration_minutes || 60;
+          
           // Check if participant already exists
           const existingParticipant = await pool.query(
             `SELECT id FROM booking_participants WHERE session_id = $1 AND participant_type = 'owner'`,
@@ -737,9 +743,9 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
           
           if (existingParticipant.rows.length === 0) {
             await pool.query(`
-              INSERT INTO booking_participants (session_id, user_id, display_name, participant_type)
-              VALUES ($1, $2, $3, 'owner')
-            `, [sessionId, member.id, `${member.first_name} ${member.last_name}`]);
+              INSERT INTO booking_participants (session_id, user_id, display_name, participant_type, slot_duration)
+              VALUES ($1, $2, $3, 'owner', $4)
+            `, [sessionId, member.id, `${member.first_name} ${member.last_name}`, slotDuration]);
           } else {
             // Update existing owner participant
             await pool.query(`
@@ -1996,12 +2002,19 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
     );
     
     const bookingResult = await pool.query(
-      `SELECT request_date, start_time, status, session_id FROM booking_requests WHERE id = $1`,
+      `SELECT request_date, start_time, end_time, status, session_id FROM booking_requests WHERE id = $1`,
       [bookingId]
     );
     
     if (bookingResult.rows[0]?.session_id) {
       const sessionId = bookingResult.rows[0].session_id;
+      const booking = bookingResult.rows[0];
+      
+      // Calculate slot duration from booking times
+      const slotDuration = booking.start_time && booking.end_time
+        ? Math.round((new Date(`2000-01-01T${booking.end_time}`).getTime() - 
+                     new Date(`2000-01-01T${booking.start_time}`).getTime()) / 60000)
+        : 60;
       
       const memberInfo = await pool.query(
         `SELECT id, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)`,
@@ -2042,9 +2055,9 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
         }
         
         await pool.query(
-          `INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, invite_status)
-           VALUES ($1, $2, 'member', $3, 'pending', 'confirmed')`,
-          [sessionId, userId, displayName]
+          `INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, invite_status, slot_duration)
+           VALUES ($1, $2, 'member', $3, 'pending', 'confirmed', $4)`,
+          [sessionId, userId, displayName, slotDuration]
         );
       }
       
@@ -2678,6 +2691,12 @@ router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => 
         const displayName = booking.user_name || booking.user_email || 'Unknown';
         const userId = booking.owner_user_id || booking.user_id;
         
+        // Calculate slot duration from booking times
+        const slotDuration = booking.start_time && booking.end_time
+          ? Math.round((new Date(`2000-01-01T${booking.end_time}`).getTime() - 
+                       new Date(`2000-01-01T${booking.start_time}`).getTime()) / 60000)
+          : 60;
+        
         if (!linkedExisting) {
           // Only add participant for newly created sessions
           await client.query(`
@@ -2690,13 +2709,15 @@ router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => 
               payment_status,
               invited_at,
               created_at,
-              paid_at
+              paid_at,
+              slot_duration
             )
-            VALUES ($1, $2, 'owner', $3, 'accepted', 'paid', NOW(), NOW(), NOW())
+            VALUES ($1, $2, 'owner', $3, 'accepted', 'paid', NOW(), NOW(), NOW(), $4)
           `, [
             sessionId,
             userId,
-            displayName
+            displayName,
+            slotDuration
           ]);
         }
         
