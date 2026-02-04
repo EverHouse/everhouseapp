@@ -2169,11 +2169,29 @@ const SimulatorTab: React.FC = () => {
                                                                     </button>
                                                                 ) : !isConferenceRoom && isToday ? (
                                                                     <button
-                                                                        onClick={(e) => {
+                                                                        onClick={async (e) => {
                                                                             e.preventDefault();
                                                                             e.stopPropagation();
                                                                             const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
-                                                                            setBillingModal({ isOpen: true, bookingId });
+                                                                            try {
+                                                                                const res = await fetch(`/api/bookings/${bookingId}/checkin`, {
+                                                                                    method: 'PUT',
+                                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                                    credentials: 'include',
+                                                                                    body: JSON.stringify({ status: 'attended', skipPaymentCheck: true })
+                                                                                });
+                                                                                if (res.ok) {
+                                                                                    showToast('Checked in successfully', 'success');
+                                                                                    handleRefresh();
+                                                                                } else if (res.status === 402) {
+                                                                                    setBillingModal({ isOpen: true, bookingId });
+                                                                                } else {
+                                                                                    const err = await res.json();
+                                                                                    showToast(err.error || 'Check-in failed', 'error');
+                                                                                }
+                                                                            } catch (err) {
+                                                                                showToast('Check-in failed', 'error');
+                                                                            }
                                                                         }}
                                                                         className="flex-1 py-2.5 bg-accent text-primary rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 hover:shadow-md active:scale-95 transition-all duration-200"
                                                                     >
@@ -3248,15 +3266,55 @@ const SimulatorTab: React.FC = () => {
                                 handleRefresh();
                             }}
                             onCollectPayment={(bookingId) => setBillingModal({isOpen: true, bookingId})}
-                            onCheckIn={async (bookingId) => {
-                                const booking = selectedCalendarBooking;
-                                if (!booking) return;
-                                await updateBookingStatusOptimistic(booking, 'attended', () => setSelectedCalendarBooking(null));
+                            onCheckIn={async (passedBookingId) => {
+                                // Use the passed bookingId directly to avoid stale closure issues
+                                try {
+                                    const res = await fetch(`/api/bookings/${passedBookingId}/checkin`, {
+                                        method: 'PUT',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        credentials: 'include',
+                                        body: JSON.stringify({ status: 'attended', skipPaymentCheck: true })
+                                    });
+                                    if (res.ok) {
+                                        showToast('Checked in successfully', 'success');
+                                        setSelectedCalendarBooking(null);
+                                        handleRefresh();
+                                    } else if (res.status === 402) {
+                                        const data = await res.json();
+                                        if (data.requiresRoster) {
+                                            showToast('Please complete the roster first', 'error');
+                                        } else {
+                                            setSelectedCalendarBooking(null);
+                                            setBillingModal({ isOpen: true, bookingId: passedBookingId });
+                                        }
+                                    } else {
+                                        const err = await res.json();
+                                        showToast(err.error || 'Check-in failed', 'error');
+                                    }
+                                } catch (err) {
+                                    showToast('Check-in failed', 'error');
+                                }
                             }}
-                            onNoShow={async (bookingId) => {
-                                const booking = selectedCalendarBooking;
-                                if (!booking) return;
-                                await updateBookingStatusOptimistic(booking, 'no_show', () => setSelectedCalendarBooking(null));
+                            onNoShow={async (passedBookingId) => {
+                                // Use the passed bookingId directly to avoid stale closure issues
+                                try {
+                                    const res = await fetch(`/api/bookings/${passedBookingId}/checkin`, {
+                                        method: 'PUT',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        credentials: 'include',
+                                        body: JSON.stringify({ status: 'no_show' })
+                                    });
+                                    if (res.ok) {
+                                        showToast('Marked as no show', 'success');
+                                        setSelectedCalendarBooking(null);
+                                        handleRefresh();
+                                    } else {
+                                        const err = await res.json();
+                                        showToast(err.error || 'Failed to mark as no show', 'error');
+                                    }
+                                } catch (err) {
+                                    showToast('Failed to mark as no show', 'error');
+                                }
                             }}
                         />
                     )}
@@ -3389,18 +3447,37 @@ const SimulatorTab: React.FC = () => {
                     ) : (
                         <div className="flex gap-3">
                             <button
-                                onClick={() => {
+                                onClick={async () => {
                                     if (!markStatusModal.booking) return;
                                     const bookingId = typeof markStatusModal.booking.id === 'string' 
                                         ? parseInt(String(markStatusModal.booking.id).replace('cal_', '')) 
                                         : markStatusModal.booking.id;
-                                    setMarkStatusModal({ booking: null, confirmNoShow: false });
-                                    setBillingModal({ isOpen: true, bookingId });
+                                    try {
+                                        const res = await fetch(`/api/bookings/${bookingId}/checkin`, {
+                                            method: 'PUT',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            credentials: 'include',
+                                            body: JSON.stringify({ status: 'attended', skipPaymentCheck: true })
+                                        });
+                                        if (res.ok) {
+                                            showToast('Checked in successfully', 'success');
+                                            setMarkStatusModal({ booking: null, confirmNoShow: false });
+                                            handleRefresh();
+                                        } else if (res.status === 402) {
+                                            setMarkStatusModal({ booking: null, confirmNoShow: false });
+                                            setBillingModal({ isOpen: true, bookingId });
+                                        } else {
+                                            const err = await res.json();
+                                            showToast(err.error || 'Check-in failed', 'error');
+                                        }
+                                    } catch (err) {
+                                        showToast('Check-in failed', 'error');
+                                    }
                                 }}
                                 className="flex-1 py-3 px-4 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium flex items-center justify-center gap-2"
                             >
                                 <span aria-hidden="true" className="material-symbols-outlined text-sm">how_to_reg</span>
-                                Complete Check-In
+                                Check In
                             </button>
                             <button
                                 onClick={() => setMarkStatusModal({ ...markStatusModal, confirmNoShow: true })}
