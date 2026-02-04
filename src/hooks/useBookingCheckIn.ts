@@ -108,7 +108,7 @@ export function useBookingCheckIn() {
     } finally {
       setIsCheckingIn(null);
     }
-  }, [showToast, isCheckingIn]);
+  }, [showToast]);
 
   return {
     checkIn,

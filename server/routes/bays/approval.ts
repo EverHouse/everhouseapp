@@ -929,11 +929,22 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
         existing.session_id = sessionResult.sessionId;
         console.log(`[Check-in] Auto-created session ${sessionResult.sessionId} for booking ${bookingId}`);
       } else {
-        return res.status(400).json({
-          error: 'Billing session could not be generated',
-          requiresSync: true,
-          message: sessionResult.error || 'System attempted to generate a billing session but failed. Please contact support.'
-        });
+        // Session creation failed - check if this booking has any fees that would require a session
+        // For zero-fee bookings (solo member with no guests, no overage), allow check-in without session
+        const declaredPlayers = existing.declared_player_count || existing.trackman_player_count || 1;
+        const hasGuests = declaredPlayers > 1;
+        
+        if (!hasGuests) {
+          // Solo booking with no guests - allow check-in without session for zero-fee scenarios
+          console.log(`[Check-in] Session creation failed but allowing check-in for solo booking ${bookingId}: ${sessionResult.error}`);
+        } else {
+          // Has guests that might incur fees - require session
+          return res.status(400).json({
+            error: 'Billing session could not be generated',
+            requiresSync: true,
+            message: sessionResult.error || 'System attempted to generate a billing session but failed. Please contact support.'
+          });
+        }
       }
     }
     

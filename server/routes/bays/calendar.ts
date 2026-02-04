@@ -189,9 +189,8 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
     const enrichedDbResult = dbResult.map(b => {
       const declaredPlayers = b.declared_player_count || 1;
       const actualFilledSlots = filledSlotsMap.get(b.id);
-      const filledSlots = actualFilledSlots !== undefined && actualFilledSlots > 0
-        ? actualFilledSlots
-        : 1 + (b.guest_count || 0);
+      // Owner always counts as 1 filled slot; add members and guests from their tables
+      const filledSlots = 1 + (actualFilledSlots !== undefined ? actualFilledSlots : (b.guest_count || 0));
       const unfilledSlots = Math.max(0, declaredPlayers - filledSlots);
       
       return {

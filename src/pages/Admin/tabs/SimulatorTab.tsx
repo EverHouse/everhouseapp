@@ -1108,8 +1108,6 @@ const SimulatorTab: React.FC = () => {
         booking: BookingRequest,
         newStatus: 'attended' | 'no_show' | 'cancelled'
     ): Promise<boolean> => {
-        console.log('[CHECKIN-DEBUG] updateBookingStatusOptimistic called', { bookingId: booking.id, newStatus });
-        
         // Store previous data for rollback
         const previousRequests = queryClient.getQueryData(bookingsKeys.allRequests());
         const previousApproved = queryClient.getQueryData(bookingsKeys.approved(startDate, endDate));
@@ -1127,14 +1125,12 @@ const SimulatorTab: React.FC = () => {
         );
         
         try {
-            console.log('[CHECKIN-DEBUG] Making API call to /api/bookings/' + booking.id + '/checkin');
             const res = await fetch(`/api/bookings/${booking.id}/checkin`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({ status: newStatus, source: booking.source })
             });
-            console.log('[CHECKIN-DEBUG] API response status:', res.status);
             
             if (res.status === 402) {
                 const errorData = await res.json();
