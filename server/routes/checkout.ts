@@ -15,8 +15,12 @@ const CORPORATE_MIN_SEATS = 5;
 const checkoutSessionSchema = z.object({
   tier: z.string().min(1, 'Tier slug is required').max(100),
   email: z.string().email('Invalid email format').optional(),
+  firstName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
+  phone: z.string().max(30).optional(),
   companyName: z.string().max(200).optional(),
   jobTitle: z.string().max(100).optional(),
+  quantity: z.number().int().min(1).max(100).optional(),
 });
 
 router.post('/api/checkout/sessions', checkoutRateLimiter, async (req, res) => {
@@ -28,7 +32,7 @@ router.post('/api/checkout/sessions', checkoutRateLimiter, async (req, res) => {
       return res.status(400).json({ error: firstError.message || 'Invalid input' });
     }
     
-    const { tier: tierSlug, email, companyName, jobTitle } = parseResult.data;
+    const { tier: tierSlug, email, firstName, lastName, phone, companyName, jobTitle, quantity } = parseResult.data;
 
     const [tierData] = await db
       .select()
@@ -46,22 +50,45 @@ router.post('/api/checkout/sessions', checkoutRateLimiter, async (req, res) => {
     const baseUrl = replitDomains ? `https://${replitDomains}` : 'http://localhost:5000';
 
     const isCorporate = tierData.tierType === 'corporate' || tierSlug === 'corporate';
+    
+    if (isCorporate) {
+      if (!firstName?.trim()) {
+        return res.status(400).json({ error: 'First name is required for corporate checkout' });
+      }
+      if (!lastName?.trim()) {
+        return res.status(400).json({ error: 'Last name is required for corporate checkout' });
+      }
+      if (!email?.trim()) {
+        return res.status(400).json({ error: 'Email is required for corporate checkout' });
+      }
+      if (!phone?.trim()) {
+        return res.status(400).json({ error: 'Phone number is required for corporate checkout' });
+      }
+      if (!companyName?.trim()) {
+        return res.status(400).json({ error: 'Company name is required for corporate checkout' });
+      }
+    }
+    
+    const seatCount = isCorporate ? Math.max(quantity || CORPORATE_MIN_SEATS, CORPORATE_MIN_SEATS) : 1;
 
     let sessionParams: any = {
       mode: 'subscription',
       ui_mode: 'embedded',
       return_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       metadata: {
+        first_name: firstName || '',
+        last_name: lastName || '',
+        phone: phone || '',
         company_name: companyName || '',
         job_title: jobTitle || '',
-        quantity: String(CORPORATE_MIN_SEATS),
+        quantity: String(seatCount),
         tier_type: tierData.tierType || 'individual',
         tier_slug: tierSlug,
       },
     };
 
     if (isCorporate) {
-      const corporatePricePerSeat = getCorporateVolumePrice(CORPORATE_MIN_SEATS);
+      const corporatePricePerSeat = getCorporateVolumePrice(seatCount);
       
       await logSystemAction({
         action: 'checkout_pricing_calculated',
@@ -70,9 +97,12 @@ router.post('/api/checkout/sessions', checkoutRateLimiter, async (req, res) => {
         details: {
           tier: tierSlug,
           tierType: 'corporate',
-          seatCount: CORPORATE_MIN_SEATS,
+          seatCount,
           pricePerSeatCents: corporatePricePerSeat,
-          totalMonthlyCents: corporatePricePerSeat * CORPORATE_MIN_SEATS,
+          totalMonthlyCents: corporatePricePerSeat * seatCount,
+          firstName: firstName || null,
+          lastName: lastName || null,
+          phone: phone || null,
           companyName: companyName || null,
           serverControlled: true,
         },
@@ -84,14 +114,14 @@ router.post('/api/checkout/sessions', checkoutRateLimiter, async (req, res) => {
             currency: 'usd',
             product_data: {
               name: `${tierData.name} - Corporate Membership`,
-              description: `${CORPORATE_MIN_SEATS} employee seats at $${(corporatePricePerSeat / 100).toFixed(2)}/seat/month. Volume discounts applied as employees are added.`,
+              description: `${seatCount} employee seats at $${(corporatePricePerSeat / 100).toFixed(2)}/seat/month. Volume discounts applied as employees are added.`,
             },
             unit_amount: corporatePricePerSeat,
             recurring: {
               interval: 'month',
             },
           },
-          quantity: CORPORATE_MIN_SEATS,
+          quantity: seatCount,
         },
       ];
     } else {

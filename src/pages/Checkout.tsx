@@ -38,9 +38,12 @@ interface CheckoutFormProps {
   companyName?: string;
   jobTitle?: string;
   isCorporate?: boolean;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
 }
 
-function CheckoutForm({ tier, email, quantity = 1, companyName, jobTitle, isCorporate }: CheckoutFormProps) {
+function CheckoutForm({ tier, email, quantity = 1, companyName, jobTitle, isCorporate, firstName, lastName, phone }: CheckoutFormProps) {
   const [stripeInstance, setStripeInstance] = useState<Stripe | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +68,9 @@ function CheckoutForm({ tier, email, quantity = 1, companyName, jobTitle, isCorp
             quantity: isCorporate ? quantity : 1,
             companyName: isCorporate ? companyName : undefined,
             jobTitle: isCorporate ? jobTitle : undefined,
+            firstName: isCorporate ? firstName : undefined,
+            lastName: isCorporate ? lastName : undefined,
+            phone: isCorporate ? phone : undefined,
           }),
         });
 
@@ -83,7 +89,7 @@ function CheckoutForm({ tier, email, quantity = 1, companyName, jobTitle, isCorp
     };
 
     init();
-  }, [tier, email, quantity, companyName, jobTitle, isCorporate]);
+  }, [tier, email, quantity, companyName, jobTitle, isCorporate, firstName, lastName, phone]);
 
   if (loading) {
     return (
@@ -149,6 +155,10 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
   const [quantity, setQuantity] = useState(Math.max(initialQuantity, 5));
   const [showStripeCheckout, setShowStripeCheckout] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [phone, setPhone] = useState('');
 
   const pricePerSeat = getCorporatePriceDisplay(quantity);
   const totalMonthly = pricePerSeat * quantity;
@@ -159,6 +169,27 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
   };
 
   const handleContinue = () => {
+    if (!firstName.trim()) {
+      setError('First name is required');
+      return;
+    }
+    if (!lastName.trim()) {
+      setError('Last name is required');
+      return;
+    }
+    if (!contactEmail.trim()) {
+      setError('Email is required');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(contactEmail)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+    if (!phone.trim()) {
+      setError('Phone number is required');
+      return;
+    }
     if (!companyName.trim()) {
       setError('Company name is required');
       return;
@@ -171,23 +202,31 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
     return (
       <div className="space-y-6">
         <div className="glass-card rounded-2xl p-4 backdrop-blur-xl bg-white/30 dark:bg-white/5 border border-white/20">
-          <div className="flex items-center justify-between text-sm">
-            <div className="text-primary/70 dark:text-white/70">
-              <span className="font-medium text-primary dark:text-white">{companyName}</span>
-              {jobTitle && <span className="ml-2">({jobTitle})</span>}
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <div className="text-primary/70 dark:text-white/70">
+                <span className="font-medium text-primary dark:text-white">{companyName}</span>
+                {jobTitle && <span className="ml-2">({jobTitle})</span>}
+              </div>
+              <div className="text-primary dark:text-white font-medium">
+                {quantity} seats × ${pricePerSeat}/mo = ${totalMonthly.toLocaleString()}/mo
+              </div>
             </div>
-            <div className="text-primary dark:text-white font-medium">
-              {quantity} seats × ${pricePerSeat}/mo = ${totalMonthly.toLocaleString()}/mo
+            <div className="text-primary/60 dark:text-white/60 text-xs">
+              Contact: {firstName} {lastName} • {contactEmail} • {phone}
             </div>
           </div>
         </div>
         <CheckoutForm 
           tier={tier} 
-          email={email} 
+          email={contactEmail} 
           quantity={quantity}
           companyName={companyName}
           jobTitle={jobTitle}
           isCorporate={true}
+          firstName={firstName}
+          lastName={lastName}
+          phone={phone}
         />
       </div>
     );
@@ -204,6 +243,59 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
       </div>
 
       <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-2">
+              First Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              placeholder="John"
+              className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-2">
+              Last Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              placeholder="Doe"
+              className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-2">
+            Email <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="email"
+            value={contactEmail}
+            onChange={(e) => setContactEmail(e.target.value)}
+            placeholder="you@company.com"
+            className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-2">
+            Phone Number <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="(555) 123-4567"
+            className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+          />
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-2">
             Company Name <span className="text-red-500">*</span>

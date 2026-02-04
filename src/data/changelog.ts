@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.6.2",
+    date: "2026-02-04",
+    title: "Improved: Corporate Checkout Contact Fields",
+    changes: [
+      "Added: First Name, Last Name, Email, and Phone Number fields to corporate checkout",
+      "Added: All new contact fields are required before proceeding to payment",
+      "Added: Email validation to ensure proper format",
+      "Added: Contact info now stored in Stripe metadata for corporate memberships"
+    ]
+  },
+  {
     version: "69.6.1",
     date: "2026-02-04",
     title: "Fixed: Corporate Membership Navigation",
