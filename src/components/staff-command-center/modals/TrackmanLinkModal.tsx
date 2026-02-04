@@ -86,6 +86,8 @@ export function TrackmanLinkModal({
   const [overlappingNotices, setOverlappingNotices] = useState<Array<{id: number; title: string; reason: string | null; notice_type: string | null; start_date: string; end_date: string; start_time: string | null; end_time: string | null; source: string}>>([]);
   const [isLoadingNotices, setIsLoadingNotices] = useState(false);
   const { showToast } = useToast();
+  const [feeEstimate, setFeeEstimate] = useState<{ totalCents: number; overageCents: number; guestCents: number } | null>(null);
+  const [isCalculatingFees, setIsCalculatingFees] = useState(false);
 
   const isPlaceholderEmail = (email: string): boolean => {
     if (!email) return true;
@@ -127,6 +129,8 @@ export function TrackmanLinkModal({
       setStaffList([]);
       setShowNoticeSelection(false);
       setOverlappingNotices([]);
+      setFeeEstimate(null);
+      setIsCalculatingFees(false);
     }
   }, [isOpen]);
 
@@ -205,6 +209,67 @@ export function TrackmanLinkModal({
     const timeoutId = setTimeout(searchVisitors, 300);
     return () => clearTimeout(timeoutId);
   }, [visitorSearch]);
+
+  useEffect(() => {
+    const calculateFees = async () => {
+      const ownerSlot = slots[0];
+      if (ownerSlot.type !== 'member' && ownerSlot.type !== 'visitor') {
+        setFeeEstimate(null);
+        return;
+      }
+      
+      let durationMinutes = 60;
+      if (timeSlot) {
+        const match = timeSlot.match(/(\d{1,2}:\d{2}\s*(?:AM|PM)?)\s*-\s*(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
+        if (match) {
+          const parseTime = (t: string) => {
+            const [time, period] = t.trim().split(/\s+/);
+            let [h, m] = time.split(':').map(Number);
+            if (period?.toUpperCase() === 'PM' && h !== 12) h += 12;
+            if (period?.toUpperCase() === 'AM' && h === 12) h = 0;
+            return h * 60 + m;
+          };
+          const startMins = parseTime(match[1]);
+          const endMins = parseTime(match[2]);
+          durationMinutes = endMins > startMins ? endMins - startMins : 1440 - startMins + endMins;
+        }
+      }
+      
+      const guestCount = slots.filter(s => s.type === 'guest_placeholder').length;
+      const memberCount = slots.slice(1).filter(s => s.type === 'member' || s.type === 'visitor').length;
+      const totalPlayers = 1 + guestCount + memberCount;
+      
+      setIsCalculatingFees(true);
+      try {
+        const params = new URLSearchParams({
+          email: ownerSlot.member?.email || '',
+          durationMinutes: String(durationMinutes),
+          playerCount: String(totalPlayers),
+          guestCount: String(guestCount)
+        });
+        if (bookingDate) {
+          params.set('date', bookingDate);
+        }
+        const res = await fetch(`/api/fee-estimate?${params}`, {
+          credentials: 'include'
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setFeeEstimate({
+            totalCents: data.totalCents || 0,
+            overageCents: data.overageCents || 0,
+            guestCents: data.guestCents || 0
+          });
+        }
+      } catch (err) {
+        console.error('Fee estimation error:', err);
+      } finally {
+        setIsCalculatingFees(false);
+      }
+    };
+    
+    calculateFees();
+  }, [slots, timeSlot, bookingDate]);
 
   const updateSlot = (index: number, slotState: SlotState) => {
     setSlots(prev => {
@@ -956,6 +1021,33 @@ export function TrackmanLinkModal({
 
   const stickyFooterContent = (
     <div className="p-4 space-y-2">
+      {feeEstimate && feeEstimate.totalCents > 0 && (
+        <div className="mb-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-lg">payments</span>
+              <span className="text-sm font-medium text-amber-700 dark:text-amber-300">Estimated Fees</span>
+            </div>
+            <span className="text-lg font-bold text-amber-700 dark:text-amber-300">
+              ${(feeEstimate.totalCents / 100).toFixed(2)}
+            </span>
+          </div>
+          <div className="mt-1 flex gap-4 text-xs text-amber-600 dark:text-amber-400">
+            {feeEstimate.overageCents > 0 && (
+              <span>Overage: ${(feeEstimate.overageCents / 100).toFixed(2)}</span>
+            )}
+            {feeEstimate.guestCents > 0 && (
+              <span>Guest fees: ${(feeEstimate.guestCents / 100).toFixed(2)}</span>
+            )}
+          </div>
+        </div>
+      )}
+      {isCalculatingFees && (
+        <div className="mb-3 p-3 rounded-lg bg-gray-50 dark:bg-white/5 flex items-center justify-center gap-2 text-sm text-primary/50 dark:text-white/50">
+          <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+          Calculating fees...
+        </div>
+      )}
       <div className="flex gap-3">
         <button
           onClick={onClose}
@@ -1208,6 +1300,19 @@ export function TrackmanLinkModal({
               )}
             </div>
           </div>
+
+          {slots.slice(1).some(s => s.type === 'empty') && (
+            <button
+              onClick={() => {
+                const emptyIndex = slots.findIndex((s, i) => i > 0 && s.type === 'empty');
+                if (emptyIndex > 0) handleAddGuestPlaceholder(emptyIndex);
+              }}
+              className="w-full py-2 px-3 rounded-lg border-2 border-dashed border-amber-300 dark:border-amber-600 text-amber-600 dark:text-amber-400 font-medium text-sm hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-sm">person_add</span>
+              Quick Add Guest (+$25)
+            </button>
+          )}
         </div>
 
         {shouldShowRememberEmail() && (
