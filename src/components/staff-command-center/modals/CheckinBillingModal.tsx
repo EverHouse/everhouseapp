@@ -90,6 +90,12 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
   } | null>(null);
   const [showOveragePayment, setShowOveragePayment] = useState(false);
   const [overageClientSecret, setOverageClientSecret] = useState<string | null>(null);
+  const [savedCardInfo, setSavedCardInfo] = useState<{
+    hasSavedCard: boolean;
+    cardLast4?: string;
+    cardBrand?: string;
+  } | null>(null);
+  const [checkingCard, setCheckingCard] = useState(false);
 
   useEffect(() => {
     console.log('[CheckinBillingModal] Props changed:', { isOpen, bookingId });
@@ -116,6 +122,79 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
       setError(getNetworkErrorMessage());
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkSavedCard = async (email: string) => {
+    try {
+      setCheckingCard(true);
+      const res = await fetch(`/api/stripe/staff/check-saved-card/${encodeURIComponent(email)}`, {
+        credentials: 'include'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSavedCardInfo(data);
+      }
+    } catch (err) {
+      console.error('Failed to check saved card:', err);
+    } finally {
+      setCheckingCard(false);
+    }
+  };
+
+  useEffect(() => {
+    if (context?.ownerEmail && isOpen) {
+      checkSavedCard(context.ownerEmail);
+    }
+  }, [context?.ownerEmail, isOpen]);
+
+  const handleChargeSavedCard = async () => {
+    if (!context || !savedCardInfo?.hasSavedCard) return;
+    
+    const pendingParticipants = context.participants.filter(p => 
+      p.paymentStatus === 'pending' && p.totalFee > 0
+    );
+    const participantIds = pendingParticipants.map(p => p.participantId);
+
+    setActionInProgress('charge-saved-card');
+    try {
+      // Backend computes authoritative amount from cached fees - we only send participant IDs
+      const res = await fetch('/api/stripe/staff/charge-saved-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          memberEmail: context.ownerEmail,
+          bookingId,
+          sessionId: context.sessionId,
+          participantIds
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        showToast(data.message || 'Card charged successfully', 'success');
+        await fetchContext();
+        onCheckinComplete();
+        onClose();
+      } else {
+        if (data.noSavedCard || data.noStripeCustomer) {
+          showToast('No saved card on file - use the card payment option', 'warning');
+          setSavedCardInfo({ hasSavedCard: false });
+        } else if (data.requiresAction) {
+          showToast('Card requires additional verification - use the card payment option', 'warning');
+        } else if (data.cardError) {
+          showToast(`Card declined: ${data.error}`, 'error');
+        } else {
+          showToast(data.error || 'Failed to charge card', 'error');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to charge saved card:', err);
+      showToast('Failed to charge card - please try again', 'error');
+    } finally {
+      setActionInProgress(null);
     }
   };
 
@@ -468,6 +547,18 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
         <div className="flex flex-col gap-2">
           {hasPendingPayments ? (
             <>
+              {context?.totalOutstanding && context.totalOutstanding > 0 && savedCardInfo?.hasSavedCard && (
+                <button
+                  onClick={handleChargeSavedCard}
+                  disabled={actionInProgress !== null}
+                  className="w-full py-3 bg-purple-600 text-white font-semibold rounded-xl hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined">credit_score</span>
+                  {actionInProgress === 'charge-saved-card' 
+                    ? 'Charging...' 
+                    : `Charge Card on File (${savedCardInfo.cardBrand} ****${savedCardInfo.cardLast4}) - $${context.totalOutstanding.toFixed(2)}`}
+                </button>
+              )}
               {context?.totalOutstanding && context.totalOutstanding > 0 && (
                 <button
                   onClick={handleShowStripePayment}
@@ -475,7 +566,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
                   className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <span className="material-symbols-outlined">credit_card</span>
-                  Pay with Card (${context.totalOutstanding.toFixed(2)})
+                  {savedCardInfo?.hasSavedCard ? 'Pay with Different Card' : `Pay with Card ($${context.totalOutstanding.toFixed(2)})`}
                 </button>
               )}
               <button

@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.4.0",
+    date: "2026-02-04",
+    title: "Staff Can Charge Member's Card on File",
+    isMajor: true,
+    changes: [
+      "New: Staff can now charge a member's saved card directly during check-in without requiring the member to enter their card",
+      "New: 'Charge Card on File' button appears in check-in billing modal when member has a saved payment method",
+      "New: Shows card brand and last 4 digits (e.g., 'Visa ****4242') so staff knows which card will be charged",
+      "Improved: Staff can still use 'Pay with Different Card' if needed for a new payment method",
+      "Technical: Uses off-session charging similar to day pass auto-charge for seamless processing"
+    ]
+  },
+  {
     version: "69.3.9",
     date: "2026-02-04",
     title: "Critical: Booking Participants Now Saved at Approval",

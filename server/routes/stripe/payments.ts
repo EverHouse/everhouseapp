@@ -693,6 +693,251 @@ router.post('/api/stripe/staff/quick-charge/confirm', isStaffOrAdmin, async (req
   }
 });
 
+// Staff charge member's saved card directly (off-session)
+router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { memberEmail, bookingId, sessionId, participantIds } = req.body;
+    const { staffEmail, staffName } = getStaffInfo(req);
+
+    if (!memberEmail) {
+      return res.status(400).json({ error: 'Missing required field: memberEmail' });
+    }
+
+    if (!participantIds || !Array.isArray(participantIds) || participantIds.length === 0) {
+      return res.status(400).json({ error: 'Missing required field: participantIds' });
+    }
+
+    // Get member and their Stripe customer
+    const memberResult = await pool.query(
+      `SELECT id, email, name, first_name, last_name, stripe_customer_id 
+       FROM users WHERE LOWER(email) = LOWER($1)`,
+      [memberEmail]
+    );
+
+    if (memberResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    const member = memberResult.rows[0];
+    const memberName = member.name || [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email;
+
+    // CRITICAL: Validate participantIds and compute amount from authoritative cached fees
+    const participantResult = await pool.query(
+      `SELECT bp.id, bp.session_id, bp.cached_fee_cents, bp.payment_status, bs.booking_id
+       FROM booking_participants bp
+       JOIN booking_sessions bs ON bp.session_id = bs.id
+       WHERE bp.id = ANY($1::int[]) AND bp.payment_status = 'pending'`,
+      [participantIds]
+    );
+
+    if (participantResult.rows.length === 0) {
+      return res.status(400).json({ error: 'No pending participants found for the provided IDs' });
+    }
+
+    // Verify all requested participants were found
+    const foundIds = new Set(participantResult.rows.map(r => r.id));
+    const missingIds = participantIds.filter((id: number) => !foundIds.has(id));
+    if (missingIds.length > 0) {
+      return res.status(400).json({ error: `Some participant IDs not found or already paid: ${missingIds.join(', ')}` });
+    }
+
+    // Verify all participants are from the same booking if bookingId provided
+    if (bookingId) {
+      const wrongBooking = participantResult.rows.filter(r => r.booking_id !== bookingId);
+      if (wrongBooking.length > 0) {
+        return res.status(400).json({ error: 'Participant IDs do not belong to the specified booking' });
+      }
+    }
+
+    // Compute authoritative amount from cached fees (TRUST DATABASE, NOT CLIENT)
+    const authoritativeAmountCents = participantResult.rows.reduce(
+      (sum, r) => sum + (r.cached_fee_cents || 0), 0
+    );
+
+    if (authoritativeAmountCents < 50) {
+      return res.status(400).json({ error: 'Total amount too small to charge (minimum $0.50)' });
+    }
+
+    const resolvedSessionId = participantResult.rows[0].session_id;
+    const resolvedBookingId = participantResult.rows[0].booking_id;
+
+    if (!member.stripe_customer_id) {
+      return res.status(400).json({ 
+        error: 'Member does not have a Stripe account. They need to make a payment first to save their card.',
+        noStripeCustomer: true
+      });
+    }
+
+    const stripe = await getStripeClient();
+
+    // Get customer's saved payment methods
+    const paymentMethods = await stripe.paymentMethods.list({
+      customer: member.stripe_customer_id,
+      type: 'card'
+    });
+
+    if (paymentMethods.data.length === 0) {
+      return res.status(400).json({ 
+        error: 'Member has no saved card on file. They need to make a payment first to save their card.',
+        noSavedCard: true
+      });
+    }
+
+    // Use the first (most recent) payment method
+    const paymentMethod = paymentMethods.data[0];
+    const cardLast4 = paymentMethod.card?.last4 || '****';
+    const cardBrand = paymentMethod.card?.brand || 'card';
+
+    // Create and confirm payment intent off-session using AUTHORITATIVE amount
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: authoritativeAmountCents,
+      currency: 'usd',
+      customer: member.stripe_customer_id,
+      payment_method: paymentMethod.id,
+      confirm: true,
+      off_session: true,
+      description: `Booking fees charged by staff`,
+      metadata: {
+        type: 'staff_saved_card_charge',
+        staffEmail: staffEmail,
+        staffName: staffName || '',
+        memberEmail: member.email,
+        memberId: member.id,
+        bookingId: resolvedBookingId?.toString() || '',
+        sessionId: resolvedSessionId?.toString() || '',
+        participantIds: JSON.stringify(participantIds),
+        authoritativeAmountCents: authoritativeAmountCents.toString()
+      }
+    });
+
+    if (paymentIntent.status === 'succeeded') {
+      // If participantIds provided, mark them as paid
+      if (participantIds && Array.isArray(participantIds) && participantIds.length > 0) {
+        await pool.query(
+          `UPDATE booking_participants 
+           SET payment_status = 'paid', 
+               stripe_payment_intent_id = $1,
+               paid_at = NOW()
+           WHERE id = ANY($2::int[])`,
+          [paymentIntent.id, participantIds]
+        );
+        console.log(`[Stripe] Staff charged saved card: $${(authoritativeAmountCents / 100).toFixed(2)} for ${member.email}, marked ${participantIds.length} participants as paid`);
+      }
+
+      // Record the payment
+      await pool.query(
+        `INSERT INTO stripe_payment_intents 
+          (payment_intent_id, member_email, member_id, amount_cents, status, purpose, description, created_by)
+         VALUES ($1, $2, $3, $4, 'succeeded', 'booking_fee', $5, $6)
+         ON CONFLICT (payment_intent_id) DO UPDATE SET status = 'succeeded', updated_at = NOW()`,
+        [paymentIntent.id, member.email, member.id, authoritativeAmountCents, 'Staff charged saved card', staffEmail]
+      );
+
+      // Log the action
+      await pool.query(
+        `INSERT INTO staff_actions (action_type, staff_email, staff_name, target_email, details, created_at)
+         VALUES ('charge_saved_card', $1, $2, $3, $4, NOW())`,
+        [staffEmail, staffName || '', member.email, JSON.stringify({
+          amountCents: authoritativeAmountCents,
+          cardLast4,
+          cardBrand,
+          paymentIntentId: paymentIntent.id,
+          bookingId: resolvedBookingId,
+          sessionId: resolvedSessionId
+        })]
+      );
+
+      broadcastBillingUpdate({
+        action: 'payment_succeeded',
+        memberEmail: member.email,
+        amount: authoritativeAmountCents
+      });
+
+      console.log(`[Stripe] Staff ${staffEmail} charged saved card (${cardBrand} ****${cardLast4}) for ${member.email}: $${(authoritativeAmountCents / 100).toFixed(2)}`);
+
+      res.json({ 
+        success: true, 
+        message: `Charged ${cardBrand} ending in ${cardLast4}: $${(authoritativeAmountCents / 100).toFixed(2)}`,
+        paymentIntentId: paymentIntent.id,
+        cardLast4,
+        cardBrand,
+        amountCharged: authoritativeAmountCents
+      });
+    } else {
+      // Payment requires additional action (3D Secure, etc.)
+      console.warn(`[Stripe] Saved card charge requires action: ${paymentIntent.status} for ${member.email}`);
+      res.status(400).json({ 
+        error: `Payment requires additional verification. Please use the standard payment flow.`,
+        requiresAction: true,
+        status: paymentIntent.status
+      });
+    }
+  } catch (error: any) {
+    console.error('[Stripe] Error charging saved card:', error);
+    
+    // Handle specific Stripe errors
+    if (error.type === 'StripeCardError') {
+      return res.status(400).json({ 
+        error: `Card declined: ${error.message}`,
+        cardError: true,
+        declineCode: error.decline_code
+      });
+    }
+    
+    if (error.code === 'authentication_required') {
+      return res.status(400).json({ 
+        error: 'Card requires authentication. Please use the standard payment flow.',
+        requiresAction: true
+      });
+    }
+
+    await alertOnExternalServiceError('Stripe', error, 'charge saved card');
+    res.status(500).json({ 
+      error: 'Failed to charge card. Please try again or use another payment method.',
+      retryable: true
+    });
+  }
+});
+
+// Check if member has a saved card on file
+router.get('/api/stripe/staff/check-saved-card/:email', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const memberEmail = decodeURIComponent(req.params.email).toLowerCase();
+
+    const memberResult = await pool.query(
+      `SELECT stripe_customer_id FROM users WHERE LOWER(email) = LOWER($1)`,
+      [memberEmail]
+    );
+
+    if (memberResult.rows.length === 0 || !memberResult.rows[0].stripe_customer_id) {
+      return res.json({ hasSavedCard: false });
+    }
+
+    const stripe = await getStripeClient();
+    const paymentMethods = await stripe.paymentMethods.list({
+      customer: memberResult.rows[0].stripe_customer_id,
+      type: 'card',
+      limit: 1
+    });
+
+    if (paymentMethods.data.length === 0) {
+      return res.json({ hasSavedCard: false });
+    }
+
+    const card = paymentMethods.data[0].card;
+    res.json({ 
+      hasSavedCard: true,
+      cardLast4: card?.last4,
+      cardBrand: card?.brand,
+      cardExpMonth: card?.exp_month,
+      cardExpYear: card?.exp_year
+    });
+  } catch (error: any) {
+    console.error('[Stripe] Error checking saved card:', error);
+    res.json({ hasSavedCard: false, error: 'Could not check saved card' });
+  }
+});
+
 router.get('/api/staff/member-balance/:email', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
     const memberEmail = decodeURIComponent(req.params.email).toLowerCase();
