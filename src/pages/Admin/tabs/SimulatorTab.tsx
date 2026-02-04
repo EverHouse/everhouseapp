@@ -1131,7 +1131,9 @@ const SimulatorTab: React.FC = () => {
         try {
             // Use the shared check-in hook with parsed booking ID
             const bookingForApi = { ...booking, id: bookingId };
+            console.log('[Check-in] About to call performCheckIn with:', { bookingForApi, statusArg: newStatus === 'cancelled' ? 'attended' : newStatus });
             const result = await performCheckIn(bookingForApi, newStatus === 'cancelled' ? 'attended' : newStatus);
+            console.log('[Check-in] performCheckIn returned:', result);
             
             if (result.success) {
                 onSuccess?.();
