@@ -863,7 +863,7 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
     const newStatus = validStatuses.includes(targetStatus) ? targetStatus : 'attended';
     
     const existingResult = await pool.query(`
-      SELECT br.status, br.user_email, br.session_id
+      SELECT br.status, br.user_email, br.session_id, br.resource_id, br.request_date, br.start_time, br.end_time, br.declared_player_count, br.user_name
       FROM booking_requests br
       WHERE br.id = $1
     `, [bookingId]);
@@ -877,6 +877,62 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
     
     if (currentStatus === newStatus) {
       return res.json({ success: true, message: `Already marked as ${newStatus}`, alreadyProcessed: true });
+    }
+    
+    // Auto-fix: If session is missing, create it now so check-in can proceed
+    if (newStatus === 'attended' && !existing.session_id && existing.resource_id) {
+      try {
+        // 1. Check for existing overlapping session (Trackman or other source)
+        const existingSession = await pool.query(`
+          SELECT id FROM booking_sessions 
+          WHERE resource_id = $1 
+            AND session_date = $2 
+            AND tsrange((session_date + start_time)::timestamp, (session_date + end_time)::timestamp, '[)') && 
+                tsrange(($2::date + $3::time)::timestamp, ($2::date + $4::time)::timestamp, '[)')
+          LIMIT 1
+        `, [existing.resource_id, existing.request_date, existing.start_time, existing.end_time]);
+
+        let newSessionId: number;
+        if (existingSession.rows.length > 0) {
+          newSessionId = existingSession.rows[0].id;
+        } else {
+          // 2. Create new session with valid source enum
+          const sessionResult = await pool.query(`
+            INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, source, created_by)
+            VALUES ($1, $2, $3, $4, 'staff_manual', $5)
+            RETURNING id
+          `, [existing.resource_id, existing.request_date, existing.start_time, existing.end_time, staffEmail]);
+          newSessionId = sessionResult.rows[0].id;
+        }
+
+        if (newSessionId) {
+          // 3. Link session to booking
+          await pool.query(`UPDATE booking_requests SET session_id = $1 WHERE id = $2`, [newSessionId, bookingId]);
+          existing.session_id = newSessionId;
+
+          // 4. Create Owner Participant if not exists
+          const userResult = await pool.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1)`, [existing.user_email]);
+          const userId = userResult.rows[0]?.id || null;
+          
+          const existingOwner = await pool.query(`
+            SELECT id FROM booking_participants WHERE session_id = $1 AND participant_type = 'owner'
+          `, [newSessionId]);
+          
+          if (existingOwner.rows.length === 0) {
+            await pool.query(`
+              INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+              VALUES ($1, $2, 'owner', $3, 'pending', $4)
+            `, [newSessionId, userId, existing.user_name || 'Member', 60]);
+          }
+
+          // 5. Calculate Fees
+          await recalculateSessionFees(newSessionId, 'checkin_auto');
+          console.log(`[Checkin] Auto-created session ${newSessionId} for booking ${bookingId}`);
+        }
+      } catch (err) {
+        console.error('[Checkin] Failed to auto-create session:', err);
+        // Continue - let the strict check below handle the error if it failed
+      }
     }
     
     // Allow checking in cancelled bookings if they have a session (for overdue payment recovery)
