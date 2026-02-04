@@ -1375,7 +1375,10 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
       )}
       {financialSummary && financialSummary.grandTotal > 0 && !financialSummary.allPaid && (
         <button
-          onClick={() => onCollectPayment?.(Number(bookingId))}
+          onClick={() => {
+            console.log('[Collect Payment] Button clicked', { bookingId, hasHandler: !!onCollectPayment });
+            onCollectPayment?.(Number(bookingId));
+          }}
           className="w-full mt-3 py-2.5 px-4 bg-primary text-white rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors"
         >
           <span className="material-symbols-outlined text-lg">credit_card</span>

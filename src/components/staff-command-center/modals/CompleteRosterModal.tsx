@@ -245,7 +245,10 @@ export const CompleteRosterModal: React.FC<CompleteRosterModalProps> = ({
               <BookingMembersEditor 
                 bookingId={bookingId} 
                 onMemberLinked={handleMemberLinked}
-                onCollectPayment={() => setShowBillingModal(true)}
+                onCollectPayment={() => {
+                  console.log('[CompleteRosterModal] onCollectPayment triggered, opening billing modal');
+                  setShowBillingModal(true);
+                }}
               />
             </div>
           ) : null}
