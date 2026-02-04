@@ -1123,12 +1123,14 @@ const SimulatorTab: React.FC = () => {
         );
         
         try {
+            console.log('[Check-in v2] Making API call', { bookingId: booking.id, newStatus, source: booking.source });
             const res = await fetch(`/api/bookings/${booking.id}/checkin`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({ status: newStatus, source: booking.source })
             });
+            console.log('[Check-in v2] API response', { status: res.status, ok: res.ok });
             
             if (res.status === 402) {
                 const errorData = await res.json();
