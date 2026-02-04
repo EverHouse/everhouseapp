@@ -79,6 +79,32 @@ interface Bay {
     description: string;
 }
 
+// Estimate fees based on tier and booking duration (when no session exists yet)
+// Returns estimated fee in dollars
+function estimateFeeByTier(tier: string | null | undefined, durationMinutes: number): number {
+    if (!tier || durationMinutes <= 0) return 0;
+    const tierLower = tier.toLowerCase();
+    
+    // Tier-based included minutes
+    let includedMinutes = 0;
+    if (tierLower === 'vip') {
+        return 0; // VIP has unlimited access
+    } else if (tierLower === 'corporate' || tierLower === 'premium') {
+        includedMinutes = 90;
+    } else if (tierLower === 'core') {
+        includedMinutes = 60;
+    }
+    // Social, Base, Day Pass, etc. have 0 included minutes
+    
+    // Calculate overage
+    const overageMinutes = Math.max(0, durationMinutes - includedMinutes);
+    if (overageMinutes === 0) return 0;
+    
+    // Fee is $25 per 30 min, round up to nearest 30 min block
+    const blocks = Math.ceil(overageMinutes / 30);
+    return blocks * 25;
+}
+
 interface Resource {
     id: number;
     name: string;
@@ -2181,17 +2207,23 @@ const SimulatorTab: React.FC = () => {
                                                                         <span aria-hidden="true" className="material-symbols-outlined text-lg">check_circle</span>
                                                                         Checked In
                                                                     </span>
-                                                                ) : !isConferenceRoom && isToday && booking.has_unpaid_fees ? (
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
-                                                                            setBillingModal({ isOpen: true, bookingId });
-                                                                        }}
-                                                                        className="flex-1 py-2.5 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:bg-amber-200 dark:hover:bg-amber-500/30 hover:shadow-md active:scale-95 transition-all duration-200"
-                                                                    >
-                                                                        <span aria-hidden="true" className="material-symbols-outlined text-lg">payments</span>
-                                                                        ${(booking.total_owed || 0).toFixed(0)} Due
-                                                                    </button>
+                                                                ) : !isConferenceRoom && isToday && (booking.has_unpaid_fees || estimateFeeByTier((booking as any).tier, booking.duration_minutes || 0) > 0) ? (
+                                                                    (() => {
+                                                                        const estimatedFee = booking.total_owed || estimateFeeByTier((booking as any).tier, booking.duration_minutes || 0);
+                                                                        const isEstimate = !booking.has_unpaid_fees;
+                                                                        return (
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
+                                                                                    setBillingModal({ isOpen: true, bookingId });
+                                                                                }}
+                                                                                className="flex-1 py-2.5 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:bg-amber-200 dark:hover:bg-amber-500/30 hover:shadow-md active:scale-95 transition-all duration-200"
+                                                                            >
+                                                                                <span aria-hidden="true" className="material-symbols-outlined text-lg">payments</span>
+                                                                                {isEstimate ? `~$${estimatedFee} Est` : `$${estimatedFee.toFixed(0)} Due`}
+                                                                            </button>
+                                                                        );
+                                                                    })()
                                                                 ) : !isConferenceRoom && (booking as any).declared_player_count > 0 && (booking as any).declared_player_count > ((booking as any).filled_player_count || 0) ? (
                                                                     <button
                                                                         onClick={() => {
@@ -2502,8 +2534,9 @@ const SimulatorTab: React.FC = () => {
                                                                 const unfilledSlots = (booking as any)?.unfilled_slots ?? 0;
                                                                 const declaredPlayers = (booking as any)?.declared_player_count ?? 1;
                                                                 const filledSlots = Math.max(0, declaredPlayers - unfilledSlots);
-                                                                const hasUnpaidFees = (booking as any)?.has_unpaid_fees ?? false;
-                                                                const totalOwed = (booking as any)?.total_owed ?? 0;
+                                                                const estimatedFromTier = estimateFeeByTier((booking as any)?.tier, (booking as any)?.duration_minutes || 0);
+                                                                const hasUnpaidFees = ((booking as any)?.has_unpaid_fees ?? false) || estimatedFromTier > 0;
+                                                                const totalOwed = (booking as any)?.total_owed || estimatedFromTier;
                                                                 const isPartialRoster = !isConference && declaredPlayers > 1 && filledSlots < declaredPlayers;
                                                                 const textColor = isConference 
                                                                     ? 'text-purple-700 dark:text-purple-300' 

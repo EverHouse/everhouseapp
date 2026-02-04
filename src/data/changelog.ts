@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.4.5",
+    date: "2026-02-04",
+    title: "Booking Cards Always Show Expected Fees",
+    changes: [
+      "Improved: Staff booking cards now always show expected fees based on member tier, even before session is created",
+      "Improved: Social tier members show '~$50 Est' for 1-hour booking before session exists, then exact amount after check-in",
+      "Improved: Calendar grid now shows fee indicator (red dot) for bookings where fees are expected based on tier",
+      "Previously: Staff only saw 'Check In' button until session was created - now shows fees upfront"
+    ]
+  },
+  {
     version: "69.4.4",
     date: "2026-02-04",
     title: "Dev Confirm Workflow Simplified",
