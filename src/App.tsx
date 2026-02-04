@@ -33,6 +33,7 @@ import { useUserStore } from './stores/userStore';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useSupabaseRealtime } from './hooks/useSupabaseRealtime';
 import { StaffBookingToast } from './components/StaffBookingToast';
+import { MemberNotificationToast } from './components/MemberNotificationToast';
 import UpdateNotification from './components/UpdateNotification';
 import { StaffWebSocketProvider } from './contexts/StaffWebSocketContext';
 
@@ -798,6 +799,7 @@ const App: React.FC = () => {
             <InitialLoadingScreen>
               <OfflineBanner />
               <StaffBookingToast />
+              <MemberNotificationToast />
               <UpdateNotification />
               <BrowserRouter>
                 <SmoothScrollProvider>
