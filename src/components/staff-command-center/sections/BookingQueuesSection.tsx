@@ -188,7 +188,7 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
       );
     }
     
-    const declaredPlayers = booking.declared_player_count ?? 1;
+    const declaredPlayers = booking.declared_player_count ?? 0;
     const filledPlayers = booking.filled_player_count ?? 0;
     
     if (declaredPlayers > 0 && filledPlayers < declaredPlayers) {
@@ -223,7 +223,13 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
     
     return (
       <button
-        onClick={(e) => { e.stopPropagation(); executeCheckIn(booking); }}
+        type="button"
+        onClick={(e) => { 
+          e.stopPropagation(); 
+          e.preventDefault();
+          executeCheckIn(booking); 
+        }}
+        onTouchEnd={(e) => e.stopPropagation()}
         disabled={isCheckingIn}
         className="text-xs px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 flex items-center gap-1"
       >
