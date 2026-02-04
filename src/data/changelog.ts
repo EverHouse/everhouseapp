@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.16.0",
+    date: "2026-02-04",
+    title: "Security: XSS Prevention",
+    changes: [
+      "Security: Tour booking form inputs now sanitized before passing to HubSpot calendar (prevents XSS attacks)",
+      "Security: External script URLs now use explicit HTTPS protocol (prevents potential MITM attacks)"
+    ]
+  },
+  {
     version: "69.15.0",
     date: "2026-02-04",
     title: "Reschedule, Pause & Duplicate Guest Fixes",

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 import { Footer } from '../../components/Footer';
 import BackToTop from '../../components/BackToTop';
 import { usePageReady } from '../../contexts/PageReadyContext';
@@ -54,12 +55,16 @@ const HubSpotMeetingModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
       script.src = 'https://static.hsappstatic.net/MeetingsEmbed/ex/MeetingsEmbedCode.js';
       script.async = true;
       
+      // SECURITY FIX: Sanitize all user inputs before passing to HubSpot iframe URL
+      // Prevents XSS attacks via malicious script injection in form fields
+      const sanitize = (str: string): string => DOMPurify.sanitize(str, { ALLOWED_TAGS: [] }).trim();
+      
       const params = new URLSearchParams({
         embed: 'true',
-        firstname: formData.firstName,
-        lastname: formData.lastName,
-        email: formData.email,
-        ...(formData.phone && { phone: formData.phone })
+        firstname: sanitize(formData.firstName),
+        lastname: sanitize(formData.lastName),
+        email: sanitize(formData.email),
+        ...(formData.phone && { phone: sanitize(formData.phone) })
       });
       
       const meetingsDiv = document.createElement('div');
