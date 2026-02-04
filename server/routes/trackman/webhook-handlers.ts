@@ -95,16 +95,27 @@ export async function tryAutoApproveBooking(
     
     if (!pendingBooking.session_id && resourceId) {
       try {
-        // CRITICAL FIX: Fetch all participants from booking, not just the owner
-        // Otherwise guests are dropped and their fees are never generated
+        // CRITICAL FIX: Fetch all participants from booking using correct table schemas
+        // booking_members has: booking_id, user_email, is_primary
+        // booking_guests has: booking_id, guest_name, guest_email
+        // NOTE: booking_participants uses session_id (not booking_request_id), so we can't query it here
         const participantsResult = await pool.query(
-          `SELECT bp.user_id, bp.user_email, bp.display_name, bp.participant_type
-           FROM booking_participants bp
-           WHERE bp.booking_request_id = $1
-           UNION
-           SELECT bm.user_id, bm.user_email, bm.display_name, bm.participant_type
+          `SELECT 
+             bm.user_email,
+             COALESCE(u.first_name || ' ' || u.last_name, bm.user_email) as display_name,
+             CASE WHEN bm.is_primary THEN 'owner' ELSE 'member' END as participant_type,
+             u.id as user_id
            FROM booking_members bm
-           WHERE bm.booking_id = $1`,
+           LEFT JOIN users u ON LOWER(u.email) = LOWER(bm.user_email)
+           WHERE bm.booking_id = $1 AND bm.user_email IS NOT NULL
+           UNION ALL
+           SELECT 
+             bg.guest_email as user_email,
+             COALESCE(bg.guest_name, bg.guest_email, 'Guest') as display_name,
+             'guest' as participant_type,
+             NULL as user_id
+           FROM booking_guests bg
+           WHERE bg.booking_id = $1`,
           [bookingId]
         );
         

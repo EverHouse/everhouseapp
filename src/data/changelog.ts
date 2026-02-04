@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.17.0",
+    date: "2026-02-04",
+    title: "Auto-Approve & Booking Query Fixes",
+    changes: [
+      "Fixed: Trackman auto-approve now correctly fetches all participants (guests were being dropped due to invalid SQL)",
+      "Fixed: Member bookings list now correctly shows bookings where member is a participant (query was failing silently)"
+    ]
+  },
+  {
     version: "69.16.0",
     date: "2026-02-04",
     title: "Security: XSS Prevention",

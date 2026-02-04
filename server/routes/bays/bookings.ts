@@ -56,13 +56,19 @@ router.get('/api/booking-requests', async (req, res) => {
     
     if (user_email && !include_all) {
       const userEmailLower = (user_email as string).toLowerCase();
-      // CRITICAL FIX: Check BOTH booking_members (legacy) AND booking_participants (new)
-      // Otherwise members added via Session Manager / Trackman auto-match are invisible in their dashboard
+      // CRITICAL FIX: Check booking_members (legacy), booking_participants (via session_id), and booking_guests
+      // booking_participants uses session_id, so we must join through booking_sessions to get booking_request_id
+      // booking_participants.user_id is a varchar ID, so we join through users to match by email
       conditions.push(
         or(
           sql`LOWER(${bookingRequests.userEmail}) = ${userEmailLower}`,
           sql`${bookingRequests.id} IN (SELECT booking_id FROM booking_members WHERE LOWER(user_email) = ${userEmailLower})`,
-          sql`${bookingRequests.id} IN (SELECT booking_request_id FROM booking_participants WHERE LOWER(user_email) = ${userEmailLower})`
+          sql`${bookingRequests.id} IN (
+            SELECT bs.booking_request_id FROM booking_sessions bs
+            JOIN booking_participants bp ON bp.session_id = bs.id
+            JOIN users u ON u.id = bp.user_id
+            WHERE LOWER(u.email) = ${userEmailLower} AND bs.booking_request_id IS NOT NULL
+          )`
         )
       );
     }
