@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.23.0",
+    date: "2026-02-04",
+    title: "Member Real-Time Notification Toasts",
+    changes: [
+      "Added: Visual toast notifications for members when bookings are approved, declined, or cancelled",
+      "Added: Sound alerts for booking approval and payment notifications",
+      "Improved: Real-time notification display without needing to refresh page"
+    ]
+  },
+  {
     version: "69.22.0",
     date: "2026-02-04",
     title: "Profile Page Navigation Menu",
