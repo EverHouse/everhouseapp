@@ -151,7 +151,7 @@ const formatDate = (dateStr: string): string => {
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user, actualUser, isViewingAs, addBooking, deleteBooking } = useData();
+  const { user, actualUser, isViewingAs, viewAsUser, addBooking, deleteBooking } = useData();
   const { effectiveTheme } = useTheme();
   
   const isAdminViewingAs = actualUser?.role === 'admin' && isViewingAs;
@@ -178,9 +178,14 @@ const Dashboard: React.FC = () => {
   const { permissions: tierPermissions } = useTierPermissions(user?.tier);
 
   // Combined dashboard data query - replaces 9 separate API calls
+  // Pass user_email when in view-as mode so backend fetches the right user's data
+  const effectiveEmail = user?.email?.toLowerCase() || '';
   const { data: dashboardData, isLoading, error: dashboardError, refetch: refetchDashboardData } = useQuery({
-    queryKey: ['member', 'dashboard-data'],
-    queryFn: () => fetchWithCredentials<DashboardData>('/api/member/dashboard-data'),
+    queryKey: ['member', 'dashboard-data', effectiveEmail],
+    queryFn: () => {
+      const params = isViewingAs && viewAsUser?.email ? `?user_email=${encodeURIComponent(viewAsUser.email)}` : '';
+      return fetchWithCredentials<DashboardData>(`/api/member/dashboard-data${params}`);
+    },
     enabled: !!user?.email,
     refetchOnWindowFocus: true,
     staleTime: 300000, // 5 minutes - makes returning to dashboard instant

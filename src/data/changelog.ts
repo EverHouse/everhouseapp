@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.21.0",
+    date: "2026-02-04",
+    title: "View-As Mode Dashboard Fix",
+    changes: [
+      "Fixed: Member dashboard now shows correct data when staff uses 'View as member' mode",
+      "Fixed: Pending booking requests now visible in member portal when viewing as a specific member"
+    ]
+  },
+  {
     version: "69.20.0",
     date: "2026-02-04",
     title: "Reschedule Feature Removal & Anti-Spam",

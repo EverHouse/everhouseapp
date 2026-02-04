@@ -31,15 +31,32 @@ router.get('/api/member/dashboard-data', async (req, res) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
     
-    const userEmail = sessionUser.email?.toLowerCase() || '';
-    const userName = sessionUser.name || '';
+    const sessionEmail = sessionUser.email?.toLowerCase() || '';
+    const { user_email } = req.query;
     
-    if (!userEmail) {
+    if (!sessionEmail) {
       return res.status(400).json({ error: 'User email is required' });
     }
     
+    // Support view-as mode for staff/admin
+    let userEmail = sessionEmail;
+    let userName = sessionUser.name || '';
+    
+    if (user_email && typeof user_email === 'string') {
+      const targetEmail = user_email.toLowerCase();
+      // Only staff/admin can view as other users
+      const isStaffOrAdmin = sessionUser.role === 'admin' || sessionUser.role === 'staff';
+      if (!isStaffOrAdmin) {
+        return res.status(403).json({ error: 'Permission denied' });
+      }
+      userEmail = targetEmail;
+      // Fetch the target user's name using raw SQL
+      const result = await pool.query('SELECT name FROM users WHERE LOWER(email) = $1 LIMIT 1', [targetEmail]);
+      userName = result.rows[0]?.name || '';
+    }
+    
     logger.info('[dashboard-data] Fetching combined dashboard data', { 
-      extra: { email: userEmail }
+      extra: { email: userEmail, viewAs: !!user_email }
     });
     
     const todayPacific = getTodayPacific();
