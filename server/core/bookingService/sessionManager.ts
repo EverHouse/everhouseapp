@@ -818,3 +818,116 @@ export async function createSessionWithUsageTracking(
     };
   }
 }
+
+/**
+ * Ensures a booking has a valid session. If no session exists, creates one on-the-fly.
+ * This resolves the "chicken-and-egg" problem where check-in requires a session,
+ * but the session was only created by the billing modal (which never opens if check-in fails).
+ * 
+ * @param bookingId - The booking request ID
+ * @param source - Source identifier for audit trail (e.g., 'checkin_auto_create', 'checkin_context')
+ * @returns The session ID (existing or newly created), or null if creation failed
+ */
+export async function ensureBookingSession(
+  bookingId: number,
+  source: string = 'checkin_auto_create'
+): Promise<{ sessionId: number | null; created: boolean; error?: string }> {
+  try {
+    const existingResult = await pool.query(`
+      SELECT session_id, resource_id FROM booking_requests WHERE id = $1
+    `, [bookingId]);
+
+    if (existingResult.rows.length === 0) {
+      return { sessionId: null, created: false, error: 'Booking not found' };
+    }
+
+    const existing = existingResult.rows[0];
+    
+    if (existing.session_id) {
+      return { sessionId: existing.session_id, created: false };
+    }
+
+    if (!existing.resource_id) {
+      return { sessionId: null, created: false, error: 'Booking has no resource assigned' };
+    }
+
+    const bookingDetails = await pool.query(`
+      SELECT resource_id, request_date, start_time, end_time, declared_player_count, user_email, user_name
+      FROM booking_requests WHERE id = $1
+    `, [bookingId]);
+
+    if (bookingDetails.rows.length === 0) {
+      return { sessionId: null, created: false, error: 'Booking details not found' };
+    }
+
+    const bd = bookingDetails.rows[0];
+
+    const sessionResult = await pool.query(`
+      INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, source, created_by)
+      VALUES ($1, $2, $3, $4, 'staff_manual', $5)
+      ON CONFLICT DO NOTHING
+      RETURNING id
+    `, [bd.resource_id, bd.request_date, bd.start_time, bd.end_time, source]);
+
+    let sessionId: number | null = sessionResult.rows[0]?.id || null;
+
+    if (!sessionId) {
+      const existingSession = await pool.query(`
+        SELECT id FROM booking_sessions 
+        WHERE resource_id = $1 AND session_date = $2 AND start_time = $3 AND end_time = $4
+        LIMIT 1
+      `, [bd.resource_id, bd.request_date, bd.start_time, bd.end_time]);
+      sessionId = existingSession.rows[0]?.id || null;
+    }
+
+    if (!sessionId) {
+      return { sessionId: null, created: false, error: 'Failed to create or find session' };
+    }
+
+    await pool.query(`UPDATE booking_requests SET session_id = $1 WHERE id = $2`, [sessionId, bookingId]);
+
+    const userResult = await pool.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1)`, [bd.user_email]);
+    const userId = userResult.rows[0]?.id || null;
+
+    const existingOwner = await pool.query(`
+      SELECT id FROM booking_participants 
+      WHERE session_id = $1 AND participant_type = 'owner'
+      LIMIT 1
+    `, [sessionId]);
+
+    if (existingOwner.rows.length === 0) {
+      await pool.query(`
+        INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
+        VALUES ($1, $2, 'owner', $3, 'pending')
+      `, [sessionId, userId, bd.user_name || 'Member']);
+    }
+
+    const playerCount = bd.declared_player_count || 1;
+    const existingGuests = await pool.query(`
+      SELECT COUNT(*) as count FROM booking_participants 
+      WHERE session_id = $1 AND participant_type = 'guest'
+    `, [sessionId]);
+    const existingGuestCount = parseInt(existingGuests.rows[0]?.count || '0');
+
+    if (existingGuestCount < playerCount - 1) {
+      for (let i = existingGuestCount + 1; i < playerCount; i++) {
+        await pool.query(`
+          INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
+          VALUES ($1, NULL, 'guest', $2, 'pending')
+        `, [sessionId, `Guest ${i + 1}`]);
+      }
+    }
+
+    const { recalculateSessionFees } = await import('../billing/unifiedFeeService');
+    await recalculateSessionFees(sessionId, source);
+
+    logger.info('[ensureBookingSession] Created session for booking', {
+      extra: { bookingId, sessionId, source }
+    });
+
+    return { sessionId, created: true };
+  } catch (error: any) {
+    logger.error('[ensureBookingSession] Error:', { error });
+    return { sessionId: null, created: false, error: error.message };
+  }
+}

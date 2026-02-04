@@ -14,7 +14,7 @@ import { sendNotificationToUser, broadcastAvailabilityUpdate, broadcastMemberSta
 import { getSessionUser } from '../../types/session';
 import { refundGuestPass } from '../guestPasses';
 import { updateHubSpotContactVisitCount } from '../../core/memberSync';
-import { createSessionWithUsageTracking } from '../../core/bookingService/sessionManager';
+import { createSessionWithUsageTracking, ensureBookingSession } from '../../core/bookingService/sessionManager';
 import { computeFeeBreakdown, applyFeeBreakdownToParticipants, recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { PaymentStatusService } from '../../core/billing/PaymentStatusService';
 import { cancelPaymentIntent, getStripeClient } from '../../core/stripe';
@@ -923,11 +923,18 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
     }
     
     if (newStatus === 'attended' && !existing.session_id && !skipPaymentCheck) {
-      return res.status(400).json({
-        error: 'Billing session not generated yet',
-        requiresSync: true,
-        message: 'Billing session not generated yet - Check Trackman Sync. The session may need to be synced from Trackman before check-in to ensure proper billing.'
-      });
+      const sessionResult = await ensureBookingSession(bookingId, 'checkin_auto_create');
+      
+      if (sessionResult.sessionId) {
+        existing.session_id = sessionResult.sessionId;
+        console.log(`[Check-in] Auto-created session ${sessionResult.sessionId} for booking ${bookingId}`);
+      } else {
+        return res.status(400).json({
+          error: 'Billing session could not be generated',
+          requiresSync: true,
+          message: sessionResult.error || 'System attempted to generate a billing session but failed. Please contact support.'
+        });
+      }
     }
     
     if (newStatus === 'attended' && existing.session_id && !skipPaymentCheck) {
