@@ -2183,7 +2183,11 @@ const SimulatorTab: React.FC = () => {
                                                                     </button>
                                                                 ) : !isConferenceRoom && isToday ? (
                                                                     <button
-                                                                        onClick={() => updateBookingStatusOptimistic(booking, 'attended')}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            console.log('[Check In Button] Clicked for booking:', booking.id, booking.status);
+                                                                            updateBookingStatusOptimistic(booking, 'attended');
+                                                                        }}
                                                                         className="flex-1 py-2.5 bg-accent text-primary rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 hover:shadow-md active:scale-95 transition-all duration-200"
                                                                     >
                                                                         <span aria-hidden="true" className="material-symbols-outlined text-lg">how_to_reg</span>
