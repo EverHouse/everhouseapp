@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.10.0",
+    date: "2026-02-04",
+    title: "Guest Pass & Webhook Reliability Fixes",
+    changes: [
+      "Fixed: Guest pass holds now properly block bookings when passes are insufficient (closes 'pay later' loophole)",
+      "Fixed: Live Trackman sessions stay 'approved' even when conflicts detected (prevents staff from accidentally declining active sessions)",
+      "Fixed: Notification failures for unregistered emails now log warnings and attempt email fallback",
+      "Improved: Conflict detection adds 'NEEDS REVIEW' flag instead of blocking live sessions"
+    ]
+  },
+  {
     version: "69.9.0",
     date: "2026-02-04",
     title: "Booking & Billing Accuracy Fixes",

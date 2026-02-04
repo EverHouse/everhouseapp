@@ -507,9 +507,11 @@ export async function createUnmatchedBookingRequest(
     const durationMinutes = calculateDurationMinutes(startTime, endTime);
     
     // Pre-check availability before INSERT for better error logging
-    // FIX: If conflict with Private Event, set status to 'pending' instead of 'approved'
+    // CRITICAL: Live Trackman sessions represent PHYSICAL REALITY - person is already in the bay
+    // They MUST be 'approved' (or 'attended'), NOT 'pending' - use needs_review flag for conflicts instead
     let bookingStatus = 'approved';
     let conflictNote = '';
+    let needsReview = false;
     
     if (resourceId) {
       const availability = await checkUnifiedAvailability(resourceId, slotDate, startTime, endTime);
@@ -527,11 +529,12 @@ export async function createUnmatchedBookingRequest(
           }
         });
         
-        // If conflict is a Private Event block, downgrade to pending for staff review
+        // If conflict detected, keep status as 'approved' but flag for staff review
+        // Setting to 'pending' is dangerous - staff might decline a live session!
         if (availability.conflictType === 'private_event' || availability.conflictType === 'availability_block') {
-          bookingStatus = 'pending';
-          conflictNote = ` [Pending: Conflicts with ${availability.conflictTitle || 'private event'}]`;
-          logger.info('[Trackman Webhook] Downgrading to pending due to private event conflict', {
+          needsReview = true;
+          conflictNote = ` [NEEDS REVIEW: Live session conflicts with ${availability.conflictTitle || 'private event'}]`;
+          logger.warn('[Trackman Webhook] Live session flagged for review due to private event conflict', {
             extra: { trackmanBookingId, conflictType: availability.conflictType, conflictTitle: availability.conflictTitle }
           });
         }
@@ -770,6 +773,45 @@ async function notifyMemberBookingConfirmed(
           channels: result.deliveryResults.map(r => ({ channel: r.channel, success: r.success }))
         } 
       });
+    } else {
+      // CRITICAL FIX: Log warning when user not found - don't silently fail
+      // This helps identify email mismatches or sync lag issues
+      logger.warn('[Trackman Webhook] Could not notify member - user not found in database', {
+        extra: {
+          email: customerEmail,
+          bookingId,
+          slotDate,
+          startTime,
+          bayName
+        }
+      });
+      
+      // Try sending notification via email as fallback (the email address came from Trackman)
+      try {
+        await notifyMember(
+          {
+            userEmail: customerEmail,
+            title: 'Booking Confirmed',
+            message: `Your simulator booking for ${slotDate} at ${startTime}${bayName ? ` (${bayName})` : ''} has been confirmed.`,
+            type: 'booking_approved',
+            relatedId: bookingId,
+            relatedType: 'booking',
+            url: '/bookings'
+          },
+          {
+            sendPush: false,  // Can't send push without user record
+            sendWebSocket: false,
+            sendEmail: true   // Fallback to email using address from Trackman
+          }
+        );
+        logger.info('[Trackman Webhook] Sent email fallback notification to unregistered email', { 
+          extra: { email: customerEmail, bookingId } 
+        });
+      } catch (emailErr) {
+        logger.warn('[Trackman Webhook] Email fallback notification also failed', { 
+          extra: { email: customerEmail, error: emailErr } 
+        });
+      }
     }
   } catch (e) {
     logger.error('[Trackman Webhook] Failed to notify member', { error: e as Error });

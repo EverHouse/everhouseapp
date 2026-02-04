@@ -545,6 +545,18 @@ router.post('/api/booking-requests', async (req, res) => {
           client
         );
         if (!holdResult.success) {
+          // CRITICAL FIX: Insufficient guest passes must BLOCK the booking
+          // Previously this was non-blocking, allowing users to book without passes
+          if (holdResult.error?.includes('insufficient') || holdResult.availablePasses === 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            console.log(`[Booking] Guest pass hold failed - rolling back: ${holdResult.error}`);
+            return res.status(400).json({ 
+              error: `Unable to book with ${guestCount} guest(s). ${holdResult.error || 'No guest passes available.'}`,
+              availablePasses: holdResult.availablePasses || 0
+            });
+          }
+          // Other hold failures (e.g., pass not required for tier) are still non-blocking
           console.log(`[Booking] Guest pass hold not created (non-blocking): ${holdResult.error}`);
         }
       }
