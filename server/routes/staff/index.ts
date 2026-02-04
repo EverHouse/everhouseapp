@@ -28,24 +28,23 @@ router.get('/api/admin/command-center', isStaffOrAdmin, async (req, res) => {
     ] = await Promise.all([
       pool.query(`SELECT COUNT(*) as count FROM booking_requests WHERE status = 'pending_approval'`),
       pool.query(`
-        SELECT br.id, br.booking_date, br.start_time, br.end_time, br.status, br.created_at,
-               u.first_name, u.last_name, u.email, b.name as bay_name
+        SELECT br.id, br.request_date, br.start_time, br.end_time, br.status, br.created_at,
+               u.first_name, u.last_name, u.email, r.name as resource_name
         FROM booking_requests br
         LEFT JOIN users u ON u.id = br.user_id
-        LEFT JOIN bays b ON b.id = br.bay_id
+        LEFT JOIN resources r ON r.id = br.resource_id
         WHERE br.status IN ('pending', 'pending_approval')
         ORDER BY br.created_at DESC
         LIMIT 20
       `),
       pool.query(`
-        SELECT br.id, br.booking_date, br.start_time, br.end_time, br.status,
-               bs.bay_id, b.name as bay_name, b.color as bay_color,
+        SELECT br.id, br.request_date, br.start_time, br.end_time, br.status,
+               br.resource_id, r.name as resource_name,
                u.first_name, u.last_name, u.email
         FROM booking_requests br
-        LEFT JOIN booking_sessions bs ON bs.booking_id = br.id
-        LEFT JOIN bays b ON b.id = br.bay_id
+        LEFT JOIN resources r ON r.id = br.resource_id
         LEFT JOIN users u ON u.id = br.user_id
-        WHERE br.booking_date = $1
+        WHERE br.request_date = $1
         AND br.status NOT IN ('cancelled', 'declined')
         ORDER BY br.start_time ASC
       `, [today]),
@@ -55,35 +54,24 @@ router.get('/api/admin/command-center', isStaffOrAdmin, async (req, res) => {
         FROM tours WHERE status = 'pending' ORDER BY created_at DESC LIMIT 10
       `),
       pool.query(`
-        SELECT id, action, user_email, resource_type, resource_name, created_at
-        FROM audit_log
+        SELECT id, action, staff_email, resource_type, resource_name, created_at
+        FROM admin_audit_log
         ORDER BY created_at DESC
         LIMIT 15
       `)
     ]);
     
-    // Financials queries with error handling for missing tables
+    // Financials queries with error handling for missing columns/tables
     let financials = { todayRevenueCents: 0, overduePaymentsCount: 0, failedPaymentsCount: 0 };
     try {
-      const [todayRevenue, overdueCount] = await Promise.all([
-        pool.query(`
-          SELECT COALESCE(SUM(amount_cents), 0) as total_cents
-          FROM stripe_transaction_cache
-          WHERE status IN ('succeeded', 'paid')
-          AND created_at >= to_timestamp($1) AND created_at < to_timestamp($2)
-        `, [startOfDayUnix, endOfDayUnix]),
-        pool.query(`
-          SELECT COUNT(DISTINCT bs.booking_id) as count
-          FROM booking_sessions bs
-          JOIN booking_requests br ON br.id = bs.booking_id
-          WHERE bs.payment_status IN ('outstanding', 'partially_paid')
-          AND bs.cancelled_at IS NULL AND bs.fee_status = 'finalized'
-          AND br.status NOT IN ('cancelled', 'declined')
-        `)
-      ]);
+      const todayRevenue = await pool.query(`
+        SELECT COALESCE(SUM(amount_cents), 0) as total_cents
+        FROM stripe_transaction_cache
+        WHERE status IN ('succeeded', 'paid')
+        AND created_at >= to_timestamp($1) AND created_at < to_timestamp($2)
+      `, [startOfDayUnix, endOfDayUnix]);
       financials.todayRevenueCents = parseInt(todayRevenue.rows[0]?.total_cents || '0');
-      financials.overduePaymentsCount = parseInt(overdueCount.rows[0]?.count || '0');
-    } catch { /* tables may not exist */ }
+    } catch { /* table may not have expected structure */ }
     
     res.json({
       counts: {

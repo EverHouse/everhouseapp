@@ -12,20 +12,12 @@ export function usePendingCounts(): UsePendingCountsResult {
 
   const fetchPendingCount = useCallback(async () => {
     try {
-      const [requestsRes, bookingsRes] = await Promise.all([
-        fetch('/api/booking-requests?include_all=true', { credentials: 'include' }),
-        fetch('/api/pending-bookings', { credentials: 'include' })
-      ]);
-      let count = 0;
-      if (requestsRes.ok) {
-        const data = await requestsRes.json();
-        count += data.filter((r: any) => r.status === 'pending' || r.status === 'pending_approval').length;
+      const res = await fetch('/api/admin/command-center', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        const count = (data.counts?.pendingBookings || 0) + (data.pendingRequests?.length || 0);
+        setPendingRequestsCount(count);
       }
-      if (bookingsRes.ok) {
-        const data = await bookingsRes.json();
-        count += data.length;
-      }
-      setPendingRequestsCount(count);
     } catch (err) {
       console.error('Failed to fetch pending count:', err);
     }
