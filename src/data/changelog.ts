@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.28.0",
+    date: "2026-02-04",
+    title: "SimulatorTab Queue Button Fix",
+    changes: [
+      "Fixed: Check In, Players, and Billing buttons on booking queue now properly prevent parent click interference",
+      "Fixed: Added stopPropagation to queue action buttons so they don't also open the booking details drawer",
+      "Improved: Queue buttons now more reliably trigger their intended actions on first click"
+    ]
+  },
+  {
     version: "69.27.0",
     date: "2026-02-04",
     title: "Check-In Button Fix",

@@ -2160,7 +2160,10 @@ const SimulatorTab: React.FC = () => {
                                                                     </span>
                                                                 ) : !isConferenceRoom && isToday && booking.has_unpaid_fees ? (
                                                                     <button
-                                                                        onClick={() => {
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            e.preventDefault();
+                                                                            e.stopPropagation();
                                                                             const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
                                                                             setBillingModal({ isOpen: true, bookingId });
                                                                         }}
@@ -2171,7 +2174,10 @@ const SimulatorTab: React.FC = () => {
                                                                     </button>
                                                                 ) : !isConferenceRoom && ((booking as any).declared_player_count || 1) > ((booking as any).filled_player_count || 0) ? (
                                                                     <button
-                                                                        onClick={() => {
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            e.preventDefault();
+                                                                            e.stopPropagation();
                                                                             const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
                                                                             setRosterModal({ isOpen: true, bookingId });
                                                                         }}
@@ -2182,7 +2188,13 @@ const SimulatorTab: React.FC = () => {
                                                                     </button>
                                                                 ) : !isConferenceRoom && isToday ? (
                                                                     <button
-                                                                        onClick={() => updateBookingStatusOptimistic(booking, 'attended')}
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            e.preventDefault();
+                                                                            e.stopPropagation();
+                                                                            console.log('[SimulatorTab] Check In button clicked for booking:', booking.id);
+                                                                            updateBookingStatusOptimistic(booking, 'attended');
+                                                                        }}
                                                                         className="flex-1 py-2.5 bg-accent text-primary rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 hover:shadow-md active:scale-95 transition-all duration-200"
                                                                     >
                                                                         <span aria-hidden="true" className="material-symbols-outlined text-lg">how_to_reg</span>
