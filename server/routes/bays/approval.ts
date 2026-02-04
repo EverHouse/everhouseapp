@@ -1287,4 +1287,159 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
   }
 });
 
+// Dev-only: Directly confirm a booking without webhook simulation
+// Creates session, participants, calculates fees, and marks as approved
+router.post('/api/admin/bookings/:id/dev-confirm', isStaffOrAdmin, async (req, res) => {
+  try {
+    const bookingId = parseInt(req.params.id, 10);
+    if (isNaN(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
+
+    const bookingResult = await pool.query(
+      `SELECT br.*, u.id as user_id, u.stripe_customer_id, u.tier
+       FROM booking_requests br
+       LEFT JOIN users u ON LOWER(u.email) = LOWER(br.user_email)
+       WHERE br.id = $1`,
+      [bookingId]
+    );
+
+    if (bookingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const booking = bookingResult.rows[0];
+    
+    if (booking.status !== 'pending' && booking.status !== 'pending_approval') {
+      return res.status(400).json({ error: `Booking is already ${booking.status}` });
+    }
+
+    let sessionId = booking.session_id;
+    let totalFeeCents = 0;
+    
+    // Create or find session with exact time matching
+    if (!sessionId && booking.resource_id) {
+      const existingSession = await pool.query(`
+        SELECT id FROM booking_sessions 
+        WHERE resource_id = $1 
+          AND session_date = $2 
+          AND start_time = $3 
+          AND end_time = $4
+        LIMIT 1
+      `, [booking.resource_id, booking.request_date, booking.start_time, booking.end_time]);
+      
+      if (existingSession.rows.length > 0) {
+        sessionId = existingSession.rows[0].id;
+      } else {
+        const sessionResult = await pool.query(`
+          INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, source, created_by)
+          VALUES ($1, $2, $3, $4, 'staff_manual', 'dev_confirm')
+          RETURNING id
+        `, [booking.resource_id, booking.request_date, booking.start_time, booking.end_time]);
+        
+        if (sessionResult.rows.length > 0) {
+          sessionId = sessionResult.rows[0].id;
+        }
+      }
+      
+      if (sessionId) {
+        const sessionDuration = Math.round(
+          (new Date(`2000-01-01T${booking.end_time}`).getTime() - 
+           new Date(`2000-01-01T${booking.start_time}`).getTime()) / 60000
+        );
+        const playerCount = booking.declared_player_count || 1;
+        
+        // Check if owner already exists
+        const existingOwner = await pool.query(`
+          SELECT id FROM booking_participants 
+          WHERE session_id = $1 AND (participant_type = 'owner' OR user_id = $2)
+        `, [sessionId, booking.user_id]);
+        
+        if (existingOwner.rows.length === 0) {
+          // Create owner participant
+          await pool.query(`
+            INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+            VALUES ($1, $2, 'owner', $3, 'pending', $4)
+          `, [sessionId, booking.user_id, booking.user_name || 'Member', sessionDuration]);
+          
+          // Create guest participants
+          for (let i = 1; i < playerCount; i++) {
+            await pool.query(`
+              INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+              VALUES ($1, NULL, 'guest', $2, 'pending', $3)
+            `, [sessionId, `Guest ${i + 1}`, sessionDuration]);
+          }
+        }
+        
+        // Calculate fees
+        try {
+          const feeResult = await recalculateSessionFees(sessionId);
+          if (feeResult?.totalSessionFee) {
+            totalFeeCents = feeResult.totalSessionFee;
+          }
+        } catch (feeError) {
+          console.warn('[Dev Confirm] Failed to calculate fees:', feeError);
+        }
+      }
+    }
+
+    // Update booking to approved (no fake trackman ID needed)
+    await pool.query(
+      `UPDATE booking_requests 
+       SET status = 'approved', 
+           session_id = COALESCE(session_id, $2),
+           notes = COALESCE(notes, '') || E'\n[Dev confirmed]',
+           updated_at = NOW()
+       WHERE id = $1`,
+      [bookingId, sessionId]
+    );
+
+    // Log staff action
+    await logFromRequest(req, {
+      action: 'booking_dev_confirm',
+      resourceType: 'booking',
+      resourceId: bookingId.toString(),
+      resourceName: `Booking #${bookingId}`,
+      details: { sessionId, totalFeeCents }
+    });
+
+    // Send confirmation notification
+    const dateStr = typeof booking.request_date === 'string' 
+      ? booking.request_date 
+      : booking.request_date.toISOString().split('T')[0];
+    const timeStr = typeof booking.start_time === 'string' 
+      ? booking.start_time.substring(0, 5) 
+      : booking.start_time;
+    
+    await pool.query(
+      `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())`,
+      [
+        booking.user_email, 
+        'Booking Confirmed', 
+        `Your simulator booking for ${dateStr} at ${timeStr} has been confirmed.`,
+        'booking',
+        'booking'
+      ]
+    );
+    
+    sendNotificationToUser(booking.user_email, {
+      type: 'notification',
+      title: 'Booking Confirmed',
+      message: `Your simulator booking for ${dateStr} at ${timeStr} has been confirmed.`,
+      data: { bookingId: bookingId.toString(), eventType: 'booking_confirmed' }
+    }, { action: 'booking_confirmed', bookingId, triggerSource: 'approval.ts' });
+
+    res.json({ 
+      success: true, 
+      bookingId,
+      sessionId,
+      totalFeeCents,
+      message: 'Booking confirmed'
+    });
+  } catch (error: any) {
+    logAndRespond(req, res, 500, 'Failed to confirm booking', error);
+  }
+});
+
 export default router;

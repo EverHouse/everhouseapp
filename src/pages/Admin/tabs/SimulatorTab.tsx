@@ -2007,14 +2007,14 @@ const SimulatorTab: React.FC = () => {
                                             <button
                                                 onClick={async () => {
                                                     try {
-                                                        const res = await fetch(`/api/admin/bookings/${req.id}/simulate-confirm`, {
+                                                        const res = await fetch(`/api/admin/bookings/${req.id}/dev-confirm`, {
                                                             method: 'POST',
                                                             headers: { 'Content-Type': 'application/json' },
                                                             credentials: 'include'
                                                         });
                                                         const data = await res.json();
                                                         if (res.ok) {
-                                                            const totalFee = (data.totalFeeCents || data.overageFeeCents || 0) / 100;
+                                                            const totalFee = (data.totalFeeCents || 0) / 100;
                                                             showToast(`Confirmed! Total fees: $${totalFee.toFixed(2)}`, 'success');
                                                             handleRefresh();
                                                         } else {

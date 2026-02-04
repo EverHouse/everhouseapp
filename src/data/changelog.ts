@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.4.4",
+    date: "2026-02-04",
+    title: "Dev Confirm Workflow Simplified",
+    changes: [
+      "Improved: Dev Confirm button now directly confirms bookings without simulating webhooks",
+      "Improved: Confirmation creates session and participants directly - no fake Trackman IDs needed",
+      "Technical: New clean endpoint preserves all booking details while bypassing webhook simulation"
+    ]
+  },
+  {
     version: "69.4.3",
     date: "2026-02-04",
     title: "Fee Calculation & Check-In Stability",
