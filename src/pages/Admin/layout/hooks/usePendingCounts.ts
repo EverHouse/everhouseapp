@@ -18,8 +18,7 @@ export function usePendingCounts(): UsePendingCountsResult {
         const count = (data.counts?.pendingBookings || 0) + (data.pendingRequests?.length || 0);
         setPendingRequestsCount(count);
       }
-    } catch (err) {
-      console.error('Failed to fetch pending count:', err);
+    } catch {
     }
   }, []);
 

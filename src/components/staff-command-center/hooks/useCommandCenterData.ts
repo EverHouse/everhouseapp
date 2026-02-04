@@ -454,8 +454,7 @@ export function useCommandCenterData(userEmail?: string) {
       }
 
       setLastSynced(new Date());
-    } catch (err) {
-      console.error('Failed to fetch command center data:', err);
+    } catch {
     } finally {
       setIsLoading(false);
     }
@@ -466,7 +465,6 @@ export function useCommandCenterData(userEmail?: string) {
     const interval = setInterval(fetchAllData, REFRESH_INTERVAL);
     
     const handleGlobalBookingUpdate = () => {
-      console.log('[CommandCenter] Global booking-update event received, refreshing data');
       fetchAllData();
     };
     window.addEventListener('booking-update', handleGlobalBookingUpdate);

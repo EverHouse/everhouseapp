@@ -35,11 +35,11 @@ export interface TodaysBooking {
 
 export interface PendingTour {
   id: string;
-  contact_name: string;
-  contact_email: string;
-  contact_phone: string | null;
-  requested_date: string | null;
-  requested_time: string | null;
+  guest_name: string;
+  guest_email: string;
+  guest_phone: string | null;
+  tour_date: string | null;
+  start_time: string | null;
   status: string;
   created_at: string;
 }

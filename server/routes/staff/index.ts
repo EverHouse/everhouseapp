@@ -50,7 +50,7 @@ router.get('/api/admin/command-center', isStaffOrAdmin, async (req, res) => {
       `, [today]),
       pool.query(`SELECT COUNT(*) as count FROM users WHERE membership_status = 'active' AND archived_at IS NULL`),
       pool.query(`
-        SELECT id, contact_name, contact_email, contact_phone, requested_date, requested_time, status, created_at
+        SELECT id, guest_name, guest_email, guest_phone, tour_date, start_time, status, created_at
         FROM tours WHERE status = 'pending' ORDER BY created_at DESC LIMIT 10
       `),
       pool.query(`
@@ -113,7 +113,7 @@ router.get('/api/admin/dashboard-summary', isStaffOrAdmin, async (req, res) => {
       pool.query(`
         SELECT COUNT(*) as count 
         FROM booking_requests 
-        WHERE booking_date = $1 AND status = 'approved'
+        WHERE request_date = $1 AND status = 'approved'
       `, [today]),
       pool.query(`
         SELECT COUNT(*) as count 
@@ -227,14 +227,13 @@ router.get('/api/admin/todays-bookings', isStaffOrAdmin, async (req, res) => {
     const endOfDay = new Date(startOfDay.getTime() + 86400000);
     
     const result = await pool.query(`
-      SELECT br.id, br.booking_date, br.start_time, br.end_time, br.status,
-             bs.bay_id, b.name as bay_name, b.color as bay_color,
+      SELECT br.id, br.request_date, br.start_time, br.end_time, br.status,
+             br.resource_id, r.name as resource_name,
              u.first_name, u.last_name, u.email
       FROM booking_requests br
-      LEFT JOIN booking_sessions bs ON bs.booking_id = br.id
-      LEFT JOIN bays b ON b.id = br.bay_id
+      LEFT JOIN resources r ON r.id = br.resource_id
       LEFT JOIN users u ON u.id = br.user_id
-      WHERE br.booking_date = $1
+      WHERE br.request_date = $1
       AND br.status NOT IN ('cancelled', 'declined')
       ORDER BY br.start_time ASC
     `, [today]);
