@@ -128,29 +128,28 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
         if (bookingDetails.rows.length > 0) {
           const bd = bookingDetails.rows[0];
           
-          // First check if a session already exists that overlaps this time slot (from Trackman or another booking)
+          // Calculate booking duration for slot_duration
+          const bookingDuration = Math.round(
+            (new Date(`2000-01-01T${bd.end_time}`).getTime() - 
+             new Date(`2000-01-01T${bd.start_time}`).getTime()) / 60000
+          );
+          
+          // Check for existing session with EXACT matching times (not just overlap)
+          // This prevents reusing sessions with different durations
           const existingSession = await pool.query(`
             SELECT id FROM booking_sessions 
             WHERE resource_id = $1 
               AND session_date = $2 
-              AND tsrange(
-                (session_date + start_time)::timestamp,
-                (session_date + end_time)::timestamp,
-                '[)'
-              ) && tsrange(
-                ($2::date + $3::time)::timestamp,
-                ($2::date + $4::time)::timestamp,
-                '[)'
-              )
-            ORDER BY start_time
+              AND start_time = $3 
+              AND end_time = $4
             LIMIT 1
           `, [bd.resource_id, bd.request_date, bd.start_time, bd.end_time]);
           
           if (existingSession.rows.length > 0) {
-            // Use existing session
+            // Use existing session with exact times
             sessionId = existingSession.rows[0].id;
             await pool.query(`UPDATE booking_requests SET session_id = $1 WHERE id = $2`, [sessionId, bookingId]);
-            console.log(`[Checkin Context] Linked booking ${bookingId} to existing session ${sessionId}`);
+            console.log(`[Checkin Context] Linked booking ${bookingId} to existing session ${sessionId} with exact times`);
           } else {
             // Create new session
             const sessionResult = await pool.query(`
@@ -162,7 +161,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
             if (sessionResult.rows.length > 0) {
               sessionId = sessionResult.rows[0].id;
               await pool.query(`UPDATE booking_requests SET session_id = $1 WHERE id = $2`, [sessionId, bookingId]);
-              console.log(`[Checkin Context] Created session ${sessionId} for booking ${bookingId}`);
+              console.log(`[Checkin Context] Created session ${sessionId} for booking ${bookingId} (${bookingDuration} min)`);
             }
           }
           
@@ -178,10 +177,11 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
             `, [sessionId]);
             
             if (existingOwner.rows.length === 0) {
+              // Use actual booking duration for slot_duration
               await pool.query(`
-                INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
-                VALUES ($1, $2, 'owner', $3, 'pending')
-              `, [sessionId, userId, bd.user_name || 'Member']);
+                INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+                VALUES ($1, $2, 'owner', $3, 'pending', $4)
+              `, [sessionId, userId, bd.user_name || 'Member', bookingDuration]);
             }
             
             // Ensure guest participants exist
@@ -195,9 +195,9 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
             if (existingGuestCount < playerCount - 1) {
               for (let i = existingGuestCount + 1; i < playerCount; i++) {
                 await pool.query(`
-                  INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status)
-                  VALUES ($1, NULL, 'guest', $2, 'pending')
-                `, [sessionId, `Guest ${i + 1}`]);
+                  INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+                  VALUES ($1, NULL, 'guest', $2, 'pending', $3)
+                `, [sessionId, `Guest ${i + 1}`, bookingDuration]);
               }
             }
             
@@ -978,7 +978,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
     }
 
     const bookingResult = await pool.query(`
-      SELECT br.session_id, br.user_email as owner_email
+      SELECT br.session_id, br.user_email as owner_email, br.start_time, br.end_time
       FROM booking_requests br
       WHERE br.id = $1
     `, [bookingId]);
@@ -989,6 +989,12 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
 
     const booking = bookingResult.rows[0];
     let sessionId = booking.session_id;
+    
+    // Calculate booking duration for slot_duration on new participants
+    const slotDuration = booking.start_time && booking.end_time 
+      ? Math.round((new Date(`2000-01-01T${booking.end_time}`).getTime() - 
+                   new Date(`2000-01-01T${booking.start_time}`).getTime()) / 60000)
+      : 60; // fallback to 60 if times missing
 
     if (!sessionId) {
       const sessionResult = await pool.query(`
@@ -1060,9 +1066,9 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
 
         await pool.query(`
           INSERT INTO booking_participants 
-            (session_id, user_id, participant_type, display_name, invite_status, payment_status)
-          VALUES ($1, $2, 'member', $3, 'accepted', 'pending')
-        `, [sessionId, matchedMember.id, matchedMember.name]);
+            (session_id, user_id, participant_type, display_name, invite_status, payment_status, slot_duration)
+          VALUES ($1, $2, 'member', $3, 'accepted', 'pending', $4)
+        `, [sessionId, matchedMember.id, matchedMember.name, slotDuration]);
 
         await pool.query(`
           INSERT INTO booking_payment_audit 
@@ -1104,9 +1110,9 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       // No matching member - add as true guest
       await pool.query(`
         INSERT INTO booking_participants 
-          (session_id, participant_type, display_name, invite_status, payment_status, cached_fee_cents)
-        VALUES ($1, 'guest', $2, 'accepted', 'pending', 2500)
-      `, [sessionId, guestName]);
+          (session_id, participant_type, display_name, invite_status, payment_status, cached_fee_cents, slot_duration)
+        VALUES ($1, 'guest', $2, 'accepted', 'pending', 2500, $3)
+      `, [sessionId, guestName, slotDuration]);
 
       await pool.query(`
         INSERT INTO booking_payment_audit 
@@ -1204,9 +1210,9 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       
       await pool.query(`
         INSERT INTO booking_participants 
-          (session_id, user_id, participant_type, display_name, invite_status, payment_status)
-        VALUES ($1, $2, 'member', $3, 'accepted', 'pending')
-      `, [sessionId, member.id, member.name || member.email]);
+          (session_id, user_id, participant_type, display_name, invite_status, payment_status, slot_duration)
+        VALUES ($1, $2, 'member', $3, 'accepted', 'pending', $4)
+      `, [sessionId, member.id, member.name || member.email, slotDuration]);
 
       await pool.query(`
         INSERT INTO booking_payment_audit 
