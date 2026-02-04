@@ -20,7 +20,8 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: Booking cancellation now properly refreshes the list instead of showing an error",
       "Fixed: Check-in button no longer shows conflicting success/failure messages",
       "Fixed: Fees are now locked in at approval time - members see the same price at check-in that they were quoted",
-      "Improved: Added protection against accidental double check-ins"
+      "Improved: Added protection against accidental double check-ins",
+      "Improved: Staff can now provide optional email when adding guests - if it matches a member, they're automatically added as a member instead"
     ]
   },
   {

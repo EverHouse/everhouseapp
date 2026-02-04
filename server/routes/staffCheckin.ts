@@ -971,7 +971,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
     const staffEmail = sessionUser.email;
     const staffName = sessionUser.name || null;
 
-    const { memberEmail, guestName, overrideReason, participantType } = req.body;
+    const { memberEmail, guestName, guestEmail, overrideReason, participantType } = req.body;
 
     if (!participantType || !['member', 'guest'].includes(participantType)) {
       return res.status(400).json({ error: 'participantType must be member or guest' });
@@ -1031,6 +1031,77 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
         return res.status(400).json({ error: 'guestName required for guest participant' });
       }
 
+      // Check if guest email matches an existing member
+      let matchedMember: { id: string; name: string; email: string } | null = null;
+      if (guestEmail) {
+        const memberCheck = await pool.query(`
+          SELECT id, COALESCE(name, email) as name, email 
+          FROM users 
+          WHERE LOWER(email) = LOWER($1) AND is_deleted = false
+        `, [guestEmail]);
+        if (memberCheck.rows.length > 0) {
+          matchedMember = memberCheck.rows[0];
+        }
+      }
+
+      // If we found a matching member, add them as a member participant instead
+      if (matchedMember) {
+        // Check if already in roster
+        const existingCheck = await pool.query(`
+          SELECT id FROM booking_participants 
+          WHERE session_id = $1 AND user_id = $2
+        `, [sessionId, matchedMember.id]);
+        
+        if (existingCheck.rows.length > 0) {
+          return res.status(400).json({ 
+            error: `${matchedMember.name} is already in this booking's roster` 
+          });
+        }
+
+        await pool.query(`
+          INSERT INTO booking_participants 
+            (session_id, user_id, participant_type, display_name, invite_status, payment_status)
+          VALUES ($1, $2, 'member', $3, 'accepted', 'pending')
+        `, [sessionId, matchedMember.id, matchedMember.name]);
+
+        await pool.query(`
+          INSERT INTO booking_payment_audit 
+            (booking_id, session_id, action, staff_email, staff_name, reason, metadata)
+          VALUES ($1, $2, 'staff_direct_add', $3, $4, $5, $6)
+        `, [
+          bookingId,
+          sessionId,
+          staffEmail,
+          staffName,
+          overrideReason || 'Staff direct add - matched to member',
+          JSON.stringify({ participantType: 'member', guestEmail, matchedUserId: matchedMember.id, matchedName: matchedMember.name })
+        ]);
+
+        try {
+          await recalculateSessionFees(sessionId, 'staff_add_member');
+        } catch (feeErr) {
+          console.warn(`[Staff Add Guest->Member] Failed to recalculate fees for session ${sessionId}:`, feeErr);
+        }
+
+        logFromRequest(req, 'direct_add_participant', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
+          participantType: 'member',
+          originalGuestEmail: guestEmail,
+          matchedUserId: matchedMember.id,
+          matchedName: matchedMember.name,
+          sessionId,
+          reason: overrideReason || 'Staff direct add - matched to member'
+        });
+
+        return res.json({ 
+          success: true, 
+          message: `Found existing member "${matchedMember.name}" - added as member (not guest)`,
+          sessionId,
+          matchedAsMember: true,
+          memberName: matchedMember.name
+        });
+      }
+
+      // No matching member - add as true guest
       await pool.query(`
         INSERT INTO booking_participants 
           (session_id, participant_type, display_name, invite_status, payment_status, cached_fee_cents)
@@ -1047,7 +1118,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
         staffEmail,
         staffName,
         overrideReason || 'Staff direct add',
-        JSON.stringify({ participantType: 'guest', guestName })
+        JSON.stringify({ participantType: 'guest', guestName, guestEmail: guestEmail || null })
       ]);
 
       // Recalculate fees to update all participant fees
