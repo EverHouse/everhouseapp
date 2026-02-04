@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.8.0",
+    date: "2026-02-04",
+    title: "Billing, Security & Data Integrity Fixes",
+    changes: [
+      "Fixed: Usage ledger now correctly records both guest fees AND usage minutes (prevents lost revenue)",
+      "Fixed: Guest name matching no longer blocks guests with similar names to host (e.g., 'Johnson' vs 'John')",
+      "Fixed: Deactivated staff no longer receive sensitive push notifications (security fix)",
+      "Fixed: Late cancellations now properly charge the cancellation fee instead of releasing payment holds",
+      "Improved: Better logging for late cancellation payment captures"
+    ]
+  },
+  {
     version: "69.7.0",
     date: "2026-02-04",
     title: "Critical Stripe Webhook Security Fixes",
