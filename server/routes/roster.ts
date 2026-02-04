@@ -46,6 +46,7 @@ import { getStripeClient } from '../core/stripe/client';
 import { getOrCreateStripeCustomer } from '../core/stripe/customers';
 import { computeFeeBreakdown, getEffectivePlayerCount, invalidateCachedFees, recalculateSessionFees } from '../core/billing/unifiedFeeService';
 import { PRICING } from '../core/billing/pricingConfig';
+import { createPrepaymentIntent } from '../core/billing/prepaymentService';
 
 const router = Router();
 
@@ -715,6 +716,58 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
           ledgerUpdated: recalcResult.ledgerUpdated
         }
       });
+      
+      // Create prepayment intent if there are fees after adding participant
+      if (recalcResult.billingResult.totalFees > 0) {
+        try {
+          // Get owner info from booking
+          const ownerResult = await pool.query(
+            `SELECT u.id, u.email, u.first_name, u.last_name 
+             FROM users u 
+             WHERE LOWER(u.email) = LOWER($1)
+             LIMIT 1`,
+            [booking.owner_email]
+          );
+          
+          const owner = ownerResult.rows[0];
+          const ownerUserId = owner?.id || null;
+          const ownerName = owner ? `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || booking.owner_email : booking.owner_email;
+          
+          // Calculate fee breakdown
+          const feeResult = await pool.query(`
+            SELECT SUM(COALESCE(cached_fee_cents, 0)) as total_cents,
+                   SUM(CASE WHEN participant_type = 'owner' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as overage_cents,
+                   SUM(CASE WHEN participant_type = 'guest' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as guest_cents
+            FROM booking_participants
+            WHERE session_id = $1
+          `, [sessionId]);
+          
+          const totalCents = parseInt(feeResult.rows[0]?.total_cents || '0');
+          const overageCents = parseInt(feeResult.rows[0]?.overage_cents || '0');
+          const guestCents = parseInt(feeResult.rows[0]?.guest_cents || '0');
+          
+          if (totalCents > 0) {
+            await createPrepaymentIntent({
+              sessionId,
+              bookingId,
+              userId: ownerUserId,
+              userEmail: booking.owner_email,
+              userName: ownerName,
+              totalFeeCents: totalCents,
+              feeBreakdown: { overageCents, guestCents }
+            });
+            
+            logger.info('[roster] Created prepayment intent after adding participant', {
+              extra: { sessionId, bookingId, totalCents }
+            });
+          }
+        } catch (prepayError) {
+          logger.warn('[roster] Failed to create prepayment intent (non-blocking)', {
+            error: prepayError as Error,
+            extra: { sessionId, bookingId }
+          });
+        }
+      }
     } catch (recalcError) {
       logger.warn('[roster] Failed to recalculate session fees (non-blocking)', {
         error: recalcError as Error,

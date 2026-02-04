@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.4.9",
+    date: "2026-02-04",
+    title: "Fixed: Prepayment Intents Now Created When Guests Added After Approval",
+    changes: [
+      "Fixed: Adding guests via roster or staff check-in now creates prepayment intent for member to pay online",
+      "Fixed: Members can now prepay fees when guests are added after initial booking approval",
+      "Fixed: All participant-add flows (roster, staff check-in) now trigger prepayment creation if fees exist",
+      "Previously: Guests added after booking approval had fees calculated but no prepayment intent - blocking check-in with no way to pay online"
+    ]
+  },
+  {
     version: "69.4.8",
     date: "2026-02-04",
     title: "Fixed: Booking Cards Now Show Correct Fee Estimates",

@@ -46,7 +46,7 @@ export async function createPrepaymentIntent(
     );
 
     if (existingIntent.rows.length > 0) {
-      console.log(`[Prepayment] Skipping - existing prepayment intent for session ${sessionId}`);
+      logger.info('[Prepayment] Skipping - existing prepayment intent', { extra: { sessionId } });
       return null;
     }
 
@@ -70,7 +70,9 @@ export async function createPrepaymentIntent(
       }
     });
 
-    console.log(`[Prepayment] Created payment intent ${result.paymentIntentId} for session ${sessionId}: $${(totalFeeCents / 100).toFixed(2)}`);
+    logger.info('[Prepayment] Created payment intent', { 
+      extra: { paymentIntentId: result.paymentIntentId, sessionId, amountDollars: (totalFeeCents / 100).toFixed(2) } 
+    });
 
     return {
       paymentIntentId: result.paymentIntentId,

@@ -4,12 +4,13 @@ import { pool } from '../core/db';
 import { bookingRequests, bookingParticipants, bookingSessions, usageLedger, bookingPaymentAudit, users } from '../../shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../core/middleware';
-import { logAndRespond } from '../core/logger';
+import { logAndRespond, logger } from '../core/logger';
 import { getSessionUser } from '../types/session';
 import { notifyMember, notifyFeeWaived } from '../core/notificationService';
 import { sendFeeWaivedEmail } from '../emails/paymentEmails';
 import { computeFeeBreakdown, applyFeeBreakdownToParticipants, recalculateSessionFees } from '../core/billing/unifiedFeeService';
 import { consumeGuestPassForParticipant, canUseGuestPass } from '../core/billing/guestPassConsumer';
+import { createPrepaymentIntent } from '../core/billing/prepaymentService';
 import { logFromRequest } from '../core/auditLog';
 import { enforceSocialTierRules, type ParticipantForValidation } from '../core/bookingService/tierRules';
 import { broadcastMemberStatsUpdated } from '../core/websocket';
@@ -1085,8 +1086,45 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
 
         try {
           await recalculateSessionFees(sessionId, 'staff_add_member');
+          
+          // Create prepayment intent for any new fees (e.g., overage)
+          try {
+            const feeResult = await pool.query(`
+              SELECT SUM(COALESCE(cached_fee_cents, 0)) as total_cents,
+                     SUM(CASE WHEN participant_type = 'owner' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as overage_cents,
+                     SUM(CASE WHEN participant_type = 'guest' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as guest_cents
+              FROM booking_participants
+              WHERE session_id = $1
+            `, [sessionId]);
+            
+            const totalCents = parseInt(feeResult.rows[0]?.total_cents || '0');
+            const overageCents = parseInt(feeResult.rows[0]?.overage_cents || '0');
+            const guestCents = parseInt(feeResult.rows[0]?.guest_cents || '0');
+            
+            if (totalCents > 0) {
+              const ownerResult = await pool.query(
+                `SELECT id, COALESCE(first_name || ' ' || last_name, email) as name 
+                 FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+                [booking.owner_email]
+              );
+              const owner = ownerResult.rows[0];
+              
+              await createPrepaymentIntent({
+                sessionId,
+                bookingId,
+                userId: owner?.id || null,
+                userEmail: booking.owner_email,
+                userName: owner?.name || booking.owner_email,
+                totalFeeCents: totalCents,
+                feeBreakdown: { overageCents, guestCents }
+              });
+              logger.info('[Staff Add Member] Created prepayment intent', { extra: { sessionId, amountDollars: (totalCents/100).toFixed(2) } });
+            }
+          } catch (prepayErr) {
+            logger.warn('[Staff Add Member] Failed to create prepayment intent', { extra: { sessionId, error: String(prepayErr) } });
+          }
         } catch (feeErr) {
-          console.warn(`[Staff Add Guest->Member] Failed to recalculate fees for session ${sessionId}:`, feeErr);
+          logger.warn('[Staff Add Guest->Member] Failed to recalculate fees', { extra: { sessionId, error: String(feeErr) } });
         }
 
         logFromRequest(req, 'direct_add_participant', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
@@ -1130,8 +1168,45 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       // Recalculate fees to update all participant fees
       try {
         await recalculateSessionFees(sessionId, 'staff_add_guest');
+        
+        // Create prepayment intent for the new fees
+        try {
+          const feeResult = await pool.query(`
+            SELECT SUM(COALESCE(cached_fee_cents, 0)) as total_cents,
+                   SUM(CASE WHEN participant_type = 'owner' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as overage_cents,
+                   SUM(CASE WHEN participant_type = 'guest' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as guest_cents
+            FROM booking_participants
+            WHERE session_id = $1
+          `, [sessionId]);
+          
+          const totalCents = parseInt(feeResult.rows[0]?.total_cents || '0');
+          const overageCents = parseInt(feeResult.rows[0]?.overage_cents || '0');
+          const guestCents = parseInt(feeResult.rows[0]?.guest_cents || '0');
+          
+          if (totalCents > 0) {
+            const ownerResult = await pool.query(
+              `SELECT id, COALESCE(first_name || ' ' || last_name, email) as name 
+               FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+              [booking.owner_email]
+            );
+            const owner = ownerResult.rows[0];
+            
+            await createPrepaymentIntent({
+              sessionId,
+              bookingId,
+              userId: owner?.id || null,
+              userEmail: booking.owner_email,
+              userName: owner?.name || booking.owner_email,
+              totalFeeCents: totalCents,
+              feeBreakdown: { overageCents, guestCents }
+            });
+            logger.info('[Staff Add Guest] Created prepayment intent', { extra: { sessionId, amountDollars: (totalCents/100).toFixed(2) } });
+          }
+        } catch (prepayErr) {
+          logger.warn('[Staff Add Guest] Failed to create prepayment intent', { extra: { sessionId, error: String(prepayErr) } });
+        }
       } catch (feeErr) {
-        console.warn(`[Staff Add Guest] Failed to recalculate fees for session ${sessionId}:`, feeErr);
+        logger.warn('[Staff Add Guest] Failed to recalculate fees', { extra: { sessionId, error: String(feeErr) } });
       }
 
       logFromRequest(req, 'direct_add_participant', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
