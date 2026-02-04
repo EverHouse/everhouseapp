@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.3.8",
+    date: "2026-02-04",
+    title: "Check-In & Fee Stability Fixes",
+    changes: [
+      "Fixed: Booking cancellation now properly refreshes the list instead of showing an error",
+      "Fixed: Check-in button no longer shows conflicting success/failure messages",
+      "Fixed: Fees are now locked in at approval time - members see the same price at check-in that they were quoted",
+      "Improved: Added protection against accidental double check-ins"
+    ]
+  },
+  {
     version: "69.3.7",
     date: "2026-02-03",
     title: "Assign Players Bug Fix",
