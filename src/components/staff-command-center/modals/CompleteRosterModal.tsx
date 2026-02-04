@@ -41,6 +41,11 @@ export const CompleteRosterModal: React.FC<CompleteRosterModalProps> = ({
   const [rosterComplete, setRosterComplete] = useState(false);
   const [showBillingModal, setShowBillingModal] = useState(false);
 
+  // Debug: Log when billing modal state changes
+  useEffect(() => {
+    console.log('[CompleteRosterModal] showBillingModal changed:', showBillingModal, 'bookingId:', bookingId);
+  }, [showBillingModal, bookingId]);
+
   useEffect(() => {
     if (isOpen && bookingId) {
       fetchContext();

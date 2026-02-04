@@ -3444,7 +3444,7 @@ return null;
               isOpen={rosterModal.isOpen}
               bookingId={rosterModal.bookingId || 0}
               onClose={() => setRosterModal({isOpen: false, bookingId: null})}
-              onComplete={() => {
+              onRosterComplete={() => {
                 setRosterModal({isOpen: false, bookingId: null});
                 handleRefresh();
               }}

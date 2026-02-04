@@ -1375,7 +1375,8 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
       )}
       {financialSummary && financialSummary.grandTotal > 0 && !financialSummary.allPaid && (
         <button
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation();
             console.log('[Collect Payment] Button clicked', { bookingId, hasHandler: !!onCollectPayment });
             onCollectPayment?.(Number(bookingId));
           }}

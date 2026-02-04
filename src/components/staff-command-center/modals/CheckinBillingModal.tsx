@@ -92,7 +92,9 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
   const [overageClientSecret, setOverageClientSecret] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('[CheckinBillingModal] Props changed:', { isOpen, bookingId });
     if (isOpen && bookingId) {
+      console.log('[CheckinBillingModal] Opening and fetching context');
       fetchContext();
     }
   }, [isOpen, bookingId]);
