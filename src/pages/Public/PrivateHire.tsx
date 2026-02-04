@@ -1,24 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
-import EventInquiryForm from '../../components/EventInquiryForm';
 import VirtualTour from '../../components/VirtualTour';
-import { triggerHaptic } from '../../utils/haptics';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useParallax } from '../../hooks/useParallax';
 
 const PrivateHire: React.FC = () => {
   const { setPageReady } = usePageReady();
-  const [showInquiryForm, setShowInquiryForm] = useState(false);
   const { offset: parallaxOffset, opacity: parallaxOpacity, gradientShift, ref: heroRef } = useParallax({ speed: 0.25, maxOffset: 120 });
 
   useEffect(() => {
     setPageReady(true);
   }, [setPageReady]);
-
-  const openForm = () => {
-    triggerHaptic('light');
-    setShowInquiryForm(true);
-  };
 
   return (
     <div className="min-h-screen pb-0 overflow-x-hidden relative bg-[#F2F2EC]">
@@ -73,12 +66,12 @@ const PrivateHire: React.FC = () => {
              From intimate dinners to grand receptions, discover the perfect setting for your next event at our Tustin location. Our team handles every detail so you can focus on your guests.
            </p>
            <div className="flex flex-col gap-3 w-full max-w-xs animate-hero-cta">
-             <button 
-               onClick={openForm}
+             <Link 
+               to="/private-hire/inquire"
                className="w-full py-4 rounded-2xl bg-white/30 backdrop-blur-xl text-white font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-white/40 transition-all text-center border border-white/40"
              >
                Submit Inquiry
-             </button>
+             </Link>
            </div>
          </div>
        </div>
@@ -134,11 +127,6 @@ const PrivateHire: React.FC = () => {
        </div>
        
        <Footer />
-
-       <EventInquiryForm
-         isOpen={showInquiryForm}
-         onClose={() => setShowInquiryForm(false)}
-       />
     </div>
   );
 };

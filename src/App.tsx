@@ -106,6 +106,7 @@ const Contact = lazy(() => import('./pages/Public/Contact'));
 const Gallery = lazy(() => import('./pages/Public/Gallery'));
 const WhatsOn = lazy(() => import('./pages/Public/WhatsOn'));
 const PrivateHire = lazy(() => import('./pages/Public/PrivateHire'));
+const PrivateHireInquire = lazy(() => import('./pages/Public/PrivateHireInquire'));
 const PublicCafe = lazy(() => import('./pages/Public/Cafe'));
 const FAQ = lazy(() => import('./pages/Public/FAQ'));
 const BuyDayPass = lazy(() => import('./pages/Public/BuyDayPass'));
@@ -360,6 +361,7 @@ const AnimatedRoutes: React.FC = () => {
             <Route path="/gallery" element={<DirectionalPageTransition><PageErrorBoundary pageName="Gallery"><Gallery /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/whats-on" element={<DirectionalPageTransition><PageErrorBoundary pageName="WhatsOn"><WhatsOn /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/private-hire" element={<DirectionalPageTransition><PageErrorBoundary pageName="PrivateHire"><PrivateHire /></PageErrorBoundary></DirectionalPageTransition>} />
+            <Route path="/private-hire/inquire" element={<DirectionalPageTransition><PageErrorBoundary pageName="PrivateHireInquire"><PrivateHireInquire /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/menu" element={<DirectionalPageTransition><PageErrorBoundary pageName="Cafe"><PublicCafe /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/faq" element={<DirectionalPageTransition><PageErrorBoundary pageName="FAQ"><FAQ /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/day-pass" element={<DirectionalPageTransition><PageErrorBoundary pageName="BuyDayPass"><BuyDayPass /></PageErrorBoundary></DirectionalPageTransition>} />
