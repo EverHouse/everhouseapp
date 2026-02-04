@@ -3375,13 +3375,24 @@ const SimulatorTab: React.FC = () => {
                                             onClick={async (e) => {
                                                 e.preventDefault();
                                                 e.stopPropagation();
-                                                const booking = selectedCalendarBooking;
-                                                if (!booking) {
-                                                    showToast('Booking not found', 'error');
-                                                    return;
+                                                try {
+                                                    const booking = selectedCalendarBooking;
+                                                    if (!booking) {
+                                                        showToast('Booking not found', 'error');
+                                                        return;
+                                                    }
+                                                    // Parse booking ID - calendar bookings may have "cal_" prefix
+                                                    const parsedId = typeof booking.id === 'string' 
+                                                        ? parseInt(String(booking.id).replace('cal_', ''), 10) 
+                                                        : booking.id;
+                                                    console.log('[SimulatorTab] Calendar modal Check In clicked for booking:', booking.id, '-> parsed:', parsedId);
+                                                    // Create a booking object with the parsed ID for the API call
+                                                    const bookingForApi = { ...booking, id: parsedId };
+                                                    await updateBookingStatusOptimistic(bookingForApi as any, 'attended', () => setSelectedCalendarBooking(null));
+                                                } catch (err: any) {
+                                                    console.error('[SimulatorTab] Check In error:', err);
+                                                    showToast(err.message || 'Check-in failed', 'error');
                                                 }
-                                                console.log('[SimulatorTab] Calendar modal Check In clicked for booking:', booking.id);
-                                                await updateBookingStatusOptimistic(booking, 'attended', () => setSelectedCalendarBooking(null));
                                             }}
                                             className="flex-1 py-3 px-4 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium flex items-center justify-center gap-2"
                                         >
@@ -3393,13 +3404,23 @@ const SimulatorTab: React.FC = () => {
                                             onClick={async (e) => {
                                                 e.preventDefault();
                                                 e.stopPropagation();
-                                                const booking = selectedCalendarBooking;
-                                                if (!booking) {
-                                                    showToast('Booking not found', 'error');
-                                                    return;
+                                                try {
+                                                    const booking = selectedCalendarBooking;
+                                                    if (!booking) {
+                                                        showToast('Booking not found', 'error');
+                                                        return;
+                                                    }
+                                                    // Parse booking ID - calendar bookings may have "cal_" prefix
+                                                    const parsedId = typeof booking.id === 'string' 
+                                                        ? parseInt(String(booking.id).replace('cal_', ''), 10) 
+                                                        : booking.id;
+                                                    console.log('[SimulatorTab] Calendar modal No Show clicked for booking:', booking.id, '-> parsed:', parsedId);
+                                                    const bookingForApi = { ...booking, id: parsedId };
+                                                    await updateBookingStatusOptimistic(bookingForApi as any, 'no_show', () => setSelectedCalendarBooking(null));
+                                                } catch (err: any) {
+                                                    console.error('[SimulatorTab] No Show error:', err);
+                                                    showToast(err.message || 'Failed to mark as no show', 'error');
                                                 }
-                                                console.log('[SimulatorTab] Calendar modal No Show clicked for booking:', booking.id);
-                                                await updateBookingStatusOptimistic(booking, 'no_show', () => setSelectedCalendarBooking(null));
                                             }}
                                             className="flex-1 py-3 px-4 rounded-lg bg-red-500 hover:bg-red-600 text-white font-medium flex items-center justify-center gap-2"
                                         >
