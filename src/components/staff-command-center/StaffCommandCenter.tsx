@@ -430,7 +430,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
       const res = await fetch(`/api/bookings/${id}/checkin`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include'
+        credentials: 'include',
+        body: JSON.stringify({ status: 'attended' })
       });
       
       if (res.ok) {

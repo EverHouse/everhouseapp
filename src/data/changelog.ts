@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.27.0",
+    date: "2026-02-04",
+    title: "Check-In Button Fix",
+    changes: [
+      "Fixed: Check-in button now works correctly - was missing required data in the request",
+      "Fixed: Staff Command Center check-in now properly sends booking status to server"
+    ]
+  },
+  {
     version: "69.26.0",
     date: "2026-02-04",
     title: "Queue Payment Priority & Check-In Error Messages",
