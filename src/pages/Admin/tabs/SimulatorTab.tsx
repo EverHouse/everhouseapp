@@ -3327,6 +3327,9 @@ const SimulatorTab: React.FC = () => {
                         {(() => {
                             if (!selectedCalendarBooking) return null;
                             const status = selectedCalendarBooking.status;
+                            const bookingId = typeof selectedCalendarBooking.id === 'string' 
+                                ? parseInt(String(selectedCalendarBooking.id).replace('cal_', '')) 
+                                : selectedCalendarBooking.id as number;
                             
                             if (status === 'attended') {
                                 return (
@@ -3348,19 +3351,36 @@ const SimulatorTab: React.FC = () => {
                             
                             if (status === 'approved' || status === 'confirmed') {
                                 return (
-                                    <button
-                                        onClick={() => {
-                                            const bookingId = typeof selectedCalendarBooking.id === 'string' 
-                                                ? parseInt(String(selectedCalendarBooking.id).replace('cal_', '')) 
-                                                : selectedCalendarBooking.id as number;
-                                            setMarkStatusModal({ booking: selectedCalendarBooking, confirmNoShow: false });
-                                            setSelectedCalendarBooking(null);
-                                        }}
-                                        className="w-full py-3 px-4 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium flex items-center justify-center gap-2"
-                                    >
-                                        <span aria-hidden="true" className="material-symbols-outlined text-sm">how_to_reg</span>
-                                        Check In / Mark Status
-                                    </button>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={async (e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                const booking = selectedCalendarBooking;
+                                                setSelectedCalendarBooking(null);
+                                                await updateBookingStatusOptimistic(booking, 'attended');
+                                            }}
+                                            className="flex-1 py-3 px-4 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium flex items-center justify-center gap-2"
+                                        >
+                                            <span aria-hidden="true" className="material-symbols-outlined text-sm">check_circle</span>
+                                            Check In
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={async (e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                const booking = selectedCalendarBooking;
+                                                setSelectedCalendarBooking(null);
+                                                await updateBookingStatusOptimistic(booking, 'no_show');
+                                            }}
+                                            className="flex-1 py-3 px-4 rounded-lg bg-red-500 hover:bg-red-600 text-white font-medium flex items-center justify-center gap-2"
+                                        >
+                                            <span aria-hidden="true" className="material-symbols-outlined text-sm">person_off</span>
+                                            No Show
+                                        </button>
+                                    </div>
                                 );
                             }
                             
