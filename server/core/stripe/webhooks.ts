@@ -15,6 +15,7 @@ import { computeFeeBreakdown } from '../billing/unifiedFeeService';
 import { logPaymentFailure, logWebhookFailure } from '../monitoring';
 import { logSystemAction } from '../auditLog';
 import { queueJobInTransaction } from '../jobQueue';
+import { MemberService } from '../memberService/MemberService';
 import type { PoolClient } from 'pg';
 
 const EVENT_DEDUP_WINDOW_DAYS = 7;
@@ -363,35 +364,82 @@ async function handleChargeRefunded(client: PoolClient, charge: any): Promise<De
     if (participantUpdate.rowCount && participantUpdate.rowCount > 0) {
       console.log(`[Stripe Webhook] Marked ${participantUpdate.rowCount} participant(s) as refunded for PI ${paymentIntentId}`);
       
+      // Check if this is a full refund - if so, cancel the booking to prevent "free play"
+      const isFullRefund = amount_refunded >= amount;
+      
       for (const row of participantUpdate.rows) {
         await client.query(
           `INSERT INTO booking_payment_audit 
            (booking_id, session_id, participant_id, action, staff_email, staff_name, amount_affected, payment_method, metadata)
            SELECT bs.booking_id, $1, $2, 'refund_processed', 'system', 'Stripe Webhook', 0, 'stripe', $3
            FROM booking_sessions bs WHERE bs.id = $1`,
-          [row.session_id, row.id, JSON.stringify({ stripePaymentIntentId: paymentIntentId })]
+          [row.session_id, row.id, JSON.stringify({ stripePaymentIntentId: paymentIntentId, isFullRefund })]
         );
+        
+        // For full refunds, cancel the participant's booking to prevent "free play" loophole
+        if (isFullRefund) {
+          // Soft-delete the participant (mark as cancelled rather than removing entirely for audit trail)
+          await client.query(
+            `UPDATE booking_participants 
+             SET cancelled_at = NOW(), cancelled_reason = 'full_refund_issued'
+             WHERE id = $1`,
+            [row.id]
+          );
+          
+          // Check if all participants in this session are now cancelled/refunded
+          const remainingActiveResult = await client.query(
+            `SELECT COUNT(*) as active_count 
+             FROM booking_participants 
+             WHERE session_id = $1 
+             AND cancelled_at IS NULL 
+             AND payment_status != 'refunded'`,
+            [row.session_id]
+          );
+          
+          // If no active participants remain, cancel the entire session
+          if (parseInt(remainingActiveResult.rows[0]?.active_count || '0') === 0) {
+            await client.query(
+              `UPDATE booking_sessions SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1`,
+              [row.session_id]
+            );
+            
+            // Also cancel the associated booking request
+            await client.query(
+              `UPDATE booking_requests SET status = 'cancelled' 
+               WHERE id = (SELECT booking_id FROM booking_sessions WHERE id = $1)`,
+              [row.session_id]
+            );
+            
+            console.log(`[Stripe Webhook] Cancelled booking session ${row.session_id} after full refund - no remaining active participants`);
+          }
+          
+          console.log(`[Stripe Webhook] Cancelled participant ${row.id} after full refund for PI ${paymentIntentId}`);
+        }
         
         // Send refund notification to member
         if (row.user_email) {
           const userResult = await client.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`, [row.user_email]);
           const userId = userResult.rows[0]?.id;
           
+          const notificationMessage = isFullRefund
+            ? `Your booking has been cancelled and your payment of $${(amount_refunded / 100).toFixed(2)} has been refunded. It may take 5-10 business days to appear on your statement.`
+            : `Your booking payment of $${(amount_refunded / 100).toFixed(2)} has been refunded. It may take 5-10 business days to appear on your statement.`;
+          
           if (userId) {
             await client.query(
               `INSERT INTO notifications (user_id, title, message, type, link, created_at)
                VALUES ($1, $2, $3, $4, $5, NOW())`,
-              [userId, 'Payment Refunded', `Your booking payment of $${(amount_refunded / 100).toFixed(2)} has been refunded. It may take 5-10 business days to appear on your statement.`, 'billing', '/billing']
+              [userId, isFullRefund ? 'Booking Cancelled & Refunded' : 'Payment Refunded', notificationMessage, 'billing', '/billing']
             );
           }
           
           deferredActions.push(async () => {
             sendNotificationToUser(row.user_email, {
               type: 'notification',
-              title: 'Payment Refunded',
-              message: `Your booking payment of $${(amount_refunded / 100).toFixed(2)} has been refunded. It may take 5-10 business days to appear on your statement.`,
-              data: { sessionId: row.session_id, eventType: 'payment_refunded' }
-            }, { action: 'payment_refunded', sessionId: row.session_id, triggerSource: 'webhooks.ts' });
+              title: isFullRefund ? 'Booking Cancelled & Refunded' : 'Payment Refunded',
+              message: notificationMessage,
+              data: { sessionId: row.session_id, eventType: isFullRefund ? 'booking_cancelled_refunded' : 'payment_refunded' }
+            }, { action: isFullRefund ? 'booking_cancelled_refunded' : 'payment_refunded', sessionId: row.session_id, triggerSource: 'webhooks.ts' });
           });
         }
       }
@@ -2096,6 +2144,9 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
           [newTierName, userId, 'stripe']
         );
         
+        // Invalidate member cache to ensure fresh data is served
+        MemberService.invalidateCache(email);
+        
         console.log(`[Stripe Webhook] Tier updated via Stripe for ${email}: ${currentTier} -> ${newTierName} (matched by ${matchMethod})`);
         
         // Sync tier change to HubSpot (contact properties + deal line items) - Stripe-billed only
@@ -2148,6 +2199,8 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
          AND COALESCE(membership_status, '') NOT IN ('cancelled', 'suspended', 'terminated')`,
         [userId]
       );
+      // Invalidate member cache to ensure fresh data is served
+      MemberService.invalidateCache(email);
       console.log(`[Stripe Webhook] Membership status set to active for ${email}`);
       
       // Sync status change to HubSpot
@@ -2163,6 +2216,8 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
         `UPDATE users SET membership_status = 'past_due', updated_at = NOW() WHERE id = $1`,
         [userId]
       );
+      // Invalidate member cache to ensure fresh data is served
+      MemberService.invalidateCache(email);
       await notifyMember({
         userEmail: email,
         title: 'Membership Past Due',
@@ -2195,6 +2250,8 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
         `UPDATE users SET membership_status = 'suspended', updated_at = NOW() WHERE id = $1`,
         [userId]
       );
+      // Invalidate member cache to ensure fresh data is served
+      MemberService.invalidateCache(email);
       await notifyMember({
         userEmail: email,
         title: 'Membership Unpaid',

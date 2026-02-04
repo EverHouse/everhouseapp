@@ -244,6 +244,7 @@ const BookGolf: React.FC = () => {
   const isFirstRenderRef = useRef(true);
   const prevDateRef = useRef<string | null>(null);
   const prevDurationRef = useRef<number | null>(null);
+  const prevTabRef = useRef<string | null>(null);
 
   const effectiveUser = viewAsUser || user;
   
@@ -501,15 +502,17 @@ const BookGolf: React.FC = () => {
     
     const dateChanged = currentDate !== prevDateRef.current;
     const durationChanged = duration !== prevDurationRef.current;
+    const tabChanged = activeTab !== prevTabRef.current;
     
-    if (dateChanged || durationChanged) {
+    if (dateChanged || durationChanged || tabChanged) {
       setSelectedSlot(null);
       setSelectedResource(null);
     }
     
     prevDateRef.current = currentDate;
     prevDurationRef.current = duration;
-  }, [selectedDateObj, duration]);
+    prevTabRef.current = activeTab;
+  }, [selectedDateObj, duration, activeTab]);
 
   useEffect(() => {
     if (!isLoading) {

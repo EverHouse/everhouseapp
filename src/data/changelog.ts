@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.6.0",
+    date: "2026-02-04",
+    title: "Critical Bug Fixes: Cache, Refunds & UI",
+    changes: [
+      "Fixed: Member data cache now properly invalidates when Stripe webhooks update tier or membership status",
+      "Fixed: Full refunds issued via Stripe Dashboard now automatically cancel the booking (prevents 'free play' loophole)",
+      "Fixed: Switching between Simulator and Conference tabs now properly clears the selected time slot",
+      "Improved: Refund notifications now clearly indicate if booking was cancelled due to full refund",
+      "Improved: Booking sessions with all participants refunded are now automatically cancelled"
+    ]
+  },
+  {
     version: "69.5.3",
     date: "2026-02-03",
     title: "Golf Bay Booking Touch Handling Fix",
