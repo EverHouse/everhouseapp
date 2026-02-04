@@ -2159,9 +2159,13 @@ const SimulatorTab: React.FC = () => {
                                                                 ) : !isConferenceRoom && isToday ? (
                                                                     <button
                                                                         type="button"
+                                                                        onPointerDown={(e) => e.stopPropagation()}
+                                                                        onMouseDown={(e) => e.stopPropagation()}
+                                                                        onTouchStart={(e) => e.stopPropagation()}
                                                                         onClick={async (e) => {
                                                                             e.preventDefault();
                                                                             e.stopPropagation();
+                                                                            e.nativeEvent.stopImmediatePropagation();
                                                                             if (!booking) {
                                                                                 showToast('Booking not found', 'error');
                                                                                 return;
@@ -2169,7 +2173,7 @@ const SimulatorTab: React.FC = () => {
                                                                             console.log('[SimulatorTab] Queue Check In button clicked for booking:', booking.id);
                                                                             await updateBookingStatusOptimistic(booking, 'attended');
                                                                         }}
-                                                                        className="flex-1 py-2.5 bg-accent text-primary rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 hover:shadow-md active:scale-95 transition-all duration-200"
+                                                                        className="flex-1 py-2.5 bg-accent text-primary rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 hover:shadow-md active:scale-95 transition-all duration-200 relative z-20"
                                                                     >
                                                                         <span aria-hidden="true" className="material-symbols-outlined text-lg">how_to_reg</span>
                                                                         Check In
