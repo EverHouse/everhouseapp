@@ -227,7 +227,11 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
     
     return (
       <button
-        onClick={(e) => { e.stopPropagation(); executeCheckIn(booking); }}
+        onClick={(e) => { 
+          e.stopPropagation(); 
+          console.log('[Queue Check-in] Button clicked', { bookingId: booking.id });
+          executeCheckIn(booking); 
+        }}
         disabled={isCheckingIn}
         className="text-xs px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 flex items-center gap-1"
       >
