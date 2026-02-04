@@ -1192,6 +1192,9 @@ const SimulatorTab: React.FC = () => {
             const statusLabel = newStatus === 'attended' ? 'checked in' : 
                               newStatus === 'no_show' ? 'marked as no show' : 'cancelled';
             showToast(`Booking ${statusLabel}`, 'success');
+            // Invalidate queries to ensure fresh data after successful status change
+            queryClient.invalidateQueries({ queryKey: bookingsKeys.allRequests() });
+            queryClient.invalidateQueries({ queryKey: bookingsKeys.approved(startDate, endDate) });
             // Don't clean up ref on success - booking is now checked in
             return true;
         } catch (err: any) {
@@ -2208,43 +2211,10 @@ const SimulatorTab: React.FC = () => {
                                                                             e.preventDefault();
                                                                             const btn = e.currentTarget;
                                                                             if (btn.disabled) return;
-                                                                            const id = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
-                                                                            // Prevent double-execution using ref
-                                                                            if (checkinInProgressRef.current.has(id)) {
-                                                                                console.log('[Check-in] Already in progress for booking', id);
-                                                                                return;
-                                                                            }
-                                                                            checkinInProgressRef.current.add(id);
                                                                             btn.disabled = true;
-                                                                            try {
-                                                                                const res = await fetch(`/api/bookings/${id}/checkin`, {
-                                                                                    method: 'PUT',
-                                                                                    headers: { 'Content-Type': 'application/json' },
-                                                                                    credentials: 'include'
-                                                                                });
-                                                                                if (res.ok) {
-                                                                                    showToast('Member checked in', 'success');
-                                                                                    queryClient.invalidateQueries({ queryKey: bookingsKeys.allRequests() });
-                                                                                    queryClient.invalidateQueries({ queryKey: bookingsKeys.approved(startDate, endDate) });
-                                                                                } else if (res.status === 402) {
-                                                                                    const errorData = await res.json();
-                                                                                    if (errorData.requiresRoster) {
-                                                                                        setRosterModal({ isOpen: true, bookingId: id });
-                                                                                    } else {
-                                                                                        setBillingModal({ isOpen: true, bookingId: id });
-                                                                                    }
-                                                                                    btn.disabled = false;
-                                                                                    checkinInProgressRef.current.delete(id);
-                                                                                } else {
-                                                                                    showToast('Failed to check in', 'error');
-                                                                                    btn.disabled = false;
-                                                                                    checkinInProgressRef.current.delete(id);
-                                                                                }
-                                                                            } catch (err) {
-                                                                                showToast('Failed to check in', 'error');
-                                                                                btn.disabled = false;
-                                                                                checkinInProgressRef.current.delete(id);
-                                                                            }
+                                                                            // Use centralized check-in handler to prevent duplicate toasts
+                                                                            await updateBookingStatusOptimistic(booking, 'attended');
+                                                                            btn.disabled = false;
                                                                         }}
                                                                         className="flex-1 py-2.5 bg-accent text-primary rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 hover:shadow-md active:scale-95 transition-all duration-200 disabled:opacity-50"
                                                                     >

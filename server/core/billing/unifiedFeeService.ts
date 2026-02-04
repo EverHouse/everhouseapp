@@ -53,18 +53,25 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
     let params: any[];
     
     if (sessionId) {
+      // Calculate session duration from session times (most accurate)
+      // Fall back to booking's duration_minutes if session times are missing
+      // When multiple bookings share a session, use the one with matching duration to avoid bugs
       query = `
         SELECT 
           bs.id as session_id,
           br.id as booking_id,
           bs.session_date,
-          br.start_time,
-          br.duration_minutes,
+          COALESCE(bs.start_time, br.start_time) as start_time,
+          COALESCE(
+            EXTRACT(EPOCH FROM (bs.end_time - bs.start_time)) / 60,
+            br.duration_minutes
+          )::int as duration_minutes,
           COALESCE(br.declared_player_count, br.trackman_player_count, br.guest_count + 1, 1) as declared_player_count,
           br.user_email as host_email
         FROM booking_sessions bs
         JOIN booking_requests br ON br.session_id = bs.id
         WHERE bs.id = $1
+        ORDER BY br.duration_minutes DESC
         LIMIT 1
       `;
       params = [sessionId];
