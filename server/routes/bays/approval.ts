@@ -1143,7 +1143,7 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
       });
     }
     
-    if (newStatus === 'attended' && existing.session_id && !skipPaymentCheck) {
+    if (newStatus === 'attended' && existing.session_id) {
       const nullFeesCheck = await pool.query(`
         SELECT COUNT(*) as null_count
         FROM booking_participants bp
@@ -1186,26 +1186,44 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
       }
       
       if (totalOutstanding > 0 && !confirmPayment) {
-        await pool.query(`
-          INSERT INTO booking_payment_audit 
-            (booking_id, session_id, action, staff_email, staff_name, amount_affected, metadata)
-          VALUES ($1, $2, 'checkin_guard_triggered', $3, $4, $5, $6)
-        `, [
-          bookingId,
-          existing.session_id,
-          staffEmail,
-          staffName,
-          totalOutstanding,
-          JSON.stringify({ unpaidParticipants })
-        ]);
-        
-        return res.status(402).json({ 
-          error: 'Payment required',
-          requiresPayment: true,
-          totalOutstanding,
-          unpaidParticipants,
-          message: `Outstanding balance of $${totalOutstanding.toFixed(2)}. Has the member paid?`
-        });
+        if (skipPaymentCheck) {
+          await pool.query(`
+            INSERT INTO booking_payment_audit 
+              (booking_id, session_id, action, staff_email, staff_name, amount_affected, metadata)
+            VALUES ($1, $2, 'payment_check_bypassed', $3, $4, $5, $6)
+          `, [
+            bookingId,
+            existing.session_id,
+            staffEmail,
+            staffName,
+            totalOutstanding,
+            JSON.stringify({ unpaidParticipants, bypassed: true, reason: 'skipPaymentCheck flag used' })
+          ]);
+          console.warn(`[Check-in Guard] AUDIT: Payment check bypassed by ${staffEmail} for booking ${bookingId}, outstanding: $${totalOutstanding.toFixed(2)}`);
+        } else {
+          await pool.query(`
+            INSERT INTO booking_payment_audit 
+              (booking_id, session_id, action, staff_email, staff_name, amount_affected, metadata)
+            VALUES ($1, $2, 'checkin_guard_triggered', $3, $4, $5, $6)
+          `, [
+            bookingId,
+            existing.session_id,
+            staffEmail,
+            staffName,
+            totalOutstanding,
+            JSON.stringify({ unpaidParticipants })
+          ]);
+          
+          return res.status(402).json({ 
+            error: 'Cannot complete check-in: All fees must be collected first',
+            code: 'OUTSTANDING_BALANCE',
+            requiresPayment: true,
+            totalOutstanding,
+            unpaidParticipants,
+            pendingCount: unpaidParticipants.length,
+            message: `Outstanding balance of $${totalOutstanding.toFixed(2)}. Has the member paid?`
+          });
+        }
       }
       
       if (confirmPayment && totalOutstanding > 0) {

@@ -360,7 +360,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ status: 'attended', skipPaymentCheck: true })
+        body: JSON.stringify({ status: 'attended' })
       });
       if (res.ok) {
         onCheckinComplete();
@@ -459,7 +459,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ status: 'attended', skipPaymentCheck: true })
+        body: JSON.stringify({ status: 'attended', confirmPayment: true })
       });
       if (res.ok) {
         onCheckinComplete();
@@ -620,6 +620,13 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
               <span className="material-symbols-outlined">check_circle</span>
               {actionInProgress === 'mark-reviewed' ? 'Processing...' : 'Mark Waivers as Reviewed'}
             </button>
+          ) : context?.hasUnpaidBalance ? (
+            <div className="w-full p-3 bg-red-50 dark:bg-red-900/20 rounded-xl text-center flex items-center justify-center gap-2">
+              <span className="material-symbols-outlined text-red-500">warning</span>
+              <span className="text-red-600 dark:text-red-400 font-medium">
+                Collect all payments before check-in
+              </span>
+            </div>
           ) : (
             <button
               onClick={handleCheckinNoPayment}
