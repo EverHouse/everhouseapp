@@ -1957,6 +1957,31 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
             } catch (hubspotError) {
               console.error('[Stripe Webhook] HubSpot sync failed for existing user subscription:', hubspotError);
             }
+            
+            // Auto-create corporate billing group for volume pricing purchases
+            const quantity = subscription.items?.data?.[0]?.quantity || 1;
+            const companyName = subscription.metadata?.company_name;
+            const tierType = subscription.metadata?.tier_type;
+            
+            if (tierType === 'corporate' && quantity > 1 && companyName) {
+              try {
+                const { createCorporateBillingGroupFromSubscription } = await import('./groupBilling');
+                const groupResult = await createCorporateBillingGroupFromSubscription({
+                  primaryEmail: email,
+                  companyName: companyName,
+                  quantity: quantity,
+                  stripeCustomerId: customerId,
+                  stripeSubscriptionId: subscription.id,
+                });
+                if (groupResult.success) {
+                  console.log(`[Stripe Webhook] Auto-created corporate billing group for ${email}: ${companyName} with ${quantity} seats`);
+                } else {
+                  console.warn(`[Stripe Webhook] Failed to auto-create corporate billing group: ${groupResult.error}`);
+                }
+              } catch (groupError) {
+                console.error('[Stripe Webhook] Error auto-creating corporate billing group:', groupError);
+              }
+            }
           } else {
             console.log(`[Stripe Webhook] User activation: ${email} - no update performed`);
           }

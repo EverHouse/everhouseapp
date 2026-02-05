@@ -249,6 +249,7 @@ export const billingGroups = pgTable("billing_groups", {
   type: text("type").default("family"), // 'family' or 'corporate'
   companyName: text("company_name"),
   hubspotCompanyId: text("hubspot_company_id"),
+  maxSeats: integer("max_seats"), // for corporate groups: total purchased seats
   
   // Status
   isActive: boolean("is_active").default(true),

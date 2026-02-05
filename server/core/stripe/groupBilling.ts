@@ -282,6 +282,62 @@ export async function createBillingGroup(params: {
 
 export const createFamilyGroup = createBillingGroup;
 
+export async function createCorporateBillingGroupFromSubscription(params: {
+  primaryEmail: string;
+  companyName: string;
+  quantity: number;
+  stripeCustomerId: string;
+  stripeSubscriptionId: string;
+}): Promise<{ success: boolean; groupId?: number; error?: string }> {
+  try {
+    const existingGroup = await db.select()
+      .from(billingGroups)
+      .where(eq(billingGroups.primaryEmail, params.primaryEmail.toLowerCase()))
+      .limit(1);
+    
+    if (existingGroup.length > 0) {
+      console.log(`[GroupBilling] Corporate billing group already exists for ${params.primaryEmail}, updating subscription ID and seats`);
+      await db.update(billingGroups)
+        .set({
+          primaryStripeSubscriptionId: params.stripeSubscriptionId,
+          primaryStripeCustomerId: params.stripeCustomerId,
+          companyName: params.companyName,
+          groupName: params.companyName,
+          type: 'corporate',
+          maxSeats: params.quantity,
+          updatedAt: new Date(),
+        })
+        .where(eq(billingGroups.id, existingGroup[0].id));
+      return { success: true, groupId: existingGroup[0].id };
+    }
+    
+    const result = await db.insert(billingGroups).values({
+      primaryEmail: params.primaryEmail.toLowerCase(),
+      primaryStripeCustomerId: params.stripeCustomerId,
+      primaryStripeSubscriptionId: params.stripeSubscriptionId,
+      groupName: params.companyName,
+      companyName: params.companyName,
+      type: 'corporate',
+      maxSeats: params.quantity,
+      isActive: true,
+      createdBy: 'system',
+      createdByName: 'Stripe Checkout',
+    }).returning({ id: billingGroups.id });
+    
+    await pool.query(
+      'UPDATE users SET billing_group_id = $1 WHERE LOWER(email) = $2',
+      [result[0].id, params.primaryEmail.toLowerCase()]
+    );
+    
+    console.log(`[GroupBilling] Auto-created corporate billing group: ${params.companyName} (ID: ${result[0].id}) for ${params.primaryEmail} with ${params.quantity} seats`);
+    
+    return { success: true, groupId: result[0].id };
+  } catch (err: any) {
+    console.error('[GroupBilling] Error auto-creating corporate billing group:', err);
+    return { success: false, error: err.message };
+  }
+}
+
 export async function updateBillingGroupName(
   groupId: number,
   groupName: string | null
