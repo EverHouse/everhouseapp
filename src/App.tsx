@@ -35,6 +35,7 @@ import { useSupabaseRealtime } from './hooks/useSupabaseRealtime';
 import { StaffBookingToast } from './components/StaffBookingToast';
 import UpdateNotification from './components/UpdateNotification';
 import { StaffWebSocketProvider } from './contexts/StaffWebSocketContext';
+import { StaffMobileSidebar } from './components/StaffMobileSidebar';
 
 const MINIMUM_LOADER_DISPLAY_MS = 2000;
 
@@ -496,6 +497,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isStaffOrAdmin = actualUser?.role === 'admin' || actualUser?.role === 'staff';
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMemberMenuOpen, setIsMemberMenuOpen] = useState(false);
+  const [isStaffMenuOpen, setIsStaffMenuOpen] = useState(false);
   const unreadCount = useNotificationStore(state => state.unreadCount);
   useWebSocket({ effectiveEmail: user?.email });
   useSupabaseRealtime({ userEmail: user?.email });
@@ -637,7 +639,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             onClick={() => {
               // On profile page, staff/admin (not viewing as member) should see staff sidebar
               if (isProfilePage && isStaffOrAdmin && !isViewingAs) {
-                setIsMenuOpen(true);
+                setIsStaffMenuOpen(true);
               } else {
                 setIsMemberMenuOpen(true);
               }
@@ -789,6 +791,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
             <MenuOverlay isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
             <MemberMenuOverlay isOpen={isMemberMenuOpen} onClose={() => setIsMemberMenuOpen(false)} />
+            <StaffMobileSidebar 
+              isOpen={isStaffMenuOpen} 
+              onClose={() => setIsStaffMenuOpen(false)} 
+              activeTab="home"
+              isAdmin={actualUser?.role === 'admin'}
+            />
         </div>
       </NotificationContext.Provider>
     </div>
