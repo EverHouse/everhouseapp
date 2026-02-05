@@ -811,6 +811,9 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
     const visitorIdStr = String(id);
     const deletionLog: string[] = [];
     
+    await pool.query('DELETE FROM pass_redemption_logs WHERE purchase_id IN (SELECT id FROM day_pass_purchases WHERE user_id = $1)', [visitorIdStr]);
+    deletionLog.push('pass_redemption_logs');
+    
     await pool.query('DELETE FROM day_pass_purchases WHERE user_id = $1', [visitorIdStr]);
     deletionLog.push('day_pass_purchases');
     
@@ -828,6 +831,31 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
     
     await pool.query('DELETE FROM booking_participants WHERE user_id = $1', [id]);
     deletionLog.push('booking_participants');
+    
+    await pool.query('UPDATE event_rsvps SET matched_user_id = NULL WHERE matched_user_id = $1', [visitorIdStr]);
+    await pool.query('DELETE FROM event_rsvps WHERE LOWER(user_email) = $1', [visitorEmail]);
+    deletionLog.push('event_rsvps');
+    
+    await pool.query('UPDATE booking_sessions SET created_by = NULL WHERE LOWER(created_by) = $1', [visitorEmail]);
+    deletionLog.push('booking_sessions (unlinked)');
+    
+    await pool.query('UPDATE guests SET created_by_member_id = NULL WHERE created_by_member_id = $1', [visitorIdStr]);
+    deletionLog.push('guests (unlinked)');
+    
+    await pool.query('DELETE FROM email_events WHERE LOWER(recipient_email) = $1', [visitorEmail]);
+    deletionLog.push('email_events');
+    
+    await pool.query('DELETE FROM tours WHERE LOWER(guest_email) = $1', [visitorEmail]);
+    deletionLog.push('tours');
+    
+    await pool.query('DELETE FROM trackman_unmatched_bookings WHERE LOWER(original_email) = $1 OR LOWER(resolved_email) = $1', [visitorEmail, visitorEmail]);
+    deletionLog.push('trackman_unmatched_bookings');
+    
+    await pool.query('DELETE FROM hubspot_line_items WHERE hubspot_deal_id IN (SELECT hubspot_deal_id FROM hubspot_deals WHERE LOWER(member_email) = $1)', [visitorEmail]);
+    deletionLog.push('hubspot_line_items');
+    
+    await pool.query('DELETE FROM hubspot_deals WHERE LOWER(member_email) = $1', [visitorEmail]);
+    deletionLog.push('hubspot_deals');
     
     await pool.query('DELETE FROM notifications WHERE LOWER(user_email) = $1', [visitorEmail]);
     deletionLog.push('notifications');

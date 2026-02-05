@@ -354,6 +354,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
     await pool.query('DELETE FROM guest_check_ins WHERE LOWER(member_email) = $1', [normalizedEmail]);
     deletionLog.push('guest_check_ins');
     
+    await pool.query('UPDATE event_rsvps SET matched_user_id = NULL WHERE matched_user_id = $1', [userIdStr]);
     await pool.query('DELETE FROM event_rsvps WHERE LOWER(user_email) = $1', [normalizedEmail]);
     deletionLog.push('event_rsvps');
     
@@ -371,6 +372,12 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
     
     await pool.query('UPDATE booking_participants SET user_id = NULL WHERE user_id = $1', [userId]);
     deletionLog.push('booking_participants (unlinked)');
+    
+    await pool.query('UPDATE booking_sessions SET created_by = NULL WHERE LOWER(created_by) = $1', [normalizedEmail]);
+    deletionLog.push('booking_sessions (unlinked)');
+    
+    await pool.query('UPDATE guests SET created_by_member_id = NULL WHERE created_by_member_id = $1', [userIdStr]);
+    deletionLog.push('guests (unlinked)');
     
     await pool.query("DELETE FROM sessions WHERE sess->'user'->>'email' = $1", [normalizedEmail]);
     deletionLog.push('sessions');
@@ -423,8 +430,26 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
     await pool.query("DELETE FROM hubspot_sync_queue WHERE LOWER(payload->>'email') = $1", [normalizedEmail]);
     deletionLog.push('hubspot_sync_queue');
     
+    await pool.query('DELETE FROM email_events WHERE LOWER(recipient_email) = $1', [normalizedEmail]);
+    deletionLog.push('email_events');
+    
+    await pool.query('DELETE FROM hubspot_line_items WHERE hubspot_deal_id IN (SELECT hubspot_deal_id FROM hubspot_deals WHERE LOWER(member_email) = $1)', [normalizedEmail]);
+    deletionLog.push('hubspot_line_items');
+    
+    await pool.query('DELETE FROM hubspot_deals WHERE LOWER(member_email) = $1', [normalizedEmail]);
+    deletionLog.push('hubspot_deals');
+    
+    await pool.query('DELETE FROM tours WHERE LOWER(guest_email) = $1', [normalizedEmail]);
+    deletionLog.push('tours');
+    
+    await pool.query('DELETE FROM trackman_unmatched_bookings WHERE LOWER(original_email) = $1 OR LOWER(resolved_email) = $1', [normalizedEmail, normalizedEmail]);
+    deletionLog.push('trackman_unmatched_bookings');
+    
     await pool.query('DELETE FROM terminal_payments WHERE user_id = $1', [userIdStr]);
     deletionLog.push('terminal_payments');
+    
+    await pool.query('DELETE FROM pass_redemption_logs WHERE purchase_id IN (SELECT id FROM day_pass_purchases WHERE user_id = $1)', [userIdStr]);
+    deletionLog.push('pass_redemption_logs');
     
     await pool.query('DELETE FROM day_pass_purchases WHERE user_id = $1', [userIdStr]);
     deletionLog.push('day_pass_purchases');
