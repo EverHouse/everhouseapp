@@ -259,7 +259,7 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
     }
     
     const { db } = await import('../../db');
-    const { users } = await import('../../../shared/schema');
+    const { users, terminalPayments } = await import('../../../shared/schema');
     const { eq } = await import('drizzle-orm');
     
     const [existingUser] = await db.select().from(users).where(eq(users.id, userId));
@@ -315,6 +315,28 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
     }
     
     const customerId = subscription.customer as string;
+    
+    const existingPaymentRecord = await db.select().from(terminalPayments)
+      .where(eq(terminalPayments.stripePaymentIntentId, paymentIntentId));
+    
+    if (existingPaymentRecord.length === 0) {
+      const staffEmail = (req as any).user?.email || 'unknown';
+      await db.insert(terminalPayments).values({
+        userId,
+        userEmail: existingUser?.email || piMetadata.email || 'unknown',
+        stripePaymentIntentId: paymentIntentId,
+        stripeSubscriptionId: subscriptionId,
+        stripeInvoiceId: actualInvoiceId || null,
+        stripeCustomerId: customerId,
+        amountCents: paymentIntent.amount,
+        currency: paymentIntent.currency || 'usd',
+        readerId: piMetadata.readerId || null,
+        readerLabel: piMetadata.readerLabel || null,
+        status: 'succeeded',
+        processedBy: staffEmail,
+      });
+      console.log(`[Terminal] Payment record created for PI ${paymentIntentId}`);
+    }
     
     if (actualInvoiceId && latestInvoice?.status !== 'paid') {
       try {
