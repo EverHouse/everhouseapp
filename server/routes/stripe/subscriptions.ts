@@ -455,6 +455,141 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
   }
 });
 
+router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { paymentIntentId, subscriptionId, userId } = req.body;
+    const sessionUser = getSessionUser(req);
+    
+    if (!paymentIntentId) {
+      return res.status(400).json({ error: 'paymentIntentId is required' });
+    }
+    
+    const stripe = await getStripeClient();
+    
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    
+    if (paymentIntent.status !== 'succeeded') {
+      return res.status(400).json({ 
+        error: `Payment not successful. Status: ${paymentIntent.status}` 
+      });
+    }
+    
+    const invoiceId = paymentIntent.metadata?.invoice_id;
+    const subId = subscriptionId || paymentIntent.metadata?.subscription_id;
+    
+    if (invoiceId) {
+      try {
+        const invoice = await stripe.invoices.retrieve(invoiceId);
+        
+        if (invoice.status === 'open') {
+          const paymentMethodId = paymentIntent.payment_method;
+          
+          if (paymentMethodId && typeof paymentMethodId === 'string') {
+            await stripe.customers.update(paymentIntent.customer as string, {
+              invoice_settings: { default_payment_method: paymentMethodId }
+            });
+          }
+          
+          await stripe.invoices.pay(invoiceId, {
+            paid_out_of_band: true
+          });
+          console.log(`[Stripe Subscriptions] Marked invoice ${invoiceId} as paid out of band`);
+        }
+      } catch (invoiceError: any) {
+        console.error('[Stripe Subscriptions] Error paying invoice:', invoiceError.message);
+      }
+    }
+    
+    let userEmail = '';
+    let tierName = '';
+    
+    if (userId) {
+      const userResult = await pool.query(
+        `SELECT email, tier FROM users WHERE id = $1`,
+        [userId]
+      );
+      
+      if (userResult.rows.length > 0) {
+        userEmail = userResult.rows[0].email;
+        tierName = userResult.rows[0].tier;
+        
+        await pool.query(
+          `UPDATE users SET membership_status = 'active', updated_at = NOW() WHERE id = $1`,
+          [userId]
+        );
+        console.log(`[Stripe Subscriptions] Activated member ${userEmail}`);
+      }
+    } else if (paymentIntent.customer) {
+      const custResult = await pool.query(
+        `SELECT id, email, tier FROM users WHERE stripe_customer_id = $1`,
+        [paymentIntent.customer]
+      );
+      
+      if (custResult.rows.length > 0) {
+        userEmail = custResult.rows[0].email;
+        tierName = custResult.rows[0].tier;
+        
+        await pool.query(
+          `UPDATE users SET membership_status = 'active', updated_at = NOW() WHERE stripe_customer_id = $1`,
+          [paymentIntent.customer]
+        );
+        console.log(`[Stripe Subscriptions] Activated member ${userEmail} via customer ID`);
+      }
+    }
+    
+    if (userEmail) {
+      try {
+        const { syncMemberToHubSpot } = await import('../../core/hubspot/stages');
+        await syncMemberToHubSpot({ 
+          email: userEmail, 
+          status: 'active', 
+          tier: tierName, 
+          billingProvider: 'stripe', 
+          memberSince: new Date() 
+        });
+        console.log(`[Stripe Subscriptions] Synced ${userEmail} to HubSpot`);
+      } catch (hubspotError) {
+        console.error('[Stripe Subscriptions] HubSpot sync failed:', hubspotError);
+      }
+      
+      try {
+        const { sendNotificationToUser, broadcastBillingUpdate } = await import('../../core/notifications/realtime');
+        sendNotificationToUser(userEmail, {
+          type: 'billing_update',
+          title: 'Membership Activated',
+          message: `Your ${tierName} membership has been activated.`,
+          data: { subscriptionId: subId, tier: tierName }
+        });
+        broadcastBillingUpdate(userEmail, 'subscription_created');
+      } catch (notifyError) {
+        console.error('[Stripe Subscriptions] Notification failed:', notifyError);
+      }
+    }
+    
+    await logFromRequest(req, {
+      action: 'inline_payment_confirmed',
+      resourceType: 'member',
+      resourceId: userId || paymentIntent.customer as string,
+      resourceName: userEmail,
+      details: {
+        paymentIntentId,
+        subscriptionId: subId,
+        invoiceId,
+        amount: paymentIntent.amount
+      }
+    });
+    
+    res.json({ 
+      success: true, 
+      message: 'Payment confirmed and membership activated',
+      memberEmail: userEmail
+    });
+  } catch (error: any) {
+    console.error('[Stripe Subscriptions] Error confirming inline payment:', error);
+    res.status(500).json({ error: error.message || 'Failed to confirm payment' });
+  }
+});
+
 router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
     const { email, firstName, lastName, phone, dob, tierSlug, couponId } = req.body;

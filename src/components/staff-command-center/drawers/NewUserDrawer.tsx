@@ -474,6 +474,8 @@ function MemberFlow({
   const [stripeInstance, setStripeInstance] = useState<Stripe | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
+  const [createdUserId, setCreatedUserId] = useState<string | null>(null);
   const [stripeLoading, setStripeLoading] = useState(false);
   const [stripeError, setStripeError] = useState<string | null>(null);
   const paymentInitiatedRef = useRef(false);
@@ -588,7 +590,8 @@ function MemberFlow({
         }
         
         setClientSecret(data.clientSecret);
-        setPaymentIntentId(data.subscriptionId);
+        setSubscriptionId(data.subscriptionId);
+        setCreatedUserId(data.userId);
       }
     } catch (err: any) {
       setStripeError(err.message || 'Failed to initialize payment');
@@ -599,7 +602,7 @@ function MemberFlow({
   };
 
   const handlePaymentSuccess = async (paymentIntentIdResult?: string) => {
-    if (!paymentIntentId && !paymentIntentIdResult) return;
+    if (!paymentIntentIdResult) return;
     setIsLoading(true);
     
     try {
@@ -608,7 +611,7 @@ function MemberFlow({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ paymentIntentId: paymentIntentIdResult || paymentIntentId })
+          body: JSON.stringify({ paymentIntentId: paymentIntentIdResult })
         });
         
         try {
@@ -653,11 +656,29 @@ function MemberFlow({
           showToast('Payment received but failed to add to group. Contact support.', 'error');
         }
       } else {
-        showToast('Payment received! Membership will activate shortly.', 'success');
+        // Confirm inline membership payment and activate member
+        const confirmRes = await fetch('/api/stripe/subscriptions/confirm-inline-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ 
+            paymentIntentId: paymentIntentIdResult,
+            subscriptionId,
+            userId: createdUserId
+          })
+        });
+        
+        if (!confirmRes.ok) {
+          const confirmData = await confirmRes.json();
+          console.error('Payment confirmation failed:', confirmData.error);
+          showToast('Payment received but activation failed. Contact support.', 'error');
+        } else {
+          showToast('Payment received! Membership activated.', 'success');
+        }
       }
 
       onSuccess({ 
-        id: 'member-' + Date.now(), 
+        id: createdUserId || 'member-' + Date.now(), 
         email: form.email, 
         name: `${form.firstName} ${form.lastName}` 
       });

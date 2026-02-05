@@ -65,6 +65,7 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
           amount: invoice.amount_due,
           currency: invoice.currency || 'usd',
           customer: customerId,
+          description: 'Subscription creation',
           setup_future_usage: 'off_session', // Save payment method for future billing
           metadata: {
             invoice_id: invoice.id,
