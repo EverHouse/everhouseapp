@@ -219,11 +219,21 @@ router.get('/api/bookings/:bookingId/participants', async (req: Request, res: Re
     let guestPassesRemaining = 0;
     let remainingMinutes = 0;
     
+    // Get resource type to correctly calculate remaining minutes
+    let resourceTypeForRoster = 'simulator';
+    if (booking.resource_id) {
+      const resourceResult = await pool.query(
+        'SELECT type FROM resources WHERE id = $1',
+        [booking.resource_id]
+      );
+      resourceTypeForRoster = resourceResult.rows[0]?.type || 'simulator';
+    }
+    
     if (ownerTier) {
       // Fetch guest passes and remaining minutes in parallel to reduce latency
       [guestPassesRemaining, remainingMinutes] = await Promise.all([
         getGuestPassesRemaining(booking.owner_email),
-        getRemainingMinutes(booking.owner_email, ownerTier, booking.request_date)
+        getRemainingMinutes(booking.owner_email, ownerTier, booking.request_date, resourceTypeForRoster)
       ]);
     }
 
@@ -1076,16 +1086,18 @@ router.post('/api/bookings/:bookingId/participants/preview-fees', async (req: Re
     const durationMinutes = booking.duration_minutes || 60;
     const declaredPlayerCount = booking.declared_player_count || 1;
     
-    // Get resource capacity as an upper bound for time allocation
+    // Get resource capacity and type as an upper bound for time allocation
     let resourceCapacity: number | null = null;
+    let isConferenceRoom = false;
     if (booking.resource_id) {
-      const capacityResult = await pool.query(
-        'SELECT capacity FROM resources WHERE id = $1',
+      const resourceResult = await pool.query(
+        'SELECT capacity, type FROM resources WHERE id = $1',
         [booking.resource_id]
       );
-      if (capacityResult.rows[0]?.capacity) {
-        resourceCapacity = capacityResult.rows[0].capacity;
+      if (resourceResult.rows[0]?.capacity) {
+        resourceCapacity = resourceResult.rows[0].capacity;
       }
+      isConferenceRoom = resourceResult.rows[0]?.type === 'conference_room';
     }
     
     // Count actual participants (owner + added participants)
@@ -1107,10 +1119,15 @@ router.post('/api/bookings/:bookingId/participants/preview-fees', async (req: Re
     if (ownerTier) {
       const tierLimits = await getTierLimits(ownerTier);
       if (tierLimits) {
-        dailyAllowance = tierLimits.daily_sim_minutes;
+        // Use conference room minutes for conference room bookings, simulator minutes otherwise
+        dailyAllowance = isConferenceRoom 
+          ? tierLimits.daily_conf_room_minutes 
+          : tierLimits.daily_sim_minutes;
         guestPassesPerMonth = tierLimits.guest_passes_per_month;
       }
-      remainingMinutesToday = await getRemainingMinutes(booking.owner_email, ownerTier, booking.request_date);
+      // Pass resource type to get correct remaining minutes for conference room vs simulator
+      const resourceTypeForRemaining = isConferenceRoom ? 'conference_room' : 'simulator';
+      remainingMinutesToday = await getRemainingMinutes(booking.owner_email, ownerTier, booking.request_date, resourceTypeForRemaining);
     }
 
     // Build participant list for unified fee service
@@ -1150,7 +1167,8 @@ router.post('/api/bookings/:bookingId/participants/preview-fees', async (req: Re
               sessionId: booking.session_id,
               declaredPlayerCount: effectivePlayerCount,
               source: 'roster_update' as const,
-              excludeSessionFromUsage: true
+              excludeSessionFromUsage: true,
+              isConferenceRoom
             }
           : {
               sessionDate: booking.request_date,
@@ -1158,7 +1176,8 @@ router.post('/api/bookings/:bookingId/participants/preview-fees', async (req: Re
               declaredPlayerCount: effectivePlayerCount,
               hostEmail: booking.owner_email,
               participants: participantsForFeeCalc,
-              source: 'roster_update' as const
+              source: 'roster_update' as const,
+              isConferenceRoom
             }
       );
     } catch (feeError) {

@@ -434,7 +434,15 @@ router.post('/api/booking-requests', async (req, res) => {
         [user_email, request_date]
       );
       
+      // Get resource type to pass to limit checking
+      let resourceType = 'simulator';
       if (resource_id) {
+        const resourceResult = await client.query(
+          `SELECT type FROM resources WHERE id = $1`,
+          [resource_id]
+        );
+        resourceType = resourceResult.rows[0]?.type || 'simulator';
+        
         const overlapCheck = await client.query(
           `SELECT id FROM booking_requests 
            WHERE resource_id = $1 
@@ -455,7 +463,7 @@ router.post('/api/booking-requests', async (req, res) => {
         }
       }
       
-      const limitCheck = await checkDailyBookingLimit(user_email, request_date, duration_minutes, user_tier);
+      const limitCheck = await checkDailyBookingLimit(user_email, request_date, duration_minutes, user_tier, resourceType);
       if (!limitCheck.allowed) {
         await client.query('ROLLBACK');
         client.release();

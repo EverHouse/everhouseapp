@@ -268,7 +268,8 @@ export async function checkDailyBookingLimit(
   email: string, 
   date: string, 
   requestedMinutes: number,
-  providedTier?: string
+  providedTier?: string,
+  resourceType?: string
 ): Promise<{ allowed: boolean; reason?: string; remainingMinutes?: number; overageMinutes?: number; includedMinutes?: number }> {
   // Use provided tier first (from view-as-member), fall back to database lookup
   const tier = providedTier || await getMemberTierByEmail(email);
@@ -302,17 +303,21 @@ export async function checkDailyBookingLimit(
     };
   }
   
-  const dailyLimit = limits.daily_sim_minutes ?? 0;
+  // Use conference room minutes for conference room bookings, simulator minutes otherwise
+  const isConferenceRoom = resourceType === 'conference_room';
+  const dailyLimit = isConferenceRoom 
+    ? (limits.daily_conf_room_minutes ?? 0)
+    : (limits.daily_sim_minutes ?? 0);
   
   if (limits.unlimited_access || dailyLimit >= 999) {
     return { allowed: true, remainingMinutes: 999, overageMinutes: 0, includedMinutes: requestedMinutes };
   }
   
-  // If daily limit is 0 but can_book_simulators is true, this is pay-as-you-go (e.g., Social tier)
+  // If daily limit is 0 but can_book is true, this is pay-as-you-go (e.g., Social tier for simulators)
   // All time is charged as overage. They can still book, just with 0 included minutes.
-  // Only block if can_book_simulators is explicitly false (already checked above at line 145)
+  // Only block if can_book is explicitly false (already checked above)
   
-  const alreadyBooked = await getDailyBookedMinutes(email, date);
+  const alreadyBooked = await getDailyBookedMinutes(email, date, resourceType);
   const remainingMinutes = Math.max(0, dailyLimit - alreadyBooked);
   
   // Allow bookings - calculate included vs overage for billing

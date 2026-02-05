@@ -2038,7 +2038,17 @@ router.post('/api/bookings', bookingRateLimiter, async (req, res) => {
     const endParts = end_time.split(':').map(Number);
     const durationMinutes = (endParts[0] * 60 + endParts[1]) - (startParts[0] * 60 + startParts[1]);
     
-    const limitCheck = await checkDailyBookingLimit(user_email, booking_date, durationMinutes, userTier);
+    // Get resource type to pass to limit checking
+    let resourceType = 'simulator';
+    if (resource_id) {
+      const resourceResult = await pool.query(
+        `SELECT type FROM resources WHERE id = $1`,
+        [resource_id]
+      );
+      resourceType = resourceResult.rows[0]?.type || 'simulator';
+    }
+    
+    const limitCheck = await checkDailyBookingLimit(user_email, booking_date, durationMinutes, userTier, resourceType);
     if (!limitCheck.allowed) {
       return res.status(403).json({ 
         error: limitCheck.reason,

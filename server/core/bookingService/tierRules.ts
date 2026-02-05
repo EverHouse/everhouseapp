@@ -39,7 +39,8 @@ export async function validateTierWindowAndBalance(
   memberEmail: string,
   bookingDate: string,
   duration: number,
-  declaredPlayerCount: number = 1
+  declaredPlayerCount: number = 1,
+  resourceType?: string
 ): Promise<TierValidationResult> {
   try {
     const tier = await getMemberTierByEmail(memberEmail);
@@ -51,7 +52,7 @@ export async function validateTierWindowAndBalance(
       };
     }
     
-    const result = await checkDailyBookingLimit(memberEmail, bookingDate, duration, tier);
+    const result = await checkDailyBookingLimit(memberEmail, bookingDate, duration, tier, resourceType);
     
     if (!result.allowed) {
       return {
@@ -78,7 +79,8 @@ export async function validateTierWindowAndBalance(
 export async function getRemainingMinutes(
   memberEmail: string,
   tier?: string,
-  date?: string
+  date?: string,
+  resourceType?: string
 ): Promise<number> {
   try {
     const memberTier = tier || await getMemberTierByEmail(memberEmail);
@@ -88,19 +90,26 @@ export async function getRemainingMinutes(
     }
     
     const limits = await getTierLimits(memberTier);
+    const isConferenceRoom = resourceType === 'conference_room';
     
-    if (limits.unlimited_access || limits.daily_sim_minutes >= 999) {
+    // Use appropriate daily limit based on resource type
+    const dailyLimit = isConferenceRoom 
+      ? limits.daily_conf_room_minutes 
+      : limits.daily_sim_minutes;
+    
+    if (limits.unlimited_access || dailyLimit >= 999) {
       return 999;
     }
     
-    if (limits.daily_sim_minutes === 0) {
+    if (dailyLimit === 0) {
       return 0;
     }
     
     const targetDate = date || new Date().toISOString().split('T')[0];
-    const bookedMinutes = await getDailyBookedMinutes(memberEmail, targetDate);
+    // Pass resource type to filter usage appropriately
+    const bookedMinutes = await getDailyBookedMinutes(memberEmail, targetDate, resourceType || 'simulator');
     
-    return Math.max(0, limits.daily_sim_minutes - bookedMinutes);
+    return Math.max(0, dailyLimit - bookedMinutes);
   } catch (error) {
     logger.error('[getRemainingMinutes] Error:', { error: error as Error });
     return 0;
