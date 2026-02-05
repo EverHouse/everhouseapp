@@ -547,27 +547,47 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
       }, { action: 'booking_approved', bookingId: parseInt(id, 10), triggerSource: 'approval.ts' });
       
       // Notify participants (excluding owner) that they've been added to the approved booking
+      // Use request_participants directly to avoid race condition with booking_members linking
       if (updated.userEmail) {
         (async () => {
           try {
-            const participantsResult = await pool.query(
-              `SELECT bm.user_email 
-               FROM booking_members bm
-               WHERE bm.booking_id = $1 
-                 AND bm.user_email IS NOT NULL 
-                 AND bm.user_email != ''
-                 AND LOWER(bm.user_email) != LOWER($2)
-                 AND bm.is_primary = false`,
-              [bookingId, updated.userEmail]
-            );
+            const requestParticipants = updated.requestParticipants as Array<{
+              email?: string;
+              type: 'member' | 'guest';
+              userId?: string;
+              name?: string;
+            }> | null;
             
+            if (!requestParticipants || !Array.isArray(requestParticipants) || requestParticipants.length === 0) {
+              return; // No participants to notify
+            }
+            
+            const ownerEmailLower = updated.userEmail?.toLowerCase();
             const ownerName = updated.userName || updated.userEmail?.split('@')[0] || 'A member';
             const formattedDate = formatDateDisplayWithDay(updated.requestDate);
             const formattedTime = formatTime12Hour(updated.startTime || '');
+            const processedEmails = new Set<string>();
             
-            for (const participant of participantsResult.rows) {
-              const participantEmail = participant.user_email?.toLowerCase();
+            for (const rp of requestParticipants) {
+              if (!rp || typeof rp !== 'object') continue;
+              if (rp.type !== 'member') continue; // Only notify members, not guests
+              
+              // Resolve email from userId if not present
+              let participantEmail = rp.email?.toLowerCase()?.trim() || '';
+              if (!participantEmail && rp.userId) {
+                const userResult = await db.select({ email: users.email })
+                  .from(users)
+                  .where(eq(users.id, rp.userId))
+                  .limit(1);
+                if (userResult.length > 0) {
+                  participantEmail = userResult[0].email?.toLowerCase() || '';
+                }
+              }
+              
               if (!participantEmail) continue;
+              if (participantEmail === ownerEmailLower) continue; // Skip owner
+              if (processedEmails.has(participantEmail)) continue;
+              processedEmails.add(participantEmail);
               
               const notificationMsg = `${ownerName} has added you to their simulator booking on ${formattedDate} at ${formattedTime}.`;
               
@@ -583,6 +603,8 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                 message: notificationMsg,
                 data: { bookingId: bookingId.toString(), eventType: 'booking_participant_added' }
               }, { action: 'booking_participant_added', bookingId, triggerSource: 'approval.ts' });
+              
+              console.log(`[Approval] Sent 'Added to Booking' notification to ${participantEmail} for booking ${bookingId}`);
             }
           } catch (notifyErr) {
             console.error('[Approval] Failed to notify participants (non-blocking):', notifyErr);
