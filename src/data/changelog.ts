@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.7.3",
+    date: "2026-02-05",
+    title: "Profile Page Navigation Improvement",
+    changes: [
+      "Improved: Profile page now shows hamburger menu instead of back arrow for consistent navigation",
+      "Improved: Tapping the hamburger menu on Profile opens the full navigation sidebar with all member options"
+    ]
+  },
+  {
     version: "69.7.2",
     date: "2026-02-05",
     title: "Staff Notes for Closures & Notices",

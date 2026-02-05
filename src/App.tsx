@@ -633,23 +633,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Left section - flex-1 for symmetric spacing with right */}
       <div className="flex-1 flex justify-start">
         {isMemberRoute ? (
-          isProfilePage ? (
-            <button 
-              onClick={() => navigate(-1)}
-              className={`w-10 h-10 flex items-center justify-center ${headerBtnClasses} focus:ring-2 focus:ring-accent focus:outline-none rounded-lg`}
-              aria-label="Go back"
-            >
-              <span className="material-symbols-outlined text-[24px]">arrow_back</span>
-            </button>
-          ) : (
-            <button 
-              onClick={() => setIsMemberMenuOpen(true)}
-              className={`w-10 h-10 flex items-center justify-center ${headerBtnClasses} focus:ring-2 focus:ring-accent focus:outline-none rounded-lg`}
-              aria-label="Open menu"
-            >
-              <span className="material-symbols-outlined text-[24px]">menu</span>
-            </button>
-          )
+          <button 
+            onClick={() => setIsMemberMenuOpen(true)}
+            className={`w-10 h-10 flex items-center justify-center ${headerBtnClasses} focus:ring-2 focus:ring-accent focus:outline-none rounded-lg`}
+            aria-label="Open menu"
+          >
+            <span className="material-symbols-outlined text-[24px]">menu</span>
+          </button>
         ) : (
           <button 
             onClick={handleTopLeftClick}
