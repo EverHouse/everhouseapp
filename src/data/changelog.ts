@@ -23,7 +23,9 @@ export const changelog: ChangelogEntry[] = [
       "Added: Links are valid for 7 days and guide members to set up their own payment method",
       "Added: Automatic member activation when payment is completed via activation link",
       "Fixed: Notification system now handles null values correctly for data integrity alerts",
-      "Fixed: Corporate billing webhook now properly updates member tier and billing provider"
+      "Fixed: Corporate billing webhook now properly updates member tier and billing provider",
+      "Fixed: HubSpot sync no longer overwrites membership status to 'non-member' for users with active Stripe subscriptions",
+      "Fixed: Members with Stripe subscriptions now correctly appear only in Active tab, not Visitors"
     ]
   },
   {

@@ -1194,11 +1194,30 @@ router.post('/webhooks', async (req, res) => {
             if (email) {
               if (propertyName === 'membership_status') {
                 const newStatus = (propertyValue || 'non-member').toLowerCase();
-                await pool.query(
-                  `UPDATE users SET membership_status = $1, updated_at = NOW() WHERE LOWER(email) = $2`,
-                  [newStatus, email]
-                );
-                console.log(`[HubSpot Webhook] Updated DB membership_status for ${email} to: ${newStatus}`);
+                
+                // Don't allow HubSpot to downgrade status to 'non-member' if user has active Stripe subscription
+                // Stripe is the source of truth for billing status
+                if (newStatus === 'non-member') {
+                  const stripeCheck = await pool.query(
+                    `SELECT stripe_subscription_id FROM users WHERE LOWER(email) = $1`,
+                    [email]
+                  );
+                  if (stripeCheck.rows.length > 0 && stripeCheck.rows[0].stripe_subscription_id) {
+                    console.log(`[HubSpot Webhook] Skipping status change to 'non-member' for ${email} - has active Stripe subscription`);
+                  } else {
+                    await pool.query(
+                      `UPDATE users SET membership_status = $1, updated_at = NOW() WHERE LOWER(email) = $2`,
+                      [newStatus, email]
+                    );
+                    console.log(`[HubSpot Webhook] Updated DB membership_status for ${email} to: ${newStatus}`);
+                  }
+                } else {
+                  await pool.query(
+                    `UPDATE users SET membership_status = $1, updated_at = NOW() WHERE LOWER(email) = $2`,
+                    [newStatus, email]
+                  );
+                  console.log(`[HubSpot Webhook] Updated DB membership_status for ${email} to: ${newStatus}`);
+                }
               } else if (propertyName === 'membership_tier') {
                 const normalizedTier = normalizeTierName(propertyValue || '');
                 if (normalizedTier) {
