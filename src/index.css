@@ -1452,6 +1452,29 @@ html.dark .border-accessible {
   animation: popIn 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
+/* FAB Bounce In Animation - Springy entrance for floating action buttons */
+@keyframes fabBounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(-180deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15) rotate(10deg);
+  }
+  70% {
+    transform: scale(0.95) rotate(-5deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.animate-fab-bounce-in {
+  animation: fabBounceIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
 /* Pop Out Animation - Exit animation for toasts and modals */
 @keyframes popOut {
   0% {
@@ -1871,6 +1894,46 @@ html.dark .border-accessible {
   30% { transform: scale(var(--tap-scale)); }
   60% { transform: scale(1.02); }
   100% { transform: scale(1); }
+}
+
+/* Smooth Loading Spinner Transition */
+@keyframes spinFadeIn {
+  0% {
+    opacity: 0;
+    transform: rotate(0deg) scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+.animate-spin-fade-in {
+  animation: spinFadeIn 0.3s ease-out forwards, spin 1s linear 0.3s infinite;
+}
+
+/* Button Loading State Transition - wraps content for smooth swap */
+.btn-loading-content {
+  transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+}
+
+.btn-loading-content[data-loading="true"] {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.btn-loading-spinner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
+}
+
+.btn-loading-spinner[data-loading="true"] {
+  opacity: 1;
 }
 
 /* Quick Tap Feedback Animation */

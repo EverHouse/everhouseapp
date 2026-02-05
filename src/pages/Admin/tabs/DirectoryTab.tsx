@@ -1220,7 +1220,7 @@ const DirectoryTab: React.FC = () => {
                                     <div 
                                         key={v.id}
                                         onClick={() => openVisitorDetails(v)}
-                                        className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm cursor-pointer hover:border-primary/50 transition-colors animate-slide-up-stagger"
+                                        className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm cursor-pointer hover:border-primary/50 transition-colors transition-transform active:scale-[0.98] animate-slide-up-stagger"
                                         style={{ '--stagger-index': index } as React.CSSProperties}
                                     >
                                         <div className="flex justify-between items-start mb-2">
@@ -1430,7 +1430,7 @@ const DirectoryTab: React.FC = () => {
                                     <div 
                                         key={member.staff_id}
                                         onClick={() => openTeamMemberDetails(member)}
-                                        className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm cursor-pointer hover:border-primary/50 transition-colors animate-slide-up-stagger"
+                                        className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm cursor-pointer hover:border-primary/50 transition-colors transition-transform active:scale-[0.98] animate-slide-up-stagger"
                                         style={{ '--stagger-index': index } as React.CSSProperties}
                                     >
                                         <div className="flex justify-between items-start mb-2">
@@ -1508,7 +1508,7 @@ const DirectoryTab: React.FC = () => {
                                         <div 
                                             key={m.email}
                                             onClick={() => openDetailsModal(m)}
-                                            className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm cursor-pointer hover:border-primary/50 transition-colors animate-slide-up-stagger"
+                                            className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm cursor-pointer hover:border-primary/50 transition-colors transition-transform active:scale-[0.98] animate-slide-up-stagger"
                                             style={{ '--stagger-index': Math.min(index, 10) } as React.CSSProperties}
                                         >
                                             <div className="flex justify-between items-start mb-2">

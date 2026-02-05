@@ -289,7 +289,7 @@ const MemberEvents: React.FC = () => {
             <EmptyEvents />
           ) : (
             <MotionList className="space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
-              {filteredAndSortedEvents.map((event) => {
+              {filteredAndSortedEvents.map((event, index) => {
                 const isExpanded = expandedEventId === event.id;
                 const isRsvpd = hasRsvp(event.id);
                 const isLoadingThis = loadingRsvp === event.id;
@@ -301,13 +301,14 @@ const MemberEvents: React.FC = () => {
                 return (
                   <MotionListItem 
                     key={event.id}
+                    index={index}
                     className={`rounded-2xl overflow-hidden transition-all glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}
                   >
                     <button 
                       onClick={() => handleCardClick(event.id)}
                       aria-expanded={isExpanded}
                       aria-label={`${event.title} on ${event.date} at ${event.time}. ${isExpanded ? 'Collapse' : 'Expand'} for details`}
-                      className={`w-full flex gap-4 p-4 cursor-pointer transition-colors text-left ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}
+                      className={`w-full flex gap-4 p-4 cursor-pointer transition-colors transition-transform text-left active:scale-[0.98] ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}
                     >
                       <div className={`w-20 h-20 md:w-24 md:h-24 flex-shrink-0 rounded-xl overflow-hidden relative flex items-center justify-center ${isDark ? 'bg-lavender/20' : 'bg-primary/10'}`}>
                         <span className={`material-symbols-outlined text-3xl md:text-4xl ${isDark ? 'text-lavender' : 'text-primary'}`}>

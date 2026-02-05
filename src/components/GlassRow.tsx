@@ -25,7 +25,7 @@ const GlassRow: React.FC<GlassRowProps> = ({ title, subtitle, icon, color, actio
    return (
      <div 
        onClick={onClick}
-       className={`glass-card p-4 flex items-center gap-4 group animate-slide-up-stagger ${onClick ? 'cursor-pointer card-pressable glass-interactive' : ''}`} 
+       className={`glass-card p-4 flex items-center gap-4 group animate-slide-up-stagger ${onClick ? 'cursor-pointer card-pressable glass-interactive transition-transform active:scale-[0.98]' : ''}`} 
        style={staggerIndex !== undefined ? { '--stagger-index': staggerIndex, animationFillMode: 'both' } as React.CSSProperties : { animationFillMode: 'both' }}
      >
         <div className={`w-12 h-12 rounded-[1.5rem] glass-button flex items-center justify-center ${color}`}>

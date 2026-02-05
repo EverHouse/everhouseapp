@@ -173,10 +173,10 @@ export const TodayScheduleSection: React.FC<TodayScheduleSectionProps> = ({
         </div>
       ) : (
         <div className={`${isDesktop ? 'flex-1 overflow-y-auto pb-6' : ''} space-y-2`}>
-          {upcomingWellness.slice(0, isDesktop ? 5 : 3).map(wellness => {
+          {upcomingWellness.slice(0, isDesktop ? 5 : 3).map((wellness, index) => {
             const dateStr = typeof wellness.date === 'string' ? wellness.date.split('T')[0] : new Date(wellness.date).toISOString().split('T')[0];
             return (
-              <GlassListRow key={wellness.id} onClick={navigateToWellnessTab}>
+              <GlassListRow key={wellness.id} onClick={navigateToWellnessTab} className="animate-slide-up-stagger" style={{ '--stagger-index': index } as React.CSSProperties}>
                 <DateBlock dateStr={dateStr} today={today} />
                 <span className="material-symbols-outlined text-lg text-primary dark:text-[#CCB8E4]">{getWellnessIcon(wellness.title)}</span>
                 <div className="flex-1 min-w-0">
@@ -206,7 +206,7 @@ export const TodayScheduleSection: React.FC<TodayScheduleSectionProps> = ({
         </div>
       ) : (
         <div className={`${isDesktop ? 'flex-1 overflow-y-auto pb-6' : ''} space-y-2`}>
-          {upcomingEvents.slice(0, isDesktop ? 5 : 3).map(event => {
+          {upcomingEvents.slice(0, isDesktop ? 5 : 3).map((event, index) => {
             const dateStr = event.event_date;
             const hasStartTime = event.start_time && event.start_time !== '00:00';
             const hasEndTime = event.end_time && event.end_time !== '00:00';
@@ -216,7 +216,7 @@ export const TodayScheduleSection: React.FC<TodayScheduleSectionProps> = ({
                 ? formatTime12Hour(event.start_time)
                 : 'All Day';
             return (
-              <GlassListRow key={event.id} onClick={() => navigateToTab('events')}>
+              <GlassListRow key={event.id} onClick={() => navigateToTab('events')} className="animate-slide-up-stagger" style={{ '--stagger-index': index } as React.CSSProperties}>
                 <DateBlock dateStr={dateStr} today={today} />
                 <span className="material-symbols-outlined text-lg text-primary dark:text-[#CCB8E4]">{getEventIcon(event.category || '')}</span>
                 <div className="flex-1 min-w-0">

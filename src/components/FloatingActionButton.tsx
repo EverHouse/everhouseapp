@@ -47,7 +47,7 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
   const fabContent = (
     <button
       onClick={onClick}
-      className={`fixed right-5 md:right-8 bottom-8 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ease-out hover:scale-110 active:scale-95 fab-button ${colorClasses[color]}`}
+      className={`fixed right-5 md:right-8 bottom-8 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ease-out hover:scale-110 active:scale-95 fab-button animate-fab-bounce-in ${colorClasses[color]}`}
       style={{ 
         zIndex: 'var(--z-fab)',
         '--fab-mobile-bottom': mobileBottom,

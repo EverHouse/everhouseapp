@@ -525,7 +525,10 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
         
         return (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div 
+              className="animate-slide-up-stagger grid grid-cols-2 gap-3"
+              style={{ '--stagger-index': 0 } as React.CSSProperties}
+            >
               <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="material-symbols-outlined text-lg text-brand-green">event_note</span>
@@ -557,12 +560,16 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
             </div>
 
             {isAdmin && !visitorMode && (
-              <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className={`text-sm font-bold flex items-center gap-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                    <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
-                    Account Balance
-                  </h4>
+              <div 
+                className="animate-slide-up-stagger"
+                style={{ '--stagger-index': 1 } as React.CSSProperties}
+              >
+                <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className={`text-sm font-bold flex items-center gap-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                      <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
+                      Account Balance
+                    </h4>
                   <span className={`text-xl font-bold font-serif ${(accountBalance?.balanceDollars || 0) > 0 ? 'text-green-500' : (isDark ? 'text-gray-400' : 'text-gray-500')}`}>
                     ${(accountBalance?.balanceDollars || 0).toFixed(2)}
                   </span>
@@ -633,14 +640,19 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                   </button>
                 )}
               </div>
+              </div>
             )}
 
             {(member?.dateOfBirth || member?.companyName || hasAddress || member?.emailOptIn !== null || member?.smsOptIn !== null) && (
-              <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                <h4 className={`text-sm font-bold mb-3 flex items-center gap-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                  <span className="material-symbols-outlined text-[18px]">info</span>
-                  Personal Information
-                </h4>
+              <div 
+                className="animate-slide-up-stagger"
+                style={{ '--stagger-index': 2 } as React.CSSProperties}
+              >
+                <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+                  <h4 className={`text-sm font-bold mb-3 flex items-center gap-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                    <span className="material-symbols-outlined text-[18px]">info</span>
+                    Personal Information
+                  </h4>
                 <div className="space-y-2">
                   {member?.dateOfBirth && (
                     <div className="flex items-center gap-2">
@@ -688,14 +700,19 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                   )}
                 </div>
               </div>
+              </div>
             )}
             
             {isAdmin && linkedEmails.length > 0 && (
-              <div className={`mt-6 p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                <h4 className={`text-sm font-bold mb-3 flex items-center gap-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                  <span className="material-symbols-outlined text-[18px]">link</span>
-                  Trackman Linked Emails
-                </h4>
+              <div 
+                className="animate-slide-up-stagger"
+                style={{ '--stagger-index': 3 } as React.CSSProperties}
+              >
+                <div className={`mt-6 p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+                  <h4 className={`text-sm font-bold mb-3 flex items-center gap-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                    <span className="material-symbols-outlined text-[18px]">link</span>
+                    Trackman Linked Emails
+                  </h4>
                 <div className="space-y-2">
                   {linkedEmails.map(email => (
                     <div key={email} className={`flex items-center justify-between px-3 py-2 rounded-lg ${isDark ? 'bg-white/5' : 'bg-white'}`}>
@@ -723,75 +740,93 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
       case 'communications':
         return (
           <div className="space-y-4">
-            <button
-              onClick={() => setShowAddComm(!showAddComm)}
-              className="w-full py-2 px-4 rounded-xl bg-brand-green text-white font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+            <div 
+              className="animate-slide-up-stagger"
+              style={{ '--stagger-index': 0 } as React.CSSProperties}
             >
-              <span className="material-symbols-outlined text-lg">add</span>
-              Log Communication
-            </button>
+              <button
+                onClick={() => setShowAddComm(!showAddComm)}
+                className="w-full py-2 px-4 rounded-xl bg-brand-green text-white font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+              >
+                <span className="material-symbols-outlined text-lg">add</span>
+                Log Communication
+              </button>
+            </div>
 
             {showAddComm && (
-              <div className={`p-4 rounded-xl ${isDark ? 'bg-white/10' : 'bg-gray-100'}`}>
-                <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <select
-                      value={newCommType}
-                      onChange={(e) => setNewCommType(e.target.value)}
-                      className={`flex-1 px-3 py-2 rounded-lg text-sm ${isDark ? 'bg-white/10 text-white border-white/20' : 'bg-white text-gray-900 border-gray-200'} border`}
-                    >
-                      <option value="email">Email</option>
-                      <option value="call">Call</option>
-                      <option value="meeting">Meeting</option>
-                      <option value="note">Note</option>
-                      <option value="sms">SMS</option>
-                    </select>
-                    <select
-                      value={newCommDirection}
-                      onChange={(e) => setNewCommDirection(e.target.value)}
-                      className={`flex-1 px-3 py-2 rounded-lg text-sm ${isDark ? 'bg-white/10 text-white border-white/20' : 'bg-white text-gray-900 border-gray-200'} border`}
-                    >
-                      <option value="outbound">Outbound</option>
-                      <option value="inbound">Inbound</option>
-                    </select>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Subject"
-                    value={newCommSubject}
-                    onChange={(e) => setNewCommSubject(e.target.value)}
-                    className={`w-full px-3 py-2 rounded-lg text-sm ${isDark ? 'bg-white/10 text-white border-white/20 placeholder-gray-500' : 'bg-white text-gray-900 border-gray-200'} border`}
-                  />
-                  <textarea
-                    placeholder="Details (optional)"
-                    value={newCommBody}
-                    onChange={(e) => setNewCommBody(e.target.value)}
-                    rows={3}
-                    className={`w-full px-3 py-2 rounded-lg text-sm resize-none ${isDark ? 'bg-white/10 text-white border-white/20 placeholder-gray-500' : 'bg-white text-gray-900 border-gray-200'} border`}
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setShowAddComm(false)}
-                      className={`flex-1 py-2 px-4 rounded-lg font-medium ${isDark ? 'bg-white/10 text-white' : 'bg-gray-200 text-gray-700'}`}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleAddCommunication}
-                      disabled={isAddingComm || !newCommSubject.trim()}
-                      className="flex-1 py-2 px-4 rounded-lg bg-brand-green text-white font-medium disabled:opacity-50"
-                    >
-                      {isAddingComm ? 'Saving...' : 'Save'}
-                    </button>
+              <div 
+                className="animate-slide-up-stagger"
+                style={{ '--stagger-index': 1 } as React.CSSProperties}
+              >
+                <div className={`p-4 rounded-xl ${isDark ? 'bg-white/10' : 'bg-gray-100'}`}>
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <select
+                        value={newCommType}
+                        onChange={(e) => setNewCommType(e.target.value)}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm ${isDark ? 'bg-white/10 text-white border-white/20' : 'bg-white text-gray-900 border-gray-200'} border`}
+                      >
+                        <option value="email">Email</option>
+                        <option value="call">Call</option>
+                        <option value="meeting">Meeting</option>
+                        <option value="note">Note</option>
+                        <option value="sms">SMS</option>
+                      </select>
+                      <select
+                        value={newCommDirection}
+                        onChange={(e) => setNewCommDirection(e.target.value)}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm ${isDark ? 'bg-white/10 text-white border-white/20' : 'bg-white text-gray-900 border-gray-200'} border`}
+                      >
+                        <option value="outbound">Outbound</option>
+                        <option value="inbound">Inbound</option>
+                      </select>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Subject"
+                      value={newCommSubject}
+                      onChange={(e) => setNewCommSubject(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-lg text-sm ${isDark ? 'bg-white/10 text-white border-white/20 placeholder-gray-500' : 'bg-white text-gray-900 border-gray-200'} border`}
+                    />
+                    <textarea
+                      placeholder="Details (optional)"
+                      value={newCommBody}
+                      onChange={(e) => setNewCommBody(e.target.value)}
+                      rows={3}
+                      className={`w-full px-3 py-2 rounded-lg text-sm resize-none ${isDark ? 'bg-white/10 text-white border-white/20 placeholder-gray-500' : 'bg-white text-gray-900 border-gray-200'} border`}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setShowAddComm(false)}
+                        className={`flex-1 py-2 px-4 rounded-lg font-medium ${isDark ? 'bg-white/10 text-white' : 'bg-gray-200 text-gray-700'}`}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleAddCommunication}
+                        disabled={isAddingComm || !newCommSubject.trim()}
+                        className="flex-1 py-2 px-4 rounded-lg bg-brand-green text-white font-medium disabled:opacity-50"
+                      >
+                        {isAddingComm ? 'Saving...' : 'Save'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
             {communications.length === 0 ? (
-              <EmptyState icon="chat" message="No communications logged yet" />
+              <div 
+                className="animate-slide-up-stagger"
+                style={{ '--stagger-index': 2 } as React.CSSProperties}
+              >
+                <EmptyState icon="chat" message="No communications logged yet" />
+              </div>
             ) : (
-              <div className="space-y-3">
+              <div 
+                className="animate-slide-up-stagger space-y-3"
+                style={{ '--stagger-index': 2 } as React.CSSProperties}
+              >
                 {communications.map((comm) => (
                   <div key={comm.id} className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
                     <div className="flex items-start justify-between">
@@ -836,38 +871,51 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
       case 'notes':
         return (
           <div className="space-y-4">
-            <div className={`p-4 rounded-xl ${isDark ? 'bg-white/10' : 'bg-gray-100'}`}>
-              <textarea
-                placeholder="Add a note about this member..."
-                value={newNoteContent}
-                onChange={(e) => setNewNoteContent(e.target.value)}
-                rows={3}
-                className={`w-full px-3 py-2 rounded-lg text-sm resize-none ${isDark ? 'bg-white/10 text-white border-white/20 placeholder-gray-500' : 'bg-white text-gray-900 border-gray-200'} border`}
-              />
-              <div className="flex items-center justify-between mt-2">
-                <label className={`flex items-center gap-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                  <input
-                    type="checkbox"
-                    checked={newNotePinned}
-                    onChange={(e) => setNewNotePinned(e.target.checked)}
-                    className="rounded"
-                  />
-                  Pin this note
-                </label>
-                <button
-                  onClick={handleAddNote}
-                  disabled={isAddingNote || !newNoteContent.trim()}
-                  className="py-2 px-4 rounded-lg bg-brand-green text-white font-medium text-sm disabled:opacity-50"
-                >
-                  {isAddingNote ? 'Adding...' : 'Add Note'}
-                </button>
+            <div 
+              className="animate-slide-up-stagger"
+              style={{ '--stagger-index': 0 } as React.CSSProperties}
+            >
+              <div className={`p-4 rounded-xl ${isDark ? 'bg-white/10' : 'bg-gray-100'}`}>
+                <textarea
+                  placeholder="Add a note about this member..."
+                  value={newNoteContent}
+                  onChange={(e) => setNewNoteContent(e.target.value)}
+                  rows={3}
+                  className={`w-full px-3 py-2 rounded-lg text-sm resize-none ${isDark ? 'bg-white/10 text-white border-white/20 placeholder-gray-500' : 'bg-white text-gray-900 border-gray-200'} border`}
+                />
+                <div className="flex items-center justify-between mt-2">
+                  <label className={`flex items-center gap-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    <input
+                      type="checkbox"
+                      checked={newNotePinned}
+                      onChange={(e) => setNewNotePinned(e.target.checked)}
+                      className="rounded"
+                    />
+                    Pin this note
+                  </label>
+                  <button
+                    onClick={handleAddNote}
+                    disabled={isAddingNote || !newNoteContent.trim()}
+                    className="py-2 px-4 rounded-lg bg-brand-green text-white font-medium text-sm disabled:opacity-50"
+                  >
+                    {isAddingNote ? 'Adding...' : 'Add Note'}
+                  </button>
+                </div>
               </div>
             </div>
 
             {notes.length === 0 ? (
-              <EmptyState icon="sticky_note_2" message="No notes yet" />
+              <div 
+                className="animate-slide-up-stagger"
+                style={{ '--stagger-index': 1 } as React.CSSProperties}
+              >
+                <EmptyState icon="sticky_note_2" message="No notes yet" />
+              </div>
             ) : (
-              <div className="space-y-3">
+              <div 
+                className="animate-slide-up-stagger space-y-3"
+                style={{ '--stagger-index': 1 } as React.CSSProperties}
+              >
                 {notes.map((note) => (
                   <div key={note.id} className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-gray-50'} ${note.isPinned ? 'ring-2 ring-yellow-500/50' : ''}`}>
                     {editingNoteId === note.id ? (
@@ -941,29 +989,39 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
       case 'billing':
         return (
           <div className="space-y-4">
-            <MemberBillingTab 
-              memberEmail={member.email} 
-              memberId={member.id} 
-              currentTier={displayedTier}
-              onTierUpdate={(newTier) => setDisplayedTier(newTier)}
-              guestPassInfo={history?.guestPassInfo}
-              guestHistory={guestHistory}
-              guestCheckInsHistory={history?.guestCheckInsHistory}
-              purchases={purchases}
-            />
+            <div 
+              className="animate-slide-up-stagger"
+              style={{ '--stagger-index': 0 } as React.CSSProperties}
+            >
+              <MemberBillingTab 
+                memberEmail={member.email} 
+                memberId={member.id} 
+                currentTier={displayedTier}
+                onTierUpdate={(newTier) => setDisplayedTier(newTier)}
+                guestPassInfo={history?.guestPassInfo}
+                guestHistory={guestHistory}
+                guestCheckInsHistory={history?.guestCheckInsHistory}
+                purchases={purchases}
+              />
+            </div>
           </div>
         );
 
       case 'activity':
         return (
-          <MemberActivityTab
-            memberEmail={member.email}
-            bookingHistory={filteredBookingHistory}
-            bookingRequestsHistory={filteredBookingRequestsHistory}
-            eventRsvpHistory={history?.eventRsvpHistory || []}
-            wellnessHistory={history?.wellnessHistory || []}
-            visitHistory={history?.visitHistory || []}
-          />
+          <div 
+            className="animate-slide-up-stagger"
+            style={{ '--stagger-index': 0 } as React.CSSProperties}
+          >
+            <MemberActivityTab
+              memberEmail={member.email}
+              bookingHistory={filteredBookingHistory}
+              bookingRequestsHistory={filteredBookingRequestsHistory}
+              eventRsvpHistory={history?.eventRsvpHistory || []}
+              wellnessHistory={history?.wellnessHistory || []}
+              visitHistory={history?.visitHistory || []}
+            />
+          </div>
         );
 
       default:

@@ -1381,7 +1381,7 @@ const EventsAdminContent: React.FC = () => {
                                     <div key={event.id} onClick={() => !isOptimistic && openEdit(event)} className={`bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border flex flex-col gap-3 relative overflow-hidden transition-all animate-slide-up-stagger ${
                                         isPending || isOptimistic 
                                             ? 'border-brand-green/50 animate-pulse cursor-wait' 
-                                            : 'border-gray-200 dark:border-white/20 cursor-pointer hover:border-primary/30'
+                                            : 'border-gray-200 dark:border-white/20 cursor-pointer hover:border-primary/30 transition-transform active:scale-[0.98]'
                                     }`} style={{ '--stagger-index': index + 1 } as React.CSSProperties}>
                                         {(isPending || isOptimistic) && (
                                             <div className="absolute top-0 left-0 bg-brand-green text-white text-[8px] font-bold uppercase px-2 py-1 rounded-br-lg z-10 flex items-center gap-1">
@@ -1460,7 +1460,7 @@ const EventsAdminContent: React.FC = () => {
                                     const isPending = pendingEventIds.has(event.id);
                                     return (
                                     <div key={event.id} onClick={() => openEdit(event)} className={`bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border flex flex-col gap-3 relative overflow-hidden transition-all animate-slide-up-stagger ${
-                                        isPending ? 'border-brand-green/50 animate-pulse cursor-wait' : 'border-gray-200 dark:border-white/20 cursor-pointer hover:border-primary/30'
+                                        isPending ? 'border-brand-green/50 animate-pulse cursor-wait' : 'border-gray-200 dark:border-white/20 cursor-pointer hover:border-primary/30 transition-transform active:scale-[0.98]'
                                     }`} style={{ '--stagger-index': upcomingEvents.length + index + 3 } as React.CSSProperties}>
                                         {isPending && (
                                             <div className="absolute top-0 left-0 bg-brand-green text-white text-[8px] font-bold uppercase px-2 py-1 rounded-br-lg z-10 flex items-center gap-1">

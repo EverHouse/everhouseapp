@@ -2022,7 +2022,7 @@ const SimulatorTab: React.FC = () => {
                                         return (
                                             <div 
                                                 key={`unmatched-${item.id}`} 
-                                                className="bg-amber-50/80 dark:bg-amber-500/10 p-4 rounded-xl border-2 border-dashed border-amber-300 dark:border-amber-500/30 animate-slide-up-stagger cursor-pointer hover:bg-amber-100/80 dark:hover:bg-amber-500/20 hover:scale-[1.01] shadow-sm hover:shadow-md transition-all duration-200" 
+                                                className="bg-amber-50/80 dark:bg-amber-500/10 p-4 rounded-xl border-2 border-dashed border-amber-300 dark:border-amber-500/30 animate-slide-up-stagger cursor-pointer hover:bg-amber-100/80 dark:hover:bg-amber-500/20 hover:scale-[1.01] active:scale-[0.98] shadow-sm hover:shadow-md transition-all duration-200" 
                                                 style={{ '--stagger-index': index + 2 } as React.CSSProperties}
                                                 onClick={() => setTrackmanLinkModal({
                                                     isOpen: true,
@@ -2091,7 +2091,7 @@ const SimulatorTab: React.FC = () => {
                                     const actionState = actionInProgress[actionKey];
                                     const isActionPending = !!actionState;
                                     return (
-                                    <div key={`${req.source || 'request'}-${req.id}`} className={`bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/25 animate-slide-up-stagger shadow-sm hover:shadow-md hover:bg-gray-100 dark:hover:bg-white/10 transition-all duration-200 cursor-pointer ${isActionPending ? 'opacity-60 pointer-events-none' : ''}`} style={{ '--stagger-index': index + 2 } as React.CSSProperties}>
+                                    <div key={`${req.source || 'request'}-${req.id}`} className={`bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/25 animate-slide-up-stagger shadow-sm hover:shadow-md hover:bg-gray-100 dark:hover:bg-white/10 transition-all duration-200 cursor-pointer active:scale-[0.98] ${isActionPending ? 'opacity-60 pointer-events-none' : ''}`} style={{ '--stagger-index': index + 2 } as React.CSSProperties}>
                                         {isActionPending && (
                                             <div className="flex items-center gap-2 mb-2 text-sm text-primary/70 dark:text-white/70">
                                                 <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">

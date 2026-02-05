@@ -111,17 +111,18 @@ export const ResourcesSection: React.FC<ResourcesSectionProps> = ({
         )
       ) : (
         <div className={`space-y-3 ${variant === 'desktop' ? 'flex-1' : ''}`}>
-          {closures.slice(0, 3).map(closure => {
+          {closures.slice(0, 3).map((closure, index) => {
             const blocking = isBlocking(closure.affectedAreas);
             return (
               <button 
                 key={closure.id}
                 onClick={() => navigateToTab('blocks')}
-                className={`w-full text-left rounded-lg p-3 transition-colors ${
+                className={`w-full text-left rounded-lg p-3 transition-colors animate-slide-up-stagger ${
                   blocking
                     ? 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30'
                     : 'bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30'
                 }`}
+                style={{ '--stagger-index': index } as React.CSSProperties}
               >
                 <div className="flex flex-wrap items-center gap-1.5 mb-1">
                   <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
@@ -153,11 +154,12 @@ export const ResourcesSection: React.FC<ResourcesSectionProps> = ({
               </button>
             );
           })}
-          {announcements.slice(0, 3).map(announcement => (
+          {announcements.slice(0, 3).map((announcement, index) => (
             <button 
               key={announcement.id}
               onClick={() => navigateToTab('announcements')}
-              className="w-full text-left bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+              className="w-full text-left bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors animate-slide-up-stagger"
+              style={{ '--stagger-index': index } as React.CSSProperties}
             >
               <p className="text-sm font-medium text-purple-800 dark:text-purple-200">{announcement.title}</p>
             </button>
@@ -178,7 +180,7 @@ export const ResourcesSection: React.FC<ResourcesSectionProps> = ({
         </div>
       </div>
       
-      {bayStatuses.filter(b => b.type === 'conference_room').map(bay => {
+      {bayStatuses.filter(b => b.type === 'conference_room').map((bay, index) => {
         const facilityStatus = isFacilityOpen();
         const isClosed = bay.isClosed || !facilityStatus.isOpen;
         const dotColor = isClosed ? 'bg-red-500' : bay.isOccupied ? 'bg-amber-500' : 'bg-green-500';
@@ -186,7 +188,8 @@ export const ResourcesSection: React.FC<ResourcesSectionProps> = ({
           <button
             key={`conf-${variant}-${bay.id}`}
             onClick={() => navigate(`/admin/bookings?resourceType=conference&bay=${bay.id}`)}
-            className="w-full flex items-center gap-2 py-2 mb-2 border-b border-primary/5 dark:border-white/10 text-left hover:opacity-80 transition-opacity"
+            className="w-full flex items-center gap-2 py-2 mb-2 border-b border-primary/5 dark:border-white/10 text-left hover:opacity-80 transition-opacity animate-slide-up-stagger"
+            style={{ '--stagger-index': index } as React.CSSProperties}
           >
             <span className={`w-2 h-2 rounded-full ${dotColor}`} />
             <div>
@@ -202,7 +205,7 @@ export const ResourcesSection: React.FC<ResourcesSectionProps> = ({
       })}
       
       <div className="grid grid-cols-2 gap-3 mt-3">
-        {bayStatuses.filter(b => b.type === 'simulator').map(bay => {
+        {bayStatuses.filter(b => b.type === 'simulator').map((bay, index) => {
           const facilityStatus = isFacilityOpen();
           const isClosed = bay.isClosed || !facilityStatus.isOpen;
           const dotColor = isClosed ? 'bg-red-500' : bay.isOccupied ? 'bg-amber-500' : 'bg-green-500';
@@ -210,7 +213,8 @@ export const ResourcesSection: React.FC<ResourcesSectionProps> = ({
             <button
               key={`bay-${variant}-${bay.id}`}
               onClick={() => navigate(`/admin/bookings?bay=${bay.id}`)}
-              className={`p-3 rounded-xl border text-left hover:opacity-80 transition-opacity ${isClosed ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-white dark:bg-white/10 border-primary/5 dark:border-white/10'}`}
+              className={`p-3 rounded-xl border text-left hover:opacity-80 transition-opacity animate-slide-up-stagger ${isClosed ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-white dark:bg-white/10 border-primary/5 dark:border-white/10'}`}
+              style={{ '--stagger-index': index } as React.CSSProperties}
             >
               <div className="flex items-center gap-2 mb-1">
                 <span className={`w-2 h-2 rounded-full ${dotColor}`} />
@@ -339,17 +343,18 @@ export const NoticeBoardWidget: React.FC<{
         )
       ) : (
         <div className="space-y-3 flex-1">
-          {closures.slice(0, 3).map(closure => {
+          {closures.slice(0, 3).map((closure, index) => {
             const blocking = isBlocking(closure.affectedAreas);
             return (
               <button 
                 key={closure.id} 
                 onClick={() => navigateToTab('blocks')}
-                className={`w-full text-left rounded-lg p-3 transition-colors ${
+                className={`w-full text-left rounded-lg p-3 transition-colors animate-slide-up-stagger ${
                   blocking
                     ? 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30'
                     : 'bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30'
                 }`}
+                style={{ '--stagger-index': index } as React.CSSProperties}
               >
                 <div className="flex flex-wrap items-center gap-1.5 mb-1">
                   <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
@@ -381,11 +386,12 @@ export const NoticeBoardWidget: React.FC<{
               </button>
             );
           })}
-          {announcements.slice(0, 3).map(announcement => (
+          {announcements.slice(0, 3).map((announcement, index) => (
             <button 
               key={announcement.id}
               onClick={() => navigateToTab('announcements')}
-              className="w-full text-left bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+              className="w-full text-left bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors animate-slide-up-stagger"
+              style={{ '--stagger-index': index } as React.CSSProperties}
             >
               <p className="text-sm font-medium text-purple-800 dark:text-purple-200">{announcement.title}</p>
             </button>
