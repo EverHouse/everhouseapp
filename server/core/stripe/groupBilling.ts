@@ -4,6 +4,7 @@ import { billingGroups, groupMembers, familyAddOnProducts } from '../../../share
 import { eq, and } from 'drizzle-orm';
 import { getStripeClient } from './client';
 import Stripe from 'stripe';
+import { randomUUID } from 'crypto';
 
 export interface BillingGroupWithMembers {
   id: number;
@@ -721,7 +722,7 @@ export async function addCorporateMember(params: {
         );
         console.log(`[GroupBilling] Updated existing user ${params.memberEmail} with corporate group`);
       } else {
-        const userId = require('crypto').randomUUID();
+        const userId = randomUUID();
         await client.query(
           `INSERT INTO users (id, email, first_name, last_name, phone, dob, tier, membership_status, billing_provider, billing_group_id, created_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', 'stripe', $8, NOW())`,
