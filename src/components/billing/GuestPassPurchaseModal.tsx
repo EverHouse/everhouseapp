@@ -9,6 +9,7 @@ import {
 } from '@stripe/react-stripe-js';
 import { loadStripe, Stripe, StripeElementsOptions } from '@stripe/stripe-js';
 import { SlideUpDrawer } from '../SlideUpDrawer';
+import { getStripeAppearance } from '../stripe/stripeAppearance';
 
 let stripePromise: Promise<Stripe | null> | null = null;
 
@@ -207,17 +208,7 @@ export function GuestPassPurchaseModal({
 
   const options: StripeElementsOptions | null = paymentData?.clientSecret ? {
     clientSecret: paymentData.clientSecret,
-    appearance: {
-      theme: 'stripe',
-      variables: {
-        colorPrimary: '#31543C',
-        colorBackground: '#ffffff',
-        colorText: '#31543C',
-        colorDanger: '#df1b41',
-        fontFamily: 'system-ui, sans-serif',
-        borderRadius: '8px',
-      },
-    },
+    appearance: getStripeAppearance(isDark),
   } : null;
 
   const handleFormSubmit = () => {
@@ -386,7 +377,7 @@ export function GuestPassPurchaseModal({
               </div>
             </div>
 
-            <Elements stripe={stripeInstance} options={options}>
+            <Elements stripe={stripeInstance} options={options} key={isDark ? 'dark' : 'light'}>
               <GuestPassCheckoutForm 
                 onSuccess={onSuccess} 
                 onCancel={onClose}

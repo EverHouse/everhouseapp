@@ -6,6 +6,8 @@ import {
   useElements,
 } from '@stripe/react-stripe-js';
 import { loadStripe, Stripe, StripeElementsOptions } from '@stripe/stripe-js';
+import { useTheme } from '../../contexts/ThemeContext';
+import { getStripeAppearance } from './stripeAppearance';
 
 let stripePromise: Promise<Stripe | null> | null = null;
 
@@ -165,6 +167,8 @@ export function StripePaymentWithSecret({
   const [stripeInstance, setStripeInstance] = useState<Stripe | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { effectiveTheme } = useTheme();
+  const isDark = effectiveTheme === 'dark';
 
   useEffect(() => {
     const initStripe = async () => {
@@ -208,21 +212,11 @@ export function StripePaymentWithSecret({
 
   const options: StripeElementsOptions = {
     clientSecret,
-    appearance: {
-      theme: 'stripe',
-      variables: {
-        colorPrimary: '#31543C',
-        colorBackground: '#ffffff',
-        colorText: '#31543C',
-        colorDanger: '#df1b41',
-        fontFamily: 'system-ui, sans-serif',
-        borderRadius: '8px',
-      },
-    },
+    appearance: getStripeAppearance(isDark),
   };
 
   return (
-    <Elements stripe={stripeInstance} options={options}>
+    <Elements stripe={stripeInstance} options={options} key={isDark ? 'dark' : 'light'}>
       <div className="space-y-4">
         <div className="bg-primary/5 dark:bg-white/5 rounded-xl p-4 flex items-center justify-between">
           <span className="text-primary/70 dark:text-white/70">{description}</span>
@@ -254,6 +248,8 @@ export function StripePaymentForm({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const intentCreatedRef = React.useRef(false);
+  const { effectiveTheme } = useTheme();
+  const isDark = effectiveTheme === 'dark';
 
   useEffect(() => {
     if (intentCreatedRef.current) {
@@ -333,21 +329,11 @@ export function StripePaymentForm({
 
   const options: StripeElementsOptions = {
     clientSecret,
-    appearance: {
-      theme: 'stripe',
-      variables: {
-        colorPrimary: '#31543C',
-        colorBackground: '#ffffff',
-        colorText: '#31543C',
-        colorDanger: '#df1b41',
-        fontFamily: 'system-ui, sans-serif',
-        borderRadius: '8px',
-      },
-    },
+    appearance: getStripeAppearance(isDark),
   };
 
   return (
-    <Elements stripe={stripeInstance} options={options}>
+    <Elements stripe={stripeInstance} options={options} key={isDark ? 'dark' : 'light'}>
       <div className="space-y-4">
         <div className="bg-primary/5 dark:bg-white/5 rounded-xl p-4 flex items-center justify-between">
           <span className="text-primary/70 dark:text-white/70">{description}</span>
