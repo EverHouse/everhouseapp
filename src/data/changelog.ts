@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.7.0",
+    date: "2026-02-05",
+    title: "Staff Conference Room Booking",
+    changes: [
+      "Added: New 'Conference Room' tab in staff manual booking modal for creating conference room bookings on behalf of members",
+      "Added: Date, duration (30-240 min), and available time slot selection with conflict checking",
+      "Added: Real-time overage fee estimation based on member's tier and daily allowance",
+      "Added: Members receive notification when staff creates a booking for them",
+      "Improved: Conference Room removed from Bay dropdown in Member Booking tab to prevent confusion"
+    ],
+    isMajor: true
+  },
+  {
     version: "69.6.5",
     date: "2026-02-05",
     title: "Fixed: Admin View As Mode",

@@ -6,6 +6,15 @@ import { getTodayPacific, formatTime12Hour, formatDateShort } from '../../../uti
 
 const TRACKMAN_PORTAL_URL = 'https://portal.trackmangolf.com/facility/RmFjaWxpdHkKZGI4YWMyN2FhLTM2YWQtNDM4ZC04MjUzLWVmOWU5NzMwMjkxZg==';
 
+interface FeeEstimate {
+  dailyAllowance: number;
+  usedToday: number;
+  remainingAllowance: number;
+  overageMinutes: number;
+  overageCents: number;
+  tierName: string | null;
+}
+
 interface Resource {
   id: number;
   name: string;
@@ -97,7 +106,7 @@ export function StaffManualBookingModal({
   defaultHostMember
 }: StaffManualBookingModalProps) {
   const { showToast } = useToast();
-  const [mode, setMode] = useState<'member' | 'lesson'>('member');
+  const [mode, setMode] = useState<'member' | 'lesson' | 'conference'>('member');
   const [step, setStep] = useState<1 | 2>(1);
   const [resources, setResources] = useState<Resource[]>([]);
   const [loadingResources, setLoadingResources] = useState(false);
@@ -105,6 +114,17 @@ export function StaffManualBookingModal({
   // Lesson helper state
   const [lessonClientName, setLessonClientName] = useState('');
   const [lessonCopied, setLessonCopied] = useState(false);
+  
+  // Conference Room state
+  const [confDate, setConfDate] = useState(getTodayPacific());
+  const [confDuration, setConfDuration] = useState(60);
+  const [confAvailableSlots, setConfAvailableSlots] = useState<string[]>([]);
+  const [confSelectedSlot, setConfSelectedSlot] = useState<string>('');
+  const [confHostMember, setConfHostMember] = useState<SelectedMember | null>(null);
+  const [confFeeEstimate, setConfFeeEstimate] = useState<FeeEstimate | null>(null);
+  const [confLoadingSlots, setConfLoadingSlots] = useState(false);
+  const [confLoadingFee, setConfLoadingFee] = useState(false);
+  const [confSubmitting, setConfSubmitting] = useState(false);
 
   const [resourceId, setResourceId] = useState<number | null>(defaultResourceId ?? null);
   const [requestDate, setRequestDate] = useState(defaultDate ?? getTodayPacific());
@@ -136,6 +156,14 @@ export function StaffManualBookingModal({
       setLessonClientName('');
       setLessonCopied(false);
       
+      // Reset conference room state
+      setConfDate(defaultDate ?? getTodayPacific());
+      setConfDuration(60);
+      setConfAvailableSlots([]);
+      setConfSelectedSlot('');
+      setConfHostMember(null);
+      setConfFeeEstimate(null);
+      
       setResourceId(defaultResourceId ?? null);
       setStartTime(defaultStartTime ?? '10:00');
       setRequestDate(defaultDate ?? getTodayPacific());
@@ -144,15 +172,52 @@ export function StaffManualBookingModal({
       fetch('/api/resources?type=simulator', { credentials: 'include' })
         .then(res => res.json())
         .then(data => {
-          setResources(data);
-          if (data.length > 0 && defaultResourceId === undefined) {
-            setResourceId(prev => prev ?? data[0].id);
+          // Filter out conference room from resources list
+          const simulatorResources = data.filter((r: Resource) => r.type === 'simulator');
+          setResources(simulatorResources);
+          if (simulatorResources.length > 0 && defaultResourceId === undefined) {
+            setResourceId(prev => prev ?? simulatorResources[0].id);
           }
         })
         .catch(err => console.error('Failed to load resources:', err))
         .finally(() => setLoadingResources(false));
     }
   }, [isOpen, defaultResourceId, defaultStartTime, defaultDate, defaultHostMember]);
+
+  // Fetch available conference room slots when date/duration changes
+  useEffect(() => {
+    if (mode !== 'conference') return;
+    if (!confDate) return;
+
+    setConfLoadingSlots(true);
+    setConfSelectedSlot('');
+    fetch(`/api/staff/conference-room/available-slots?date=${confDate}&duration=${confDuration}`, { credentials: 'include' })
+      .then(res => res.json())
+      .then(slots => {
+        setConfAvailableSlots(slots);
+        if (slots.length > 0) {
+          setConfSelectedSlot(slots[0]);
+        }
+      })
+      .catch(err => console.error('Failed to load available slots:', err))
+      .finally(() => setConfLoadingSlots(false));
+  }, [mode, confDate, confDuration]);
+
+  // Fetch fee estimate when host member or date/duration changes
+  useEffect(() => {
+    if (mode !== 'conference') return;
+    if (!confHostMember || !confDate) {
+      setConfFeeEstimate(null);
+      return;
+    }
+
+    setConfLoadingFee(true);
+    fetch(`/api/staff/conference-room/fee-estimate?email=${encodeURIComponent(confHostMember.email)}&date=${confDate}&duration=${confDuration}`, { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => setConfFeeEstimate(data))
+      .catch(err => console.error('Failed to load fee estimate:', err))
+      .finally(() => setConfLoadingFee(false));
+  }, [mode, confHostMember, confDate, confDuration]);
 
   useEffect(() => {
     const additionalSlots = Math.max(0, playerCount - 1);
@@ -254,6 +319,47 @@ export function StaffManualBookingModal({
     }
   }, [lessonClientName]);
 
+  const handleConferenceSubmit = useCallback(async () => {
+    if (!confHostMember || !confSelectedSlot || !confDate) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    setError(null);
+    setConfSubmitting(true);
+
+    try {
+      const response = await fetch('/api/staff/conference-room/booking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          hostEmail: confHostMember.email,
+          hostName: confHostMember.name,
+          date: confDate,
+          startTime: confSelectedSlot,
+          durationMinutes: confDuration
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create booking');
+      }
+
+      showToast(`Conference room booked for ${confHostMember.name}`, 'success');
+      handleClose();
+    } catch (err: any) {
+      const errorMsg = err.message || 'Failed to create conference room booking';
+      setError(errorMsg);
+      showToast(errorMsg, 'error');
+    } finally {
+      setConfSubmitting(false);
+    }
+  }, [confHostMember, confSelectedSlot, confDate, confDuration, showToast]);
+
+  const canCreateConferenceBooking = confHostMember && confSelectedSlot && confDate;
+
   const handleSubmit = useCallback(async () => {
     if (!hostMember || !resourceId) {
       setError('Missing required booking data');
@@ -327,7 +433,32 @@ export function StaffManualBookingModal({
   const selectedResource = resources.find(r => r.id === resourceId);
   const endTime = calculateEndTime(startTime, durationMinutes);
 
-  const stickyFooterContent = mode === 'lesson' ? (
+  const stickyFooterContent = mode === 'conference' ? (
+    <div className="p-4 space-y-3">
+      {error && (
+        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+        </div>
+      )}
+      <button
+        onClick={handleConferenceSubmit}
+        disabled={confSubmitting || !canCreateConferenceBooking}
+        className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+      >
+        {confSubmitting ? (
+          <>
+            <span className="material-symbols-outlined animate-spin">progress_activity</span>
+            Creating Booking...
+          </>
+        ) : (
+          <>
+            <span className="material-symbols-outlined">meeting_room</span>
+            Create Booking
+          </>
+        )}
+      </button>
+    </div>
+  ) : mode === 'lesson' ? (
     <div className="p-4 flex gap-3">
       <button
         onClick={handleCopyLessonNotes}
@@ -389,11 +520,17 @@ export function StaffManualBookingModal({
     </div>
   );
 
+  const getTitle = () => {
+    if (mode === 'conference') return 'Conference Room Booking';
+    if (mode === 'lesson') return 'Lesson / Staff Block';
+    return step === 1 ? 'Create Manual Booking' : 'Complete Trackman Booking';
+  };
+
   return (
     <SlideUpDrawer
       isOpen={isOpen}
       onClose={handleClose}
-      title={mode === 'lesson' ? 'Lesson / Staff Block' : (step === 1 ? 'Create Manual Booking' : 'Complete Trackman Booking')}
+      title={getTitle()}
       maxHeight="full"
       stickyFooter={stickyFooterContent}
     >
@@ -402,7 +539,7 @@ export function StaffManualBookingModal({
         <div className="flex p-1 bg-gray-100 dark:bg-white/10 rounded-lg">
           <button
             type="button"
-            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+            className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${
               mode === 'member' 
                 ? 'bg-white dark:bg-white/20 shadow text-gray-900 dark:text-white' 
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/5'
@@ -413,7 +550,7 @@ export function StaffManualBookingModal({
           </button>
           <button
             type="button"
-            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+            className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${
               mode === 'lesson' 
                 ? 'bg-white dark:bg-white/20 shadow text-gray-900 dark:text-white' 
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/5'
@@ -422,9 +559,159 @@ export function StaffManualBookingModal({
           >
             Lesson / Staff Block
           </button>
+          <button
+            type="button"
+            className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${
+              mode === 'conference' 
+                ? 'bg-white dark:bg-white/20 shadow text-gray-900 dark:text-white' 
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/5'
+            }`}
+            onClick={() => setMode('conference')}
+          >
+            Conference Room
+          </button>
         </div>
 
-        {mode === 'lesson' ? (
+        {mode === 'conference' ? (
+          /* Conference Room Booking Form */
+          <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            {/* Date and Duration */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={confDate}
+                  onChange={(e) => setConfDate(e.target.value)}
+                  min={getTodayPacific()}
+                  className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Duration
+                </label>
+                <select
+                  value={confDuration}
+                  onChange={(e) => setConfDuration(Number(e.target.value))}
+                  className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all"
+                >
+                  <option value={30}>30 minutes</option>
+                  <option value={60}>60 minutes</option>
+                  <option value={90}>90 minutes</option>
+                  <option value={120}>120 minutes</option>
+                  <option value={150}>150 minutes</option>
+                  <option value={180}>180 minutes</option>
+                  <option value={210}>210 minutes</option>
+                  <option value={240}>240 minutes</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Available Time Slots */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Available Time Slots
+              </label>
+              {confLoadingSlots ? (
+                <div className="flex items-center gap-2 py-2.5 px-4 text-sm text-gray-500 dark:text-gray-400">
+                  <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+                  Loading available slots...
+                </div>
+              ) : confAvailableSlots.length === 0 ? (
+                <div className="py-2.5 px-4 text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10">
+                  No available slots for this date and duration
+                </div>
+              ) : (
+                <select
+                  value={confSelectedSlot}
+                  onChange={(e) => setConfSelectedSlot(e.target.value)}
+                  className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all"
+                >
+                  {confAvailableSlots.map(slot => (
+                    <option key={slot} value={slot}>
+                      {formatTime12Hour(slot)} - {formatTime12Hour(calculateEndTime(slot, confDuration))}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Host Member Search */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Host Member <span className="text-red-500">*</span>
+              </label>
+              <MemberSearchInput
+                onSelect={setConfHostMember}
+                onClear={() => setConfHostMember(null)}
+                selectedMember={confHostMember}
+                placeholder="Search for host member..."
+              />
+            </div>
+
+            {/* Fee Estimate */}
+            {confHostMember && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">receipt_long</span>
+                  <h4 className="font-semibold text-blue-900 dark:text-blue-100">Fee Estimate</h4>
+                </div>
+                {confLoadingFee ? (
+                  <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
+                    <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+                    Calculating...
+                  </div>
+                ) : confFeeEstimate ? (
+                  <div className="space-y-2 text-sm">
+                    {confFeeEstimate.tierName && (
+                      <div className="flex justify-between">
+                        <span className="text-blue-700/70 dark:text-blue-300/70">Member Tier</span>
+                        <span className="font-medium text-blue-900 dark:text-blue-100">{confFeeEstimate.tierName}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-blue-700/70 dark:text-blue-300/70">Daily Allowance</span>
+                      <span className="font-medium text-blue-900 dark:text-blue-100">{confFeeEstimate.dailyAllowance} min</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-blue-700/70 dark:text-blue-300/70">Used Today</span>
+                      <span className="font-medium text-blue-900 dark:text-blue-100">{confFeeEstimate.usedToday} min</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-blue-700/70 dark:text-blue-300/70">This Booking</span>
+                      <span className="font-medium text-blue-900 dark:text-blue-100">{confDuration} min</span>
+                    </div>
+                    {confFeeEstimate.overageMinutes > 0 ? (
+                      <div className="pt-2 mt-2 border-t border-blue-200 dark:border-blue-700">
+                        <div className="flex justify-between items-center">
+                          <span className="text-amber-700 dark:text-amber-400 font-medium">Overage Fee</span>
+                          <span className="font-bold text-amber-700 dark:text-amber-400">
+                            ${(confFeeEstimate.overageCents / 100).toFixed(2)} for {confFeeEstimate.overageMinutes} min
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="pt-2 mt-2 border-t border-blue-200 dark:border-blue-700">
+                        <div className="flex justify-between items-center">
+                          <span className="text-green-700 dark:text-green-400 font-medium">Within Allowance</span>
+                          <span className="font-bold text-green-700 dark:text-green-400">No fee</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-blue-600/70 dark:text-blue-400/70">
+                    Unable to calculate fee estimate
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        ) : mode === 'lesson' ? (
           /* Lesson / Staff Block Helper View */
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-200">
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-4">
