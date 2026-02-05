@@ -811,10 +811,10 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
     const visitorIdStr = String(id);
     const deletionLog: string[] = [];
     
-    await pool.query('DELETE FROM pass_redemption_logs WHERE purchase_id IN (SELECT id FROM day_pass_purchases WHERE user_id = $1)', [visitorIdStr]);
+    await pool.query('DELETE FROM pass_redemption_logs WHERE purchase_id IN (SELECT id FROM day_pass_purchases WHERE user_id = $1 OR LOWER(purchaser_email) = $2)', [visitorIdStr, visitorEmail]);
     deletionLog.push('pass_redemption_logs');
     
-    await pool.query('DELETE FROM day_pass_purchases WHERE user_id = $1', [visitorIdStr]);
+    await pool.query('DELETE FROM day_pass_purchases WHERE user_id = $1 OR LOWER(purchaser_email) = $2', [visitorIdStr, visitorEmail]);
     deletionLog.push('day_pass_purchases');
     
     await pool.query('DELETE FROM booking_guests WHERE LOWER(guest_email) = $1', [visitorEmail]);
@@ -884,7 +884,7 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
     await pool.query("DELETE FROM hubspot_sync_queue WHERE LOWER(payload->>'email') = $1", [visitorEmail]);
     deletionLog.push('hubspot_sync_queue');
     
-    await pool.query('DELETE FROM guest_check_ins WHERE LOWER(member_email) = $1', [visitorEmail]);
+    await pool.query('DELETE FROM guest_check_ins WHERE LOWER(member_email) = $1 OR LOWER(guest_email) = $1', [visitorEmail, visitorEmail]);
     deletionLog.push('guest_check_ins');
     
     await pool.query('DELETE FROM guest_passes WHERE LOWER(member_email) = $1', [visitorEmail]);
@@ -899,7 +899,7 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
     await pool.query('DELETE FROM bug_reports WHERE LOWER(user_email) = $1', [visitorEmail]);
     deletionLog.push('bug_reports');
     
-    await pool.query('DELETE FROM terminal_payments WHERE user_id = $1', [visitorIdStr]);
+    await pool.query('DELETE FROM terminal_payments WHERE user_id = $1 OR LOWER(user_email) = $2', [visitorIdStr, visitorEmail]);
     deletionLog.push('terminal_payments');
     
     await pool.query('DELETE FROM stripe_payment_intents WHERE user_id = $1', [visitorIdStr]);

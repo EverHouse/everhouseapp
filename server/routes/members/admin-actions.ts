@@ -351,7 +351,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
     await pool.query('DELETE FROM guest_passes WHERE LOWER(member_email) = $1', [normalizedEmail]);
     deletionLog.push('guest_passes');
     
-    await pool.query('DELETE FROM guest_check_ins WHERE LOWER(member_email) = $1', [normalizedEmail]);
+    await pool.query('DELETE FROM guest_check_ins WHERE LOWER(member_email) = $1 OR LOWER(guest_email) = $1', [normalizedEmail, normalizedEmail]);
     deletionLog.push('guest_check_ins');
     
     await pool.query('UPDATE event_rsvps SET matched_user_id = NULL WHERE matched_user_id = $1', [userIdStr]);
@@ -451,13 +451,13 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
     await pool.query('UPDATE trackman_webhook_events SET matched_user_id = NULL WHERE matched_user_id = $1', [userIdStr]);
     deletionLog.push('trackman_webhook_events (unlinked)');
     
-    await pool.query('DELETE FROM terminal_payments WHERE user_id = $1', [userIdStr]);
+    await pool.query('DELETE FROM terminal_payments WHERE user_id = $1 OR LOWER(user_email) = $2', [userIdStr, normalizedEmail]);
     deletionLog.push('terminal_payments');
     
-    await pool.query('DELETE FROM pass_redemption_logs WHERE purchase_id IN (SELECT id FROM day_pass_purchases WHERE user_id = $1)', [userIdStr]);
+    await pool.query('DELETE FROM pass_redemption_logs WHERE purchase_id IN (SELECT id FROM day_pass_purchases WHERE user_id = $1 OR LOWER(purchaser_email) = $2)', [userIdStr, normalizedEmail]);
     deletionLog.push('pass_redemption_logs');
     
-    await pool.query('DELETE FROM day_pass_purchases WHERE user_id = $1', [userIdStr]);
+    await pool.query('DELETE FROM day_pass_purchases WHERE user_id = $1 OR LOWER(purchaser_email) = $2', [userIdStr, normalizedEmail]);
     deletionLog.push('day_pass_purchases');
     
     await pool.query('DELETE FROM stripe_payment_intents WHERE user_id = $1', [userIdStr]);
