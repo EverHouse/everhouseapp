@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.9.6",
+    date: "2026-02-05",
+    title: "Notice to Members Field",
+    changes: [
+      "Added: Dedicated 'Note to Members' field for notices, separate from Google Calendar sync",
+      "Added: 'Note to Members' text area in notice form for staff to write member-facing messages",
+      "Fixed: Notice cards now display the dedicated member notice instead of raw HTML from calendar",
+      "Fixed: Google Calendar descriptions now sync to Staff Notes only, not member-facing content",
+      "Improved: Clear labels distinguishing member-visible content from internal staff notes"
+    ]
+  },
+  {
     version: "69.9.5",
     date: "2026-02-05",
     title: "Comprehensive Database Column Fixes",

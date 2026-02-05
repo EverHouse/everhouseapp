@@ -16,6 +16,7 @@ interface BlocksClosure {
     id: number;
     title: string;
     reason: string | null;
+    memberNotice: string | null;
     notes: string | null;
     noticeType: string | null;
     startDate: string;
@@ -39,6 +40,7 @@ interface BlocksClosureForm {
     affected_areas: string;
     visibility: string;
     reason: string;
+    member_notice: string;
     notes: string;
     title: string;
     notice_type: string;
@@ -122,6 +124,7 @@ const BlocksTab: React.FC = () => {
         affected_areas: 'entire_facility',
         visibility: '',
         reason: '',
+        member_notice: '',
         notes: '',
         title: '',
         notice_type: '',
@@ -390,6 +393,7 @@ const BlocksTab: React.FC = () => {
             affected_areas: 'entire_facility',
             visibility: '',
             reason: '',
+            member_notice: '',
             notes: '',
             title: '',
             notice_type: '',
@@ -415,6 +419,7 @@ const BlocksTab: React.FC = () => {
             affected_areas: closure.affectedAreas || 'entire_facility',
             visibility: closure.visibility || '',
             reason: closure.reason || '',
+            member_notice: closure.memberNotice || '',
             notes: stripHtml(closure.notes),
             title: closure.title || '',
             notice_type: closure.noticeType || '',
@@ -1069,10 +1074,10 @@ const BlocksTab: React.FC = () => {
                                 {isExpanded && (
                                     <div className={`border-t ${blocking ? 'border-red-200 dark:border-red-500/30' : 'border-amber-200 dark:border-amber-500/30'}`}>
                                         <div className="p-4 space-y-3">
-                                            {closure.reason && (
+                                            {closure.memberNotice && (
                                                 <div>
                                                     <p className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1">Note to Members</p>
-                                                    <p className="text-sm text-gray-600 dark:text-white/80">{closure.reason}</p>
+                                                    <p className="text-sm text-gray-600 dark:text-white/80 whitespace-pre-wrap">{closure.memberNotice}</p>
                                                 </div>
                                             )}
                                             

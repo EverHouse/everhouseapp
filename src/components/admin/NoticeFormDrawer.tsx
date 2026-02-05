@@ -23,6 +23,7 @@ function stripHtml(html: string | null | undefined): string {
 interface NoticeFormData {
   id?: number;
   title: string;
+  member_notice: string;
   notes: string;
   start_date: string;
   end_date: string;
@@ -53,6 +54,7 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
   
   const [formData, setFormData] = useState<NoticeFormData>({
     title: '',
+    member_notice: '',
     notes: '',
     start_date: today,
     end_date: today,
@@ -80,6 +82,7 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
         setFormData({
           id: editItem.id,
           title: editItem.title || '',
+          member_notice: editItem.member_notice || '',
           notes: stripHtml(editItem.notes),
           start_date: editItem.start_date || today,
           end_date: editItem.end_date || today,
@@ -91,6 +94,7 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
       } else {
         setFormData({
           title: '',
+          member_notice: '',
           notes: '',
           start_date: today,
           end_date: today,
@@ -138,6 +142,7 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
   const handleClose = () => {
     setFormData({
       title: '',
+      member_notice: '',
       notes: '',
       start_date: today,
       end_date: today,
@@ -216,7 +221,21 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
         </div>
 
         <div>
-          <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Notes</label>
+          <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Note to Members</label>
+          <textarea 
+            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none" 
+            placeholder="Message shown to members about this notice..." 
+            rows={2} 
+            value={formData.member_notice} 
+            onChange={e => setFormData({...formData, member_notice: e.target.value})} 
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Visible to members in the app
+          </p>
+        </div>
+
+        <div>
+          <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Staff Notes</label>
           <textarea 
             className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none" 
             placeholder="Internal notes, event details, logistics..." 
@@ -225,7 +244,7 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
             onChange={e => setFormData({...formData, notes: e.target.value})} 
           />
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Syncs with Google Calendar event description
+            Internal only - syncs with Google Calendar
           </p>
         </div>
 

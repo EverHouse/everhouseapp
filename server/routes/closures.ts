@@ -571,6 +571,7 @@ router.post('/api/closures', isStaffOrAdmin, async (req, res) => {
     const { 
       title, 
       reason,
+      member_notice,
       notes,
       notice_type,
       start_date, 
@@ -591,6 +592,7 @@ router.post('/api/closures', isStaffOrAdmin, async (req, res) => {
     const [result] = await db.insert(facilityClosures).values({
       title: title || 'Facility Closure',
       reason,
+      memberNotice: member_notice || null,
       notes: notes || null,
       noticeType: notice_type || null,
       startDate: start_date,
@@ -817,6 +819,7 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
     const { 
       title, 
       reason,
+      member_notice,
       notes,
       notice_type,
       start_date, 
@@ -852,6 +855,7 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
       .set({
         title: title || existing.title,
         reason: reason !== undefined ? reason : existing.reason,
+        memberNotice: member_notice !== undefined ? member_notice : existing.memberNotice,
         notes: notes !== undefined ? notes : existing.notes,
         noticeType: notice_type !== undefined ? notice_type : existing.noticeType,
         startDate: start_date || existing.startDate,

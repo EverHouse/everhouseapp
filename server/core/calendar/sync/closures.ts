@@ -274,7 +274,7 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
       const { noticeType, cleanTitle } = extractNoticeTypeFromTitle(rawTitle);
       const title = cleanTitle;
       const rawDescription = event.description || '';
-      const reason = getBaseDescription(rawDescription) || 'Internal calendar event';
+      const calendarNotes = getBaseDescription(rawDescription) || null;
       
       if (noticeType) {
         await ensureNoticeTypeExists(noticeType);
@@ -334,10 +334,10 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
         
         await pool.query(
           `UPDATE facility_closures SET 
-           title = $1, reason = $2, start_date = $3, start_time = $4,
-           end_date = $5, end_time = $6, notice_type = $7, notes = $8, is_active = true
-           WHERE internal_calendar_id = $9`,
-          [title, reason, startDate, startTime, endDate, endTime, noticeType, metadata.notes || null, internalCalendarId]
+           title = $1, start_date = $2, start_time = $3,
+           end_date = $4, end_time = $5, notice_type = $6, notes = COALESCE($7, notes), is_active = true
+           WHERE internal_calendar_id = $8`,
+          [title, startDate, startTime, endDate, endTime, noticeType, calendarNotes || metadata.notes || null, internalCalendarId]
         );
         
         if (datesChanged) {
@@ -347,7 +347,7 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
             const dates = getDatesBetween(startDate, endDate);
             const blockStartTime = startTime || '08:00:00';
             const blockEndTime = endTime || '22:00:00';
-            await createAvailabilityBlocks(closureId, resourceIds, dates, blockStartTime, blockEndTime, reason);
+            await createAvailabilityBlocks(closureId, resourceIds, dates, blockStartTime, blockEndTime, title);
             console.log(`[Calendar Sync] Updated availability blocks for closure #${closureId}: ${title}`);
           } else {
             console.log(`[Calendar Sync] Updated closure #${closureId}: ${title} (no availability blocks - affected_areas='none')`);
@@ -362,10 +362,10 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
         
         const result = await pool.query(
           `INSERT INTO facility_closures 
-           (title, reason, notes, notice_type, start_date, start_time, end_date, end_time, affected_areas, is_active, created_by, internal_calendar_id, needs_review)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, 'system', $10, $11)
+           (title, notes, notice_type, start_date, start_time, end_date, end_time, affected_areas, is_active, created_by, internal_calendar_id, needs_review)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, 'system', $9, $10)
            RETURNING id`,
-          [title, reason, metadata.notes || null, noticeType, startDate, startTime, endDate, endTime, affectedAreas, internalCalendarId, needsReview]
+          [title, calendarNotes || metadata.notes || null, noticeType, startDate, startTime, endDate, endTime, affectedAreas, internalCalendarId, needsReview]
         );
         
         const closureId = result.rows[0].id;
@@ -375,7 +375,7 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
           const dates = getDatesBetween(startDate, endDate);
           const blockStartTime = startTime || '08:00:00';
           const blockEndTime = endTime || '22:00:00';
-          const blocksCreated = await createAvailabilityBlocks(closureId, resourceIds, dates, blockStartTime, blockEndTime, reason);
+          const blocksCreated = await createAvailabilityBlocks(closureId, resourceIds, dates, blockStartTime, blockEndTime, title);
           console.log(`[Calendar Sync] Created ${blocksCreated} availability blocks for closure #${closureId}: ${title}`);
         } else {
           console.log(`[Calendar Sync] Created closure #${closureId}: ${title} (no availability blocks - affected_areas='none')`);
