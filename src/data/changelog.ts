@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.12.0",
+    date: "2026-02-05",
+    title: "Terminal Payment Integrity & Reconciliation",
+    changes: [
+      "Added: Internal payment record table linking Terminal payments to subscriptions",
+      "Added: Webhook handling for Terminal payment refunds - membership suspended automatically",
+      "Added: Webhook handling for payment disputes - membership suspended with staff alert",
+      "Added: Staff notifications when Terminal payments are refunded or disputed",
+      "Enhanced: Full audit trail from payment to membership activation",
+      "Security: Improved reconciliation between Stripe and internal records"
+    ]
+  },
+  {
     version: "69.11.0",
     date: "2026-02-05",
     title: "Stripe Terminal Card Reader Support",
