@@ -13,6 +13,22 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.7.4",
+    date: "2026-02-05",
+    title: "Staff Training Guide Accuracy Update",
+    changes: [
+      "Updated: Training guide now accurately reflects current app navigation and feature locations",
+      "Fixed: Bottom navigation description corrected (Home, Bookings, Financials, Calendar, Directory)",
+      "Fixed: Payment button labels now match actual UI (Charge Card on File, Pay with Card, Mark Paid)",
+      "Fixed: Updates page tabs renamed to Alerts and Announce to match actual labels",
+      "Fixed: Directory now correctly documented as having 4 tabs including Team",
+      "Added: POS Refunds section documentation in Financials training",
+      "Added: Closure Reasons subtab and member visibility toggle documentation",
+      "Updated: Tour sources now correctly list website widget, HubSpot, and Google Calendar",
+      "Updated: All admin section navigation paths corrected to use sidebar/hamburger menu"
+    ]
+  },
+  {
     version: "69.7.3",
     date: "2026-02-05",
     title: "Profile Page Navigation Improvement",

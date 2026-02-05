@@ -1,5 +1,5 @@
-export const APP_VERSION = '8.9';
-export const LAST_UPDATED = '2026-01-16';
+export const APP_VERSION = '69.7.4';
+export const LAST_UPDATED = '2026-02-05';
 
 export function formatLastUpdated(): string {
   const [year, month, day] = LAST_UPDATED.split('-').map(Number);
