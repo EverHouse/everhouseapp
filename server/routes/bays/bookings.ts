@@ -646,7 +646,9 @@ router.post('/api/booking-requests', async (req, res) => {
     
     const playerCount = declared_player_count && declared_player_count > 1 ? ` (${declared_player_count} players)` : '';
     
-    const staffTitle = 'New Golf Booking Request';
+    // Conference rooms are auto-confirmed so say "Booking" not "Request"
+    const isConfRoom = resourceType === 'conference_room';
+    const staffTitle = isConfRoom ? 'New Conference Room Booking' : 'New Golf Booking Request';
     const staffMessage = `${row.userName || row.userEmail}${playerCount} - ${resourceName} on ${formattedDate} at ${formattedTime12h} for ${durationDisplay}`;
     
     // Send response FIRST before any post-commit async operations
@@ -704,7 +706,7 @@ router.post('/api/booking-requests', async (req, res) => {
       
       broadcastAvailabilityUpdate({
         resourceId: row.resourceId || undefined,
-        resourceType: 'simulator',
+        resourceType: resourceType === 'conference_room' ? 'conference_room' : 'simulator',
         date: row.requestDate,
         action: 'booked'
       });
