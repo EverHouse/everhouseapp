@@ -130,7 +130,7 @@ export const StaffMobileSidebar: React.FC<StaffMobileSidebarProps> = ({
   if (!isOpen) return null;
 
   const sidebarContent = (
-    <div className="lg:hidden fixed inset-0" style={{ zIndex: 'var(--z-modal, 100)' }}>
+    <div className="fixed inset-0" style={{ zIndex: 'var(--z-modal, 100)' }}>
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
