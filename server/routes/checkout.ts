@@ -85,6 +85,16 @@ router.post('/api/checkout/sessions', checkoutRateLimiter, async (req, res) => {
         tier_type: tierData.tierType || 'individual',
         tier_slug: tierSlug,
       },
+      subscription_data: {
+        metadata: {
+          tier_slug: tierSlug,
+          tier_name: tierData.name,
+          tier_type: tierData.tierType || 'individual',
+          purchaser_email: email || '',
+          company_name: companyName || '',
+          quantity: String(seatCount),
+        },
+      },
     };
 
     if (isCorporate) {

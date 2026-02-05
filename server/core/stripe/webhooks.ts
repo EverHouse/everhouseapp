@@ -1688,10 +1688,21 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
                      subscription.items?.data?.[0]?.plan?.nickname || 
                      'Membership';
 
-    const userResult = await pool.query(
+    // First try to find user by stripe_customer_id
+    let userResult = await pool.query(
       'SELECT email, first_name, last_name, tier, membership_status FROM users WHERE stripe_customer_id = $1',
       [customerId]
     );
+    
+    // If not found by customer ID, try by email from subscription metadata
+    const purchaserEmail = subscription.metadata?.purchaser_email?.toLowerCase();
+    if (userResult.rows.length === 0 && purchaserEmail) {
+      console.log(`[Stripe Webhook] No user found by customer ID, trying by email from metadata: ${purchaserEmail}`);
+      userResult = await pool.query(
+        'SELECT email, first_name, last_name, tier, membership_status FROM users WHERE LOWER(email) = LOWER($1)',
+        [purchaserEmail]
+      );
+    }
 
     let email: string;
     let first_name: string | null;
@@ -1724,7 +1735,30 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
       let tierSlug: string | null = null;
       let tierName: string | null = null;
       
-      if (priceId) {
+      // First check subscription metadata for tier info (used by dynamic pricing like corporate)
+      const metadataTierSlug = subscription.metadata?.tier_slug;
+      const metadataTierName = subscription.metadata?.tier_name;
+      
+      if (metadataTierSlug) {
+        // Look up tier by slug from metadata
+        const tierResult = await pool.query(
+          'SELECT slug, name FROM membership_tiers WHERE slug = $1',
+          [metadataTierSlug]
+        );
+        if (tierResult.rows.length > 0) {
+          tierSlug = tierResult.rows[0].slug;
+          tierName = tierResult.rows[0].name;
+          console.log(`[Stripe Webhook] Found tier from subscription metadata: ${tierSlug} (${tierName})`);
+        } else if (metadataTierName) {
+          // Use the tier name from metadata if slug lookup fails
+          tierSlug = metadataTierSlug;
+          tierName = metadataTierName;
+          console.log(`[Stripe Webhook] Using tier from metadata (no DB match): ${tierSlug} (${tierName})`);
+        }
+      }
+      
+      // Fallback to price ID lookup if no metadata
+      if (!tierSlug && priceId) {
         const tierResult = await pool.query(
           'SELECT slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
           [priceId]
@@ -1732,6 +1766,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
         if (tierResult.rows.length > 0) {
           tierSlug = tierResult.rows[0].slug;
           tierName = tierResult.rows[0].name;
+          console.log(`[Stripe Webhook] Found tier from price ID: ${tierSlug} (${tierName})`);
         }
       }
       
@@ -1846,30 +1881,64 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
       planName
     });
 
-    // Closed-loop activation: Look up tier from price ID and update user
-    if (priceId) {
+    // Closed-loop activation: Look up tier from metadata first, then price ID
+    let activationTierSlug: string | null = null;
+    let activationTierName: string | null = null;
+    
+    // First check subscription metadata for tier info (used by dynamic pricing like corporate)
+    const metadataTierSlug = subscription.metadata?.tier_slug;
+    const metadataTierName = subscription.metadata?.tier_name;
+    
+    if (metadataTierSlug) {
+      const tierResult = await pool.query(
+        'SELECT slug, name FROM membership_tiers WHERE slug = $1',
+        [metadataTierSlug]
+      );
+      if (tierResult.rows.length > 0) {
+        activationTierSlug = tierResult.rows[0].slug;
+        activationTierName = tierResult.rows[0].name;
+        console.log(`[Stripe Webhook] Found activation tier from subscription metadata: ${activationTierSlug} (${activationTierName})`);
+      } else if (metadataTierName) {
+        activationTierSlug = metadataTierSlug;
+        activationTierName = metadataTierName;
+        console.log(`[Stripe Webhook] Using activation tier from metadata (no DB match): ${activationTierSlug} (${activationTierName})`);
+      }
+    }
+    
+    // Fallback to price ID lookup
+    if (!activationTierSlug && priceId) {
+      const tierResult = await pool.query(
+        'SELECT slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
+        [priceId]
+      );
+      if (tierResult.rows.length > 0) {
+        activationTierSlug = tierResult.rows[0].slug;
+        activationTierName = tierResult.rows[0].name;
+        console.log(`[Stripe Webhook] Found activation tier from price ID: ${activationTierSlug} (${activationTierName})`);
+      }
+    }
+    
+    if (activationTierSlug) {
       try {
-        const tierResult = await pool.query(
-          'SELECT slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
-          [priceId]
-        );
-
-        if (tierResult.rows.length > 0) {
-          const { slug: tierSlug, name: tierName } = tierResult.rows[0];
+        const tierSlug = activationTierSlug;
+        const tierName = activationTierName;
           
-          // Update user's tier and conditionally activate if membership_status is pending/inactive/null/non-member
-          const updateResult = await pool.query(
-            `UPDATE users SET 
-              tier = $1, 
-              membership_status = CASE 
-                WHEN membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member') THEN 'active' 
-                ELSE membership_status 
-              END, 
-              updated_at = NOW() 
-            WHERE email = $2 
-            RETURNING id`,
-            [tierSlug, email]
-          );
+        // Update user's tier, billing_provider, and conditionally activate if membership_status is pending/inactive/null/non-member
+        const updateResult = await pool.query(
+          `UPDATE users SET 
+            tier = $1, 
+            billing_provider = 'stripe',
+            stripe_customer_id = COALESCE(stripe_customer_id, $3),
+            stripe_subscription_id = COALESCE(stripe_subscription_id, $4),
+            membership_status = CASE 
+              WHEN membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member') THEN 'active' 
+              ELSE membership_status 
+            END, 
+            updated_at = NOW() 
+          WHERE LOWER(email) = LOWER($2) 
+          RETURNING id`,
+          [tierSlug, email, customerId, subscription.id]
+        );
           
           if (updateResult.rowCount && updateResult.rowCount > 0) {
             console.log(`[Stripe Webhook] User activation: ${email} tier updated to ${tierSlug}, membership_status conditionally set to active`);
@@ -1905,11 +1974,14 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
           } catch (hubspotError) {
             console.error('[Stripe Webhook] Error updating HubSpot deal:', hubspotError);
           }
-        } else {
-          // Fallback: try to match by product name
-          const productId = subscription.items?.data?.[0]?.price?.product;
-          if (productId) {
-            try {
+      } catch (tierActivationError) {
+        console.error('[Stripe Webhook] Error during tier activation:', tierActivationError);
+      }
+    } else {
+      // Fallback: try to match by product name
+      const productId = subscription.items?.data?.[0]?.price?.product;
+      if (productId) {
+        try {
               const stripe = await getStripeClient();
               const product = await stripe.products.retrieve(productId as string);
               const productName = product.name?.toLowerCase() || '';
@@ -1961,15 +2033,11 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
                   }
                 }
               }
-            } catch (productError) {
-              console.error('[Stripe Webhook] Error fetching product for name match:', productError);
-            }
-          } else {
-            console.warn(`[Stripe Webhook] No tier found for price ID ${priceId}`);
-          }
+        } catch (productError) {
+          console.error('[Stripe Webhook] Error fetching product for name match:', productError);
         }
-      } catch (tierError) {
-        console.error('[Stripe Webhook] Error with closed-loop activation:', tierError);
+      } else {
+        console.warn(`[Stripe Webhook] No tier found for price ID ${priceId}`);
       }
     }
 
