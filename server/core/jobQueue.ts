@@ -181,10 +181,21 @@ async function executeJob(job: { id: number; jobType: string; payload: any; retr
         await notifyStaffPaymentFailed(payload.memberEmail, payload.memberName, payload.amount, payload.reason);
         break;
       case 'notify_member':
-        await notifyMember(payload.userEmail, payload.title, payload.message, payload.type, payload.actionUrl, payload.category);
+        await notifyMember({
+          userEmail: payload.userEmail,
+          title: payload.title,
+          message: payload.message,
+          type: payload.type,
+          relatedId: payload.relatedId,
+          relatedType: payload.relatedType,
+        });
         break;
       case 'notify_all_staff':
-        await notifyAllStaff(payload.title, payload.message, payload.type, payload.actionUrl, payload.category);
+        await notifyAllStaff(payload.title, payload.message, payload.type, {
+          relatedId: payload.relatedId,
+          relatedType: payload.relatedType,
+          url: payload.actionUrl,
+        });
         break;
       case 'broadcast_billing_update':
         broadcastBillingUpdate(payload);
