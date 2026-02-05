@@ -417,10 +417,10 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
     await pool.query('DELETE FROM wellness_enrollments WHERE LOWER(user_email) = $1', [normalizedEmail]);
     deletionLog.push('wellness_enrollments');
     
-    await pool.query('DELETE FROM booking_fee_snapshots WHERE booking_id IN (SELECT id FROM booking_requests WHERE LOWER(user_email) = $1)', [normalizedEmail]);
+    await pool.query('DELETE FROM booking_fee_snapshots WHERE booking_id IN (SELECT id FROM booking_requests WHERE LOWER(user_email) = $1 OR user_id = $2)', [normalizedEmail, userId]);
     deletionLog.push('booking_fee_snapshots');
     
-    await pool.query('DELETE FROM booking_requests WHERE LOWER(user_email) = $1', [normalizedEmail]);
+    await pool.query('DELETE FROM booking_requests WHERE LOWER(user_email) = $1 OR user_id = $2', [normalizedEmail, userId]);
     deletionLog.push('booking_requests');
     
     await pool.query('DELETE FROM booking_members WHERE LOWER(user_email) = $1', [normalizedEmail]);
@@ -629,7 +629,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
       message: `Member ${memberName || normalizedEmail} permanently deleted`
     });
   } catch (error: any) {
-    if (!isProduction) console.error('Member permanent delete error:', error);
+    console.error('Member permanent delete error:', error?.message || error);
     res.status(500).json({ error: 'Failed to permanently delete member' });
   }
 });
