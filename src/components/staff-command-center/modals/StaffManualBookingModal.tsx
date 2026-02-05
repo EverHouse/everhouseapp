@@ -50,6 +50,7 @@ interface StaffManualBookingModalProps {
   defaultStartTime?: string;
   defaultDate?: string;
   defaultHostMember?: SelectedMember | null;
+  initialMode?: 'member' | 'lesson' | 'conference';
 }
 
 function generateNotesText(
@@ -105,7 +106,8 @@ export function StaffManualBookingModal({
   defaultResourceId,
   defaultStartTime,
   defaultDate,
-  defaultHostMember
+  defaultHostMember,
+  initialMode = 'member'
 }: StaffManualBookingModalProps) {
   const { showToast } = useToast();
   const [mode, setMode] = useState<'member' | 'lesson' | 'conference'>('member');
@@ -159,7 +161,7 @@ export function StaffManualBookingModal({
 
   useEffect(() => {
     if (isOpen) {
-      setMode('member');
+      setMode(initialMode);
       setStep(1);
       setHostMember(defaultHostMember ?? null);
       setParticipants([]);
@@ -198,7 +200,7 @@ export function StaffManualBookingModal({
         .catch(err => console.error('Failed to load resources:', err))
         .finally(() => setLoadingResources(false));
     }
-  }, [isOpen, defaultResourceId, defaultStartTime, defaultDate, defaultHostMember]);
+  }, [isOpen, defaultResourceId, defaultStartTime, defaultDate, defaultHostMember, initialMode]);
 
   // Fetch available conference room slots when date/duration changes
   useEffect(() => {

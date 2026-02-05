@@ -940,6 +940,7 @@ const SimulatorTab: React.FC = () => {
         resourceId?: number;
         startTime?: string;
         date?: string;
+        initialMode?: 'member' | 'lesson' | 'conference';
     }>({});
     
     // Per-booking optimistic action tracking for visual feedback
@@ -2629,7 +2630,8 @@ const SimulatorTab: React.FC = () => {
                                                         setStaffManualBookingDefaults({
                                                             resourceId: resource.id,
                                                             startTime: slot,
-                                                            date: calendarDate
+                                                            date: calendarDate,
+                                                            initialMode: resource.type === 'conference_room' ? 'conference' : 'member'
                                                         });
                                                         setStaffManualBookingModalOpen(true);
                                                     } : booking ? (isUnmatched ? () => setTrackmanLinkModal({
@@ -3687,6 +3689,7 @@ return null;
               defaultResourceId={staffManualBookingDefaults.resourceId}
               defaultStartTime={staffManualBookingDefaults.startTime}
               defaultDate={staffManualBookingDefaults.date}
+              initialMode={staffManualBookingDefaults.initialMode}
             />
 
             <TrackmanLinkModal
