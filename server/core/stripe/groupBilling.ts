@@ -419,6 +419,8 @@ export async function addGroupMember(params: {
   relationship?: string;
   firstName?: string;
   lastName?: string;
+  phone?: string;
+  dob?: string;
   addedBy: string;
   addedByName: string;
 }): Promise<{ success: boolean; memberId?: number; error?: string }> {
@@ -456,8 +458,10 @@ export async function addGroupMember(params: {
         };
       }
       
-      // Guard against dual subscriptions - if user has their own active subscription, prevent adding to group
-      if (user.stripe_subscription_id && user.membership_status === 'active') {
+      // Guard against dual subscriptions - if user has their own active subscription (any provider), prevent adding to group
+      const hasActiveSubscription = user.stripe_subscription_id && 
+        (user.membership_status === 'active' || user.membership_status === 'past_due');
+      if (hasActiveSubscription) {
         return {
           success: false,
           error: 'User already has their own active subscription. Cancel it before adding them to a family plan.'
@@ -516,26 +520,48 @@ export async function addGroupMember(params: {
       
       insertedMemberId = insertResult.rows[0].id;
 
-      // Create or update user account
+      // Create or update user account (matching addCorporateMember pattern)
       if (userExists) {
+        const updateFields: string[] = ['billing_group_id = $1', 'tier = $2', "billing_provider = 'stripe'", "membership_status = 'active'", 'updated_at = NOW()'];
+        const updateValues: any[] = [params.billingGroupId, params.memberTier];
+        let paramIndex = 3;
+        
+        if (params.firstName) {
+          updateFields.push(`first_name = $${paramIndex++}`);
+          updateValues.push(params.firstName);
+        }
+        if (params.lastName) {
+          updateFields.push(`last_name = $${paramIndex++}`);
+          updateValues.push(params.lastName);
+        }
+        if (params.phone) {
+          updateFields.push(`phone = $${paramIndex++}`);
+          updateValues.push(params.phone);
+        }
+        if (params.dob) {
+          updateFields.push(`date_of_birth = $${paramIndex++}`);
+          updateValues.push(params.dob);
+        }
+        
+        updateValues.push(params.memberEmail.toLowerCase());
         await client.query(
-          `UPDATE users SET billing_group_id = $1, tier = $2, membership_status = 'active', billing_provider = 'stripe', updated_at = NOW() 
-           WHERE LOWER(email) = $3`,
-          [params.billingGroupId, params.memberTier, params.memberEmail.toLowerCase()]
+          `UPDATE users SET ${updateFields.join(', ')} WHERE LOWER(email) = $${paramIndex}`,
+          updateValues
         );
         console.log(`[GroupBilling] Updated existing user ${params.memberEmail} with family group`);
       } else {
         // Auto-create user so they can log in
-        const { randomUUID } = await import('crypto');
         const userId = randomUUID();
         await client.query(
-          `INSERT INTO users (id, email, first_name, last_name, tier, membership_status, billing_provider, billing_group_id, created_at)
-           VALUES ($1, $2, $3, $4, $5, 'active', 'stripe', $6, NOW())`,
+          `INSERT INTO users (id, email, first_name, last_name, phone, date_of_birth, tier, membership_status, billing_provider, billing_group_id, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', 'stripe', $8, NOW())`,
           [
             userId,
             params.memberEmail.toLowerCase(),
-            params.firstName || 'Family',
-            params.lastName || 'Member',
+            params.firstName || null,
+            params.lastName || null,
+            params.phone || null,
+            params.dob || null,
             params.memberTier,
             params.billingGroupId
           ]
@@ -673,8 +699,10 @@ export async function addCorporateMember(params: {
         };
       }
       
-      // Guard against dual subscriptions - if user has their own active subscription, prevent adding to group
-      if (user.stripe_subscription_id && user.membership_status === 'active') {
+      // Guard against dual subscriptions - if user has their own active subscription (any provider), prevent adding to group
+      const hasActiveSubscription = user.stripe_subscription_id && 
+        (user.membership_status === 'active' || user.membership_status === 'past_due');
+      if (hasActiveSubscription) {
         return {
           success: false,
           error: 'User already has their own active subscription. Cancel it before adding them to a corporate plan.'
