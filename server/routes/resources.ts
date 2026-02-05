@@ -1280,10 +1280,10 @@ router.post('/api/bookings/link-trackman-to-member', isStaffOrAdmin, async (req,
           const [member] = await db.select().from(users).where(eq(users.email, ownerEmail.toLowerCase())).limit(1);
           if (member) {
             await pool.query(
-              `INSERT INTO user_linked_emails (user_id, linked_email, source, created_at) 
+              `INSERT INTO user_linked_emails (primary_email, linked_email, source, created_at) 
                VALUES ($1, $2, $3, NOW())
                ON CONFLICT (LOWER(linked_email)) DO NOTHING`,
-              [member.id, originalEmail.toLowerCase(), 'staff_assignment']
+              [member.email, originalEmail.toLowerCase(), 'staff_assignment']
             );
             emailLinked = true;
             logger.info('[link-trackman-to-member] Linked email to member', {
@@ -1905,10 +1905,10 @@ router.put('/api/bookings/:id/assign-with-players', isStaffOrAdmin, async (req, 
           const [member] = await db.select().from(users).where(eq(users.email, owner.email.toLowerCase())).limit(1);
           if (member) {
             await pool.query(
-              `INSERT INTO user_linked_emails (user_id, linked_email, source, created_at) 
+              `INSERT INTO user_linked_emails (primary_email, linked_email, source, created_at) 
                VALUES ($1, $2, $3, NOW())
                ON CONFLICT (LOWER(linked_email)) DO NOTHING`,
-              [member.id, originalEmail.toLowerCase(), 'staff_assignment']
+              [member.email, originalEmail.toLowerCase(), 'staff_assignment']
             );
             emailLinked = true;
             logger.info('[assign-with-players] Linked email to member', {

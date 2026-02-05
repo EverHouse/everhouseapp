@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.9.5",
+    date: "2026-02-05",
+    title: "Database Column Fixes for New Members",
+    changes: [
+      "Fixed: 'column user_id does not exist' error when adding new members",
+      "Fixed: Linked email lookups now use correct column name (primary_email instead of user_id)",
+      "Fixed: All email linking operations in Trackman, staff assignment, and member creation flows",
+      "Fixed: Test account cleanup now correctly references linked emails table"
+    ]
+  },
+  {
     version: "69.9.4",
     date: "2026-02-05",
     title: "Database Column Fix for New Members",

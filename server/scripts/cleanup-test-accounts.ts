@@ -95,8 +95,8 @@ async function cleanupTestAccounts() {
       await pool.query('DELETE FROM day_pass_purchases WHERE user_id = $1', [userId]);
       await pool.query('DELETE FROM legacy_purchases WHERE user_id = $1', [userId]);
       
-      // Clear linked emails and user preferences (by user_id)
-      await pool.query('DELETE FROM user_linked_emails WHERE user_id = $1', [userId]);
+      // Clear linked emails (by primary_email)
+      await pool.query('DELETE FROM user_linked_emails WHERE LOWER(primary_email) = LOWER($1)', [email]);
       await pool.query('DELETE FROM booking_participants WHERE user_id = $1', [userId]);
       await pool.query('DELETE FROM account_deletion_requests WHERE user_id = $1', [userId]);
       

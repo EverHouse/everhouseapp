@@ -951,8 +951,7 @@ router.post('/api/admin/trackman/auto-resolve-same-email', isStaffOrAdmin, async
         
         if (!targetEmail) {
           const emailMappingResult = await pool.query(
-            `SELECT u.email FROM users u
-             JOIN user_linked_emails ule ON u.id = ule.user_id
+            `SELECT ule.primary_email as email FROM user_linked_emails ule
              WHERE LOWER(ule.linked_email) = LOWER($1)
              LIMIT 1`,
             [originalEmail]

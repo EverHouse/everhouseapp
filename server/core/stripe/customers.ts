@@ -49,8 +49,8 @@ export async function getOrCreateStripeCustomer(
   }
 
   const linkedEmailsResult = await pool.query(
-    `SELECT linked_email FROM user_linked_emails WHERE user_id = $1`,
-    [userId]
+    `SELECT linked_email FROM user_linked_emails WHERE LOWER(primary_email) = LOWER($1)`,
+    [email]
   );
   const linkedEmails = linkedEmailsResult.rows.map((r: any) => r.linked_email.toLowerCase());
   const allEmails = [email.toLowerCase(), ...linkedEmails];
