@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.12.3",
+    date: "2026-02-05",
+    title: "Terminal Payment Integrity - Complete Coverage",
+    changes: [
+      "Added: Handler for abandoned/canceled Terminal payments with staff notification",
+      "Added: Dispute resolution handling - membership reactivated when disputes are won",
+      "Fixed: Payment record always created before checking if membership already active",
+      "Fixed: Amount verification now validates against invoices whether paid or unpaid",
+      "Fixed: Full refunds now processed correctly after partial refunds",
+      "Fixed: Dispute events resilient to out-of-order webhook delivery"
+    ]
+  },
+  {
     version: "69.12.0",
     date: "2026-02-05",
     title: "Terminal Payment Integrity & Reconciliation",

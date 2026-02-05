@@ -75,6 +75,7 @@ async function checkResourceEventOrder(
     'payment_intent.requires_action': 3,
     'payment_intent.succeeded': 10,
     'payment_intent.payment_failed': 10,
+    'payment_intent.canceled': 10,
     'charge.succeeded': 11,
     'charge.refunded': 20,
     'charge.dispute.created': 25,
@@ -247,6 +248,8 @@ export async function processStripeWebhook(
       deferredActions = await handlePaymentIntentSucceeded(client, event.data.object);
     } else if (event.type === 'payment_intent.payment_failed') {
       deferredActions = await handlePaymentIntentFailed(client, event.data.object);
+    } else if (event.type === 'payment_intent.canceled') {
+      deferredActions = await handlePaymentIntentCanceled(client, event.data.object);
     } else if (event.type === 'charge.refunded') {
       deferredActions = await handleChargeRefunded(client, event.data.object);
     } else if (event.type === 'invoice.payment_succeeded') {
@@ -267,6 +270,8 @@ export async function processStripeWebhook(
       deferredActions = await handleSubscriptionDeleted(client, event.data.object);
     } else if (event.type === 'charge.dispute.created') {
       deferredActions = await handleChargeDisputeCreated(client, event.data.object);
+    } else if (event.type === 'charge.dispute.closed') {
+      deferredActions = await handleChargeDisputeClosed(client, event.data.object);
     }
 
     await client.query('COMMIT');
@@ -556,6 +561,84 @@ async function handleChargeDisputeCreated(client: PoolClient, dispute: any): Pro
   
   deferredActions.push(async () => {
     broadcastBillingUpdate({ type: 'dispute', disputeId: id, status, amount });
+  });
+  
+  return deferredActions;
+}
+
+async function handleChargeDisputeClosed(client: PoolClient, dispute: any): Promise<DeferredAction[]> {
+  const { id, amount, payment_intent, reason, status } = dispute;
+  const deferredActions: DeferredAction[] = [];
+  
+  const disputeWon = status === 'won';
+  console.log(`[Stripe Webhook] Dispute closed: ${id}, status: ${status}, won: ${disputeWon}`);
+  
+  const paymentIntentId = typeof payment_intent === 'string' ? payment_intent : payment_intent?.id;
+  
+  if (paymentIntentId) {
+    const terminalPaymentResult = await client.query(
+      `UPDATE terminal_payments 
+       SET dispute_status = $1, dispute_id = $2, disputed_at = COALESCE(disputed_at, NOW()), 
+           status = $3, updated_at = NOW()
+       WHERE stripe_payment_intent_id = $4 AND status IN ('succeeded', 'partially_refunded', 'disputed')
+       RETURNING id, user_id, user_email, stripe_subscription_id, amount_cents`,
+      [status, id, disputeWon ? 'succeeded' : 'disputed_lost', paymentIntentId]
+    );
+    
+    if (terminalPaymentResult.rowCount && terminalPaymentResult.rowCount > 0) {
+      const terminalPayment = terminalPaymentResult.rows[0];
+      console.log(`[Stripe Webhook] Terminal payment dispute closed for user ${terminalPayment.user_email}: ${status}`);
+      
+      if (disputeWon) {
+        await client.query(
+          `UPDATE users SET membership_status = 'active', updated_at = NOW() WHERE id = $1`,
+          [terminalPayment.user_id]
+        );
+        console.log(`[Stripe Webhook] Reactivated membership for user ${terminalPayment.user_id} - dispute won`);
+        
+        await client.query(
+          `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
+           VALUES ($1, $2, $3, $4, $5, NOW())`,
+          [
+            terminalPayment.user_email.toLowerCase(), 
+            'Membership Reactivated', 
+            'Your membership has been reactivated. The payment dispute has been resolved in your favor.',
+            'billing',
+            'membership'
+          ]
+        );
+      }
+      
+      deferredActions.push(async () => {
+        await notifyAllStaff(
+          disputeWon ? 'Dispute Won - Membership Reactivated' : 'Dispute Lost - Membership Remains Suspended',
+          `Payment dispute for ${terminalPayment.user_email} has been closed. Status: ${status}. Amount: $${(amount / 100).toFixed(2)}.${disputeWon ? ' Membership has been reactivated.' : ' Membership remains suspended.'}`,
+          { type: 'terminal_dispute_closed', userId: terminalPayment.user_id, disputeId: id, disputeWon }
+        );
+        
+        await logSystemAction({
+          action: 'terminal_dispute_closed',
+          resourceType: 'user',
+          resourceId: terminalPayment.user_id,
+          resourceName: terminalPayment.user_email,
+          details: {
+            source: 'stripe_webhook',
+            dispute_id: id,
+            dispute_status: status,
+            dispute_won: disputeWon,
+            stripe_payment_intent_id: paymentIntentId,
+            stripe_subscription_id: terminalPayment.stripe_subscription_id,
+            amount_cents: terminalPayment.amount_cents,
+            disputed_amount_cents: amount,
+            membership_action: disputeWon ? 'reactivated' : 'remained_suspended'
+          }
+        });
+      });
+    }
+  }
+  
+  deferredActions.push(async () => {
+    broadcastBillingUpdate({ type: 'dispute_closed', disputeId: id, status, disputeWon, amount });
   });
   
   return deferredActions;
@@ -1095,6 +1178,62 @@ async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: any)
     }
   });
 
+  return deferredActions;
+}
+
+async function handlePaymentIntentCanceled(client: PoolClient, paymentIntent: any): Promise<DeferredAction[]> {
+  const { id, metadata, amount, cancellation_reason } = paymentIntent;
+  const deferredActions: DeferredAction[] = [];
+  
+  console.log(`[Stripe Webhook] Payment canceled: ${id}, amount: $${(amount / 100).toFixed(2)}, reason: ${cancellation_reason || 'not specified'}`);
+  
+  if (metadata?.paymentType === 'subscription_terminal') {
+    const email = metadata?.email;
+    const subscriptionId = metadata?.subscriptionId;
+    
+    await client.query(
+      `INSERT INTO terminal_payments (
+        user_id, user_email, stripe_payment_intent_id, stripe_subscription_id,
+        amount_cents, currency, status, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+      ON CONFLICT (stripe_payment_intent_id) DO UPDATE SET 
+        status = 'canceled', updated_at = NOW()`,
+      [
+        metadata?.userId || null,
+        email || 'unknown',
+        id,
+        subscriptionId || null,
+        amount,
+        paymentIntent.currency || 'usd',
+        'canceled'
+      ]
+    );
+    
+    console.log(`[Stripe Webhook] Terminal payment canceled/abandoned: ${id} for ${email || 'unknown'}`);
+    
+    deferredActions.push(async () => {
+      await notifyAllStaff(
+        'Terminal Payment Canceled',
+        `A card reader payment was canceled or timed out. Email: ${email || 'unknown'}, Amount: $${(amount / 100).toFixed(2)}, Subscription: ${subscriptionId || 'N/A'}`,
+        { type: 'terminal_payment_canceled', paymentIntentId: id, email }
+      );
+      
+      await logSystemAction({
+        action: 'terminal_payment_canceled',
+        resourceType: 'payment',
+        resourceId: id,
+        resourceName: email || 'Unknown',
+        details: {
+          source: 'stripe_webhook',
+          cancellation_reason: cancellation_reason,
+          stripe_payment_intent_id: id,
+          stripe_subscription_id: subscriptionId,
+          amount_cents: amount
+        }
+      });
+    });
+  }
+  
   return deferredActions;
 }
 

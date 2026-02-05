@@ -263,15 +263,6 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
     const { eq } = await import('drizzle-orm');
     
     const [existingUser] = await db.select().from(users).where(eq(users.id, userId));
-    if (existingUser?.membership_status === 'active') {
-      return res.json({
-        success: true,
-        membershipStatus: 'active',
-        subscriptionId,
-        paymentIntentId,
-        alreadyActivated: true
-      });
-    }
     
     const stripe = await getStripeClient();
     
@@ -303,13 +294,19 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
     const latestInvoice = subscription.latest_invoice as any;
     const actualInvoiceId = latestInvoice?.id || invoiceId;
     
-    if (latestInvoice && latestInvoice.status !== 'paid') {
-      if (paymentIntent.amount !== latestInvoice.amount_due) {
+    if (latestInvoice) {
+      const expectedAmount = latestInvoice.status === 'paid' 
+        ? latestInvoice.amount_paid 
+        : latestInvoice.amount_due;
+      
+      if (paymentIntent.amount !== expectedAmount) {
+        console.error(`[Terminal] Amount mismatch: PI ${paymentIntentId} = $${(paymentIntent.amount / 100).toFixed(2)}, invoice ${actualInvoiceId} = $${(expectedAmount / 100).toFixed(2)}`);
         return res.status(400).json({ 
           error: 'Payment amount mismatch',
-          details: `Payment was $${(paymentIntent.amount / 100).toFixed(2)} but invoice requires $${(latestInvoice.amount_due / 100).toFixed(2)}`,
+          details: `Payment was $${(paymentIntent.amount / 100).toFixed(2)} but invoice ${latestInvoice.status === 'paid' ? 'was paid for' : 'requires'} $${(expectedAmount / 100).toFixed(2)}`,
           paymentAmount: paymentIntent.amount,
-          invoiceAmount: latestInvoice.amount_due
+          invoiceAmount: expectedAmount,
+          invoiceStatus: latestInvoice.status
         });
       }
     }
@@ -336,6 +333,17 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
         processedBy: staffEmail,
       });
       console.log(`[Terminal] Payment record created for PI ${paymentIntentId}`);
+    }
+    
+    if (existingUser?.membership_status === 'active') {
+      console.log(`[Terminal] User ${userId} already active, payment record ensured, returning early`);
+      return res.json({
+        success: true,
+        membershipStatus: 'active',
+        subscriptionId,
+        paymentIntentId,
+        alreadyActivated: true
+      });
     }
     
     if (actualInvoiceId && latestInvoice?.status !== 'paid') {
