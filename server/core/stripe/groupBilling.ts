@@ -417,6 +417,8 @@ export async function addGroupMember(params: {
   memberEmail: string;
   memberTier: string;
   relationship?: string;
+  firstName?: string;
+  lastName?: string;
   addedBy: string;
   addedByName: string;
 }): Promise<{ success: boolean; memberId?: number; error?: string }> {
@@ -435,20 +437,30 @@ export async function addGroupMember(params: {
       return { success: false, error: 'This member is already part of a billing group' };
     }
     
-    // Check if user is already in a billing group via the users table
+    // Check if user exists and their billing status
     const userResult = await pool.query(
-      'SELECT billing_group_id FROM users WHERE LOWER(email) = $1',
+      'SELECT id, billing_group_id, stripe_subscription_id, membership_status FROM users WHERE LOWER(email) = $1',
       [params.memberEmail.toLowerCase()]
     );
     
-    if (userResult.rows.length > 0) {
-      const userBillingGroupId = userResult.rows[0].billing_group_id;
+    let userExists = userResult.rows.length > 0;
+    
+    if (userExists) {
+      const user = userResult.rows[0];
       
       // If user is already in a different billing group, prevent the operation
-      if (userBillingGroupId !== null && userBillingGroupId !== params.billingGroupId) {
+      if (user.billing_group_id !== null && user.billing_group_id !== params.billingGroupId) {
         return { 
           success: false, 
           error: 'User is already in a billing group. Remove them first.' 
+        };
+      }
+      
+      // Guard against dual subscriptions - if user has their own active subscription, prevent adding to group
+      if (user.stripe_subscription_id && user.membership_status === 'active') {
+        return {
+          success: false,
+          error: 'User already has their own active subscription. Cancel it before adding them to a family plan.'
         };
       }
     }
@@ -504,10 +516,32 @@ export async function addGroupMember(params: {
       
       insertedMemberId = insertResult.rows[0].id;
 
-      await client.query(
-        'UPDATE users SET billing_group_id = $1 WHERE LOWER(email) = $2',
-        [params.billingGroupId, params.memberEmail.toLowerCase()]
-      );
+      // Create or update user account
+      if (userExists) {
+        await client.query(
+          `UPDATE users SET billing_group_id = $1, tier = $2, membership_status = 'active', billing_provider = 'stripe', updated_at = NOW() 
+           WHERE LOWER(email) = $3`,
+          [params.billingGroupId, params.memberTier, params.memberEmail.toLowerCase()]
+        );
+        console.log(`[GroupBilling] Updated existing user ${params.memberEmail} with family group`);
+      } else {
+        // Auto-create user so they can log in
+        const { randomUUID } = await import('crypto');
+        const userId = randomUUID();
+        await client.query(
+          `INSERT INTO users (id, email, first_name, last_name, tier, membership_status, billing_provider, billing_group_id, created_at)
+           VALUES ($1, $2, $3, $4, $5, 'active', 'stripe', $6, NOW())`,
+          [
+            userId,
+            params.memberEmail.toLowerCase(),
+            params.firstName || 'Family',
+            params.lastName || 'Member',
+            params.memberTier,
+            params.billingGroupId
+          ]
+        );
+        console.log(`[GroupBilling] Created new user ${params.memberEmail} for family group with tier ${params.memberTier}`);
+      }
 
       if (group[0].primaryStripeSubscriptionId && product.stripePriceId) {
         try {
@@ -622,20 +656,28 @@ export async function addCorporateMember(params: {
       return { success: false, error: 'This member is already part of a billing group' };
     }
     
-    // Check if user is already in a billing group via the users table
+    // Check if user exists and their billing status
     const userResult = await pool.query(
-      'SELECT billing_group_id FROM users WHERE LOWER(email) = $1',
+      'SELECT id, billing_group_id, stripe_subscription_id, membership_status FROM users WHERE LOWER(email) = $1',
       [params.memberEmail.toLowerCase()]
     );
     
     if (userResult.rows.length > 0) {
-      const userBillingGroupId = userResult.rows[0].billing_group_id;
+      const user = userResult.rows[0];
       
       // If user is already in a different billing group, prevent the operation
-      if (userBillingGroupId !== null && userBillingGroupId !== params.billingGroupId) {
+      if (user.billing_group_id !== null && user.billing_group_id !== params.billingGroupId) {
         return { 
           success: false, 
           error: 'User is already in a billing group. Remove them first.' 
+        };
+      }
+      
+      // Guard against dual subscriptions - if user has their own active subscription, prevent adding to group
+      if (user.stripe_subscription_id && user.membership_status === 'active') {
+        return {
+          success: false,
+          error: 'User already has their own active subscription. Cancel it before adding them to a corporate plan.'
         };
       }
     }

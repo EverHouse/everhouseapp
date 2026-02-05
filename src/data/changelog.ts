@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.9.7",
+    date: "2026-02-05",
+    title: "Family Billing & Subscription Safety Fixes",
+    changes: [
+      "Fixed: Family members added to billing groups now automatically get user accounts created",
+      "Fixed: Family billing now matches corporate billing behavior for user account creation",
+      "Added: Dual subscription prevention - users with active individual subscriptions cannot be added to family/corporate plans",
+      "Added: Clear error messages when attempting to add a member who already has their own subscription",
+      "Verified: Past-due status already propagates correctly to sub-members when primary account fails payment"
+    ]
+  },
+  {
     version: "69.9.6",
     date: "2026-02-05",
     title: "Notice to Members Field",
