@@ -534,6 +534,10 @@ router.post('/api/booking-requests', async (req, res) => {
         }
       }
       
+      // Conference rooms auto-confirm (no staff approval needed), simulators stay pending
+      const isConferenceRoom = resourceType === 'conference_room';
+      const initialStatus = isConferenceRoom ? 'confirmed' : 'pending';
+      
       const insertResult = await client.query(
         `INSERT INTO booking_requests (
           user_email, user_name, resource_id, resource_preference, 
@@ -541,7 +545,7 @@ router.post('/api/booking-requests', async (req, res) => {
           declared_player_count, member_notes,
           guardian_name, guardian_relationship, guardian_phone, guardian_consent_at,
           request_participants, status, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'pending', NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())
         RETURNING *`,
         [
           user_email.toLowerCase(),
@@ -559,7 +563,8 @@ router.post('/api/booking-requests', async (req, res) => {
           guardian_consent && guardian_relationship ? guardian_relationship : null,
           guardian_consent && guardian_phone ? guardian_phone : null,
           guardian_consent ? new Date() : null,
-          sanitizedParticipants.length > 0 ? JSON.stringify(sanitizedParticipants) : '[]'
+          sanitizedParticipants.length > 0 ? JSON.stringify(sanitizedParticipants) : '[]',
+          initialStatus
         ]
       );
       

@@ -237,7 +237,11 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
   const actualPlayerCount = participants.length;
   const effectivePlayerCount = getEffectivePlayerCount(declaredPlayerCount, actualPlayerCount);
   
-  const minutesPerParticipant = Math.floor(sessionDuration / effectivePlayerCount);
+  // For conference rooms, use full duration for owner (no splitting)
+  // For simulators, divide duration by player count
+  const minutesPerParticipant = isConferenceRoom 
+    ? sessionDuration 
+    : Math.floor(sessionDuration / effectivePlayerCount);
   
   const resolvedHostEmail = await resolveToEmail(hostEmail);
   const hostTier = await getMemberTierByEmail(resolvedHostEmail);
@@ -502,6 +506,15 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
     };
     
     if (participant.participantType === 'guest') {
+      // Conference rooms don't have guests - skip guest fee logic
+      if (isConferenceRoom) {
+        lineItem.minutesAllocated = 0;
+        lineItem.guestCents = 0;
+        lineItem.totalCents = 0;
+        lineItems.push(lineItem);
+        continue;
+      }
+      
       lineItem.minutesAllocated = minutesPerParticipant;
       
       // Only charge guest fee if participant has NO user_id (i.e., not a member)
@@ -588,6 +601,15 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
       
       lineItem.totalCents = lineItem.overageCents;
     } else {
+      // Conference rooms don't have additional members - only owner matters
+      if (isConferenceRoom) {
+        lineItem.minutesAllocated = 0;
+        lineItem.overageCents = 0;
+        lineItem.totalCents = 0;
+        lineItems.push(lineItem);
+        continue;
+      }
+      
       lineItem.minutesAllocated = minutesPerParticipant;
       
       const memberEmail = await resolveToEmail(participant.email || participant.userId);
