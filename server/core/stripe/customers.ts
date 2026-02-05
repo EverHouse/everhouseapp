@@ -63,7 +63,7 @@ export async function getOrCreateStripeCustomer(
      WHERE u.stripe_customer_id IS NOT NULL 
        AND (LOWER(u.email) = ANY($1) 
             OR EXISTS (SELECT 1 FROM user_linked_emails ule 
-                       WHERE ule.user_id = u.id 
+                       WHERE LOWER(ule.primary_email) = LOWER(u.email) 
                        AND LOWER(ule.linked_email) = ANY($1)))
      ORDER BY priority ASC, u.created_at DESC
      LIMIT 1`,
