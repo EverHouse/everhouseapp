@@ -582,7 +582,8 @@ router.post('/api/booking-requests', async (req, res) => {
             }
             
             const prepayment = prepaymentCheck.rows[0];
-            if (prepayment.status !== 'succeeded') {
+            // Accept both 'succeeded' (credit payment) and 'completed' (card payment after confirm)
+            if (prepayment.status !== 'succeeded' && prepayment.status !== 'completed') {
               await client.query('ROLLBACK');
               client.release();
               return res.status(402).json({ error: 'Prepayment not completed. Please complete payment first.' });
