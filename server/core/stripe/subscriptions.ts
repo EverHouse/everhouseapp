@@ -29,12 +29,11 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
       customer: customerId,
       items: [{ price: priceId }],
       payment_behavior: 'default_incomplete',
-      collection_method: 'charge_automatically',
       payment_settings: {
         save_default_payment_method: 'on_subscription',
         payment_method_types: ['card'],
       },
-      expand: ['latest_invoice.payment_intent'],
+      expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
       metadata: {
         ...metadata,
         source: 'even_house_app',
@@ -50,9 +49,15 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
     
     const invoice = subscription.latest_invoice as Stripe.Invoice;
     const paymentIntent = invoice?.payment_intent as Stripe.PaymentIntent;
+    const pendingSetupIntent = subscription.pending_setup_intent as Stripe.SetupIntent | null;
+    
+    // Use payment_intent client_secret if available, otherwise use pending_setup_intent
+    const clientSecret = paymentIntent?.client_secret || pendingSetupIntent?.client_secret;
     
     console.log(`[Stripe Subscriptions] Created subscription ${subscription.id} for customer ${customerId}`);
-    console.log(`[Stripe Subscriptions] Invoice status: ${invoice?.status}, Payment intent: ${paymentIntent?.id || 'none'}, Client secret exists: ${!!paymentIntent?.client_secret}`);
+    console.log(`[Stripe Subscriptions] Invoice status: ${invoice?.status}, Invoice ID: ${invoice?.id}`);
+    console.log(`[Stripe Subscriptions] Payment intent: ${paymentIntent?.id || 'none'}, Setup intent: ${pendingSetupIntent?.id || 'none'}`);
+    console.log(`[Stripe Subscriptions] Client secret exists: ${!!clientSecret}`);
     
     return {
       success: true,
@@ -60,7 +65,7 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
         subscriptionId: subscription.id,
         status: subscription.status,
         currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-        clientSecret: paymentIntent?.client_secret || undefined,
+        clientSecret: clientSecret || undefined,
       },
     };
   } catch (error: any) {
