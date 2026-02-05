@@ -565,7 +565,7 @@ function getMembershipActivationHtml(params: MembershipActivationParams): string
           </tr>
           
           <tr>
-            <td style="padding-bottom: 24px; text-align: center;">
+            <td style="padding-top: 32px; padding-bottom: 32px; text-align: center;">
               <a href="${checkoutUrl}" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
                 Complete Membership Setup
               </a>
