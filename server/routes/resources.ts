@@ -737,6 +737,23 @@ router.put('/api/bookings/:id/decline', isStaffOrAdmin, async (req, res) => {
       return updated;
     });
     
+    // Clean up any corresponding Trackman bay slot cache entry
+    if (result.resourceId && result.requestDate && result.startTime) {
+      try {
+        await pool.query(
+          `DELETE FROM trackman_bay_slots 
+           WHERE resource_id = $1 AND slot_date = $2 AND start_time = $3`,
+          [result.resourceId, result.requestDate, result.startTime]
+        );
+      } catch (err) {
+        logger.warn('[Staff Decline] Failed to clean up trackman_bay_slots', { 
+          bookingId, 
+          resourceId: result.resourceId,
+          error: (err as Error).message 
+        });
+      }
+    }
+    
     logFromRequest(req, 'decline_booking', 'booking', id, {
       member_email: result.userEmail,
       reason: req.body.reason || 'Not specified'
@@ -2386,6 +2403,23 @@ router.put('/api/bookings/:id/member-cancel', async (req, res) => {
     await db.update(bookingRequests)
       .set({ status: 'cancelled' })
       .where(eq(bookingRequests.id, bookingId));
+    
+    // Clean up any corresponding Trackman bay slot cache entry
+    if (existing.resourceId && existing.requestDate && existing.startTime) {
+      try {
+        await pool.query(
+          `DELETE FROM trackman_bay_slots 
+           WHERE resource_id = $1 AND slot_date = $2 AND start_time = $3`,
+          [existing.resourceId, existing.requestDate, existing.startTime]
+        );
+      } catch (err) {
+        logger.warn('[Member Cancel] Failed to clean up trackman_bay_slots', { 
+          bookingId, 
+          resourceId: existing.resourceId,
+          error: (err as Error).message 
+        });
+      }
+    }
     
     const cascadeResult = await handleCancellationCascade(
       bookingId,
