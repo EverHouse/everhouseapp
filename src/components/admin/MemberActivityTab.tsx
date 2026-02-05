@@ -415,12 +415,12 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+      <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
         {FILTER_TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveFilter(tab.id)}
-            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors min-w-[44px] sm:min-w-0 ${
+            className={`flex-shrink-0 flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
               activeFilter === tab.id
                 ? isDark
                   ? 'bg-accent text-primary'
