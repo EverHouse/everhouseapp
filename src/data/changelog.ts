@@ -15,13 +15,15 @@ export const changelog: ChangelogEntry[] = [
   {
     version: "69.9.5",
     date: "2026-02-05",
-    title: "Database Column Fixes for New Members",
+    title: "Comprehensive Database Column Fixes",
     changes: [
       "Fixed: 'column user_id does not exist' error when adding new members",
       "Fixed: Linked email lookups now use correct column name (primary_email instead of user_id)",
       "Fixed: All email linking operations in Trackman, staff assignment, and member creation flows",
       "Fixed: Test account cleanup now correctly references linked emails table",
-      "Fixed: Stripe webhook now uses correct 'membership_status' column instead of 'status'"
+      "Fixed: Stripe webhook now uses correct 'membership_status' column instead of 'status'",
+      "Fixed: Notification inserts now use correct 'user_email' column instead of 'user_id'",
+      "Fixed: Booking confirmation notifications in Trackman webhook and resource assignment flows"
     ]
   },
   {

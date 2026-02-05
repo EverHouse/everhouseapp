@@ -827,16 +827,16 @@ router.post('/api/bookings/:id/assign-member', isStaffOrAdmin, async (req, res) 
     const formattedDate = result.requestDate ? new Date(result.requestDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '';
     const formattedTime = result.startTime || '';
     
-    if (member_id) {
+    if (member_email) {
       await pool.query(
-        `INSERT INTO notifications (user_id, title, message, type, link, created_at)
+        `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
          VALUES ($1, $2, $3, $4, $5, NOW())`,
         [
-          member_id,
+          member_email.toLowerCase(),
           'Booking Confirmed',
           `Your simulator booking for ${formattedDate} at ${formattedTime} has been confirmed.`,
           'booking',
-          '/bookings'
+          'booking'
         ]
       );
     }
@@ -1869,14 +1869,14 @@ router.put('/api/bookings/:id/assign-with-players', isStaffOrAdmin, async (req, 
         const timeStr = result.booking.startTime || '';
         
         await pool.query(
-          `INSERT INTO notifications (user_id, title, message, type, link, created_at)
+          `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
            VALUES ($1, $2, $3, $4, $5, NOW())`,
           [
-            owner.member_id,
+            owner.email.toLowerCase(),
             'Booking Confirmed',
             `Your simulator booking for ${dateStr} at ${timeStr} has been confirmed.${feeMessage}`,
             'booking',
-            '/bookings'
+            'booking'
           ]
         );
         

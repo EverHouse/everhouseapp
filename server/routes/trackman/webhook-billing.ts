@@ -352,14 +352,14 @@ export async function createBookingForMember(
       const confirmMessage = `Your simulator booking for ${slotDate} at ${startTime} (${bayNameForNotification}) has been confirmed.${feeInfo}`;
       
       await pool.query(
-        `INSERT INTO notifications (user_id, title, message, type, link, created_at)
+        `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
          VALUES ($1, $2, $3, $4, $5, NOW())`,
         [
-          member.id,
+          member.email.toLowerCase(),
           'Booking Confirmed',
           confirmMessage,
           'booking',
-          '/bookings'
+          'booking'
         ]
       );
       
@@ -598,14 +598,14 @@ export async function createBookingForMember(
       });
       
       await pool.query(
-        `INSERT INTO notifications (user_id, title, message, type, link, created_at)
+        `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
          VALUES ($1, $2, $3, $4, $5, NOW())`,
         [
-          member.id,
+          member.email.toLowerCase(),
           'Booking Confirmed',
           `Your simulator booking for ${slotDate} at ${startTime} (${bayNameForNotification}) has been confirmed.`,
           'booking',
-          '/bookings'
+          'booking'
         ]
       );
       

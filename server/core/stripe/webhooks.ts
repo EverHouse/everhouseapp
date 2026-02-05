@@ -374,16 +374,11 @@ async function handleChargeRefunded(client: PoolClient, charge: any): Promise<De
         
         // Send refund notification to member
         if (row.user_email) {
-          const userResult = await client.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`, [row.user_email]);
-          const userId = userResult.rows[0]?.id;
-          
-          if (userId) {
-            await client.query(
-              `INSERT INTO notifications (user_id, title, message, type, link, created_at)
-               VALUES ($1, $2, $3, $4, $5, NOW())`,
-              [userId, 'Payment Refunded', `Your booking payment of $${(amount_refunded / 100).toFixed(2)} has been refunded. It may take 5-10 business days to appear on your statement.`, 'billing', '/billing']
-            );
-          }
+          await client.query(
+            `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
+             VALUES ($1, $2, $3, $4, $5, NOW())`,
+            [row.user_email.toLowerCase(), 'Payment Refunded', `Your booking payment of $${(amount_refunded / 100).toFixed(2)} has been refunded. It may take 5-10 business days to appear on your statement.`, 'billing', 'payment']
+          );
           
           deferredActions.push(async () => {
             sendNotificationToUser(row.user_email, {
