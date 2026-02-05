@@ -20,7 +20,8 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: 'column user_id does not exist' error when adding new members",
       "Fixed: Linked email lookups now use correct column name (primary_email instead of user_id)",
       "Fixed: All email linking operations in Trackman, staff assignment, and member creation flows",
-      "Fixed: Test account cleanup now correctly references linked emails table"
+      "Fixed: Test account cleanup now correctly references linked emails table",
+      "Fixed: Stripe webhook now uses correct 'membership_status' column instead of 'status'"
     ]
   },
   {
