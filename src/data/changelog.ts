@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.8.3",
+    date: "2026-02-05",
+    title: "Staff Manual Booking Improvements",
+    changes: [
+      "Fixed: Duration options now adjust based on player count in staff manual booking modal",
+      "Fixed: Clicking a conference room cell now opens the modal to the Conference Room tab",
+      "Improved: Reordered fields so Player Count appears before Duration for better UX"
+    ]
+  },
+  {
     version: "69.8.2",
     date: "2026-02-05",
     title: "Enhanced Animations & UI Polish",

@@ -99,6 +99,16 @@ function calculateEndTime(startTime: string, durationMinutes: number): string {
 
 const modeIndex: Record<'member' | 'lesson' | 'conference', number> = { member: 0, lesson: 1, conference: 2 };
 
+function getSimulatorDurations(players: number): number[] {
+  switch (players) {
+    case 1: return [30, 60, 90, 120, 150, 180, 210, 240];
+    case 2: return [60, 120, 180, 240];
+    case 3: return [90, 180, 270];
+    case 4: return [120, 240];
+    default: return [60, 120, 180, 240];
+  }
+}
+
 export function StaffManualBookingModal({
   isOpen,
   onClose,
@@ -201,6 +211,15 @@ export function StaffManualBookingModal({
         .finally(() => setLoadingResources(false));
     }
   }, [isOpen, defaultResourceId, defaultStartTime, defaultDate, defaultHostMember, initialMode]);
+
+  // Reset duration when player count changes if current duration is not valid
+  useEffect(() => {
+    if (mode !== 'member') return;
+    const validDurations = getSimulatorDurations(playerCount);
+    if (!validDurations.includes(durationMinutes)) {
+      setDurationMinutes(validDurations[0]);
+    }
+  }, [playerCount, mode, durationMinutes]);
 
   // Fetch available conference room slots when date/duration changes
   useEffect(() => {
@@ -649,22 +668,6 @@ export function StaffManualBookingModal({
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Duration
-                      </label>
-                      <select
-                        value={durationMinutes}
-                        onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                        className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all"
-                      >
-                        <option value={30}>30 minutes</option>
-                        <option value={60}>60 minutes</option>
-                        <option value={90}>90 minutes</option>
-                        <option value={120}>120 minutes</option>
-                      </select>
-                    </div>
-
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Player Count
@@ -678,6 +681,21 @@ export function StaffManualBookingModal({
                         <option value={2}>2 players</option>
                         <option value={3}>3 players</option>
                         <option value={4}>4 players</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Duration
+                      </label>
+                      <select
+                        value={durationMinutes}
+                        onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                        className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all"
+                      >
+                        {getSimulatorDurations(playerCount).map(mins => (
+                          <option key={mins} value={mins}>{mins} minutes</option>
+                        ))}
                       </select>
                     </div>
                   </div>
