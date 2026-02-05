@@ -176,5 +176,41 @@ export const conferencePrepayments = pgTable(
 
 export type ConferencePrepayment = typeof conferencePrepayments.$inferSelect;
 
+// --- Terminal Payments Table ---
+// Tracks in-person card reader payments for membership subscriptions
+export const terminalPayments = pgTable(
+  "terminal_payments",
+  {
+    id: serial("id").primaryKey(),
+    userId: varchar("user_id", { length: 255 }).notNull(),
+    userEmail: varchar("user_email", { length: 255 }).notNull(),
+    stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }).notNull(),
+    stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }).notNull(),
+    stripeInvoiceId: varchar("stripe_invoice_id", { length: 255 }),
+    stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+    amountCents: integer("amount_cents").notNull(),
+    currency: varchar("currency", { length: 10 }).default("usd"),
+    readerId: varchar("reader_id", { length: 255 }),
+    readerLabel: varchar("reader_label", { length: 255 }),
+    status: varchar("status", { length: 50 }).notNull().default("succeeded"),
+    refundedAt: timestamp("refunded_at", { withTimezone: true }),
+    refundAmountCents: integer("refund_amount_cents"),
+    disputedAt: timestamp("disputed_at", { withTimezone: true }),
+    disputeId: varchar("dispute_id", { length: 255 }),
+    disputeStatus: varchar("dispute_status", { length: 50 }),
+    processedBy: varchar("processed_by", { length: 255 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("idx_terminal_payments_user_id").on(table.userId),
+    index("idx_terminal_payments_payment_intent_id").on(table.stripePaymentIntentId),
+    index("idx_terminal_payments_subscription_id").on(table.stripeSubscriptionId),
+    index("idx_terminal_payments_status").on(table.status),
+  ],
+);
+
+export type TerminalPayment = typeof terminalPayments.$inferSelect;
+
 // Note: billingGroups, groupMembers, and familyAddOnProducts are defined in hubspot-billing.ts
 // to avoid duplicate exports. Import them from there or from the main schema.
