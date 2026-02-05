@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.14.0",
+    date: "2026-02-05",
+    title: "Billing Safety & Access Control Fixes",
+    isMajor: true,
+    changes: [
+      "Fixed: Corporate groups can now fill all purchased seats (previously the last seat was incorrectly blocked)",
+      "Fixed: When a corporate group subscription is cancelled, all sub-members are properly deactivated (status set to cancelled, tier cleared) — previously they kept permanent free access",
+      "Fixed: Quick Charge one-time payments no longer grant permanent active membership status — prevents users from staying active forever without a subscription",
+      "Added: Archiving (removing) a member from the directory now automatically cancels their Stripe subscription so they stop being charged",
+      "Improved: Permanent member deletion always cancels active subscriptions automatically (previously required a manual flag)"
+    ]
+  },
+  {
     version: "69.13.0",
     date: "2026-02-05",
     title: "Comprehensive Member Deletion",
