@@ -298,7 +298,7 @@ router.post('/api/group-billing/groups/:groupId/members', isStaffOrAdmin, async 
 router.post('/api/group-billing/groups/:groupId/corporate-members', isStaffOrAdmin, async (req, res) => {
   try {
     const { groupId } = req.params;
-    const { email } = req.body;
+    const { email, firstName, lastName, phone, dob } = req.body;
     const user = req.user as any;
     
     if (!email) {
@@ -337,6 +337,10 @@ router.post('/api/group-billing/groups/:groupId/corporate-members', isStaffOrAdm
       billingGroupId: groupIdInt,
       memberEmail: email,
       memberTier: 'Corporate',
+      firstName: firstName || undefined,
+      lastName: lastName || undefined,
+      phone: phone || undefined,
+      dob: dob || undefined,
       addedBy: user?.email || 'staff',
       addedByName: user?.displayName || 'Staff Member',
     });
@@ -387,40 +391,6 @@ router.post('/api/family-billing/groups/:groupId/members', isStaffOrAdmin, async
   }
 });
 
-router.post('/api/group-billing/groups/:groupId/corporate-members', isStaffOrAdmin, async (req, res) => {
-  try {
-    const { groupId } = req.params;
-    const { memberEmail, memberTier } = req.body;
-    const user = req.user as any;
-    
-    if (!memberEmail || !memberTier) {
-      return res.status(400).json({ error: 'Member email and tier are required' });
-    }
-    
-    const result = await addCorporateMember({
-      billingGroupId: parseInt(groupId, 10),
-      memberEmail,
-      memberTier,
-      addedBy: user?.email || 'staff',
-      addedByName: user?.displayName || 'Staff Member',
-    });
-    
-    if (result.success) {
-      logFromRequest(req, 'add_group_member', 'group', groupId, memberEmail, {
-        memberId: result.memberId,
-        memberEmail,
-        memberTier,
-        groupType: 'corporate',
-      });
-      res.json({ success: true, memberId: result.memberId });
-    } else {
-      res.status(400).json({ error: result.error });
-    }
-  } catch (error: any) {
-    console.error('[GroupBilling] Error adding corporate member:', error);
-    res.status(500).json({ error: 'An error occurred. Please try again.' });
-  }
-});
 
 router.get('/api/group-billing/corporate-pricing', isStaffOrAdmin, async (req, res) => {
   try {

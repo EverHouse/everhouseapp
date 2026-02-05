@@ -599,6 +599,10 @@ export async function addCorporateMember(params: {
   billingGroupId: number;
   memberEmail: string;
   memberTier: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  dob?: string;
   addedBy: string;
   addedByName: string;
 }): Promise<{ success: boolean; memberId?: number; error?: string }> {
@@ -683,10 +687,57 @@ export async function addCorporateMember(params: {
       
       insertedMemberId = insertResult.rows[0].id;
       
-      await client.query(
-        'UPDATE users SET billing_group_id = $1 WHERE LOWER(email) = $2',
-        [params.billingGroupId, params.memberEmail.toLowerCase()]
+      const existingUserCheck = await client.query(
+        'SELECT id FROM users WHERE LOWER(email) = $1',
+        [params.memberEmail.toLowerCase()]
       );
+      
+      if (existingUserCheck.rows.length > 0) {
+        const updateFields: string[] = ['billing_group_id = $1', 'tier = $2', "billing_provider = 'stripe'", "membership_status = 'active'"];
+        const updateValues: any[] = [params.billingGroupId, params.memberTier];
+        let paramIndex = 3;
+        
+        if (params.firstName) {
+          updateFields.push(`first_name = $${paramIndex++}`);
+          updateValues.push(params.firstName);
+        }
+        if (params.lastName) {
+          updateFields.push(`last_name = $${paramIndex++}`);
+          updateValues.push(params.lastName);
+        }
+        if (params.phone) {
+          updateFields.push(`phone = $${paramIndex++}`);
+          updateValues.push(params.phone);
+        }
+        if (params.dob) {
+          updateFields.push(`dob = $${paramIndex++}`);
+          updateValues.push(params.dob);
+        }
+        
+        updateValues.push(params.memberEmail.toLowerCase());
+        await client.query(
+          `UPDATE users SET ${updateFields.join(', ')} WHERE LOWER(email) = $${paramIndex}`,
+          updateValues
+        );
+        console.log(`[GroupBilling] Updated existing user ${params.memberEmail} with corporate group`);
+      } else {
+        const userId = require('crypto').randomUUID();
+        await client.query(
+          `INSERT INTO users (id, email, first_name, last_name, phone, dob, tier, membership_status, billing_provider, billing_group_id, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', 'stripe', $8, NOW())`,
+          [
+            userId,
+            params.memberEmail.toLowerCase(),
+            params.firstName || null,
+            params.lastName || null,
+            params.phone || null,
+            params.dob || null,
+            params.memberTier,
+            params.billingGroupId
+          ]
+        );
+        console.log(`[GroupBilling] Created new user ${params.memberEmail} with tier ${params.memberTier}`);
+      }
 
       if (group[0].primaryStripeSubscriptionId) {
         try {

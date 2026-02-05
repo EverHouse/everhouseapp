@@ -66,6 +66,10 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
   const [selectedRelationship, setSelectedRelationship] = useState<string>('');
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [corporateEmail, setCorporateEmail] = useState('');
+  const [corporateFirstName, setCorporateFirstName] = useState('');
+  const [corporateLastName, setCorporateLastName] = useState('');
+  const [corporatePhone, setCorporatePhone] = useState('');
+  const [corporateDob, setCorporateDob] = useState('');
 
   const [removingMemberId, setRemovingMemberId] = useState<number | null>(null);
 
@@ -214,12 +218,22 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email: corporateEmail.trim() }),
+        body: JSON.stringify({ 
+          email: corporateEmail.trim(),
+          firstName: corporateFirstName.trim() || undefined,
+          lastName: corporateLastName.trim() || undefined,
+          phone: corporatePhone.trim() || undefined,
+          dob: corporateDob || undefined,
+        }),
       });
       if (res.ok) {
         await fetchFamilyGroup();
         setShowAddMemberForm(false);
         setCorporateEmail('');
+        setCorporateFirstName('');
+        setCorporateLastName('');
+        setCorporatePhone('');
+        setCorporateDob('');
         showSuccess('Team member added successfully');
       } else {
         setError(getApiErrorMessage(res, 'add team member'));
@@ -630,9 +644,36 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
 
                 {isCorporateGroup ? (
                   <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                          First Name
+                        </label>
+                        <input
+                          type="text"
+                          value={corporateFirstName}
+                          onChange={(e) => setCorporateFirstName(e.target.value)}
+                          placeholder="First name"
+                          className="w-full px-3 py-2 border border-gray-200 dark:border-white/20 rounded-lg bg-white dark:bg-black/30 text-sm text-primary dark:text-white placeholder:text-gray-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                          Last Name
+                        </label>
+                        <input
+                          type="text"
+                          value={corporateLastName}
+                          onChange={(e) => setCorporateLastName(e.target.value)}
+                          placeholder="Last name"
+                          className="w-full px-3 py-2 border border-gray-200 dark:border-white/20 rounded-lg bg-white dark:bg-black/30 text-sm text-primary dark:text-white placeholder:text-gray-400"
+                        />
+                      </div>
+                    </div>
+                    
                     <div>
                       <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
-                        Email Address
+                        Email Address <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="email"
@@ -641,6 +682,32 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
                         placeholder="Enter team member email..."
                         className="w-full px-3 py-2 border border-gray-200 dark:border-white/20 rounded-lg bg-white dark:bg-black/30 text-sm text-primary dark:text-white placeholder:text-gray-400"
                       />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                          Phone
+                        </label>
+                        <input
+                          type="tel"
+                          value={corporatePhone}
+                          onChange={(e) => setCorporatePhone(e.target.value)}
+                          placeholder="(555) 555-5555"
+                          className="w-full px-3 py-2 border border-gray-200 dark:border-white/20 rounded-lg bg-white dark:bg-black/30 text-sm text-primary dark:text-white placeholder:text-gray-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                          Date of Birth
+                        </label>
+                        <input
+                          type="date"
+                          value={corporateDob}
+                          onChange={(e) => setCorporateDob(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-200 dark:border-white/20 rounded-lg bg-white dark:bg-black/30 text-sm text-primary dark:text-white placeholder:text-gray-400"
+                        />
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -660,6 +727,10 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
                         onClick={() => {
                           setShowAddMemberForm(false);
                           setCorporateEmail('');
+                          setCorporateFirstName('');
+                          setCorporateLastName('');
+                          setCorporatePhone('');
+                          setCorporateDob('');
                         }}
                         className="px-4 py-2.5 border border-gray-200 dark:border-white/20 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
                       >
