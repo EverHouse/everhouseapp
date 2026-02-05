@@ -54,7 +54,7 @@ const generateSlotsForResource = (
   calendarSlots: { start_time: string; end_time: string }[]
 ): APISlot[] => {
   const slots: APISlot[] = [];
-  const slotIncrement = 5;
+  const slotIncrement = 15;
   const { open: openMinutes, close: closeMinutes } = hours;
 
   for (let startMins = openMinutes; startMins + durationMinutes <= closeMinutes; startMins += slotIncrement) {
@@ -273,8 +273,8 @@ router.get('/api/availability', async (req, res) => {
     }
     
     const durationMinutes = parseInt(duration as string) || 60;
-    // Fixed 5-minute increment for more flexible start times
-    const slotIncrement = 5;
+    // 15-minute increment for cleaner time slots (:00, :15, :30, :45)
+    const slotIncrement = 15;
     
     // Get resource type to determine business hours
     const resourceResult = await pool.query(

@@ -529,6 +529,28 @@ const BookGolf: React.FC = () => {
     prevDurationRef.current = duration;
   }, [selectedDateObj, duration]);
 
+  // Auto-reset duration when player count changes and current duration is no longer valid
+  // Valid durations must divide evenly into 30-min blocks per player
+  useEffect(() => {
+    if (activeTab !== 'simulator') return;
+    
+    const getValidDurations = (players: number): number[] => {
+      switch (players) {
+        case 1: return [30, 60, 90, 120, 150, 180, 210, 240];
+        case 2: return [60, 120, 180, 240];
+        case 3: return [90, 180, 270];
+        case 4: return [120, 240];
+        default: return [60, 120, 180, 240];
+      }
+    };
+    
+    const validDurations = getValidDurations(playerCount);
+    if (!validDurations.includes(duration)) {
+      // Reset to first valid duration for this player count
+      setDuration(validDurations[0]);
+    }
+  }, [playerCount, activeTab, duration]);
+
   useEffect(() => {
     if (!isLoading) {
       setPageReady(true);
@@ -1412,11 +1434,24 @@ const BookGolf: React.FC = () => {
               </div>
               <div className={`grid ${activeTab === 'simulator' ? 'grid-cols-2' : 'grid-cols-4'} gap-2`}>
                 {(() => {
-                  const baseSimDurations = [60, 90, 120, 150, 180];
-                  if (playerCount >= 4) baseSimDurations.push(240);
+                  // Filter durations based on player count so time splits into even 30-min blocks per player
+                  // 1 player: all 30-min increments (30, 60, 90, 120, 150, 180, 210, 240)
+                  // 2 players: multiples of 60 (60, 120, 180, 240)
+                  // 3 players: multiples of 90 (90, 180, 270)
+                  // 4 players: multiples of 120 (120, 240)
+                  const getSimulatorDurations = (players: number): number[] => {
+                    switch (players) {
+                      case 1: return [30, 60, 90, 120, 150, 180, 210, 240];
+                      case 2: return [60, 120, 180, 240];
+                      case 3: return [90, 180, 270];
+                      case 4: return [120, 240];
+                      default: return [60, 120, 180, 240];
+                    }
+                  };
+                  
                   const baseDurations = activeTab === 'simulator' 
-                    ? baseSimDurations 
-                    : [30, 60, 90, 120];
+                    ? getSimulatorDurations(playerCount) 
+                    : [30, 60, 90, 120, 150, 180, 210, 240];
                   const availableDurations = baseDurations;
                   
                   if (availableDurations.length === 0) {
