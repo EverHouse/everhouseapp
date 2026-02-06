@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { membershipTiers } from '../../shared/schema';
+import { membershipTiers, users } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 import { getStripeClient } from '../core/stripe/client';
 import { getCorporateVolumePrice } from '../core/stripe/groupBilling';
 import { logSystemAction } from '../core/auditLog';
 import { checkoutRateLimiter } from '../middleware/rateLimiting';
 import { z } from 'zod';
+import { sql } from 'drizzle-orm';
 
 const router = Router();
 
@@ -150,7 +151,19 @@ router.post('/api/checkout/sessions', checkoutRateLimiter, async (req, res) => {
     }
 
     if (email) {
-      sessionParams.customer_email = email;
+      const [existingUser] = await db.select({
+        stripeCustomerId: users.stripeCustomerId,
+      })
+        .from(users)
+        .where(sql`LOWER(${users.email}) = ${email.toLowerCase()}`)
+        .limit(1);
+
+      if (existingUser?.stripeCustomerId) {
+        sessionParams.customer = existingUser.stripeCustomerId;
+        console.log(`[Checkout] Reusing existing Stripe customer ${existingUser.stripeCustomerId} for ${email}`);
+      } else {
+        sessionParams.customer_email = email;
+      }
     }
 
     const session = await stripe.checkout.sessions.create(sessionParams);

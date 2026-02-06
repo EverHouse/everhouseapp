@@ -991,25 +991,24 @@ export async function removeCorporateMember(params: {
       [params.memberEmail.toLowerCase()]
     );
     
-    const group = await db.select()
-      .from(billingGroups)
-      .where(eq(billingGroups.id, params.billingGroupId))
-      .limit(1);
+    const groupResult = await client.query(
+      `SELECT id, primary_stripe_subscription_id FROM billing_groups WHERE id = $1 FOR UPDATE`,
+      [params.billingGroupId]
+    );
+    const group = groupResult.rows;
     
-    if (group.length > 0 && group[0].primaryStripeSubscriptionId) {
+    if (group.length > 0 && group[0].primary_stripe_subscription_id) {
       try {
-        const remainingMembers = await db.select()
-          .from(groupMembers)
-          .where(and(
-            eq(groupMembers.billingGroupId, params.billingGroupId),
-            eq(groupMembers.isActive, true)
-          ));
+        const remainingResult = await client.query(
+          `SELECT COUNT(*) as cnt FROM group_members WHERE billing_group_id = $1 AND is_active = true`,
+          [params.billingGroupId]
+        );
         
-        const newMemberCount = Math.max(remainingMembers.length, 5);
+        const newMemberCount = Math.max(parseInt(remainingResult.rows[0].cnt, 10), 5);
         const newPricePerSeat = getCorporateVolumePrice(newMemberCount);
         
         const stripe = await getStripeClient();
-        const subscription = await stripe.subscriptions.retrieve(group[0].primaryStripeSubscriptionId, {
+        const subscription = await stripe.subscriptions.retrieve(group[0].primary_stripe_subscription_id, {
           expand: ['items.data'],
         });
         
@@ -1024,7 +1023,7 @@ export async function removeCorporateMember(params: {
             console.log(`[GroupBilling] Price tier change on removal: ${oldPricePerSeat} -> ${newPricePerSeat} cents/seat for ${newMemberCount} members`);
             
             await stripe.subscriptionItems.create({
-              subscription: group[0].primaryStripeSubscriptionId,
+              subscription: group[0].primary_stripe_subscription_id,
               price_data: {
                 currency: 'usd',
                 product: corporateItem.price?.product as string,

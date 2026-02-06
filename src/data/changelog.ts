@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.3.3",
+    date: "2026-02-06",
+    title: "Checkout Customer Fix & Corporate Billing Safety",
+    changes: [
+      "Fix: Members who re-sign up through the public checkout page now keep their existing Stripe account instead of getting a duplicate — preserves saved cards and payment history",
+      "Fix: Adding and removing corporate group members at the same time can no longer cause the billing count to get out of sync with Stripe"
+    ]
+  },
+  {
     version: "7.3.2",
     date: "2026-02-06",
     title: "Phone Formatting, Terminal Signup Fix & Auto-Close",
