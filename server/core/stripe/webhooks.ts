@@ -16,6 +16,7 @@ import { logPaymentFailure, logWebhookFailure } from '../monitoring';
 import { logSystemAction } from '../auditLog';
 import { queueJobInTransaction } from '../jobQueue';
 import { pullTierFeaturesFromStripe, pullCafeItemsFromStripe } from './products';
+import { clearTierCache } from '../tierService';
 import type { PoolClient } from 'pg';
 
 const EVENT_DEDUP_WINDOW_DAYS = 7;
@@ -3000,6 +3001,7 @@ async function handleProductDeleted(client: PoolClient, product: any): Promise<D
         [tierMatch.rows[0].id]
       );
       console.log(`[Stripe Webhook] Cleared Stripe references for tier "${tierMatch.rows[0].name}" after product deletion`);
+      clearTierCache();
       return deferredActions;
     }
 
@@ -3056,6 +3058,7 @@ async function handlePriceChange(client: PoolClient, price: any): Promise<Deferr
       for (const row of tierResult.rows) {
         console.log(`[Stripe Webhook] Updated tier "${row.name}" price to ${priceCents} cents ($${priceDecimal})`);
       }
+      clearTierCache();
     }
   } catch (error) {
     console.error('[Stripe Webhook] Error handling price change:', error);

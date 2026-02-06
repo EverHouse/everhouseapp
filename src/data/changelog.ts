@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "70.4.2",
+    date: "2026-02-06",
+    title: "Stripe Sync Gap Fixes (Round 2)",
+    changes: [
+      "Fixed: Tier cache now clears immediately after syncing from Stripe — booking limits, guest pass counts, and fee calculations reflect changes instantly instead of up to 5 minutes later",
+      "Fixed: Overage fee rate now uses a single centralized source — Trackman reconciliation and Stripe product setup no longer have independent copies of the $25 rate",
+      "Fixed: Tier cache clears when a Stripe tier product is deleted or price changes via webhook"
+    ]
+  },
+  {
     version: "70.4.1",
     date: "2026-02-06",
     title: "Stripe Sync Gap Fixes",

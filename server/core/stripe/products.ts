@@ -4,6 +4,8 @@ import { stripeProducts, membershipTiers } from '../../../shared/schema';
 import { eq } from 'drizzle-orm';
 import { getStripeClient } from './client';
 import { getHubSpotClientWithFallback } from '../integrations';
+import { clearTierCache } from '../tierService';
+import { PRICING } from '../billing/pricingConfig';
 
 export interface HubSpotProduct {
   id: string;
@@ -793,7 +795,7 @@ export async function ensureSimulatorOverageProduct(): Promise<{
 }> {
   const OVERAGE_SLUG = 'simulator-overage-30min';
   const OVERAGE_NAME = 'Simulator Overage (30 min)';
-  const OVERAGE_PRICE_CENTS = 2500;
+  const OVERAGE_PRICE_CENTS = PRICING.OVERAGE_RATE_CENTS;
   const OVERAGE_DESCRIPTION = 'Per 30 minutes over tier privileges';
 
   try {
@@ -814,7 +816,7 @@ export async function ensureSimulatorOverageProduct(): Promise<{
       const [newTier] = await db.insert(membershipTiers).values({
         name: OVERAGE_NAME,
         slug: OVERAGE_SLUG,
-        priceString: '$25',
+        priceString: `$${PRICING.OVERAGE_RATE_DOLLARS}`,
         description: OVERAGE_DESCRIPTION,
         buttonText: 'Pay Now',
         sortOrder: 99,
@@ -1313,6 +1315,7 @@ export async function pullTierFeaturesFromStripe(): Promise<{
     }
 
     console.log(`[Reverse Sync] Tier feature pull complete: ${tiersUpdated} updated, ${errors.length} errors`);
+    clearTierCache();
     return { success: errors.length === 0, tiersUpdated, errors };
   } catch (error: any) {
     console.error('[Reverse Sync] Fatal error pulling tier features:', error);

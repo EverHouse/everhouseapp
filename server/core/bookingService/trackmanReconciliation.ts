@@ -1,6 +1,7 @@
 import { pool } from '../db';
 import { logger } from '../logger';
 import { getTierLimits, getMemberTierByEmail } from '../tierService';
+import { PRICING } from '../billing/pricingConfig';
 
 export interface ReconciliationResult {
   bookingId: number;
@@ -39,7 +40,7 @@ export interface FindDiscrepanciesOptions {
   offset?: number;
 }
 
-const DEFAULT_OVERAGE_RATE_PER_30_MIN = 25;
+const DEFAULT_OVERAGE_RATE_PER_30_MIN = PRICING.OVERAGE_RATE_DOLLARS;
 
 async function getTierOverageRate(tier: string | null): Promise<number> {
   if (!tier) return DEFAULT_OVERAGE_RATE_PER_30_MIN;
