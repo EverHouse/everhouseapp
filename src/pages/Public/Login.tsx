@@ -13,13 +13,19 @@ const Spinner = () => (
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { startNavigation } = useNavigationLoading();
-  const { loginWithMember } = useData();
+  const { loginWithMember, user, actualUser, isViewingAs, sessionChecked } = useData();
   const { setPageReady } = usePageReady();
   const [email, setEmail] = useState('');
   
   useEffect(() => {
+    if (!sessionChecked) return;
+    if (user) {
+      const staffOrAdmin = actualUser?.role === 'admin' || actualUser?.role === 'staff';
+      navigate((staffOrAdmin && !isViewingAs) ? '/admin' : '/member/dashboard', { replace: true });
+      return;
+    }
     setPageReady(true);
-  }, [setPageReady]);
+  }, [sessionChecked, user, actualUser, isViewingAs, navigate, setPageReady]);
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [devLoading, setDevLoading] = useState(false);

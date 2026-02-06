@@ -17,8 +17,9 @@ export const changelog: ChangelogEntry[] = [
     date: "2026-02-06",
     title: "Smart Login Redirect",
     changes: [
-      "Fix: Logged-in users visiting the home page are now automatically taken to their dashboard — staff and admins go to the Staff Portal, members go to their Member Dashboard",
-      "Fix: Logged-in users visiting the login page are now redirected to their dashboard instead of seeing the login form again"
+      "Fix: Logged-in users visiting the home page are now instantly taken to their dashboard — staff and admins go to the Staff Portal, members go to their Member Dashboard",
+      "Fix: Logged-in users visiting the login page are now redirected to their dashboard instead of seeing the login form again",
+      "Improvement: Redirect uses fast client-side navigation instead of full page reloads for a smoother experience"
     ]
   },
   {

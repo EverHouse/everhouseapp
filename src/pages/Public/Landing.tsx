@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
 import BackToTop from '../../components/BackToTop';
 import { usePageReady } from '../../contexts/PageReadyContext';
+import { useData } from '../../contexts/DataContext';
 import { useParallax } from '../../hooks/useParallax';
 import { playSound } from '../../utils/sounds';
 import ModalShell from '../../components/ModalShell';
@@ -217,11 +218,20 @@ const HubSpotMeetingModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
 const Landing: React.FC = () => {
   const navigate = useNavigate();
   const { setPageReady } = usePageReady();
+  const { user, actualUser, isViewingAs, sessionChecked } = useData();
   const [showTourModal, setShowTourModal] = useState(false);
   const [tiers, setTiers] = useState<MembershipTier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showStickyMobileCta, setShowStickyMobileCta] = useState(false);
   const { offset: parallaxOffset, opacity: parallaxOpacity, gradientShift, ref: heroRef } = useParallax({ speed: 0.25, maxOffset: 120 });
+
+  useEffect(() => {
+    if (!sessionChecked) return;
+    if (user) {
+      const staffOrAdmin = actualUser?.role === 'admin' || actualUser?.role === 'staff';
+      navigate((staffOrAdmin && !isViewingAs) ? '/admin' : '/member/dashboard', { replace: true });
+    }
+  }, [sessionChecked, user, actualUser, isViewingAs, navigate]);
 
   useEffect(() => {
     const handleScroll = () => {

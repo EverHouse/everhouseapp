@@ -281,21 +281,6 @@ const ScrollToTop = () => {
   return null;
 };
 
-const AuthenticatedRedirect: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, actualUser, isViewingAs, sessionChecked } = useData();
-  const [redirecting, setRedirecting] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!sessionChecked || !user || redirecting) return;
-    const isStaffOrAdmin = actualUser?.role === 'admin' || actualUser?.role === 'staff';
-    const target = (isStaffOrAdmin && !isViewingAs) ? '/admin' : '/member/dashboard';
-    setRedirecting(true);
-    window.location.replace(target);
-  }, [sessionChecked, user, actualUser, isViewingAs, redirecting]);
-
-  if (!sessionChecked || user) return <div className="min-h-screen" />;
-  return <>{children}</>;
-};
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, sessionChecked } = useData();
@@ -371,7 +356,7 @@ const AnimatedRoutes: React.FC = () => {
     <TransitionContext.Provider value={transitionState}>
       <Suspense fallback={<PageSkeleton />}>
           <Routes location={location}>
-            <Route path="/" element={<AuthenticatedRedirect><DirectionalPageTransition><PageErrorBoundary pageName="Landing"><Landing /></PageErrorBoundary></DirectionalPageTransition></AuthenticatedRedirect>} />
+            <Route path="/" element={<DirectionalPageTransition><PageErrorBoundary pageName="Landing"><Landing /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/membership/apply" element={<DirectionalPageTransition><PageErrorBoundary pageName="MembershipApply"><MembershipApply /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/membership/*" element={<DirectionalPageTransition><PageErrorBoundary pageName="Membership"><Membership /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/contact" element={<DirectionalPageTransition><PageErrorBoundary pageName="Contact"><Contact /></PageErrorBoundary></DirectionalPageTransition>} />
@@ -385,7 +370,7 @@ const AnimatedRoutes: React.FC = () => {
             <Route path="/day-pass/success" element={<DirectionalPageTransition><PageErrorBoundary pageName="DayPassSuccess"><DayPassSuccess /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/privacy" element={<DirectionalPageTransition><PageErrorBoundary pageName="Privacy"><PrivacyPolicy /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/terms" element={<DirectionalPageTransition><PageErrorBoundary pageName="Terms"><TermsOfService /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/login" element={<AuthenticatedRedirect><DirectionalPageTransition><PageErrorBoundary pageName="Login"><Login /></PageErrorBoundary></DirectionalPageTransition></AuthenticatedRedirect>} />
+            <Route path="/login" element={<DirectionalPageTransition><PageErrorBoundary pageName="Login"><Login /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/auth/callback" element={<DirectionalPageTransition><PageErrorBoundary pageName="AuthCallback"><AuthCallback /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/reset-password" element={<DirectionalPageTransition><PageErrorBoundary pageName="ResetPassword"><Login /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/checkout/*" element={<DirectionalPageTransition><PageErrorBoundary pageName="Checkout"><Checkout /></PageErrorBoundary></DirectionalPageTransition>} />
