@@ -125,6 +125,15 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
         });
         if (existingCustomers.data.length > 0) {
           customerId = existingCustomers.data[0].id;
+          try {
+            await pool.query(
+              `UPDATE users SET stripe_customer_id = $1, updated_at = NOW()
+               WHERE LOWER(email) = LOWER($2) AND stripe_customer_id IS NULL`,
+              [customerId, metadata.ownerEmail]
+            );
+          } catch (linkErr: any) {
+            console.warn('[Terminal] Could not link existing Stripe customer (non-blocking):', linkErr.message);
+          }
         } else {
           const customer = await stripe.customers.create({
             email: metadata.ownerEmail,
@@ -141,7 +150,7 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
             const lastName = nameParts.slice(1).join(' ') || '';
 
             const existingUser = await pool.query(
-              'SELECT id FROM users WHERE LOWER(email) = LOWER($1)',
+              'SELECT id, stripe_customer_id FROM users WHERE LOWER(email) = LOWER($1)',
               [metadata.ownerEmail]
             );
 
@@ -151,10 +160,20 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
               await pool.query(
                 `INSERT INTO users (id, email, first_name, last_name, membership_status, stripe_customer_id, data_source, visitor_type, role, created_at, updated_at)
                  VALUES ($1, $2, $3, $4, 'visitor', $5, 'APP', 'day_pass', 'visitor', NOW(), NOW())
-                 ON CONFLICT (email) DO NOTHING`,
+                 ON CONFLICT (email) DO UPDATE SET
+                   stripe_customer_id = COALESCE(users.stripe_customer_id, EXCLUDED.stripe_customer_id),
+                   first_name = COALESCE(NULLIF(users.first_name, ''), EXCLUDED.first_name),
+                   last_name = COALESCE(NULLIF(users.last_name, ''), EXCLUDED.last_name),
+                   updated_at = NOW()`,
                 [visitorId, metadata.ownerEmail, firstName, lastName, customer.id]
               );
-              console.log(`[Terminal] Created visitor record for new POS customer: ${metadata.ownerEmail}`);
+              console.log(`[Terminal] Created/updated visitor record for POS customer: ${metadata.ownerEmail}`);
+            } else if (!existingUser.rows[0].stripe_customer_id) {
+              await pool.query(
+                'UPDATE users SET stripe_customer_id = $1, updated_at = NOW() WHERE id = $2',
+                [customer.id, existingUser.rows[0].id]
+              );
+              console.log(`[Terminal] Linked Stripe customer ${customer.id} to existing user: ${metadata.ownerEmail}`);
             }
           } catch (visitorErr: any) {
             console.warn('[Terminal] Could not create visitor record for new POS customer (non-blocking):', visitorErr.message);

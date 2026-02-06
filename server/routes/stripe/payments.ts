@@ -561,6 +561,15 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, async (req: Reques
       if (existingCustomers.data.length > 0) {
         stripeCustomerId = existingCustomers.data[0].id;
         console.log(`[Stripe] Found existing customer ${stripeCustomerId} for quick charge: ${memberEmail}`);
+        try {
+          await pool.query(
+            `UPDATE users SET stripe_customer_id = $1, updated_at = NOW()
+             WHERE LOWER(email) = LOWER($2) AND stripe_customer_id IS NULL`,
+            [stripeCustomerId, memberEmail]
+          );
+        } catch (linkErr: any) {
+          console.warn('[QuickCharge] Could not link existing Stripe customer (non-blocking):', linkErr.message);
+        }
       } else {
         const customer = await stripe.customers.create({
           email: memberEmail,
@@ -574,6 +583,36 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, async (req: Reques
         });
         stripeCustomerId = customer.id;
         console.log(`[Stripe] Created new customer ${customer.id} for quick charge: ${memberEmail}`);
+
+        try {
+          const existingUser = await pool.query(
+            'SELECT id, stripe_customer_id FROM users WHERE LOWER(email) = LOWER($1)',
+            [memberEmail]
+          );
+          if (existingUser.rows.length === 0) {
+            const crypto = await import('crypto');
+            const visitorId = crypto.randomUUID();
+            await pool.query(
+              `INSERT INTO users (id, email, first_name, last_name, membership_status, stripe_customer_id, data_source, visitor_type, role, created_at, updated_at)
+               VALUES ($1, $2, $3, $4, 'visitor', $5, 'APP', 'day_pass', 'visitor', NOW(), NOW())
+               ON CONFLICT (email) DO UPDATE SET
+                 stripe_customer_id = COALESCE(users.stripe_customer_id, EXCLUDED.stripe_customer_id),
+                 first_name = COALESCE(NULLIF(users.first_name, ''), EXCLUDED.first_name),
+                 last_name = COALESCE(NULLIF(users.last_name, ''), EXCLUDED.last_name),
+                 updated_at = NOW()`,
+              [visitorId, memberEmail, firstName, lastName, customer.id]
+            );
+            console.log(`[QuickCharge] Created visitor record for new customer: ${memberEmail}`);
+          } else if (!existingUser.rows[0].stripe_customer_id) {
+            await pool.query(
+              'UPDATE users SET stripe_customer_id = $1, updated_at = NOW() WHERE id = $2',
+              [customer.id, existingUser.rows[0].id]
+            );
+            console.log(`[QuickCharge] Linked Stripe customer ${customer.id} to existing user: ${memberEmail}`);
+          }
+        } catch (visitorErr: any) {
+          console.warn('[QuickCharge] Could not create visitor record (non-blocking):', visitorErr.message);
+        }
       }
       
     } else {
