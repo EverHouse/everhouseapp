@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "70.1.0",
+    date: "2026-02-06",
+    title: "Stripe Product Catalog Features Setup",
+    changes: [
+      "Added: 22 Stripe Product Catalog Features mirroring all membership tier permissions and limits",
+      "Added: Access permission features — Can Book Simulators, Can Book Conference Room, Can Book Wellness",
+      "Added: Tier benefit features — Group Lessons, Extended Sessions, Private Lessons, Simulator Guest Passes, Discounted Merch, Unlimited Access",
+      "Added: Numeric limit features — Daily Sim Minutes (60/90/Unlimited), Guest Passes (4/8/15/Unlimited), Booking Window (7/10/14 days), Conference Room (60/90/Unlimited min/day)",
+      "Added: All features attached to correct Stripe products — Social, Core, Premium, Corporate, VIP, Base",
+      "Note: Features are informational in Stripe only — app logic unchanged, no member-facing impact"
+    ]
+  },
+  {
     version: "70.0.0",
     date: "2026-02-06",
     title: "Record Purchase Redesign — Point-of-Sale Experience",
