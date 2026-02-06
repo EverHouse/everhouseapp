@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "72.0.2",
+    date: "2026-02-06",
+    title: "Reschedule Hardening: Full Gap Audit",
+    changes: [
+      "Fix: Reschedule now checks for facility closures and availability blocks before confirming — previously it only checked for conflicting bookings, so a reschedule could land on a closed time slot",
+      "Fix: Reschedule confirm now runs inside a database transaction — if the session update fails, the booking update is rolled back too, preventing data mismatches",
+      "New: Members receive a branded email when their booking is rescheduled — shows the new date, time, and bay name",
+      "New: Members receive a push notification when their booking is rescheduled — works even if the app isn't open",
+      "Improvement: In-app reschedule notification is now generated on the server instead of the browser — more reliable delivery"
+    ]
+  },
+  {
     version: "72.0.1",
     date: "2026-02-06",
     title: "Reschedule Safety Fixes",

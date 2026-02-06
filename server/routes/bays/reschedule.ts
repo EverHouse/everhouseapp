@@ -8,6 +8,8 @@ import { getStripeClient } from '../../core/stripe/client';
 import { broadcastAvailabilityUpdate } from '../../core/websocket';
 import { sendPushNotification } from '../push';
 import { formatTime12Hour } from '../../utils/dateUtils';
+import { checkClosureConflict, checkAvailabilityBlockConflict } from '../../core/bookingValidation';
+import { sendBookingRescheduleEmail } from '../../emails/bookingEmails';
 
 const router = Router();
 
@@ -138,38 +140,58 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
       return res.status(409).json({ error: 'Time slot conflicts with existing booking' });
     }
 
+    const closureCheck = await checkClosureConflict(resource_id, request_date, start_time, end_time);
+    if (closureCheck.hasConflict) {
+      return res.status(409).json({
+        error: 'Cannot reschedule booking during closure',
+        message: `This time slot conflicts with "${closureCheck.closureTitle}". Please choose a different time.`
+      });
+    }
+
+    const blockCheck = await checkAvailabilityBlockConflict(resource_id, request_date, start_time, end_time);
+    if (blockCheck.hasConflict) {
+      return res.status(409).json({
+        error: 'Cannot reschedule booking during event block',
+        message: `This time slot is blocked: ${blockCheck.blockType || 'Event block'}. Please choose a different time.`
+      });
+    }
+
     const originalResourceId = booking.resource_id;
     const originalStartTime = booking.start_time;
     const originalEndTime = booking.end_time;
     const originalDate = booking.request_date;
     const originalBayName = booking.resource_name;
 
-    const updateResult = await pool.query(
-      `UPDATE booking_requests
-       SET resource_id = $1,
-           request_date = $2,
-           start_time = $3,
-           end_time = $4,
-           duration_minutes = $5,
-           trackman_booking_id = $6,
-           original_resource_id = $7,
-           original_start_time = $8,
-           original_end_time = $9,
-           original_booked_date = $10,
-           is_relocating = false,
-           relocating_started_at = NULL,
-           updated_at = NOW()
-       WHERE id = $11
-       RETURNING *`,
-      [resource_id, request_date, start_time, end_time, duration_minutes, trackman_booking_id,
-       originalResourceId, originalStartTime, originalEndTime, originalDate, bookingId]
-    );
+    const client = await pool.connect();
+    let updated: any;
+    try {
+      await client.query('BEGIN');
 
-    const updated = updateResult.rows[0];
+      const updateResult = await client.query(
+        `UPDATE booking_requests
+         SET resource_id = $1,
+             request_date = $2,
+             start_time = $3,
+             end_time = $4,
+             duration_minutes = $5,
+             trackman_booking_id = $6,
+             original_resource_id = $7,
+             original_start_time = $8,
+             original_end_time = $9,
+             original_booked_date = $10,
+             is_relocating = false,
+             relocating_started_at = NULL,
+             updated_at = NOW()
+         WHERE id = $11
+         RETURNING *`,
+        [resource_id, request_date, start_time, end_time, duration_minutes, trackman_booking_id,
+         originalResourceId, originalStartTime, originalEndTime, originalDate, bookingId]
+      );
 
-    if (updated.session_id) {
-      try {
-        await pool.query(
+      updated = updateResult.rows[0];
+
+      if (updated.session_id) {
+        await client.query(
           `UPDATE booking_sessions 
            SET resource_id = $1, session_date = $2, start_time = $3, end_time = $4,
                trackman_booking_id = $5, updated_at = NOW()
@@ -179,54 +201,60 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
         logger.info('[Reschedule] Updated booking session', {
           extra: { bookingId, sessionId: updated.session_id, newResourceId: resource_id, newDate: request_date }
         });
+      }
 
-        try {
-          await recalculateSessionFees(updated.session_id, 'reschedule');
-          logger.info('[Reschedule] Recalculated session fees after reschedule', {
-            extra: { bookingId, sessionId: updated.session_id }
-          });
-        } catch (feeErr) {
-          logger.warn('[Reschedule] Fee recalculation failed (non-blocking)', {
-            extra: { bookingId, sessionId: updated.session_id, error: (feeErr as Error).message }
-          });
-        }
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      logger.error('[Reschedule] Transaction failed, rolled back', { error: txErr as Error });
+      return res.status(500).json({ error: 'Failed to confirm reschedule' });
+    } finally {
+      client.release();
+    }
 
-        try {
-          const staleIntents = await pool.query(
-            `SELECT id, stripe_payment_intent_id FROM stripe_payment_intents
-             WHERE session_id = $1
-               AND purpose = 'prepayment'
-               AND status NOT IN ('canceled', 'cancelled', 'refunded', 'failed', 'succeeded')`,
-            [updated.session_id]
-          );
+    if (updated.session_id) {
+      try {
+        await recalculateSessionFees(updated.session_id, 'reschedule');
+        logger.info('[Reschedule] Recalculated session fees after reschedule', {
+          extra: { bookingId, sessionId: updated.session_id }
+        });
+      } catch (feeErr) {
+        logger.warn('[Reschedule] Fee recalculation failed (non-blocking)', {
+          extra: { bookingId, sessionId: updated.session_id, error: (feeErr as Error).message }
+        });
+      }
 
-          if (staleIntents.rows.length > 0) {
-            const stripe = await getStripeClient();
-            for (const intent of staleIntents.rows) {
-              try {
-                await stripe.paymentIntents.cancel(intent.stripe_payment_intent_id);
-                await pool.query(
-                  `UPDATE stripe_payment_intents SET status = 'canceled', updated_at = NOW() WHERE id = $1`,
-                  [intent.id]
-                );
-                logger.info('[Reschedule] Canceled stale prepayment intent after reschedule', {
-                  extra: { bookingId, sessionId: updated.session_id, paymentIntentId: intent.stripe_payment_intent_id }
-                });
-              } catch (cancelErr) {
-                logger.warn('[Reschedule] Failed to cancel prepayment intent (non-blocking)', {
-                  extra: { bookingId, paymentIntentId: intent.stripe_payment_intent_id, error: (cancelErr as Error).message }
-                });
-              }
+      try {
+        const staleIntents = await pool.query(
+          `SELECT id, stripe_payment_intent_id FROM stripe_payment_intents
+           WHERE session_id = $1
+             AND purpose = 'prepayment'
+             AND status NOT IN ('canceled', 'cancelled', 'refunded', 'failed', 'succeeded')`,
+          [updated.session_id]
+        );
+
+        if (staleIntents.rows.length > 0) {
+          const stripe = await getStripeClient();
+          for (const intent of staleIntents.rows) {
+            try {
+              await stripe.paymentIntents.cancel(intent.stripe_payment_intent_id);
+              await pool.query(
+                `UPDATE stripe_payment_intents SET status = 'canceled', updated_at = NOW() WHERE id = $1`,
+                [intent.id]
+              );
+              logger.info('[Reschedule] Canceled stale prepayment intent after reschedule', {
+                extra: { bookingId, sessionId: updated.session_id, paymentIntentId: intent.stripe_payment_intent_id }
+              });
+            } catch (cancelErr) {
+              logger.warn('[Reschedule] Failed to cancel prepayment intent (non-blocking)', {
+                extra: { bookingId, paymentIntentId: intent.stripe_payment_intent_id, error: (cancelErr as Error).message }
+              });
             }
           }
-        } catch (intentErr) {
-          logger.warn('[Reschedule] Failed to query stale prepayment intents (non-blocking)', {
-            extra: { bookingId, sessionId: updated.session_id, error: (intentErr as Error).message }
-          });
         }
-      } catch (sessionErr) {
-        logger.warn('[Reschedule] Failed to update session (non-blocking)', {
-          extra: { bookingId, sessionId: updated.session_id, error: (sessionErr as Error).message }
+      } catch (intentErr) {
+        logger.warn('[Reschedule] Failed to query stale prepayment intents (non-blocking)', {
+          extra: { bookingId, sessionId: updated.session_id, error: (intentErr as Error).message }
         });
       }
     }
@@ -286,6 +314,14 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
         title: 'Booking Rescheduled',
         body: notifMessage,
         url: '/sims'
+      }).catch(() => {});
+
+      sendBookingRescheduleEmail(booking.user_email, {
+        date: request_date,
+        startTime: start_time,
+        endTime: end_time,
+        bayName: newBayName,
+        memberName: booking.user_name || 'Member',
       }).catch(() => {});
     }
 
