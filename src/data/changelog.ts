@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "70.8.0",
+    date: "2026-02-06",
+    title: "Stripe Deployment Safety & Environment Indicator",
+    changes: [
+      "New: 'Stripe Live' or 'Stripe Test' badge now shows next to the sync buttons on the Products & Pricing page — staff can always see which Stripe environment is active",
+      "New: 'Pull from Stripe' now has safety guards — if no tiers are linked to Stripe products or Stripe returns zero cafe products but your database has existing data, the pull is skipped to prevent accidental data wipe on a fresh/misconfigured Stripe account",
+      "New: Server startup now checks for Stripe environment mismatches — warns if production is using test keys or development is using live keys",
+      "New: Server startup checks if live Stripe account has zero products and suggests running 'Sync to Stripe' first"
+    ]
+  },
+  {
     version: "70.7.0",
     date: "2026-02-06",
     title: "Instant Staff Notifications for Member Status Changes",

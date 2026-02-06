@@ -1372,6 +1372,12 @@ export async function pullTierFeaturesFromStripe(): Promise<{
 
     console.log(`[Reverse Sync] Starting tier feature pull for ${tiers.length} active tiers`);
 
+    const tiersWithStripe = tiers.filter(t => t.stripeProductId);
+    if (tiersWithStripe.length === 0) {
+      console.warn('[Reverse Sync] No tiers are linked to Stripe products yet. Run "Sync to Stripe" first. Skipping pull to preserve local data.');
+      return { success: true, tiersUpdated: 0, errors: ['No tiers linked to Stripe products. Run "Sync to Stripe" first.'] };
+    }
+
     for (const tier of tiers) {
       if (!tier.stripeProductId) {
         continue;
@@ -1556,6 +1562,14 @@ export async function pullCafeItemsFromStripe(): Promise<{
     }
 
     console.log(`[Reverse Sync] Found ${activeStripeProducts.length} active and ${inactiveStripeProductIds.length} inactive cafe products in Stripe`);
+
+    const existingCafeCount = await pool.query('SELECT COUNT(*) FROM cafe_items WHERE is_active = true');
+    const localCafeItems = parseInt(existingCafeCount.rows[0].count, 10);
+
+    if (activeStripeProducts.length === 0 && localCafeItems > 0) {
+      console.warn(`[Reverse Sync] Stripe has 0 cafe products but local DB has ${localCafeItems} active items. Skipping pull to preserve local data. Run "Sync to Stripe" first to push cafe items.`);
+      return { success: true, synced: 0, created: 0, deactivated: 0, errors: ['No cafe products found in Stripe. Run "Sync to Stripe" first to push local data.'] };
+    }
 
     for (const product of activeStripeProducts) {
       try {

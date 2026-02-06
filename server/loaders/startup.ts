@@ -1,6 +1,7 @@
 import { ensureDatabaseConstraints, seedDefaultNoticeTypes, createStripeTransactionCache, setupEmailNormalization, normalizeExistingEmails, cleanupOrphanedRecords, seedTierFeatures } from '../db-init';
 import { seedTrainingSections } from '../routes/training';
 import { getStripeSync } from '../core/stripe';
+import { getStripeEnvironmentInfo, getStripeClient } from '../core/stripe/client';
 import { runMigrations } from 'stripe-replit-sync';
 import { enableRealtimeForTable } from '../core/supabase/client';
 import { initMemberSyncSettings } from '../core/memberSync';
@@ -175,6 +176,29 @@ export async function runStartupTasks(): Promise<void> {
     startupHealth.warnings.push(`Supabase realtime: ${err.message}`);
   }
   
+  try {
+    const { isLive, mode, isProduction } = await getStripeEnvironmentInfo();
+    if (isProduction && !isLive) {
+      console.warn('[STARTUP WARNING] ⚠️ PRODUCTION DEPLOYMENT IS USING STRIPE TEST KEYS! Payments will NOT be processed with real money. Configure live Stripe keys in deployment settings.');
+    } else if (!isProduction && isLive) {
+      console.warn('[STARTUP WARNING] ⚠️ Development environment is using Stripe LIVE keys. Be careful — real charges will be processed!');
+    } else {
+      console.log(`[Startup] Stripe environment: ${mode} mode${isProduction ? ' (production)' : ' (development)'}`);
+    }
+
+    try {
+      const stripe = await getStripeClient();
+      const products = await stripe.products.list({ limit: 1, active: true });
+      if (products.data.length === 0 && isProduction) {
+        console.warn('[STARTUP WARNING] ⚠️ Stripe live account has ZERO products. Run "Sync to Stripe" from the admin panel to push your tier and product data.');
+      }
+    } catch (productErr: any) {
+      console.warn('[Startup] Could not check Stripe products:', productErr.message);
+    }
+  } catch (err: any) {
+    console.warn('[Startup] Could not check Stripe environment:', err.message);
+  }
+
   startupHealth.completedAt = new Date().toISOString();
   
   if (startupHealth.criticalFailures.length > 0) {

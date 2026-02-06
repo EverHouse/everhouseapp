@@ -62,6 +62,13 @@ export async function getStripeSecretKey(): Promise<string> {
   return secretKey;
 }
 
+export async function getStripeEnvironmentInfo(): Promise<{ isLive: boolean; mode: 'live' | 'test'; isProduction: boolean }> {
+  const { secretKey } = await getCredentials();
+  const isLive = secretKey.startsWith('sk_live_') || secretKey.startsWith('rk_live_');
+  const isProduction = process.env.REPLIT_DEPLOYMENT === '1';
+  return { isLive, mode: isLive ? 'live' : 'test', isProduction };
+}
+
 let stripeSync: any = null;
 
 export async function getStripeSync() {

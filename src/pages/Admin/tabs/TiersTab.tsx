@@ -116,6 +116,17 @@ const TiersTab: React.FC = () => {
         { key: 'cafe', label: 'Cafe Menu', icon: 'local_cafe' },
     ];
 
+    const { data: stripeConnection } = useQuery({
+        queryKey: ['stripe-connection-mode'],
+        queryFn: async () => {
+            const res = await fetch('/api/stripe/debug-connection', { credentials: 'include' });
+            if (!res.ok) return null;
+            return res.json();
+        },
+        staleTime: 5 * 60 * 1000,
+        retry: 1,
+    });
+
     const { data: tiers = [], isLoading } = useQuery({
         queryKey: ['membership-tiers'],
         queryFn: async () => {
@@ -1119,6 +1130,16 @@ const TiersTab: React.FC = () => {
                             Membership Tiers
                         </h3>
                         <div className="flex items-center gap-2">
+                            {stripeConnection?.mode && (
+                                <span className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full ${
+                                    stripeConnection.mode === 'live' 
+                                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
+                                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                                }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${stripeConnection.mode === 'live' ? 'bg-green-500' : 'bg-amber-500'}`} />
+                                    Stripe {stripeConnection.mode === 'live' ? 'Live' : 'Test'}
+                                </span>
+                            )}
                             <button
                                 onClick={handlePullFromStripe}
                                 disabled={pullFromStripeMutation.isPending}
