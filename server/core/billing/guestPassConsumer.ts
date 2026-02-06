@@ -51,7 +51,7 @@ export async function consumeGuestPassForParticipant(
     const tierGuestPasses = tierResult.rows[0]?.guest_passes_per_month ?? 4;
     
     const existingPass = await client.query(
-      `SELECT id, passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = $1`,
+      `SELECT id, passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = $1 FOR UPDATE`,
       [ownerEmailLower]
     );
     

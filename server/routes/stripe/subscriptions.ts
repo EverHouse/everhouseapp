@@ -430,13 +430,20 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
         try {
           await cancelSubscription(subscriptionResult.subscription.subscriptionId);
           console.log(`[Stripe] Emergency rollback: cancelled subscription ${subscriptionResult.subscription.subscriptionId}`);
+          await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+          return res.status(500).json({ 
+            error: 'System error during activation. Payment has been voided. Please try again.' 
+          });
         } catch (cancelError: any) {
-          console.error('[Stripe] Failed to cancel subscription during rollback:', cancelError.message);
+          console.error(`[Stripe] CRITICAL: Failed to cancel subscription ${subscriptionResult.subscription.subscriptionId} during rollback. User preserved for manual cleanup.`, cancelError.message);
+          return res.status(500).json({ 
+            error: 'CRITICAL: Account setup failed but the payment could not be automatically reversed. Please contact support immediately so we can issue a refund.' 
+          });
         }
       }
       await pool.query('DELETE FROM users WHERE id = $1', [userId]);
       return res.status(500).json({ 
-        error: 'System error during activation. Payment has been voided. Please try again.' 
+        error: 'System error during activation. Please try again.' 
       });
     }
     

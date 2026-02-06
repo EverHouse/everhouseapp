@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "71.2.0",
+    date: "2026-02-06",
+    title: "Billing Safety: Race Condition & Revenue Leak Fixes",
+    changes: [
+      "Fixed: Guest pass race condition — two simultaneous check-in requests could both consume the same remaining pass, allowing more uses than the member's limit. Row locking now prevents double-consumption.",
+      "Fixed: Zombie subscription risk — if a new member signup failed partway through, the system could delete the member's account while Stripe kept billing them. Now the account is preserved so staff can investigate and refund.",
+      "Fixed: Overage fee calculation gap — during a brief window between check-in and fee processing, a booking's usage minutes could temporarily disappear from the daily total, potentially undercharging overage fees."
+    ]
+  },
+  {
     version: "71.1.0",
     date: "2026-02-06",
     title: "POS Checkout: Card-Only Payments & Card on File",
