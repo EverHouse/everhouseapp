@@ -785,19 +785,19 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
       )}
 
       {showEmailSearch && !showPassIdInput && (
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full min-w-0">
           <input
             type="email"
             value={searchEmail}
             onChange={(e) => setSearchEmail(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             placeholder="Enter visitor email..."
-            className="flex-1 px-4 py-3 rounded-xl bg-white/80 dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="min-w-0 flex-1 px-3 py-3 rounded-xl bg-white/80 dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm"
           />
           <button
             onClick={handleSearch}
             disabled={!searchEmail.trim() || isSearching}
-            className="px-4 py-3 rounded-xl bg-teal-500 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="shrink-0 px-3 py-3 rounded-xl bg-teal-500 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isSearching ? (
               <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
@@ -807,7 +807,7 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
           </button>
           <button
             onClick={handleScanQR}
-            className="px-4 py-3 rounded-xl bg-teal-600 text-white font-semibold flex items-center gap-2 hover:bg-teal-700 transition-colors"
+            className="shrink-0 px-3 py-3 rounded-xl bg-teal-600 text-white font-semibold flex items-center gap-2 hover:bg-teal-700 transition-colors"
             title="Scan QR / Enter Pass ID"
           >
             <span className="material-symbols-outlined text-lg">qr_code_scanner</span>
@@ -1179,7 +1179,7 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
 
   if (variant === 'card') {
     return (
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-5">
+      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-5 overflow-hidden">
         <div className="flex items-center gap-2 mb-4">
           <span className="material-symbols-outlined text-teal-600 dark:text-teal-400">qr_code_scanner</span>
           <h3 className="font-bold text-primary dark:text-white">Redeem Day Pass</h3>
