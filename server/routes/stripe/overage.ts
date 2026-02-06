@@ -21,7 +21,7 @@ router.post('/api/stripe/overage/create-payment-intent', async (req: Request, re
       SELECT br.id, br.user_email, br.overage_fee_cents, br.overage_paid, br.overage_minutes,
              br.request_date, br.start_time, br.duration_minutes,
              br.session_id, br.declared_player_count,
-             u.stripe_customer_id
+             u.stripe_customer_id, u.id as user_id, u.first_name, u.last_name
       FROM booking_requests br
       LEFT JOIN users u ON LOWER(u.email) = LOWER(br.user_email)
       WHERE br.id = $1
@@ -76,25 +76,26 @@ router.post('/api/stripe/overage/create-payment-intent', async (req: Request, re
       return res.status(400).json({ error: 'Cannot process payment for placeholder booking. Please assign this booking to a real member first.' });
     }
     
-    let customerId = booking.stripe_customer_id;
-    if (!customerId) {
+    let customerId: string;
+    if (booking.user_id) {
+      const { getOrCreateStripeCustomer } = await import('../../core/stripe/customers');
+      const memberName = [booking.first_name, booking.last_name].filter(Boolean).join(' ') || undefined;
+      const result = await getOrCreateStripeCustomer(booking.user_id, booking.user_email, memberName);
+      customerId = result.customerId;
+    } else {
       const existingCustomers = await stripe.customers.list({
         email: booking.user_email.toLowerCase(),
         limit: 1
       });
-      
       if (existingCustomers.data.length > 0) {
         customerId = existingCustomers.data[0].id;
-        console.log(`[Stripe] Found existing customer ${customerId} for ${booking.user_email}`);
       } else {
         const customer = await stripe.customers.create({
           email: booking.user_email.toLowerCase(),
           metadata: { source: 'overage_payment' }
         });
         customerId = customer.id;
-        console.log(`[Stripe] Created new customer ${customerId} for ${booking.user_email}`);
       }
-      await pool.query(`UPDATE users SET stripe_customer_id = $1 WHERE LOWER(email) = LOWER($2)`, [customerId, booking.user_email]);
     }
     
     const productResult = await pool.query(`

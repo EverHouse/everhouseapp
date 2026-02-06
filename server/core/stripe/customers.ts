@@ -45,7 +45,19 @@ export async function getOrCreateStripeCustomer(
   const userTier = tier || userResult.rows[0]?.tier;
   
   if (userResult.rows[0]?.stripe_customer_id) {
-    return { customerId: userResult.rows[0].stripe_customer_id, isNew: false };
+    const existingCustomerId = userResult.rows[0].stripe_customer_id;
+    try {
+      const stripeForValidation = await getStripeClient();
+      await stripeForValidation.customers.retrieve(existingCustomerId);
+      return { customerId: existingCustomerId, isNew: false };
+    } catch (validationError: any) {
+      if (validationError.code === 'resource_missing') {
+        console.warn(`[Stripe] Stored customer ${existingCustomerId} no longer exists in Stripe for user ${userId}, clearing and re-creating`);
+        await pool.query('UPDATE users SET stripe_customer_id = NULL WHERE id = $1', [userId]);
+      } else {
+        return { customerId: existingCustomerId, isNew: false };
+      }
+    }
   }
 
   const linkedEmailsResult = await pool.query(
