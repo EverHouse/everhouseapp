@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.18.0",
+    date: "2026-02-06",
+    title: "Fee Calculation Fix for Non-Active Members",
+    changes: [
+      "Fixed: Terminated and pending members were incorrectly getting their old tier's daily allowance, showing $0.00 fees when they should be charged the full overage rate",
+      "Fixed: Fee calculations now check membership status — only active, trial, and past-due members get tier benefits"
+    ]
+  },
+  {
     version: "69.17.0",
     date: "2026-02-06",
     title: "Card Reader for Booking Payments",

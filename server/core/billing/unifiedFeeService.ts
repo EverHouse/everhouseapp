@@ -273,11 +273,11 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
     }
   }
 
-  // Batch fetch member tiers
+  // Batch fetch member tiers - only for members with active benefits
   const tierMap = new Map<string, string>();
   if (emailList.length > 0) {
     const tiersResult = await pool.query(
-      `SELECT LOWER(email) as email, tier FROM users WHERE LOWER(email) = ANY($1::text[])`,
+      `SELECT LOWER(email) as email, tier FROM users WHERE LOWER(email) = ANY($1::text[]) AND membership_status IN ('active', 'trial', 'past_due')`,
       [emailList.map(e => e.toLowerCase())]
     );
     tiersResult.rows.forEach(r => tierMap.set(r.email, r.tier));
