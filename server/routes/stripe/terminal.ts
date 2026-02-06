@@ -179,7 +179,8 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
       capture_method: 'automatic',
       description: description || 'Terminal payment',
       metadata: finalMetadata,
-      ...(customerId ? { customer: customerId } : {})
+      ...(customerId ? { customer: customerId } : {}),
+      ...(metadata?.ownerEmail ? { receipt_email: metadata.ownerEmail } : {})
     });
     
     if (customerId || metadata?.ownerEmail) {
@@ -331,6 +332,7 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
       try {
         paymentIntent = await stripe.paymentIntents.update(invoicePI.id, {
           payment_method_types: ['card_present'],
+          ...(email ? { receipt_email: email } : {}),
           metadata: {
             subscriptionId,
             invoiceId: invoice.id,
@@ -355,6 +357,7 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
         payment_method_types: ['card_present'],
         capture_method: 'automatic',
         description: 'Subscription creation',
+        ...(email ? { receipt_email: email } : {}),
         metadata: {
           subscriptionId,
           invoiceId: invoice.id,
