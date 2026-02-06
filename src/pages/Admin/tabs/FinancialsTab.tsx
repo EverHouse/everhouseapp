@@ -55,10 +55,10 @@ const FinancialsTab: React.FC = () => {
   return (
     <AnimatedPage className="pb-32">
       {/* Sub-tab Navigation */}
-      <div className="flex gap-2 mb-6 animate-content-enter-delay-1">
+      <div className="flex gap-2 mb-6 animate-content-enter-delay-1 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
         <button
           onClick={() => setActiveTab('POS')}
-          className={`px-4 py-2 rounded-full font-medium transition-colors ${
+          className={`shrink-0 px-4 py-2 rounded-full font-medium transition-colors ${
             activeTab === 'POS'
               ? 'bg-primary dark:bg-accent text-white dark:text-primary'
               : 'bg-white/60 dark:bg-white/10 text-primary/60 dark:text-white/60'
@@ -68,7 +68,7 @@ const FinancialsTab: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('Transactions')}
-          className={`px-4 py-2 rounded-full font-medium transition-colors ${
+          className={`shrink-0 px-4 py-2 rounded-full font-medium transition-colors ${
             activeTab === 'Transactions'
               ? 'bg-primary dark:bg-accent text-white dark:text-primary'
               : 'bg-white/60 dark:bg-white/10 text-primary/60 dark:text-white/60'
@@ -78,7 +78,7 @@ const FinancialsTab: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('Subscriptions')}
-          className={`px-4 py-2 rounded-full font-medium transition-colors ${
+          className={`shrink-0 px-4 py-2 rounded-full font-medium transition-colors ${
             activeTab === 'Subscriptions'
               ? 'bg-primary dark:bg-accent text-white dark:text-primary'
               : 'bg-white/60 dark:bg-white/10 text-primary/60 dark:text-white/60'
@@ -88,7 +88,7 @@ const FinancialsTab: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('Invoices')}
-          className={`px-4 py-2 rounded-full font-medium transition-colors ${
+          className={`shrink-0 px-4 py-2 rounded-full font-medium transition-colors ${
             activeTab === 'Invoices'
               ? 'bg-primary dark:bg-accent text-white dark:text-primary'
               : 'bg-white/60 dark:bg-white/10 text-primary/60 dark:text-white/60'

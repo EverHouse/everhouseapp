@@ -953,18 +953,18 @@ const POSRegister: React.FC = () => {
             {renderCustomerSection()}
           </div>
 
-          <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+          <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4 overflow-hidden">
             <div className="flex items-center gap-2 mb-3">
               <span className="material-symbols-outlined text-primary dark:text-accent">grid_view</span>
               <h3 className="font-bold text-primary dark:text-white">Products</h3>
             </div>
 
-            <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+            <div className="flex gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
               {CATEGORY_TABS.map(tab => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
                     activeTab === tab.key
                       ? 'bg-primary dark:bg-lavender text-white'
                       : 'bg-white/60 dark:bg-white/10 text-primary/60 dark:text-white/60 hover:bg-white/80 dark:hover:bg-white/15'
