@@ -1305,6 +1305,11 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: any): 
     'SELECT id, first_name, last_name FROM users WHERE email = $1',
     [email]
   );
+
+  if (userResult.rows.length === 0 && invoice.subscription) {
+    console.warn(`[Stripe Webhook] Payment succeeded for customer ${invoiceCustomerId} but no matching user found in database. Subscription may need manual cancellation.`);
+  }
+
   const memberName = userResult.rows[0]
     ? `${userResult.rows[0].first_name || ''} ${userResult.rows[0].last_name || ''}`.trim() || email
     : email;

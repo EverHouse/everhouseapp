@@ -1139,6 +1139,7 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
                       onSelect={(member: SelectedMember) => handleLinkMember(slot.id, member.email)}
                       onClear={() => setActiveSearchSlot(null)}
                       forceApiSearch
+                      includeVisitors={true}
                     />
                   </div>
                 ) : guestAddSlot === slot.id ? (

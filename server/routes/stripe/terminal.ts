@@ -134,6 +134,31 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
             }
           });
           customerId = customer.id;
+
+          try {
+            const nameParts = (metadata.ownerName || '').trim().split(/\s+/);
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.slice(1).join(' ') || '';
+
+            const existingUser = await pool.query(
+              'SELECT id FROM users WHERE LOWER(email) = LOWER($1)',
+              [metadata.ownerEmail]
+            );
+
+            if (existingUser.rows.length === 0) {
+              const crypto = await import('crypto');
+              const visitorId = crypto.randomUUID();
+              await pool.query(
+                `INSERT INTO users (id, email, first_name, last_name, membership_status, stripe_customer_id, data_source, visitor_type, role, created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, 'visitor', $5, 'APP', 'day_pass', 'visitor', NOW(), NOW())
+                 ON CONFLICT (email) DO NOTHING`,
+                [visitorId, metadata.ownerEmail, firstName, lastName, customer.id]
+              );
+              console.log(`[Terminal] Created visitor record for new POS customer: ${metadata.ownerEmail}`);
+            }
+          } catch (visitorErr: any) {
+            console.warn('[Terminal] Could not create visitor record for new POS customer (non-blocking):', visitorErr.message);
+          }
         }
       } catch (custErr: any) {
         console.warn('[Terminal] Could not create Stripe customer for new customer (non-blocking):', custErr.message);
@@ -279,7 +304,7 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
     const stripe = await getStripeClient();
     
     const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
-      expand: ['latest_invoice']
+      expand: ['latest_invoice.payment_intent']
     });
     
     const invoice = subscription.latest_invoice as any;
@@ -292,23 +317,56 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
       return res.status(400).json({ error: 'Invoice has no amount due' });
     }
     
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount,
-      currency: invoice.currency || 'usd',
-      payment_method_types: ['card_present'],
-      capture_method: 'automatic',
-      description: 'Subscription creation',
-      metadata: {
-        subscriptionId,
-        invoiceId: invoice.id,
-        invoiceAmountDue: String(amount),
-        userId: userId || '',
-        email: email || '',
-        paymentType: 'subscription_terminal'
+    const invoicePI = invoice.payment_intent as any;
+    let paymentIntent: any;
+    
+    if (invoicePI && invoicePI.id) {
+      if (invoicePI.status !== 'requires_payment_method' && invoicePI.status !== 'requires_confirmation') {
+        return res.status(400).json({ 
+          error: `Invoice PaymentIntent is in unexpected state: ${invoicePI.status}. Expected requires_payment_method or requires_confirmation.`,
+          paymentIntentStatus: invoicePI.status
+        });
       }
-    }, {
-      idempotencyKey: `terminal_sub_${subscriptionId}_${invoice.id}`
-    });
+      
+      try {
+        paymentIntent = await stripe.paymentIntents.update(invoicePI.id, {
+          payment_method_types: ['card_present'],
+          metadata: {
+            subscriptionId,
+            invoiceId: invoice.id,
+            userId: userId || '',
+            email: email || '',
+            paymentType: 'subscription_terminal'
+          }
+        });
+        console.log(`[Terminal] Using invoice PI ${invoicePI.id} for subscription ${subscriptionId}`);
+      } catch (updateErr: any) {
+        console.error(`[Terminal] Failed to update invoice PI ${invoicePI.id}:`, updateErr.message);
+        return res.status(500).json({ 
+          error: `Failed to configure invoice payment for terminal: ${updateErr.message}`,
+          paymentIntentId: invoicePI.id
+        });
+      }
+    } else {
+      console.warn(`[Terminal] No invoice PI found for subscription ${subscriptionId}, creating separate PI as fallback`);
+      paymentIntent = await stripe.paymentIntents.create({
+        amount,
+        currency: invoice.currency || 'usd',
+        payment_method_types: ['card_present'],
+        capture_method: 'automatic',
+        description: 'Subscription creation',
+        metadata: {
+          subscriptionId,
+          invoiceId: invoice.id,
+          invoiceAmountDue: String(amount),
+          userId: userId || '',
+          email: email || '',
+          paymentType: 'subscription_terminal'
+        }
+      }, {
+        idempotencyKey: `terminal_sub_${subscriptionId}_${invoice.id}`
+      });
+    }
     
     const reader = await stripe.terminal.readers.processPaymentIntent(readerId, {
       payment_intent: paymentIntent.id
@@ -444,18 +502,6 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
         paymentIntentId,
         alreadyActivated: true
       });
-    }
-    
-    if (actualInvoiceId && latestInvoice?.status !== 'paid') {
-      try {
-        await stripe.invoices.pay(actualInvoiceId, {
-          paid_out_of_band: true
-        });
-      } catch (invoiceError: any) {
-        if (!invoiceError.message?.includes('already paid')) {
-          console.error('[Terminal] Error marking invoice paid:', invoiceError);
-        }
-      }
     }
     
     if (paymentIntent.payment_method) {

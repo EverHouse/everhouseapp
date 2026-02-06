@@ -38,11 +38,14 @@ export async function getOrCreateStripeCustomer(
   }
   
   const userResult = await pool.query(
-    'SELECT stripe_customer_id, tier FROM users WHERE id = $1',
+    'SELECT stripe_customer_id, tier, first_name, last_name FROM users WHERE id = $1',
     [userId]
   );
   
   const userTier = tier || userResult.rows[0]?.tier;
+  const resolvedName = name || (userResult.rows[0]?.first_name && userResult.rows[0]?.last_name
+    ? `${userResult.rows[0].first_name} ${userResult.rows[0].last_name}`.trim()
+    : userResult.rows[0]?.first_name || undefined);
   
   if (userResult.rows[0]?.stripe_customer_id) {
     const existingCustomerId = userResult.rows[0].stripe_customer_id;
@@ -171,14 +174,14 @@ export async function getOrCreateStripeCustomer(
       customerId = foundCustomerId;
       await stripe.customers.update(customerId, {
         metadata: metadata,
-        name: name || undefined,
+        name: resolvedName || undefined,
         email: email.toLowerCase()
       });
       console.log(`[Stripe] Updated metadata for existing customer ${customerId}, set primary email to ${email}`);
     } else {
       const customer = await stripe.customers.create({
         email: email.toLowerCase(),
-        name: name || undefined,
+        name: resolvedName || undefined,
         metadata: metadata
       });
       customerId = customer.id;

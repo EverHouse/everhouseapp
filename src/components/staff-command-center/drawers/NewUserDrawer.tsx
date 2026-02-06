@@ -138,7 +138,7 @@ export function NewUserDrawer({
   const { setDrawerOpen } = useBottomNav();
   const { showToast } = useToast();
   
-  const [mode, setMode] = useState<Mode>(defaultMode);
+  const [mode] = useState<Mode>('member');
   const [memberStep, setMemberStep] = useState<MemberStep>('form');
   const [visitorStep, setVisitorStep] = useState<VisitorStep>('form');
   
@@ -168,7 +168,6 @@ export function NewUserDrawer({
   }, [isOpen, setDrawerOpen]);
 
   const resetForm = useCallback(() => {
-    setMode(defaultMode);
     setMemberStep('form');
     setVisitorStep('form');
     setMemberForm(initialMemberForm);
@@ -286,33 +285,9 @@ export function NewUserDrawer({
       maxHeight="full"
     >
       <div className="px-4 pt-2 pb-4">
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={() => handleModeChange('member')}
-            className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-sm transition-all ${
-              mode === 'member'
-                ? 'bg-emerald-600 text-white'
-                : isDark
-                  ? 'bg-white/5 text-gray-400 hover:bg-white/10'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            <span className="material-symbols-outlined text-sm mr-1.5 align-middle">badge</span>
-            New Member
-          </button>
-          <button
-            onClick={() => handleModeChange('visitor')}
-            className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-sm transition-all ${
-              mode === 'visitor'
-                ? 'bg-emerald-600 text-white'
-                : isDark
-                  ? 'bg-white/5 text-gray-400 hover:bg-white/10'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            <span className="material-symbols-outlined text-sm mr-1.5 align-middle">person_add</span>
-            New Visitor
-          </button>
+        <div className="flex items-center gap-2 mb-4">
+          <span className="material-symbols-outlined text-sm text-emerald-600">badge</span>
+          <span className={`font-medium text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>New Member</span>
         </div>
 
         <div className="flex items-center gap-2 mb-4">
@@ -375,61 +350,28 @@ export function NewUserDrawer({
           </div>
         )}
 
-        {mode === 'member' ? (
-          <MemberFlow
-            step={memberStep}
-            setPendingUserToCleanup={setPendingUserToCleanup}
-            form={memberForm}
-            setForm={setMemberForm}
-            tiers={tiers}
-            discounts={discounts}
-            existingBillingGroups={existingBillingGroups}
-            isDark={isDark}
-            isLoading={isLoading}
-            setIsLoading={setIsLoading}
-            setError={setError}
-            setStep={setMemberStep}
-            onSuccess={(user) => {
-              setCreatedUser(user);
-              setMemberStep('success');
-              onSuccess?.({ ...user, mode: 'member' });
-            }}
-            createdUser={createdUser}
-            onClose={handleClose}
-            showToast={showToast}
-          />
-        ) : (
-          <VisitorFlow
-            step={visitorStep}
-            form={visitorForm}
-            setForm={setVisitorForm}
-            products={dayPassProducts}
-            isDark={isDark}
-            isLoading={isLoading}
-            setIsLoading={setIsLoading}
-            setError={setError}
-            setStep={setVisitorStep}
-            onSuccess={(user) => {
-              setCreatedUser(user);
-              setVisitorStep('success');
-              onSuccess?.({ ...user, mode: 'visitor' });
-            }}
-            createdUser={createdUser}
-            onClose={handleClose}
-            showToast={showToast}
-            onBookNow={() => {
-              if (createdUser) {
-                onBookNow?.({
-                  id: createdUser.id,
-                  email: createdUser.email,
-                  name: createdUser.name,
-                  phone: visitorForm.phone,
-                });
-                handleClose();
-              }
-            }}
-          />
-        )}
+        <MemberFlow
+          step={memberStep}
+          setPendingUserToCleanup={setPendingUserToCleanup}
+          form={memberForm}
+          setForm={setMemberForm}
+          tiers={tiers}
+          discounts={discounts}
+          existingBillingGroups={existingBillingGroups}
+          isDark={isDark}
+          isLoading={isLoading}
+          setIsLoading={setIsLoading}
+          setError={setError}
+          setStep={setMemberStep}
+          onSuccess={(user) => {
+            setCreatedUser(user);
+            setMemberStep('success');
+            onSuccess?.({ ...user, mode: 'member' });
+          }}
+          createdUser={createdUser}
+          onClose={handleClose}
+          showToast={showToast}
+        />
       </div>
     </SlideUpDrawer>
   );

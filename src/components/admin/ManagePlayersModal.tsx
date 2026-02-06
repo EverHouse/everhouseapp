@@ -564,6 +564,7 @@ const ManagePlayersModal: React.FC<ManagePlayersModalProps> = ({
                           autoFocus
                           showTier
                           disabled={linkingSlotId === slot.id}
+                          includeVisitors={true}
                         />
                       </div>
                     ) : (

@@ -733,6 +733,7 @@ export function StaffManualBookingModal({
                           onClear={() => setHostMember(null)}
                           selectedMember={hostMember}
                           placeholder="Search for host member..."
+                          includeVisitors={true}
                           excludeEmails={getExcludedEmails().filter(e => e !== hostMember?.email)}
                         />
                       </div>
@@ -774,7 +775,7 @@ export function StaffManualBookingModal({
                             onClear={() => handleParticipantClear(index)}
                             selectedMember={participant.member}
                             placeholder={participant.type === 'member' ? 'Search member...' : 'Search guest (optional)...'}
-                            includeVisitors={participant.type === 'guest'}
+                            includeVisitors={true}
                             excludeEmails={getExcludedEmails().filter(e => e !== participant.member?.email)}
                           />
                           {participant.type === 'member' && !participant.member && (
@@ -1027,6 +1028,7 @@ export function StaffManualBookingModal({
                     onClear={() => setConfHostMember(null)}
                     selectedMember={confHostMember}
                     placeholder="Search for host member..."
+                    includeVisitors={true}
                   />
                 </div>
 
