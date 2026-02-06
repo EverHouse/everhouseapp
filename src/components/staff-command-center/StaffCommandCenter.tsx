@@ -44,7 +44,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   const { showToast } = useToast();
   const { isAtBottom } = useBottomNav();
   const isMobile = useIsMobile();
-  const { actualUser } = useData();
+  const { actualUser, refreshMembers } = useData();
   const { isConnected: wsConnected } = useStaffWebSocketContext();
   
   const navigateToTab = useCallback((tab: TabType) => {
@@ -854,6 +854,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         }}
         onSuccess={(userData) => {
           refresh();
+          refreshMembers();
           showToast(`${userData.mode === 'member' ? 'Member' : 'Visitor'} ${userData.name} created successfully`, 'success');
         }}
         onBookNow={(visitorData) => {
