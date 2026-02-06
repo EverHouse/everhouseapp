@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { pool, isProduction } from '../core/db';
 import { isAdmin, isStaffOrAdmin } from '../core/middleware';
 import { invalidateTierCache, clearTierCache } from '../core/tierService';
-import { syncMembershipTiersToStripe, getTierSyncStatus, cleanupOrphanStripeProducts, syncTierFeaturesToStripe, syncCafeItemsToStripe } from '../core/stripe/products';
+import { syncMembershipTiersToStripe, getTierSyncStatus, cleanupOrphanStripeProducts, syncTierFeaturesToStripe, syncCafeItemsToStripe, pullTierFeaturesFromStripe, pullCafeItemsFromStripe } from '../core/stripe/products';
+import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
 
@@ -266,6 +267,42 @@ router.get('/api/admin/stripe/sync-status', isStaffOrAdmin, async (req, res) => 
   } catch (error: any) {
     console.error('[Admin] Error getting sync status:', error);
     res.status(500).json({ error: 'Failed to get sync status' });
+  }
+});
+
+router.post('/api/admin/stripe/pull-from-stripe', isStaffOrAdmin, async (req, res) => {
+  try {
+    console.log('[Admin] Starting pull from Stripe...');
+
+    const [tierResult, cafeResult] = await Promise.all([
+      pullTierFeaturesFromStripe(),
+      pullCafeItemsFromStripe(),
+    ]);
+
+    console.log(`[Admin] Pull from Stripe complete: ${tierResult.tiersUpdated} tiers updated, ${cafeResult.synced} cafe items synced, ${cafeResult.created} created, ${cafeResult.deactivated} deactivated`);
+
+    logFromRequest(req, {
+      action: 'pull_from_stripe',
+      resourceType: 'system',
+      resourceName: 'Stripe Reverse Sync',
+      details: {
+        tiersUpdated: tierResult.tiersUpdated,
+        tierErrors: tierResult.errors,
+        cafeSynced: cafeResult.synced,
+        cafeCreated: cafeResult.created,
+        cafeDeactivated: cafeResult.deactivated,
+        cafeErrors: cafeResult.errors,
+      },
+    });
+
+    res.json({
+      success: tierResult.success && cafeResult.success,
+      tiers: tierResult,
+      cafe: cafeResult,
+    });
+  } catch (error: any) {
+    console.error('[Admin] Pull from Stripe error:', error);
+    res.status(500).json({ error: 'Failed to pull from Stripe', message: error.message });
   }
 });
 

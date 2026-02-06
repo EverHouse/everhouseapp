@@ -13,6 +13,21 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "70.4.0",
+    date: "2026-02-06",
+    title: "Stripe-Driven Product Management (Reverse Sync)",
+    changes: [
+      "Added: 'Pull from Stripe' button on Products & Pricing page — refreshes tier permissions and cafe items from Stripe Product Catalog",
+      "Added: Booking Limits and Access Permissions now show 'Managed by Stripe' labels when a tier is linked to a Stripe product",
+      "Added: Booking limit fields (daily sim minutes, guest passes, booking window, conf room minutes) become read-only when managed by Stripe",
+      "Added: Access permission toggles become read-only when managed by Stripe — edit in Stripe Dashboard to update",
+      "Added: Cafe Menu items now show 'Managed by Stripe' notice — prices and items sync from Stripe Product Catalog",
+      "Added: Automatic webhook sync — changes made in Stripe Dashboard (product updates, price changes) automatically sync to the app",
+      "Added: Product.updated, product.created, product.deleted, price.updated, price.created webhook handlers for real-time Stripe sync",
+      "Foundation: Stripe Product Catalog is now the source of truth for membership permissions, booking limits, and cafe items"
+    ]
+  },
+  {
     version: "70.3.0",
     date: "2026-02-06",
     title: "Admin Navigation Consolidation",

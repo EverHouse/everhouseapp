@@ -114,7 +114,8 @@ export type AuditAction =
   | 'checkout_pricing_calculated'
   | 'unauthorized_access_attempt'
   | 'send_receipt'
-  | 'initiate_charge';
+  | 'initiate_charge'
+  | 'pull_from_stripe';
 
 export type ActorType = 'staff' | 'member' | 'system';
 

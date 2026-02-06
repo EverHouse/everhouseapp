@@ -341,6 +341,25 @@ const TiersTab: React.FC = () => {
         },
     });
 
+    const pullFromStripeMutation = useMutation({
+        mutationFn: async () => {
+            return postWithCredentials<{ success: boolean; tiers: { tiersUpdated: number; errors: string[] }; cafe: { synced: number; created: number; deactivated: number; errors: string[] } }>('/api/admin/stripe/pull-from-stripe', {});
+        },
+        onSuccess: (data) => {
+            let message = `Pulled from Stripe:\n• ${data.tiers.tiersUpdated} tier permissions updated\n• ${data.cafe.synced} cafe items synced`;
+            if (data.cafe.created > 0) message += `\n• ${data.cafe.created} new cafe items created`;
+            if (data.cafe.deactivated > 0) message += `\n• ${data.cafe.deactivated} cafe items deactivated`;
+            const allErrors = [...(data.tiers.errors || []), ...(data.cafe.errors || [])];
+            if (allErrors.length > 0) message += `\n\nWarnings:\n${allErrors.join('\n')}`;
+            alert(message);
+            queryClient.invalidateQueries({ queryKey: ['membership-tiers'] });
+            queryClient.invalidateQueries({ queryKey: ['cafe-menu'] });
+        },
+        onError: (err: Error) => {
+            alert('Pull from Stripe failed: ' + (err.message || 'Unknown error'));
+        },
+    });
+
     const debouncedUpdateFeatureValue = useCallback((featureId: number, tierId: number, value: any) => {
         const key = `${featureId}-${tierId}`;
         if (debounceTimers.current[key]) {
@@ -417,6 +436,10 @@ const TiersTab: React.FC = () => {
 
     const handleSyncStripe = async () => {
         syncStripeMutation.mutate();
+    };
+
+    const handlePullFromStripe = async () => {
+        pullFromStripeMutation.mutate();
     };
 
     if (isLoading) {
@@ -717,59 +740,102 @@ const TiersTab: React.FC = () => {
                     </div>
 
                     <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Booking Limits</h4>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
+                            Booking Limits
+                            {selectedTier?.stripe_product_id && (
+                                <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[10px] normal-case font-semibold">
+                                    <span aria-hidden="true" className="material-symbols-outlined text-xs">cloud</span>
+                                    Managed by Stripe
+                                </span>
+                            )}
+                        </h4>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Daily Sim Minutes</label>
                                 <input 
                                     type="number"
-                                    className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+                                    className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                        selectedTier?.stripe_product_id 
+                                            ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
+                                            : 'bg-gray-50 dark:bg-black/30'
+                                    }`}
                                     value={selectedTier?.daily_sim_minutes || 0} 
                                     onChange={e => selectedTier && setSelectedTier({...selectedTier, daily_sim_minutes: parseInt(e.target.value) || 0})} 
+                                    readOnly={!!selectedTier?.stripe_product_id}
                                 />
                             </div>
                             <div>
                                 <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Guest Passes/Month</label>
                                 <input 
                                     type="number"
-                                    className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+                                    className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                        selectedTier?.stripe_product_id 
+                                            ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
+                                            : 'bg-gray-50 dark:bg-black/30'
+                                    }`}
                                     value={selectedTier?.guest_passes_per_month || 0} 
                                     onChange={e => selectedTier && setSelectedTier({...selectedTier, guest_passes_per_month: parseInt(e.target.value) || 0})} 
+                                    readOnly={!!selectedTier?.stripe_product_id}
                                 />
                             </div>
                             <div>
                                 <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Booking Window (Days)</label>
                                 <input 
                                     type="number"
-                                    className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+                                    className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                        selectedTier?.stripe_product_id 
+                                            ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
+                                            : 'bg-gray-50 dark:bg-black/30'
+                                    }`}
                                     value={selectedTier?.booking_window_days || 7} 
                                     onChange={e => selectedTier && setSelectedTier({...selectedTier, booking_window_days: parseInt(e.target.value) || 7})} 
+                                    readOnly={!!selectedTier?.stripe_product_id}
                                 />
                             </div>
                             <div>
                                 <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Daily Conf Room Minutes</label>
                                 <input 
                                     type="number"
-                                    className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+                                    className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                        selectedTier?.stripe_product_id 
+                                            ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
+                                            : 'bg-gray-50 dark:bg-black/30'
+                                    }`}
                                     value={selectedTier?.daily_conf_room_minutes || 0} 
                                     onChange={e => selectedTier && setSelectedTier({...selectedTier, daily_conf_room_minutes: parseInt(e.target.value) || 0})} 
+                                    readOnly={!!selectedTier?.stripe_product_id}
                                 />
                             </div>
                         </div>
                     </div>
 
                     <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Access Permissions</h4>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
+                            Access Permissions
+                            {selectedTier?.stripe_product_id && (
+                                <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[10px] normal-case font-semibold">
+                                    <span aria-hidden="true" className="material-symbols-outlined text-xs">cloud</span>
+                                    Managed by Stripe
+                                </span>
+                            )}
+                        </h4>
                         <div className="space-y-2">
                             {BOOLEAN_FIELDS.map(field => (
                                 <label 
                                     key={field.key}
-                                    className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25 cursor-pointer hover:bg-gray-100 dark:hover:bg-black/30 transition-colors"
+                                    className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${
+                                        selectedTier?.stripe_product_id
+                                            ? 'bg-gray-100 dark:bg-black/40 border-gray-200 dark:border-white/15 cursor-not-allowed opacity-75'
+                                            : 'bg-gray-50 dark:bg-black/20 border-gray-200 dark:border-white/25 cursor-pointer hover:bg-gray-100 dark:hover:bg-black/30'
+                                    }`}
                                 >
                                     <span className="text-sm text-primary dark:text-white">{field.label}</span>
                                     <Toggle
                                         checked={(selectedTier as any)?.[field.key] || false}
-                                        onChange={(val) => selectedTier && setSelectedTier({...selectedTier, [field.key]: val})}
+                                        onChange={(val) => {
+                                            if (selectedTier?.stripe_product_id) return;
+                                            selectedTier && setSelectedTier({...selectedTier, [field.key]: val});
+                                        }}
                                         label={field.label}
                                     />
                                 </label>
@@ -978,16 +1044,28 @@ const TiersTab: React.FC = () => {
                         <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                             Membership Tiers
                         </h3>
-                        <button
-                            onClick={handleSyncStripe}
-                            disabled={syncStripeMutation.isPending}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50"
-                        >
-                            <span aria-hidden="true" className={`material-symbols-outlined text-sm ${syncStripeMutation.isPending ? 'animate-spin' : ''}`}>
-                                {syncStripeMutation.isPending ? 'progress_activity' : 'sync'}
-                            </span>
-                            {syncStripeMutation.isPending ? 'Syncing...' : 'Sync to Stripe'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handlePullFromStripe}
+                                disabled={pullFromStripeMutation.isPending}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors disabled:opacity-50"
+                            >
+                                <span aria-hidden="true" className={`material-symbols-outlined text-sm ${pullFromStripeMutation.isPending ? 'animate-spin' : ''}`}>
+                                    {pullFromStripeMutation.isPending ? 'progress_activity' : 'cloud_download'}
+                                </span>
+                                {pullFromStripeMutation.isPending ? 'Pulling...' : 'Pull from Stripe'}
+                            </button>
+                            <button
+                                onClick={handleSyncStripe}
+                                disabled={syncStripeMutation.isPending}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50"
+                            >
+                                <span aria-hidden="true" className={`material-symbols-outlined text-sm ${syncStripeMutation.isPending ? 'animate-spin' : ''}`}>
+                                    {syncStripeMutation.isPending ? 'progress_activity' : 'sync'}
+                                </span>
+                                {syncStripeMutation.isPending ? 'Syncing...' : 'Sync to Stripe'}
+                            </button>
+                        </div>
                     </div>
                     {subscriptionTiers.length === 0 ? (
                         <EmptyState

@@ -13,6 +13,8 @@ export {
   getTierSyncStatus,
   syncTierFeaturesToStripe,
   syncCafeItemsToStripe,
+  pullTierFeaturesFromStripe,
+  pullCafeItemsFromStripe,
   type HubSpotProduct,
   type StripeProductWithPrice,
   type ProductSyncStatus,

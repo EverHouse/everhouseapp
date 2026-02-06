@@ -1211,3 +1211,263 @@ export async function syncCafeItemsToStripe(): Promise<{
     return { success: false, synced, failed, skipped };
   }
 }
+
+export async function pullTierFeaturesFromStripe(): Promise<{
+  success: boolean;
+  tiersUpdated: number;
+  errors: string[];
+}> {
+  let tiersUpdated = 0;
+  const errors: string[] = [];
+
+  try {
+    const stripe = await getStripeClient();
+    const tiers = await db.select().from(membershipTiers).where(eq(membershipTiers.isActive, true));
+
+    console.log(`[Reverse Sync] Starting tier feature pull for ${tiers.length} active tiers`);
+
+    for (const tier of tiers) {
+      if (!tier.stripeProductId) {
+        continue;
+      }
+
+      try {
+        const attachedKeys = new Set<string>();
+        let hasMore = true;
+        let startingAfter: string | undefined;
+
+        while (hasMore) {
+          const params: any = { limit: 100 };
+          if (startingAfter) params.starting_after = startingAfter;
+          const attached = await stripe.products.listFeatures(tier.stripeProductId, params);
+          for (const af of attached.data) {
+            if (af.entitlement_feature?.lookup_key) {
+              attachedKeys.add(af.entitlement_feature.lookup_key);
+            }
+          }
+          hasMore = attached.has_more;
+          if (attached.data.length > 0) {
+            startingAfter = attached.data[attached.data.length - 1].id;
+          }
+        }
+
+        if (attachedKeys.size === 0) {
+          console.log(`[Reverse Sync] Tier "${tier.name}" has no Stripe features attached, preserving current DB values`);
+          continue;
+        }
+
+        const update: Record<string, any> = {
+          canBookSimulators: false,
+          canBookConference: false,
+          canBookWellness: false,
+          hasGroupLessons: false,
+          hasExtendedSessions: false,
+          hasPrivateLesson: false,
+          hasSimulatorGuestPasses: false,
+          hasDiscountedMerch: false,
+          unlimitedAccess: false,
+          dailySimMinutes: 0,
+          guestPassesPerMonth: 0,
+          bookingWindowDays: tier.bookingWindowDays || 7,
+          dailyConfRoomMinutes: 0,
+        };
+
+        for (const key of attachedKeys) {
+          if (key === 'can_book_simulators') update.canBookSimulators = true;
+          else if (key === 'can_book_conference') update.canBookConference = true;
+          else if (key === 'can_book_wellness') update.canBookWellness = true;
+          else if (key === 'has_group_lessons') update.hasGroupLessons = true;
+          else if (key === 'has_extended_sessions') update.hasExtendedSessions = true;
+          else if (key === 'has_private_lesson') update.hasPrivateLesson = true;
+          else if (key === 'has_simulator_guest_passes') update.hasSimulatorGuestPasses = true;
+          else if (key === 'has_discounted_merch') update.hasDiscountedMerch = true;
+          else if (key === 'unlimited_access') update.unlimitedAccess = true;
+          else if (key.startsWith('daily_sim_minutes_')) {
+            const suffix = key.replace('daily_sim_minutes_', '');
+            update.dailySimMinutes = suffix === 'unlimited' ? 900 : (parseInt(suffix, 10) || 0);
+          } else if (key.startsWith('guest_passes_')) {
+            const suffix = key.replace('guest_passes_', '');
+            update.guestPassesPerMonth = suffix === 'unlimited' ? 900 : (parseInt(suffix, 10) || 0);
+          } else if (key.startsWith('booking_window_')) {
+            const suffix = key.replace('booking_window_', '');
+            update.bookingWindowDays = parseInt(suffix, 10) || 7;
+          } else if (key.startsWith('conf_room_minutes_')) {
+            const suffix = key.replace('conf_room_minutes_', '');
+            update.dailyConfRoomMinutes = suffix === 'unlimited' ? 900 : (parseInt(suffix, 10) || 0);
+          }
+        }
+
+        update.updatedAt = new Date();
+
+        await db.update(membershipTiers)
+          .set(update)
+          .where(eq(membershipTiers.id, tier.id));
+
+        tiersUpdated++;
+        console.log(`[Reverse Sync] Updated tier "${tier.name}" from ${attachedKeys.size} Stripe features`);
+      } catch (err: any) {
+        const msg = `Error pulling features for tier "${tier.name}": ${err.message}`;
+        console.error(`[Reverse Sync] ${msg}`);
+        errors.push(msg);
+      }
+    }
+
+    console.log(`[Reverse Sync] Tier feature pull complete: ${tiersUpdated} updated, ${errors.length} errors`);
+    return { success: errors.length === 0, tiersUpdated, errors };
+  } catch (error: any) {
+    console.error('[Reverse Sync] Fatal error pulling tier features:', error);
+    return { success: false, tiersUpdated, errors: [...errors, error.message] };
+  }
+}
+
+export async function pullCafeItemsFromStripe(): Promise<{
+  success: boolean;
+  synced: number;
+  created: number;
+  deactivated: number;
+  errors: string[];
+}> {
+  let synced = 0;
+  let created = 0;
+  let deactivated = 0;
+  const errors: string[] = [];
+
+  try {
+    const stripe = await getStripeClient();
+    console.log('[Reverse Sync] Starting cafe items pull from Stripe');
+
+    const activeStripeProducts: any[] = [];
+    const inactiveStripeProductIds: string[] = [];
+
+    let hasMore = true;
+    let startingAfter: string | undefined;
+
+    while (hasMore) {
+      const params: any = { limit: 100, active: true };
+      if (startingAfter) params.starting_after = startingAfter;
+      const products = await stripe.products.list(params);
+      for (const product of products.data) {
+        if (
+          product.metadata?.source === 'ever_house_app' &&
+          product.metadata?.product_type === 'one_time' &&
+          product.metadata?.cafe_item_id
+        ) {
+          activeStripeProducts.push(product);
+        }
+      }
+      hasMore = products.has_more;
+      if (products.data.length > 0) {
+        startingAfter = products.data[products.data.length - 1].id;
+      }
+    }
+
+    hasMore = true;
+    startingAfter = undefined;
+
+    while (hasMore) {
+      const params: any = { limit: 100, active: false };
+      if (startingAfter) params.starting_after = startingAfter;
+      const products = await stripe.products.list(params);
+      for (const product of products.data) {
+        if (
+          product.metadata?.source === 'ever_house_app' &&
+          product.metadata?.product_type === 'one_time' &&
+          product.metadata?.cafe_item_id
+        ) {
+          inactiveStripeProductIds.push(product.id);
+        }
+      }
+      hasMore = products.has_more;
+      if (products.data.length > 0) {
+        startingAfter = products.data[products.data.length - 1].id;
+      }
+    }
+
+    console.log(`[Reverse Sync] Found ${activeStripeProducts.length} active and ${inactiveStripeProductIds.length} inactive cafe products in Stripe`);
+
+    for (const product of activeStripeProducts) {
+      try {
+        let priceCents = 0;
+        let stripePriceId: string | null = null;
+
+        if (product.default_price) {
+          const priceId = typeof product.default_price === 'string' ? product.default_price : product.default_price.id;
+          try {
+            const price = await stripe.prices.retrieve(priceId);
+            priceCents = price.unit_amount || 0;
+            stripePriceId = price.id;
+          } catch {
+          }
+        }
+
+        if (!stripePriceId) {
+          const prices = await stripe.prices.list({ product: product.id, active: true, limit: 1 });
+          if (prices.data.length > 0) {
+            priceCents = prices.data[0].unit_amount || 0;
+            stripePriceId = prices.data[0].id;
+          }
+        }
+
+        const priceDecimal = (priceCents / 100).toFixed(2);
+        const imageUrl = product.images?.[0] || null;
+        const category = product.metadata?.category || 'other';
+        const cafeItemId = parseInt(product.metadata?.cafe_item_id, 10) || -1;
+
+        const existing = await pool.query(
+          'SELECT id FROM cafe_items WHERE stripe_product_id = $1 OR id = $2 LIMIT 1',
+          [product.id, cafeItemId]
+        );
+
+        if (existing.rows.length > 0) {
+          await pool.query(
+            `UPDATE cafe_items SET
+              name = $1, description = $2, price = $3, category = $4,
+              image_url = COALESCE($5, image_url), stripe_product_id = $6, stripe_price_id = $7,
+              is_active = true
+            WHERE id = $8`,
+            [product.name, product.description || null, priceDecimal, category, imageUrl, product.id, stripePriceId, existing.rows[0].id]
+          );
+          synced++;
+          console.log(`[Reverse Sync] Updated cafe item "${product.name}" (id: ${existing.rows[0].id})`);
+        } else {
+          await pool.query(
+            `INSERT INTO cafe_items (name, description, price, category, image_url, icon, sort_order, is_active, stripe_product_id, stripe_price_id, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+            [product.name, product.description || null, priceDecimal, category, imageUrl, 'restaurant', 0, true, product.id, stripePriceId]
+          );
+          created++;
+          console.log(`[Reverse Sync] Created cafe item "${product.name}" from Stripe`);
+        }
+      } catch (err: any) {
+        const msg = `Error syncing cafe product "${product.name}": ${err.message}`;
+        console.error(`[Reverse Sync] ${msg}`);
+        errors.push(msg);
+      }
+    }
+
+    for (const stripeProductId of inactiveStripeProductIds) {
+      try {
+        const result = await pool.query(
+          'UPDATE cafe_items SET is_active = false WHERE stripe_product_id = $1 AND is_active = true RETURNING id, name',
+          [stripeProductId]
+        );
+        if (result.rowCount && result.rowCount > 0) {
+          deactivated += result.rowCount;
+          for (const row of result.rows) {
+            console.log(`[Reverse Sync] Deactivated cafe item "${row.name}" (Stripe product inactive)`);
+          }
+        }
+      } catch (err: any) {
+        const msg = `Error deactivating cafe item for Stripe product ${stripeProductId}: ${err.message}`;
+        console.error(`[Reverse Sync] ${msg}`);
+        errors.push(msg);
+      }
+    }
+
+    console.log(`[Reverse Sync] Cafe items pull complete: ${synced} synced, ${created} created, ${deactivated} deactivated, ${errors.length} errors`);
+    return { success: errors.length === 0, synced, created, deactivated, errors };
+  } catch (error: any) {
+    console.error('[Reverse Sync] Fatal error pulling cafe items:', error);
+    return { success: false, synced, created, deactivated, errors: [...errors, error.message] };
+  }
+}
