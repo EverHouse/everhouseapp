@@ -327,23 +327,50 @@ const DirectoryTab: React.FC = () => {
 
     const syncMutation = useMutation({
         mutationFn: async () => {
-            const hubspotRes = await postWithCredentials<SyncResponse>('/api/hubspot/sync-all-members', {});
-            return { hubspotCount: hubspotRes.synced || 0 };
+            let pullCount = 0;
+            let pushCount = 0;
+            let errors: string[] = [];
+
+            try {
+                const pullRes = await postWithCredentials<SyncResponse>('/api/hubspot/sync-all-members', {});
+                pullCount = pullRes.synced || 0;
+            } catch {
+                errors.push('pull');
+            }
+
+            try {
+                const pushRes = await postWithCredentials<{ synced?: number }>('/api/hubspot/push-members-to-hubspot', {});
+                pushCount = pushRes.synced || 0;
+            } catch {
+                errors.push('push');
+            }
+
+            return { pullCount, pushCount, errors };
         },
-        onSuccess: async ({ hubspotCount }) => {
+        onSuccess: async ({ pullCount, pushCount, errors }) => {
             await refreshMembers();
-            
-            setSyncMessage({
-                type: 'success',
-                text: hubspotCount > 0 ? `Synced ${hubspotCount} members from HubSpot` : 'HubSpot up to date'
-            });
-            
+
+            if (errors.length === 0) {
+                const parts: string[] = [];
+                if (pullCount > 0) parts.push(`${pullCount} pulled from HubSpot`);
+                if (pushCount > 0) parts.push(`${pushCount} pushed to HubSpot`);
+                setSyncMessage({
+                    type: 'success',
+                    text: parts.length > 0 ? parts.join(', ') : 'HubSpot up to date'
+                });
+            } else if (errors.length === 2) {
+                setSyncMessage({ type: 'error', text: 'Failed to sync with HubSpot' });
+            } else {
+                const failedPart = errors[0] === 'pull' ? 'pull from' : 'push to';
+                setSyncMessage({ type: 'success', text: `Partial sync — failed to ${failedPart} HubSpot` });
+            }
+
             if (memberTab === 'former') {
                 setFormerLoading(true);
                 await fetchFormerMembers();
                 setFormerLoading(false);
             }
-            
+
             queryClient.invalidateQueries({ queryKey: directoryKeys.syncStatus() });
             setTimeout(() => setSyncMessage(null), 5000);
         },

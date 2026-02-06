@@ -18,7 +18,8 @@ export const changelog: ChangelogEntry[] = [
     title: "Directory Sync Speed Improvement",
     changes: [
       "Improvement: Sync button on Directory page now runs much faster — only syncs members with active statuses or recent changes from HubSpot, instead of re-processing all 2,000+ contacts",
-      "Improvement: Removed redundant Stripe sync from the manual sync button — Stripe updates already arrive instantly through webhooks"
+      "Improvement: Removed redundant Stripe sync from the manual sync button — Stripe updates already arrive instantly through webhooks",
+      "New: Sync button now also pushes your app's membership status and tier data back out to HubSpot for all active members, so HubSpot always matches what the app shows"
     ]
   },
   {
