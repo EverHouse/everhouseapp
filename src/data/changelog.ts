@@ -13,6 +13,14 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "71.4.0",
+    date: "2026-02-06",
+    title: "Trackman Webhook Log on Import Page",
+    changes: [
+      "New: Trackman Import page now shows a live feed of all webhooks received from Trackman — including whether each booking was created, changed, or deleted, and whether it was auto-linked or manually resolved"
+    ]
+  },
+  {
     version: "71.3.0",
     date: "2026-02-06",
     title: "Booking Duration Options: More Flexibility for Groups",

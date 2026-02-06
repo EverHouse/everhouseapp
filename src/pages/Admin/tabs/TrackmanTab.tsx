@@ -13,6 +13,7 @@ import RosterManager from '../../../components/booking/RosterManager';
 import { TrackmanLinkModal } from '../../../components/staff-command-center/modals/TrackmanLinkModal';
 import { fetchWithCredentials } from '../../../hooks/queries/useFetch';
 import { TrackmanTabSkeleton } from '../../../components/skeletons';
+import TrackmanWebhookEventsSection from '../../../components/staff-command-center/sections/TrackmanWebhookEventsSection';
 
 interface OptimisticAction {
   type: 'linking' | 'unlinking';
@@ -782,6 +783,10 @@ const TrackmanTab: React.FC = () => {
           )}
         </div>
       )}
+
+      <div className="mt-6">
+        <TrackmanWebhookEventsSection />
+      </div>
 
       {managePlayersModal && (
         <ModalShell
