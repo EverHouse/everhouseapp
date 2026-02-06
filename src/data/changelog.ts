@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.17.0",
+    date: "2026-02-06",
+    title: "Card Reader for Booking Payments",
+    isMajor: false,
+    changes: [
+      "Added: Staff can now collect booking fees (overage, guest fees) using the physical card reader during check-in",
+      "Added: Payment method toggle — choose between 'Online Card' or 'Card Reader' when charging booking fees",
+      "Added: Card reader also works for simulator overage fee collection at check-in"
+    ]
+  },
+  {
     version: "69.16.0",
     date: "2026-02-06",
     title: "Stripe Customer Auto-Recovery & Terminal Simulated Reader Fix",

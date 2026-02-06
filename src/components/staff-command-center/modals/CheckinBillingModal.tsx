@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../../Toast';
 import { StripePaymentForm } from '../../stripe/StripePaymentForm';
+import { TerminalPayment } from '../TerminalPayment';
 import SlideUpDrawer from '../../SlideUpDrawer';
 import { getApiErrorMessage, getNetworkErrorMessage } from '../../../utils/errorHandling';
 
@@ -96,6 +97,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
     cardBrand?: string;
   } | null>(null);
   const [checkingCard, setCheckingCard] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'online' | 'terminal'>('online');
 
   useEffect(() => {
     console.log('[CheckinBillingModal] Props changed:', { isOpen, bookingId });
@@ -430,6 +432,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
     showToast('Overage payment successful!', 'success');
     setShowOveragePayment(false);
     setOverageClientSecret(null);
+    setPaymentMethod('online');
     if (paymentIntentId) {
       await fetch('/api/stripe/confirm-payment', {
         method: 'POST',
@@ -445,6 +448,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
     showToast('Payment successful - syncing...', 'success');
     setShowStripePayment(false);
     setFrozenPaymentData(null);
+    setPaymentMethod('online');
     setActionInProgress('checkin-after-payment');
     try {
       if (paymentIntentId) {
@@ -531,14 +535,14 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
     <div className="px-6 py-4">
       {showOveragePayment ? (
         <button
-          onClick={() => { setShowOveragePayment(false); setOverageClientSecret(null); }}
+          onClick={() => { setShowOveragePayment(false); setOverageClientSecret(null); setPaymentMethod('online'); }}
           className="w-full py-2 text-primary/70 dark:text-white/70 font-medium hover:text-primary dark:hover:text-white"
         >
           Back
         </button>
       ) : showStripePayment ? (
         <button
-          onClick={onClose}
+          onClick={() => { setShowStripePayment(false); setFrozenPaymentData(null); setPaymentMethod('online'); }}
           className="w-full py-2 text-primary/70 dark:text-white/70 font-medium hover:text-primary dark:hover:text-white"
         >
           Cancel
@@ -657,7 +661,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
       stickyFooter={footerContent}
     >
       <div className="p-6">
-        {showOveragePayment && context && overageClientSecret ? (
+        {showOveragePayment && context ? (
           <div className="space-y-4">
             <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-4">
               <h3 className="font-semibold text-red-800 dark:text-red-300 mb-2">Simulator Overage Payment</h3>
@@ -665,17 +669,58 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
                 {context.overageMinutes} minutes over tier limit • ${((context.overageFeeCents || 0) / 100).toFixed(2)}
               </p>
             </div>
-            <StripePaymentForm
-              amount={(context.overageFeeCents || 0) / 100}
-              description={`Simulator overage fee - ${context.resourceName}`}
-              userId={context.ownerId}
-              userEmail={context.ownerEmail}
-              memberName={context.ownerName}
-              purpose="overage_fee"
-              bookingId={bookingId}
-              onSuccess={handleOveragePaymentSuccess}
-              onCancel={() => { setShowOveragePayment(false); setOverageClientSecret(null); }}
-            />
+            <div className="flex rounded-lg border border-primary/20 dark:border-white/20 overflow-hidden">
+              <button
+                onClick={() => setPaymentMethod('online')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium transition-colors ${
+                  paymentMethod === 'online'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-white dark:bg-white/5 text-primary/70 dark:text-white/70 hover:bg-primary/5 dark:hover:bg-white/10'
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">credit_card</span>
+                Online Card
+              </button>
+              <button
+                onClick={() => setPaymentMethod('terminal')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium transition-colors ${
+                  paymentMethod === 'terminal'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-white dark:bg-white/5 text-primary/70 dark:text-white/70 hover:bg-primary/5 dark:hover:bg-white/10'
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">contactless</span>
+                Card Reader
+              </button>
+            </div>
+            {paymentMethod === 'terminal' ? (
+              <TerminalPayment
+                amount={context.overageFeeCents || 0}
+                subscriptionId={null}
+                userId={context.ownerId}
+                description={`Simulator overage fee - ${context.resourceName}`}
+                paymentMetadata={{ bookingId: String(bookingId), ownerEmail: context.ownerEmail, userId: context.ownerId, ownerName: context.ownerName, paymentType: 'overage_fee' }}
+                onSuccess={(piId) => handleOveragePaymentSuccess(piId)}
+                onError={(msg) => showToast(msg, 'error')}
+                onCancel={() => { setShowOveragePayment(false); setOverageClientSecret(null); setPaymentMethod('online'); }}
+              />
+            ) : overageClientSecret ? (
+              <StripePaymentForm
+                amount={(context.overageFeeCents || 0) / 100}
+                description={`Simulator overage fee - ${context.resourceName}`}
+                userId={context.ownerId}
+                userEmail={context.ownerEmail}
+                memberName={context.ownerName}
+                purpose="overage_fee"
+                bookingId={bookingId}
+                onSuccess={handleOveragePaymentSuccess}
+                onCancel={() => { setShowOveragePayment(false); setOverageClientSecret(null); setPaymentMethod('online'); }}
+              />
+            ) : (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
+              </div>
+            )}
           </div>
         ) : showStripePayment && context && frozenPaymentData ? (
           <div className="space-y-4">
@@ -685,19 +730,56 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
                 {context.resourceName} • {formatBookingDate(context.bookingDate)} • {formatTime12Hour(context.startTime)} - {formatTime12Hour(context.endTime)}
               </p>
             </div>
-            <StripePaymentForm
-              amount={frozenPaymentData.totalAmount}
-              description={frozenPaymentData.description}
-              userId={context.ownerId}
-              userEmail={context.ownerEmail}
-              memberName={context.ownerName}
-              purpose="guest_fee"
-              bookingId={bookingId}
-              sessionId={context.sessionId || undefined}
-              participantFees={frozenPaymentData.participantFees}
-              onSuccess={handleStripePaymentSuccess}
-              onCancel={() => { setShowStripePayment(false); setFrozenPaymentData(null); }}
-            />
+            <div className="flex rounded-lg border border-primary/20 dark:border-white/20 overflow-hidden">
+              <button
+                onClick={() => setPaymentMethod('online')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium transition-colors ${
+                  paymentMethod === 'online'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-white dark:bg-white/5 text-primary/70 dark:text-white/70 hover:bg-primary/5 dark:hover:bg-white/10'
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">credit_card</span>
+                Online Card
+              </button>
+              <button
+                onClick={() => setPaymentMethod('terminal')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium transition-colors ${
+                  paymentMethod === 'terminal'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-white dark:bg-white/5 text-primary/70 dark:text-white/70 hover:bg-primary/5 dark:hover:bg-white/10'
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">contactless</span>
+                Card Reader
+              </button>
+            </div>
+            {paymentMethod === 'terminal' ? (
+              <TerminalPayment
+                amount={Math.round(frozenPaymentData.totalAmount * 100)}
+                subscriptionId={null}
+                userId={context.ownerId}
+                description={frozenPaymentData.description}
+                paymentMetadata={{ bookingId: String(bookingId), ownerEmail: context.ownerEmail, userId: context.ownerId, ownerName: context.ownerName, paymentType: 'booking_fee' }}
+                onSuccess={(piId) => handleStripePaymentSuccess(piId)}
+                onError={(msg) => showToast(msg, 'error')}
+                onCancel={() => { setShowStripePayment(false); setFrozenPaymentData(null); setPaymentMethod('online'); }}
+              />
+            ) : (
+              <StripePaymentForm
+                amount={frozenPaymentData.totalAmount}
+                description={frozenPaymentData.description}
+                userId={context.ownerId}
+                userEmail={context.ownerEmail}
+                memberName={context.ownerName}
+                purpose="guest_fee"
+                bookingId={bookingId}
+                sessionId={context.sessionId || undefined}
+                participantFees={frozenPaymentData.participantFees}
+                onSuccess={handleStripePaymentSuccess}
+                onCancel={() => { setShowStripePayment(false); setFrozenPaymentData(null); setPaymentMethod('online'); }}
+              />
+            )}
           </div>
         ) : loading ? (
           <div className="flex items-center justify-center py-8">

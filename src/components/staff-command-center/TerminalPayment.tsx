@@ -10,8 +10,10 @@ interface TerminalReader {
 
 interface TerminalPaymentProps {
   amount: number;
-  subscriptionId: string | null;
+  subscriptionId?: string | null;
   userId: string | null;
+  description?: string;
+  paymentMetadata?: Record<string, string>;
   onSuccess: (paymentIntentId: string) => void;
   onError: (message: string) => void;
   onCancel: () => void;
@@ -21,6 +23,8 @@ export function TerminalPayment({
   amount, 
   subscriptionId, 
   userId,
+  description,
+  paymentMetadata,
   onSuccess, 
   onError,
   onCancel 
@@ -123,26 +127,38 @@ export function TerminalPayment({
       return;
     }
 
-    if (!subscriptionId) {
-      onError('Subscription not ready');
-      return;
-    }
-
     setProcessing(true);
     setStatus('waiting');
     setStatusMessage('Waiting for card on reader...');
 
     try {
-      const res = await fetch('/api/stripe/terminal/process-subscription-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          readerId: selectedReader,
-          subscriptionId,
-          userId
-        })
-      });
+      let res: Response;
+
+      if (subscriptionId) {
+        res = await fetch('/api/stripe/terminal/process-subscription-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            readerId: selectedReader,
+            subscriptionId,
+            userId
+          })
+        });
+      } else {
+        res = await fetch('/api/stripe/terminal/process-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            readerId: selectedReader,
+            amount,
+            currency: 'usd',
+            description,
+            metadata: paymentMetadata
+          })
+        });
+      }
 
       if (!res.ok) {
         const data = await res.json();
@@ -299,7 +315,7 @@ export function TerminalPayment({
 
           <button
             onClick={handleProcessPayment}
-            disabled={!selectedReader || !subscriptionId}
+            disabled={!selectedReader}
             className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
               isDark 
                 ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
