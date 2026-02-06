@@ -274,13 +274,18 @@ const POSRegister: React.FC = () => {
     if (!intentId) return;
 
     try {
-      await fetch('/api/stripe/staff/quick-charge/confirm', {
+      const res = await fetch('/api/stripe/staff/quick-charge/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ paymentIntentId: intentId }),
       });
-    } catch {}
+      if (!res.ok) {
+        console.warn('[POS] Confirm call returned non-OK status:', res.status);
+      }
+    } catch (err) {
+      console.error('[POS] Failed to confirm payment record:', err);
+    }
 
     setPaymentIntentId(intentId);
     setSuccess(true);
@@ -288,13 +293,18 @@ const POSRegister: React.FC = () => {
 
   const handleTerminalSuccess = async (piId: string) => {
     try {
-      await fetch('/api/stripe/staff/quick-charge/confirm', {
+      const res = await fetch('/api/stripe/staff/quick-charge/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ paymentIntentId: piId }),
       });
-    } catch {}
+      if (!res.ok) {
+        console.warn('[POS] Terminal confirm returned non-OK status:', res.status);
+      }
+    } catch (err) {
+      console.error('[POS] Failed to confirm terminal payment record:', err);
+    }
 
     setPaymentIntentId(piId);
     setSuccess(true);

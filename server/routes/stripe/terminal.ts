@@ -115,7 +115,28 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
         );
         customerId = result.customerId;
       } catch (custErr: any) {
-        console.warn('[Terminal] Could not resolve Stripe customer (non-blocking):', custErr.message);
+        console.warn('[Terminal] Could not resolve Stripe customer for existing member (non-blocking):', custErr.message);
+      }
+    } else if (metadata?.ownerEmail) {
+      try {
+        const existingCustomers = await stripe.customers.list({
+          email: metadata.ownerEmail,
+          limit: 1
+        });
+        if (existingCustomers.data.length > 0) {
+          customerId = existingCustomers.data[0].id;
+        } else {
+          const customer = await stripe.customers.create({
+            email: metadata.ownerEmail,
+            name: metadata.ownerName || undefined,
+            metadata: {
+              source: 'terminal_pos',
+            }
+          });
+          customerId = customer.id;
+        }
+      } catch (custErr: any) {
+        console.warn('[Terminal] Could not create Stripe customer for new customer (non-blocking):', custErr.message);
       }
     }
     
