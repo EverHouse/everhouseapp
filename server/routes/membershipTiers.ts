@@ -3,6 +3,7 @@ import { pool, isProduction } from '../core/db';
 import { isAdmin, isStaffOrAdmin } from '../core/middleware';
 import { invalidateTierCache, clearTierCache } from '../core/tierService';
 import { syncMembershipTiersToStripe, getTierSyncStatus, cleanupOrphanStripeProducts, syncTierFeaturesToStripe, syncCafeItemsToStripe, pullTierFeaturesFromStripe, pullCafeItemsFromStripe } from '../core/stripe/products';
+import { syncAllCustomerMetadata } from '../core/stripe/customers';
 import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
@@ -94,7 +95,7 @@ router.put('/api/membership-tiers/:id', isAdmin, async (req, res) => {
     const { id } = req.params;
     const {
       name, slug, price_string, description, button_text, sort_order,
-      is_active, is_popular, show_in_comparison, highlighted_features, all_features,
+      is_active, is_popular, show_in_comparison, show_on_membership_page, highlighted_features, all_features,
       daily_sim_minutes, guest_passes_per_month, booking_window_days,
       daily_conf_room_minutes, can_book_simulators, can_book_conference,
       can_book_wellness, has_group_lessons, has_extended_sessions,
@@ -132,6 +133,7 @@ router.put('/api/membership-tiers/:id', isAdmin, async (req, res) => {
         stripe_price_id = $26,
         stripe_product_id = $27,
         price_cents = $28,
+        show_on_membership_page = COALESCE($29, show_on_membership_page),
         updated_at = NOW()
       WHERE id = $25
       RETURNING *
@@ -145,7 +147,8 @@ router.put('/api/membership-tiers/:id', isAdmin, async (req, res) => {
       can_book_wellness, has_group_lessons, has_extended_sessions,
       has_private_lesson, has_simulator_guest_passes, has_discounted_merch,
       unlimited_access, id,
-      stripe_price_id || null, stripe_product_id || null, price_cents || null
+      stripe_price_id || null, stripe_product_id || null, price_cents || null,
+      show_on_membership_page
     ]);
     
     if (result.rows.length === 0) {
@@ -168,7 +171,7 @@ router.post('/api/membership-tiers', isAdmin, async (req, res) => {
   try {
     const {
       name, slug, price_string, description, button_text, sort_order,
-      is_active, is_popular, show_in_comparison, highlighted_features, all_features,
+      is_active, is_popular, show_in_comparison, show_on_membership_page, highlighted_features, all_features,
       daily_sim_minutes, guest_passes_per_month, booking_window_days,
       daily_conf_room_minutes, can_book_simulators, can_book_conference,
       can_book_wellness, has_group_lessons, has_extended_sessions,
@@ -183,17 +186,17 @@ router.post('/api/membership-tiers', isAdmin, async (req, res) => {
     const result = await pool.query(`
       INSERT INTO membership_tiers (
         name, slug, price_string, description, button_text, sort_order,
-        is_active, is_popular, show_in_comparison, highlighted_features, all_features,
+        is_active, is_popular, show_in_comparison, show_on_membership_page, highlighted_features, all_features,
         daily_sim_minutes, guest_passes_per_month, booking_window_days,
         daily_conf_room_minutes, can_book_simulators, can_book_conference,
         can_book_wellness, has_group_lessons, has_extended_sessions,
         has_private_lesson, has_simulator_guest_passes, has_discounted_merch,
         unlimited_access
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
       RETURNING *
     `, [
       name, slug, price_string, description || null, button_text || 'Apply Now', sort_order || 0,
-      is_active ?? true, is_popular ?? false, show_in_comparison ?? true,
+      is_active ?? true, is_popular ?? false, show_in_comparison ?? true, show_on_membership_page ?? true,
       JSON.stringify(highlighted_features || []),
       JSON.stringify(all_features || {}),
       daily_sim_minutes || 0, guest_passes_per_month || 0, booking_window_days || 7,
@@ -240,6 +243,15 @@ router.post('/api/admin/stripe/sync-products', isStaffOrAdmin, async (req, res) 
     const cafeResult = await syncCafeItemsToStripe();
     console.log(`[Admin] Cafe sync complete: ${cafeResult.synced} synced, ${cafeResult.failed} failed, ${cafeResult.skipped} skipped`);
     
+    // Step 5: Sync customer metadata to Stripe
+    let customerMetadataResult = { synced: 0, failed: 0 };
+    try {
+      customerMetadataResult = await syncAllCustomerMetadata();
+      console.log(`[Admin] Customer metadata sync complete: ${customerMetadataResult.synced} synced, ${customerMetadataResult.failed} failed`);
+    } catch (metaErr: any) {
+      console.error('[Admin] Customer metadata sync error (non-fatal):', metaErr.message);
+    }
+    
     res.json({ 
       success: syncResult.success && cleanupResult.success && featureResult.success && cafeResult.success, 
       synced: syncResult.synced,
@@ -251,7 +263,8 @@ router.post('/api/admin/stripe/sync-products', isStaffOrAdmin, async (req, res) 
       details: syncResult.results,
       cleanupDetails: cleanupResult.results,
       featureSync: featureResult,
-      cafeSync: cafeResult
+      cafeSync: cafeResult,
+      customerMetadata: customerMetadataResult
     });
   } catch (error: any) {
     console.error('[Admin] Stripe sync error:', error);

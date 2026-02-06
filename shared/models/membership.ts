@@ -15,6 +15,7 @@ export const membershipTiers = pgTable("membership_tiers", {
   isActive: boolean("is_active").default(true),
   isPopular: boolean("is_popular").default(false),
   showInComparison: boolean("show_in_comparison").default(true),
+  showOnMembershipPage: boolean("show_on_membership_page").default(true),
   
   // Marketing fields (JSON)
   highlightedFeatures: jsonb("highlighted_features").default(sql`'[]'::jsonb`),

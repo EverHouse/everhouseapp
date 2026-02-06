@@ -2935,7 +2935,35 @@ async function handleProductUpdated(client: PoolClient, product: any): Promise<D
     );
 
     if (tierMatch.rows.length > 0) {
-      console.log(`[Stripe Webhook] Product ${product.id} matches tier "${tierMatch.rows[0].name}", deferring feature pull`);
+      const tierId = tierMatch.rows[0].id;
+      const tierName = tierMatch.rows[0].name;
+      console.log(`[Stripe Webhook] Product ${product.id} matches tier "${tierName}", deferring feature pull`);
+
+      if (Array.isArray(product.marketing_features) && product.marketing_features.length > 0) {
+        const featureNames = product.marketing_features
+          .map((f: any) => f.name)
+          .filter((n: string) => n && n.trim());
+        if (featureNames.length > 0) {
+          await client.query(
+            'UPDATE membership_tiers SET highlighted_features = $1, updated_at = NOW() WHERE id = $2',
+            [JSON.stringify(featureNames), tierId]
+          );
+          console.log(`[Stripe Webhook] Updated highlighted features for "${tierName}" from ${featureNames.length} marketing features`);
+        } else {
+          await client.query(
+            'UPDATE membership_tiers SET highlighted_features = $1, updated_at = NOW() WHERE id = $2',
+            [JSON.stringify([]), tierId]
+          );
+          console.log(`[Stripe Webhook] Cleared highlighted features for "${tierName}" (marketing features empty)`);
+        }
+      } else {
+        await client.query(
+          'UPDATE membership_tiers SET highlighted_features = $1, updated_at = NOW() WHERE id = $2',
+          [JSON.stringify([]), tierId]
+        );
+        console.log(`[Stripe Webhook] Cleared highlighted features for "${tierName}" (no marketing features)`);
+      }
+
       deferredActions.push(async () => {
         await pullTierFeaturesFromStripe();
       });

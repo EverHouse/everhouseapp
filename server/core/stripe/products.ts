@@ -1392,8 +1392,33 @@ export async function pullTierFeaturesFromStripe(): Promise<{
           }
         }
 
+        const stripeProduct = await stripe.products.retrieve(tier.stripeProductId);
+        const marketingFeatures = (stripeProduct as any).marketing_features;
+        if (Array.isArray(marketingFeatures) && marketingFeatures.length > 0) {
+          const featureNames = marketingFeatures
+            .map((f: any) => f.name)
+            .filter((n: string) => n && n.trim());
+          if (featureNames.length > 0) {
+            await db.update(membershipTiers)
+              .set({ highlightedFeatures: featureNames })
+              .where(eq(membershipTiers.id, tier.id));
+            console.log(`[Reverse Sync] Updated highlighted features for "${tier.name}" from ${featureNames.length} Stripe marketing features`);
+          } else {
+            await db.update(membershipTiers)
+              .set({ highlightedFeatures: [] })
+              .where(eq(membershipTiers.id, tier.id));
+            console.log(`[Reverse Sync] Cleared highlighted features for "${tier.name}" (Stripe marketing features empty)`);
+          }
+        } else {
+          await db.update(membershipTiers)
+            .set({ highlightedFeatures: [] })
+            .where(eq(membershipTiers.id, tier.id));
+          console.log(`[Reverse Sync] Cleared highlighted features for "${tier.name}" (no Stripe marketing features)`);
+        }
+
         if (attachedKeys.size === 0) {
-          console.log(`[Reverse Sync] Tier "${tier.name}" has no Stripe features attached, preserving current DB values`);
+          console.log(`[Reverse Sync] Tier "${tier.name}" has no Stripe entitlement features attached, preserving current DB permission values`);
+          tiersUpdated++;
           continue;
         }
 

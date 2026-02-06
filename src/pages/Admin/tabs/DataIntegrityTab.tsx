@@ -238,7 +238,6 @@ const DataIntegrityTab: React.FC = () => {
     errors: string[];
   } | null>(null);
 
-  const [stripeMetadataResult, setStripeMetadataResult] = useState<{ success: boolean; message: string; synced?: number; failed?: number } | null>(null);
   const [stripeCacheResult, setStripeCacheResult] = useState<{ success: boolean; message: string; stats?: any } | null>(null);
 
   const [showSyncTools, setShowSyncTools] = useState(true);
@@ -673,20 +672,6 @@ const DataIntegrityTab: React.FC = () => {
     onError: (err: Error) => {
       setCsvUploadResult({ success: false, message: err.message || 'Import failed' });
       showToast(err.message || 'Failed to upload CSV files', 'error');
-    },
-  });
-
-  // Sync Stripe Metadata Mutation
-  const syncStripeMetadataMutation = useMutation({
-    mutationFn: () => 
-      postWithCredentials<{ message: string; synced?: number; failed?: number }>('/api/data-integrity/sync-stripe-metadata', {}),
-    onSuccess: (data) => {
-      setStripeMetadataResult({ success: true, message: data.message, synced: data.synced, failed: data.failed });
-      showToast(data.message, 'success');
-    },
-    onError: (err: Error) => {
-      setStripeMetadataResult({ success: false, message: err.message || 'Failed to sync metadata' });
-      showToast(err.message || 'Failed to sync metadata', 'error');
     },
   });
 
@@ -1193,11 +1178,6 @@ const DataIntegrityTab: React.FC = () => {
     csvUploadMutation.mutate(formData);
   };
 
-  const handleSyncStripeMetadata = () => {
-    setStripeMetadataResult(null);
-    syncStripeMetadataMutation.mutate();
-  };
-
   const handleBackfillStripeCache = () => {
     setStripeCacheResult(null);
     backfillStripeCacheMutation.mutate();
@@ -1285,7 +1265,6 @@ const DataIntegrityTab: React.FC = () => {
   const isSearchingAttendance = searchAttendanceMutation.isPending;
   const isRunningMindbodyImport = mindbodyReimportMutation.isPending;
   const isUploadingCSV = csvUploadMutation.isPending;
-  const isSyncingStripeMetadata = syncStripeMetadataMutation.isPending;
   const isBackfillingStripeCache = backfillStripeCacheMutation.isPending;
   const isSyncingToHubspot = syncMembersToHubspotMutation.isPending;
   const isCleaningMindbodyIds = cleanupMindbodyIdsMutation.isPending;
@@ -2436,24 +2415,6 @@ const DataIntegrityTab: React.FC = () => {
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-
-            <div className="border-t border-gray-200 dark:border-white/10 pt-4 space-y-3">
-              <h4 className="text-sm font-medium text-primary dark:text-white">Sync Stripe Metadata</h4>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Update Stripe customer metadata with current app data</p>
-              <button
-                onClick={handleSyncStripeMetadata}
-                disabled={isSyncingStripeMetadata}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-              >
-                {isSyncingStripeMetadata && <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                Sync Metadata
-              </button>
-              {stripeMetadataResult && (
-                <p className={`text-xs ${stripeMetadataResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                  {stripeMetadataResult.message}
-                </p>
               )}
             </div>
 

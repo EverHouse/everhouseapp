@@ -18,6 +18,7 @@ interface MembershipTier {
   is_active: boolean;
   is_popular: boolean;
   show_in_comparison: boolean;
+  show_on_membership_page?: boolean;
   highlighted_features: string[];
   daily_sim_minutes: number;
   guest_passes_per_month: number;
@@ -74,7 +75,7 @@ const MembershipOverview: React.FC = () => {
         const response = await fetch('/api/membership-tiers?active=true');
         if (response.ok) {
           const data = await response.json();
-          const filteredTiers = data.filter((t: MembershipTier) => t.show_in_comparison !== false);
+          const filteredTiers = data.filter((t: MembershipTier) => t.show_on_membership_page !== false);
           setTiers(filteredTiers);
         }
       } catch (error) {
@@ -85,11 +86,6 @@ const MembershipOverview: React.FC = () => {
     };
     fetchTiers();
   }, []);
-
-  const socialTier = tiers.find(t => t.slug === 'social');
-  const coreTier = tiers.find(t => t.slug === 'core');
-  const premiumTier = tiers.find(t => t.slug === 'premium');
-  const corporateTier = tiers.find(t => t.slug === 'corporate');
 
   const extractPrice = (priceString: string) => {
     const match = priceString.match(/\$[\d,]+/);
@@ -140,76 +136,67 @@ const MembershipOverview: React.FC = () => {
       </Link>
 
       <div className="flex flex-col gap-5 animate-content-enter-delay-2">
-        {socialTier && (
-          <MembershipCard 
-            title={`${socialTier.name} Membership`}
-            price={extractPrice(socialTier.price_string)}
-            suffix={extractSuffix(socialTier.price_string)}
-            desc={socialTier.description}
-            features={socialTier.highlighted_features}
-            onClick={() => navigate('/membership/apply')}
-            btnText={socialTier.button_text}
-          />
-        )}
-        
-        {coreTier && (
-          <div className="relative flex flex-col p-6 backdrop-blur-xl bg-primary/90 rounded-[2rem] overflow-hidden text-white border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.2),0_0_20px_rgba(41,53,21,0.3),inset_0_1px_1px_rgba(255,255,255,0.1)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms]">
-            <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none"></div>
-            <div className="flex justify-between items-start mb-4 relative z-10">
-              <div className="pr-2">
-                <h3 className="text-xl font-semibold mb-2">{coreTier.name} Membership</h3>
-                <p className="text-sm text-white/70 leading-relaxed font-light">{coreTier.description}</p>
-              </div>
-              {coreTier.is_popular && (
-                <span className="shrink-0 px-3 py-1 bg-accent/90 backdrop-blur text-primary text-[10px] font-bold rounded-full uppercase tracking-wider shadow-sm border border-white/20 mt-1">
-                  Popular
-                </span>
-              )}
-            </div>
-            <div className="flex items-baseline gap-1 mb-6 relative z-10">
-              <span className="text-4xl font-semibold tracking-tight">{extractPrice(coreTier.price_string)}</span>
-              <span className="text-sm font-medium text-white/60">{extractSuffix(coreTier.price_string)}</span>
-            </div>
-            <ul className="flex flex-col gap-3 mb-8 relative z-10">
-              {coreTier.highlighted_features.map((f, i) => (
-                <li key={i} className="flex gap-3 text-sm text-white/90 font-light">
-                  <span className="material-symbols-outlined text-[18px] text-accent shrink-0 font-light">check_circle</span>
-                  <span>{f}</span>
-                </li>
-              ))}
-            </ul>
-            <button 
-              onClick={() => navigate('/membership/apply')}
-              className="w-full relative z-10 py-4 px-6 rounded-2xl bg-white/95 backdrop-blur text-primary font-bold text-sm tracking-widest uppercase hover:bg-white transition-all duration-300 active:scale-[0.98] shadow-[0_4px_16px_rgba(0,0,0,0.2)]"
-            >
-              {coreTier.button_text}
-            </button>
-          </div>
-        )}
-        
-        {corporateTier && (
-          <MembershipCard 
-            title={`${corporateTier.name} Membership`}
-            price={extractPrice(corporateTier.price_string)}
-            suffix="/mo per employee"
-            desc={corporateTier.description}
-            features={corporateTier.highlighted_features}
-            onClick={() => { startNavigation(); navigate('corporate'); }}
-            btnText="View Details"
-          />
-        )}
+        {tiers.map((tier) => {
+          const isCorporate = tier.slug === 'corporate';
+          const suffix = isCorporate ? '/mo per employee' : extractSuffix(tier.price_string);
+          const handleClick = () => {
+            if (isCorporate) {
+              startNavigation();
+              navigate('corporate');
+            } else {
+              navigate('/membership/apply');
+            }
+          };
+          const btnText = isCorporate ? 'View Details' : tier.button_text;
 
-        {premiumTier && (
-          <MembershipCard 
-            title={`${premiumTier.name} Membership`}
-            price={extractPrice(premiumTier.price_string)}
-            suffix={extractSuffix(premiumTier.price_string)}
-            desc={premiumTier.description}
-            features={premiumTier.highlighted_features}
-            onClick={() => navigate('/membership/apply')}
-            btnText={premiumTier.button_text}
-          />
-        )}
+          if (tier.is_popular) {
+            return (
+              <div key={tier.id} className="relative flex flex-col p-6 backdrop-blur-xl bg-primary/90 rounded-[2rem] overflow-hidden text-white border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.2),0_0_20px_rgba(41,53,21,0.3),inset_0_1px_1px_rgba(255,255,255,0.1)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms]">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none"></div>
+                <div className="flex justify-between items-start mb-4 relative z-10">
+                  <div className="pr-2">
+                    <h3 className="text-xl font-semibold mb-2">{tier.name} Membership</h3>
+                    <p className="text-sm text-white/70 leading-relaxed font-light">{tier.description}</p>
+                  </div>
+                  <span className="shrink-0 px-3 py-1 bg-accent/90 backdrop-blur text-primary text-[10px] font-bold rounded-full uppercase tracking-wider shadow-sm border border-white/20 mt-1">
+                    Popular
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-1 mb-6 relative z-10">
+                  <span className="text-4xl font-semibold tracking-tight">{extractPrice(tier.price_string)}</span>
+                  <span className="text-sm font-medium text-white/60">{suffix}</span>
+                </div>
+                <ul className="flex flex-col gap-3 mb-8 relative z-10">
+                  {tier.highlighted_features.map((f, i) => (
+                    <li key={i} className="flex gap-3 text-sm text-white/90 font-light">
+                      <span className="material-symbols-outlined text-[18px] text-accent shrink-0 font-light">check_circle</span>
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+                <button 
+                  onClick={handleClick}
+                  className="w-full relative z-10 py-4 px-6 rounded-2xl bg-white/95 backdrop-blur text-primary font-bold text-sm tracking-widest uppercase hover:bg-white transition-all duration-300 active:scale-[0.98] shadow-[0_4px_16px_rgba(0,0,0,0.2)]"
+                >
+                  {btnText}
+                </button>
+              </div>
+            );
+          } else {
+            return (
+              <MembershipCard
+                key={tier.id}
+                title={`${tier.name} Membership`}
+                price={extractPrice(tier.price_string)}
+                suffix={suffix}
+                desc={tier.description}
+                features={tier.highlighted_features}
+                onClick={handleClick}
+                btnText={btnText}
+              />
+            );
+          }
+        })}
       </div>
       
       <div className="bg-white/40 backdrop-blur-xl rounded-3xl p-6 border border-white/60 shadow-sm animate-content-enter-delay-3">

@@ -13,6 +13,24 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "70.6.0",
+    date: "2026-02-06",
+    title: "Admin Tier Editor Overhaul & Dynamic Membership Page",
+    isMajor: true,
+    changes: [
+      "New: Tier edit modal reorganized into 3 clear sections — Membership Page Card, Stripe-Managed Settings, and Compare Table — each with descriptive helper text so staff know exactly what they're editing",
+      "New: 'Show on Membership Page' toggle — control which tiers display as cards on the public membership page without changing any code",
+      "New: Membership page now renders cards dynamically from the database instead of being locked to 4 hardcoded tiers — add, remove, or reorder cards from admin",
+      "New: Card features (highlighted bullet points) now sync from Stripe's Marketing Feature list — edit them in Stripe Dashboard → Products → Marketing Features and they appear on the cards automatically",
+      "New: Card features section shows 'Managed by Stripe' label when tier is linked, with read-only display of the actual feature text from Stripe",
+      "New: Stripe customer metadata sync merged into the 'Sync to Stripe' button on Products & Pricing — no more separate button on Data Integrity page",
+      "New: Reverse sync now pulls Marketing Features from Stripe products into the app's highlighted features (previously only pushed, never pulled)",
+      "New: Product.updated webhook now syncs Marketing Features back immediately when edited in Stripe Dashboard",
+      "Fixed: Highlighted features in the edit modal were showing internal permission labels (e.g. 'Can Book Simulators') instead of the actual customer-facing text from Stripe (e.g. 'Cafe, Bar & Patio Dining')",
+      "Removed: 'Sync Stripe Metadata' button from Data Integrity page (functionality consolidated into Sync to Stripe)"
+    ]
+  },
+  {
     version: "70.5.0",
     date: "2026-02-06",
     title: "Stripe-Managed Corporate Pricing & Family Discount",

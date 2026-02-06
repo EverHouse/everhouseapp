@@ -35,6 +35,7 @@ interface MembershipTier {
     is_active: boolean;
     is_popular: boolean;
     show_in_comparison: boolean;
+    show_on_membership_page: boolean;
     highlighted_features: string[];
     all_features: Record<string, boolean>;
     daily_sim_minutes: number;
@@ -157,6 +158,7 @@ const TiersTab: React.FC = () => {
         is_active: true,
         is_popular: false,
         show_in_comparison: true,
+        show_on_membership_page: true,
         highlighted_features: [],
         all_features: {},
         daily_sim_minutes: 0,
@@ -567,7 +569,8 @@ const TiersTab: React.FC = () => {
                     )}
 
                     <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Display Fields</h4>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">MEMBERSHIP PAGE CARD</h4>
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-4">Controls what appears on the membership page pricing cards.</p>
                         <div className="space-y-3">
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
@@ -605,127 +608,21 @@ const TiersTab: React.FC = () => {
                                     onChange={e => selectedTier && setSelectedTier({...selectedTier, button_text: e.target.value})} 
                                 />
                             </div>
-                            <label className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25 cursor-pointer hover:bg-gray-100 dark:hover:bg-black/30 transition-colors mt-2">
-                                <span className="text-sm text-primary dark:text-white">Show in Compare Table</span>
-                                <Toggle
-                                    checked={selectedTier?.show_in_comparison || false}
-                                    onChange={(val) => selectedTier && setSelectedTier({...selectedTier, show_in_comparison: val})}
-                                    label="Show in Compare Table"
-                                />
-                            </label>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Stripe Pricing</h4>
-                        <div className="space-y-3">
-                            {selectedTier?.stripe_price_id && (
-                                <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-500/30">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span aria-hidden="true" className="material-symbols-outlined text-indigo-600 dark:text-indigo-400">link</span>
-                                        <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Linked to Stripe</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                if (!selectedTier) return;
-                                                setSelectedTier({
-                                                    ...selectedTier,
-                                                    stripe_price_id: null,
-                                                    stripe_product_id: null,
-                                                    price_cents: null
-                                                });
-                                                setSuccessMessage('Stripe link removed. Save to confirm.');
-                                                setTimeout(() => setSuccessMessage(null), 3000);
-                                            }}
-                                            className="ml-auto px-2 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                                        >
-                                            Unlink
-                                        </button>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                        <div>
-                                            <span className="text-indigo-500 dark:text-indigo-400">Product:</span>
-                                            <span className="ml-1 text-indigo-700 dark:text-indigo-300 font-mono">{selectedTier.stripe_product_id || '—'}</span>
-                                        </div>
-                                        <div>
-                                            <span className="text-indigo-500 dark:text-indigo-400">Price:</span>
-                                            <span className="ml-1 text-indigo-700 dark:text-indigo-300 font-mono">{selectedTier.stripe_price_id}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
                             <div>
-                                <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Linked Stripe Price</label>
-                                <select
-                                    className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
-                                    value={selectedTier?.stripe_price_id || ''}
-                                    onChange={e => {
-                                        if (!selectedTier) return;
-                                        const priceId = e.target.value;
-                                        if (!priceId) {
-                                            setSelectedTier({
-                                                ...selectedTier,
-                                                stripe_price_id: null,
-                                                stripe_product_id: null,
-                                                price_cents: null
-                                            });
-                                        } else {
-                                            const selectedPrice = stripePrices.find(p => p.id === priceId);
-                                            if (selectedPrice) {
-                                                setSelectedTier({
-                                                    ...selectedTier,
-                                                    stripe_price_id: selectedPrice.id,
-                                                    stripe_product_id: selectedPrice.productId,
-                                                    price_cents: selectedPrice.amountCents
-                                                });
-                                            }
-                                        }
-                                    }}
-                                >
-                                    <option value="">Not linked to Stripe</option>
-                                    {loadingPrices ? (
-                                        <option disabled>Loading prices...</option>
-                                    ) : (
-                                        stripePrices.map(price => (
-                                            <option key={price.id} value={price.id}>
-                                                {price.displayString}
-                                            </option>
-                                        ))
-                                    )}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">
-                                    Price (Cents)
-                                    {selectedTier?.stripe_price_id && (
-                                        <span className="ml-2 text-indigo-600 dark:text-indigo-400 normal-case font-normal">Auto-filled from Stripe</span>
-                                    )}
-                                </label>
-                                <input
+                                <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Sort Order</label>
+                                <input 
                                     type="number"
-                                    className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
-                                        selectedTier?.stripe_price_id 
-                                            ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
-                                            : 'bg-gray-50 dark:bg-black/30'
-                                    }`}
-                                    value={selectedTier?.price_cents || ''}
-                                    onChange={e => selectedTier && setSelectedTier({...selectedTier, price_cents: parseInt(e.target.value) || null})}
-                                    readOnly={!!selectedTier?.stripe_price_id}
-                                    placeholder="e.g., 19900 for $199.00"
+                                    className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+                                    value={selectedTier?.sort_order ?? 0} 
+                                    onChange={e => selectedTier && setSelectedTier({...selectedTier, sort_order: parseInt(e.target.value) || 0})} 
                                 />
                             </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Display Options</h4>
-                        <div className="space-y-2">
                             <label className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25 cursor-pointer hover:bg-gray-100 dark:hover:bg-black/30 transition-colors">
-                                <span className="text-sm text-primary dark:text-white">Active</span>
+                                <span className="text-sm text-primary dark:text-white">Show on Membership Page</span>
                                 <Toggle
-                                    checked={selectedTier?.is_active || false}
-                                    onChange={(val) => selectedTier && setSelectedTier({...selectedTier, is_active: val})}
-                                    label="Active"
+                                    checked={selectedTier?.show_on_membership_page ?? true}
+                                    onChange={(val) => selectedTier && setSelectedTier({...selectedTier, show_on_membership_page: val})}
+                                    label="Show on Membership Page"
                                 />
                             </label>
                             <label className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25 cursor-pointer hover:bg-gray-100 dark:hover:bg-black/30 transition-colors">
@@ -736,301 +633,457 @@ const TiersTab: React.FC = () => {
                                     label="Mark as Popular"
                                 />
                             </label>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
-                            Booking Limits
-                            {selectedTier?.stripe_product_id && (
-                                <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[10px] normal-case font-semibold">
-                                    <span aria-hidden="true" className="material-symbols-outlined text-xs">cloud</span>
-                                    Managed by Stripe
-                                </span>
-                            )}
-                        </h4>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Daily Sim Minutes</label>
-                                <input 
-                                    type="number"
-                                    className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
-                                        selectedTier?.stripe_product_id 
-                                            ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
-                                            : 'bg-gray-50 dark:bg-black/30'
-                                    }`}
-                                    value={selectedTier?.daily_sim_minutes || 0} 
-                                    onChange={e => selectedTier && setSelectedTier({...selectedTier, daily_sim_minutes: parseInt(e.target.value) || 0})} 
-                                    readOnly={!!selectedTier?.stripe_product_id}
+                            <label className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25 cursor-pointer hover:bg-gray-100 dark:hover:bg-black/30 transition-colors">
+                                <span className="text-sm text-primary dark:text-white">Active</span>
+                                <Toggle
+                                    checked={selectedTier?.is_active || false}
+                                    onChange={(val) => selectedTier && setSelectedTier({...selectedTier, is_active: val})}
+                                    label="Active"
                                 />
-                            </div>
-                            <div>
-                                <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Guest Passes/Month</label>
-                                <input 
-                                    type="number"
-                                    className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
-                                        selectedTier?.stripe_product_id 
-                                            ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
-                                            : 'bg-gray-50 dark:bg-black/30'
-                                    }`}
-                                    value={selectedTier?.guest_passes_per_month || 0} 
-                                    onChange={e => selectedTier && setSelectedTier({...selectedTier, guest_passes_per_month: parseInt(e.target.value) || 0})} 
-                                    readOnly={!!selectedTier?.stripe_product_id}
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Booking Window (Days)</label>
-                                <input 
-                                    type="number"
-                                    className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
-                                        selectedTier?.stripe_product_id 
-                                            ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
-                                            : 'bg-gray-50 dark:bg-black/30'
-                                    }`}
-                                    value={selectedTier?.booking_window_days || 7} 
-                                    onChange={e => selectedTier && setSelectedTier({...selectedTier, booking_window_days: parseInt(e.target.value) || 7})} 
-                                    readOnly={!!selectedTier?.stripe_product_id}
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Daily Conf Room Minutes</label>
-                                <input 
-                                    type="number"
-                                    className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
-                                        selectedTier?.stripe_product_id 
-                                            ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
-                                            : 'bg-gray-50 dark:bg-black/30'
-                                    }`}
-                                    value={selectedTier?.daily_conf_room_minutes || 0} 
-                                    onChange={e => selectedTier && setSelectedTier({...selectedTier, daily_conf_room_minutes: parseInt(e.target.value) || 0})} 
-                                    readOnly={!!selectedTier?.stripe_product_id}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
-                            Access Permissions
-                            {selectedTier?.stripe_product_id && (
-                                <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[10px] normal-case font-semibold">
-                                    <span aria-hidden="true" className="material-symbols-outlined text-xs">cloud</span>
-                                    Managed by Stripe
-                                </span>
-                            )}
-                        </h4>
-                        <div className="space-y-2">
-                            {BOOLEAN_FIELDS.map(field => (
-                                <label 
-                                    key={field.key}
-                                    className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${
-                                        selectedTier?.stripe_product_id
-                                            ? 'bg-gray-100 dark:bg-black/40 border-gray-200 dark:border-white/15 cursor-not-allowed opacity-75'
-                                            : 'bg-gray-50 dark:bg-black/20 border-gray-200 dark:border-white/25 cursor-pointer hover:bg-gray-100 dark:hover:bg-black/30'
-                                    }`}
-                                >
-                                    <span className="text-sm text-primary dark:text-white">{field.label}</span>
-                                    <Toggle
-                                        checked={(selectedTier as any)?.[field.key] || false}
-                                        onChange={(val) => {
-                                            if (selectedTier?.stripe_product_id) return;
-                                            selectedTier && setSelectedTier({...selectedTier, [field.key]: val});
-                                        }}
-                                        label={field.label}
-                                    />
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div>
-                        <div className="flex items-center justify-between mb-3">
-                            <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                                Feature Values
-                                {featuresLoading && (
-                                    <span className="ml-2 text-gray-400">Loading...</span>
-                                )}
-                            </h4>
-                        </div>
-                        
-                        {tierFeatures.length > 0 && selectedTier && (
-                            <div className="space-y-3">
-                                {tierFeatures.map((feature, index) => (
-                                    <div key={feature.id} className="p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex flex-col">
-                                                    <button
-                                                        onClick={() => handleReorderFeature(feature.id, 'up')}
-                                                        disabled={index === 0 || isReordering}
-                                                        className="text-gray-400 hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors p-0.5"
-                                                        aria-label="Move feature up"
-                                                    >
-                                                        <span aria-hidden="true" className="material-symbols-outlined text-base leading-none">keyboard_arrow_up</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleReorderFeature(feature.id, 'down')}
-                                                        disabled={index === tierFeatures.length - 1 || isReordering}
-                                                        className="text-gray-400 hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors p-0.5"
-                                                        aria-label="Move feature down"
-                                                    >
-                                                        <span aria-hidden="true" className="material-symbols-outlined text-base leading-none">keyboard_arrow_down</span>
-                                                    </button>
-                                                </div>
-                                                {editingLabelId === feature.id ? (
-                                                    <input
-                                                        className="flex-1 mr-2 text-sm font-medium border-b border-primary bg-transparent text-primary dark:text-white outline-none"
-                                                        value={feature.displayLabel}
-                                                        onChange={e => {
-                                                            const newLabel = e.target.value;
-                                                            queryClient.setQueryData(['tier-features'], (old: TierFeature[] | undefined) => {
-                                                                if (!old) return old;
-                                                                return old.map(f => f.id === feature.id ? { ...f, displayLabel: newLabel } : f);
-                                                            });
-                                                        }}
-                                                        onBlur={() => {
-                                                            updateFeatureLabelMutation.mutate({ featureId: feature.id, displayLabel: feature.displayLabel });
-                                                            setEditingLabelId(null);
-                                                        }}
-                                                        onKeyDown={e => {
-                                                            if (e.key === 'Enter') {
-                                                                updateFeatureLabelMutation.mutate({ featureId: feature.id, displayLabel: feature.displayLabel });
-                                                                setEditingLabelId(null);
-                                                            }
-                                                        }}
-                                                        autoFocus
-                                                    />
-                                                ) : (
-                                                    <span 
-                                                        className="text-sm font-medium text-primary dark:text-white cursor-pointer hover:text-primary/70"
-                                                        onClick={() => setEditingLabelId(feature.id)}
-                                                    >
-                                                        {feature.displayLabel}
-                                                    </span>
-                                                )}
+                            </label>
+                            <div className="mt-2">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
+                                    Card Features
+                                    {selectedTier?.stripe_product_id ? (
+                                        <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[10px] normal-case font-semibold">
+                                            <span aria-hidden="true" className="material-symbols-outlined text-xs">cloud</span>
+                                            Managed by Stripe
+                                        </span>
+                                    ) : (
+                                        <span className="ml-2 font-normal text-gray-400">({(selectedTier?.highlighted_features || []).length}/4)</span>
+                                    )}
+                                </h4>
+                                {selectedTier?.stripe_product_id ? (
+                                    <div>
+                                        <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-3">Edit these in Stripe Dashboard → Products → Marketing Features</p>
+                                        {(selectedTier?.highlighted_features || []).length > 0 ? (
+                                            <div className="space-y-2">
+                                                {(selectedTier?.highlighted_features || []).map((feature, idx) => (
+                                                    <div key={idx} className="flex items-center gap-2 p-2.5 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25">
+                                                        <span aria-hidden="true" className="material-symbols-outlined text-sm text-green-600 dark:text-green-400">check_circle</span>
+                                                        <span className="text-sm text-primary dark:text-white">{feature}</span>
+                                                    </div>
+                                                ))}
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[10px] text-gray-400 uppercase">{feature.valueType}</span>
-                                                <button
-                                                    onClick={() => deleteFeature(feature.id)}
-                                                    className="text-gray-400 hover:text-red-500 transition-colors"
-                                                >
-                                                    <span aria-hidden="true" className="material-symbols-outlined text-sm">delete</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        
-                                        {feature.valueType === 'boolean' ? (
-                                            <Toggle
-                                                checked={feature.values[selectedTier.id]?.value === true}
-                                                onChange={(val) => debouncedUpdateFeatureValue(feature.id, selectedTier.id, val)}
-                                                label={feature.displayLabel}
-                                            />
-                                        ) : feature.valueType === 'number' ? (
-                                            <input
-                                                type="number"
-                                                className="w-full border border-gray-200 dark:border-white/20 bg-white dark:bg-black/30 p-2 rounded-lg text-sm text-primary dark:text-white"
-                                                value={feature.values[selectedTier.id]?.value as number || ''}
-                                                onChange={e => {
-                                                    const newVal = parseInt(e.target.value) || 0;
-                                                    queryClient.setQueryData(['tier-features'], (old: TierFeature[] | undefined) => {
-                                                        if (!old) return old;
-                                                        return old.map(f => 
-                                                            f.id === feature.id 
-                                                                ? { ...f, values: { ...f.values, [selectedTier.id]: { tierId: selectedTier.id, value: newVal } } }
-                                                                : f
-                                                        );
-                                                    });
-                                                    debouncedUpdateFeatureValue(feature.id, selectedTier.id, newVal);
-                                                }}
-                                            />
                                         ) : (
-                                            <input
-                                                type="text"
-                                                className="w-full border border-gray-200 dark:border-white/20 bg-white dark:bg-black/30 p-2 rounded-lg text-sm text-primary dark:text-white"
-                                                value={feature.values[selectedTier.id]?.value as string || ''}
-                                                onChange={e => {
-                                                    const newVal = e.target.value;
-                                                    queryClient.setQueryData(['tier-features'], (old: TierFeature[] | undefined) => {
-                                                        if (!old) return old;
-                                                        return old.map(f => 
-                                                            f.id === feature.id 
-                                                                ? { ...f, values: { ...f.values, [selectedTier.id]: { tierId: selectedTier.id, value: newVal } } }
-                                                                : f
-                                                        );
-                                                    });
-                                                    debouncedUpdateFeatureValue(feature.id, selectedTier.id, newVal);
-                                                }}
-                                            />
+                                            <p className="text-xs text-gray-400 dark:text-gray-500 italic">No marketing features configured in Stripe</p>
                                         )}
                                     </div>
-                                ))}
+                                ) : (
+                                    <div>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                                            Select up to 4 features to highlight on the pricing card
+                                        </p>
+                                        <div className="space-y-2">
+                                            {BOOLEAN_FIELDS.filter(f => (selectedTier as any)?.[f.key]).map(field => (
+                                                <label 
+                                                    key={field.key}
+                                                    className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-colors ${
+                                                        (selectedTier?.highlighted_features || []).includes(field.label)
+                                                            ? 'bg-primary/10 dark:bg-primary/20 border border-primary/30'
+                                                            : 'bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25 hover:bg-gray-100 dark:hover:bg-black/30'
+                                                    }`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={(selectedTier?.highlighted_features || []).includes(field.label)}
+                                                        onChange={() => handleHighlightToggle(field.label)}
+                                                        disabled={(selectedTier?.highlighted_features || []).length >= 4 && !(selectedTier?.highlighted_features || []).includes(field.label)}
+                                                        className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                                    />
+                                                    <span className="text-sm text-primary dark:text-white">{field.label}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                        )}
-
-                        <div className="mt-4 p-3 rounded-xl border-2 border-dashed border-gray-200 dark:border-white/20">
-                            <h5 className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">Add New Feature</h5>
-                            <div className="grid grid-cols-3 gap-2 mb-2">
-                                <input
-                                    className="border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2 rounded-lg text-sm text-primary dark:text-white placeholder:text-gray-400"
-                                    placeholder="Key"
-                                    value={newFeatureForm.key}
-                                    onChange={e => setNewFeatureForm(prev => ({ ...prev, key: e.target.value }))}
-                                />
-                                <input
-                                    className="border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2 rounded-lg text-sm text-primary dark:text-white placeholder:text-gray-400"
-                                    placeholder="Label"
-                                    value={newFeatureForm.label}
-                                    onChange={e => setNewFeatureForm(prev => ({ ...prev, label: e.target.value }))}
-                                />
-                                <select
-                                    className="border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2 rounded-lg text-sm text-primary dark:text-white"
-                                    value={newFeatureForm.type}
-                                    onChange={e => setNewFeatureForm(prev => ({ ...prev, type: e.target.value as any }))}
-                                >
-                                    <option value="boolean">Boolean</option>
-                                    <option value="number">Number</option>
-                                    <option value="text">Text</option>
-                                </select>
-                            </div>
-                            <button
-                                onClick={createFeature}
-                                disabled={!newFeatureForm.key.trim() || !newFeatureForm.label.trim() || createFeatureMutation.isPending}
-                                className="w-full py-2 text-sm font-medium text-primary dark:text-white bg-gray-100 dark:bg-white/10 rounded-lg hover:bg-gray-200 dark:hover:bg-white/20 transition-colors disabled:opacity-50"
-                            >
-                                {createFeatureMutation.isPending ? 'Adding...' : 'Add Feature'}
-                            </button>
                         </div>
                     </div>
 
-                    <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
-                            Highlighted Features
-                            <span className="ml-2 font-normal text-gray-400">({(selectedTier?.highlighted_features || []).length}/4)</span>
-                        </h4>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                            Select up to 4 features to highlight on the pricing card
-                        </p>
-                        <div className="space-y-2">
-                            {BOOLEAN_FIELDS.filter(f => (selectedTier as any)?.[f.key]).map(field => (
-                                <label 
-                                    key={field.key}
-                                    className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-colors ${
-                                        (selectedTier?.highlighted_features || []).includes(field.label)
-                                            ? 'bg-primary/10 dark:bg-primary/20 border border-primary/30'
-                                            : 'bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25 hover:bg-gray-100 dark:hover:bg-black/30'
-                                    }`}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={(selectedTier?.highlighted_features || []).includes(field.label)}
-                                        onChange={() => handleHighlightToggle(field.label)}
-                                        disabled={(selectedTier?.highlighted_features || []).length >= 4 && !(selectedTier?.highlighted_features || []).includes(field.label)}
-                                        className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                    />
-                                    <span className="text-sm text-primary dark:text-white">{field.label}</span>
-                                </label>
-                            ))}
+                    <div className="border-t-2 border-gray-200 dark:border-white/15 pt-6">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">STRIPE-MANAGED SETTINGS</h4>
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-4">These values sync from Stripe. When linked to a Stripe product, edit them in the Stripe Dashboard.</p>
+                        <div className="space-y-6">
+                            <div>
+                                <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Stripe Pricing</h5>
+                                <div className="space-y-3">
+                                    {selectedTier?.stripe_price_id && (
+                                        <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-500/30">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span aria-hidden="true" className="material-symbols-outlined text-indigo-600 dark:text-indigo-400">link</span>
+                                                <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Linked to Stripe</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (!selectedTier) return;
+                                                        setSelectedTier({
+                                                            ...selectedTier,
+                                                            stripe_price_id: null,
+                                                            stripe_product_id: null,
+                                                            price_cents: null
+                                                        });
+                                                        setSuccessMessage('Stripe link removed. Save to confirm.');
+                                                        setTimeout(() => setSuccessMessage(null), 3000);
+                                                    }}
+                                                    className="ml-auto px-2 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                                                >
+                                                    Unlink
+                                                </button>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                                <div>
+                                                    <span className="text-indigo-500 dark:text-indigo-400">Product:</span>
+                                                    <span className="ml-1 text-indigo-700 dark:text-indigo-300 font-mono">{selectedTier.stripe_product_id || '—'}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-indigo-500 dark:text-indigo-400">Price:</span>
+                                                    <span className="ml-1 text-indigo-700 dark:text-indigo-300 font-mono">{selectedTier.stripe_price_id}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Linked Stripe Price</label>
+                                        <select
+                                            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                                            value={selectedTier?.stripe_price_id || ''}
+                                            onChange={e => {
+                                                if (!selectedTier) return;
+                                                const priceId = e.target.value;
+                                                if (!priceId) {
+                                                    setSelectedTier({
+                                                        ...selectedTier,
+                                                        stripe_price_id: null,
+                                                        stripe_product_id: null,
+                                                        price_cents: null
+                                                    });
+                                                } else {
+                                                    const selectedPrice = stripePrices.find(p => p.id === priceId);
+                                                    if (selectedPrice) {
+                                                        setSelectedTier({
+                                                            ...selectedTier,
+                                                            stripe_price_id: selectedPrice.id,
+                                                            stripe_product_id: selectedPrice.productId,
+                                                            price_cents: selectedPrice.amountCents
+                                                        });
+                                                    }
+                                                }
+                                            }}
+                                        >
+                                            <option value="">Not linked to Stripe</option>
+                                            {loadingPrices ? (
+                                                <option disabled>Loading prices...</option>
+                                            ) : (
+                                                stripePrices.map(price => (
+                                                    <option key={price.id} value={price.id}>
+                                                        {price.displayString}
+                                                    </option>
+                                                ))
+                                            )}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">
+                                            Price (Cents)
+                                            {selectedTier?.stripe_price_id && (
+                                                <span className="ml-2 text-indigo-600 dark:text-indigo-400 normal-case font-normal">Auto-filled from Stripe</span>
+                                            )}
+                                        </label>
+                                        <input
+                                            type="number"
+                                            className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                                selectedTier?.stripe_price_id 
+                                                    ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
+                                                    : 'bg-gray-50 dark:bg-black/30'
+                                            }`}
+                                            value={selectedTier?.price_cents || ''}
+                                            onChange={e => selectedTier && setSelectedTier({...selectedTier, price_cents: parseInt(e.target.value) || null})}
+                                            readOnly={!!selectedTier?.stripe_price_id}
+                                            placeholder="e.g., 19900 for $199.00"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
+                                    Booking Limits
+                                    {selectedTier?.stripe_product_id && (
+                                        <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[10px] normal-case font-semibold">
+                                            <span aria-hidden="true" className="material-symbols-outlined text-xs">cloud</span>
+                                            Managed by Stripe
+                                        </span>
+                                    )}
+                                </h5>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Daily Sim Minutes</label>
+                                        <input 
+                                            type="number"
+                                            className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                                selectedTier?.stripe_product_id 
+                                                    ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
+                                                    : 'bg-gray-50 dark:bg-black/30'
+                                            }`}
+                                            value={selectedTier?.daily_sim_minutes || 0} 
+                                            onChange={e => selectedTier && setSelectedTier({...selectedTier, daily_sim_minutes: parseInt(e.target.value) || 0})} 
+                                            readOnly={!!selectedTier?.stripe_product_id}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Guest Passes/Month</label>
+                                        <input 
+                                            type="number"
+                                            className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                                selectedTier?.stripe_product_id 
+                                                    ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
+                                                    : 'bg-gray-50 dark:bg-black/30'
+                                            }`}
+                                            value={selectedTier?.guest_passes_per_month || 0} 
+                                            onChange={e => selectedTier && setSelectedTier({...selectedTier, guest_passes_per_month: parseInt(e.target.value) || 0})} 
+                                            readOnly={!!selectedTier?.stripe_product_id}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Booking Window (Days)</label>
+                                        <input 
+                                            type="number"
+                                            className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                                selectedTier?.stripe_product_id 
+                                                    ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
+                                                    : 'bg-gray-50 dark:bg-black/30'
+                                            }`}
+                                            value={selectedTier?.booking_window_days || 7} 
+                                            onChange={e => selectedTier && setSelectedTier({...selectedTier, booking_window_days: parseInt(e.target.value) || 7})} 
+                                            readOnly={!!selectedTier?.stripe_product_id}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Daily Conf Room Minutes</label>
+                                        <input 
+                                            type="number"
+                                            className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                                selectedTier?.stripe_product_id 
+                                                    ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
+                                                    : 'bg-gray-50 dark:bg-black/30'
+                                            }`}
+                                            value={selectedTier?.daily_conf_room_minutes || 0} 
+                                            onChange={e => selectedTier && setSelectedTier({...selectedTier, daily_conf_room_minutes: parseInt(e.target.value) || 0})} 
+                                            readOnly={!!selectedTier?.stripe_product_id}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
+                                    Access Permissions
+                                    {selectedTier?.stripe_product_id && (
+                                        <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[10px] normal-case font-semibold">
+                                            <span aria-hidden="true" className="material-symbols-outlined text-xs">cloud</span>
+                                            Managed by Stripe
+                                        </span>
+                                    )}
+                                </h5>
+                                <div className="space-y-2">
+                                    {BOOLEAN_FIELDS.map(field => (
+                                        <label 
+                                            key={field.key}
+                                            className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${
+                                                selectedTier?.stripe_product_id
+                                                    ? 'bg-gray-100 dark:bg-black/40 border-gray-200 dark:border-white/15 cursor-not-allowed opacity-75'
+                                                    : 'bg-gray-50 dark:bg-black/20 border-gray-200 dark:border-white/25 cursor-pointer hover:bg-gray-100 dark:hover:bg-black/30'
+                                            }`}
+                                        >
+                                            <span className="text-sm text-primary dark:text-white">{field.label}</span>
+                                            <Toggle
+                                                checked={(selectedTier as any)?.[field.key] || false}
+                                                onChange={(val) => {
+                                                    if (selectedTier?.stripe_product_id) return;
+                                                    selectedTier && setSelectedTier({...selectedTier, [field.key]: val});
+                                                }}
+                                                label={field.label}
+                                            />
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="border-t-2 border-gray-200 dark:border-white/15 pt-6">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">COMPARE TABLE</h4>
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-4">Controls what appears in the feature comparison table on the compare page.</p>
+                        <div className="space-y-6">
+                            <label className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25 cursor-pointer hover:bg-gray-100 dark:hover:bg-black/30 transition-colors">
+                                <span className="text-sm text-primary dark:text-white">Show in Compare Table</span>
+                                <Toggle
+                                    checked={selectedTier?.show_in_comparison || false}
+                                    onChange={(val) => selectedTier && setSelectedTier({...selectedTier, show_in_comparison: val})}
+                                    label="Show in Compare Table"
+                                />
+                            </label>
+
+                            <div>
+                                <div className="flex items-center justify-between mb-3">
+                                    <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                        Feature Values
+                                        {featuresLoading && (
+                                            <span className="ml-2 text-gray-400">Loading...</span>
+                                        )}
+                                    </h5>
+                                </div>
+                                
+                                {tierFeatures.length > 0 && selectedTier && (
+                                    <div className="space-y-3">
+                                        {tierFeatures.map((feature, index) => (
+                                            <div key={feature.id} className="p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex flex-col">
+                                                            <button
+                                                                onClick={() => handleReorderFeature(feature.id, 'up')}
+                                                                disabled={index === 0 || isReordering}
+                                                                className="text-gray-400 hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors p-0.5"
+                                                                aria-label="Move feature up"
+                                                            >
+                                                                <span aria-hidden="true" className="material-symbols-outlined text-base leading-none">keyboard_arrow_up</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleReorderFeature(feature.id, 'down')}
+                                                                disabled={index === tierFeatures.length - 1 || isReordering}
+                                                                className="text-gray-400 hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors p-0.5"
+                                                                aria-label="Move feature down"
+                                                            >
+                                                                <span aria-hidden="true" className="material-symbols-outlined text-base leading-none">keyboard_arrow_down</span>
+                                                            </button>
+                                                        </div>
+                                                        {editingLabelId === feature.id ? (
+                                                            <input
+                                                                className="flex-1 mr-2 text-sm font-medium border-b border-primary bg-transparent text-primary dark:text-white outline-none"
+                                                                value={feature.displayLabel}
+                                                                onChange={e => {
+                                                                    const newLabel = e.target.value;
+                                                                    queryClient.setQueryData(['tier-features'], (old: TierFeature[] | undefined) => {
+                                                                        if (!old) return old;
+                                                                        return old.map(f => f.id === feature.id ? { ...f, displayLabel: newLabel } : f);
+                                                                    });
+                                                                }}
+                                                                onBlur={() => {
+                                                                    updateFeatureLabelMutation.mutate({ featureId: feature.id, displayLabel: feature.displayLabel });
+                                                                    setEditingLabelId(null);
+                                                                }}
+                                                                onKeyDown={e => {
+                                                                    if (e.key === 'Enter') {
+                                                                        updateFeatureLabelMutation.mutate({ featureId: feature.id, displayLabel: feature.displayLabel });
+                                                                        setEditingLabelId(null);
+                                                                    }
+                                                                }}
+                                                                autoFocus
+                                                            />
+                                                        ) : (
+                                                            <span 
+                                                                className="text-sm font-medium text-primary dark:text-white cursor-pointer hover:text-primary/70"
+                                                                onClick={() => setEditingLabelId(feature.id)}
+                                                            >
+                                                                {feature.displayLabel}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] text-gray-400 uppercase">{feature.valueType}</span>
+                                                        <button
+                                                            onClick={() => deleteFeature(feature.id)}
+                                                            className="text-gray-400 hover:text-red-500 transition-colors"
+                                                        >
+                                                            <span aria-hidden="true" className="material-symbols-outlined text-sm">delete</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                
+                                                {feature.valueType === 'boolean' ? (
+                                                    <Toggle
+                                                        checked={feature.values[selectedTier.id]?.value === true}
+                                                        onChange={(val) => debouncedUpdateFeatureValue(feature.id, selectedTier.id, val)}
+                                                        label={feature.displayLabel}
+                                                    />
+                                                ) : feature.valueType === 'number' ? (
+                                                    <input
+                                                        type="number"
+                                                        className="w-full border border-gray-200 dark:border-white/20 bg-white dark:bg-black/30 p-2 rounded-lg text-sm text-primary dark:text-white"
+                                                        value={feature.values[selectedTier.id]?.value as number || ''}
+                                                        onChange={e => {
+                                                            const newVal = parseInt(e.target.value) || 0;
+                                                            queryClient.setQueryData(['tier-features'], (old: TierFeature[] | undefined) => {
+                                                                if (!old) return old;
+                                                                return old.map(f => 
+                                                                    f.id === feature.id 
+                                                                        ? { ...f, values: { ...f.values, [selectedTier.id]: { tierId: selectedTier.id, value: newVal } } }
+                                                                        : f
+                                                                );
+                                                            });
+                                                            debouncedUpdateFeatureValue(feature.id, selectedTier.id, newVal);
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <input
+                                                        type="text"
+                                                        className="w-full border border-gray-200 dark:border-white/20 bg-white dark:bg-black/30 p-2 rounded-lg text-sm text-primary dark:text-white"
+                                                        value={feature.values[selectedTier.id]?.value as string || ''}
+                                                        onChange={e => {
+                                                            const newVal = e.target.value;
+                                                            queryClient.setQueryData(['tier-features'], (old: TierFeature[] | undefined) => {
+                                                                if (!old) return old;
+                                                                return old.map(f => 
+                                                                    f.id === feature.id 
+                                                                        ? { ...f, values: { ...f.values, [selectedTier.id]: { tierId: selectedTier.id, value: newVal } } }
+                                                                        : f
+                                                                );
+                                                            });
+                                                            debouncedUpdateFeatureValue(feature.id, selectedTier.id, newVal);
+                                                        }}
+                                                    />
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <div className="mt-4 p-3 rounded-xl border-2 border-dashed border-gray-200 dark:border-white/20">
+                                    <h5 className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">Add New Feature</h5>
+                                    <div className="grid grid-cols-3 gap-2 mb-2">
+                                        <input
+                                            className="border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2 rounded-lg text-sm text-primary dark:text-white placeholder:text-gray-400"
+                                            placeholder="Key"
+                                            value={newFeatureForm.key}
+                                            onChange={e => setNewFeatureForm(prev => ({ ...prev, key: e.target.value }))}
+                                        />
+                                        <input
+                                            className="border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2 rounded-lg text-sm text-primary dark:text-white placeholder:text-gray-400"
+                                            placeholder="Label"
+                                            value={newFeatureForm.label}
+                                            onChange={e => setNewFeatureForm(prev => ({ ...prev, label: e.target.value }))}
+                                        />
+                                        <select
+                                            className="border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2 rounded-lg text-sm text-primary dark:text-white"
+                                            value={newFeatureForm.type}
+                                            onChange={e => setNewFeatureForm(prev => ({ ...prev, type: e.target.value as any }))}
+                                        >
+                                            <option value="boolean">Boolean</option>
+                                            <option value="number">Number</option>
+                                            <option value="text">Text</option>
+                                        </select>
+                                    </div>
+                                    <button
+                                        onClick={createFeature}
+                                        disabled={!newFeatureForm.key.trim() || !newFeatureForm.label.trim() || createFeatureMutation.isPending}
+                                        className="w-full py-2 text-sm font-medium text-primary dark:text-white bg-gray-100 dark:bg-white/10 rounded-lg hover:bg-gray-200 dark:hover:bg-white/20 transition-colors disabled:opacity-50"
+                                    >
+                                        {createFeatureMutation.isPending ? 'Adding...' : 'Add Feature'}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
