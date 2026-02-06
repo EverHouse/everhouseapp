@@ -73,6 +73,15 @@ export function TerminalPayment({
     };
   }, [fetchReaders]);
 
+  useEffect(() => {
+    if (status === 'success') {
+      const timer = setTimeout(() => {
+        onCancel();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [status, onCancel]);
+
   const createSimulatedReader = async () => {
     try {
       setCreatingSimulated(true);
@@ -108,7 +117,9 @@ export function TerminalPayment({
         }
         setStatus('success');
         setStatusMessage('Payment successful!');
-        onSuccess(piId);
+        setTimeout(() => {
+          onSuccess(piId);
+        }, 1500);
       } else if (data.status === 'canceled' || data.status === 'requires_payment_method') {
         if (pollingRef.current) {
           clearInterval(pollingRef.current);
@@ -381,8 +392,11 @@ export function TerminalPayment({
           <h3 className={`text-lg font-medium mb-2 ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
             Payment Successful
           </h3>
-          <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+          <p className={`text-sm mb-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
             {statusMessage}
+          </p>
+          <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+            Closing automatically...
           </p>
         </div>
       )}

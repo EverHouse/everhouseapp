@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.3.2",
+    date: "2026-02-06",
+    title: "Phone Formatting, Terminal Signup Fix & Auto-Close",
+    changes: [
+      "New: Phone number fields now auto-format as (XXX) XXX-XXXX while you type",
+      "Fix: Card Reader payment during new member signup now correctly links to the subscription and customer instead of creating a standalone charge",
+      "Fix: If the signup has an error (like an existing pending account), the Card Reader tab now shows the error and prevents an accidental unlinked charge",
+      "Fix: After a successful Card Reader payment, the success screen auto-closes after a brief moment instead of staying open",
+      "Removed: Guest Pass removed from the POS product list — it's only charged automatically through the booking fee system"
+    ]
+  },
+  {
     version: "7.3.1",
     date: "2026-02-06",
     title: "Terminal Card Reader: Default for Staff Billing & Reuse Existing Charges",

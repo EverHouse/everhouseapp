@@ -7,6 +7,7 @@ import { useToast } from '../../Toast';
 import { SimpleCheckoutForm } from '../../stripe/StripePaymentForm';
 import { SlideUpDrawer } from '../../SlideUpDrawer';
 import { TerminalPayment } from '../TerminalPayment';
+import { formatPhoneInput } from '../../../utils/formatting';
 
 let stripePromise: Promise<Stripe | null> | null = null;
 
@@ -1067,40 +1068,57 @@ function MemberFlow({
         )}
 
         {paymentMethod === 'terminal' && (
-          <TerminalPayment
-            amount={totalPrice}
-            subscriptionId={subscriptionId}
-            userId={createdUserId}
-            onSuccess={async (paymentIntentId) => {
-              try {
-                const confirmRes = await fetch('/api/stripe/terminal/confirm-subscription-payment', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  credentials: 'include',
-                  body: JSON.stringify({
-                    paymentIntentId,
-                    subscriptionId,
-                    userId: createdUserId,
-                    invoiceId: null
-                  })
-                });
-                if (!confirmRes.ok) {
-                  const data = await confirmRes.json();
-                  throw new Error(data.error || 'Failed to confirm payment');
-                }
-                showToast('Payment received! Membership activated.', 'success');
-                onSuccess({
-                  id: createdUserId || 'member-' + Date.now(),
-                  email: form.email,
-                  name: `${form.firstName} ${form.lastName}`
-                });
-              } catch (err: any) {
-                setStripeError(err.message || 'Failed to activate membership');
-              }
-            }}
-            onError={(msg) => setStripeError(msg)}
-            onCancel={() => {}}
-          />
+          <>
+            {stripeError && !subscriptionId ? (
+              <div className={`p-3 rounded-lg ${isDark ? 'bg-red-900/20 border border-red-700 text-red-400' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+                <p className="text-sm">{stripeError}</p>
+                <button
+                  onClick={() => {
+                    resetPayment();
+                    initializePayment();
+                  }}
+                  className="text-sm underline mt-2"
+                >
+                  Try Again
+                </button>
+              </div>
+            ) : (
+              <TerminalPayment
+                amount={totalPrice}
+                subscriptionId={subscriptionId}
+                userId={createdUserId}
+                onSuccess={async (paymentIntentId) => {
+                  try {
+                    const confirmRes = await fetch('/api/stripe/terminal/confirm-subscription-payment', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({
+                        paymentIntentId,
+                        subscriptionId,
+                        userId: createdUserId,
+                        invoiceId: null
+                      })
+                    });
+                    if (!confirmRes.ok) {
+                      const data = await confirmRes.json();
+                      throw new Error(data.error || 'Failed to confirm payment');
+                    }
+                    showToast('Payment received! Membership activated.', 'success');
+                    onSuccess({
+                      id: createdUserId || 'member-' + Date.now(),
+                      email: form.email,
+                      name: `${form.firstName} ${form.lastName}`
+                    });
+                  } catch (err: any) {
+                    setStripeError(err.message || 'Failed to activate membership');
+                  }
+                }}
+                onError={(msg) => setStripeError(msg)}
+                onCancel={() => {}}
+              />
+            )}
+          </>
         )}
 
         <div className={`pt-2 border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
@@ -1254,9 +1272,10 @@ function MemberFlow({
         <label className={labelClass}>Phone *</label>
         <input
           type="tel"
-          value={form.phone}
+          value={formatPhoneInput(form.phone)}
           onChange={(e) => {
-            setForm(prev => ({ ...prev, phone: e.target.value }));
+            const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+            setForm(prev => ({ ...prev, phone: digits }));
             if (fieldErrors.phone) setFieldErrors(prev => ({ ...prev, phone: '' }));
           }}
           placeholder="(555) 123-4567"
@@ -1436,8 +1455,11 @@ function MemberFlow({
                     />
                     <input
                       type="tel"
-                      value={member.phone}
-                      onChange={(e) => updateGroupMember(index, 'phone', e.target.value)}
+                      value={formatPhoneInput(member.phone)}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        updateGroupMember(index, 'phone', digits);
+                      }}
                       placeholder="Phone"
                       className={`${inputClass} text-sm py-2`}
                     />
@@ -1869,9 +1891,10 @@ function VisitorFlow({
         <label className={labelClass}>Phone *</label>
         <input
           type="tel"
-          value={form.phone}
+          value={formatPhoneInput(form.phone)}
           onChange={(e) => {
-            setForm(prev => ({ ...prev, phone: e.target.value }));
+            const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+            setForm(prev => ({ ...prev, phone: digits }));
             if (fieldErrors.phone) setFieldErrors(prev => ({ ...prev, phone: '' }));
           }}
           placeholder="(555) 123-4567"
