@@ -122,7 +122,7 @@ export interface RosterManagerProps {
   onUpdate?: () => void;
 }
 
-const RosterManager: React.FC<RosterManagerProps> = ({
+const RosterManager: React.FC<RosterManagerProps> = React.memo(({
   bookingId,
   declaredPlayerCount,
   isOwner,
@@ -937,6 +937,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
       )}
     </>
   );
-};
+});
 
+RosterManager.displayName = 'RosterManager';
 export default RosterManager;
