@@ -5,6 +5,9 @@ import { logFromRequest } from '../../core/auditLog';
 import { logger } from '../../core/logger';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { getStripeClient } from '../../core/stripe/client';
+import { broadcastAvailabilityUpdate } from '../../core/websocket';
+import { sendPushNotification } from '../push';
+import { formatTime12Hour } from '../../utils/dateUtils';
 
 const router = Router();
 
@@ -248,6 +251,43 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
         newTime: `${start_time} - ${end_time}`,
       }
     });
+
+    try {
+      broadcastAvailabilityUpdate({
+        resourceId: originalResourceId,
+        resourceType: 'simulator',
+        date: originalDate,
+        action: 'updated'
+      });
+      if (resource_id !== originalResourceId || request_date !== originalDate) {
+        broadcastAvailabilityUpdate({
+          resourceId: resource_id,
+          resourceType: 'simulator',
+          date: request_date,
+          action: 'updated'
+        });
+      }
+    } catch {
+    }
+
+    if (booking.user_email) {
+      const displayDate = new Date(request_date + 'T12:00:00').toLocaleDateString('en-US', {
+        weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles'
+      });
+      const notifMessage = `Your booking has been rescheduled to ${displayDate} at ${formatTime12Hour(start_time)} – ${formatTime12Hour(end_time)} (${newBayName}).`;
+
+      pool.query(
+        `INSERT INTO notifications (user_email, title, message, type, related_id, related_type)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [booking.user_email, 'Booking Rescheduled', notifMessage, 'booking_rescheduled', bookingId, 'booking']
+      ).catch(() => {});
+
+      sendPushNotification(booking.user_email, {
+        title: 'Booking Rescheduled',
+        body: notifMessage,
+        url: '/sims'
+      }).catch(() => {});
+    }
 
     return res.json({
       success: true,

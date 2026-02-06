@@ -130,29 +130,6 @@ export function RescheduleBookingModal({ isOpen, onClose, booking, resources, on
         throw new Error(data.error || 'Failed to confirm reschedule');
       }
 
-      if (booking.user_email) {
-        try {
-          const displayDate = new Date(newDate + 'T12:00:00').toLocaleDateString('en-US', {
-            weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles'
-          });
-          await fetch('/api/notifications', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              user_email: booking.user_email,
-              title: 'Booking Rescheduled',
-              message: `Your booking has been rescheduled to ${displayDate} at ${formatTime12Hour(newStartTime)} - ${formatTime12Hour(newEndTime)} (${newBayName}).`,
-              type: 'booking_rescheduled',
-              related_id: booking.id,
-              related_type: 'booking'
-            })
-          });
-        } catch {
-          // notification failure is non-critical
-        }
-      }
-
       showToast('Booking rescheduled successfully', 'success');
       onSuccess();
     } catch (err: any) {
