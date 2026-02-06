@@ -241,7 +241,7 @@ router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
     const targetEmail = (req.body.email && isStaff) ? String(req.body.email) : sessionUser.email;
     
     const result = await pool.query(
-      `SELECT stripe_customer_id, billing_provider, email, role FROM users WHERE LOWER(email) = $1`,
+      `SELECT stripe_customer_id, billing_provider, email, role, first_name, last_name FROM users WHERE LOWER(email) = $1`,
       [targetEmail.toLowerCase()]
     );
     
@@ -276,7 +276,8 @@ router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
           console.warn(`[MyBilling] Failed to sync billing provider to HubSpot for ${member.email}:`, e?.message || e);
         }
       } else {
-        const customer = await stripe.customers.create({ email: member.email });
+        const fullName = [member.first_name, member.last_name].filter(Boolean).join(' ') || undefined;
+        const customer = await stripe.customers.create({ email: member.email, name: fullName });
         customerId = customer.id;
         await pool.query(
           `UPDATE users SET stripe_customer_id = $1, billing_provider = 'stripe' WHERE LOWER(email) = $2`,
