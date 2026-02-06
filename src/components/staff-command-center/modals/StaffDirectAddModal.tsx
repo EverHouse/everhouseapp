@@ -237,6 +237,7 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
                 onSelect={setSelectedMember}
                 onClear={() => setSelectedMember(null)}
                 showTier={true}
+                includeVisitors={true}
               />
 
               {selectedMember && (

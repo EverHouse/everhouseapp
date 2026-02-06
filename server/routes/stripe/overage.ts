@@ -92,6 +92,7 @@ router.post('/api/stripe/overage/create-payment-intent', async (req: Request, re
       } else {
         const customer = await stripe.customers.create({
           email: booking.user_email.toLowerCase(),
+          name: [booking.first_name, booking.last_name].filter(Boolean).join(' ') || undefined,
           metadata: { source: 'overage_payment' }
         });
         customerId = customer.id;
