@@ -21,6 +21,8 @@ export const changelog: ChangelogEntry[] = [
       "Fix: Card Reader payment during new member signup now correctly links to the subscription and customer instead of creating a standalone charge",
       "Fix: If the signup has an error (like an existing pending account), the Card Reader tab now shows the error and prevents an accidental unlinked charge",
       "Fix: After a successful Card Reader payment, the success screen auto-closes after a brief moment instead of staying open",
+      "Fix: Card Reader now works correctly for group/family add-on signups — previously it would fail because it tried to confirm a subscription that didn't exist",
+      "Fix: New members now appear immediately in the Active tab of the Directory after signup from staff quick actions",
       "Removed: Guest Pass removed from the POS product list — it's only charged automatically through the booking fee system"
     ]
   },

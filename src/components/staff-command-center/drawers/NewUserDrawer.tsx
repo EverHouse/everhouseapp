@@ -1085,33 +1085,39 @@ function MemberFlow({
             ) : (
               <TerminalPayment
                 amount={totalPrice}
-                subscriptionId={subscriptionId}
+                subscriptionId={form.joinExistingGroup ? null : subscriptionId}
+                existingPaymentIntentId={form.joinExistingGroup ? (paymentIntentId || undefined) : undefined}
                 userId={createdUserId}
-                onSuccess={async (paymentIntentId) => {
-                  try {
-                    const confirmRes = await fetch('/api/stripe/terminal/confirm-subscription-payment', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      credentials: 'include',
-                      body: JSON.stringify({
-                        paymentIntentId,
-                        subscriptionId,
-                        userId: createdUserId,
-                        invoiceId: null
-                      })
-                    });
-                    if (!confirmRes.ok) {
-                      const data = await confirmRes.json();
-                      throw new Error(data.error || 'Failed to confirm payment');
+                description={form.joinExistingGroup ? `${selectedTier?.name || 'Membership'} (Group Add-on)` : undefined}
+                onSuccess={async (piId) => {
+                  if (form.joinExistingGroup) {
+                    await handlePaymentSuccess(piId);
+                  } else {
+                    try {
+                      const confirmRes = await fetch('/api/stripe/terminal/confirm-subscription-payment', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                          paymentIntentId: piId,
+                          subscriptionId,
+                          userId: createdUserId,
+                          invoiceId: null
+                        })
+                      });
+                      if (!confirmRes.ok) {
+                        const data = await confirmRes.json();
+                        throw new Error(data.error || 'Failed to confirm payment');
+                      }
+                      showToast('Payment received! Membership activated.', 'success');
+                      onSuccess({
+                        id: createdUserId || 'member-' + Date.now(),
+                        email: form.email,
+                        name: `${form.firstName} ${form.lastName}`
+                      });
+                    } catch (err: any) {
+                      setStripeError(err.message || 'Failed to activate membership');
                     }
-                    showToast('Payment received! Membership activated.', 'success');
-                    onSuccess({
-                      id: createdUserId || 'member-' + Date.now(),
-                      email: form.email,
-                      name: `${form.firstName} ${form.lastName}`
-                    });
-                  } catch (err: any) {
-                    setStripeError(err.message || 'Failed to activate membership');
                   }
                 }}
                 onError={(msg) => setStripeError(msg)}
