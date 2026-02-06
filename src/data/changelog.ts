@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "70.5.0",
+    date: "2026-02-06",
+    title: "Stripe-Managed Corporate Pricing & Family Discount",
+    isMajor: true,
+    changes: [
+      "New: Corporate volume pricing tiers ($249–$350/seat) are now stored as Stripe product metadata — edit them in Stripe Dashboard and they sync automatically",
+      "New: Family discount percentage is now read directly from the FAMILY20 Stripe coupon instead of being hardcoded — change it in Stripe and it flows to the app",
+      "New: Webhook handlers for coupon updates keep the family discount in sync in real-time",
+      "New: Corporate volume pricing refreshes automatically when its Stripe product metadata is updated"
+    ]
+  },
+  {
     version: "70.4.2",
     date: "2026-02-06",
     title: "Stripe Sync Gap Fixes (Round 2)",

@@ -124,6 +124,16 @@ export async function runStartupTasks(): Promise<void> {
         .then((result) => console.log(`[Stripe] Simulator Overage product ${result.action}`))
         .catch((err: any) => console.error('[Stripe] Simulator Overage setup failed:', err.message));
       
+      import('../core/stripe/products.js')
+        .then(({ ensureCorporateVolumePricingProduct }) => ensureCorporateVolumePricingProduct())
+        .then((result) => console.log(`[Stripe] Corporate Volume Pricing product ${result.action}`))
+        .catch((err: any) => console.error('[Stripe] Corporate Volume Pricing setup failed:', err.message));
+      
+      import('../core/stripe/products.js')
+        .then(({ pullCorporateVolumePricingFromStripe }) => pullCorporateVolumePricingFromStripe())
+        .then((pulled) => console.log(`[Stripe] Corporate pricing ${pulled ? 'pulled from Stripe' : 'using defaults'}`))
+        .catch((err: any) => console.error('[Stripe] Corporate pricing pull failed:', err.message));
+      
       import('../core/stripe/customerSync.js')
         .then(({ syncStripeCustomersForMindBodyMembers }) => syncStripeCustomersForMindBodyMembers())
         .then((result) => {

@@ -5,6 +5,7 @@ import { eq, and } from 'drizzle-orm';
 import { getStripeClient } from './client';
 import Stripe from 'stripe';
 import { randomUUID } from 'crypto';
+import { getCorporateVolumeTiers, getCorporateBasePrice, getFamilyDiscountPercent, updateFamilyDiscountPercent } from '../billing/pricingConfig';
 
 export interface BillingGroupWithMembers {
   id: number;
@@ -35,15 +36,14 @@ export type FamilyGroupWithMembers = BillingGroupWithMembers;
 export type FamilyMemberInfo = GroupMemberInfo;
 
 export function getCorporateVolumePrice(memberCount: number): number {
-  if (memberCount >= 50) return 24900;
-  if (memberCount >= 20) return 27500;
-  if (memberCount >= 10) return 29900;
-  if (memberCount >= 5) return 32500;
-  return 35000;
+  const tiers = getCorporateVolumeTiers();
+  for (const tier of tiers) {
+    if (memberCount >= tier.minMembers) return tier.priceCents;
+  }
+  return getCorporateBasePrice();
 }
 
 const FAMILY_COUPON_ID = 'FAMILY20';
-const FAMILY_DISCOUNT_PERCENT = 20;
 
 export async function getOrCreateFamilyCoupon(): Promise<string> {
   try {
@@ -51,15 +51,18 @@ export async function getOrCreateFamilyCoupon(): Promise<string> {
     
     try {
       const existingCoupon = await stripe.coupons.retrieve(FAMILY_COUPON_ID);
+      if (existingCoupon.percent_off) {
+        updateFamilyDiscountPercent(existingCoupon.percent_off);
+      }
       console.log(`[GroupBilling] Found existing FAMILY20 coupon: ${existingCoupon.id}`);
       return existingCoupon.id;
     } catch (retrieveError: any) {
       if (retrieveError.code === 'resource_missing') {
         const newCoupon = await stripe.coupons.create({
           id: FAMILY_COUPON_ID,
-          percent_off: FAMILY_DISCOUNT_PERCENT,
+          percent_off: getFamilyDiscountPercent(),
           duration: 'forever',
-          name: 'Family Member Discount (20% off)',
+          name: `Family Member Discount (${getFamilyDiscountPercent()}% off)`,
           metadata: {
             source: 'group_billing',
             type: 'family_addon',

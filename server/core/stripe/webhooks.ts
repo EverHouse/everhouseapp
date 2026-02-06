@@ -17,6 +17,7 @@ import { logSystemAction } from '../auditLog';
 import { queueJobInTransaction } from '../jobQueue';
 import { pullTierFeaturesFromStripe, pullCafeItemsFromStripe } from './products';
 import { clearTierCache } from '../tierService';
+import { updateFamilyDiscountPercent } from '../billing/pricingConfig';
 import type { PoolClient } from 'pg';
 
 const EVENT_DEDUP_WINDOW_DAYS = 7;
@@ -282,6 +283,17 @@ export async function processStripeWebhook(
       deferredActions = await handleProductDeleted(client, event.data.object);
     } else if (event.type === 'price.updated' || event.type === 'price.created') {
       deferredActions = await handlePriceChange(client, event.data.object);
+    } else if (event.type === 'coupon.updated' || event.type === 'coupon.created') {
+      const coupon = event.data.object as any;
+      if (coupon.id === 'FAMILY20' && coupon.percent_off) {
+        updateFamilyDiscountPercent(coupon.percent_off);
+        console.log(`[Stripe Webhook] FAMILY20 coupon ${event.type}: ${coupon.percent_off}% off`);
+      }
+    } else if (event.type === 'coupon.deleted') {
+      const coupon = event.data.object as any;
+      if (coupon.id === 'FAMILY20') {
+        console.log('[Stripe Webhook] FAMILY20 coupon deleted - will be recreated on next use');
+      }
     }
 
     await client.query('COMMIT');
@@ -2928,6 +2940,13 @@ async function handleProductUpdated(client: PoolClient, product: any): Promise<D
         await pullTierFeaturesFromStripe();
       });
       return deferredActions;
+    }
+
+    if (product.metadata?.config_type === 'corporate_volume_pricing') {
+      const { pullCorporateVolumePricingFromStripe } = await import('./products');
+      deferredActions.push(async () => {
+        await pullCorporateVolumePricingFromStripe();
+      });
     }
 
     if (product.metadata?.cafe_item_id) {

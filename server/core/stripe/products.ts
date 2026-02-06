@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { getStripeClient } from './client';
 import { getHubSpotClientWithFallback } from '../integrations';
 import { clearTierCache } from '../tierService';
-import { PRICING } from '../billing/pricingConfig';
+import { PRICING, getCorporateVolumeTiers, getCorporateBasePrice, updateCorporateVolumePricing, VolumeTier } from '../billing/pricingConfig';
 
 export interface HubSpotProduct {
   id: string;
@@ -892,6 +892,145 @@ export async function ensureSimulatorOverageProduct(): Promise<{
   } catch (error: any) {
     console.error('[Overage Product] Error:', error.message);
     return { success: false, action: 'error' };
+  }
+}
+
+const CORPORATE_PRICING_SLUG = 'corporate-volume-pricing';
+const CORPORATE_PRICING_NAME = 'Corporate Volume Pricing';
+
+export async function ensureCorporateVolumePricingProduct(): Promise<{
+  success: boolean;
+  stripeProductId?: string;
+  action: 'created' | 'exists' | 'error';
+}> {
+  try {
+    const stripe = await getStripeClient();
+    
+    const existing = await db.select()
+      .from(membershipTiers)
+      .where(eq(membershipTiers.slug, CORPORATE_PRICING_SLUG))
+      .limit(1);
+    
+    let tierId: number;
+    let stripeProductId = existing[0]?.stripeProductId;
+    
+    if (existing.length === 0) {
+      const [newTier] = await db.insert(membershipTiers).values({
+        name: CORPORATE_PRICING_NAME,
+        slug: CORPORATE_PRICING_SLUG,
+        priceString: 'Volume',
+        description: 'Corporate volume pricing configuration',
+        buttonText: '',
+        sortOrder: 98,
+        isActive: true,
+        isPopular: false,
+        showInComparison: false,
+        highlightedFeatures: [],
+        allFeatures: {},
+        dailySimMinutes: 0,
+        guestPassesPerMonth: 0,
+        bookingWindowDays: 0,
+        dailyConfRoomMinutes: 0,
+        canBookSimulators: false,
+        canBookConference: false,
+        canBookWellness: false,
+        hasGroupLessons: false,
+        hasExtendedSessions: false,
+        hasPrivateLesson: false,
+        hasSimulatorGuestPasses: false,
+        hasDiscountedMerch: false,
+        unlimitedAccess: false,
+        productType: 'config',
+        priceCents: 0,
+      }).returning();
+      tierId = newTier.id;
+      console.log(`[Corporate Pricing] Created database record: ${CORPORATE_PRICING_NAME}`);
+    } else {
+      tierId = existing[0].id;
+    }
+    
+    if (!stripeProductId) {
+      const tiers = getCorporateVolumeTiers();
+      const basePrice = getCorporateBasePrice();
+      
+      const metadata: Record<string, string> = {
+        tier_id: tierId.toString(),
+        tier_slug: CORPORATE_PRICING_SLUG,
+        product_type: 'config',
+        config_type: 'corporate_volume_pricing',
+        volume_base_price: basePrice.toString(),
+      };
+      
+      for (const tier of tiers) {
+        metadata[`volume_tier_${tier.minMembers}`] = tier.priceCents.toString();
+      }
+      
+      const product = await stripe.products.create({
+        name: CORPORATE_PRICING_NAME,
+        description: 'Configuration product for corporate volume pricing tiers. Edit metadata to change pricing.',
+        metadata,
+      });
+      stripeProductId = product.id;
+      
+      await db.update(membershipTiers)
+        .set({ stripeProductId })
+        .where(eq(membershipTiers.id, tierId));
+      
+      console.log(`[Corporate Pricing] Created Stripe product: ${stripeProductId}`);
+    }
+    
+    updateCorporateVolumePricing(getCorporateVolumeTiers(), getCorporateBasePrice(), stripeProductId);
+    
+    console.log(`[Corporate Pricing] ${CORPORATE_PRICING_NAME} ready (${stripeProductId})`);
+    return { success: true, stripeProductId, action: existing.length > 0 && existing[0].stripeProductId ? 'exists' : 'created' };
+  } catch (error: any) {
+    console.error('[Corporate Pricing] Error:', error.message);
+    return { success: false, action: 'error' };
+  }
+}
+
+export async function pullCorporateVolumePricingFromStripe(): Promise<boolean> {
+  try {
+    const stripe = await getStripeClient();
+    
+    const existing = await db.select()
+      .from(membershipTiers)
+      .where(eq(membershipTiers.slug, CORPORATE_PRICING_SLUG))
+      .limit(1);
+    
+    if (existing.length === 0 || !existing[0].stripeProductId) {
+      console.log('[Corporate Pricing] No Stripe product linked, using defaults');
+      return false;
+    }
+    
+    const product = await stripe.products.retrieve(existing[0].stripeProductId);
+    const metadata = product.metadata || {};
+    
+    const tiers: VolumeTier[] = [];
+    const basePrice = metadata.volume_base_price ? parseInt(metadata.volume_base_price, 10) : getCorporateBasePrice();
+    
+    for (const [key, value] of Object.entries(metadata)) {
+      const match = key.match(/^volume_tier_(\d+)$/);
+      if (match) {
+        const minMembers = parseInt(match[1], 10);
+        const priceCents = parseInt(value, 10);
+        if (!isNaN(minMembers) && !isNaN(priceCents)) {
+          tiers.push({ minMembers, priceCents });
+        }
+      }
+    }
+    
+    if (tiers.length > 0) {
+      updateCorporateVolumePricing(tiers, basePrice, existing[0].stripeProductId);
+      console.log(`[Corporate Pricing] Pulled ${tiers.length} volume tiers from Stripe`);
+      return true;
+    }
+    
+    console.log('[Corporate Pricing] No volume tiers found in Stripe metadata, using defaults');
+    return false;
+  } catch (error: any) {
+    console.error('[Corporate Pricing] Pull failed:', error.message);
+    return false;
   }
 }
 
