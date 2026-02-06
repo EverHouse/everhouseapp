@@ -146,6 +146,13 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
   const isDesktopGrid = variant === 'desktop-top' || variant === 'desktop-bottom';
 
   const getStatusBadge = (booking: BookingRequest) => {
+    if (booking.status === 'attended' && booking.has_unpaid_fees && (booking.total_owed ?? 0) > 0) {
+      return (
+        <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full">
+          Payment Due
+        </span>
+      );
+    }
     if (booking.status === 'attended') {
       return (
         <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 rounded-full">
@@ -167,6 +174,21 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
     const isCheckingIn = isActionLoading(`checkin-${booking.id}`);
     const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
     
+    if (booking.status === 'attended' && booking.has_unpaid_fees && (booking.total_owed ?? 0) > 0) {
+      return (
+        <button
+          onClick={(e) => { 
+            e.stopPropagation(); 
+            onPaymentClick?.(bookingId);
+          }}
+          className="text-xs px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors flex items-center gap-1"
+        >
+          <span className="material-symbols-outlined text-sm">payments</span>
+          Charge ${(booking.total_owed || 0).toFixed(0)}
+        </button>
+      );
+    }
+
     if (booking.status === 'attended') {
       return (
         <span className="text-xs px-2 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-lg font-medium flex items-center gap-1">

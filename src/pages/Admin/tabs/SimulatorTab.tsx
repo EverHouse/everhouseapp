@@ -2737,15 +2737,6 @@ const SimulatorTab: React.FC = () => {
                                                                     </>
                                                                 );
                                                             })()}
-                                                            {/* Desktop: Inactive member badge - top right, shifts left if unpaid badge present */}
-                                                            {isInactiveMember && (
-                                                                <span className={`hidden sm:block absolute -top-1 ${(booking as any)?.has_unpaid_fees ? '-right-4' : '-right-1'} group`}>
-                                                                    <span className="w-2 h-2 rounded-full bg-orange-400 dark:bg-orange-500 block cursor-help"></span>
-                                                                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs font-medium text-white bg-gray-800 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
-                                                                        Non-active member
-                                                                    </span>
-                                                                </span>
-                                                            )}
                                                         </div>
                                                     ) : pendingRequest && (
                                                         <div className="px-0.5 sm:px-1 h-full flex items-center justify-center sm:justify-start">

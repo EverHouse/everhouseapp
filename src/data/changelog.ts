@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "69.19.0",
+    date: "2026-02-06",
+    title: "Calendar & Queue Improvements for Inactive Members",
+    changes: [
+      "Improved: Removed redundant amber dot from calendar cells — amber dotted outline already shows inactive membership status",
+      "Fixed: Booking queue card now shows 'Charge' button with amount due instead of 'Checked In' when a checked-in booking has unpaid fees",
+      "Added: 'Payment Due' status badge on queue cards for checked-in bookings that still need payment"
+    ]
+  },
+  {
     version: "69.18.0",
     date: "2026-02-06",
     title: "Fee Calculation Fix for Non-Active Members",
