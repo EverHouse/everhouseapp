@@ -249,6 +249,7 @@ const Landing: React.FC = () => {
   }, [isLoading, setPageReady]);
 
   useEffect(() => {
+    if (user) return;
     const fetchTiers = async () => {
       try {
         const response = await fetch('/api/membership-tiers?active=true');
@@ -263,7 +264,7 @@ const Landing: React.FC = () => {
       }
     };
     fetchTiers();
-  }, []);
+  }, [user]);
 
   const socialTier = tiers.find(t => t.slug === 'social');
   const coreTier = tiers.find(t => t.slug === 'core');
@@ -278,6 +279,10 @@ const Landing: React.FC = () => {
     const match = priceString?.match(/\/\w+/);
     return match ? match[0] : '/mo';
   };
+
+  if (!sessionChecked || user) {
+    return <div className="min-h-screen" />;
+  }
 
   return (
     <AnimatedPage>

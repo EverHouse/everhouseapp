@@ -287,6 +287,10 @@ const Login: React.FC = () => {
     }
   };
 
+  if (!sessionChecked || user) {
+    return <div className="min-h-screen" />;
+  }
+
   if (otpSent) {
     return (
       <div className="flex flex-col min-h-screen bg-[#F2F2EC] overflow-x-hidden">
