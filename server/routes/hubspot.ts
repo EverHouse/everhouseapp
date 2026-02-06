@@ -1217,6 +1217,37 @@ router.post('/webhooks', async (req, res) => {
                     [newStatus, email]
                   );
                   console.log(`[HubSpot Webhook] Updated DB membership_status for ${email} to: ${newStatus}`);
+
+                  // Notify staff of membership status changes from HubSpot/MindBody
+                  const activeStatuses = ['active', 'trialing'];
+                  const inactiveStatuses = ['expired', 'terminated', 'cancelled', 'canceled', 'inactive', 'churned', 'declined', 'suspended', 'frozen', 'non-member'];
+                  
+                  // Get member name for notification
+                  const memberResult = await pool.query(
+                    'SELECT first_name, last_name, tier FROM users WHERE LOWER(email) = $1',
+                    [email]
+                  );
+                  const memberRow = memberResult.rows[0];
+                  const hubspotMemberName = memberRow 
+                    ? `${memberRow.first_name || ''} ${memberRow.last_name || ''}`.trim() || email 
+                    : email;
+                  const memberTier = memberRow?.tier || 'Unknown';
+                  
+                  if (activeStatuses.includes(newStatus)) {
+                    await notifyAllStaff(
+                      '🎉 New Member Activated',
+                      `${hubspotMemberName} (${email}) is now active via MindBody (${memberTier} tier).`,
+                      'new_member',
+                      { sendPush: true, url: '/admin/members' }
+                    );
+                  } else if (inactiveStatuses.includes(newStatus)) {
+                    await notifyAllStaff(
+                      'Member Status Changed',
+                      `${hubspotMemberName} (${email}) status changed to ${newStatus} via MindBody.`,
+                      'member_status_change',
+                      { sendPush: true, url: '/admin/members' }
+                    );
+                  }
                 }
               } else if (propertyName === 'membership_tier') {
                 const normalizedTier = normalizeTierName(propertyValue || '');

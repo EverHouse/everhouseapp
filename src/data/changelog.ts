@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "70.7.0",
+    date: "2026-02-06",
+    title: "Instant Staff Notifications for Member Status Changes",
+    changes: [
+      "New: Staff now receive instant push + in-app notifications when a new member joins via Stripe checkout — includes member name, email, and plan",
+      "New: Staff now receive instant push + in-app notifications when a new member is activated via MindBody/HubSpot — includes member name, email, and tier",
+      "New: Staff now receive instant push + in-app notifications when a member's status changes to inactive (expired, cancelled, etc.) via MindBody/HubSpot",
+      "New: Staff now receive instant push + in-app notifications when a previously inactive member reactivates their Stripe subscription",
+      "Improved: 'New Subscription Created' notification upgraded from in-app only to full push notification with direct link to member list"
+    ]
+  },
+  {
     version: "70.6.1",
     date: "2026-02-06",
     title: "Smarter Product Editing & Stripe Category Tagging",

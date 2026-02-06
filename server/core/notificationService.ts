@@ -34,6 +34,8 @@ export type NotificationType =
   | 'card_expiring'
   | 'day_pass'
   | 'trackman_booking'
+  | 'new_member'
+  | 'member_status_change'
   | 'account_deletion';
 
 export interface NotificationPayload {

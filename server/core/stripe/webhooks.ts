@@ -2191,10 +2191,10 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
     });
 
     await notifyAllStaff(
-      'New Subscription Created',
+      '🎉 New Member Joined',
       `${memberName} (${email}) has subscribed to ${planName}.`,
-      'membership_renewed',
-      { sendPush: false }
+      'new_member',
+      { sendPush: true, url: '/admin/members' }
     );
 
     broadcastBillingUpdate({
@@ -2570,6 +2570,16 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
         [userId, subscriptionPeriodEnd]
       );
       console.log(`[Stripe Webhook] Membership status set to active for ${email}`);
+
+      const reactivationStatuses = ['past_due', 'unpaid', 'suspended'];
+      if (previousAttributes?.status && reactivationStatuses.includes(previousAttributes.status)) {
+        await notifyAllStaff(
+          'Member Reactivated',
+          `${memberName} (${email}) membership has been reactivated (was ${previousAttributes.status}).`,
+          'member_status_change',
+          { sendPush: true, url: '/admin/members' }
+        );
+      }
       
       // Reactivate sub-members (family/corporate employees) if they were suspended/past_due
       try {
