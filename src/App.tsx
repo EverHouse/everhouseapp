@@ -129,7 +129,6 @@ const BlocksTab = lazy(() => import('./pages/Admin/tabs/BlocksTab'));
 const UpdatesTab = lazy(() => import('./pages/Admin/tabs/UpdatesTab'));
 const AnnouncementsTab = lazy(() => import('./pages/Admin/tabs/AnnouncementsTab'));
 const TeamTab = lazy(() => import('./pages/Admin/tabs/TeamTab'));
-const CafeTab = lazy(() => import('./pages/Admin/tabs/CafeTab'));
 const TiersTab = lazy(() => import('./pages/Admin/tabs/TiersTab'));
 const TrackmanTab = lazy(() => import('./pages/Admin/tabs/TrackmanTab'));
 const DataIntegrityTab = lazy(() => import('./pages/Admin/tabs/DataIntegrityTab'));
@@ -391,7 +390,6 @@ const AnimatedRoutes: React.FC = () => {
               <Route path="updates" element={<UpdatesTab />} />
               <Route path="news" element={<AnnouncementsTab />} />
               <Route path="team" element={<TeamTab />} />
-              <Route path="cafe" element={<CafeTab />} />
               <Route path="tiers" element={<TiersTab />} />
               <Route path="trackman" element={<TrackmanTab />} />
               <Route path="data-integrity" element={<DataIntegrityTab />} />

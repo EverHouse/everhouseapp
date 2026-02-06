@@ -10,8 +10,9 @@ import DiscountsSubTab from './DiscountsSubTab';
 import { fetchWithCredentials, postWithCredentials, deleteWithCredentials } from '../../../hooks/queries/useFetch';
 import { useConfirmDialog } from '../../../components/ConfirmDialog';
 import { TiersTabSkeleton } from '../../../components/skeletons';
+import CafeTab from './CafeTab';
 
-type SubTab = 'tiers' | 'products' | 'fees' | 'discounts';
+type SubTab = 'tiers' | 'products' | 'fees' | 'discounts' | 'cafe';
 
 interface TierFeature {
     id: number;
@@ -83,7 +84,7 @@ const TiersTab: React.FC = () => {
     const queryClient = useQueryClient();
     const [searchParams, setSearchParams] = useSearchParams();
     const subtabParam = searchParams.get('subtab');
-    const activeSubTab: SubTab = subtabParam === 'products' ? 'products' : subtabParam === 'fees' ? 'fees' : subtabParam === 'discounts' ? 'discounts' : 'tiers';
+    const activeSubTab: SubTab = subtabParam === 'products' ? 'products' : subtabParam === 'fees' ? 'fees' : subtabParam === 'discounts' ? 'discounts' : subtabParam === 'cafe' ? 'cafe' : 'tiers';
     
     const setActiveSubTab = (tab: SubTab) => {
         setSearchParams(params => {
@@ -111,6 +112,7 @@ const TiersTab: React.FC = () => {
         { key: 'products', label: 'Products', icon: 'inventory_2' },
         { key: 'fees', label: 'Fees & Passes', icon: 'receipt_long' },
         { key: 'discounts', label: 'Discounts', icon: 'percent' },
+        { key: 'cafe', label: 'Cafe Menu', icon: 'local_cafe' },
     ];
 
     const { data: tiers = [], isLoading } = useQuery({
@@ -501,6 +503,7 @@ const TiersTab: React.FC = () => {
                 );
             })()}
             {activeSubTab === 'discounts' && <DiscountsSubTab />}
+            {activeSubTab === 'cafe' && <CafeTab />}
 
 
             <SlideUpDrawer 

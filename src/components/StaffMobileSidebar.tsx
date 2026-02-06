@@ -29,15 +29,11 @@ const MAIN_NAV_ITEMS: NavItem[] = [
   { id: 'blocks', icon: 'domain', label: 'Facility' },
   { id: 'updates', icon: 'campaign', label: 'Updates' },
   { id: 'directory', icon: 'group', label: 'Directory' },
-];
-
-const RESOURCES_ITEMS: NavItem[] = [
-  { id: 'cafe', icon: 'local_cafe', label: 'Cafe Menu' },
   { id: 'training', icon: 'school', label: 'Training Guide' },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
-  { id: 'tiers', icon: 'settings', label: 'Stripe Config' },
+  { id: 'tiers', icon: 'storefront', label: 'Products & Pricing' },
   { id: 'team', icon: 'badge', label: 'Manage Team' },
   { id: 'gallery', icon: 'photo_library', label: 'Gallery' },
   { id: 'faqs', icon: 'help_outline', label: 'FAQs' },
@@ -161,17 +157,6 @@ export const StaffMobileSidebar: React.FC<StaffMobileSidebarProps> = ({
             {MAIN_NAV_ITEMS.map(item => (
               <NavButton key={item.id} item={item} />
             ))}
-          </div>
-
-          <div className="mt-6 pt-4 border-t border-white/10">
-            <p className="px-3 mb-2 text-[10px] font-semibold text-white/40 uppercase tracking-wider">
-              Resources
-            </p>
-            <div className="space-y-1">
-              {RESOURCES_ITEMS.map(item => (
-                <NavButton key={item.id} item={item} />
-              ))}
-            </div>
           </div>
 
           {isAdmin && (

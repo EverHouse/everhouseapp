@@ -1,4 +1,4 @@
-export type TabType = 'home' | 'cafe' | 'events' | 'announcements' | 'directory' | 'simulator' | 'team' | 'faqs' | 'inquiries' | 'gallery' | 'tiers' | 'blocks' | 'changelog' | 'training' | 'updates' | 'tours' | 'bugs' | 'trackman' | 'data-integrity' | 'settings' | 'financials';
+export type TabType = 'home' | 'events' | 'announcements' | 'directory' | 'simulator' | 'team' | 'faqs' | 'inquiries' | 'gallery' | 'tiers' | 'blocks' | 'changelog' | 'training' | 'updates' | 'tours' | 'bugs' | 'trackman' | 'data-integrity' | 'settings' | 'financials';
 
 export interface NavItemData {
   id: TabType;
@@ -24,7 +24,6 @@ export const tabToPath: Record<TabType, string> = {
   'updates': '/admin/updates',
   'announcements': '/admin/news',
   'team': '/admin/team',
-  'cafe': '/admin/cafe',
   'tiers': '/admin/tiers',
   'trackman': '/admin/trackman',
   'data-integrity': '/admin/data-integrity',

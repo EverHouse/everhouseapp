@@ -77,7 +77,6 @@ const AdminDashboard: React.FC = () => {
   const getTabTitle = () => {
     switch (activeTab) {
       case 'home': return 'Dashboard';
-      case 'cafe': return 'Cafe Menu';
       case 'events': return 'Calendar';
       case 'announcements': return 'News';
       case 'directory': return 'Directory';
@@ -86,7 +85,7 @@ const AdminDashboard: React.FC = () => {
       case 'faqs': return 'FAQs';
       case 'inquiries': return 'Inquiries';
       case 'gallery': return 'Gallery';
-      case 'tiers': return 'Stripe Config';
+      case 'tiers': return 'Products & Pricing';
       case 'blocks': return 'Notices';
       case 'changelog': return 'Changelog';
       case 'bugs': return 'Bug Reports';

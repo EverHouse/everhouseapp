@@ -69,7 +69,6 @@ const staffRouteImports: Record<string, () => Promise<any>> = {
   '/admin/notices': () => import('../pages/Admin/tabs/BlocksTab'),
   '/admin/updates': () => import('../pages/Admin/tabs/UpdatesTab'),
   '/admin/tours': () => import('../pages/Admin/tabs/ToursTab'),
-  '/admin/cafe': () => import('../pages/Admin/tabs/CafeTab'),
   '/admin/team': () => import('../pages/Admin/tabs/TeamTab'),
   '/admin/tiers': () => import('../pages/Admin/tabs/TiersTab'),
   '/admin/changelog': () => import('../pages/Admin/tabs/ChangelogTab'),

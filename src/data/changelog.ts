@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "70.3.0",
+    date: "2026-02-06",
+    title: "Admin Navigation Consolidation",
+    changes: [
+      "Moved: Cafe Menu management into Products & Pricing page as a new tab — all Stripe-synced products now managed from one place",
+      "Renamed: 'Stripe Config' page is now 'Products & Pricing' for clarity",
+      "Moved: Training Guide from Resources section to main navigation under Directory",
+      "Removed: Resources sidebar section (no longer needed)"
+    ]
+  },
+  {
     version: "70.2.0",
     date: "2026-02-06",
     title: "Stripe Sync — Product Features & Cafe Menu",
