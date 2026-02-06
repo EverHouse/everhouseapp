@@ -898,6 +898,321 @@ export async function ensureSimulatorOverageProduct(): Promise<{
   }
 }
 
+export async function ensureGuestPassProduct(): Promise<{
+  success: boolean;
+  stripeProductId?: string;
+  stripePriceId?: string;
+  action: 'created' | 'exists' | 'error';
+}> {
+  const GUEST_PASS_SLUG = 'guest-pass';
+  const GUEST_PASS_NAME = 'Guest Pass';
+  const GUEST_PASS_PRICE_CENTS = PRICING.GUEST_FEE_CENTS;
+  const GUEST_PASS_DESCRIPTION = 'Bring a guest to the club';
+
+  try {
+    const stripe = await getStripeClient();
+    
+    const existing = await db.select()
+      .from(membershipTiers)
+      .where(eq(membershipTiers.slug, GUEST_PASS_SLUG))
+      .limit(1);
+    
+    let tierId: number;
+    let stripeProductId = existing[0]?.stripeProductId;
+    let stripePriceId = existing[0]?.stripePriceId;
+    
+    if (existing.length === 0) {
+      const [newTier] = await db.insert(membershipTiers).values({
+        name: GUEST_PASS_NAME,
+        slug: GUEST_PASS_SLUG,
+        priceString: `$${GUEST_PASS_PRICE_CENTS / 100}`,
+        description: GUEST_PASS_DESCRIPTION,
+        buttonText: 'Purchase',
+        sortOrder: 97,
+        isActive: true,
+        isPopular: false,
+        showInComparison: false,
+        highlightedFeatures: [],
+        allFeatures: {},
+        dailySimMinutes: 0,
+        guestPassesPerMonth: 0,
+        bookingWindowDays: 0,
+        dailyConfRoomMinutes: 0,
+        canBookSimulators: false,
+        canBookConference: false,
+        canBookWellness: false,
+        hasGroupLessons: false,
+        hasExtendedSessions: false,
+        hasPrivateLesson: false,
+        hasSimulatorGuestPasses: false,
+        hasDiscountedMerch: false,
+        unlimitedAccess: false,
+        productType: 'one_time',
+        priceCents: GUEST_PASS_PRICE_CENTS,
+      }).returning();
+      tierId = newTier.id;
+      console.log(`[Guest Pass Product] Created database record: ${GUEST_PASS_NAME}`);
+    } else {
+      tierId = existing[0].id;
+    }
+    
+    if (!stripeProductId) {
+      const product = await stripe.products.create({
+        name: GUEST_PASS_NAME,
+        description: GUEST_PASS_DESCRIPTION,
+        metadata: {
+          tier_id: tierId.toString(),
+          tier_slug: GUEST_PASS_SLUG,
+          product_type: 'one_time',
+          fee_type: 'guest_pass',
+          app_category: 'fee',
+        },
+      });
+      stripeProductId = product.id;
+      console.log(`[Guest Pass Product] Created Stripe product: ${stripeProductId}`);
+    }
+    
+    if (!stripePriceId) {
+      const price = await stripe.prices.create({
+        product: stripeProductId,
+        unit_amount: GUEST_PASS_PRICE_CENTS,
+        currency: 'usd',
+        metadata: {
+          tier_id: tierId.toString(),
+          tier_slug: GUEST_PASS_SLUG,
+          product_type: 'one_time',
+          app_category: 'fee',
+        },
+      });
+      stripePriceId = price.id;
+      console.log(`[Guest Pass Product] Created Stripe price: ${stripePriceId}`);
+    }
+    
+    await db.update(membershipTiers)
+      .set({
+        stripeProductId,
+        stripePriceId,
+      })
+      .where(eq(membershipTiers.id, tierId));
+    
+    console.log(`[Guest Pass Product] ${GUEST_PASS_NAME} ready (${stripePriceId})`);
+    return { success: true, stripeProductId, stripePriceId, action: existing.length > 0 && existing[0].stripePriceId ? 'exists' : 'created' };
+  } catch (error: any) {
+    console.error('[Guest Pass Product] Error:', error.message);
+    return { success: false, action: 'error' };
+  }
+}
+
+export async function ensureDayPassCoworkingProduct(): Promise<{
+  success: boolean;
+  stripeProductId?: string;
+  stripePriceId?: string;
+  action: 'created' | 'exists' | 'error';
+}> {
+  const COWORKING_SLUG = 'day-pass-coworking';
+  const COWORKING_NAME = 'Day Pass - Coworking';
+  const COWORKING_PRICE_CENTS = 3500;
+  const COWORKING_DESCRIPTION = 'Full day workspace access';
+
+  try {
+    const stripe = await getStripeClient();
+    
+    const existing = await db.select()
+      .from(membershipTiers)
+      .where(eq(membershipTiers.slug, COWORKING_SLUG))
+      .limit(1);
+    
+    let tierId: number;
+    let stripeProductId = existing[0]?.stripeProductId;
+    let stripePriceId = existing[0]?.stripePriceId;
+    
+    if (existing.length === 0) {
+      const [newTier] = await db.insert(membershipTiers).values({
+        name: COWORKING_NAME,
+        slug: COWORKING_SLUG,
+        priceString: `$${COWORKING_PRICE_CENTS / 100}`,
+        description: COWORKING_DESCRIPTION,
+        buttonText: 'Purchase',
+        sortOrder: 96,
+        isActive: true,
+        isPopular: false,
+        showInComparison: false,
+        highlightedFeatures: [],
+        allFeatures: {},
+        dailySimMinutes: 0,
+        guestPassesPerMonth: 0,
+        bookingWindowDays: 0,
+        dailyConfRoomMinutes: 0,
+        canBookSimulators: false,
+        canBookConference: false,
+        canBookWellness: false,
+        hasGroupLessons: false,
+        hasExtendedSessions: false,
+        hasPrivateLesson: false,
+        hasSimulatorGuestPasses: false,
+        hasDiscountedMerch: false,
+        unlimitedAccess: false,
+        productType: 'one_time',
+        priceCents: COWORKING_PRICE_CENTS,
+      }).returning();
+      tierId = newTier.id;
+      console.log(`[Day Pass Coworking Product] Created database record: ${COWORKING_NAME}`);
+    } else {
+      tierId = existing[0].id;
+    }
+    
+    if (!stripeProductId) {
+      const product = await stripe.products.create({
+        name: COWORKING_NAME,
+        description: COWORKING_DESCRIPTION,
+        metadata: {
+          tier_id: tierId.toString(),
+          tier_slug: COWORKING_SLUG,
+          product_type: 'one_time',
+          fee_type: 'day_pass_coworking',
+          app_category: 'fee',
+        },
+      });
+      stripeProductId = product.id;
+      console.log(`[Day Pass Coworking Product] Created Stripe product: ${stripeProductId}`);
+    }
+    
+    if (!stripePriceId) {
+      const price = await stripe.prices.create({
+        product: stripeProductId,
+        unit_amount: COWORKING_PRICE_CENTS,
+        currency: 'usd',
+        metadata: {
+          tier_id: tierId.toString(),
+          tier_slug: COWORKING_SLUG,
+          product_type: 'one_time',
+          app_category: 'fee',
+        },
+      });
+      stripePriceId = price.id;
+      console.log(`[Day Pass Coworking Product] Created Stripe price: ${stripePriceId}`);
+    }
+    
+    await db.update(membershipTiers)
+      .set({
+        stripeProductId,
+        stripePriceId,
+      })
+      .where(eq(membershipTiers.id, tierId));
+    
+    console.log(`[Day Pass Coworking Product] ${COWORKING_NAME} ready (${stripePriceId})`);
+    return { success: true, stripeProductId, stripePriceId, action: existing.length > 0 && existing[0].stripePriceId ? 'exists' : 'created' };
+  } catch (error: any) {
+    console.error('[Day Pass Coworking Product] Error:', error.message);
+    return { success: false, action: 'error' };
+  }
+}
+
+export async function ensureDayPassGolfSimProduct(): Promise<{
+  success: boolean;
+  stripeProductId?: string;
+  stripePriceId?: string;
+  action: 'created' | 'exists' | 'error';
+}> {
+  const GOLF_SIM_SLUG = 'day-pass-golf-sim';
+  const GOLF_SIM_NAME = 'Day Pass - Golf Sim';
+  const GOLF_SIM_PRICE_CENTS = 5000;
+  const GOLF_SIM_DESCRIPTION = '60 minute golf simulator session';
+
+  try {
+    const stripe = await getStripeClient();
+    
+    const existing = await db.select()
+      .from(membershipTiers)
+      .where(eq(membershipTiers.slug, GOLF_SIM_SLUG))
+      .limit(1);
+    
+    let tierId: number;
+    let stripeProductId = existing[0]?.stripeProductId;
+    let stripePriceId = existing[0]?.stripePriceId;
+    
+    if (existing.length === 0) {
+      const [newTier] = await db.insert(membershipTiers).values({
+        name: GOLF_SIM_NAME,
+        slug: GOLF_SIM_SLUG,
+        priceString: `$${GOLF_SIM_PRICE_CENTS / 100}`,
+        description: GOLF_SIM_DESCRIPTION,
+        buttonText: 'Purchase',
+        sortOrder: 95,
+        isActive: true,
+        isPopular: false,
+        showInComparison: false,
+        highlightedFeatures: [],
+        allFeatures: {},
+        dailySimMinutes: 0,
+        guestPassesPerMonth: 0,
+        bookingWindowDays: 0,
+        dailyConfRoomMinutes: 0,
+        canBookSimulators: false,
+        canBookConference: false,
+        canBookWellness: false,
+        hasGroupLessons: false,
+        hasExtendedSessions: false,
+        hasPrivateLesson: false,
+        hasSimulatorGuestPasses: false,
+        hasDiscountedMerch: false,
+        unlimitedAccess: false,
+        productType: 'one_time',
+        priceCents: GOLF_SIM_PRICE_CENTS,
+      }).returning();
+      tierId = newTier.id;
+      console.log(`[Day Pass Golf Sim Product] Created database record: ${GOLF_SIM_NAME}`);
+    } else {
+      tierId = existing[0].id;
+    }
+    
+    if (!stripeProductId) {
+      const product = await stripe.products.create({
+        name: GOLF_SIM_NAME,
+        description: GOLF_SIM_DESCRIPTION,
+        metadata: {
+          tier_id: tierId.toString(),
+          tier_slug: GOLF_SIM_SLUG,
+          product_type: 'one_time',
+          fee_type: 'day_pass_golf_sim',
+          app_category: 'fee',
+        },
+      });
+      stripeProductId = product.id;
+      console.log(`[Day Pass Golf Sim Product] Created Stripe product: ${stripeProductId}`);
+    }
+    
+    if (!stripePriceId) {
+      const price = await stripe.prices.create({
+        product: stripeProductId,
+        unit_amount: GOLF_SIM_PRICE_CENTS,
+        currency: 'usd',
+        metadata: {
+          tier_id: tierId.toString(),
+          tier_slug: GOLF_SIM_SLUG,
+          product_type: 'one_time',
+          app_category: 'fee',
+        },
+      });
+      stripePriceId = price.id;
+      console.log(`[Day Pass Golf Sim Product] Created Stripe price: ${stripePriceId}`);
+    }
+    
+    await db.update(membershipTiers)
+      .set({
+        stripeProductId,
+        stripePriceId,
+      })
+      .where(eq(membershipTiers.id, tierId));
+    
+    console.log(`[Day Pass Golf Sim Product] ${GOLF_SIM_NAME} ready (${stripePriceId})`);
+    return { success: true, stripeProductId, stripePriceId, action: existing.length > 0 && existing[0].stripePriceId ? 'exists' : 'created' };
+  } catch (error: any) {
+    console.error('[Day Pass Golf Sim Product] Error:', error.message);
+    return { success: false, action: 'error' };
+  }
+}
+
 const CORPORATE_PRICING_SLUG = 'corporate-volume-pricing';
 const CORPORATE_PRICING_NAME = 'Corporate Volume Pricing';
 

@@ -108,6 +108,13 @@ export async function runStartupTasks(): Promise<void> {
       
       startupHealth.stripe = 'ok';
 
+      try {
+        const { validateStripeEnvironmentIds } = await import('../core/stripe/environmentValidation');
+        await validateStripeEnvironmentIds();
+      } catch (err: any) {
+        console.error('[Stripe Env] Validation failed:', err.message);
+      }
+
       stripeSync.syncBackfill()
         .then(() => console.log('[Stripe] Data sync complete'))
         .catch((err: any) => {
@@ -124,6 +131,21 @@ export async function runStartupTasks(): Promise<void> {
         .then(({ ensureSimulatorOverageProduct }) => ensureSimulatorOverageProduct())
         .then((result) => console.log(`[Stripe] Simulator Overage product ${result.action}`))
         .catch((err: any) => console.error('[Stripe] Simulator Overage setup failed:', err.message));
+      
+      import('../core/stripe/products.js')
+        .then(({ ensureGuestPassProduct }) => ensureGuestPassProduct())
+        .then((result) => console.log(`[Stripe] Guest Pass product ${result.action}`))
+        .catch((err: any) => console.error('[Stripe] Guest Pass setup failed:', err.message));
+      
+      import('../core/stripe/products.js')
+        .then(({ ensureDayPassCoworkingProduct }) => ensureDayPassCoworkingProduct())
+        .then((result) => console.log(`[Stripe] Day Pass Coworking product ${result.action}`))
+        .catch((err: any) => console.error('[Stripe] Day Pass Coworking setup failed:', err.message));
+      
+      import('../core/stripe/products.js')
+        .then(({ ensureDayPassGolfSimProduct }) => ensureDayPassGolfSimProduct())
+        .then((result) => console.log(`[Stripe] Day Pass Golf Sim product ${result.action}`))
+        .catch((err: any) => console.error('[Stripe] Day Pass Golf Sim setup failed:', err.message));
       
       import('../core/stripe/products.js')
         .then(({ ensureCorporateVolumePricingProduct }) => ensureCorporateVolumePricingProduct())

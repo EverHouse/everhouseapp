@@ -13,6 +13,21 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "70.9.0",
+    date: "2026-02-06",
+    title: "Automatic Stripe Environment Validation & Fee Product Auto-Creation",
+    isMajor: true,
+    changes: [
+      "New: Server startup now validates every stored Stripe ID (products, prices, subscriptions) against the connected Stripe environment — stale IDs from the wrong environment are automatically cleared so the system can rebuild them cleanly",
+      "New: Guest Pass ($25), Day Pass - Coworking ($35), and Day Pass - Golf Sim ($50) products are now auto-created on startup — they'll always exist in whatever Stripe account the server connects to, no manual setup needed",
+      "New: Simulator Overage and Corporate Volume Pricing auto-creation now works correctly after environment changes — the validation clears stale IDs first so the auto-creators detect they need to rebuild",
+      "New: Transaction cache is automatically cleared when an environment change is detected, preventing test data from mixing with live data",
+      "New: Clear startup warnings tell staff exactly what needs manual attention — which subscription tiers and cafe items need 'Sync to Stripe' before member signups or cafe operations will work",
+      "Improved: Error messages across 9 checkout and payment endpoints now give clear, actionable instructions — subscription tiers say 'Run Sync to Stripe from Products & Pricing' and auto-created products say 'This usually resolves on server restart'",
+      "Improved: Stale user subscription IDs are cleared to prevent false alarms in data integrity checks"
+    ]
+  },
+  {
     version: "70.8.0",
     date: "2026-02-06",
     title: "Stripe Deployment Safety & Environment Indicator",

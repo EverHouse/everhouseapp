@@ -424,7 +424,7 @@ router.post('/api/public/day-pass/checkout', async (req: Request, res: Response)
     const tier = tierResult.rows[0];
 
     if (!tier.stripe_price_id) {
-      return res.status(400).json({ error: 'This day pass is not available for purchase yet. Please contact us.' });
+      return res.status(400).json({ error: 'This day pass is not set up in Stripe yet. This usually resolves itself on server restart. Try refreshing in a minute.' });
     }
 
     const stripe = await getStripeClient();

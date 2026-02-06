@@ -139,7 +139,7 @@ router.post('/api/checkout/sessions', checkoutRateLimiter, async (req, res) => {
       ];
     } else {
       if (!tierData.stripePriceId) {
-        return res.status(400).json({ error: 'This tier does not have a configured Stripe price' });
+        return res.status(400).json({ error: 'This membership tier is not set up in Stripe yet. An admin needs to run "Sync to Stripe" from Products & Pricing before signups can be processed.' });
       }
       sessionParams.line_items = [
         {

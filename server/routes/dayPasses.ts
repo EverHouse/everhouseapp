@@ -67,7 +67,7 @@ router.post('/api/day-passes/checkout', checkoutRateLimiter, async (req: Request
 
     if (!product.stripePriceId) {
       return res.status(400).json({ 
-        error: 'Product not synced to Stripe. Please run Sync Tiers to Stripe from admin panel.' 
+        error: 'This day pass is not set up in Stripe yet. This usually resolves itself on server restart. Try refreshing in a minute.' 
       });
     }
 

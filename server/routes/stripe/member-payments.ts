@@ -629,7 +629,7 @@ router.post('/api/member/guest-passes/purchase', async (req: Request, res: Respo
 
     if (!passProduct || !passProduct.stripePriceId || !passProduct.priceCents) {
       return res.status(500).json({
-        error: 'Guest Pass product not configured. Please sync tiers to Stripe first.'
+        error: 'Guest Pass product is not set up in Stripe yet. This usually resolves itself on server restart. Try refreshing in a minute.'
       });
     }
 
@@ -736,7 +736,7 @@ router.post('/api/member/guest-passes/confirm', async (req: Request, res: Respon
 
     if (!passProduct || !passProduct.stripePriceId || !passProduct.priceCents) {
       return res.status(500).json({
-        error: 'Guest Pass product not configured. Please sync tiers to Stripe first.'
+        error: 'Guest Pass product is not set up in Stripe yet. This usually resolves itself on server restart. Try refreshing in a minute.'
       });
     }
 

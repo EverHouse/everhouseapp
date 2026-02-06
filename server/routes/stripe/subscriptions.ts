@@ -218,7 +218,7 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, async
     const tier = tierResult[0];
     
     if (!tier.stripePriceId) {
-      return res.status(400).json({ error: `Tier "${tierName}" does not have a Stripe price configured` });
+      return res.status(400).json({ error: `The "${tierName}" tier is not set up in Stripe yet. Run "Sync to Stripe" from Products & Pricing first.` });
     }
     
     const memberName = `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email;
@@ -372,7 +372,7 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
     const tier = tierResult[0];
     
     if (!tier.stripePriceId) {
-      return res.status(400).json({ error: `Tier "${tier.name}" does not have a Stripe price configured` });
+      return res.status(400).json({ error: `The "${tier.name}" tier is not set up in Stripe yet. Run "Sync to Stripe" from Products & Pricing first.` });
     }
     
     const userId = randomUUID();
@@ -648,7 +648,7 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
     const tier = tierResult[0];
     
     if (!tier.stripePriceId) {
-      return res.status(400).json({ error: `Tier "${tier.name}" does not have a Stripe price configured` });
+      return res.status(400).json({ error: `The "${tier.name}" tier is not set up in Stripe yet. Run "Sync to Stripe" from Products & Pricing first.` });
     }
     
     const userId = randomUUID();

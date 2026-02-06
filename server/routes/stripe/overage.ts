@@ -105,7 +105,7 @@ router.post('/api/stripe/overage/create-payment-intent', async (req: Request, re
     `);
     
     if (productResult.rows.length === 0 || !productResult.rows[0].stripe_price_id) {
-      return res.status(500).json({ error: 'Simulator overage product not configured.' });
+      return res.status(500).json({ error: 'Simulator overage product is not set up in Stripe yet. This usually resolves itself on server restart. Try refreshing in a minute.' });
     }
     
     const overageBlocks = Math.ceil(booking.overage_minutes / 30);
