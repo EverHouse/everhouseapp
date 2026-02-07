@@ -116,6 +116,10 @@ async function checkResourceEventOrder(
   const lastPriority = EVENT_PRIORITY[lastEventType] || 5;
 
   if (lastPriority > currentPriority) {
+    if (eventType === 'customer.subscription.created') {
+      console.log(`[Stripe Webhook] Out-of-order event: ${eventType} (priority ${currentPriority}) after ${lastEventType} (priority ${lastPriority}) for resource ${resourceId} — allowing through because subscription creation should never be skipped`);
+      return true;
+    }
     console.log(`[Stripe Webhook] Out-of-order event: ${eventType} (priority ${currentPriority}) after ${lastEventType} (priority ${lastPriority}) for resource ${resourceId}`);
     return false;
   }

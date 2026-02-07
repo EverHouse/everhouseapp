@@ -1789,6 +1789,20 @@ export async function pullTierFeaturesFromStripe(): Promise<{
           }
         }
 
+        if (tier.dailySimMinutes && tier.dailySimMinutes > 0 && update.dailySimMinutes === 0) {
+          const msg = `SAFETY: Skipping tier "${tier.name}" — dailySimMinutes would drop from ${tier.dailySimMinutes} to 0. This likely indicates a missing Stripe entitlement feature key.`;
+          console.warn(`[Reverse Sync] ${msg}`);
+          errors.push(msg);
+          continue;
+        }
+
+        if (tier.guestPassesPerMonth && tier.guestPassesPerMonth > 0 && update.guestPassesPerMonth === 0) {
+          const msg = `SAFETY: Skipping tier "${tier.name}" — guestPassesPerMonth would drop from ${tier.guestPassesPerMonth} to 0. This likely indicates a missing Stripe entitlement feature key.`;
+          console.warn(`[Reverse Sync] ${msg}`);
+          errors.push(msg);
+          continue;
+        }
+
         update.updatedAt = new Date();
 
         await db.update(membershipTiers)

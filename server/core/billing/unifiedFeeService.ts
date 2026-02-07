@@ -435,7 +435,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
                AND br.status IN ('approved', 'confirmed', 'attended')
                AND (
                  br.session_id IS NULL
-                 OR NOT EXISTS (SELECT 1 FROM usage_ledger ul WHERE ul.session_id = br.session_id)
+                 OR (br.session_id != $3 AND NOT EXISTS (SELECT 1 FROM usage_ledger ul WHERE ul.session_id = br.session_id))
                )
                AND EXISTS (SELECT 1 FROM resources r WHERE r.id = br.resource_id AND r.type = $4)
              GROUP BY LOWER(br.user_email)

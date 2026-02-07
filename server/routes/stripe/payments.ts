@@ -145,12 +145,22 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
                 message: 'Payment already completed' 
               });
             } else if (pi.status === 'requires_payment_method' || pi.status === 'requires_confirmation') {
-              console.log(`[Stripe] Reusing existing payment intent ${existing.stripe_payment_intent_id}`);
-              return res.json({ 
-                clientSecret: pi.client_secret, 
-                paymentIntentId: pi.id,
-                reused: true
-              });
+              if (pi.amount !== Math.round(amountCents)) {
+                console.warn(`[Stripe] Stale payment intent ${existing.stripe_payment_intent_id}: PI amount ${pi.amount} != requested ${Math.round(amountCents)}, cancelling and creating new one`);
+                try {
+                  await cancelPaymentIntent(existing.stripe_payment_intent_id);
+                } catch (cancelErr) {
+                  console.warn('[Stripe] Failed to cancel stale payment intent:', cancelErr);
+                }
+                await pool.query(`DELETE FROM booking_fee_snapshots WHERE id = $1`, [existing.id]);
+              } else {
+                console.log(`[Stripe] Reusing existing payment intent ${existing.stripe_payment_intent_id}`);
+                return res.json({ 
+                  clientSecret: pi.client_secret, 
+                  paymentIntentId: pi.id,
+                  reused: true
+                });
+              }
             }
           } catch (err) {
             console.warn('[Stripe] Failed to check existing payment intent, creating new one');

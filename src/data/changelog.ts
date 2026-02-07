@@ -13,6 +13,21 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.4.0",
+    date: "2026-02-07",
+    title: "Critical Billing & Payment Safety Fixes",
+    isMajor: true,
+    changes: [
+      "Fix: Core members were being incorrectly charged $50 overage fees on bookings within their included 60-minute daily allowance — affected 9 bookings across Feb 5–8 (root cause: the system was accidentally counting a booking's own time as 'prior usage,' doubling the total and triggering a false overage)",
+      "Fix: All 9 affected bookings have been recalculated to the correct $0 fee. Nicholas Sherry's incorrectly collected $50 has been flagged for refund.",
+      "Fix: If a member modifies their booking after starting payment (e.g., adds guests), the system now detects the amount changed and creates a fresh payment request instead of reusing the old one with the wrong amount",
+      "Fix: Free guest passes are now only counted when actually used — previously, paying cash for a guest still counted against the member's monthly free pass allowance",
+      "Fix: When updating corporate group billing in Stripe, if part of the update fails mid-way, the system now properly rolls back Stripe charges to prevent double-billing",
+      "Fix: New membership subscriptions created in Stripe are no longer accidentally skipped if Stripe sends status updates out of order",
+      "Safety: The 'Pull from Stripe' sync now refuses to overwrite tier limits (like daily simulator minutes) with zero if the current value is positive — prevents accidental billing breakage from missing Stripe feature keys"
+    ]
+  },
+  {
     version: "7.3.5",
     date: "2026-02-06",
     title: "Directory Sync Speed Improvement",

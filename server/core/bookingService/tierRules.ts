@@ -185,6 +185,7 @@ export async function getGuestPassesRemaining(memberEmail: string): Promise<numb
        JOIN booking_sessions bs ON bp.session_id = bs.id
        JOIN booking_requests br ON bs.id = br.session_id
        WHERE bp.participant_type = 'guest'
+         AND bp.used_guest_pass = true
          AND bs.session_date >= $1
          AND bs.session_date <= $2
          AND br.status NOT IN ('cancelled', 'declined')

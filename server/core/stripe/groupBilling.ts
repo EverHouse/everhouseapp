@@ -688,6 +688,7 @@ export async function addCorporateMember(params: {
     let insertedMemberId: number | null = null;
     let stripeUpdated = false;
     let priceTierChanged = false;
+    let newStripeItemId: string | null = null;
     let primaryStripeSubscriptionId: string | null = null;
     
     try {
@@ -872,6 +873,7 @@ export async function addCorporateMember(params: {
                 proration_behavior: 'none',
               });
               
+              newStripeItemId = newItem.id;
               corporateItemId = newItem.id;
               priceTierChanged = true;
             } else {
@@ -885,6 +887,17 @@ export async function addCorporateMember(params: {
           }
         } catch (stripeErr: any) {
           console.error('[GroupBilling] Stripe API failed, rolling back DB reservation:', stripeErr);
+          if (newStripeItemId) {
+            try {
+              const stripeForRollback = await getStripeClient();
+              await stripeForRollback.subscriptionItems.del(newStripeItemId, {
+                proration_behavior: 'none',
+              });
+              console.log(`[GroupBilling] Rolled back newly created Stripe subscription item ${newStripeItemId}`);
+            } catch (rollbackErr: any) {
+              console.error(`[GroupBilling] CRITICAL: Failed to delete newly created Stripe subscription item ${newStripeItemId}. Customer may be double-billed. Manual intervention required.`, rollbackErr);
+            }
+          }
           await client.query('ROLLBACK');
           return { success: false, error: 'Failed to update billing. Please try again.' };
         }
