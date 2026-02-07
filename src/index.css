@@ -345,11 +345,6 @@ html.page-dark, html.page-dark body {
   }
 }
 
-/* Apply toolbar padding to body - only affects iOS Safari browser */
-body {
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--safari-toolbar-padding));
-}
-
 /* Safe area bottom filler - transparent to allow content to show through frosted toolbar */
 body::after {
   content: '';
@@ -365,6 +360,7 @@ body::after {
 
 #root {
   background-color: inherit;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--safari-toolbar-padding));
 }
 
 /* Native scrolling container for main content - restores iOS rubber-band physics */
