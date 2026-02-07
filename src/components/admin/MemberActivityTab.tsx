@@ -167,9 +167,15 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
       });
     });
 
-    // Note: visitHistory is NOT added here because attended bookings are already 
-    // included in bookingHistory. Adding visitHistory would create duplicates.
-    // The visitHistory data is still used for the "Visits" filter tab count.
+    (visitHistory || []).filter((v: any) => v.isWalkIn).forEach((visit: any) => {
+      const dateStr = visit.bookingDate;
+      activities.push({
+        id: `walkin-${visit.id}`,
+        type: 'visit',
+        date: new Date(dateStr),
+        data: { ...visit, role: 'Walk-in' },
+      });
+    });
 
     activities.sort((a, b) => b.date.getTime() - a.date.getTime());
 
@@ -187,10 +193,11 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
       const now = new Date();
       const visitHistoryIds = new Set((visitHistory || []).map((v: any) => v.id));
       return allActivities.filter(a => {
+        if (a.type === 'visit') return true;
         if (a.type === 'booking' && visitHistoryIds.has(a.data?.id)) return true;
         if (a.type === 'event') {
           const eventDate = new Date(a.data?.eventDate);
-          return eventDate < now; // Past events count as attended
+          return eventDate < now;
         }
         if (a.type === 'wellness' && a.data?.status === 'attended') return true;
         return false;
@@ -339,10 +346,10 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
   const renderVisitItem = (visit: any) => (
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2 mb-1">
-        <span className="material-symbols-outlined text-green-500 text-lg">{getRoleIcon(visit.role)}</span>
+        <span className="material-symbols-outlined text-green-500 text-lg">{visit.isWalkIn ? 'qr_code_scanner' : getRoleIcon(visit.role)}</span>
         <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{visit.resourceName || 'Visit'}</span>
         {visit.role && (
-          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${getRoleBadgeColor(visit.role)}`}>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${visit.isWalkIn ? 'bg-emerald-500 text-white' : getRoleBadgeColor(visit.role)}`}>
             {visit.role}
           </span>
         )}
@@ -351,6 +358,11 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
         {formatDatePacific(visit.date || visit.bookingDate)}
         {visit.startTime && <> · {formatTime12Hour(visit.startTime)}{visit.endTime && ` - ${formatTime12Hour(visit.endTime)}`}</>}
       </p>
+      {visit.checkedInBy && (
+        <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+          Checked in by {visit.checkedInBy}
+        </p>
+      )}
       {visit.hostName && visit.role === 'Guest' && (
         <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
           Invited by {visit.hostName}

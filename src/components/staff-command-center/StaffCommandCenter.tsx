@@ -135,6 +135,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
             tier: result.tier,
             membershipStatus: result.membershipStatus
           });
+        } else if (result.alreadyCheckedIn) {
+          showToast('This member was already checked in just now', 'info');
         } else {
           showToast(result.error || 'Check-in failed', 'error');
         }

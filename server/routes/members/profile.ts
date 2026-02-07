@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { eq, sql, desc, and, or } from 'drizzle-orm';
 import { db } from '../../db';
+import { pool } from '../../core/db';
 import { 
   users, 
   bookingRequests, 
@@ -504,28 +505,47 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       .where(sql`LOWER(${bookingGuests.guestEmail}) = ${normalizedEmail}`)
       .orderBy(desc(bookingRequests.requestDate));
     
-    // Calculate total attended visits including bookings, events, and wellness
-    // - Simulator bookings with status='attended' (already in visitHistory)
-    // - Past event RSVPs count as attended visits
-    // - Wellness classes with status='attended'
-    const attendedBookingsCount = visitHistory.length;
+    const walkInResult = await pool.query(`
+      SELECT id, member_email, checked_in_by_name, created_at
+      FROM walk_in_visits
+      WHERE LOWER(member_email) = $1
+      ORDER BY created_at DESC
+    `, [normalizedEmail]);
+
+    const walkInItems = walkInResult.rows.map((v: any) => ({
+      id: `walkin-${v.id}`,
+      bookingDate: v.created_at,
+      startTime: null,
+      endTime: null,
+      resourceName: 'Walk-in Visit',
+      resourceType: 'walk_in',
+      guestCount: 0,
+      checkedInBy: v.checked_in_by_name,
+      isWalkIn: true,
+    }));
+
+    const combinedVisitHistory = [...visitHistory, ...walkInItems].sort((a: any, b: any) =>
+      new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime()
+    );
+
+    // Calculate total attended visits including bookings, walk-ins, events, and wellness
+    const attendedBookingsCount = visitHistory.length + walkInItems.length;
     const now = new Date();
     const attendedEventsCount = eventRsvpHistory.filter((e: any) => {
       const eventDate = new Date(e.eventDate);
-      return eventDate < now; // Past events count as attended
+      return eventDate < now;
     }).length;
     const attendedWellnessCount = wellnessHistory.filter((w: any) => w.status === 'attended').length;
     const totalAttendedVisits = attendedBookingsCount + attendedEventsCount + attendedWellnessCount;
     
-    // Return with field names that match frontend MemberHistory interface
     res.json({
       bookingHistory: enrichedBookingHistory,
-      bookingRequestsHistory: [], // Legacy field - requests are now included in bookingHistory
+      bookingRequestsHistory: [],
       eventRsvpHistory: eventRsvpHistory,
       wellnessHistory: wellnessHistory,
       guestPassInfo: guestPassInfo,
       guestCheckInsHistory: guestCheckInsHistory,
-      visitHistory: visitHistory,
+      visitHistory: combinedVisitHistory,
       guestAppearances,
       attendedVisitsCount: totalAttendedVisits
     });

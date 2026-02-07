@@ -1351,6 +1351,14 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
       return res.status(400).json({ error: 'Member ID required' });
     }
 
+    const recentCheckin = await pool.query(
+      `SELECT id, created_at FROM walk_in_visits WHERE member_id = $1 AND created_at > NOW() - INTERVAL '2 minutes' LIMIT 1`,
+      [memberId]
+    );
+    if (recentCheckin.rows.length > 0) {
+      return res.status(409).json({ error: 'This member was already checked in less than 2 minutes ago', alreadyCheckedIn: true });
+    }
+
     const sessionUser = getSessionUser(req);
     const staffEmail = sessionUser?.email || 'unknown';
     const staffName = sessionUser?.name || null;

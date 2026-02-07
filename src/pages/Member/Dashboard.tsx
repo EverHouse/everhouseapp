@@ -235,7 +235,7 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const handleMemberStatsUpdated = (event: CustomEvent) => {
       const detail = event.detail;
-      if (detail?.memberEmail?.toLowerCase() === user?.email?.toLowerCase() && detail?.guestPasses !== undefined) {
+      if (detail?.memberEmail?.toLowerCase() === user?.email?.toLowerCase() && (detail?.guestPasses !== undefined || detail?.lifetimeVisits !== undefined)) {
         queryClient.invalidateQueries({ queryKey: ['member', 'dashboard-data'] });
       }
     };
