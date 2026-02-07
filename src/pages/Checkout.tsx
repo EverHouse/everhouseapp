@@ -4,7 +4,7 @@ import { loadStripe, Stripe } from '@stripe/stripe-js';
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js';
 import Logo from '../components/Logo';
 import EmptyState from '../components/EmptyState';
-import { usePricing } from '@/hooks/usePricing';
+import { usePricing } from '../hooks/usePricing';
 
 interface DayPassProduct {
   id: string;
