@@ -13,9 +13,9 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "7.4.2",
+    version: "7.4.3",
     date: "2026-02-07",
-    title: "Complete Dynamic Pricing Coverage",
+    title: "Complete Dynamic Pricing — Final Sweep",
     changes: [
       "New: /api/pricing endpoint provides current guest fee and overage rate to all frontend components",
       "Fix: Guest payment choice modal now shows the real Stripe price instead of hardcoded $25",
@@ -32,6 +32,11 @@ export const changelog: ChangelogEntry[] = [
       "Fix: Stripe payment helpers fallback now references the centralized pricing config",
       "Fix: Booking page guest fee and overage rate display fallbacks now use the real Stripe price instead of hardcoded $25",
       "Fix: Staff simulator tab guest fee display fallback now uses the real Stripe price instead of hardcoded $25",
+      "Fix: Backend fee calculator overage and guest fee calculations now use the real Stripe price instead of hardcoded $25",
+      "Fix: Trackman admin fee breakdown (overage and empty slot fees) now uses the real Stripe price for all 5 calculation paths",
+      "Fix: Simulator tab tier-based fee estimator now passes real Stripe pricing instead of hardcoded $25",
+      "Fix: Trackman link modal player slot guest count total now uses the real guest fee from Stripe",
+      "Fix: E2E booking test fallback now uses the centralized pricing config",
       "Improvement: All components use a shared pricing hook with 5-minute caching for efficient updates"
     ]
   },

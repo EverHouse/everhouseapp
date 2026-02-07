@@ -1,6 +1,7 @@
 import { pool } from '../core/db';
 import { getOrCreateStripeCustomer } from '../core/stripe/customers';
 import { getStripeClient } from '../core/stripe/client';
+import { PRICING } from '../core/billing/pricingConfig';
 
 const TEST_MEMBER_EMAIL = 'testbooking@example.com';
 const TEST_GUEST_EMAIL = 'testguest@example.com';
@@ -356,7 +357,7 @@ async function runE2ETest() {
           const feeResult = await pool.query(`
             SELECT guest_fee_cents FROM membership_tiers WHERE name = 'Core'
           `);
-          const guestFeeCents = feeResult.rows[0]?.guest_fee_cents || 2500; // $25 default
+          const guestFeeCents = feeResult.rows[0]?.guest_fee_cents || PRICING.GUEST_FEE_CENTS;
           
           // Create a test payment intent for guest fee with the payment method
           const paymentIntent = await stripe.paymentIntents.create({

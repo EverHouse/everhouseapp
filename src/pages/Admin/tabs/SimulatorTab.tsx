@@ -87,15 +87,17 @@ interface Bay {
 function estimateFeeByTier(
     tier: string | null | undefined, 
     durationMinutes: number,
-    declaredPlayerCount: number = 1
+    declaredPlayerCount: number = 1,
+    guestFeeRate: number = 25,
+    overageRate: number = 25
 ): number {
     if (durationMinutes <= 0) return 0;
     
     const playerCount = Math.max(1, declaredPlayerCount);
     const guestCount = Math.max(0, playerCount - 1); // All non-owner slots are guests by default
     
-    // Guest fees per guest slot (default $25, actual value comes from API fee estimate)
-    const guestFees = guestCount * 25;
+    // Guest fees per guest slot (actual value comes from API fee estimate)
+    const guestFees = guestCount * guestFeeRate;
     
     // If no tier, only charge guest fees
     if (!tier) return guestFees;
@@ -122,9 +124,9 @@ function estimateFeeByTier(
     // Calculate owner's overage (only owner pays overage based on their tier)
     const ownerOverageMinutes = Math.max(0, perPersonMinutes - includedMinutes);
     
-    // Fee per 30 min overage block (default $25, actual value comes from API fee estimate)
+    // Fee per 30 min overage block (actual value comes from API fee estimate)
     const ownerOverageBlocks = ownerOverageMinutes > 0 ? Math.ceil(ownerOverageMinutes / 30) : 0;
-    const ownerOverageFee = ownerOverageBlocks * 25;
+    const ownerOverageFee = ownerOverageBlocks * overageRate;
     
     return ownerOverageFee + guestFees;
 }
@@ -745,7 +747,7 @@ const SimulatorTab: React.FC = () => {
     const { setPageReady } = usePageReady();
     const { user, actualUser, members } = useData();
     const queryClient = useQueryClient();
-    const { guestFeeDollars } = usePricing();
+    const { guestFeeDollars, overageRatePerBlockDollars } = usePricing();
     
     const navigateToTab = useCallback((tab: TabType) => {
         if (tabToPath[tab]) {
@@ -2358,7 +2360,7 @@ const SimulatorTab: React.FC = () => {
                                                                     const declPlayers = (booking as any).declared_player_count || 1;
                                                                     const filledPlayers = (booking as any).filled_player_count || 0;
                                                                     const dbOwed = booking.total_owed || 0;
-                                                                    const estimatedFee = estimateFeeByTier((booking as any).tier, booking.duration_minutes || 0, declPlayers);
+                                                                    const estimatedFee = estimateFeeByTier((booking as any).tier, booking.duration_minutes || 0, declPlayers, guestFeeDollars, overageRatePerBlockDollars);
                                                                     // Only show fee button if: actual fees owed OR (roster incomplete AND estimated fees > 0)
                                                                     return booking.has_unpaid_fees === true || dbOwed > 0 || (filledPlayers < declPlayers && estimatedFee > 0);
                                                                 })() ? (
@@ -2366,7 +2368,7 @@ const SimulatorTab: React.FC = () => {
                                                                         const declPlayers = (booking as any).declared_player_count || 1;
                                                                         const filledPlayers = (booking as any).filled_player_count || 0;
                                                                         const dbOwed = booking.total_owed || 0;
-                                                                        const estimatedFee = dbOwed > 0 ? dbOwed : (filledPlayers < declPlayers ? estimateFeeByTier((booking as any).tier, booking.duration_minutes || 0, declPlayers) : 0);
+                                                                        const estimatedFee = dbOwed > 0 ? dbOwed : (filledPlayers < declPlayers ? estimateFeeByTier((booking as any).tier, booking.duration_minutes || 0, declPlayers, guestFeeDollars, overageRatePerBlockDollars) : 0);
                                                                         const isEstimate = !booking.has_unpaid_fees && dbOwed === 0;
                                                                         return (
                                                                             <button
@@ -2692,7 +2694,7 @@ const SimulatorTab: React.FC = () => {
                                                                 const unfilledSlots = (booking as any)?.unfilled_slots ?? 0;
                                                                 const declaredPlayers = (booking as any)?.declared_player_count ?? 1;
                                                                 const filledSlots = Math.max(0, declaredPlayers - unfilledSlots);
-                                                                const estimatedFromTier = estimateFeeByTier((booking as any)?.tier, (booking as any)?.duration_minutes || 0, declaredPlayers);
+                                                                const estimatedFromTier = estimateFeeByTier((booking as any)?.tier, (booking as any)?.duration_minutes || 0, declaredPlayers, guestFeeDollars, overageRatePerBlockDollars);
                                                                 // Only use estimate for incomplete rosters; use actual database value when roster is complete
                                                                 const dbTotalOwed = (booking as any)?.total_owed ?? 0;
                                                                 const hasUnpaidFees = ((booking as any)?.has_unpaid_fees === true) || 

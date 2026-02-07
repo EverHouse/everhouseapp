@@ -163,10 +163,10 @@ export function estimateBookingFees(
 
   const overageMinutes = Math.max(0, (usedMinutesForDay + perPersonMins) - dailyAllowance);
   const overageBlocks = Math.ceil(overageMinutes / 30);
-  const overageFee = overageBlocks * 25;
+  const overageFee = overageBlocks * PRICING.OVERAGE_RATE_DOLLARS;
 
   const guestCount = Math.max(0, safePlayerCount - 1);
-  const guestFees = guestCount * 25;
+  const guestFees = guestCount * PRICING.GUEST_FEE_DOLLARS;
 
   const totalFee = overageFee + guestFees;
 

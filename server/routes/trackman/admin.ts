@@ -1601,17 +1601,17 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
           } else if (isSocialTier) {
             overageMinutes = perPersonMins;
             const overageBlocks = Math.ceil(perPersonMins / 30);
-            fee = overageBlocks * 25;
+            fee = overageBlocks * PRICING.OVERAGE_RATE_DOLLARS;
             feeNote = fee > 0 ? `Social tier - $${fee} (${perPersonMins} min)` : 'Included';
           } else if (dailyAllowance > 0) {
             overageMinutes = Math.max(0, (usedToday + perPersonMins) - dailyAllowance);
             const overageBlocks = Math.ceil(overageMinutes / 30);
-            fee = overageBlocks * 25;
+            fee = overageBlocks * PRICING.OVERAGE_RATE_DOLLARS;
             feeNote = fee > 0 ? `${tier} - $${fee} (overage)` : 'Included in membership';
           } else {
             overageMinutes = perPersonMins;
             const overageBlocks = Math.ceil(perPersonMins / 30);
-            fee = overageBlocks * 25;
+            fee = overageBlocks * PRICING.OVERAGE_RATE_DOLLARS;
             feeNote = `Pay-as-you-go - $${fee}`;
           }
           
@@ -1796,7 +1796,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
         const ownerMember = membersWithFees.find(m => m.isPrimary);
         const nonOwnerMembers = membersWithFees.filter(m => !m.isPrimary && m.userEmail);
         const emptySlots = membersWithFees.filter(m => !m.userEmail);
-        const emptySlotFees = emptySlots.length * 25;
+        const emptySlotFees = emptySlots.length * PRICING.GUEST_FEE_DOLLARS;
         guestFeesWithoutPass = guestsWithFees.filter(g => !g.usedGuestPass).reduce((sum, g) => sum + g.fee, 0) + emptySlotFees;
         ownerOverageFee = ownerMember?.fee || 0;
         totalPlayersOwe = nonOwnerMembers.reduce((sum, m) => sum + m.fee, 0);
@@ -1811,7 +1811,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
       const ownerMember = membersWithFees.find(m => m.isPrimary);
       const nonOwnerMembers = membersWithFees.filter(m => !m.isPrimary && m.userEmail);
       const emptySlots = membersWithFees.filter(m => !m.userEmail);
-      const emptySlotFees = emptySlots.length * 25;
+      const emptySlotFees = emptySlots.length * PRICING.GUEST_FEE_DOLLARS;
       guestFeesWithoutPass = guestsWithFees.filter(g => !g.usedGuestPass).reduce((sum, g) => sum + g.fee, 0) + emptySlotFees;
       ownerOverageFee = ownerMember?.fee || 0;
       totalPlayersOwe = nonOwnerMembers.reduce((sum, m) => sum + m.fee, 0);

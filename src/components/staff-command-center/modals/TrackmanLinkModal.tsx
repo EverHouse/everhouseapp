@@ -1274,7 +1274,7 @@ export function TrackmanLinkModal({
             {filledSlotsCount > 0 && (
               <span className="text-xs text-primary/60 dark:text-white/60">
                 {filledSlotsCount} player{filledSlotsCount !== 1 ? 's' : ''}
-                {guestCount > 0 && ` (${guestCount} guest${guestCount !== 1 ? 's' : ''} = $${guestCount * 25})`}
+                {guestCount > 0 && ` (${guestCount} guest${guestCount !== 1 ? 's' : ''} = $${guestCount * guestFeeDollars})`}
               </span>
             )}
           </div>

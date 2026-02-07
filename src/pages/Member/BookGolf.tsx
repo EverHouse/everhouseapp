@@ -420,7 +420,7 @@ const BookGolf: React.FC = () => {
   });
 
   // Fee Estimate Query (debounced via staleTime)
-  // Count ALL guest-type slots for fee estimation - each slot is $25 unless:
+  // Count ALL guest-type slots for fee estimation - each slot incurs the current guest fee unless:
   // 1. A member with Core tier or above fills the slot (type becomes 'member')
   // 2. A guest pass is used (handled by backend)
   const guestCount = activeTab === 'simulator' 
@@ -967,7 +967,7 @@ const BookGolf: React.FC = () => {
             }))
         : undefined;
 
-      // Use full playerCount since all guest slots are charged $25
+      // Use full playerCount since all guest slots are charged the guest fee rate
       // (unless member with Core+ fills slot or guest pass is used)
       await createBookingMutation.mutateAsync({
         user_email: effectiveUser.email,
@@ -1483,7 +1483,7 @@ const BookGolf: React.FC = () => {
                     const myUsageMinutes = perPersonMins;
                     const overageMinutes = Math.max(0, (usedMinutesForDay + myUsageMinutes) - dailyAllowance);
                     const overageBlocks = Math.ceil(overageMinutes / 30);
-                    const overageFee = overageBlocks * 25;
+                    const overageFee = overageBlocks * overageRatePerBlockDollars;
                     const hasOverage = overageMinutes > 0;
                     
                     return (
