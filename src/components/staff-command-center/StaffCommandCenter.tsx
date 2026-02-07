@@ -24,6 +24,7 @@ import { QuickActionsGrid } from './sections/QuickActionsGrid';
 import { CheckinBillingModal } from './modals/CheckinBillingModal';
 import { CompleteRosterModal } from './modals/CompleteRosterModal';
 import QrScannerModal from './modals/QrScannerModal';
+import CheckInConfirmationModal from './modals/CheckInConfirmationModal';
 import { TrackmanBookingModal } from './modals/TrackmanBookingModal';
 import { TrackmanLinkModal } from './modals/TrackmanLinkModal';
 import { StaffManualBookingModal, type StaffManualBookingData } from './modals/StaffManualBookingModal';
@@ -68,6 +69,13 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   const [announcementDrawerOpen, setAnnouncementDrawerOpen] = useState(false);
   const [noticeDrawerOpen, setNoticeDrawerOpen] = useState(false);
   const [trackmanModal, setTrackmanModal] = useState<{ isOpen: boolean; booking: BookingRequest | null }>({ isOpen: false, booking: null });
+  const [checkinConfirmation, setCheckinConfirmation] = useState<{
+    isOpen: boolean;
+    memberName: string;
+    pinnedNotes: Array<{ content: string; createdBy: string }>;
+    tier?: string | null;
+    membershipStatus?: string | null;
+  }>({ isOpen: false, memberName: '', pinnedNotes: [] });
   const [trackmanLinkModal, setTrackmanLinkModal] = useState<{
     isOpen: boolean;
     trackmanBookingId: string | null;
@@ -104,7 +112,38 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
     };
   }, [showToast, refresh]);
 
-  const handleScanSuccess = (decodedText: string) => {
+  const handleScanSuccess = async (decodedText: string) => {
+    setQrScannerOpen(false);
+
+    const memberMatch = decodedText.match(/^MEMBER:(.+)$/);
+    if (memberMatch) {
+      const memberId = memberMatch[1];
+      try {
+        showToast('Processing check-in...', 'info');
+        const response = await fetch('/api/staff/qr-checkin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ memberId })
+        });
+        const result = await response.json();
+        if (response.ok && result.success) {
+          setCheckinConfirmation({
+            isOpen: true,
+            memberName: result.memberName,
+            pinnedNotes: result.pinnedNotes || [],
+            tier: result.tier,
+            membershipStatus: result.membershipStatus
+          });
+        } else {
+          showToast(result.error || 'Check-in failed', 'error');
+        }
+      } catch (err) {
+        showToast('Failed to process check-in', 'error');
+      }
+      return;
+    }
+
     try {
       const scanData = JSON.parse(decodedText);
       if (scanData.bookingId) {
@@ -121,7 +160,6 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
     } catch (error) {
       showToast('Invalid QR code.', 'error');
     }
-    setQrScannerOpen(false);
   };
   
   const safeRevertOptimisticUpdate = useCallback((
@@ -686,6 +724,15 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         isOpen={qrScannerOpen}
         onClose={() => setQrScannerOpen(false)}
         onScanSuccess={handleScanSuccess}
+      />
+
+      <CheckInConfirmationModal
+        isOpen={checkinConfirmation.isOpen}
+        onClose={() => setCheckinConfirmation(prev => ({ ...prev, isOpen: false }))}
+        memberName={checkinConfirmation.memberName}
+        pinnedNotes={checkinConfirmation.pinnedNotes}
+        tier={checkinConfirmation.tier}
+        membershipStatus={checkinConfirmation.membershipStatus}
       />
 
       <TrackmanBookingModal

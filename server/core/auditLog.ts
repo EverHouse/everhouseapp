@@ -99,6 +99,7 @@ export type AuditAction =
   // Staff checkin actions
   | 'review_waiver'
   | 'direct_add_participant'
+  | 'qr_walkin_checkin'
   // Settings/Admin actions
   | 'view_directory'
   | 'export_directory'

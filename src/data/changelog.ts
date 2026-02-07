@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.9.0",
+    date: "2026-02-07",
+    title: "QR Check-In & Membership Card Improvements",
+    changes: [
+      "New: Walk-in QR check-in — staff can scan a member's QR code to record a visit even without a booking, with automatic visit count tracking and HubSpot sync",
+      "New: Staff check-in confirmation popup — after scanning a member's QR code, a brief modal shows the member's name, tier, and any pinned staff notes, then auto-dismisses after a few seconds",
+      "New: QR code added to the membership card popup on the dashboard — members can now tap their card and show the QR code at the front desk for quick check-in",
+      "Improvement: Removed the separate 'Digital Access Card' section from the profile page since the QR code now lives on the membership card popup",
+      "Improvement: Removed the redundant 'Membership' section from the bottom of the profile page — the same info is already on the membership card popup",
+    ],
+  },
+  {
     version: "7.8.1",
     date: "2026-02-07",
     title: "Google Sign-In Fix & Quieter Error Alerts",

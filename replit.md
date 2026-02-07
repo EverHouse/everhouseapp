@@ -61,7 +61,7 @@ The application uses a React 19 frontend with Vite and Tailwind CSS, connected t
 - **Payment Recovery (Dunning)**: Tracks failed payments, retries, and member notifications.
 - **Grace Period System**: 3-day grace period for billing failures.
 - **Day Pass System**: Non-member day pass purchases with visitor matching and QR code delivery.
-- **QR Code System**: QR codes for day passes and digital access cards for members, with staff scanning.
+- **QR Code System**: QR codes for day passes and member check-in (on membership card popup). Walk-in QR check-in records visits without a booking. Staff sees confirmation modal with member name, tier, and pinned notes.
 - **Corporate Membership**: Unified billing groups, volume pricing, corporate checkout, HubSpot sync, individual tracking.
 - **Data Integrity Architecture**: Stripe as source of truth for billing, transaction rollback, webhook idempotency, and dual-source active tracking with HubSpot.
 - **Stripe Member Auto-Fix**: Login flow verifies Stripe subscription status and corrects `membership_status`.

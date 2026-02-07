@@ -15,6 +15,7 @@ import { logFromRequest } from '../core/auditLog';
 import { PRICING } from '../core/billing/pricingConfig';
 import { enforceSocialTierRules, type ParticipantForValidation } from '../core/bookingService/tierRules';
 import { broadcastMemberStatsUpdated } from '../core/websocket';
+import { updateHubSpotContactVisitCount } from '../core/memberSync';
 
 const router = Router();
 
@@ -1340,6 +1341,92 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
     res.status(400).json({ error: 'Invalid participant type' });
   } catch (error: any) {
     logAndRespond(req, res, 500, 'Failed to add participant directly', error);
+  }
+});
+
+router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { memberId } = req.body;
+    if (!memberId) {
+      return res.status(400).json({ error: 'Member ID required' });
+    }
+
+    const sessionUser = getSessionUser(req);
+    const staffEmail = sessionUser?.email || 'unknown';
+    const staffName = sessionUser?.name || null;
+
+    const memberResult = await pool.query<{
+      id: string;
+      email: string;
+      first_name: string | null;
+      last_name: string | null;
+      name: string | null;
+      membership_status: string | null;
+      tier_name: string | null;
+      hubspot_id: string | null;
+      lifetime_visits: number | null;
+    }>(`
+      SELECT u.id, u.email, u.first_name, u.last_name, u.name, u.membership_status, u.tier_name, u.hubspot_id, u.lifetime_visits
+      FROM users u
+      WHERE u.id = $1
+      LIMIT 1
+    `, [memberId]);
+
+    if (memberResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    const member = memberResult.rows[0];
+    const displayName = member.name || [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email.split('@')[0];
+
+    const updateResult = await pool.query<{ lifetime_visits: number }>(
+      `UPDATE users SET lifetime_visits = COALESCE(lifetime_visits, 0) + 1 WHERE id = $1 RETURNING lifetime_visits`,
+      [memberId]
+    );
+    const newVisitCount = updateResult.rows[0]?.lifetime_visits || 1;
+
+    if (member.hubspot_id) {
+      updateHubSpotContactVisitCount(member.hubspot_id, newVisitCount)
+        .catch(err => console.error('[QR Checkin] Failed to sync visit count to HubSpot:', err));
+    }
+
+    broadcastMemberStatsUpdated(member.email, { lifetimeVisits: newVisitCount });
+
+    await pool.query(
+      `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())`,
+      [member.email, 'Check-In Complete', `Welcome back! You've been checked in by staff.`, 'booking', 'booking']
+    );
+
+    const pinnedNotesResult = await pool.query<{ content: string; created_by_name: string | null }>(
+      `SELECT content, created_by_name FROM member_notes WHERE member_email = $1 AND is_pinned = true ORDER BY created_at DESC`,
+      [member.email]
+    );
+    const pinnedNotes = pinnedNotesResult.rows.map(n => ({
+      content: n.content,
+      createdBy: n.created_by_name || 'Staff'
+    }));
+
+    logFromRequest(req, 'qr_walkin_checkin', 'member', memberId, displayName, {
+      memberEmail: member.email,
+      tier: member.tier_name,
+      lifetimeVisits: newVisitCount,
+      type: 'walk_in'
+    });
+
+    console.log(`[QR Checkin] Walk-in check-in: ${displayName} (${member.email}) by ${staffEmail}. Visit #${newVisitCount}`);
+
+    res.json({
+      success: true,
+      memberName: displayName,
+      memberEmail: member.email,
+      tier: member.tier_name,
+      lifetimeVisits: newVisitCount,
+      pinnedNotes,
+      membershipStatus: member.membership_status
+    });
+  } catch (error: any) {
+    logAndRespond(req, res, 500, 'Failed to process QR check-in', error);
   }
 });
 
