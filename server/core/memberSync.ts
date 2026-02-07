@@ -290,7 +290,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
       
       const results = await Promise.allSettled(
         batch.map(contact => syncLimit(async () => {
-          const email = contact.properties.email?.toLowerCase();
+          let email = contact.properties.email?.toLowerCase();
           if (!email) return null;
           
           const status = (contact.properties.membership_status || 'non-member').toLowerCase();
@@ -342,6 +342,13 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           // Stripe delinquent status (comes as "true"/"false" string)
           const stripeDelinquent = parseOptIn(contact.properties.stripe_delinquent);
           
+          const { resolveUserByEmail } = await import('./stripe/customers');
+          const resolvedSync = await resolveUserByEmail(email);
+          if (resolvedSync && resolvedSync.matchType !== 'direct') {
+            console.log(`[MemberSync] HubSpot email ${email} resolved to existing user ${resolvedSync.primaryEmail} via ${resolvedSync.matchType}`);
+            email = resolvedSync.primaryEmail.toLowerCase();
+          }
+
           const existingUser = await db.select({ 
             membershipStatus: users.membershipStatus,
             lastHubspotNotesHash: users.lastHubspotNotesHash
@@ -832,7 +839,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
       
       const results = await Promise.allSettled(
         batch.map(contact => syncLimit(async () => {
-          const email = contact.properties.email?.toLowerCase();
+          let email = contact.properties.email?.toLowerCase();
           if (!email) return null;
           
           const status = (contact.properties.membership_status || 'non-member').toLowerCase();
@@ -875,6 +882,13 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
           
           const stripeDelinquent = parseOptIn(contact.properties.stripe_delinquent);
           
+          const { resolveUserByEmail } = await import('./stripe/customers');
+          const resolvedSync = await resolveUserByEmail(email);
+          if (resolvedSync && resolvedSync.matchType !== 'direct') {
+            console.log(`[MemberSync] HubSpot email ${email} resolved to existing user ${resolvedSync.primaryEmail} via ${resolvedSync.matchType}`);
+            email = resolvedSync.primaryEmail.toLowerCase();
+          }
+
           const existingUser = await db.select({ 
             membershipStatus: users.membershipStatus,
             lastHubspotNotesHash: users.lastHubspotNotesHash

@@ -784,7 +784,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
       return res.status(400).json({ error: 'Email and code are required' });
     }
     
-    const normalizedEmail = normalizeEmail(email);
+    let normalizedEmail = normalizeEmail(email);
     const normalizedCode = code.toString().trim();
     
     const attemptCheck = await checkOtpVerifyAttempts(normalizedEmail);
@@ -867,6 +867,13 @@ router.post('/api/auth/verify-otp', async (req, res) => {
     } else {
       // HYBRID APPROACH: Check database first for Stripe-billed members
       // Fall back to HubSpot only for Mindbody legacy members
+      const { resolveUserByEmail } = await import('../core/stripe/customers');
+      const resolvedLogin = await resolveUserByEmail(normalizedEmail);
+      if (resolvedLogin && resolvedLogin.matchType !== 'direct') {
+        console.log(`[Auth] Login email ${normalizedEmail} resolved to existing user ${resolvedLogin.primaryEmail} via ${resolvedLogin.matchType}`);
+        normalizedEmail = resolvedLogin.primaryEmail.toLowerCase();
+      }
+
       const dbUser = await db.select({
         id: users.id,
         firstName: users.firstName,

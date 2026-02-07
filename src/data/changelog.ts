@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.6.2",
+    date: "2026-02-07",
+    title: "Login & HubSpot Sync Deduplication — Final Gaps Closed",
+    changes: [
+      "Fix: Login flow now checks linked emails — if a member logs in with an alternate email we have on file, they're matched to their existing account instead of getting a new one",
+      "Fix: HubSpot bulk sync now checks linked emails before creating or updating users — prevents duplicates when a HubSpot contact's email is a known alternate email in our system (both full sync and delta sync paths)",
+    ],
+  },
+  {
     version: "7.6.1",
     date: "2026-02-07",
     title: "Deduplication Coverage Audit — 5 Additional Entry Points Secured",
