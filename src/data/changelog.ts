@@ -19,6 +19,7 @@ export const changelog: ChangelogEntry[] = [
     changes: [
       "New: Walk-in QR check-ins now appear in the staff dashboard's recent activity feed with a scanner icon and staff name",
       "Fix: Lifetime visit counts now include walk-in check-ins everywhere — membership card, staff profile drawer, member directory, and HubSpot contacts all previously missed walk-in visits",
+      "Fix: MindBody imports can no longer overwrite visit counts — they now only increase the count, never decrease it, so walk-in check-ins and other locally-tracked visits are preserved",
       "Improvement: Check-in confirmation popup now shows amber warnings for cancelled, suspended, or inactive memberships — not just expired",
       "Fix: Member dashboard now refreshes visit count in real-time after a walk-in check-in",
       "Improvement: Duplicate QR scan within 2 minutes shows a friendly 'already checked in' message instead of an error",

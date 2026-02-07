@@ -755,13 +755,9 @@ export async function importAttendanceFromCSV(csvPath: string): Promise<{
         continue;
       }
       
-      // Update user's lifetime visits
-      const updated = await db.update(users)
-        .set({
-          lifetimeVisits: totalVisits,
-          updatedAt: new Date(),
-        })
-        .where(eq(users.mindbodyClientId, clientId));
+      // Update user's lifetime visits — use GREATEST so MindBody data
+      // never overwrites a higher count from walk-in check-ins or other sources
+      await db.execute(sql`UPDATE users SET lifetime_visits = GREATEST(COALESCE(lifetime_visits, 0), ${totalVisits}), updated_at = NOW() WHERE mindbody_client_id = ${clientId}`);
       
       result.updated++;
     } catch (error) {
