@@ -13,6 +13,21 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.10.0",
+    date: "2026-02-07",
+    title: "ID & Driver's License Scanning",
+    isMajor: true,
+    changes: [
+      "New: Staff can scan a member's driver's license or ID card during registration — the system uses AI to automatically read and fill in the name, date of birth, and address fields",
+      "New: Live camera preview with a banking-app-style guide overlay helps staff position the ID correctly before capturing",
+      "New: Image quality feedback — the system warns if the photo is too blurry, too dark, has glare, or is partially obscured, and suggests retaking",
+      "New: File upload option — staff can also upload an existing photo of an ID instead of using the camera",
+      "New: Scanned ID images are securely stored on the member's record for future reference",
+      "New: 'ID on File' section in the member profile drawer — staff can view the stored ID image full-size, re-scan, or remove it",
+      "New: ID scanning works for both new member and visitor registration flows",
+    ],
+  },
+  {
     version: "7.9.1",
     date: "2026-02-07",
     title: "QR Check-In Refinements & Activity Feed",

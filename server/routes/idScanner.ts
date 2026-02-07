@@ -5,6 +5,7 @@ import { ObjectStorageService } from '../replit_integrations/object_storage';
 import { db } from '../db';
 import { users } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
+import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
@@ -19,6 +20,11 @@ router.post('/api/admin/scan-id', isStaffOrAdmin, async (req, res) => {
 
     if (!['image/jpeg', 'image/png'].includes(mimeType)) {
       return res.status(400).json({ error: 'Invalid mimeType. Must be image/jpeg or image/png' });
+    }
+
+    const maxSizeBytes = 10 * 1024 * 1024; // 10MB limit
+    if (Buffer.byteLength(image, 'base64') > maxSizeBytes) {
+      return res.status(400).json({ error: 'Image too large. Maximum size is 10MB.' });
     }
 
     const dataUrl = `data:${mimeType};base64,${image}`;
@@ -88,6 +94,12 @@ Even if quality is poor, still attempt to extract whatever information is visibl
     };
     const quality = parsed.quality || { isReadable: false, qualityIssues: ['parse_error'] };
 
+    logFromRequest(req, 'scan_id', 'member', undefined, undefined, {
+      isReadable: quality.isReadable,
+      qualityIssues: quality.qualityIssues,
+      fieldsExtracted: Object.entries(data).filter(([_, v]) => v !== null).map(([k]) => k),
+    });
+
     res.json({
       success: true,
       data,
@@ -111,6 +123,11 @@ router.post('/api/admin/save-id-image', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Invalid mimeType. Must be image/jpeg or image/png' });
     }
 
+    const maxSizeBytes = 10 * 1024 * 1024; // 10MB limit
+    if (Buffer.byteLength(image, 'base64') > maxSizeBytes) {
+      return res.status(400).json({ error: 'Image too large. Maximum size is 10MB.' });
+    }
+
     const uploadURL = await objectStorageService.getObjectEntityUploadURL();
     const buffer = Buffer.from(image, 'base64');
     const uploadResponse = await fetch(uploadURL, {
@@ -127,6 +144,8 @@ router.post('/api/admin/save-id-image', isStaffOrAdmin, async (req, res) => {
     const publicUrl = `/objects${objectPath.replace('/objects', '')}`;
 
     await db.update(users).set({ idImageUrl: publicUrl }).where(eq(users.id, userId));
+
+    logFromRequest(req, 'save_id_image', 'member', userId, undefined, { imageUrl: publicUrl });
 
     res.json({ success: true, imageUrl: publicUrl });
   } catch (error: any) {
@@ -157,6 +176,8 @@ router.delete('/api/admin/member/:userId/id-image', isStaffOrAdmin, async (req, 
     const { userId } = req.params;
 
     await db.update(users).set({ idImageUrl: null }).where(eq(users.id, userId));
+
+    logFromRequest(req, 'delete_id_image', 'member', userId);
 
     res.json({ success: true });
   } catch (error: any) {

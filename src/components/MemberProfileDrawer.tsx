@@ -261,7 +261,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
   }, [member?.email]);
 
   const fetchIdImage = useCallback(async () => {
-    if (!member?.id || !isAdmin) return;
+    if (!member?.id) return;
     setIsLoadingIdImage(true);
     try {
       const res = await fetch(`/api/admin/member/${encodeURIComponent(member.id)}/id-image`, { credentials: 'include' });
@@ -274,7 +274,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
     } finally {
       setIsLoadingIdImage(false);
     }
-  }, [member?.id, isAdmin]);
+  }, [member?.id]);
 
   useEffect(() => {
     if (isOpen && member) {
@@ -285,10 +285,10 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
   }, [isOpen, member, fetchMemberData]);
 
   useEffect(() => {
-    if (isOpen && member && isAdmin) {
+    if (isOpen && member) {
       fetchIdImage();
     }
-  }, [isOpen, member, isAdmin, fetchIdImage]);
+  }, [isOpen, member, fetchIdImage]);
 
   useEffect(() => {
     const handleStatsUpdate = (event: CustomEvent) => {
@@ -737,7 +737,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
               </div>
             )}
 
-            {isAdmin && (
+            {(
               <div 
                 className="animate-slide-up-stagger"
                 style={{ '--stagger-index': 2 } as React.CSSProperties}
