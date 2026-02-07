@@ -126,8 +126,14 @@ export function registerAuthRoutes(app: Express): void {
       );
       const lastActivityDate = lastActivityResult.rows[0]?.last_date || null;
       
-      // Total lifetime visits = past bookings + past event RSVPs + past wellness enrollments
-      const totalLifetimeVisits = pastBookingsCount + pastEventsCount + pastWellnessCount;
+      const walkInResult = await pool.query(
+        `SELECT COUNT(*)::int as count FROM walk_in_visits WHERE LOWER(member_email) = LOWER($1)`,
+        [user.email]
+      );
+      const walkInCount = walkInResult.rows[0]?.count || 0;
+
+      // Total lifetime visits = past bookings + past event RSVPs + past wellness enrollments + walk-ins
+      const totalLifetimeVisits = pastBookingsCount + pastEventsCount + pastWellnessCount + walkInCount;
       
       res.json({
         id: user.id,

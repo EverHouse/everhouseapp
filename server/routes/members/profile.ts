@@ -104,7 +104,7 @@ router.get('/api/members/:email/details', isAuthenticated, memberLookupRateLimit
     const user = userResult[0];
     
     // Run all count queries in parallel for better performance
-    const [pastBookingsResult, pastEventsResult, pastWellnessResult, lastActivityResult] = await Promise.all([
+    const [pastBookingsResult, pastEventsResult, pastWellnessResult, lastActivityResult, walkInResult] = await Promise.all([
       db.execute(sql`
         SELECT COUNT(DISTINCT booking_id) as count FROM (
           SELECT id as booking_id FROM booking_requests
@@ -176,13 +176,18 @@ router.get('/api/members/:email/details', isAuthenticated, memberLookupRateLimit
             AND we.status != 'cancelled'
             AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
         ) combined
-      `)
+      `),
+      pool.query(
+        `SELECT COUNT(*)::int as count FROM walk_in_visits WHERE LOWER(member_email) = $1`,
+        [normalizedEmail]
+      )
     ]);
     
     const pastBookingsCount = Number((pastBookingsResult as any).rows?.[0]?.count || 0);
     const pastEventsCount = Number(pastEventsResult[0]?.count || 0);
     const pastWellnessCount = Number(pastWellnessResult[0]?.count || 0);
-    const totalLifetimeVisits = pastBookingsCount + pastEventsCount + pastWellnessCount;
+    const walkInCount = (walkInResult as any).rows?.[0]?.count || 0;
+    const totalLifetimeVisits = pastBookingsCount + pastEventsCount + pastWellnessCount + walkInCount;
     
     const lastBookingDateRaw = (lastActivityResult as any).rows?.[0]?.last_date;
     const lastBookingDate = lastBookingDateRaw 

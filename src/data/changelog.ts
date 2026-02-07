@@ -18,7 +18,7 @@ export const changelog: ChangelogEntry[] = [
     title: "QR Check-In Refinements & Activity Feed",
     changes: [
       "New: Walk-in QR check-ins now appear in the staff dashboard's recent activity feed with a scanner icon and staff name",
-      "Fix: Member directory visit counts now include walk-in check-ins — previously only counted bookings, events, and wellness visits",
+      "Fix: Lifetime visit counts now include walk-in check-ins everywhere — membership card, staff profile drawer, member directory, and HubSpot contacts all previously missed walk-in visits",
       "Improvement: Check-in confirmation popup now shows amber warnings for cancelled, suspended, or inactive memberships — not just expired",
       "Fix: Member dashboard now refreshes visit count in real-time after a walk-in check-in",
       "Improvement: Duplicate QR scan within 2 minutes shows a friendly 'already checked in' message instead of an error",

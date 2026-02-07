@@ -497,6 +497,16 @@ async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
     wellnessVisitsMap[row.email] = row.count;
   }
   
+  const walkInCountResult = await pool.query(`
+    SELECT LOWER(member_email) as email, COUNT(*)::int as count
+    FROM walk_in_visits
+    GROUP BY LOWER(member_email)
+  `);
+  const walkInCounts: Record<string, number> = {};
+  for (const row of walkInCountResult.rows) {
+    walkInCounts[row.email] = row.count;
+  }
+
   // Merge contact data with database data
   // Join date logic handles batch-import vs post-import contacts differently
   return contacts.map((contact: any) => {
@@ -529,7 +539,7 @@ async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
     
     return {
       ...contact,
-      lifetimeVisits: pastBookings + eventVisits + wellnessVisits,
+      lifetimeVisits: pastBookings + eventVisits + wellnessVisits + (walkInCounts[emailLower] || 0),
       joinDate: normalizedJoinDate,
       mindbodyClientId: dbUser?.mindbody_client_id || null,
       manuallyLinkedEmails: dbUser?.manually_linked_emails || [],
