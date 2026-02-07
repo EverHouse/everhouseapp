@@ -850,6 +850,18 @@ function MemberFlow({
       
       setActivationUrl(data.checkoutUrl);
       showToast(`Activation link sent to ${form.email}`, 'success');
+      if (scannedIdImage && data.userId) {
+        fetch('/api/admin/save-id-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            userId: data.userId,
+            image: scannedIdImage.base64,
+            mimeType: scannedIdImage.mimeType,
+          }),
+        }).catch(err => console.error('Failed to save ID image:', err));
+      }
       onSuccess({ 
         id: data.userId, 
         email: form.email, 
@@ -905,6 +917,18 @@ function MemberFlow({
         await navigator.clipboard.writeText(data.checkoutUrl);
         setActivationUrl(data.checkoutUrl);
         showToast('Activation link copied to clipboard!', 'success');
+        if (scannedIdImage && data.userId) {
+          fetch('/api/admin/save-id-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              userId: data.userId,
+              image: scannedIdImage.base64,
+              mimeType: scannedIdImage.mimeType,
+            }),
+          }).catch(err => console.error('Failed to save ID image:', err));
+        }
       } else {
         throw new Error('No checkout URL returned');
       }
