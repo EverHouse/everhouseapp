@@ -1,116 +1,135 @@
 import { getResendClient } from '../utils/resend';
 import { logger } from './logger';
-import * as fs from 'fs';
-import * as path from 'path';
+import { pool } from './db';
 
 const ALERT_EMAIL = process.env.ALERT_EMAIL || 'nick@evenhouse.club';
-const ALERT_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour between same-type alerts
-const MAX_ALERTS_PER_HOUR = 2; // Very strict hourly limit
-const MAX_ALERTS_PER_DAY = 6; // Very strict daily limit to prevent floods
-const RATE_LIMIT_FILE = '/tmp/alert_rate_limits.json';
+const ALERT_COOLDOWN_MS = 4 * 60 * 60 * 1000; // 4 hours between same-type alerts
+const MAX_ALERTS_PER_DAY = 3; // Strict daily limit
+const STARTUP_GRACE_PERIOD_MS = 5 * 60 * 1000; // No alerts for first 5 minutes after startup
+const serverStartTime = Date.now();
 
-interface AlertRecord {
-  lastSent: number;
-  count: number;
+const TRANSIENT_ERROR_PATTERNS = [
+  /ECONNRESET/i,
+  /ECONNREFUSED/i,
+  /ETIMEDOUT/i,
+  /EPIPE/i,
+  /socket hang up/i,
+  /network.*(timeout|error)/i,
+  /fetch failed/i,
+  /aborted/i,
+  /EHOSTUNREACH/i,
+  /EAI_AGAIN/i,
+  /rate.?limit/i,
+  /too many requests/i,
+  /429/,
+  /503.*service unavailable/i,
+  /502.*bad gateway/i,
+];
+
+function isTransientError(message: string): boolean {
+  return TRANSIENT_ERROR_PATTERNS.some(pattern => pattern.test(message));
 }
 
-interface RateLimitState {
-  alertHistory: Record<string, AlertRecord>;
-  alertsThisHour: number;
+function isInStartupGracePeriod(): boolean {
+  return (Date.now() - serverStartTime) < STARTUP_GRACE_PERIOD_MS;
+}
+
+interface DailyState {
   alertsToday: number;
-  hourStart: number;
   dayStart: number;
+  keyLastSent: Record<string, number>;
 }
 
-function loadRateLimitState(): RateLimitState {
+let dailyState: DailyState = {
+  alertsToday: 0,
+  dayStart: Date.now(),
+  keyLastSent: {},
+};
+
+let dbLoadAttempted = false;
+let dbAvailable = false;
+
+async function loadDailyStateFromDb(): Promise<void> {
+  if (dbLoadAttempted) return;
+  dbLoadAttempted = true;
   try {
-    if (fs.existsSync(RATE_LIMIT_FILE)) {
-      const data = JSON.parse(fs.readFileSync(RATE_LIMIT_FILE, 'utf-8'));
-      return {
-        alertHistory: data.alertHistory || {},
-        alertsThisHour: data.alertsThisHour || 0,
-        alertsToday: data.alertsToday || 0,
-        hourStart: data.hourStart || Date.now(),
-        dayStart: data.dayStart || Date.now(),
-      };
+    const result = await pool.query(
+      `SELECT value FROM app_settings WHERE key = 'alert_rate_limits'`
+    );
+    dbAvailable = true;
+    if (result.rows.length > 0 && result.rows[0].value) {
+      const saved = JSON.parse(result.rows[0].value);
+      const now = Date.now();
+      if (now - (saved.dayStart || 0) < 24 * 60 * 60 * 1000) {
+        dailyState = {
+          alertsToday: saved.alertsToday || 0,
+          dayStart: saved.dayStart || now,
+          keyLastSent: saved.keyLastSent || {},
+        };
+        logger.info('[ErrorAlert] Loaded rate limit state from database', {
+          extra: { alertsToday: dailyState.alertsToday }
+        });
+      }
     }
-  } catch (error) {
-    logger.warn('[ErrorAlert] Failed to load rate limit state, using defaults');
+  } catch (err) {
+    logger.warn('[ErrorAlert] Could not load rate limits from database, using in-memory only');
+    dbAvailable = false;
   }
-  return {
-    alertHistory: {},
-    alertsThisHour: 0,
-    alertsToday: 0,
-    hourStart: Date.now(),
-    dayStart: Date.now(),
-  };
 }
 
-function saveRateLimitState(state: RateLimitState): void {
+async function saveDailyStateToDb(): Promise<void> {
+  if (!dbAvailable) return;
   try {
-    fs.writeFileSync(RATE_LIMIT_FILE, JSON.stringify(state, null, 2));
-  } catch (error) {
-    logger.warn('[ErrorAlert] Failed to save rate limit state');
+    const exists = await pool.query(
+      `SELECT 1 FROM app_settings WHERE key = 'alert_rate_limits'`
+    );
+    if (exists.rows.length > 0) {
+      await pool.query(
+        `UPDATE app_settings SET value = $1, updated_at = NOW() WHERE key = 'alert_rate_limits'`,
+        [JSON.stringify(dailyState)]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO app_settings (key, value, category, updated_at) VALUES ('alert_rate_limits', $1, 'system', NOW())`,
+        [JSON.stringify(dailyState)]
+      );
+    }
+  } catch {
+    logger.warn('[ErrorAlert] Could not persist rate limits to database');
   }
 }
-
-let state = loadRateLimitState();
 
 function getAlertKey(type: string, context?: string): string {
-  return `${type}:${context || 'general'}`;
+  if (type === 'server_error') return 'server_error';
+  if (type === 'external_service_error') return `ext:${context || 'general'}`;
+  return type;
 }
 
 function canSendAlert(key: string): boolean {
   const now = Date.now();
-  
-  // Reset hourly counter
-  if (now - state.hourStart > 60 * 60 * 1000) {
-    state.hourStart = now;
-    state.alertsThisHour = 0;
+
+  if (now - dailyState.dayStart > 24 * 60 * 60 * 1000) {
+    dailyState.dayStart = now;
+    dailyState.alertsToday = 0;
+    dailyState.keyLastSent = {};
   }
-  
-  // Reset daily counter
-  if (now - state.dayStart > 24 * 60 * 60 * 1000) {
-    state.dayStart = now;
-    state.alertsToday = 0;
-  }
-  
-  // Check daily limit first
-  if (state.alertsToday >= MAX_ALERTS_PER_DAY) {
-    logger.info('[ErrorAlert] Daily limit reached, skipping alert', {
-      extra: { event: 'error_alert.daily_limit', alertsToday: state.alertsToday }
-    });
+
+  if (dailyState.alertsToday >= MAX_ALERTS_PER_DAY) {
     return false;
   }
-  
-  // Check hourly limit
-  if (state.alertsThisHour >= MAX_ALERTS_PER_HOUR) {
+
+  const lastSent = dailyState.keyLastSent[key];
+  if (lastSent && (now - lastSent) < ALERT_COOLDOWN_MS) {
     return false;
   }
-  
-  // Check per-key cooldown
-  const record = state.alertHistory[key];
-  if (record && (now - record.lastSent) < ALERT_COOLDOWN_MS) {
-    return false;
-  }
-  
+
   return true;
 }
 
 function recordAlertSent(key: string): void {
-  const now = Date.now();
-  const existing = state.alertHistory[key];
-  
-  state.alertHistory[key] = {
-    lastSent: now,
-    count: (existing?.count || 0) + 1
-  };
-  
-  state.alertsThisHour++;
-  state.alertsToday++;
-  
-  // Persist to file so limits survive restarts
-  saveRateLimitState(state);
+  dailyState.keyLastSent[key] = Date.now();
+  dailyState.alertsToday++;
+  saveDailyStateToDb();
 }
 
 export type AlertType = 
@@ -145,6 +164,9 @@ function getFriendlyAreaName(path?: string): string {
   if (path.includes('/calendar')) return 'Calendar Sync';
   if (path.includes('/push')) return 'Push Notifications';
   if (path.includes('/admin')) return 'Admin Dashboard';
+  if (path.includes('Stripe') || path.includes('stripe')) return 'Stripe Payments';
+  if (path.includes('HubSpot') || path.includes('hubspot')) return 'HubSpot (member data)';
+  if (path.includes('Google') || path.includes('google')) return 'Google Calendar';
   
   return 'the app';
 }
@@ -152,7 +174,6 @@ function getFriendlyAreaName(path?: string): string {
 function translateErrorToPlainLanguage(message: string, path?: string): string {
   const area = getFriendlyAreaName(path);
   
-  // Common error patterns translated to plain language
   if (message.includes('Cannot destructure') || message.includes('undefined')) {
     return `Something went wrong in ${area}. A member tried to use a feature but the app didn't receive all the information it needed. This might have caused their action to fail.`;
   }
@@ -178,7 +199,6 @@ function translateErrorToPlainLanguage(message: string, path?: string): string {
     return `${area} received too many requests too quickly. The system is protecting itself from overload.`;
   }
   
-  // Default: simplify the message
   return `An issue occurred in ${area}. The app encountered an unexpected situation while processing a request.`;
 }
 
@@ -194,11 +214,28 @@ interface AlertOptions {
 
 export async function sendErrorAlert(options: AlertOptions): Promise<boolean> {
   const { type, title, message, context, details, userEmail, requestId } = options;
+
+  if (isInStartupGracePeriod()) {
+    logger.info('[ErrorAlert] Skipping alert during startup grace period', {
+      extra: { event: 'error_alert.startup_grace', type, context }
+    });
+    return false;
+  }
+
+  if (type !== 'payment_failure' && type !== 'security_alert' && isTransientError(message)) {
+    logger.info('[ErrorAlert] Skipping transient error alert', {
+      extra: { event: 'error_alert.transient_skip', type, context, message: message.substring(0, 100) }
+    });
+    return false;
+  }
+
+  await loadDailyStateFromDb();
+
   const key = getAlertKey(type, context);
   
   if (!canSendAlert(key)) {
     logger.info('[ErrorAlert] Alert rate-limited', {
-      extra: { event: 'error_alert.rate_limited', type, context }
+      extra: { event: 'error_alert.rate_limited', type, context, alertsToday: dailyState.alertsToday }
     });
     return false;
   }
@@ -221,7 +258,6 @@ export async function sendErrorAlert(options: AlertOptions): Promise<boolean> {
     const friendlyMessage = translateErrorToPlainLanguage(message, details?.path || context);
     const area = getFriendlyAreaName(details?.path || context);
     
-    // Build a simple, human-friendly details section
     let contextInfo = '';
     if (userEmail) {
       const userName = userEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -231,7 +267,6 @@ export async function sendErrorAlert(options: AlertOptions): Promise<boolean> {
       contextInfo += `<p style="margin: 8px 0;"><strong>Where it happened:</strong> ${area}</p>`;
     }
     
-    // Suggested action based on error type
     let suggestedAction = '';
     switch (type) {
       case 'server_error':
@@ -255,6 +290,8 @@ export async function sendErrorAlert(options: AlertOptions): Promise<boolean> {
       default:
         suggestedAction = 'Monitor for recurring issues. If this happens frequently, it may need technical attention.';
     }
+    
+    const remainingToday = MAX_ALERTS_PER_DAY - dailyState.alertsToday - 1;
     
     await client.emails.send({
       from: fromEmail || 'Ever Club <noreply@everclub.app>',
@@ -299,7 +336,7 @@ export async function sendErrorAlert(options: AlertOptions): Promise<boolean> {
             <div style="text-align: center; padding-top: 16px; border-top: 1px solid #e5e7eb;">
               <p style="margin: 0; color: #9ca3af; font-size: 12px;">
                 This is an automated alert from the Ever Club app.<br>
-                You'll receive at most ${MAX_ALERTS_PER_DAY} of these per day.
+                ${remainingToday > 0 ? `You may receive up to ${remainingToday} more alert${remainingToday === 1 ? '' : 's'} today.` : 'This is your last alert for today.'}
               </p>
             </div>
             
@@ -312,7 +349,7 @@ export async function sendErrorAlert(options: AlertOptions): Promise<boolean> {
     recordAlertSent(key);
     
     logger.info('[ErrorAlert] Alert sent successfully', {
-      extra: { event: 'error_alert.sent', type, title, alertsToday: state.alertsToday }
+      extra: { event: 'error_alert.sent', type, title, alertsToday: dailyState.alertsToday }
     });
     
     return true;
@@ -361,6 +398,13 @@ export async function alertOnExternalServiceError(
   error: Error,
   operation?: string
 ): Promise<void> {
+  if (isTransientError(error.message)) {
+    logger.info('[ErrorAlert] Skipping transient external service error', {
+      extra: { event: 'error_alert.transient_ext_skip', service, operation, error: error.message.substring(0, 100) }
+    });
+    return;
+  }
+
   const friendlyServiceName = service === 'HubSpot' ? 'HubSpot (member data)' 
     : service === 'Google' ? 'Google Calendar' 
     : service === 'Resend' ? 'Email Service'

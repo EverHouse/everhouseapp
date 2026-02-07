@@ -15,10 +15,14 @@ export const changelog: ChangelogEntry[] = [
   {
     version: "7.8.1",
     date: "2026-02-07",
-    title: "Google Sign-In Production Fix",
+    title: "Google Sign-In Fix & Quieter Error Alerts",
     changes: [
       "Fix: Google Sign-In was returning 'Not found' in production — caused by a route registration order conflict where the test auth middleware intercepted Google auth requests before they could reach the proper handler",
       "Fix: Google Sign-In, Google account linking, and Google account status endpoints now all work correctly in production",
+      "Improvement: Error alert emails reduced from up to 6/day to max 3/day, with 4-hour cooldown between similar alerts instead of 1 hour",
+      "Improvement: Temporary network blips (timeouts, brief disconnections, rate limits) no longer trigger alert emails — only real, persistent issues send notifications",
+      "Improvement: Alert system now remembers its limits across app restarts, so deploys no longer reset the daily email counter",
+      "Improvement: 5-minute grace period after server start — no alert emails sent during the brief connection hiccups that naturally happen when the app restarts",
     ],
   },
   {
