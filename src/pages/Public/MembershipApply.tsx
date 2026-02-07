@@ -280,7 +280,7 @@ const MembershipApply: React.FC = () => {
 
                     <div className="pt-4 border-t border-primary/10">
                       <p className="text-xs text-primary/60 mb-4 leading-relaxed">
-                        Even House is committed to protecting and respecting your privacy. We use your information to administer your account and to provide the products, services, and updates you request from us. We also contact you with information about membership, events, promotions, operational updates, and other content that may be relevant to you. If you consent to receiving communications from us, please indicate your preferences below.
+                        Ever Club is committed to protecting and respecting your privacy. We use your information to administer your account and to provide the products, services, and updates you request from us. We also contact you with information about membership, events, promotions, operational updates, and other content that may be relevant to you. If you consent to receiving communications from us, please indicate your preferences below.
                       </p>
                       <label className={`flex items-start gap-3 cursor-pointer group p-3 rounded-xl transition-colors ${fieldErrors.consent ? 'bg-red-50 border border-red-200' : 'hover:bg-primary/5'}`}>
                         <input
@@ -293,7 +293,7 @@ const MembershipApply: React.FC = () => {
                           className="mt-0.5 w-5 h-5 rounded border-primary/30 text-primary focus:ring-primary"
                         />
                         <span className="text-sm text-primary leading-relaxed">
-                          I agree to receive communications from Even House regarding membership, account updates, events, and promotions. <span className="text-red-500">*</span>
+                          I agree to receive communications from Ever Club regarding membership, account updates, events, and promotions. <span className="text-red-500">*</span>
                         </span>
                       </label>
                       {fieldErrors.consent && (
@@ -303,10 +303,10 @@ const MembershipApply: React.FC = () => {
                         </p>
                       )}
                       <p className="text-xs text-primary/60 mt-4 leading-relaxed">
-                        You can unsubscribe from Even House communications at any time. For more information about how to unsubscribe, our privacy practices, and how we protect and respect your personal information, please review our Privacy Policy.
+                        You can unsubscribe from Ever Club communications at any time. For more information about how to unsubscribe, our privacy practices, and how we protect and respect your personal information, please review our Privacy Policy.
                       </p>
                       <p className="text-xs text-primary/60 mt-3 leading-relaxed">
-                        By submitting this form, you authorize Even House to store and process your personal information to provide the content, services, and membership evaluation you have requested.
+                        By submitting this form, you authorize Ever Club to store and process your personal information to provide the content, services, and membership evaluation you have requested.
                       </p>
                     </div>
 

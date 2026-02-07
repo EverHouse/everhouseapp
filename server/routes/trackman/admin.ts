@@ -466,14 +466,14 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
     
     const PLACEHOLDER_EMAILS = [
       'anonymous@yourgolfbooking.com',
-      'booking@evenhouse.club',
-      'bookings@evenhouse.club',
-      'tccmembership@evenhouse.club'
+      'booking@everclub.app',
+      'bookings@everclub.app',
+      'tccmembership@everclub.app'
     ];
     const isPlaceholderEmail = (email: string): boolean => {
       const normalizedEmail = email.toLowerCase().trim();
       if (PLACEHOLDER_EMAILS.includes(normalizedEmail)) return true;
-      if (normalizedEmail.endsWith('@evenhouse.club') && normalizedEmail.length < 25) {
+      if (normalizedEmail.endsWith('@everclub.app') && normalizedEmail.length < 25) {
         const localPart = normalizedEmail.split('@')[0];
         if (/^[a-z]{3,12}$/.test(localPart) && !/\d/.test(localPart)) {
           return true;
@@ -1364,7 +1364,7 @@ router.post('/api/admin/trackman/unmatch-member', isStaffOrAdmin, async (req, re
         normalizedEmail.includes('unmatched-') || 
         normalizedEmail.includes('@trackman.local') ||
         normalizedEmail.includes('anonymous@') ||
-        normalizedEmail.includes('booking@evenhouse')) {
+        normalizedEmail.includes('booking@everclub')) {
       return res.json({ 
         success: true, 
         affectedCount: 0,
@@ -2989,9 +2989,9 @@ router.post('/api/trackman/admin/cleanup-lessons', isStaffOrAdmin, async (req, r
 
     // Staff email patterns to detect lesson bookings
     const INSTRUCTOR_EMAILS = [
-      'tim@evenhouse.club',
-      'rebecca@evenhouse.club',
-      'instructors@evenhouse.club'
+      'tim@everclub.app',
+      'rebecca@everclub.app',
+      'instructors@everclub.app'
     ];
 
     let convertedBookings = 0;

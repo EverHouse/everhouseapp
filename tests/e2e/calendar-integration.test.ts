@@ -25,7 +25,7 @@ describe('Calendar Integration - Event Creation', () => {
       description: booking.notes || `Booking for ${booking.memberName}`,
       start: { dateTime: startDateTime, timeZone: 'America/Los_Angeles' },
       end: { dateTime: endDateTime, timeZone: 'America/Los_Angeles' },
-      location: 'Even House Golf Club'
+      location: 'Ever Club'
     };
   }
   
@@ -44,7 +44,7 @@ describe('Calendar Integration - Event Creation', () => {
     expect(event.start.timeZone).toBe('America/Los_Angeles');
     expect(event.start.dateTime).toBe('2026-01-15T14:00:00');
     expect(event.end.dateTime).toBe('2026-01-15T15:00:00');
-    expect(event.location).toBe('Even House Golf Club');
+    expect(event.location).toBe('Ever Club');
   });
   
   it('should include member notes in description when provided', () => {

@@ -152,15 +152,15 @@ interface TrackmanRow {
 
 const PLACEHOLDER_EMAILS = [
   'anonymous@yourgolfbooking.com',
-  'booking@evenhouse.club',
-  'bookings@evenhouse.club',
-  'tccmembership@evenhouse.club'
+  'booking@everclub.app',
+  'bookings@everclub.app',
+  'tccmembership@everclub.app'
 ];
 
 function isPlaceholderEmail(email: string): boolean {
   const normalizedEmail = email.toLowerCase().trim();
   if (PLACEHOLDER_EMAILS.includes(normalizedEmail)) return true;
-  if (normalizedEmail.endsWith('@evenhouse.club') && normalizedEmail.length < 25) {
+  if (normalizedEmail.endsWith('@everclub.app') && normalizedEmail.length < 25) {
     const localPart = normalizedEmail.split('@')[0];
     if (/^[a-z]{3,12}$/.test(localPart) && !/\d/.test(localPart)) {
       return true;
@@ -868,7 +868,7 @@ async function createTrackmanSessionAndParticipants(input: SessionCreationInput)
             }
             
             // Auto-link the unmatched email to the matched member for future imports
-            // This teaches the system that e.g. jessica.dinh@evenhouse.club belongs to jessicadinh4@gmail.com
+            // This teaches the system that e.g. jessica.dinh@everclub.app belongs to jessicadinh4@gmail.com
             if (member.email && member.email.toLowerCase() !== matchedMember.email.toLowerCase()) {
               await autoLinkEmailToOwner(
                 member.email, 
@@ -1317,7 +1317,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
 
       // -----------------------------------------------------------------------
       // STAFF EMAIL DETECTION: Convert lessons to availability blocks
-      // When staff book in Trackman using their @evenhouse.club emails, or when
+      // When staff book in Trackman using their @everclub.app emails, or when
       // notes contain "lesson" keywords, convert to blocks instead of bookings.
       // This prevents financial pollution and directory distortion.
       // (INSTRUCTOR_EMAILS is loaded dynamically from staff_users with role 'golf_instructor')
@@ -1327,7 +1327,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
       const userEmailLower = (row.userEmail || '').toLowerCase().trim();
       
       // CRITICAL: Resolve email aliases BEFORE checking if they're an instructor
-      // This handles cases like rebecca.bentham@evenhouse.club -> rebecca@evenhouse.club
+      // This handles cases like rebecca.bentham@everclub.app -> rebecca@everclub.app
       const resolvedEmail = emailMapping.get(userEmailLower) || 
                            trackmanEmailMapping.get(userEmailLower) || 
                            userEmailLower;
@@ -1530,7 +1530,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
           // Try to match member email from notes to actual member
           const noteEmail = player.email.toLowerCase().trim();
           
-          // First check if it's a trackman_email format (firstname.lastname@evenhouse.club)
+          // First check if it's a trackman_email format (firstname.lastname@everclub.app)
           const trackmanMatch = trackmanEmailMapping.get(noteEmail);
           if (trackmanMatch) {
             memberEmailsFromNotes.push(trackmanMatch);
@@ -3349,7 +3349,7 @@ export async function rescanUnmatchedBookings(performedBy: string = 'system'): P
       const notes = booking.notes || '';
       
       // CRITICAL: Resolve email aliases BEFORE checking if they're an instructor
-      // This handles cases like rebecca.bentham@evenhouse.club -> rebecca@evenhouse.club
+      // This handles cases like rebecca.bentham@everclub.app -> rebecca@everclub.app
       const rawEmailLower = originalEmail.toLowerCase().trim();
       const resolvedEmail = emailMapping.get(rawEmailLower) || 
                            trackmanEmailMapping.get(rawEmailLower) || 
@@ -3601,7 +3601,7 @@ export async function rescanUnmatchedBookings(performedBy: string = 'system'): P
  * MASS CLEANUP: Converts Instructor Bookings -> Availability Blocks
  * 
  * This function scans booking_requests for:
- * - Staff emails (Tim or Rebecca at evenhouse.club)
+ * - Staff emails (Tim or Rebecca at everclub.app)
  * - Bookings containing the keyword 'Lesson' in user_name or notes
  * 
  * For each matching booking, it:

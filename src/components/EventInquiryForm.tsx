@@ -395,11 +395,11 @@ const EventInquiryForm: React.FC<EventInquiryFormProps> = ({
                         className="mt-1 w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
                       />
                       <span className="text-sm text-gray-700 dark:text-gray-300">
-                        I agree to receive other communications from Even House.
+                        I agree to receive other communications from Ever Club.
                       </span>
                     </label>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
-                      By submitting this form, you authorize Even House to store and process your personal information to provide the content, services, and membership evaluation you have requested.
+                      By submitting this form, you authorize Ever Club to store and process your personal information to provide the content, services, and membership evaluation you have requested.
                     </p>
                   </div>
 

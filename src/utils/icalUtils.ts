@@ -86,7 +86,7 @@ export function downloadICalFile(event: {
   const icalContent = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//EvenHouse//Members App//EN',
+    'PRODID:-//EverClub//Members App//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
@@ -95,7 +95,7 @@ export function downloadICalFile(event: {
     `SUMMARY:${escape(event.title)}`,
     event.description ? `DESCRIPTION:${escape(event.description)}` : '',
     event.location ? `LOCATION:${escape(event.location)}` : '',
-    `UID:${Date.now()}@evenhouse.club`,
+    `UID:${Date.now()}@everclub.app`,
     `DTSTAMP:${formatICalDate(new Date())}`,
     'END:VEVENT',
     'END:VCALENDAR'

@@ -101,7 +101,7 @@ const TermsOfService: React.FC = () => {
           <section>
             <h2 className="text-2xl font-display mb-4">10. Contact Information</h2>
             <p>
-              Questions about the Terms of Service should be sent to us at <a href="mailto:info@evenhouse.club" className="underline font-bold hover:opacity-80 transition-opacity">info@evenhouse.club</a>.
+              Questions about the Terms of Service should be sent to us at <a href="mailto:info@everclub.app" className="underline font-bold hover:opacity-80 transition-opacity">info@everclub.app</a>.
             </p>
           </section>
         </div>

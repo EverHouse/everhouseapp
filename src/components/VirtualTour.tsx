@@ -8,7 +8,7 @@ interface VirtualTourProps {
 
 const VirtualTour: React.FC<VirtualTourProps> = ({ 
   url = "https://my.matterport.com/show/?m=1hJ9Ea7Yz2c&brand=0&help=0&hl=0&ts=0&play=1", 
-  title = "Even House Virtual Tour",
+  title = "Ever Club Virtual Tour",
   className = ""
 }) => {
   const [isLoading, setIsLoading] = useState(true);

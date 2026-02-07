@@ -91,7 +91,7 @@ const PrivacyPolicy: React.FC = () => {
           <section>
             <h2 className="text-2xl font-display mb-4">Contact Us</h2>
             <p>
-              For more information about our privacy practices, if you have questions, or if you would like to make a complaint, please contact us by email at <a href="mailto:info@evenhouse.club" className="underline font-bold hover:opacity-80 transition-opacity">info@evenhouse.club</a>.
+              For more information about our privacy practices, if you have questions, or if you would like to make a complaint, please contact us by email at <a href="mailto:info@everclub.app" className="underline font-bold hover:opacity-80 transition-opacity">info@everclub.app</a>.
             </p>
           </section>
         </div>

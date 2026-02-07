@@ -77,7 +77,7 @@ const Contact: React.FC = () => {
       <section className="px-4 mb-8 space-y-3 animate-content-enter-delay-1">
            <ContactCard icon="location_on" title="VISIT US" value="15771 Red Hill Ave, Ste 500" />
            <ContactCard icon="call" title="CALL US" value="(949) 545-5855" href="tel:9495455855" />
-           <ContactCard icon="mail" title="EMAIL US" value="info@evenhouse.club" href="mailto:info@evenhouse.club" />
+           <ContactCard icon="mail" title="EMAIL US" value="info@everclub.app" href="mailto:info@everclub.app" />
            <a 
              href="https://bcrw.apple.com/urn:biz:91355ac7-f202-440d-a19e-f5a1cca16848" 
              target="_blank" 

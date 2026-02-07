@@ -1,4 +1,4 @@
-# Even House Feature Roadmap
+# Ever Club Feature Roadmap
 
 *Last updated: January 2026*
 *For team presentation and planning*
@@ -80,7 +80,7 @@
 ---
 
 #### Kisi Door Access Integration
-**What it does:** Members can unlock the club door directly from the Even House app instead of using the separate Kisi app.
+**What it does:** Members can unlock the club door directly from the Ever Club app instead of using the separate Kisi app.
 
 **How it works:**
 - Kisi has a public API we can integrate with
@@ -306,7 +306,7 @@
 
 ## Industry Comparison
 
-### Where Even House Excels
+### Where Ever Club Excels
 - **4-way calendar sync** - Most clubs do 1-2 calendars
 - **Built-in staff training** - Uncommon feature
 - **Request & Hold booking** - Better control for boutique club
@@ -324,7 +324,7 @@
 
 ## Notes
 
-- Even House is a boutique club focused on personal relationships
+- Ever Club is a boutique club focused on personal relationships
 - Not every feature from big country club apps makes sense here
 - Prioritize features that enhance member experience without adding complexity
 - Staff time is valuable - features should save time, not create work

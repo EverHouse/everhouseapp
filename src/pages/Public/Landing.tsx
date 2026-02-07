@@ -358,7 +358,7 @@ const Landing: React.FC = () => {
 
       {/* Content wrapper with cream background */}
       <div className="bg-[#F2F2EC]">
-      {/* Features Section - "Why Even House" (Moved to First Position) */}
+      {/* Features Section - "Why Ever Club" (Moved to First Position) */}
       <div className="px-6 py-12 animate-content-enter-delay-1">
         <h2 className="text-3xl font-bold text-[#293515] mb-8 font-sans">Why Ever Club</h2>
         <div className="grid grid-cols-2 gap-4">

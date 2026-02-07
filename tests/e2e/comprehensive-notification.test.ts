@@ -7,8 +7,8 @@ describe('Comprehensive Notification E2E Tests', () => {
   
   beforeAll(async () => {
     await assertServerAvailable();
-    memberSession = await login('notification-test-member@evenhouse.club', 'member');
-    staffSession = await login('nick@evenhouse.club', 'admin');
+    memberSession = await login('notification-test-member@everclub.app', 'member');
+    staffSession = await login('nick@everclub.app', 'admin');
   });
 
   describe('1. Staff Notification Delivery on New Booking Request', () => {

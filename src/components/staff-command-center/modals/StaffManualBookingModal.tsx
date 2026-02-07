@@ -926,7 +926,7 @@ export function StaffManualBookingModal({
                     <div className="p-4 flex gap-4">
                       <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300 shrink-0">2</div>
                       <div>
-                        <p className="font-medium text-gray-900 dark:text-white">Create booking with your @evenhouse.club email</p>
+                        <p className="font-medium text-gray-900 dark:text-white">Create booking with your @everclub.app email</p>
                         <p className="text-sm text-gray-500 dark:text-gray-400">This tells the system it's a lesson/staff block, not a member booking.</p>
                       </div>
                     </div>

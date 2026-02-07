@@ -109,7 +109,7 @@ This document provides everything needed to create a native iOS mobile app for E
 
 ### Brand Identity
 - **Name:** Ever Club
-- **Logo:** EH monogram
+- **Logo:** Ever Club wordmark
 - **Style:** Liquid Glass (iOS-inspired glassmorphism)
 
 ### Color Palette

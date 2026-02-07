@@ -94,7 +94,7 @@ export function TrackmanLinkModal({
   const isPlaceholderEmail = (email: string): boolean => {
     if (!email) return true;
     const lower = email.toLowerCase();
-    return lower.includes('@visitors.evenhouse.club') || 
+    return lower.includes('@visitors.everclub.app') || 
            lower.includes('@trackman.local') || 
            lower.startsWith('classpass-') ||
            lower.startsWith('golfnow-') ||

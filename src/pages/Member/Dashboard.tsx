@@ -1135,13 +1135,13 @@ const Dashboard: React.FC = () => {
                         icon: 'calendar_add_on',
                         label: 'Add to Calendar',
                         onClick: () => downloadICalFile({
-                          title: `${item.title} - Even House`,
-                          description: `Your ${item.resourceType === 'conference_room' ? 'conference room' : 'golf simulator'} booking at Even House`,
-                          location: 'Even House, 15771 Red Hill Ave, Ste 500, Tustin, CA 92780',
+                          title: `${item.title} - Ever Club`,
+                          description: `Your ${item.resourceType === 'conference_room' ? 'conference room' : 'golf simulator'} booking at Ever Club`,
+                          location: 'Ever Club, 15771 Red Hill Ave, Ste 500, Tustin, CA 92780',
                           startDate: item.rawDate,
                           startTime: startTime24,
                           endTime: endTime24
-                        }, `EvenHouse_${item.rawDate}_${item.title.replace(/[^a-zA-Z0-9]/g, '_')}.ics`)
+                        }, `EverClub_${item.rawDate}_${item.title.replace(/[^a-zA-Z0-9]/g, '_')}.ics`)
                       }] : []),
                       ...(!isLinkedMember ? [
                         { icon: 'close', label: 'Cancel', onClick: () => handleCancelBooking(item.dbId, item.type) }

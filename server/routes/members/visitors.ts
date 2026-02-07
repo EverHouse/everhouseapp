@@ -10,7 +10,7 @@ import { getOrCreateStripeCustomer } from '../../core/stripe';
 import { logFromRequest } from '../../core/auditLog';
 
 const PLACEHOLDER_EMAIL_PATTERNS = [
-  '@visitors.evenhouse.club',
+  '@visitors.everclub.app',
   '@trackman.local',
   'unmatched-',
   'golfnow-',

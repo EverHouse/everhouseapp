@@ -4839,7 +4839,7 @@ export const changelog: ChangelogEntry[] = [
     title: "Launch Day",
     isMajor: true,
     changes: [
-      "The app is live! Built from the ground up for Even House members",
+      "The app is live! Built from the ground up for Ever Club members",
       "Book golf bays and conference rooms with real-time availability",
       "Membership tiers with guest passes and booking limits",
       "Connected to HubSpot so your membership info stays in sync"

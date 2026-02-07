@@ -3,7 +3,7 @@ import { logger } from './logger';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const ALERT_EMAIL = process.env.ALERT_EMAIL || 'nick@evenhouse.club';
+const ALERT_EMAIL = process.env.ALERT_EMAIL || 'nick@everclub.app';
 const ALERT_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour between same-type alerts
 const MAX_ALERTS_PER_HOUR = 2; // Very strict hourly limit
 const MAX_ALERTS_PER_DAY = 6; // Very strict daily limit to prevent floods
