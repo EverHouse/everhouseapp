@@ -284,7 +284,7 @@ router.post('/api/stripe/staff/send-membership-link', isStaffOrAdmin, async (req
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; padding: 40px;">
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <img src="https://everclub.app/images/everclub-logo-dark.webp" alt="Ever Club" width="180" height="60" style="display: inline-block;">
+              <img src="https://everclub.app/images/everclub-logo-dark.png" alt="Ever Club" width="180" height="60" style="display: inline-block;">
             </td>
           </tr>
           <tr>

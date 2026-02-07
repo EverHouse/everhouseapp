@@ -99,7 +99,7 @@ function getIntegrityAlertEmailHtml(
           <!-- Logo & Title -->
           <tr>
             <td style="text-align: center; padding-bottom: 24px;">
-              <img src="https://everclub.app/images/everclub-logo-dark.webp" alt="Ever Club" width="150" height="50" style="display: inline-block;">
+              <img src="https://everclub.app/images/everclub-logo-dark.png" alt="Ever Club" width="150" height="50" style="display: inline-block;">
             </td>
           </tr>
           

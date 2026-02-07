@@ -669,7 +669,7 @@ router.post('/api/auth/request-otp', async (req, res) => {
     });
     
     // Send email synchronously to ensure delivery before responding
-    const logoUrl = 'https://everclub.app/images/everclub-logo-dark.webp';
+    const logoUrl = 'https://everclub.app/images/everclub-logo-dark.png';
     const startTime = Date.now();
     console.log(`[OTP Email] Starting send to ${normalizedEmail.substring(0, 5)}***`);
     
