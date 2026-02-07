@@ -232,7 +232,7 @@ router.post('/api/stripe/staff/send-membership-link', isStaffOrAdmin, async (req
 
     const baseUrl = process.env.REPLIT_DEV_DOMAIN 
       ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-      : 'https://everhouse.app';
+      : 'https://everclub.app';
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -267,9 +267,9 @@ router.post('/api/stripe/staff/send-membership-link', isStaffOrAdmin, async (req
       const safeFirstName = escapeHtml(sanitizedFirstName);
 
       await resend.emails.send({
-        from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
+        from: fromEmail || 'Ever Members Club <noreply@everclub.app>',
         to: email,
-        subject: `Your Ever House Membership Invitation - ${tier.name}`,
+        subject: `Your Ever Club Membership Invitation - ${tier.name}`,
         html: `
 <!DOCTYPE html>
 <html>
@@ -284,13 +284,13 @@ router.post('/api/stripe/staff/send-membership-link', isStaffOrAdmin, async (req
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; padding: 40px;">
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <img src="https://everhouse.app/assets/logos/monogram-dark.webp" alt="Ever House" width="60" height="60" style="display: inline-block;">
+              <img src="https://everclub.app/assets/logos/monogram-dark.webp" alt="Ever Club" width="60" height="60" style="display: inline-block;">
             </td>
           </tr>
           <tr>
             <td>
-              <h1 style="margin: 0 0 24px; font-size: 24px; font-weight: 600; color: #1a1a1a;">Welcome to Ever House, ${safeFirstName}!</h1>
-              <p style="margin: 0 0 16px; font-size: 16px; line-height: 1.6; color: #4a4a4a;">You've been invited to join Ever House as a <strong>${tier.name}</strong> member at ${priceFormatted}.</p>
+              <h1 style="margin: 0 0 24px; font-size: 24px; font-weight: 600; color: #1a1a1a;">Welcome to Ever Club, ${safeFirstName}!</h1>
+              <p style="margin: 0 0 16px; font-size: 16px; line-height: 1.6; color: #4a4a4a;">You've been invited to join Ever Club as a <strong>${tier.name}</strong> member at ${priceFormatted}.</p>
               <p style="margin: 0 0 32px; font-size: 16px; line-height: 1.6; color: #4a4a4a;">Click below to complete your membership signup:</p>
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                 <tr>
@@ -348,14 +348,14 @@ router.post('/api/stripe/staff/send-reactivation-link', isStaffOrAdmin, async (r
     const member = memberResult.rows[0];
     const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email;
 
-    let reactivationLink = 'https://everhouse.app/billing';
+    let reactivationLink = 'https://everclub.app/billing';
 
     if (member.stripe_customer_id) {
       try {
         const stripe = await getStripeClient();
         const returnUrl = process.env.NODE_ENV === 'production' 
-          ? 'https://everhouse.app'
-          : (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://everhouse.app');
+          ? 'https://everclub.app'
+          : (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://everclub.app');
 
         const session = await stripe.billingPortal.sessions.create({
           customer: member.stripe_customer_id,
@@ -430,8 +430,8 @@ router.post('/api/public/day-pass/checkout', async (req: Request, res: Response)
     const stripe = await getStripeClient();
 
     const domain = process.env.NODE_ENV === 'production' 
-      ? 'https://everhouse.app'
-      : (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://everhouse.app');
+      ? 'https://everclub.app'
+      : (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://everclub.app');
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',

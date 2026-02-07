@@ -1,19 +1,20 @@
 export const BRAND = {
-  name: 'Ever House',
+  name: 'Ever Club',
+  legalName: 'Ever Members Club',
   tagline: 'A new kind of members club — rooted in golf, built for community.',
   
   logos: {
     monogram: {
-      dark: '/assets/logos/monogram-dark.webp',
-      white: '/assets/logos/monogram-white.webp',
+      dark: '/images/everclub-logo-dark.webp',
+      white: '/images/everclub-logo-light.webp',
     },
     mascot: {
       dark: '/assets/logos/mascot-dark.webp',
       white: '/assets/logos/mascot-white.webp',
     },
     wordmark: {
-      dark: '/images/everhouse-logo-dark.webp',
-      white: '/images/everhouse-logo-light.webp',
+      dark: '/images/everclub-logo-dark.webp',
+      white: '/images/everclub-logo-light.webp',
     },
   },
   

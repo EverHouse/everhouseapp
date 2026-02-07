@@ -663,7 +663,7 @@ router.post('/api/member/guest-passes/purchase', async (req: Request, res: Respo
     const { getStripeClient } = await import('../../core/stripe/client');
     const stripe = await getStripeClient();
 
-    const description = `${quantity} Guest Pass${quantity > 1 ? 'es' : ''} - Ever House`;
+    const description = `${quantity} Guest Pass${quantity > 1 ? 'es' : ''} - Ever Club`;
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountCents,

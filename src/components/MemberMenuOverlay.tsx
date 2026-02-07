@@ -159,7 +159,7 @@ const MemberMenuOverlay: React.FC<MemberMenuOverlayProps> = ({ isOpen, onClose }
                 >
                   <img 
                     src={isDark ? "/assets/logos/mascot-white.webp" : "/assets/logos/mascot-dark.webp"}
-                    alt="Ever House Club mascot character"
+                    alt="Ever Club mascot character"
                     className="h-14 w-auto object-contain"
                   />
                 </button>

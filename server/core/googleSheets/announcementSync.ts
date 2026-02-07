@@ -78,7 +78,7 @@ export async function createAnnouncementSheet(): Promise<string> {
   const spreadsheet = await sheets.spreadsheets.create({
     requestBody: {
       properties: {
-        title: 'Ever House - Announcements'
+        title: 'Ever Club - Announcements'
       },
       sheets: [{
         properties: {

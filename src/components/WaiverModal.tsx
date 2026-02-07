@@ -127,13 +127,13 @@ export function WaiverModal({ isOpen, onComplete, currentVersion }: WaiverModalP
           
           <p>
             Please read the liability waiver below and provide your agreement. You must agree 
-            to the terms before entering Ever House. The following provisions are critical 
+            to the terms before entering Ever Club. The following provisions are critical 
             legal protections for the Club – please read them carefully:
           </p>
 
           <h5 className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Waiver of Claims</h5>
           <p>
-            To the maximum extent allowed by law, you release Ever House, its owners, partners, 
+            To the maximum extent allowed by law, you release Ever Club, its owners, partners, 
             employees, and agents from any and all liability or claims for property damage, 
             personal injury, illness, or death arising out of or relating to your membership 
             or presence at the Club. This waiver applies to any injuries or damages occurring 
@@ -150,7 +150,7 @@ export function WaiverModal({ isOpen, onComplete, currentVersion }: WaiverModalP
 
           <h5 className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Indemnification</h5>
           <p>
-            You agree to indemnify and hold harmless Ever House from any claims, damages, or 
+            You agree to indemnify and hold harmless Ever Club from any claims, damages, or 
             expenses (including legal fees) arising from your actions or the actions of your 
             guests at the Club.
           </p>

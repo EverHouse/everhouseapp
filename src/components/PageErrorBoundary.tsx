@@ -150,7 +150,7 @@ class PageErrorBoundary extends Component<Props, State> {
                   Clear Cache & Refresh
                 </button>
                 <a
-                  href="mailto:support@everhouse.com?subject=App Loading Issue"
+                  href="mailto:support@everclub.app?subject=App Loading Issue"
                   className="px-5 py-2.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/80 rounded-xl font-medium text-sm hover:bg-gray-200 dark:hover:bg-white/20 transition-colors text-center"
                 >
                   Contact Support
@@ -221,7 +221,7 @@ class PageErrorBoundary extends Component<Props, State> {
                     Refresh Page
                   </button>
                   <a
-                    href="mailto:support@everhouse.com?subject=App Error Report"
+                    href="mailto:support@everclub.app?subject=App Error Report"
                     className="px-5 py-2.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/80 rounded-xl font-medium text-sm hover:bg-gray-200 dark:hover:bg-white/20 transition-colors text-center"
                   >
                     Contact Support

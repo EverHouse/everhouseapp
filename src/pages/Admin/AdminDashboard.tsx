@@ -507,7 +507,7 @@ const StaffTrainingGuide: React.FC = () => {
         <div className="space-y-6 animate-pop-in pb-32">
             <div className="mb-6">
                 <p className="text-sm text-primary/80 dark:text-white/80 mb-4">
-                    A complete guide to using the Ever House Staff Portal. Tap any section to expand and view detailed instructions.
+                    A complete guide to using the Ever Club Staff Portal. Tap any section to expand and view detailed instructions.
                 </p>
                 {isAdmin && (
                     <div className="flex gap-2 print:hidden">
@@ -524,7 +524,7 @@ const StaffTrainingGuide: React.FC = () => {
 
             <div ref={printRef} className="space-y-4 print:space-y-6">
                 <div className="hidden print:block text-center mb-8">
-                    <h1 className="text-2xl font-bold text-primary">Ever House Staff Training Guide</h1>
+                    <h1 className="text-2xl font-bold text-primary">Ever Club Staff Training Guide</h1>
                     <p className="text-sm text-gray-500 mt-2">Comprehensive instructions for using the Staff Portal</p>
                 </div>
 
@@ -590,7 +590,7 @@ const StaffTrainingGuide: React.FC = () => {
                 ))}
 
                 <div className="hidden print:block mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-600">
-                    <p>Ever House Members App - Staff Training Guide</p>
+                    <p>Ever Club Members App - Staff Training Guide</p>
                     <p>Generated on {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Los_Angeles' })}</p>
                 </div>
             </div>

@@ -33,7 +33,7 @@ function getEmailWrapper(content: string): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ever House</title>
+  <title>Ever Club</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: ${CLUB_COLORS.bone}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: ${CLUB_COLORS.bone};">
@@ -44,7 +44,7 @@ function getEmailWrapper(content: string): string {
           <!-- Logo -->
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <img src="https://everhouse.app/assets/logos/monogram-dark.webp" alt="Ever House" width="60" height="60" style="display: inline-block;">
+              <img src="https://everclub.app/assets/logos/monogram-dark.webp" alt="Ever Club" width="60" height="60" style="display: inline-block;">
             </td>
           </tr>
           
@@ -56,8 +56,8 @@ function getEmailWrapper(content: string): string {
               <p style="margin: 0 0 8px 0; font-size: 12px; color: ${CLUB_COLORS.textMuted};">
                 Questions? Reply to this email or contact us at the club.
               </p>
-              <a href="https://everhouse.app" style="font-size: 12px; color: ${CLUB_COLORS.deepGreen}; text-decoration: none;">
-                everhouse.app
+              <a href="https://everclub.app" style="font-size: 12px; color: ${CLUB_COLORS.deepGreen}; text-decoration: none;">
+                everclub.app
               </a>
             </td>
           </tr>
@@ -158,7 +158,7 @@ function getPassWithQrHtml(passDetails: PassDetails): string {
                     <ol style="margin: 0; padding-left: 20px; font-size: 14px; color: ${CLUB_COLORS.textMuted}; line-height: 1.8;">
                       <li>Show this QR code at the front desk when you arrive</li>
                       <li>Our staff will scan the code to verify your pass</li>
-                      <li>Enjoy your visit to Ever House!</li>
+                      <li>Enjoy your visit to Ever Club!</li>
                     </ol>
                   </td>
                 </tr>
@@ -169,8 +169,8 @@ function getPassWithQrHtml(passDetails: PassDetails): string {
           <!-- CTA Button -->
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <a href="https://everhouse.app" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
-                Visit Ever House
+              <a href="https://everclub.app" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
+                Visit Ever Club
               </a>
             </td>
           </tr>
@@ -189,9 +189,9 @@ export async function sendPassWithQrEmail(
     const formattedType = formatPassType(passDetails.type);
     
     await client.emails.send({
-      from: fromEmail || 'Ever House <noreply@everhouse.app>',
+      from: fromEmail || 'Ever Club <noreply@everclub.app>',
       to: email,
-      subject: `Your ${formattedType} is Ready - Ever House`,
+      subject: `Your ${formattedType} is Ready - Ever Club`,
       html: getPassWithQrHtml(passDetails)
     });
     
@@ -220,7 +220,7 @@ function getGolfPassContent(details: RedemptionDetails, formattedType: string, f
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
               <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
-                Welcome to Ever House
+                Welcome to Ever Club
               </h1>
             </td>
           </tr>
@@ -246,7 +246,7 @@ function getGolfPassContent(details: RedemptionDetails, formattedType: string, f
                       <tr>
                         <td style="padding-bottom: 8px;">
                           <p style="margin: 0; font-size: 12px; color: ${CLUB_COLORS.textMuted}; text-transform: uppercase; letter-spacing: 0.5px;">Network</p>
-                          <p style="margin: 4px 0 0 0; font-size: 16px; color: ${CLUB_COLORS.textDark}; font-weight: 500;">Even House Members</p>
+                          <p style="margin: 4px 0 0 0; font-size: 16px; color: ${CLUB_COLORS.textDark}; font-weight: 500;">Ever Club Members</p>
                         </td>
                       </tr>
                       <tr>
@@ -299,7 +299,7 @@ function getGolfPassContent(details: RedemptionDetails, formattedType: string, f
           <tr>
             <td style="text-align: center; padding-bottom: 24px;">
               <p style="margin: 0; font-size: 16px; color: ${CLUB_COLORS.textMuted}; line-height: 1.6;">
-                Enjoy your golf session at Ever House! Our staff is here to help if you need anything.
+                Enjoy your golf session at Ever Club! Our staff is here to help if you need anything.
               </p>
             </td>
           </tr>
@@ -312,7 +312,7 @@ function getWorkspacePassContent(details: RedemptionDetails, formattedType: stri
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
               <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
-                Welcome to Ever House
+                Welcome to Ever Club
               </h1>
             </td>
           </tr>
@@ -338,7 +338,7 @@ function getWorkspacePassContent(details: RedemptionDetails, formattedType: stri
                       <tr>
                         <td style="padding-bottom: 8px;">
                           <p style="margin: 0; font-size: 12px; color: ${CLUB_COLORS.textMuted}; text-transform: uppercase; letter-spacing: 0.5px;">Network</p>
-                          <p style="margin: 4px 0 0 0; font-size: 16px; color: ${CLUB_COLORS.textDark}; font-weight: 500;">Even House Members</p>
+                          <p style="margin: 4px 0 0 0; font-size: 16px; color: ${CLUB_COLORS.textDark}; font-weight: 500;">Ever Club Members</p>
                         </td>
                       </tr>
                       <tr>
@@ -360,7 +360,7 @@ function getWorkspacePassContent(details: RedemptionDetails, formattedType: stri
               <p style="margin: 0 0 16px 0; font-size: 14px; color: ${CLUB_COLORS.textMuted};">
                 Check out our cafe menu for refreshments during your visit.
               </p>
-              <a href="https://everhouse.app/menu" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
+              <a href="https://everclub.app/menu" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
                 View Cafe Menu
               </a>
             </td>
@@ -370,7 +370,7 @@ function getWorkspacePassContent(details: RedemptionDetails, formattedType: stri
           <tr>
             <td style="text-align: center; padding-bottom: 24px;">
               <p style="margin: 0; font-size: 16px; color: ${CLUB_COLORS.textMuted}; line-height: 1.6;">
-                Enjoy your time at Ever House! Our staff is here to help if you need anything.
+                Enjoy your time at Ever Club! Our staff is here to help if you need anything.
               </p>
             </td>
           </tr>
@@ -401,9 +401,9 @@ export async function sendRedemptionConfirmationEmail(
     const { client, fromEmail } = await getResendClient();
     
     await client.emails.send({
-      from: fromEmail || 'Ever House <noreply@everhouse.app>',
+      from: fromEmail || 'Ever Club <noreply@everclub.app>',
       to: email,
-      subject: `Welcome to Ever House - You're Checked In!`,
+      subject: `Welcome to Ever Club - You're Checked In!`,
       html: getRedemptionConfirmationHtml(details)
     });
     

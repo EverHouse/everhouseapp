@@ -1080,7 +1080,7 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
     const realisticPayload = {
       venue: {
         id: 941,
-        name: "Even House",
+        name: "Ever Club",
         slug: "even-house"
       },
       booking: {

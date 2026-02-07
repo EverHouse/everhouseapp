@@ -217,7 +217,7 @@ router.post('/api/my/billing/update-payment-method', requireAuth, async (req, re
       ? `https://${process.env.REPLIT_DEV_DOMAIN}/profile`
       : process.env.REPLIT_DEPLOYMENT_DOMAIN
         ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}/profile`
-        : 'https://everhouse.com/profile';
+        : 'https://everclub.com/profile';
     
     const session = await stripe.billingPortal.sessions.create({
       customer: member.stripe_customer_id,
@@ -280,7 +280,7 @@ router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
       ? `https://${process.env.REPLIT_DEV_DOMAIN}/profile`
       : process.env.REPLIT_DEPLOYMENT_DOMAIN
         ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}/profile`
-        : 'https://everhouse.com/profile';
+        : 'https://everclub.com/profile';
     
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
@@ -330,7 +330,7 @@ router.post('/api/my/billing/add-payment-method-for-extras', requireAuth, async 
       ? `https://${process.env.REPLIT_DEV_DOMAIN}/profile`
       : process.env.REPLIT_DEPLOYMENT_DOMAIN
         ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}/profile`
-        : 'https://everhouse.com/profile';
+        : 'https://everclub.com/profile';
     
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
@@ -391,7 +391,7 @@ router.post('/api/my/billing/migrate-to-stripe', requireAuth, async (req, res) =
       ? `https://${process.env.REPLIT_DEV_DOMAIN}/profile`
       : process.env.REPLIT_DEPLOYMENT_DOMAIN
         ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}/profile`
-        : 'https://everhouse.com/profile';
+        : 'https://everclub.com/profile';
     
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
@@ -560,7 +560,7 @@ router.post('/api/my/add-funds', requireAuth, async (req, res) => {
           unit_amount: amountCents,
           product_data: {
             name: 'Account Balance Top-Up',
-            description: `Add $${(amountCents / 100).toFixed(2)} to your Ever House account balance`
+            description: `Add $${(amountCents / 100).toFixed(2)} to your Ever Club account balance`
           }
         },
         quantity: 1

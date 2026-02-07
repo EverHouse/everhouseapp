@@ -78,7 +78,7 @@ export const EmptyEvents: React.FC<{ onExplore?: () => void; message?: string }>
   <EmptyState
     icon="celebration"
     title="No events found"
-    description={message || "Check back soon for upcoming events and experiences at Ever House."}
+    description={message || "Check back soon for upcoming events and experiences at Ever Club."}
     action={onExplore ? { label: "Explore Events", onClick: onExplore } : undefined}
   />
 );

@@ -32,7 +32,7 @@ function getEmailWrapper(content: string): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ever House</title>
+  <title>Ever Club</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: ${CLUB_COLORS.bone}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: ${CLUB_COLORS.bone};">
@@ -43,7 +43,7 @@ function getEmailWrapper(content: string): string {
           <!-- Logo -->
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <img src="https://everhouse.app/assets/logos/monogram-dark.webp" alt="Ever House" width="60" height="60" style="display: inline-block;">
+              <img src="https://everclub.app/assets/logos/monogram-dark.webp" alt="Ever Club" width="60" height="60" style="display: inline-block;">
             </td>
           </tr>
           
@@ -55,8 +55,8 @@ function getEmailWrapper(content: string): string {
               <p style="margin: 0 0 8px 0; font-size: 12px; color: ${CLUB_COLORS.textMuted};">
                 Questions? Reply to this email or contact us at the club.
               </p>
-              <a href="https://everhouse.app" style="font-size: 12px; color: ${CLUB_COLORS.deepGreen}; text-decoration: none;">
-                everhouse.app
+              <a href="https://everclub.app" style="font-size: 12px; color: ${CLUB_COLORS.deepGreen}; text-decoration: none;">
+                everclub.app
               </a>
             </td>
           </tr>
@@ -143,7 +143,7 @@ function getPaymentReceiptHtml(params: PaymentReceiptParams): string {
           <!-- CTA Button -->
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <a href="https://everhouse.app/history" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
+              <a href="https://everclub.app/history" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
                 View Payment History
               </a>
             </td>
@@ -162,7 +162,7 @@ interface PaymentFailedParams {
 
 function getPaymentFailedHtml(params: PaymentFailedParams): string {
   const { memberName, amount, reason, updateCardUrl } = params;
-  const ctaUrl = updateCardUrl || 'https://everhouse.app/profile';
+  const ctaUrl = updateCardUrl || 'https://everclub.app/profile';
   
   const content = `
           <!-- Headline -->
@@ -306,7 +306,7 @@ function getOutstandingBalanceHtml(params: OutstandingBalanceParams): string {
           <!-- CTA Button -->
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <a href="https://everhouse.app/profile" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
+              <a href="https://everclub.app/profile" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
                 View Account
               </a>
             </td>
@@ -384,8 +384,8 @@ function getFeeWaivedHtml(params: FeeWaivedParams): string {
           <!-- CTA Button -->
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <a href="https://everhouse.app" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
-                Open Ever House App
+              <a href="https://everclub.app" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
+                Open Ever Club App
               </a>
             </td>
           </tr>
@@ -406,9 +406,9 @@ export async function sendPaymentReceiptEmail(
     const { client, fromEmail } = await getResendClient();
     
     await client.emails.send({
-      from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
+      from: fromEmail || 'Ever Members Club <noreply@everclub.app>',
       to: email,
-      subject: 'Payment Receipt - Ever House',
+      subject: 'Payment Receipt - Ever Club',
       html: getPaymentReceiptHtml(params)
     });
     
@@ -432,7 +432,7 @@ export async function sendPaymentFailedEmail(
     const { client, fromEmail } = await getResendClient();
     
     await client.emails.send({
-      from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
+      from: fromEmail || 'Ever Members Club <noreply@everclub.app>',
       to: email,
       subject: 'Payment Issue - Action Required',
       html: getPaymentFailedHtml(params)
@@ -458,9 +458,9 @@ export async function sendOutstandingBalanceEmail(
     const { client, fromEmail } = await getResendClient();
     
     await client.emails.send({
-      from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
+      from: fromEmail || 'Ever Members Club <noreply@everclub.app>',
       to: email,
-      subject: 'Outstanding Balance - Ever House',
+      subject: 'Outstanding Balance - Ever Club',
       html: getOutstandingBalanceHtml(params)
     });
     
@@ -484,9 +484,9 @@ export async function sendFeeWaivedEmail(
     const { client, fromEmail } = await getResendClient();
     
     await client.emails.send({
-      from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
+      from: fromEmail || 'Ever Members Club <noreply@everclub.app>',
       to: email,
-      subject: 'Fee Waived - Ever House',
+      subject: 'Fee Waived - Ever Club',
       html: getFeeWaivedHtml(params)
     });
     
@@ -599,7 +599,7 @@ function getPurchaseReceiptHtml(params: PurchaseReceiptParams): string {
 
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <a href="https://everhouse.app/history" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
+              <a href="https://everclub.app/history" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
                 View Purchase History
               </a>
             </td>
@@ -617,9 +617,9 @@ export async function sendPurchaseReceipt(
     const { client, fromEmail } = await getResendClient();
 
     await client.emails.send({
-      from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
+      from: fromEmail || 'Ever Members Club <noreply@everclub.app>',
       to: email,
-      subject: 'Your Purchase Receipt - Ever House',
+      subject: 'Your Purchase Receipt - Ever Club',
       html: getPurchaseReceiptHtml(params)
     });
 

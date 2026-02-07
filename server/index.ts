@@ -177,9 +177,7 @@ const getAllowedOrigins = (): string[] | boolean | CorsOriginFunction => {
         return;
       }
       // Allow production domains
-      if (hostname === 'everhouse.app' || 
-          hostname === 'everclub.app' ||
-          hostname.endsWith('.everhouse.app') ||
+      if (hostname === 'everclub.app' || 
           hostname.endsWith('.everclub.app')) {
         callback(null, true);
         return;

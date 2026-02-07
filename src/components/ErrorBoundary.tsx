@@ -122,7 +122,7 @@ class ErrorBoundary extends Component<Props, State> {
                 Clear Cache & Reload
               </button>
               <a
-                href="mailto:support@everhouse.com?subject=App Error Report"
+                href="mailto:support@everclub.app?subject=App Error Report"
                 className="px-6 py-3 text-white/70 hover:text-white transition-colors text-sm underline"
               >
                 Contact Support

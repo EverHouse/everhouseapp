@@ -414,7 +414,7 @@ const Login: React.FC = () => {
         <div className="w-full max-w-sm mx-auto space-y-8">
             
             <div className="text-center">
-                <img src="/assets/logos/EH-guy-icon.webp" alt="Ever House" className="w-16 h-16 mx-auto mb-6 rounded-xl" />
+                <img src="/assets/logos/EH-guy-icon.webp" alt="Ever Club" className="w-16 h-16 mx-auto mb-6 rounded-xl" />
                 <h2 className="text-3xl font-bold tracking-tight text-primary">
                     Member's Portal
                 </h2>

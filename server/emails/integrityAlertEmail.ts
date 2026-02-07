@@ -99,7 +99,7 @@ function getIntegrityAlertEmailHtml(
           <!-- Logo & Title -->
           <tr>
             <td style="text-align: center; padding-bottom: 24px;">
-              <img src="https://everhouse.app/assets/logos/monogram-dark.webp" alt="Ever House" width="48" height="48" style="display: inline-block;">
+              <img src="https://everclub.app/assets/logos/monogram-dark.webp" alt="Ever Club" width="48" height="48" style="display: inline-block;">
             </td>
           </tr>
           
@@ -195,7 +195,7 @@ function getIntegrityAlertEmailHtml(
           <!-- CTA Button -->
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <a href="https://everhouse.app/admin/data-integrity" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
+              <a href="https://everclub.app/admin/data-integrity" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
                 View in Admin Panel
               </a>
             </td>
@@ -205,7 +205,7 @@ function getIntegrityAlertEmailHtml(
           <tr>
             <td style="text-align: center; padding-top: 24px; border-top: 1px solid ${CLUB_COLORS.borderLight};">
               <p style="margin: 0; font-size: 12px; color: ${CLUB_COLORS.textMuted};">
-                This is an automated daily integrity check alert from Ever House.
+                This is an automated daily integrity check alert from Ever Club.
               </p>
             </td>
           </tr>
@@ -238,7 +238,7 @@ export async function sendIntegrityAlertEmail(
     const { client, fromEmail } = await getResendClient();
     
     await client.emails.send({
-      from: fromEmail || 'Ever House System <noreply@everhouse.app>',
+      from: fromEmail || 'Ever Club System <noreply@everclub.app>',
       to: adminEmail,
       subject: `Data Integrity Alert: ${errorCount} critical issue${errorCount !== 1 ? 's' : ''} detected`,
       html: getIntegrityAlertEmailHtml(results, criticalIssues)

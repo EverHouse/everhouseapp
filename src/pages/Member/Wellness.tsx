@@ -461,7 +461,7 @@ const MedSpaView: React.FC<{isDark?: boolean}> = ({ isDark = true }) => (
       <h2 className={`font-bold text-3xl ${isDark ? 'text-white' : 'text-primary'}`}>Amarie Aesthetics</h2>
       <div className="w-12 h-0.5 bg-accent mx-auto my-4"></div>
       <p className={`text-sm leading-relaxed max-w-[90%] mx-auto ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
-        Exclusive medical aesthetics and wellness treatments curated for Ever House members.
+        Exclusive medical aesthetics and wellness treatments curated for Ever Club members.
       </p>
     </div>
 
@@ -498,7 +498,7 @@ const MedSpaView: React.FC<{isDark?: boolean}> = ({ isDark = true }) => (
           <MenuItem name="MIC B12" price="$20" isDark={isDark} />
         </div>
         <div className="mb-4">
-          <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>Amarie x EverHouse Signature Shots</h4>
+          <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>Amarie x EverClub Signature Shots</h4>
           <MenuItem name="The Beauty Trio" price="$30" isDark={isDark} />
           <MenuItem name="Boost Me Up" price="$30" isDark={isDark} />
           <MenuItem name="The Happy Shot" price="$30" isDark={isDark} />
@@ -528,7 +528,7 @@ const MedSpaView: React.FC<{isDark?: boolean}> = ({ isDark = true }) => (
         </div>
         <div>
           <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>Dermal Fillers</h4>
-          <p className={`text-xs ${isDark ? 'text-white/80' : 'text-primary/80'}`}>Special pricing for Ever House members. Consultation required.</p>
+          <p className={`text-xs ${isDark ? 'text-white/80' : 'text-primary/80'}`}>Special pricing for Ever Club members. Consultation required.</p>
         </div>
       </MedSpaCard>
 

@@ -41,7 +41,7 @@ const PrivateHire: React.FC = () => {
          >
            <img 
              src="/images/venue-wide-optimized.webp" 
-             alt="Ever House Event Space" 
+             alt="Ever Club Event Space" 
              className="absolute inset-0 w-full h-[120%] object-cover object-[center_35%] will-change-transform animate-hero-bg"
              loading="eager"
              style={{ 

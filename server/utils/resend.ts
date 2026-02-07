@@ -90,7 +90,7 @@ export async function safeSendEmail(options: SafeSendOptions): Promise<{ success
   try {
     const { client, fromEmail } = await getResendClient();
     const result = await client.emails.send({
-      from: options.from || fromEmail || 'noreply@everhouse.app',
+      from: options.from || fromEmail || 'noreply@everclub.app',
       to: options.to,
       subject: options.subject,
       html: options.html,

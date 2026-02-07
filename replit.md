@@ -1,7 +1,7 @@
-# Ever House Members App
+# Ever Club Members App
 
 ## Overview
-The Ever House Members App is a private members club application designed for golf and wellness centers. It facilitates golf simulator bookings, wellness service appointments, and club event management. The application aims to enhance member engagement, streamline operational workflows, and provide a unified digital experience. The project aspires to become a central digital hub for private members clubs, offering comprehensive tools for membership management, facility booking, and community building to boost member satisfaction and operational efficiency.
+The Ever Club Members App (legal name: Ever Members Club) is a private members club application designed for golf and wellness centers. It facilitates golf simulator bookings, wellness service appointments, and club event management. The application aims to enhance member engagement, streamline operational workflows, and provide a unified digital experience. The project aspires to become a central digital hub for private members clubs, offering comprehensive tools for membership management, facility booking, and community building to boost member satisfaction and operational efficiency.
 
 ## User Preferences
 - **CRITICAL: Communication Style** - The founder is non-technical. Always explain changes in plain English, focusing on how they affect the member/staff experience or business operations. Avoid jargon like "ORM," "WebSocket," "orchestration," "middleware," etc. If a technical term is necessary, explain it simply first (e.g., "the notification system" instead of "WebSocket server").

@@ -8,7 +8,7 @@ interface SEOProps {
   type?: 'website' | 'article';
 }
 
-const BASE_URL = 'https://everhouse.app';
+const BASE_URL = 'https://everclub.app';
 const DEFAULT_IMAGE = '/images/hero-lounge-optimized.webp';
 
 export const SEO: React.FC<SEOProps> = ({
@@ -20,7 +20,7 @@ export const SEO: React.FC<SEOProps> = ({
 }) => {
   const fullUrl = url.startsWith('http') ? url : `${BASE_URL}${url}`;
   const fullImage = image.startsWith('http') ? image : `${BASE_URL}${image}`;
-  const fullTitle = title.includes('Ever House') ? title : `${title} | Ever House`;
+  const fullTitle = title.includes('Ever Club') ? title : `${title} | Ever Club`;
 
   return (
     <>
@@ -31,7 +31,7 @@ export const SEO: React.FC<SEOProps> = ({
       <meta property="og:url" content={fullUrl} />
       <meta property="og:image" content={fullImage} />
       <meta property="og:type" content={type} />
-      <meta property="og:site_name" content="Ever House" />
+      <meta property="og:site_name" content="Ever Club" />
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={fullTitle} />
       <meta name="twitter:description" content={description} />

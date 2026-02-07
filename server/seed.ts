@@ -87,7 +87,7 @@ async function seed() {
     // Seed Admin Users
     console.log('Creating admin users...');
     const admins = [
-      { email: 'adam@evenhouse.club', first_name: 'Adam', last_name: 'Even House', role: 'admin' },
+      { email: 'adam@evenhouse.club', first_name: 'Adam', last_name: 'Ever Club', role: 'admin' },
       { email: 'nick@evenhouse.club', first_name: 'Nick', last_name: 'Luu', role: 'admin' },
     ];
 
@@ -168,7 +168,7 @@ async function seed() {
       console.log('⚠ Member CSV file not found, skipping member import\n');
     }
 
-    // Seed Cafe Menu Items - Real Even House Menu
+    // Seed Cafe Menu Items - Real Ever Club Menu
     console.log('Creating cafe menu...');
     const cafeItems = [
       { category: 'Breakfast', name: 'Egg Toast', price: 14, description: 'Schaner Farm scrambled eggs, whipped ricotta, chives, micro greens, toasted country batard', icon: 'egg_alt', sort_order: 1 },

@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.8.0",
+    date: "2026-02-07",
+    title: "Rebrand: Ever House → Ever Club",
+    isMajor: true,
+    changes: [
+      "Rebrand: All references to 'Ever House' have been updated to 'Ever Club' across the entire app — pages, emails, notifications, and legal documents",
+      "New: Updated logos throughout the app with the new EverClub script wordmark",
+      "New: Legal name 'Ever Members Club' now appears in the footer, Terms of Service, and Privacy Policy",
+      "Update: All email sender addresses updated from @everhouse.app to @everclub.app",
+      "Update: Domain references updated from everhouse.app to everclub.app across all links, sitemap, and SEO metadata",
+      "Update: PWA manifest and service worker updated with new branding",
+    ],
+  },
+  {
     version: "7.7.0",
     date: "2026-02-07",
     title: "Sign in with Google — Link Your Google Account",

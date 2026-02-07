@@ -257,7 +257,7 @@ export async function sendErrorAlert(options: AlertOptions): Promise<boolean> {
     }
     
     await client.emails.send({
-      from: fromEmail || 'Even House <noreply@everhouse.app>',
+      from: fromEmail || 'Ever Club <noreply@everclub.app>',
       to: ALERT_EMAIL,
       subject: `${friendlyType}: ${area}`,
       html: `
@@ -298,7 +298,7 @@ export async function sendErrorAlert(options: AlertOptions): Promise<boolean> {
             
             <div style="text-align: center; padding-top: 16px; border-top: 1px solid #e5e7eb;">
               <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                This is an automated alert from the Even House app.<br>
+                This is an automated alert from the Ever Club app.<br>
                 You'll receive at most ${MAX_ALERTS_PER_DAY} of these per day.
               </p>
             </div>

@@ -36,7 +36,7 @@ function getBookingConfirmationHtml(data: BookingConfirmationData): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Booking Confirmed - Ever House</title>
+  <title>Booking Confirmed - Ever Club</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: ${CLUB_COLORS.bone}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: ${CLUB_COLORS.bone};">
@@ -47,7 +47,7 @@ function getBookingConfirmationHtml(data: BookingConfirmationData): string {
           <!-- Logo -->
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <img src="https://everhouse.app/assets/logos/monogram-dark.webp" alt="Ever House" width="60" height="60" style="display: inline-block;">
+              <img src="https://everclub.app/assets/logos/monogram-dark.webp" alt="Ever Club" width="60" height="60" style="display: inline-block;">
             </td>
           </tr>
           
@@ -113,7 +113,7 @@ function getBookingConfirmationHtml(data: BookingConfirmationData): string {
           <!-- CTA Button -->
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <a href="https://everhouse.app/bookings" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 8px;">
+              <a href="https://everclub.app/bookings" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 8px;">
                 View My Bookings
               </a>
             </td>
@@ -126,7 +126,7 @@ function getBookingConfirmationHtml(data: BookingConfirmationData): string {
                 Need to make changes? You can reschedule or cancel from your bookings page.
               </p>
               <p style="margin: 16px 0 0 0; font-size: 12px; color: ${CLUB_COLORS.textMuted};">
-                Ever House • 123 Golf Club Drive • Los Angeles, CA
+                Ever Club • 123 Golf Club Drive • Los Angeles, CA
               </p>
             </td>
           </tr>
@@ -170,7 +170,7 @@ function getBookingRescheduleHtml(data: BookingRescheduleData): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Booking Rescheduled - Ever House</title>
+  <title>Booking Rescheduled - Ever Club</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: ${CLUB_COLORS.bone}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: ${CLUB_COLORS.bone};">
@@ -180,7 +180,7 @@ function getBookingRescheduleHtml(data: BookingRescheduleData): string {
 
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <img src="https://everhouse.app/assets/logos/monogram-dark.webp" alt="Ever House" width="60" height="60" style="display: inline-block;">
+              <img src="https://everclub.app/assets/logos/monogram-dark.webp" alt="Ever Club" width="60" height="60" style="display: inline-block;">
             </td>
           </tr>
 
@@ -241,7 +241,7 @@ function getBookingRescheduleHtml(data: BookingRescheduleData): string {
 
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <a href="https://everhouse.app/bookings" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 8px;">
+              <a href="https://everclub.app/bookings" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 8px;">
                 View My Bookings
               </a>
             </td>
@@ -253,7 +253,7 @@ function getBookingRescheduleHtml(data: BookingRescheduleData): string {
                 If you have any questions about this change, please contact the front desk.
               </p>
               <p style="margin: 16px 0 0 0; font-size: 12px; color: ${CLUB_COLORS.textMuted};">
-                Ever House • 123 Golf Club Drive • Los Angeles, CA
+                Ever Club • 123 Golf Club Drive • Los Angeles, CA
               </p>
             </td>
           </tr>
@@ -281,7 +281,7 @@ export async function sendBookingRescheduleEmail(
     const html = getBookingRescheduleHtml(data);
 
     await resend.emails.send({
-      from: 'Ever House <noreply@everhouse.app>',
+      from: 'Ever Club <noreply@everclub.app>',
       to: email,
       subject: `Booking Rescheduled: ${data.bayName} on ${data.date}`,
       html,
@@ -309,7 +309,7 @@ export async function sendBookingConfirmationEmail(
     const html = getBookingConfirmationHtml(data);
     
     await resend.emails.send({
-      from: 'Ever House <noreply@everhouse.app>',
+      from: 'Ever Club <noreply@everclub.app>',
       to: email,
       subject: `Booking Confirmed: ${data.bayName} on ${data.date}`,
       html,

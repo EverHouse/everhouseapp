@@ -913,7 +913,7 @@ const Dashboard: React.FC = () => {
                     <div className="flex justify-between items-start">
                       <img src={useDarkLogo ? "/assets/logos/monogram-dark.webp" : "/assets/logos/monogram-white.webp"} className={`w-8 h-8 ${isExpired ? 'opacity-50' : 'opacity-90'}`} alt="" />
                       <div className="flex flex-col items-end gap-1">
-                        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: `${cardTextColor}99` }}>Ever House</span>
+                        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: `${cardTextColor}99` }}>Ever Club</span>
                         {isExpired && (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-500 text-white">
                             Expired

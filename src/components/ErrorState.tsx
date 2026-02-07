@@ -73,7 +73,7 @@ const ErrorState: React.FC<ErrorStateProps> = ({
         )}
         {showSupport && (
           <a
-            href="mailto:support@everhouse.com?subject=App Error Report"
+            href="mailto:support@everclub.app?subject=App Error Report"
             className={`
               inline-flex items-center justify-center gap-2
               ${isCompact ? 'px-4 py-2 text-xs' : 'px-6 py-2 text-sm'}

@@ -105,7 +105,7 @@ const Gallery: React.FC = () => {
       >
         <div className="px-5 pt-4 md:pt-2 pb-6 animate-content-enter">
           <h1 className="text-3xl font-medium tracking-tight text-primary leading-tight">Gallery</h1>
-          <p className="text-primary/70 text-base mt-2 font-light">Explore the exclusive spaces of Ever House.</p>
+          <p className="text-primary/70 text-base mt-2 font-light">Explore the exclusive spaces of Ever Club.</p>
         </div>
 
         <div className="pl-5 pr-5 py-2 w-full overflow-x-auto scrollbar-hide mb-6 animate-content-enter-delay-1">

@@ -32,7 +32,7 @@ function getEmailWrapper(content: string): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ever House</title>
+  <title>Ever Club</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: ${CLUB_COLORS.bone}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: ${CLUB_COLORS.bone};">
@@ -43,7 +43,7 @@ function getEmailWrapper(content: string): string {
           <!-- Logo -->
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <img src="https://everhouse.app/assets/logos/monogram-dark.webp" alt="Ever House" width="60" height="60" style="display: inline-block;">
+              <img src="https://everclub.app/assets/logos/monogram-dark.webp" alt="Ever Club" width="60" height="60" style="display: inline-block;">
             </td>
           </tr>
           
@@ -55,8 +55,8 @@ function getEmailWrapper(content: string): string {
               <p style="margin: 0 0 8px 0; font-size: 12px; color: ${CLUB_COLORS.textMuted};">
                 Questions? Reply to this email or contact us at the club.
               </p>
-              <a href="https://everhouse.app" style="font-size: 12px; color: ${CLUB_COLORS.deepGreen}; text-decoration: none;">
-                everhouse.app
+              <a href="https://everclub.app" style="font-size: 12px; color: ${CLUB_COLORS.deepGreen}; text-decoration: none;">
+                everclub.app
               </a>
             </td>
           </tr>
@@ -135,7 +135,7 @@ function getMembershipRenewalHtml(params: MembershipRenewalParams): string {
           <tr>
             <td style="padding-bottom: 32px;">
               <p style="margin: 0; font-size: 14px; color: ${CLUB_COLORS.textMuted}; line-height: 1.6;">
-                We're thrilled to have you as a member of Ever House. Continue enjoying all the benefits of your membership including golf simulators, wellness facilities, and exclusive events.
+                We're thrilled to have you as a member of Ever Club. Continue enjoying all the benefits of your membership including golf simulators, wellness facilities, and exclusive events.
               </p>
             </td>
           </tr>
@@ -143,8 +143,8 @@ function getMembershipRenewalHtml(params: MembershipRenewalParams): string {
           <!-- CTA Button -->
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <a href="https://everhouse.app" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
-                Open Ever House App
+              <a href="https://everclub.app" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
+                Open Ever Club App
               </a>
             </td>
           </tr>
@@ -213,7 +213,7 @@ function getMembershipFailedHtml(params: MembershipFailedParams): string {
           <tr>
             <td style="padding-bottom: 32px;">
               <p style="margin: 0; font-size: 14px; color: ${CLUB_COLORS.textMuted}; line-height: 1.6;">
-                To keep your membership active and continue enjoying Ever House benefits, please update your payment method as soon as possible. Your membership access may be limited until the payment is resolved.
+                To keep your membership active and continue enjoying Ever Club benefits, please update your payment method as soon as possible. Your membership access may be limited until the payment is resolved.
               </p>
             </td>
           </tr>
@@ -221,7 +221,7 @@ function getMembershipFailedHtml(params: MembershipFailedParams): string {
           <!-- CTA Button -->
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <a href="https://everhouse.app/profile" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
+              <a href="https://everclub.app/profile" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
                 Update Payment Method
               </a>
             </td>
@@ -299,7 +299,7 @@ function getCardExpiringHtml(params: CardExpiringParams): string {
           <!-- CTA Button -->
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <a href="https://everhouse.app/profile" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
+              <a href="https://everclub.app/profile" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
                 Update Payment Method
               </a>
             </td>
@@ -321,9 +321,9 @@ export async function sendMembershipRenewalEmail(
     const { client, fromEmail } = await getResendClient();
     
     await client.emails.send({
-      from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
+      from: fromEmail || 'Ever Members Club <noreply@everclub.app>',
       to: email,
-      subject: 'Membership Renewed - Ever House',
+      subject: 'Membership Renewed - Ever Club',
       html: getMembershipRenewalHtml(params)
     });
     
@@ -347,7 +347,7 @@ export async function sendMembershipFailedEmail(
     const { client, fromEmail } = await getResendClient();
     
     await client.emails.send({
-      from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
+      from: fromEmail || 'Ever Members Club <noreply@everclub.app>',
       to: email,
       subject: 'Membership Payment Failed - Action Required',
       html: getMembershipFailedHtml(params)
@@ -373,9 +373,9 @@ export async function sendCardExpiringEmail(
     const { client, fromEmail } = await getResendClient();
     
     await client.emails.send({
-      from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
+      from: fromEmail || 'Ever Members Club <noreply@everclub.app>',
       to: email,
-      subject: 'Update Your Payment Method - Ever House',
+      subject: 'Update Your Payment Method - Ever Club',
       html: getCardExpiringHtml(params)
     });
     
@@ -468,7 +468,7 @@ function getGracePeriodReminderHtml(params: GracePeriodReminderParams): string {
               <p style="margin: 0; font-size: 14px; color: ${CLUB_COLORS.textMuted}; line-height: 1.6;">
                 ${isUrgent 
                   ? 'Your membership access will be immediately suspended if we cannot process your payment today. Please click the button below to update your payment method and reactivate your membership.'
-                  : 'To continue enjoying Ever House benefits including golf simulators, wellness facilities, and exclusive events, please update your payment method at your earliest convenience.'}
+                  : 'To continue enjoying Ever Club benefits including golf simulators, wellness facilities, and exclusive events, please update your payment method at your earliest convenience.'}
               </p>
             </td>
           </tr>
@@ -499,11 +499,11 @@ export async function sendGracePeriodReminderEmail(
     
     const isUrgent = params.currentDay >= params.totalDays;
     const subject = isUrgent 
-      ? 'FINAL NOTICE: Membership Termination Today - Ever House'
-      : `Day ${params.currentDay} of ${params.totalDays}: Payment Required - Ever House`;
+      ? 'FINAL NOTICE: Membership Termination Today - Ever Club'
+      : `Day ${params.currentDay} of ${params.totalDays}: Payment Required - Ever Club`;
     
     await client.emails.send({
-      from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
+      from: fromEmail || 'Ever Members Club <noreply@everclub.app>',
       to: email,
       subject,
       html: getGracePeriodReminderHtml(params)
@@ -532,7 +532,7 @@ function getMembershipActivationHtml(params: MembershipActivationParams): string
           <tr>
             <td style="padding-bottom: 24px;">
               <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: ${CLUB_COLORS.deepGreen}; line-height: 1.3;">
-                Welcome to Ever House
+                Welcome to Ever Club
               </h1>
             </td>
           </tr>
@@ -543,7 +543,7 @@ function getMembershipActivationHtml(params: MembershipActivationParams): string
                 Hi ${memberName},
               </p>
               <p style="margin: 0 0 16px 0; font-size: 16px; color: ${CLUB_COLORS.textDark}; line-height: 1.5;">
-                You've been invited to join Ever House as a <strong>${tierName}</strong> member. 
+                You've been invited to join Ever Club as a <strong>${tierName}</strong> member. 
                 Complete your membership setup by clicking the button below.
               </p>
             </td>
@@ -593,9 +593,9 @@ export async function sendMembershipActivationEmail(
     const { client, fromEmail } = await getResendClient();
     
     await client.emails.send({
-      from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
+      from: fromEmail || 'Ever Members Club <noreply@everclub.app>',
       to: email,
-      subject: `Complete Your ${params.tierName} Membership - Ever House`,
+      subject: `Complete Your ${params.tierName} Membership - Ever Club`,
       html: getMembershipActivationHtml(params)
     });
     

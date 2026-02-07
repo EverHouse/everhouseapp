@@ -10,7 +10,7 @@ const CLUB_COLORS = {
 };
 
 function getWelcomeEmailHtml(firstName?: string): string {
-  const greeting = firstName ? `Welcome, ${firstName}!` : 'Welcome to Ever House!';
+  const greeting = firstName ? `Welcome, ${firstName}!` : 'Welcome to Ever Club!';
   
   return `
 <!DOCTYPE html>
@@ -18,7 +18,7 @@ function getWelcomeEmailHtml(firstName?: string): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome to Ever House</title>
+  <title>Welcome to Ever Club</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: ${CLUB_COLORS.bone}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: ${CLUB_COLORS.bone};">
@@ -29,7 +29,7 @@ function getWelcomeEmailHtml(firstName?: string): string {
           <!-- Logo -->
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <img src="https://everhouse.app/assets/logos/monogram-dark.webp" alt="Ever House" width="60" height="60" style="display: inline-block;">
+              <img src="https://everclub.app/assets/logos/monogram-dark.webp" alt="Ever Club" width="60" height="60" style="display: inline-block;">
             </td>
           </tr>
           
@@ -77,7 +77,7 @@ function getWelcomeEmailHtml(firstName?: string): string {
                     <p style="margin: 0 0 12px 0; font-size: 14px; color: ${CLUB_COLORS.textMuted}; line-height: 1.6;">
                       Reserve your Trackman bay in just a few taps. See real-time availability, request your preferred time, and get instant confirmation.
                     </p>
-                    <a href="https://everhouse.app/book-golf" style="display: inline-block; font-size: 14px; color: ${CLUB_COLORS.deepGreen}; text-decoration: none; font-weight: 500;">
+                    <a href="https://everclub.app/book-golf" style="display: inline-block; font-size: 14px; color: ${CLUB_COLORS.deepGreen}; text-decoration: none; font-weight: 500;">
                       Book now →
                     </a>
                   </td>
@@ -103,7 +103,7 @@ function getWelcomeEmailHtml(firstName?: string): string {
                     <p style="margin: 0 0 12px 0; font-size: 14px; color: ${CLUB_COLORS.textMuted}; line-height: 1.6;">
                       Browse spa services, fitness classes, and wellness treatments. Sign up for classes directly from the app with one-tap enrollment.
                     </p>
-                    <a href="https://everhouse.app/wellness" style="display: inline-block; font-size: 14px; color: ${CLUB_COLORS.deepGreen}; text-decoration: none; font-weight: 500;">
+                    <a href="https://everclub.app/wellness" style="display: inline-block; font-size: 14px; color: ${CLUB_COLORS.deepGreen}; text-decoration: none; font-weight: 500;">
                       View wellness →
                     </a>
                   </td>
@@ -129,7 +129,7 @@ function getWelcomeEmailHtml(firstName?: string): string {
                     <p style="margin: 0 0 12px 0; font-size: 14px; color: ${CLUB_COLORS.textMuted}; line-height: 1.6;">
                       Stay in the loop on member gatherings, workshops, and special occasions. RSVP with one tap and add events to your calendar.
                     </p>
-                    <a href="https://everhouse.app/events" style="display: inline-block; font-size: 14px; color: ${CLUB_COLORS.deepGreen}; text-decoration: none; font-weight: 500;">
+                    <a href="https://everclub.app/events" style="display: inline-block; font-size: 14px; color: ${CLUB_COLORS.deepGreen}; text-decoration: none; font-weight: 500;">
                       See events →
                     </a>
                   </td>
@@ -141,8 +141,8 @@ function getWelcomeEmailHtml(firstName?: string): string {
           <!-- CTA Button -->
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
-              <a href="https://everhouse.app" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
-                Open Ever House App
+              <a href="https://everclub.app" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
+                Open Ever Club App
               </a>
             </td>
           </tr>
@@ -153,8 +153,8 @@ function getWelcomeEmailHtml(firstName?: string): string {
               <p style="margin: 0 0 8px 0; font-size: 12px; color: ${CLUB_COLORS.textMuted};">
                 Questions? Reply to this email or contact us at the club.
               </p>
-              <a href="https://everhouse.app" style="font-size: 12px; color: ${CLUB_COLORS.deepGreen}; text-decoration: none;">
-                everhouse.app
+              <a href="https://everclub.app" style="font-size: 12px; color: ${CLUB_COLORS.deepGreen}; text-decoration: none;">
+                everclub.app
               </a>
             </td>
           </tr>
@@ -173,9 +173,9 @@ export async function sendWelcomeEmail(email: string, firstName?: string): Promi
     const { client, fromEmail } = await getResendClient();
     
     await client.emails.send({
-      from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
+      from: fromEmail || 'Ever Members Club <noreply@everclub.app>',
       to: email,
-      subject: 'Welcome to Ever House',
+      subject: 'Welcome to Ever Club',
       html: getWelcomeEmailHtml(firstName)
     });
     

@@ -15,7 +15,7 @@ const vapidConfigured = !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRI
 
 if (vapidConfigured) {
   webpush.setVapidDetails(
-    'mailto:hello@everhouse.app',
+    'mailto:hello@everclub.app',
     process.env.VAPID_PUBLIC_KEY!,
     process.env.VAPID_PRIVATE_KEY!
   );
@@ -243,7 +243,7 @@ router.post('/api/push/test', isAuthenticated, async (req: any, res) => {
     
     await sendPushNotification(userEmail, {
       title: 'Test Notification',
-      body: 'This is a test push notification from Ever House!',
+      body: 'This is a test push notification from Ever Club!',
       url: '/profile'
     });
     

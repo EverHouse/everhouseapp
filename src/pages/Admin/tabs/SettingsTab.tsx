@@ -37,8 +37,8 @@ const SettingsTab: React.FC = () => {
   const [hasChanges, setHasChanges] = useState(false);
   
   const [settings, setSettings] = useState<SettingsState>({
-    clubName: 'Ever House',
-    supportEmail: 'support@everhouse.com',
+    clubName: 'Ever Club',
+    supportEmail: 'support@everclub.app',
     timezoneDisplay: 'America/Los_Angeles',
     categoryLabels: {
       guest_pass: 'Guest Pass',
@@ -64,8 +64,8 @@ const SettingsTab: React.FC = () => {
       }
       
       return {
-        clubName: data['app.club_name']?.value || 'Ever House',
-        supportEmail: data['app.support_email']?.value || 'support@everhouse.com',
+        clubName: data['app.club_name']?.value || 'Ever Club',
+        supportEmail: data['app.support_email']?.value || 'support@everclub.app',
         timezoneDisplay: data['app.timezone_display']?.value || 'America/Los_Angeles',
         categoryLabels,
         dataIntegrityAlerts: data['notifications.data_integrity_alerts']?.value !== 'false',

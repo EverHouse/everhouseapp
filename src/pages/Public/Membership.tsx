@@ -118,8 +118,8 @@ const MembershipOverview: React.FC = () => {
   return (
     <AnimatedPage>
       <SEO
-        title="Membership | Ever House"
-        description="Join Ever House - Orange County's premier indoor golf and social club. Choose from Social, Core, Premium, or Corporate membership tiers with exclusive benefits including golf simulators, coworking, wellness, and events."
+        title="Membership | Ever Club"
+        description="Join Ever Club - Orange County's premier indoor golf and social club. Choose from Social, Core, Premium, or Corporate membership tiers with exclusive benefits including golf simulators, coworking, wellness, and events."
         url="/membership"
         image="/images/hero-lounge-optimized.webp"
       />

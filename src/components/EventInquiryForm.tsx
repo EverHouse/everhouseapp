@@ -385,7 +385,7 @@ const EventInquiryForm: React.FC<EventInquiryFormProps> = ({
 
                   <div className="pt-2">
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                      Ever House is committed to protecting and respecting your privacy. We use your information to administer your account and to provide the products, services, and updates you request from us.
+                      Ever Club is committed to protecting and respecting your privacy. We use your information to administer your account and to provide the products, services, and updates you request from us.
                     </p>
                     <label className="flex items-start gap-3 cursor-pointer group">
                       <input

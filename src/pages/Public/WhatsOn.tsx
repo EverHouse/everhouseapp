@@ -144,8 +144,8 @@ const WhatsOn: React.FC = () => {
   return (
     <AnimatedPage>
       <SEO
-        title="What's On | Ever House"
-        description="Discover upcoming events, wellness classes, and curated experiences at Ever House. Join us for culture, conversation, and community in Tustin, Orange County."
+        title="What's On | Ever Club"
+        description="Discover upcoming events, wellness classes, and curated experiences at Ever Club. Join us for culture, conversation, and community in Tustin, Orange County."
         url="/whats-on"
         image="/images/events-crowd-optimized.webp"
       />
@@ -156,7 +156,7 @@ const WhatsOn: React.FC = () => {
       <section className="px-6 pt-4 md:pt-2 pb-6 bg-[#EAEBE6] animate-content-enter">
         <h1 className="text-5xl font-light text-primary mb-4 tracking-tight">What's On</h1>
         <p className="text-primary/70 text-base leading-relaxed max-w-[90%]">
-           Curated experiences at Ever House. Join us for culture, conversation, and community in Tustin.
+           Curated experiences at Ever Club. Join us for culture, conversation, and community in Tustin.
         </p>
       </section>
 
@@ -302,7 +302,7 @@ const WhatsOn: React.FC = () => {
       <section className="px-4 py-8 mb-4">
         <div className="bg-[#293515] rounded-2xl p-6 text-center">
           <h3 className="text-xl font-bold text-white mb-2">Want full access?</h3>
-          <p className="text-white/70 text-sm mb-4">Join Ever House and unlock exclusive member-only events and wellness classes.</p>
+          <p className="text-white/70 text-sm mb-4">Join Ever Club and unlock exclusive member-only events and wellness classes.</p>
           <button 
             onClick={() => { startNavigation(); navigate('/membership'); }}
             className="bg-[#F2F2EC] text-[#293515] px-6 py-3 rounded-xl font-bold text-sm hover:bg-white transition-colors"

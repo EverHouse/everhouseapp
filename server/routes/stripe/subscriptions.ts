@@ -713,7 +713,7 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
     
     // Use environment-aware URLs
     const replitDomains = process.env.REPLIT_DOMAINS?.split(',')[0];
-    const baseUrl = replitDomains ? `https://${replitDomains}` : 'https://everhouse.app';
+    const baseUrl = replitDomains ? `https://${replitDomains}` : 'https://everclub.app';
     
     const successUrl = `${baseUrl}/welcome?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${baseUrl}/`;

@@ -158,7 +158,7 @@ const MembershipApply: React.FC = () => {
               Apply for Membership
             </h1>
             <p className="text-primary/60 text-sm md:text-base">
-              Join the Ever House community and discover a new way to connect, play, and unwind.
+              Join the Ever Club community and discover a new way to connect, play, and unwind.
             </p>
           </div>
 

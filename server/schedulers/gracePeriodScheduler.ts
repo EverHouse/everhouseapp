@@ -19,7 +19,7 @@ function getDaysSinceStartPacific(graceStartDate: Date): number {
 }
 
 async function getReactivationLink(stripeCustomerId: string | null): Promise<string> {
-  const fallbackLink = 'https://everhouse.app/billing';
+  const fallbackLink = 'https://everclub.app/billing';
   
   if (!stripeCustomerId) {
     return fallbackLink;
@@ -28,8 +28,8 @@ async function getReactivationLink(stripeCustomerId: string | null): Promise<str
   try {
     const stripe = await getStripeClient();
     const returnUrl = process.env.NODE_ENV === 'production' 
-      ? 'https://everhouse.app'
-      : (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://everhouse.app');
+      ? 'https://everclub.app'
+      : (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://everclub.app');
 
     const session = await stripe.billingPortal.sessions.create({
       customer: stripeCustomerId,

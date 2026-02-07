@@ -234,8 +234,8 @@ async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurcha
   
   // Map legacy purchases to unified format
   const unifiedLegacy: UnifiedPurchase[] = legacyResult.map(p => {
-    // Determine source - guest passes created in-app should show "Even House"
-    const source = p.paymentMethod === 'guest_pass' ? 'Even House' : 'Mindbody';
+    // Determine source - guest passes created in-app should show "Ever Club"
+    const source = p.paymentMethod === 'guest_pass' ? 'Ever Club' : 'Mindbody';
     
     return {
       id: `legacy-${p.id}`,

@@ -693,7 +693,7 @@ router.post('/api/member-billing/:email/payment-link', isStaffOrAdmin, async (re
       ? `https://${process.env.REPLIT_DEV_DOMAIN}`
       : process.env.REPLIT_DEPLOYMENT_DOMAIN
         ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}`
-        : 'https://everhouse.com';
+        : 'https://everclub.com';
 
     const session = await stripe.billingPortal.sessions.create({
       customer: member.stripe_customer_id,

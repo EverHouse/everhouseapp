@@ -1,7 +1,7 @@
 const RAW_BUILD_VERSION = '__BUILD_VERSION__';
 const IS_DEV = RAW_BUILD_VERSION.includes('BUILD_VERSION');
 const BUILD_VERSION = IS_DEV ? 'development' : RAW_BUILD_VERSION;
-const CACHE_NAME = `ever-house-${BUILD_VERSION}`;
+const CACHE_NAME = `ever-club-${BUILD_VERSION}`;
 const API_CACHE = `api-cache-${BUILD_VERSION}`;
 
 const STATIC_ASSETS = [
@@ -17,7 +17,7 @@ self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.keys().then(keys => {
       return Promise.all(
-        keys.filter(key => key.startsWith('ever-house-') || key.startsWith('api-cache-'))
+        keys.filter(key => key.startsWith('ever-club-') || key.startsWith('ever-house-') || key.startsWith('api-cache-'))
           .map(key => {
             console.log('[SW] Pre-clearing cache during install:', key);
             return caches.delete(key);
@@ -35,7 +35,7 @@ self.addEventListener('activate', function(event) {
     caches.keys().then(keys => {
       return Promise.all(
         keys.filter(key => {
-          return key.startsWith('ever-house-') || key.startsWith('api-cache-');
+          return key.startsWith('ever-club-') || key.startsWith('ever-house-') || key.startsWith('api-cache-');
         }).filter(key => {
           return key !== CACHE_NAME && key !== API_CACHE;
         }).map(key => {
@@ -153,7 +153,7 @@ self.addEventListener('push', function(event) {
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Ever House', options)
+    self.registration.showNotification(data.title || 'Ever Club', options)
   );
 });
 

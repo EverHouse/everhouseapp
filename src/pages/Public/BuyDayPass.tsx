@@ -121,7 +121,7 @@ const BuyDayPass: React.FC = () => {
       <div className="px-6 pt-4 md:pt-2 pb-6 text-center animate-pop-in">
         <h1 className="text-3xl font-bold tracking-tight text-primary mb-3">Day Passes</h1>
         <p className="text-primary/70 text-sm leading-relaxed max-w-xs mx-auto">
-          Experience Ever House as a guest. No membership required.
+          Experience Ever Club as a guest. No membership required.
         </p>
       </div>
 

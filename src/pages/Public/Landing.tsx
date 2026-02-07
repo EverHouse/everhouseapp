@@ -287,7 +287,7 @@ const Landing: React.FC = () => {
   return (
     <AnimatedPage>
       <SEO
-        title="Ever House | Orange County's Premier Indoor Golf & Social Club"
+        title="Ever Club | Orange County's Premier Indoor Golf & Social Club"
         description="A new kind of members club rooted in golf, built for community. Experience indoor golf simulators, coworking spaces, wellness programs, and curated events in Tustin, Orange County."
         url="/"
         image="/images/hero-lounge-optimized.webp"
@@ -319,7 +319,7 @@ const Landing: React.FC = () => {
         >
           <img 
             src="/images/hero-lounge-optimized.webp" 
-            alt="Ever House Lounge" 
+            alt="Ever Club Lounge" 
             className="absolute inset-0 w-full h-[120%] object-cover object-[center_35%] will-change-transform animate-hero-bg"
             loading="eager"
             fetchPriority="high"
@@ -360,7 +360,7 @@ const Landing: React.FC = () => {
       <div className="bg-[#F2F2EC]">
       {/* Features Section - "Why Even House" (Moved to First Position) */}
       <div className="px-6 py-12 animate-content-enter-delay-1">
-        <h2 className="text-3xl font-bold text-[#293515] mb-8 font-sans">Why Ever House</h2>
+        <h2 className="text-3xl font-bold text-[#293515] mb-8 font-sans">Why Ever Club</h2>
         <div className="grid grid-cols-2 gap-4">
           <FeatureCard 
             image="/images/golf-sims-optimized.webp"
@@ -434,7 +434,7 @@ const Landing: React.FC = () => {
           >
             <p className="text-xl font-bold text-[#293515]/80 tracking-tight mb-4" style={{ fontFamily: 'Georgia, serif' }}>Forbes</p>
             <blockquote className="text-sm text-[#293515]/80 leading-relaxed flex-1">
-              "Ever House has fashioned a tribe-finding concept... creating a 'third place' around an indoor golf experience while layering in a farm-to-table café and flex space for co-working."
+              "Ever Club has fashioned a tribe-finding concept... creating a 'third place' around an indoor golf experience while layering in a farm-to-table café and flex space for co-working."
             </blockquote>
             <p className="text-xs text-[#293515]/50 font-medium mt-4">September 2025</p>
           </a>
@@ -569,7 +569,7 @@ const Landing: React.FC = () => {
         <div className="max-w-2xl mx-auto text-center">
           <span className="text-6xl text-[#293515]/20 font-serif leading-none block mb-2">"</span>
           <blockquote className="text-lg sm:text-xl italic text-[#293515]/90 mb-4 leading-relaxed -mt-8">
-            Ever House has become my second office. The golf is incredible, but the community is what keeps me coming back.
+            Ever Club has become my second office. The golf is incredible, but the community is what keeps me coming back.
           </blockquote>
           <p className="text-sm text-[#293515]/60 font-medium">— Michael R., Core Member</p>
         </div>

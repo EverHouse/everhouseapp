@@ -257,7 +257,7 @@ async function deliverViaEmail(to: string, subject: string, html: string): Promi
     const { client, fromEmail } = await getResendClient();
     
     await client.emails.send({
-      from: fromEmail || 'Ever House <noreply@everhouse.app>',
+      from: fromEmail || 'Ever Club <noreply@everclub.app>',
       to,
       subject,
       html
@@ -605,7 +605,7 @@ export async function notifyPaymentSuccess(
     },
     {
       sendEmail: options?.sendEmail,
-      emailSubject: 'Payment Confirmation - Ever House',
+      emailSubject: 'Payment Confirmation - Ever Club',
       emailHtml: `
         <h2>Payment Successful</h2>
         <p>Your payment of <strong>${formattedAmount}</strong> for ${description} has been processed successfully.</p>
@@ -634,7 +634,7 @@ export async function notifyPaymentFailed(
     },
     {
       sendEmail: options?.sendEmail,
-      emailSubject: 'Payment Failed - Ever House',
+      emailSubject: 'Payment Failed - Ever Club',
       emailHtml: `
         <h2>Payment Failed</h2>
         <p>We were unable to process your payment of <strong>${formattedAmount}</strong>.</p>
@@ -687,7 +687,7 @@ export async function notifyOutstandingBalance(
     {
       sendPush: options?.sendPush ?? true,
       sendEmail: options?.sendEmail,
-      emailSubject: 'Outstanding Balance - Ever House',
+      emailSubject: 'Outstanding Balance - Ever Club',
       emailHtml: `
         <h2>Outstanding Balance</h2>
         <p>You have an outstanding balance of <strong>${formattedAmount}</strong> for ${description}.</p>

@@ -1,7 +1,7 @@
-# Ever House Mobile App - API Documentation & Setup Guide
+# Ever Club Mobile App - API Documentation & Setup Guide
 
 ## Overview
-This document provides everything needed to create a native iOS mobile app for Ever House members, connecting to the existing backend API while keeping the brand design intact.
+This document provides everything needed to create a native iOS mobile app for Ever Club members, connecting to the existing backend API while keeping the brand design intact.
 
 ---
 
@@ -105,10 +105,10 @@ This document provides everything needed to create a native iOS mobile app for E
 
 ---
 
-## Design System: Ever House Brand + Native Mobile
+## Design System: Ever Club Brand + Native Mobile
 
 ### Brand Identity
-- **Name:** Ever House
+- **Name:** Ever Club
 - **Logo:** EH monogram
 - **Style:** Liquid Glass (iOS-inspired glassmorphism)
 
@@ -130,7 +130,7 @@ This document provides everything needed to create a native iOS mobile app for E
 ### Native Mobile Optimization
 
 **Buttons:**
-- Use native iOS button styles with Ever House colors
+- Use native iOS button styles with Ever Club colors
 - Primary buttons: Deep Green (#1B4332) background with white text
 - Secondary buttons: Transparent with Deep Green border
 - Add subtle haptic feedback on tap
@@ -147,7 +147,7 @@ This document provides everything needed to create a native iOS mobile app for E
 - Standard iOS swipe-to-delete for cancellable items
 
 **Forms & Inputs:**
-- Native iOS text fields with Ever House color accents
+- Native iOS text fields with Ever Club color accents
 - Deep Green cursor and selection color
 - Standard iOS keyboard behaviors
 
@@ -175,7 +175,7 @@ Use this prompt when creating the new mobile app project in Replit:
 
 ---
 
-**Build a native iOS mobile app for Ever House, a private members golf and wellness club. The app connects to our existing backend API.**
+**Build a native iOS mobile app for Ever Club, a private members golf and wellness club. The app connects to our existing backend API.**
 
 **Core Features:**
 

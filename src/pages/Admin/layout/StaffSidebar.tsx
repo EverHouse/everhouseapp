@@ -135,12 +135,12 @@ export const StaffSidebar: React.FC<StaffSidebarProps> = ({
       >
         <img 
           src="/assets/logos/mascot-white.webp" 
-          alt="Ever House" 
+          alt="Ever Club" 
           className="h-10 w-auto object-contain"
         />
         <div>
           <h1 className="text-white font-bold text-lg leading-tight">Staff Portal</h1>
-          <p className="text-white/50 text-xs">Ever House</p>
+          <p className="text-white/50 text-xs">Ever Club</p>
         </div>
       </button>
 

@@ -669,7 +669,7 @@ router.post('/api/auth/request-otp', async (req, res) => {
     });
     
     // Send email synchronously to ensure delivery before responding
-    const logoUrl = 'https://everhouse.app/assets/logos/monogram-dark.webp';
+    const logoUrl = 'https://everclub.app/assets/logos/monogram-dark.webp';
     const startTime = Date.now();
     console.log(`[OTP Email] Starting send to ${normalizedEmail.substring(0, 5)}***`);
     
@@ -677,9 +677,9 @@ router.post('/api/auth/request-otp', async (req, res) => {
       const { client: resendClient, fromEmail } = await getResendClient();
       console.log(`[OTP Email] Resend client ready in ${Date.now() - startTime}ms`);
       const emailResult = await withResendRetry(() => resendClient.emails.send({
-          from: fromEmail || 'Ever House Members Club <noreply@everhouse.app>',
+          from: fromEmail || 'Ever Members Club <noreply@everclub.app>',
           to: normalizedEmail,
-          subject: 'Your Ever House Login Code',
+          subject: 'Your Ever Club Login Code',
           html: `
             <!DOCTYPE html>
             <html>
@@ -705,7 +705,7 @@ router.post('/api/auth/request-otp', async (req, res) => {
                           <!--<![endif]-->
                           <h1 style="margin: 0 0 8px 0; font-size: 28px; font-weight: 600; color: #293515; font-family: 'Georgia', serif;">Hi ${firstName},</h1>
                           <p style="margin: 0; font-size: 16px; color: #666666; line-height: 1.5;">
-                            Enter this code in the Ever House app to sign in:
+                            Enter this code in the Ever Club app to sign in:
                           </p>
                         </td>
                       </tr>
@@ -736,7 +736,7 @@ router.post('/api/auth/request-otp', async (req, res) => {
                       <tr>
                         <td style="padding: 24px 40px; background-color: #f8f8f6; border-radius: 0 0 16px 16px; text-align: center;">
                           <p style="margin: 0; font-size: 12px; color: #999999;">
-                            Ever House Members Club<br>
+                            Ever Members Club<br>
                             <span style="color: #CCB8E4;">Golf & Wellness</span>
                           </p>
                         </td>

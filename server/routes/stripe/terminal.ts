@@ -48,7 +48,7 @@ router.post('/api/stripe/terminal/create-simulated-reader', isStaffOrAdmin, asyn
     
     if (locations.data.length === 0) {
       const location = await stripe.terminal.locations.create({
-        display_name: 'Ever House - Main Location',
+        display_name: 'Ever Club - Main Location',
         address: {
           line1: '123 Main St',
           city: 'Los Angeles',
@@ -64,7 +64,7 @@ router.post('/api/stripe/terminal/create-simulated-reader', isStaffOrAdmin, asyn
     
     const reader = await stripe.terminal.readers.create({
       registration_code: 'simulated-wpe',
-      label: 'Ever House Simulated Reader',
+      label: 'Ever Club Simulated Reader',
       location: locationId
     });
     

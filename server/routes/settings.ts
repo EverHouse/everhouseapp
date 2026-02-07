@@ -9,8 +9,8 @@ import { getSessionUser } from '../types/session';
 const router = Router();
 
 const DEFAULT_SETTINGS: Record<string, { value: string; category: string }> = {
-  'app.club_name': { value: 'Ever House', category: 'display' },
-  'app.support_email': { value: 'support@everhouse.com', category: 'display' },
+  'app.club_name': { value: 'Ever Club', category: 'display' },
+  'app.support_email': { value: 'support@everclub.com', category: 'display' },
   'app.timezone_display': { value: 'America/Los_Angeles', category: 'display' },
   'category.guest_pass': { value: 'Guest Pass', category: 'categories' },
   'category.guest_sim_fee': { value: 'Guest Sim Fee', category: 'categories' },

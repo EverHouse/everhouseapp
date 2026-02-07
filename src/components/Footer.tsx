@@ -37,9 +37,9 @@ export const Footer: React.FC<FooterProps> = ({ hideCta = false }) => (
      </div>
 
      <div className="flex justify-center gap-4 mb-10">
-        <SocialLink href="https://www.instagram.com/evenhouseclub/" icon="instagram" />
-        <SocialLink href="https://www.linkedin.com/company/even-house" icon="linkedin" />
-        <SocialLink href="https://www.tiktok.com/@evenhouseclub" icon="tiktok" />
+        <SocialLink href="https://www.instagram.com/everclub/" icon="instagram" />
+        <SocialLink href="https://www.linkedin.com/company/ever-club" icon="linkedin" />
+        <SocialLink href="https://www.tiktok.com/@everclub" icon="tiktok" />
      </div>
      
      {!hideCta && (
@@ -60,7 +60,7 @@ export const Footer: React.FC<FooterProps> = ({ hideCta = false }) => (
      </div>
      
      <div className="flex flex-col items-center gap-2">
-        <p className="text-[10px] opacity-40">© {new Date().getFullYear()} Ever House. All rights reserved.</p>
+        <p className="text-[10px] opacity-40">© {new Date().getFullYear()} Ever Members Club. All rights reserved.</p>
         <p className="text-[10px] opacity-30">v{APP_VERSION} · Updated {formatLastUpdated()}</p>
      </div>
   </footer>

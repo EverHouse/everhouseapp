@@ -692,7 +692,7 @@ const ChangelogTab: React.FC = () => {
     const renderUpdatesTab = () => (
         <div className="space-y-6 animate-pop-in">
             <div className="text-sm text-primary/80 dark:text-white/80 mb-6">
-                A complete history of updates, improvements, and new features added to the Ever House app.
+                A complete history of updates, improvements, and new features added to the Ever Club app.
             </div>
 
             {visibleChangelog.map((entry, index) => (

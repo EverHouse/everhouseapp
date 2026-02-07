@@ -718,7 +718,7 @@ function CheckoutSuccess() {
             </li>
             <li className="flex items-start gap-2">
               <span className="material-symbols-outlined text-accent text-lg">location_on</span>
-              Visit us at 123 Ever House Lane
+              Visit us at 123 Ever Club Lane
             </li>
             <li className="flex items-start gap-2">
               <span className="material-symbols-outlined text-accent text-lg">schedule</span>
@@ -742,7 +742,7 @@ function CheckoutSuccess() {
       <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
         <span className="material-symbols-outlined text-5xl text-emerald-600 dark:text-emerald-400">check_circle</span>
       </div>
-      <h2 className="text-3xl font-bold text-primary dark:text-white mb-2">Welcome to EverHouse!</h2>
+      <h2 className="text-3xl font-bold text-primary dark:text-white mb-2">Welcome to EverClub!</h2>
       <p className="text-primary/70 dark:text-white/70 text-lg mb-2">Your membership is now active.</p>
       {customerEmail && (
         <p className="text-primary/60 dark:text-white/60 mb-8">A confirmation has been sent to {customerEmail}</p>
@@ -776,7 +776,7 @@ export default function Checkout() {
         <div className="max-w-4xl mx-auto px-6 py-4">
           <a href="/#/" className="inline-flex items-center gap-2 text-primary/60 dark:text-white/60 hover:text-primary dark:hover:text-white transition-colors text-sm">
             <span className="material-symbols-outlined text-lg">arrow_back</span>
-            Back to EverHouse
+            Back to EverClub
           </a>
         </div>
       </header>

@@ -1,4 +1,4 @@
-# Ever House Members App
+# Ever Club Members App
 
 A private members club application for golf and wellness centers.
 
@@ -22,4 +22,3 @@ A private members club application for golf and wellness centers.
 3. Start the API server: `npm run server`
 
 The app runs on port 5000 (frontend) and port 3001 (API).
-# everhouseapp

@@ -1,4 +1,4 @@
-# Even House App - Complete UI Element Map
+# Ever Club App - Complete UI Element Map
 
 This document maps every interactive UI element (buttons, links, cards, forms, modals) across the entire application.
 
@@ -90,7 +90,7 @@ This document maps every interactive UI element (buttons, links, cards, forms, m
 |---------|------|--------|--------|
 | "VISIT US" | Card (static) | None | Displays address |
 | "CALL US" | Link | Phone dialer | Opens `tel:9495455855` |
-| "EMAIL US" | Link | Email client | Opens `mailto:info@evenhouse.club` |
+| "EMAIL US" | Link | Email client | Opens `mailto:info@everclub.club` |
 | "MESSAGE US" | Link | External | Opens Apple Business Chat |
 
 #### Contact Form
@@ -411,7 +411,7 @@ This document maps every interactive UI element (buttons, links, cards, forms, m
 #### Header
 | Element | Type | Action | Result |
 |---------|------|--------|--------|
-| Ever House Logo | Button | Navigate | Goes to home page `/` |
+| Ever Club Logo | Button | Navigate | Goes to home page `/` |
 | Updates button | Button | Switch tab | Goes to Updates tab, shows badge |
 | Profile avatar | Button | Navigate | Goes to `/profile` |
 
