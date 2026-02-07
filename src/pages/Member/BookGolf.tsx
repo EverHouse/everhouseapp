@@ -8,6 +8,7 @@ import { useToast } from '../../components/Toast';
 import { bookingEvents } from '../../lib/bookingEvents';
 import { fetchWithCredentials, postWithCredentials, putWithCredentials } from '../../hooks/queries/useFetch';
 import DateButton from '../../components/DateButton';
+import { usePricing } from '../../hooks/usePricing';
 import TabButton from '../../components/TabButton';
 import SwipeablePage from '../../components/SwipeablePage';
 import PullToRefresh from '../../components/PullToRefresh';
@@ -194,6 +195,7 @@ const BookGolf: React.FC = () => {
   const { effectiveTheme } = useTheme();
   const { setPageReady } = usePageReady();
   const { showToast } = useToast();
+  const { guestFeeDollars, overageRatePerBlockDollars } = usePricing();
   const isDark = effectiveTheme === 'dark';
   const activeTab: 'simulator' | 'conference' = searchParams.get('tab') === 'conference' ? 'conference' : 'simulator';
   
@@ -452,7 +454,7 @@ const BookGolf: React.FC = () => {
       return {
         overageFee: 0, guestFees: 0, totalFee: 0, guestCount: 0, overageMinutes: 0,
         guestsUsingPasses: 0, guestsCharged: 0, passesRemainingAfter: guestPassInfo?.passes_remaining ?? 0, isLoading: feeEstimateLoading,
-        guestFeePerUnit: 25, overageRatePerBlock: 25
+        guestFeePerUnit: guestFeeDollars, overageRatePerBlock: overageRatePerBlockDollars
       };
     }
     return {
@@ -465,10 +467,10 @@ const BookGolf: React.FC = () => {
       guestsCharged: feeEstimateData.feeBreakdown.guestsCharged,
       passesRemainingAfter: Math.max(0, feeEstimateData.feeBreakdown.guestPassesRemaining - feeEstimateData.feeBreakdown.guestCount),
       isLoading: feeEstimateLoading,
-      guestFeePerUnit: feeEstimateData.feeBreakdown.guestFeePerUnit || 25,
-      overageRatePerBlock: feeEstimateData.feeBreakdown.overageRatePerBlock || 25
+      guestFeePerUnit: feeEstimateData.feeBreakdown.guestFeePerUnit || guestFeeDollars,
+      overageRatePerBlock: feeEstimateData.feeBreakdown.overageRatePerBlock || overageRatePerBlockDollars
     };
-  }, [feeEstimateData, feeEstimateLoading, guestPassInfo?.passes_remaining]);
+  }, [feeEstimateData, feeEstimateLoading, guestPassInfo?.passes_remaining, guestFeeDollars, overageRatePerBlockDollars]);
 
   // Create Booking Mutation
   const createBookingMutation = useMutation({
@@ -1945,7 +1947,7 @@ const BookGolf: React.FC = () => {
               {activeTab === 'simulator' && estimatedFees.guestsCharged > 0 && (
                 <div className="flex justify-between items-center">
                   <span className={`text-sm ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
-                    {estimatedFees.guestsCharged} guest{estimatedFees.guestsCharged > 1 ? 's' : ''} @ ${estimatedFees.guestFeePerUnit || 25}
+                    {estimatedFees.guestsCharged} guest{estimatedFees.guestsCharged > 1 ? 's' : ''} @ ${estimatedFees.guestFeePerUnit || guestFeeDollars}
                   </span>
                   <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-primary'}`}>${estimatedFees.guestFees}</span>
                 </div>

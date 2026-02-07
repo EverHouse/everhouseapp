@@ -8,6 +8,7 @@ import { usePageReady } from '../../../contexts/PageReadyContext';
 import { getTodayPacific, addDaysToPacificDate, formatDateDisplayWithDay, formatTime12Hour, getRelativeDateLabel, formatDuration, formatRelativeTime } from '../../../utils/dateUtils';
 import { getStatusBadge, formatStatusLabel } from '../../../utils/statusColors';
 import TierBadge from '../../../components/TierBadge';
+import { usePricing } from '../../../hooks/usePricing';
 import { SwipeableListItem } from '../../../components/SwipeableListItem';
 import ModalShell from '../../../components/ModalShell';
 import { useToast } from '../../../components/Toast';
@@ -744,6 +745,7 @@ const SimulatorTab: React.FC = () => {
     const { setPageReady } = usePageReady();
     const { user, actualUser, members } = useData();
     const queryClient = useQueryClient();
+    const { guestFeeDollars } = usePricing();
     
     const navigateToTab = useCallback((tab: TabType) => {
         if (tabToPath[tab]) {
@@ -2814,7 +2816,7 @@ const SimulatorTab: React.FC = () => {
                                             )}
                                             {feeEstimate.feeBreakdown.guestsCharged > 0 && (
                                                 <div className="flex items-center justify-between text-xs">
-                                                    <span className="text-gray-600 dark:text-gray-400">{feeEstimate.feeBreakdown.guestsCharged} guest{feeEstimate.feeBreakdown.guestsCharged > 1 ? 's' : ''} @ ${feeEstimate.feeBreakdown.guestFeePerUnit || 25}</span>
+                                                    <span className="text-gray-600 dark:text-gray-400">{feeEstimate.feeBreakdown.guestsCharged} guest{feeEstimate.feeBreakdown.guestsCharged > 1 ? 's' : ''} @ ${feeEstimate.feeBreakdown.guestFeePerUnit || guestFeeDollars}</span>
                                                     <span className="text-amber-700 dark:text-amber-300">${feeEstimate.feeBreakdown.guestFees}</span>
                                                 </div>
                                             )}

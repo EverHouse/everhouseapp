@@ -30,6 +30,8 @@ export const changelog: ChangelogEntry[] = [
       "Fix: Roster guest fee assignment now uses the real guest fee from Stripe config",
       "Fix: Guest fee payment recording now uses the actual Stripe payment amount instead of hardcoded $25",
       "Fix: Stripe payment helpers fallback now references the centralized pricing config",
+      "Fix: Booking page guest fee and overage rate display fallbacks now use the real Stripe price instead of hardcoded $25",
+      "Fix: Staff simulator tab guest fee display fallback now uses the real Stripe price instead of hardcoded $25",
       "Improvement: All components use a shared pricing hook with 5-minute caching for efficient updates"
     ]
   },
