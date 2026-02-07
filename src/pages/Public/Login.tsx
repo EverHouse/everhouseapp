@@ -529,7 +529,7 @@ const Login: React.FC = () => {
                       {devLoading ? 'Logging in...' : 'Dev Login (Nick)'}
                     </button>
                     <p className="text-center text-xs text-amber-600">
-                      Development only - logs in as nick@everclub.app
+                      Development only - logs in as nick@evenhouse.club
                     </p>
                     <button
                       type="button"

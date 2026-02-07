@@ -790,7 +790,7 @@ async function autoMatchBookingRequests(
       trackman_booking_id
     FROM booking_requests 
     WHERE is_unmatched = true 
-      AND (user_email IS NULL OR user_email LIKE 'unmatched-%@%' OR user_email LIKE '%@trackman.local' OR user_email LIKE '%@visitors.everclub.app')
+      AND (user_email IS NULL OR user_email LIKE 'unmatched-%@%' OR user_email LIKE '%@trackman.local' OR user_email LIKE '%@visitors.evenhouse.club')
       AND status IN ('pending', 'approved', 'attended')
       AND (
         LOWER(user_name) LIKE '%golfnow%'
@@ -910,7 +910,7 @@ async function autoMatchBookingRequests(
             AND LOWER(last_name) = LOWER($2)
             AND (role = 'visitor' OR membership_status IN ('visitor', 'non-member'))
             AND archived_at IS NULL
-            AND email NOT LIKE '%@visitors.everclub.app'
+            AND email NOT LIKE '%@visitors.evenhouse.club'
             AND email NOT LIKE '%@trackman.local'
             AND email NOT LIKE 'unmatched-%'
           ORDER BY created_at ASC

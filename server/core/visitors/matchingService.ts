@@ -6,7 +6,7 @@ import { eq, ilike, and, sql } from "drizzle-orm";
 import { getOrCreateStripeCustomer } from "../stripe/customers";
 
 const PLACEHOLDER_EMAIL_PATTERNS = [
-  '@visitors.everclub.app',
+  '@visitors.evenhouse.club',
   '@trackman.local',
   'unmatched-',
   'golfnow-',

@@ -953,7 +953,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
           const memberMessage = `Your ${statusLabel} for ${friendlyDateTime} has been cancelled.`;
           
           await tx.insert(notifications).values({
-            userEmail: 'staff@everclub.app',
+            userEmail: 'staff@evenhouse.club',
             title: 'Booking Cancelled by Member',
             message: staffMessage,
             type: 'booking_cancelled',
@@ -1006,7 +1006,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
           const trackmanReminderMessage = `Reminder: ${memberName}'s booking on ${friendlyDateTime} (${bayName}) was cancelled - please also cancel in Trackman`;
           
           await tx.insert(notifications).values({
-            userEmail: 'staff@everclub.app',
+            userEmail: 'staff@evenhouse.club',
             title: 'Trackman Cancellation Required',
             message: trackmanReminderMessage,
             type: 'booking_cancelled',

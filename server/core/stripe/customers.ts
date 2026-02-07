@@ -3,7 +3,7 @@ import { getStripeClient } from './client';
 import { alertOnExternalServiceError } from '../errorAlerts';
 
 const PLACEHOLDER_EMAIL_PATTERNS = [
-  '@visitors.everclub.app',
+  '@visitors.evenhouse.club',
   '@trackman.local',
   '@trackman.import',
   'unmatched-',

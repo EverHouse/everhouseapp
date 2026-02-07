@@ -339,7 +339,7 @@ router.get('/api/data-integrity/placeholder-accounts', isAdmin, async (req, res)
       const localResult = await pool.query(`
         SELECT id, email, first_name, last_name, membership_status, created_at
         FROM users 
-        WHERE email LIKE '%@visitors.everclub.app%'
+        WHERE email LIKE '%@visitors.evenhouse.club%'
            OR email LIKE '%@trackman.local%'
            OR email LIKE '%@trackman.import%'
            OR email LIKE 'unmatched-%'

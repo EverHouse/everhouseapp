@@ -1104,7 +1104,7 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
       const staffMessage = `${memberName} has cancelled their booking for ${bookingDate} at ${bookingTime}.`;
       
       await db.insert(notifications).values({
-        userEmail: 'staff@everclub.app',
+        userEmail: 'staff@evenhouse.club',
         title: 'Booking Cancelled by Member',
         message: staffMessage,
         type: 'booking_cancelled',
@@ -1124,7 +1124,7 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
         const trackmanReminderMessage = `Reminder: ${memberName}'s booking on ${bookingDate} at ${bookingTime} (${bayName}) was cancelled - please also cancel in Trackman`;
         
         await db.insert(notifications).values({
-          userEmail: 'staff@everclub.app',
+          userEmail: 'staff@evenhouse.club',
           title: 'Trackman Cancellation Required',
           message: trackmanReminderMessage,
           type: 'booking_cancelled',

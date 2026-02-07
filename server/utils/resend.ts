@@ -6,7 +6,7 @@ let connectionSettings: any;
 const isDevelopment = process.env.NODE_ENV !== 'production' && !process.env.WEB_REPL_RENEWAL;
 
 const ALLOWED_DEV_EMAILS = [
-  '@everclub.app',
+  '@evenhouse.club',
   'nicholasallanluu@gmail.com',
 ];
 

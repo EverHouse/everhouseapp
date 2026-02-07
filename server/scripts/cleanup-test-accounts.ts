@@ -6,17 +6,17 @@ import { sql } from 'drizzle-orm';
 const TEST_EMAILS = [
   'adinatestmbo@gmail.com',
   'notif-test-staff@example.com',
-  'notification-test-member@everclub.app',
+  'notification-test-member@evenhouse.club',
   'notification-test-member@example.com',
   'notification-test-staff@example.com',
   'test-admin@example.com',
   'test-member1@example.com',
   'test-staff-integrity@example.com',
   'test-staff@example.com',
-  'test@everclub.app',
+  'test@evenhouse.club',
   'testaccount@example.com',
-  'testcorp@everclub.app',
-  'testguest@everclub.app'
+  'testcorp@evenhouse.club',
+  'testguest@evenhouse.club'
 ];
 
 async function cleanupTestAccounts() {

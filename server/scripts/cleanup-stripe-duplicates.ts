@@ -2,7 +2,7 @@ import { pool } from '../core/db';
 import { getStripeClient } from '../core/stripe/client';
 
 const PLACEHOLDER_EMAIL_PATTERNS = [
-  '@visitors.everclub.app',
+  '@visitors.evenhouse.club',
   '@trackman.local',
   'lesson-',
   'classpass-',

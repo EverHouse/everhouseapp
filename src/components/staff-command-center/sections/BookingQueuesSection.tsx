@@ -103,7 +103,7 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
       const email = b.user_email?.toLowerCase() || '';
       const isPlaceholderEmail = !email || 
         email.includes('@trackman.local') ||
-        email.includes('@visitors.everclub.app') ||
+        email.includes('@visitors.evenhouse.club') ||
         email.startsWith('unmatched-') ||
         email.startsWith('golfnow-') ||
         email.startsWith('classpass-') ||

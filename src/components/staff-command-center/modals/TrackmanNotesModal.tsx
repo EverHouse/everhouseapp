@@ -53,7 +53,7 @@ export function TrackmanNotesModal({ isOpen, onClose }: TrackmanNotesModalProps)
           const data = await res.json();
           setSearchResults(data.filter((r: MemberSearchResult) => {
             const email = r.email?.toLowerCase() || '';
-            return !email.includes('@visitors.everclub.app') &&
+            return !email.includes('@visitors.evenhouse.club') &&
                    !email.includes('@trackman.local') &&
                    !email.startsWith('unmatched-');
           }));

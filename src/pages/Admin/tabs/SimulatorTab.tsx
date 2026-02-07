@@ -1547,7 +1547,7 @@ const SimulatorTab: React.FC = () => {
         const email = (b.user_email || '').toLowerCase();
         const isPlaceholderEmail = !email || 
             email.includes('@trackman.local') ||
-            email.includes('@visitors.everclub.app') ||
+            email.includes('@visitors.evenhouse.club') ||
             email.startsWith('unmatched-') ||
             email.startsWith('golfnow-') ||
             email.startsWith('classpass-') ||
@@ -1620,7 +1620,7 @@ const SimulatorTab: React.FC = () => {
         const email = (booking.user_email || '').toLowerCase();
         const isPlaceholderEmail = !email || 
             email.includes('@trackman.local') ||
-            email.includes('@visitors.everclub.app') ||
+            email.includes('@visitors.evenhouse.club') ||
             email.startsWith('unmatched-') ||
             email.startsWith('golfnow-') ||
             email.startsWith('classpass-') ||
@@ -3117,7 +3117,7 @@ const SimulatorTab: React.FC = () => {
                                     const email = selectedCalendarBooking?.user_email?.toLowerCase() || '';
                                     const isPlaceholderEmail = !email || 
                                         email.includes('@trackman.local') ||
-                                        email.includes('@visitors.everclub.app') ||
+                                        email.includes('@visitors.evenhouse.club') ||
                                         email.startsWith('unmatched-') ||
                                         email.startsWith('golfnow-') ||
                                         email.startsWith('classpass-') ||
@@ -3149,7 +3149,7 @@ const SimulatorTab: React.FC = () => {
                                     const email = selectedCalendarBooking?.user_email?.toLowerCase() || '';
                                     const isPlaceholderEmail = !email || 
                                         email.includes('@trackman.local') ||
-                                        email.includes('@visitors.everclub.app') ||
+                                        email.includes('@visitors.evenhouse.club') ||
                                         email.startsWith('unmatched-') ||
                                         email.startsWith('golfnow-') ||
                                         email.startsWith('classpass-') ||
@@ -3165,7 +3165,7 @@ const SimulatorTab: React.FC = () => {
                                     const email = selectedCalendarBooking?.user_email?.toLowerCase() || '';
                                     const isPlaceholderEmail = !email || 
                                         email.includes('@trackman.local') ||
-                                        email.includes('@visitors.everclub.app') ||
+                                        email.includes('@visitors.evenhouse.club') ||
                                         email.startsWith('unmatched-') ||
                                         email.startsWith('golfnow-') ||
                                         email.startsWith('classpass-') ||

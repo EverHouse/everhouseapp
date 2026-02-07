@@ -1293,7 +1293,7 @@ router.post('/api/auth/dev-login', async (req, res) => {
   }
   
   try {
-    const devEmail = req.body.email || 'nick@everclub.app';
+    const devEmail = req.body.email || 'nick@evenhouse.club';
     
     const existingUser = await db.select()
       .from(users)
