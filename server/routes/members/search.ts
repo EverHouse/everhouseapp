@@ -338,6 +338,17 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
       }
     }
     
+    // Count walk-in visits per member
+    const walkInCountResult = await pool.query(`
+      SELECT LOWER(member_email) as email, COUNT(*)::int as count
+      FROM walk_in_visits
+      GROUP BY LOWER(member_email)
+    `);
+    const walkInCounts: Record<string, number> = {};
+    for (const row of walkInCountResult.rows) {
+      walkInCounts[row.email] = row.count;
+    }
+
     const contacts = allMembers.map(member => {
       const emailLower = member.email?.toLowerCase() || '';
       const bookings = bookingCounts[emailLower] || 0;
@@ -362,7 +373,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
         status: isActive ? 'Active' : status,
         isActiveMember: isActive,
         isFormerMember: !isActive,
-        lifetimeVisits: bookings + events + wellness,
+        lifetimeVisits: bookings + events + wellness + (walkInCounts[emailLower] || 0),
         joinDate: member.joinDate,
         lastBookingDate: lastActivityMap[emailLower] || null,
         mindbodyClientId: member.mindbodyClientId,

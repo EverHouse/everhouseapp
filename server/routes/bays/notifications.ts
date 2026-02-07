@@ -152,6 +152,29 @@ router.get('/api/recent-activity', isStaffOrAdmin, async (req, res) => {
       }
     }
 
+    // Walk-in check-ins
+    const { pool } = await import('../../core/db');
+    const walkInResult = await pool.query(`
+      SELECT w.id, w.member_email, w.checked_in_by_name, w.created_at,
+             u.first_name, u.last_name, u.name
+      FROM walk_in_visits w
+      LEFT JOIN users u ON u.id = w.member_id
+      WHERE w.created_at >= $1
+      ORDER BY w.created_at DESC
+    `, [twentyFourHoursAgo]);
+
+    for (const visit of walkInResult.rows) {
+      const name = visit.name || [visit.first_name, visit.last_name].filter(Boolean).join(' ') || visit.member_email;
+      activities.push({
+        id: `walkin_${visit.id}`,
+        type: 'check_in',
+        timestamp: visit.created_at.toISOString ? visit.created_at.toISOString() : new Date(visit.created_at).toISOString(),
+        primary_text: name,
+        secondary_text: `Walk-in check-in${visit.checked_in_by_name ? ` by ${visit.checked_in_by_name}` : ''}`,
+        icon: 'qr_code_scanner'
+      });
+    }
+
     activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     res.json(activities.slice(0, 20));

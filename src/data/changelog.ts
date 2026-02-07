@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.9.1",
+    date: "2026-02-07",
+    title: "QR Check-In Refinements & Activity Feed",
+    changes: [
+      "New: Walk-in QR check-ins now appear in the staff dashboard's recent activity feed with a scanner icon and staff name",
+      "Fix: Member directory visit counts now include walk-in check-ins — previously only counted bookings, events, and wellness visits",
+      "Improvement: Check-in confirmation popup now shows amber warnings for cancelled, suspended, or inactive memberships — not just expired",
+      "Fix: Member dashboard now refreshes visit count in real-time after a walk-in check-in",
+      "Improvement: Duplicate QR scan within 2 minutes shows a friendly 'already checked in' message instead of an error",
+    ],
+  },
+  {
     version: "7.9.0",
     date: "2026-02-07",
     title: "QR Check-In & Membership Card Improvements",

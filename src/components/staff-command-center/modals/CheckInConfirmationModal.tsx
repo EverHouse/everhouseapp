@@ -40,7 +40,9 @@ const CheckInConfirmationModal: React.FC<CheckInConfirmationModalProps> = ({
 
   if (!isOpen) return null;
 
-  const isExpired = membershipStatus === 'Expired' || membershipStatus === 'expired';
+  const statusLower = membershipStatus?.toLowerCase() || '';
+  const isExpired = statusLower === 'expired';
+  const isInactive = ['cancelled', 'suspended', 'inactive', 'unpaid'].includes(statusLower);
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={onClose}>
@@ -75,6 +77,12 @@ const CheckInConfirmationModal: React.FC<CheckInConfirmationModalProps> = ({
           {isExpired && (
             <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full bg-red-500/30 text-red-200 text-xs font-bold uppercase tracking-wider">
               Expired Membership
+            </div>
+          )}
+
+          {isInactive && (
+            <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full bg-amber-500/30 text-amber-200 text-xs font-bold uppercase tracking-wider">
+              {membershipStatus} Membership
             </div>
           )}
         </div>
