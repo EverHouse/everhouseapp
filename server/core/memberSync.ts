@@ -252,6 +252,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
     let synced = 0;
     let errors = 0;
     let statusChanges = 0;
+    let hubspotIdCollisions = 0;
     
     // Parse opt-in values from HubSpot (they come as strings like "true"/"false" or "Yes"/"No")
     const parseOptIn = (val?: string): boolean | null => {
@@ -431,6 +432,35 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
             });
           }
           
+          try {
+            const duplicateCheck = await pool.query(
+              `SELECT id, email, first_name, last_name, membership_status, tier
+               FROM users 
+               WHERE hubspot_id = $1 
+                 AND LOWER(email) != $2
+                 AND archived_at IS NULL
+                 AND membership_status != 'merged'
+               LIMIT 5`,
+              [contact.id, email]
+            );
+            
+            if (duplicateCheck.rows.length > 0) {
+              for (const dup of duplicateCheck.rows) {
+                console.warn(`[MemberSync] HubSpot ID collision detected: ${email} and ${dup.email} share HubSpot contact ${contact.id}. These may be the same person.`);
+                
+                await pool.query(
+                  `INSERT INTO user_linked_emails (primary_email, linked_email, source, created_at)
+                   VALUES ($1, $2, 'hubspot_dedup', NOW())
+                   ON CONFLICT (linked_email) DO NOTHING`,
+                  [email, dup.email]
+                );
+              }
+              hubspotIdCollisions++;
+            }
+          } catch (dupError) {
+            console.error(`[MemberSync] Error checking for HubSpot ID collisions:`, dupError);
+          }
+          
           // Sync HubSpot notes to member_notes table with change detection
           // When notes change in HubSpot, create a NEW dated note (don't overwrite old ones)
           const hubspotNotes = contact.properties.membership_notes?.trim();
@@ -505,7 +535,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
       }
     }
     
-    if (!isProduction) console.log(`[MemberSync] Complete - Synced: ${synced}, Errors: ${errors}, Status Changes: ${statusChanges}`);
+    if (!isProduction) console.log(`[MemberSync] Complete - Synced: ${synced}, Errors: ${errors}, Status Changes: ${statusChanges}, HubSpot ID Collisions: ${hubspotIdCollisions}`);
     
     // Process merged contact IDs to extract linked emails
     // hs_merged_object_ids contains semicolon-separated HubSpot contact IDs that were merged into this contact
@@ -768,6 +798,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
     let synced = 0;
     let errors = 0;
     let statusChanges = 0;
+    let hubspotIdCollisions = 0;
     
     const parseOptIn = (val?: string): boolean | null => {
       if (!val) return null;
@@ -930,6 +961,35 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
             });
           }
           
+          try {
+            const duplicateCheck = await pool.query(
+              `SELECT id, email, first_name, last_name, membership_status, tier
+               FROM users 
+               WHERE hubspot_id = $1 
+                 AND LOWER(email) != $2
+                 AND archived_at IS NULL
+                 AND membership_status != 'merged'
+               LIMIT 5`,
+              [contact.id, email]
+            );
+            
+            if (duplicateCheck.rows.length > 0) {
+              for (const dup of duplicateCheck.rows) {
+                console.warn(`[MemberSync] HubSpot ID collision detected: ${email} and ${dup.email} share HubSpot contact ${contact.id}. These may be the same person.`);
+                
+                await pool.query(
+                  `INSERT INTO user_linked_emails (primary_email, linked_email, source, created_at)
+                   VALUES ($1, $2, 'hubspot_dedup', NOW())
+                   ON CONFLICT (linked_email) DO NOTHING`,
+                  [email, dup.email]
+                );
+              }
+              hubspotIdCollisions++;
+            }
+          } catch (dupError) {
+            console.error(`[MemberSync] Error checking for HubSpot ID collisions:`, dupError);
+          }
+          
           const hubspotNotes = contact.properties.membership_notes?.trim();
           const hubspotMessage = contact.properties.message?.trim();
           
@@ -996,7 +1056,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
       }
     }
     
-    if (!isProduction) console.log(`[MemberSync] Focused sync complete - Synced: ${synced}, Errors: ${errors}, Status Changes: ${statusChanges}`);
+    if (!isProduction) console.log(`[MemberSync] Focused sync complete - Synced: ${synced}, Errors: ${errors}, Status Changes: ${statusChanges}, HubSpot ID Collisions: ${hubspotIdCollisions}`);
     
     const contactsWithMergedIds = allContacts.filter(c => c.properties.hs_merged_object_ids);
     if (contactsWithMergedIds.length > 0) {

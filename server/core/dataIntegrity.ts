@@ -43,7 +43,8 @@ const severityMap: Record<string, 'critical' | 'high' | 'medium' | 'low'> = {
   'Duplicate Tour Sources': 'low',
   'Items Needing Review': 'low',
   'Stale Past Tours': 'low',
-  'Unmatched Trackman Bookings': 'medium'
+  'Unmatched Trackman Bookings': 'medium',
+  'HubSpot ID Duplicates': 'high'
 };
 
 function getCheckSeverity(checkName: string): 'critical' | 'high' | 'medium' | 'low' {
@@ -1715,6 +1716,76 @@ async function updateIssueTracking(results: IntegrityCheckResult[]): Promise<voi
   }
 }
 
+async function checkHubSpotIdDuplicates(): Promise<IntegrityCheckResult> {
+  const issues: IntegrityIssue[] = [];
+  
+  try {
+    const duplicatesResult = await db.execute(sql`
+      SELECT 
+        u.hubspot_id,
+        ARRAY_AGG(u.email ORDER BY u.membership_status = 'active' DESC, u.lifetime_visits DESC) as emails,
+        ARRAY_AGG(u.id ORDER BY u.membership_status = 'active' DESC, u.lifetime_visits DESC) as user_ids,
+        ARRAY_AGG(COALESCE(u.membership_status, 'unknown') ORDER BY u.membership_status = 'active' DESC, u.lifetime_visits DESC) as statuses,
+        ARRAY_AGG(COALESCE(u.tier, 'none') ORDER BY u.membership_status = 'active' DESC, u.lifetime_visits DESC) as tiers,
+        COUNT(*) as user_count
+      FROM users u
+      WHERE u.hubspot_id IS NOT NULL
+        AND u.archived_at IS NULL
+        AND u.membership_status != 'merged'
+      GROUP BY u.hubspot_id
+      HAVING COUNT(*) > 1
+      ORDER BY COUNT(*) DESC
+      LIMIT 50
+    `);
+    
+    const duplicates = duplicatesResult.rows as any[];
+    
+    for (const dup of duplicates) {
+      const emails = dup.emails as string[];
+      const statuses = dup.statuses as string[];
+      const tiers = dup.tiers as string[];
+      
+      const linkedCheck = await db.execute(sql`
+        SELECT COUNT(*) as linked_count 
+        FROM user_linked_emails 
+        WHERE LOWER(primary_email) = LOWER(${emails[0]}) 
+          AND LOWER(linked_email) = ANY(${emails.slice(1).map((e: string) => e.toLowerCase())})
+      `);
+      const alreadyLinked = parseInt((linkedCheck.rows[0] as any)?.linked_count || '0') > 0;
+      
+      const userDetails = emails.map((email: string, idx: number) => 
+        `${email} (${statuses[idx]}, ${tiers[idx]})`
+      ).join(', ');
+      
+      issues.push({
+        category: 'data_quality',
+        severity: alreadyLinked ? 'info' : 'warning',
+        table: 'users',
+        recordId: dup.hubspot_id,
+        description: `HubSpot contact ${dup.hubspot_id} is shared by ${dup.user_count} users: ${userDetails}${alreadyLinked ? ' (emails already linked)' : ''}`,
+        suggestion: alreadyLinked 
+          ? 'Emails are linked. Consider merging these users if they are the same person.'
+          : 'Link these emails or merge users if they represent the same person.',
+        context: {
+          hubspotContactId: dup.hubspot_id,
+          memberEmail: emails[0],
+          status: statuses[0]
+        }
+      });
+    }
+  } catch (error: any) {
+    console.error('[DataIntegrity] Error checking HubSpot ID duplicates:', error.message);
+  }
+  
+  return {
+    checkName: 'HubSpot ID Duplicates',
+    status: issues.length === 0 ? 'pass' : issues.some(i => i.severity === 'warning') ? 'fail' : 'warning',
+    issueCount: issues.length,
+    issues,
+    lastRun: new Date()
+  };
+}
+
 export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' = 'manual'): Promise<IntegrityCheckResult[]> {
   const checks = await Promise.all([
     checkOrphanBookingParticipants(),
@@ -1736,7 +1807,8 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
     checkBookingsWithoutSessions(),
     checkDuplicateStripeCustomers(),
     checkMindBodyStaleSyncMembers(),
-    checkMindBodyStatusMismatch()
+    checkMindBodyStatusMismatch(),
+    checkHubSpotIdDuplicates()
   ]);
   
   const now = new Date();

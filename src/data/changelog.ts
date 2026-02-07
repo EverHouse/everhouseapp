@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.5.0",
+    date: "2026-02-07",
+    title: "Cross-System Deduplication & Stripe Customer Consolidation",
+    isMajor: true,
+    changes: [
+      "New: Merged 12 duplicate member accounts that existed across Stripe, HubSpot, and the database — consolidating bookings, visits, and payment history into one unified profile per person",
+      "New: Stripe customer creation now cross-checks HubSpot contact IDs to prevent creating duplicate Stripe customers when the same person uses different emails",
+      "New: HubSpot sync now detects when two database users share the same HubSpot contact and automatically links their emails to prevent future duplicates",
+      "New: Data Integrity dashboard now includes a HubSpot ID duplicate check that surfaces suspected duplicate accounts for staff review",
+      "Fix: Merge tool now consolidates Stripe customers when both accounts have one — keeps the customer with the active subscription and logs the orphaned one for audit",
+    ],
+  },
+  {
     version: "7.4.3",
     date: "2026-02-07",
     title: "Complete Dynamic Pricing — All Prices From Stripe",

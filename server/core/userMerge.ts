@@ -4,6 +4,7 @@ import { users } from '../../shared/schema';
 import { eq, sql } from 'drizzle-orm';
 import { logger } from './logger';
 import { normalizeEmail } from './utils/emailNormalization';
+import { getStripeClient } from './stripe/client';
 
 export interface MergePreview {
   primaryUser: {
@@ -591,7 +592,7 @@ export async function executeMerge(
         ? { version: primaryUser.waiverVersion, signedAt: primaryUser.waiverSignedAt }
         : { version: secondaryUser.waiverVersion, signedAt: secondaryUser.waiverSignedAt };
     
-    const mergeInfo = {
+    const mergeInfo: Record<string, any> = {
       mergedFrom: secondaryUserId,
       mergedFromEmail: secondaryEmail,
       mergedFromName: `${secondaryUser.firstName || ''} ${secondaryUser.lastName || ''}`.trim(),
@@ -602,23 +603,68 @@ export async function executeMerge(
     };
     
     const currentTags = (primaryUser.tags as any[]) || [];
-    const updatedTags = [...currentTags, { type: 'merge_record', ...mergeInfo }];
     
     // FIX: Transfer external IDs (Stripe/HubSpot) from secondary to primary if primary is missing them
     // This prevents losing billing history when merging a fresh duplicate into the active payer
     const transferStripeId = !primaryUser.stripeCustomerId && secondaryUser.stripeCustomerId;
     const transferHubspotId = !primaryUser.hubspotId && secondaryUser.hubspotId;
     
+    let resolvedStripeCustomerId: string | null = null;
+    let orphanedStripeCustomerId: string | null = null;
+    
     if (transferStripeId) {
+      resolvedStripeCustomerId = secondaryUser.stripeCustomerId;
       logger.info('[UserMerge] Transferring Stripe Customer from secondary to primary', {
         extra: { stripeCustomerId: secondaryUser.stripeCustomerId, primaryUserId, secondaryUserId }
       });
+    } else if (primaryUser.stripeCustomerId && secondaryUser.stripeCustomerId) {
+      const primaryHasSub = !!primaryUser.stripeSubscriptionId;
+      const secondaryHasSub = !!secondaryUser.stripeSubscriptionId;
+      
+      if (secondaryHasSub && !primaryHasSub) {
+        resolvedStripeCustomerId = secondaryUser.stripeCustomerId;
+        orphanedStripeCustomerId = primaryUser.stripeCustomerId;
+        logger.info('[UserMerge] Secondary has active subscription - using secondary Stripe customer', {
+          extra: { kept: secondaryUser.stripeCustomerId, orphaned: primaryUser.stripeCustomerId, primaryUserId, secondaryUserId }
+        });
+      } else {
+        orphanedStripeCustomerId = secondaryUser.stripeCustomerId;
+        logger.info('[UserMerge] Keeping primary Stripe customer', {
+          extra: { kept: primaryUser.stripeCustomerId, orphaned: secondaryUser.stripeCustomerId, reason: primaryHasSub ? 'primary_has_subscription' : 'default_keep_primary', primaryUserId, secondaryUserId }
+        });
+      }
+      
+      try {
+        const stripe = await getStripeClient();
+        const keptId = resolvedStripeCustomerId || primaryUser.stripeCustomerId;
+        if (keptId) {
+          await stripe.customers.update(keptId, {
+            metadata: {
+              mergedFromEmail: secondaryEmail,
+              mergedFromUserId: secondaryUserId,
+              mergedAt: new Date().toISOString(),
+              orphanedStripeCustomerId: orphanedStripeCustomerId || ''
+            }
+          });
+        }
+      } catch (stripeErr) {
+        logger.error('[UserMerge] Failed to update Stripe customer metadata after merge', {
+          extra: { error: stripeErr, primaryUserId, secondaryUserId }
+        });
+      }
     }
+    
+    if (orphanedStripeCustomerId) {
+      mergeInfo.orphanedStripeCustomerId = orphanedStripeCustomerId;
+    }
+    
     if (transferHubspotId) {
       logger.info('[UserMerge] Transferring HubSpot ID from secondary to primary', {
         extra: { hubspotId: secondaryUser.hubspotId, primaryUserId, secondaryUserId }
       });
     }
+    
+    const finalTags = [...currentTags, { type: 'merge_record', ...mergeInfo }];
     
     await client.query(
       `UPDATE users SET
@@ -636,8 +682,8 @@ export async function executeMerge(
         earlierJoinDate, 
         newerWaiver.version, 
         newerWaiver.signedAt, 
-        JSON.stringify(updatedTags),
-        transferStripeId ? secondaryUser.stripeCustomerId : null,
+        JSON.stringify(finalTags),
+        resolvedStripeCustomerId || (transferStripeId ? secondaryUser.stripeCustomerId : null),
         transferHubspotId ? secondaryUser.hubspotId : null,
         primaryUserId
       ]
@@ -813,4 +859,73 @@ export async function findPotentialDuplicates(userId: string): Promise<Array<{
   }
   
   return duplicates;
+}
+
+export async function consolidateStripeCustomers(
+  primaryUserId: string,
+  secondaryUserId: string
+): Promise<{ keptCustomerId: string; orphanedCustomerId: string; reason: string }> {
+  const primaryResult = await pool.query(
+    `SELECT stripe_customer_id, stripe_subscription_id, email FROM users WHERE id = $1`,
+    [primaryUserId]
+  );
+  const secondaryResult = await pool.query(
+    `SELECT stripe_customer_id, stripe_subscription_id, email FROM users WHERE id = $1`,
+    [secondaryUserId]
+  );
+  
+  const primary = primaryResult.rows[0];
+  const secondary = secondaryResult.rows[0];
+  
+  if (!primary?.stripe_customer_id || !secondary?.stripe_customer_id) {
+    throw new Error('Both users must have Stripe customer IDs to consolidate');
+  }
+  
+  const primaryHasSub = !!primary.stripe_subscription_id;
+  const secondaryHasSub = !!secondary.stripe_subscription_id;
+  
+  let keptCustomerId: string;
+  let orphanedCustomerId: string;
+  let reason: string;
+  
+  if (secondaryHasSub && !primaryHasSub) {
+    keptCustomerId = secondary.stripe_customer_id;
+    orphanedCustomerId = primary.stripe_customer_id;
+    reason = 'secondary_has_active_subscription';
+  } else if (primaryHasSub && !secondaryHasSub) {
+    keptCustomerId = primary.stripe_customer_id;
+    orphanedCustomerId = secondary.stripe_customer_id;
+    reason = 'primary_has_active_subscription';
+  } else {
+    keptCustomerId = primary.stripe_customer_id;
+    orphanedCustomerId = secondary.stripe_customer_id;
+    reason = primaryHasSub && secondaryHasSub ? 'both_have_subscriptions_kept_primary' : 'neither_has_subscription_kept_primary';
+  }
+  
+  await pool.query(
+    `UPDATE users SET stripe_customer_id = $1, updated_at = NOW() WHERE id = $2`,
+    [keptCustomerId, primaryUserId]
+  );
+  
+  try {
+    const stripe = await getStripeClient();
+    await stripe.customers.update(keptCustomerId, {
+      metadata: {
+        mergedFromEmail: secondary.email,
+        mergedFromUserId: secondaryUserId,
+        consolidatedAt: new Date().toISOString(),
+        orphanedStripeCustomerId: orphanedCustomerId
+      }
+    });
+  } catch (stripeErr) {
+    logger.error('[UserMerge] Failed to update Stripe metadata during consolidation', {
+      extra: { error: stripeErr, keptCustomerId, orphanedCustomerId }
+    });
+  }
+  
+  logger.info('[UserMerge] Consolidated Stripe customers', {
+    extra: { primaryUserId, secondaryUserId, keptCustomerId, orphanedCustomerId, reason }
+  });
+  
+  return { keptCustomerId, orphanedCustomerId, reason };
 }

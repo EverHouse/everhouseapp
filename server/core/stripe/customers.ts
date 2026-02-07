@@ -97,6 +97,39 @@ export async function getOrCreateStripeCustomer(
     return { customerId: existingCustomerId, isNew: false };
   }
 
+  const hubspotResult = await pool.query(
+    `SELECT u.stripe_customer_id, u.email, u.hubspot_id 
+     FROM users u 
+     WHERE u.id = $1 AND u.hubspot_id IS NOT NULL`,
+    [userId]
+  );
+
+  if (hubspotResult.rows[0]?.hubspot_id) {
+    const hubspotMatchResult = await pool.query(
+      `SELECT u.stripe_customer_id, u.email
+       FROM users u
+       WHERE u.hubspot_id = $1
+         AND u.id != $2
+         AND u.stripe_customer_id IS NOT NULL
+         AND u.archived_at IS NULL
+       ORDER BY u.membership_status = 'active' DESC, u.lifetime_visits DESC
+       LIMIT 1`,
+      [hubspotResult.rows[0].hubspot_id, userId]
+    );
+
+    if (hubspotMatchResult.rows[0]?.stripe_customer_id) {
+      const existingCustomerId = hubspotMatchResult.rows[0].stripe_customer_id;
+      console.log(`[Stripe] Found existing customer ${existingCustomerId} via HubSpot ID match for user ${userId} (matched user: ${hubspotMatchResult.rows[0].email})`);
+      
+      await pool.query(
+        'UPDATE users SET stripe_customer_id = $1, updated_at = NOW() WHERE id = $2',
+        [existingCustomerId, userId]
+      );
+      
+      return { customerId: existingCustomerId, isNew: false };
+    }
+  }
+
   let stripe;
   try {
     stripe = await getStripeClient();
