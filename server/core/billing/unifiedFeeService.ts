@@ -663,6 +663,40 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
     lineItems.push(lineItem);
   }
   
+  const actualGuestCount = participants.filter(p => p.participantType === 'guest').length;
+  const actualMemberCount = participants.filter(p => p.participantType === 'member').length;
+  const ownerCount = participants.filter(p => p.participantType === 'owner').length;
+  const emptySlots = Math.max(0, effectivePlayerCount - ownerCount - actualMemberCount - actualGuestCount);
+
+  if (emptySlots > 0 && !isConferenceRoom) {
+    for (let i = 0; i < emptySlots; i++) {
+      const emptyLineItem: FeeLineItem = {
+        participantId: undefined,
+        userId: undefined,
+        displayName: 'Empty Slot',
+        participantType: 'guest',
+        minutesAllocated: minutesPerParticipant,
+        overageCents: 0,
+        guestCents: 0,
+        totalCents: 0,
+        guestPassUsed: false
+      };
+
+      if (guestPassInfo.hasGuestPassBenefit && guestPassesRemaining > 0) {
+        emptyLineItem.guestPassUsed = true;
+        guestPassesRemaining--;
+        guestPassesUsed++;
+        emptyLineItem.guestCents = 0;
+      } else {
+        emptyLineItem.guestCents = PRICING.GUEST_FEE_CENTS;
+        totalGuestCents += PRICING.GUEST_FEE_CENTS;
+      }
+
+      emptyLineItem.totalCents = emptyLineItem.guestCents;
+      lineItems.push(emptyLineItem);
+    }
+  }
+  
   return {
     totals: {
       totalCents: totalOverageCents + totalGuestCents,
@@ -756,16 +790,13 @@ export async function recalculateSessionFees(
   // Sync session fees to booking_requests for legacy compatibility
   // This ensures member Dashboard can show Pay Now button
   try {
-    const ownerFee = breakdown.participants.find(p => p.participantType === 'owner');
-    if (ownerFee) {
-      await pool.query(`
-        UPDATE booking_requests 
-        SET overage_fee_cents = $1, 
-            overage_minutes = $2,
-            updated_at = NOW()
-        WHERE session_id = $3
-      `, [ownerFee.totalCents || 0, breakdown.overageMinutes || 0, sessionId]);
-    }
+    await pool.query(`
+      UPDATE booking_requests 
+      SET overage_fee_cents = $1, 
+          overage_minutes = $2,
+          updated_at = NOW()
+      WHERE session_id = $3
+    `, [breakdown.totals.totalCents || 0, breakdown.overageMinutes || 0, sessionId]);
   } catch (syncError) {
     logger.warn('[UnifiedFee] Failed to sync fees to booking_requests', { sessionId, error: syncError });
   }

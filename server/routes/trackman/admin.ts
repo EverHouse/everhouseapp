@@ -1444,9 +1444,11 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     const bookingResult = await pool.query(
       `SELECT br.guest_count, br.trackman_player_count, br.declared_player_count, br.resource_id, br.user_email as owner_email,
               br.user_name as owner_name, br.duration_minutes, br.request_date, br.session_id, br.status,
-              r.capacity as resource_capacity
+              r.capacity as resource_capacity,
+              EXTRACT(EPOCH FROM (bs.end_time - bs.start_time)) / 60 as session_duration_minutes
        FROM booking_requests br
        LEFT JOIN resources r ON br.resource_id = r.id
+       LEFT JOIN booking_sessions bs ON br.session_id = bs.id
        WHERE br.id = $1`,
       [id]
     );
@@ -1461,7 +1463,9 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     const resourceCapacity = bookingResult.rows[0]?.resource_capacity || null;
     const ownerEmail = bookingResult.rows[0]?.owner_email;
     const ownerName = bookingResult.rows[0]?.owner_name;
-    const durationMinutes = bookingResult.rows[0]?.duration_minutes || 60;
+    const sessionDurationMinutes = bookingResult.rows[0]?.session_duration_minutes;
+    const bookingDuration = bookingResult.rows[0]?.duration_minutes || 60;
+    const durationMinutes = Math.max(bookingDuration, sessionDurationMinutes || 0);
     const requestDate = bookingResult.rows[0]?.request_date;
     const bookingStatus = bookingResult.rows[0]?.status;
     
