@@ -382,25 +382,25 @@ const AnimatedRoutes: React.FC = () => {
                 </StaffWebSocketProvider>
               </AdminProtectedRoute>
             }>
-              <Route index element={<StaffCommandCenter />} />
-              <Route path="bookings" element={<SimulatorTab />} />
-              <Route path="directory" element={<DirectoryTab />} />
-              <Route path="calendar" element={<EventsTab />} />
-              <Route path="notices" element={<BlocksTab />} />
-              <Route path="updates" element={<UpdatesTab />} />
-              <Route path="news" element={<AnnouncementsTab />} />
-              <Route path="team" element={<TeamTab />} />
-              <Route path="tiers" element={<TiersTab />} />
-              <Route path="trackman" element={<TrackmanTab />} />
-              <Route path="data-integrity" element={<DataIntegrityTab />} />
-              <Route path="financials" element={<FinancialsTab />} />
-              <Route path="gallery" element={<GalleryAdmin />} />
-              <Route path="faqs" element={<FaqsAdmin />} />
-              <Route path="inquiries" element={<InquiriesAdmin />} />
-              <Route path="bugs" element={<BugReportsAdmin />} />
-              <Route path="settings" element={<SettingsTab />} />
-              <Route path="changelog" element={<ChangelogTab />} />
-              <Route path="tours" element={<ToursTab />} />
+              <Route index element={<PageErrorBoundary pageName="StaffCommandCenter"><StaffCommandCenter /></PageErrorBoundary>} />
+              <Route path="bookings" element={<PageErrorBoundary pageName="Bookings"><SimulatorTab /></PageErrorBoundary>} />
+              <Route path="directory" element={<PageErrorBoundary pageName="Directory"><DirectoryTab /></PageErrorBoundary>} />
+              <Route path="calendar" element={<PageErrorBoundary pageName="Calendar"><EventsTab /></PageErrorBoundary>} />
+              <Route path="notices" element={<PageErrorBoundary pageName="Notices"><BlocksTab /></PageErrorBoundary>} />
+              <Route path="updates" element={<PageErrorBoundary pageName="Updates"><UpdatesTab /></PageErrorBoundary>} />
+              <Route path="news" element={<PageErrorBoundary pageName="News"><AnnouncementsTab /></PageErrorBoundary>} />
+              <Route path="team" element={<PageErrorBoundary pageName="Team"><TeamTab /></PageErrorBoundary>} />
+              <Route path="tiers" element={<PageErrorBoundary pageName="Tiers"><TiersTab /></PageErrorBoundary>} />
+              <Route path="trackman" element={<PageErrorBoundary pageName="Trackman"><TrackmanTab /></PageErrorBoundary>} />
+              <Route path="data-integrity" element={<PageErrorBoundary pageName="DataIntegrity"><DataIntegrityTab /></PageErrorBoundary>} />
+              <Route path="financials" element={<PageErrorBoundary pageName="Financials"><FinancialsTab /></PageErrorBoundary>} />
+              <Route path="gallery" element={<PageErrorBoundary pageName="Gallery"><GalleryAdmin /></PageErrorBoundary>} />
+              <Route path="faqs" element={<PageErrorBoundary pageName="FAQs"><FaqsAdmin /></PageErrorBoundary>} />
+              <Route path="inquiries" element={<PageErrorBoundary pageName="Inquiries"><InquiriesAdmin /></PageErrorBoundary>} />
+              <Route path="bugs" element={<PageErrorBoundary pageName="BugReports"><BugReportsAdmin /></PageErrorBoundary>} />
+              <Route path="settings" element={<PageErrorBoundary pageName="Settings"><SettingsTab /></PageErrorBoundary>} />
+              <Route path="changelog" element={<PageErrorBoundary pageName="Changelog"><ChangelogTab /></PageErrorBoundary>} />
+              <Route path="tours" element={<PageErrorBoundary pageName="Tours"><ToursTab /></PageErrorBoundary>} />
               <Route path="training" element={null} />
             </Route>
             <Route path="/admin/data-integrity-legacy" element={

@@ -1736,21 +1736,32 @@ const WellnessAdminContent: React.FC = () => {
         setError(null);
     };
 
-    const filteredClasses = activeCategory === 'all' 
-        ? classes 
-        : classes.filter(c => c.category === activeCategory);
+    let filteredClasses: WellnessClass[] = [];
+    let upcomingClasses: WellnessClass[] = [];
+    let pastClasses: WellnessClass[] = [];
+    try {
+        filteredClasses = activeCategory === 'all' 
+            ? classes 
+            : classes.filter(c => c.category === activeCategory);
 
-    const todayWellness = getTodayPacific();
-    const upcomingClasses = filteredClasses.filter(c => {
-        if (!c.date) return false;
-        const classDate = c.date.includes('T') ? c.date.split('T')[0] : c.date;
-        return classDate >= todayWellness;
-    }).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    const pastClasses = filteredClasses.filter(c => {
-        if (!c.date) return false;
-        const classDate = c.date.includes('T') ? c.date.split('T')[0] : c.date;
-        return classDate < todayWellness;
-    }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        const todayWellness = getTodayPacific();
+        upcomingClasses = filteredClasses.filter(c => {
+            try {
+                if (!c.date) return false;
+                const classDate = c.date.includes('T') ? c.date.split('T')[0] : c.date;
+                return classDate >= todayWellness;
+            } catch { return false; }
+        }).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        pastClasses = filteredClasses.filter(c => {
+            try {
+                if (!c.date) return false;
+                const classDate = c.date.includes('T') ? c.date.split('T')[0] : c.date;
+                return classDate < todayWellness;
+            } catch { return false; }
+        }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    } catch (err) {
+        console.error('[WellnessAdminContent] Error processing classes:', err);
+    }
 
     const calculateDuration = (startTime: string, endTime: string): string => {
         if (!startTime || !endTime) return '60 min';
