@@ -13,12 +13,13 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "7.10.11",
+    version: "7.10.12",
     date: "2026-02-08",
-    title: "Guest Pass Allocation for Empty Slots",
+    title: "Guest Pass Business Rule Correction",
     changes: [
-      "Fix: Available guest passes now apply to empty slots in all booking scenarios (not just session-linked bookings), reducing fees from $25 to $0 per covered slot",
-      "Fix: Guest pass remaining count now accurately reflects passes used for both named guests and empty slots in the financial summary",
+      "Fix: Guest passes now only apply to actual named guests/visitors — empty or unfilled player slots always charge $25 regardless of available passes",
+      "Fix: Corrected fee calculation across all booking flows (member booking preview, staff financial summary, Trackman sync, check-in, player count edits) so empty slots never consume guest passes",
+      "Fix: Reverted incorrect logic that was allowing guest passes to cover empty slots in the booking details financial summary",
     ],
   },
   {

@@ -1824,11 +1824,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
         const ownerMember = membersWithFees.find(m => m.isPrimary);
         const nonOwnerMembers = membersWithFees.filter(m => !m.isPrimary && m.userEmail);
         const emptySlots = membersWithFees.filter(m => !m.userEmail && !m.guestInfo);
-        const chargeableEmptySlots = Math.max(0, emptySlots.length - guestPassesAvailable);
-        const passesUsedForEmpty = emptySlots.length - chargeableEmptySlots;
-        guestPassesUsedThisBooking += passesUsedForEmpty;
-        guestPassesAvailable -= passesUsedForEmpty;
-        const emptySlotFees = chargeableEmptySlots * PRICING.GUEST_FEE_DOLLARS;
+        const emptySlotFees = emptySlots.length * PRICING.GUEST_FEE_DOLLARS;
         guestFeesWithoutPass = guestsWithFees.filter(g => !g.usedGuestPass).reduce((sum, g) => sum + g.fee, 0) + emptySlotFees;
         ownerOverageFee = ownerMember?.fee || 0;
         totalPlayersOwe = nonOwnerMembers.reduce((sum, m) => sum + m.fee, 0);
@@ -1843,11 +1839,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
       const ownerMember = membersWithFees.find(m => m.isPrimary);
       const nonOwnerMembers = membersWithFees.filter(m => !m.isPrimary && m.userEmail);
       const emptySlots = membersWithFees.filter(m => !m.userEmail && !m.guestInfo);
-      const chargeableEmptySlots = Math.max(0, emptySlots.length - guestPassesAvailable);
-      const passesUsedForEmpty = emptySlots.length - chargeableEmptySlots;
-      guestPassesUsedThisBooking += passesUsedForEmpty;
-      guestPassesAvailable -= passesUsedForEmpty;
-      const emptySlotFees = chargeableEmptySlots * PRICING.GUEST_FEE_DOLLARS;
+      const emptySlotFees = emptySlots.length * PRICING.GUEST_FEE_DOLLARS;
       guestFeesWithoutPass = guestsWithFees.filter(g => !g.usedGuestPass).reduce((sum, g) => sum + g.fee, 0) + emptySlotFees;
       ownerOverageFee = ownerMember?.fee || 0;
       totalPlayersOwe = nonOwnerMembers.reduce((sum, m) => sum + m.fee, 0);

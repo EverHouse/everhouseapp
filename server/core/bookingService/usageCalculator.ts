@@ -226,7 +226,7 @@ export async function calculateSessionBilling(
       let guestFee = PRICING.GUEST_FEE_DOLLARS;
       let guestPassUsed = false;
       
-      if (guestPassInfo.hasGuestPassBenefit && guestPassesRemaining > 0) {
+      if (participant.guestId && guestPassInfo.hasGuestPassBenefit && guestPassesRemaining > 0) {
         guestPassUsed = true;
         guestPassesRemaining--;
         guestPassesUsed++;
@@ -383,7 +383,7 @@ export async function calculateFullSessionBilling(
       let guestFee = PRICING.GUEST_FEE_DOLLARS;
       let guestPassUsed = false;
       
-      if (guestPassInfo.hasGuestPassBenefit && guestPassesRemaining > 0) {
+      if (participant.guestId && guestPassInfo.hasGuestPassBenefit && guestPassesRemaining > 0) {
         guestPassUsed = true;
         guestPassesRemaining--;
         guestPassesUsed++;

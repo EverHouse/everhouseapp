@@ -720,22 +720,12 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
         participantType: 'guest',
         minutesAllocated: minutesPerParticipant,
         overageCents: 0,
-        guestCents: 0,
-        totalCents: 0,
+        guestCents: PRICING.GUEST_FEE_CENTS,
+        totalCents: PRICING.GUEST_FEE_CENTS,
         guestPassUsed: false
       };
 
-      if (guestPassInfo.hasGuestPassBenefit && guestPassesRemaining > 0) {
-        emptyLineItem.guestPassUsed = true;
-        guestPassesRemaining--;
-        guestPassesUsed++;
-        emptyLineItem.guestCents = 0;
-      } else {
-        emptyLineItem.guestCents = PRICING.GUEST_FEE_CENTS;
-        totalGuestCents += PRICING.GUEST_FEE_CENTS;
-      }
-
-      emptyLineItem.totalCents = emptyLineItem.guestCents;
+      totalGuestCents += PRICING.GUEST_FEE_CENTS;
       lineItems.push(emptyLineItem);
     }
   }
