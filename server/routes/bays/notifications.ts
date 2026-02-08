@@ -156,7 +156,7 @@ router.get('/api/recent-activity', isStaffOrAdmin, async (req, res) => {
     const { pool } = await import('../../core/db');
     const walkInResult = await pool.query(`
       SELECT w.id, w.member_email, w.checked_in_by_name, w.created_at,
-             u.first_name, u.last_name, u.name
+             u.first_name, u.last_name
       FROM walk_in_visits w
       LEFT JOIN users u ON u.id = w.member_id::text
       WHERE w.created_at >= $1
@@ -164,7 +164,7 @@ router.get('/api/recent-activity', isStaffOrAdmin, async (req, res) => {
     `, [twentyFourHoursAgo]);
 
     for (const visit of walkInResult.rows) {
-      const name = visit.name || [visit.first_name, visit.last_name].filter(Boolean).join(' ') || visit.member_email;
+      const name = [visit.first_name, visit.last_name].filter(Boolean).join(' ') || visit.member_email;
       activities.push({
         id: `walkin_${visit.id}`,
         type: 'check_in',
