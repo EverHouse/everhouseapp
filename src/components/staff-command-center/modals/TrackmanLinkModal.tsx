@@ -770,7 +770,7 @@ export function TrackmanLinkModal({
         return (
           <div className="p-3 rounded-xl border border-green-200 dark:border-green-700 bg-green-50/50 dark:bg-green-900/10 space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="font-medium text-sm text-primary dark:text-white">Add Visitor</h4>
+              <h4 className="font-medium text-sm text-primary dark:text-white">Create New Visitor</h4>
               <button
                 onClick={() => {
                   setShowAddVisitor(false);
@@ -785,62 +785,6 @@ export function TrackmanLinkModal({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-primary dark:text-white mb-1">
-                Search Existing People
-              </label>
-              <div className="relative">
-                <span className="absolute left-2 top-1/2 -translate-y-1/2 material-symbols-outlined text-primary/40 dark:text-white/40 text-sm">search</span>
-                <input
-                  type="text"
-                  placeholder="Search by name or email..."
-                  value={visitorSearch}
-                  onChange={(e) => setVisitorSearch(e.target.value)}
-                  className="w-full pl-8 pr-3 py-2 rounded-lg bg-white dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white placeholder:text-primary/50 dark:placeholder:text-white/50 text-sm"
-                />
-              </div>
-              {isSearchingVisitors && <p className="text-xs text-primary/50 dark:text-white/50 mt-1">Searching...</p>}
-              {visitorSearchResults.length > 0 && (
-                <div className="mt-2 max-h-24 overflow-y-auto space-y-1 border border-primary/10 dark:border-white/20 rounded-lg p-1">
-                  {visitorSearchResults.map((v) => (
-                    <button
-                      key={v.id}
-                      onClick={() => handleSelectExistingVisitor(v)}
-                      className="w-full p-2 text-left rounded-lg hover:bg-primary/5 dark:hover:bg-white/10 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-xs text-primary dark:text-white">
-                          {v.firstName} {v.lastName}
-                        </p>
-                        {v.userType === 'instructor' && (
-                          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 rounded">
-                            Instructor
-                          </span>
-                        )}
-                        {v.userType === 'staff' && (
-                          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded">
-                            Staff
-                          </span>
-                        )}
-                        {v.userType === 'member' && (
-                          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 rounded">
-                            Member
-                          </span>
-                        )}
-                        {v.userType === 'visitor' && (
-                          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 rounded">
-                            Visitor
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-primary/60 dark:text-white/60">{v.email}</p>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="border-t border-primary/10 dark:border-white/20 pt-3">
-              <p className="text-xs font-medium text-primary dark:text-white mb-2">Or Create New Visitor</p>
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
                   <input
@@ -982,7 +926,7 @@ export function TrackmanLinkModal({
               className="flex-1 py-1.5 px-2 rounded-lg border border-green-500 text-green-600 dark:text-green-400 text-xs font-medium hover:bg-green-50 dark:hover:bg-green-500/10 transition-colors flex items-center justify-center gap-1"
             >
               <span className="material-symbols-outlined text-sm">person_add</span>
-              Add Visitor
+              New Visitor
             </button>
           </div>
         </div>
