@@ -14,6 +14,7 @@ import TierBadge from '../../../components/TierBadge';
 import { AnimatedPage } from '../../../components/motion';
 import { fetchWithCredentials, postWithCredentials, deleteWithCredentials } from '../../../hooks/queries/useFetch';
 import { EventsTabSkeleton } from '../../../components/skeletons';
+import PageErrorBoundary from '../../../components/PageErrorBoundary';
 
 interface Participant {
     id: number;
@@ -1581,14 +1582,16 @@ const WellnessAdminContent: React.FC = () => {
 
     const isWellnessFormValid = !wellnessValidation.instructor && !wellnessValidation.category && !wellnessValidation.capacity;
 
-    const { data: classes = [], isLoading } = useQuery({
+    const { data: classes = [], isLoading, isError, error: queryError, refetch } = useQuery({
         queryKey: ['wellness-classes'],
-        queryFn: () => fetchWithCredentials<WellnessClass[]>('/api/wellness-classes')
+        queryFn: () => fetchWithCredentials<WellnessClass[]>('/api/wellness-classes'),
+        throwOnError: false
     });
 
     const { data: needsReviewClasses = [] } = useQuery({
         queryKey: ['wellness-needs-review'],
-        queryFn: () => fetchWithCredentials<WellnessClass[]>('/api/wellness-classes/needs-review')
+        queryFn: () => fetchWithCredentials<WellnessClass[]>('/api/wellness-classes/needs-review'),
+        throwOnError: false
     });
 
     const { data: enrollments = [], isLoading: isLoadingEnrollments, refetch: refetchEnrollments } = useQuery({
@@ -1884,6 +1887,14 @@ const WellnessAdminContent: React.FC = () => {
             {error && !isEditing && (
                 <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-red-700 dark:text-red-400 text-sm">
                     {error}
+                </div>
+            )}
+
+            {isError && (
+                <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl text-center">
+                    <span className="material-symbols-outlined text-red-400 text-2xl mb-2 block">error_outline</span>
+                    <p className="text-sm text-red-600 dark:text-red-400 mb-2">Unable to load wellness classes</p>
+                    <button onClick={() => refetch()} className="text-xs font-medium text-primary dark:text-white underline">Try Again</button>
                 </div>
             )}
 
@@ -2478,8 +2489,8 @@ const EventsTab: React.FC = () => {
                 </div>
 
                 <div key={activeSubTab} className="animate-content-enter">
-                    {activeSubTab === 'events' && <EventsAdminContent />}
-                    {activeSubTab === 'wellness' && <WellnessAdminContent />}
+                    {activeSubTab === 'events' && <PageErrorBoundary pageName="EventsTab"><EventsAdminContent /></PageErrorBoundary>}
+                    {activeSubTab === 'wellness' && <PageErrorBoundary pageName="WellnessTab"><WellnessAdminContent /></PageErrorBoundary>}
                 </div>
                 <FloatingActionButton 
                     onClick={() => {
