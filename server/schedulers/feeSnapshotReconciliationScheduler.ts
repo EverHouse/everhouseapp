@@ -84,6 +84,111 @@ async function reconcilePendingSnapshots(): Promise<{ synced: number; errors: nu
   }
 }
 
+async function reconcileStalePaymentIntents(): Promise<{ reconciled: number; errors: number }> {
+  let reconciled = 0;
+  let errors = 0;
+
+  try {
+    const staleIntents = await pool.query(
+      `SELECT spi.id, spi.stripe_payment_intent_id, spi.booking_id, spi.status
+       FROM stripe_payment_intents spi
+       WHERE spi.status = 'pending'
+       AND spi.created_at < NOW() - INTERVAL '7 days'
+       ORDER BY spi.created_at ASC
+       LIMIT 20`,
+      []
+    );
+
+    if (staleIntents.rows.length === 0) {
+      return { reconciled: 0, errors: 0 };
+    }
+
+    console.log(`[Payment Intent Reconciliation] Found ${staleIntents.rows.length} stale pending payment intents to check`);
+
+    const stripe = await getStripeClient();
+
+    for (const spi of staleIntents.rows) {
+      try {
+        if (spi.booking_id == null) {
+          await pool.query(
+            `UPDATE stripe_payment_intents SET status = 'canceled', failure_reason = $1 WHERE id = $2`,
+            ['Auto-reconciled: orphan payment intent with no linked booking', spi.id]
+          );
+          console.log(`[Payment Intent Reconciliation] Canceled orphan payment intent ${spi.stripe_payment_intent_id} (no linked booking)`);
+          reconciled++;
+          continue;
+        }
+
+        const bookingResult = await pool.query(
+          `SELECT status FROM booking_requests WHERE id = $1`,
+          [spi.booking_id]
+        );
+
+        if (bookingResult.rows.length === 0) {
+          await pool.query(
+            `UPDATE stripe_payment_intents SET status = 'canceled', failure_reason = $1 WHERE id = $2`,
+            ['Auto-reconciled: orphan payment intent with no linked booking', spi.id]
+          );
+          console.log(`[Payment Intent Reconciliation] Canceled payment intent ${spi.stripe_payment_intent_id} (booking ${spi.booking_id} not found)`);
+          reconciled++;
+          continue;
+        }
+
+        const bookingStatus = bookingResult.rows[0].status;
+
+        if (['cancelled', 'declined', 'expired'].includes(bookingStatus)) {
+          await pool.query(
+            `UPDATE stripe_payment_intents SET status = 'canceled', failure_reason = $1 WHERE id = $2`,
+            ['Auto-reconciled: linked booking was cancelled/declined/expired', spi.id]
+          );
+          console.log(`[Payment Intent Reconciliation] Canceled payment intent ${spi.stripe_payment_intent_id} (booking ${spi.booking_id} status: ${bookingStatus})`);
+          reconciled++;
+        } else if (['attended', 'confirmed'].includes(bookingStatus)) {
+          try {
+            const pi = await stripe.paymentIntents.retrieve(spi.stripe_payment_intent_id);
+
+            if (pi.status === 'succeeded') {
+              await pool.query(
+                `UPDATE stripe_payment_intents SET status = 'succeeded' WHERE id = $1`,
+                [spi.id]
+              );
+              console.log(`[Payment Intent Reconciliation] Marked payment intent ${spi.stripe_payment_intent_id} as succeeded (confirmed by Stripe)`);
+              reconciled++;
+            } else if (pi.status === 'canceled') {
+              await pool.query(
+                `UPDATE stripe_payment_intents SET status = 'canceled' WHERE id = $1`,
+                [spi.id]
+              );
+              console.log(`[Payment Intent Reconciliation] Marked payment intent ${spi.stripe_payment_intent_id} as canceled (confirmed by Stripe)`);
+              reconciled++;
+            }
+          } catch (stripeErr: any) {
+            if (stripeErr.code === 'resource_missing') {
+              await pool.query(
+                `UPDATE stripe_payment_intents SET status = 'canceled', failure_reason = $1 WHERE id = $2`,
+                ['Auto-reconciled: payment intent not found in Stripe', spi.id]
+              );
+              console.log(`[Payment Intent Reconciliation] Canceled payment intent ${spi.stripe_payment_intent_id} (not found in Stripe)`);
+              reconciled++;
+            } else {
+              console.error(`[Payment Intent Reconciliation] Stripe error for ${spi.stripe_payment_intent_id}:`, stripeErr.message);
+              errors++;
+            }
+          }
+        }
+      } catch (err: any) {
+        console.error(`[Payment Intent Reconciliation] Error processing ${spi.stripe_payment_intent_id}:`, err.message);
+        errors++;
+      }
+    }
+
+    return { reconciled, errors };
+  } catch (error) {
+    console.error('[Payment Intent Reconciliation] Scheduler error:', error);
+    return { reconciled, errors: errors + 1 };
+  }
+}
+
 let intervalId: NodeJS.Timeout | null = null;
 
 export function startFeeSnapshotReconciliationScheduler(): void {
@@ -105,6 +210,16 @@ export function startFeeSnapshotReconciliationScheduler(): void {
       .catch(err => {
         console.error('[Fee Snapshot Reconciliation] Initial run error:', err);
       });
+
+    reconcileStalePaymentIntents()
+      .then(result => {
+        if (result.reconciled > 0 || result.errors > 0) {
+          console.log(`[Payment Intent Reconciliation] Initial run: reconciled=${result.reconciled}, errors=${result.errors}`);
+        }
+      })
+      .catch(err => {
+        console.error('[Payment Intent Reconciliation] Initial run error:', err);
+      });
   }, 2 * 60 * 1000);
   
   intervalId = setInterval(() => {
@@ -116,6 +231,16 @@ export function startFeeSnapshotReconciliationScheduler(): void {
       })
       .catch(err => {
         console.error('[Fee Snapshot Reconciliation] Uncaught error:', err);
+      });
+
+    reconcileStalePaymentIntents()
+      .then(result => {
+        if (result.reconciled > 0 || result.errors > 0) {
+          console.log(`[Payment Intent Reconciliation] Run complete: reconciled=${result.reconciled}, errors=${result.errors}`);
+        }
+      })
+      .catch(err => {
+        console.error('[Payment Intent Reconciliation] Uncaught error:', err);
       });
   }, RECONCILIATION_INTERVAL_MS);
 }

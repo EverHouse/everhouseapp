@@ -179,6 +179,39 @@ export async function cleanupOldNotifications(daysOld: number = 90): Promise<num
   }
 }
 
+export async function cleanupOldUnreadNotifications(daysOld: number = 60): Promise<number> {
+  try {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+    
+    const oldNotifications = await db
+      .delete(notifications)
+      .where(
+        and(
+          eq(notifications.isRead, false),
+          sql`${notifications.createdAt} < ${cutoffDate.toISOString()}`
+        )
+      )
+      .returning({ id: notifications.id });
+    
+    logger.info(`[Cleanup] Removed ${oldNotifications.length} old unread notifications (>${daysOld} days)`, {
+      extra: { 
+        event: 'cleanup.old_unread_notifications',
+        count: oldNotifications.length,
+        daysOld
+      }
+    });
+    
+    return oldNotifications.length;
+  } catch (error) {
+    logger.error('[Cleanup] Old unread notifications cleanup failed', {
+      error: error instanceof Error ? error.message : String(error),
+      extra: { event: 'cleanup.old_unread_notifications_failed' }
+    });
+    throw error;
+  }
+}
+
 export async function runScheduledCleanup(): Promise<void> {
   logger.info('[Cleanup] Starting scheduled cleanup', {
     extra: { event: 'cleanup.scheduled_start' }
@@ -188,6 +221,7 @@ export async function runScheduledCleanup(): Promise<void> {
     await cleanupTestData();
     await cleanupOldBookings(90);
     await cleanupOldNotifications(90);
+    await cleanupOldUnreadNotifications(60);
     
     logger.info('[Cleanup] Scheduled cleanup completed', {
       extra: { event: 'cleanup.scheduled_complete' }
