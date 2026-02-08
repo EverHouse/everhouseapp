@@ -233,7 +233,7 @@ export const TRAINING_SEED_DATA = [
     isAdminOnly: false,
     steps: [
       { title: 'Access Notices', content: 'Go to Facility from the sidebar or hamburger menu to manage facility notices and closures.', pageIcon: 'notifications' },
-      { title: 'Three Subtabs', content: 'The Notices page has three subtabs: Closures (for blocking booking availability), Closure Reasons (predefined reasons for closures), and Notices (informational announcements).' },
+      { title: 'Two Tabs', content: 'The Facility page has two tabs: Notices (closures and informational announcements) and Blocks (resource availability blocks like maintenance holds or private events).' },
       { title: 'Card Colors Explained', content: 'RED cards are closures that block bookings. CYAN cards are closure drafts that need review. AMBER cards are informational notices that don\'t affect booking availability.' },
       { title: 'Needs Review Section', content: 'Closures synced from Google Calendar without complete configuration show with a cyan border and "Needs Review" status. Tap to configure which resources are blocked.' },
       { title: 'Configuring Draft Notices', content: 'Tap a notice in "Needs Review" to configure which resources are blocked: specific Bays, Conference Room, Entire Facility, or None (informational only).' },
@@ -250,22 +250,20 @@ export const TRAINING_SEED_DATA = [
   {
     guideId: 'events-wellness',
     icon: 'calendar_month',
-    title: 'Events, Wellness & Blocks',
-    description: 'Manage events, wellness classes, and availability blocks',
+    title: 'Events & Wellness',
+    description: 'Manage events and wellness classes',
     sortOrder: 13,
     isAdminOnly: false,
     steps: [
-      { title: 'Access the Calendar', content: 'Go to the Calendar tab to view and manage events, wellness classes, and availability blocks.', pageIcon: 'calendar_month' },
-      { title: 'Three Main Tabs', content: 'Use the tabs to switch between Events (member events), Wellness (classes like yoga, pilates), and Blocks (resource availability).' },
+      { title: 'Access the Calendar', content: 'Go to the Calendar tab to view and manage events and wellness classes.', pageIcon: 'calendar_month' },
+      { title: 'Two Main Tabs', content: 'Use the tabs to switch between Events (member events) and Wellness (classes like yoga, pilates).' },
       { title: 'Calendar Status', content: 'At the top of the page, tap "Calendar Status" to see which Google Calendars are connected and their sync status.' },
       { title: 'Needs Review Items', content: 'Events or classes synced from Google Calendar may show a "Needs Review" flag. This happens when instructor is missing, category is unclear, or conflicts are detected.' },
       { title: 'Resolving Needs Review', content: 'Tap any item marked "Needs Review" to fill in missing info like instructor name, category, or spots available. You can also dismiss the review or apply the fix to all similar items.' },
       { title: 'Sync with Eventbrite', content: 'Click the Eventbrite sync button to pull in member events from your Eventbrite organization.' },
       { title: 'Sync with Google Calendar', content: 'Click the Google Calendar sync button to sync events and wellness classes with the designated calendars.' },
-      { title: 'Create Manual Events', content: 'Use the + button to add a new event, wellness class, or availability block. Fill in title, date, time, location, and description.' },
+      { title: 'Create Manual Events', content: 'Use the + button to add a new event or wellness class. Fill in title, date, time, location, and description.' },
       { title: 'View RSVPs & Enrollments', content: 'Click on an event or class to see who has RSVP\'d or enrolled. You can also manually add attendees.' },
-      { title: 'Availability Blocks', content: 'In the Blocks tab, create time blocks to mark resources as unavailable. Choose types: Maintenance, Private Event, Staff Hold, Wellness, or Other.' },
-      { title: 'Blocks by Day', content: 'Blocks are grouped by date. Tap a day header to expand and see all blocks for that day. Each block shows the resource, time range, and type.' },
     ]
   },
   {
