@@ -1218,6 +1218,7 @@ async function calculateFeeEstimate(params: {
   sessionId?: number;
   bookingId?: number;
   resourceType?: string;
+  guestsWithInfo?: number;
 }) {
   const { ownerEmail, durationMinutes, guestCount, requestDate, playerCount, sessionId, bookingId, resourceType } = params;
   
@@ -1245,10 +1246,19 @@ async function calculateFeeEstimate(params: {
     { email: ownerEmail, displayName: 'Owner', participantType: 'owner' }
   ];
   
-  // Add guests based on count (use "Estimated Guest" prefix to distinguish from
-  // placeholder "Guest N" entries in booking_participants, which should not consume passes)
+  // Add guests based on count. Guests with actual info entered (name/email) use
+  // "Estimated Guest N" naming so passes CAN apply. Empty guest slots (no info)
+  // use plain "Guest N" naming which triggers the placeholder check in the billing
+  // service, ensuring they are always charged $25 with no guest pass applied.
+  // When guestsWithInfo is undefined (staff/session paths), default to all guests
+  // being eligible for passes (existing behavior).
+  const namedGuestCount = params.guestsWithInfo ?? guestCount;
   for (let i = 0; i < guestCount; i++) {
-    participants.push({ displayName: `Estimated Guest ${i + 1}`, participantType: 'guest' });
+    if (i < namedGuestCount) {
+      participants.push({ displayName: `Estimated Guest ${i + 1}`, participantType: 'guest' });
+    } else {
+      participants.push({ displayName: `Guest ${i + 1}`, participantType: 'guest' });
+    }
   }
   
   try {
@@ -1433,6 +1443,7 @@ router.get('/api/fee-estimate', async (req, res) => {
     const playerCount = parseInt(req.query.playerCount as string) || 1;
     const requestDate = (req.query.date as string) || '';
     const resourceType = (req.query.resourceType as string) || 'simulator';
+    const guestsWithInfo = parseInt(req.query.guestsWithInfo as string) || 0;
     
     // Members can only check their own fees
     const ownerEmail = isStaff && req.query.email 
@@ -1445,7 +1456,8 @@ router.get('/api/fee-estimate', async (req, res) => {
       guestCount,
       requestDate,
       playerCount,
-      resourceType
+      resourceType,
+      guestsWithInfo
     });
     
     res.json({ ...estimate, _ts: Date.now() });

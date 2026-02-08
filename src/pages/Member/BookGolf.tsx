@@ -427,6 +427,9 @@ const BookGolf: React.FC = () => {
     ? playerSlots.filter(slot => slot.type === 'guest').length 
     : 0;
   const effectivePlayerCount = activeTab === 'simulator' ? playerCount : 1;
+  const guestsWithInfo = activeTab === 'simulator'
+    ? playerSlots.filter(slot => slot.type === 'guest' && (slot.selectedId || (slot.email && slot.email.includes('@')))).length
+    : 0;
   const feeEstimateParams = useMemo(() => {
     if (!duration || !selectedDateObj?.date) return '';
     const params = new URLSearchParams({
@@ -434,13 +437,14 @@ const BookGolf: React.FC = () => {
       guestCount: guestCount.toString(),
       playerCount: effectivePlayerCount.toString(),
       date: selectedDateObj.date,
-      resourceType: activeTab === 'conference' ? 'conference_room' : 'simulator'
+      resourceType: activeTab === 'conference' ? 'conference_room' : 'simulator',
+      guestsWithInfo: guestsWithInfo.toString()
     });
     if (effectiveUser?.email && isAdminViewingAs) {
       params.set('email', effectiveUser.email);
     }
     return params.toString();
-  }, [duration, guestCount, effectivePlayerCount, selectedDateObj?.date, activeTab, effectiveUser?.email, isAdminViewingAs]);
+  }, [duration, guestCount, guestsWithInfo, effectivePlayerCount, selectedDateObj?.date, activeTab, effectiveUser?.email, isAdminViewingAs, playerSlots]);
 
   const { data: feeEstimateData, isLoading: feeEstimateLoading } = useQuery({
     queryKey: bookGolfKeys.feeEstimate(feeEstimateParams),
