@@ -2458,7 +2458,19 @@ export async function autoFixMissingTiers(): Promise<{
     const remainingWithoutTier = parseInt((remainingResult.rows[0] as any)?.count || '0', 10);
     
     if (remainingWithoutTier > 0) {
-      console.log(`[AutoFix] ${remainingWithoutTier} members still without tier (assign in app via member profile)`);
+      const emailsResult = await db.execute(sql`
+        SELECT email, first_name, last_name, stripe_customer_id
+        FROM users 
+        WHERE role = 'member' 
+          AND membership_status = 'active' 
+          AND tier IS NULL
+          AND email NOT LIKE '%test%'
+          AND email NOT LIKE '%example.com'
+        ORDER BY created_at DESC
+        LIMIT 20
+      `);
+      const emails = (emailsResult.rows as any[]).map(r => `${r.first_name || ''} ${r.last_name || ''} <${r.email}>`).join(', ');
+      console.log(`[AutoFix] ${remainingWithoutTier} members still without tier: ${emails}`);
     }
     
     return { fixedFromAlternateEmail, remainingWithoutTier };

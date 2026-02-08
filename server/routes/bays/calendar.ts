@@ -50,6 +50,10 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
   try {
     const { start_date, end_date } = req.query;
     
+    const today = new Date();
+    const defaultStartDate = start_date || new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const defaultEndDate = end_date || new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
     const conditions: any[] = [
       or(
         eq(bookingRequests.status, 'approved'),
@@ -58,12 +62,8 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
       )
     ];
     
-    if (start_date) {
-      conditions.push(gte(bookingRequests.requestDate, start_date as string));
-    }
-    if (end_date) {
-      conditions.push(lte(bookingRequests.requestDate, end_date as string));
-    }
+    conditions.push(gte(bookingRequests.requestDate, defaultStartDate as string));
+    conditions.push(lte(bookingRequests.requestDate, defaultEndDate as string));
     
     const dbResult = await db.select({
       id: bookingRequests.id,
@@ -111,8 +111,8 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
       calendarBookings = calendarEvents
         .filter(event => {
           if (dbCalendarEventIds.has(event.id)) return false;
-          if (start_date && event.date < (start_date as string)) return false;
-          if (end_date && event.date > (end_date as string)) return false;
+          if (event.date < (defaultStartDate as string)) return false;
+          if (event.date > (defaultEndDate as string)) return false;
           return true;
         })
         .map(event => ({

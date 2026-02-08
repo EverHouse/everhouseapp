@@ -120,6 +120,43 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
       });
       
     } catch (error: any) {
+      const errorMsg = error.message || '';
+      const isUnrecoverable = 
+        errorMsg.includes('MISSING_SCOPES') || 
+        errorMsg.includes('403') || 
+        errorMsg.includes('401');
+      
+      if (isUnrecoverable) {
+        await pool.query(
+          `UPDATE hubspot_sync_queue 
+           SET status = 'dead', 
+               last_error = $2,
+               updated_at = NOW() 
+           WHERE id = $1`,
+          [job.id, `Unrecoverable error - ${errorMsg}`]
+        );
+        
+        logger.error('[HubSpot Queue] Job dead (unrecoverable error - skipping retries)', { 
+          error,
+          extra: { jobId: job.id, operation: job.operation }
+        });
+        
+        try {
+          const { notifyAllStaff } = await import('../staffNotifications');
+          await notifyAllStaff(
+            'HubSpot Sync Failed - Permission Error',
+            `Job ${job.id} (${job.operation}) failed with unrecoverable error: ${errorMsg}. ` +
+            `Update scopes at https://developers.hubspot.com/scopes`,
+            'integration_error'
+          );
+        } catch (notifyErr) {
+          logger.error('[HubSpot Queue] Failed to notify staff of dead job', { error: notifyErr });
+        }
+        
+        stats.failed++;
+        continue;
+      }
+      
       const newRetryCount = job.retry_count + 1;
       const shouldRetry = newRetryCount < job.max_retries;
       
