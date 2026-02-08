@@ -700,7 +700,7 @@ router.delete('/api/events/:id', isStaffOrAdmin, async (req, res) => {
   }
 });
 
-router.post('/api/eventbrite/sync', async (req, res) => {
+router.post('/api/eventbrite/sync', isStaffOrAdmin, async (req, res) => {
   try {
     const eventbriteToken = process.env.EVENTBRITE_PRIVATE_TOKEN;
     if (!eventbriteToken) {
@@ -910,6 +910,21 @@ router.post('/api/rsvps', async (req, res) => {
   try {
     const { event_id, user_email } = req.body;
     
+    if (!event_id || !user_email) {
+      return res.status(400).json({ error: 'Missing event_id or user_email' });
+    }
+    
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    const sessionEmail = sessionUser.email?.toLowerCase() || '';
+    const isOwnAction = sessionEmail === user_email.toLowerCase();
+    const isAdminOrStaff = sessionUser.role === 'admin' || sessionUser.role === 'staff';
+    if (!isOwnAction && !isAdminOrStaff) {
+      return res.status(403).json({ error: 'You can only perform this action for yourself' });
+    }
+    
     const eventData = await db.select({
       title: events.title,
       eventDate: events.eventDate,
@@ -1006,6 +1021,17 @@ router.post('/api/rsvps', async (req, res) => {
 router.delete('/api/rsvps/:event_id/:user_email', async (req, res) => {
   try {
     const { event_id, user_email } = req.params;
+    
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    const sessionEmail = sessionUser.email?.toLowerCase() || '';
+    const isOwnAction = sessionEmail === user_email.toLowerCase();
+    const isAdminOrStaff = sessionUser.role === 'admin' || sessionUser.role === 'staff';
+    if (!isOwnAction && !isAdminOrStaff) {
+      return res.status(403).json({ error: 'You can only perform this action for yourself' });
+    }
     
     const eventData = await db.select({
       title: events.title,

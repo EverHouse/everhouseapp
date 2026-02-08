@@ -267,7 +267,7 @@ router.patch('/api/tours/:id/confirm', async (req, res) => {
         status: 'scheduled',
         updatedAt: new Date(),
       })
-      .where(eq(tours.id, parseInt(id)))
+      .where(and(eq(tours.id, parseInt(id)), eq(tours.status, 'pending')))
       .returning();
     
     if (!updated) {

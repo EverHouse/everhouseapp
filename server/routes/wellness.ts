@@ -965,6 +965,17 @@ router.post('/api/wellness-enrollments', async (req, res) => {
       return res.status(400).json({ error: 'Missing class_id or user_email' });
     }
     
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    const sessionEmail = sessionUser.email?.toLowerCase() || '';
+    const isOwnAction = sessionEmail === user_email.toLowerCase();
+    const isAdminOrStaff = sessionUser.role === 'admin' || sessionUser.role === 'staff';
+    if (!isOwnAction && !isAdminOrStaff) {
+      return res.status(403).json({ error: 'You can only perform this action for yourself' });
+    }
+    
     const existing = await db.select({ id: wellnessEnrollments.id })
       .from(wellnessEnrollments)
       .where(and(

@@ -13,6 +13,23 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.10.4",
+    date: "2026-02-08",
+    title: "Security Audit: Route Authorization Hardening",
+    changes: [
+      "Fix: Wellness class enrollment now verifies the logged-in member matches the request — previously accepted any email without checking the session",
+      "Fix: Event RSVP creation now verifies the logged-in member matches the request — previously accepted any email without checking the session",
+      "Fix: Event RSVP cancellation now verifies the logged-in member matches the request — previously accepted any email without checking the session",
+      "Fix: Eventbrite sync endpoint now requires staff access — previously could be triggered without authentication",
+      "Fix: Tour confirmation now only allows confirming tours that are in 'pending' status — prevents re-confirming already scheduled tours",
+      "Verified: All admin/staff mutation routes properly protected with role-based access control",
+      "Verified: All member-facing routes enforce self-access-only (members can only modify their own data)",
+      "Verified: Frontend auth guards properly redirect unauthenticated users and non-staff from admin pages",
+      "Verified: Service worker properly handles cache versioning and old cache cleanup",
+      "Verified: Announcements, gallery, settings, FAQs, bug reports, notices, cafe menu, and membership tier routes all properly protected",
+    ],
+  },
+  {
     version: "7.10.3",
     date: "2026-02-08",
     title: "System Audit: Webhook & Job Queue Hardening",
