@@ -7,6 +7,7 @@ import { formSubmissions, users } from '../../shared/schema';
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { notifyAllStaff } from '../core/notificationService';
 import { isStaffOrAdmin } from '../core/middleware';
+import { getSessionUser } from '../types/session';
 import { normalizeTierName, extractTierTags, TIER_NAMES } from '../../shared/constants/tiers';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -764,6 +765,11 @@ router.post('/api/hubspot/forms/:formType', async (req, res) => {
     }
     
     if (formType === 'guest-checkin') {
+      const sessionUser = getSessionUser(req);
+      if (!sessionUser || !sessionUser.isStaff) {
+        return res.status(401).json({ error: 'Authentication required. Guest check-in is a staff-only action.' });
+      }
+
       const memberEmailField = fields.find((f: { name: string; value: string }) => f.name === 'member_email');
       if (!memberEmailField?.value) {
         return res.status(400).json({ error: 'Member email is required for guest check-in' });

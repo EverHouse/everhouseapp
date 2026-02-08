@@ -13,6 +13,23 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.10.5",
+    date: "2026-02-08",
+    title: "Deep Security Audit: Booking, Billing, Members & Integrations",
+    changes: [
+      "Fix: Visitor search now uses parameterized database queries — previously used a fragile string escaping pattern that could potentially allow SQL injection in edge cases",
+      "Fix: Resend email webhook verification is now mandatory in production — previously, if the webhook secret wasn't configured, all webhook events were accepted without verification, allowing potential forgery of email bounce/complaint events",
+      "Fix: Guest check-in via HubSpot forms now requires staff authentication — previously the public form endpoint could be used to deplete any member's guest passes without logging in",
+      "Verified: 85+ routes across booking system, member management, billing, admin tools, and integrations — all properly protected",
+      "Verified: All Stripe payment routes use proper auth, transactions, and idempotency",
+      "Verified: HubSpot webhook uses timing-safe signature verification with replay protection",
+      "Verified: File uploads enforce 10MB size limits with image type validation",
+      "Verified: Data export only returns the requesting member's own data, with sensitive fields excluded",
+      "Verified: Member search redacts email addresses for non-staff users",
+      "Verified: All data integrity and admin tools require admin-level access",
+    ],
+  },
+  {
     version: "7.10.4",
     date: "2026-02-08",
     title: "Security Audit: Route Authorization Hardening",

@@ -36,16 +36,15 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
     const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
     const searchTerm = (search as string || '').trim().toLowerCase();
     
-    let orderByClause = `last_purchase_date ${sortOrder} NULLS LAST`;
-    if (sortBy === 'name') {
-      orderByClause = `first_name || ' ' || last_name ${sortOrder}`;
-    } else if (sortBy === 'totalSpent') {
-      orderByClause = `total_spent_cents ${sortOrder}`;
-    } else if (sortBy === 'purchaseCount') {
-      orderByClause = `purchase_count ${sortOrder}`;
-    } else if (sortBy === 'createdAt') {
-      orderByClause = `created_at ${sortOrder} NULLS LAST`;
-    }
+    const sortColumnMap: Record<string, string> = {
+      name: "first_name || ' ' || last_name",
+      totalSpent: 'total_spent_cents',
+      purchaseCount: 'purchase_count',
+      createdAt: 'created_at',
+    };
+    const nullsLast = sortBy === 'name' || sortBy === 'totalSpent' || sortBy === 'purchaseCount' ? '' : ' NULLS LAST';
+    const sortColumn = sortColumnMap[sortBy as string] || 'last_purchase_date';
+    const orderByClause = sql.raw(`${sortColumn} ${sortOrder}${nullsLast}`);
     
     let sourceCondition = '';
     if (sourceFilter === 'stripe') {
@@ -90,15 +89,14 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
       typeConditionMain = "AND effective_type = 'NEW'";
     }
     
-    let searchCondition = '';
-    if (searchTerm) {
-      const escapedSearch = searchTerm.replace(/'/g, "''");
-      searchCondition = `AND (
-        LOWER(u.first_name || ' ' || u.last_name) LIKE '%${escapedSearch}%'
-        OR LOWER(u.email) LIKE '%${escapedSearch}%'
-        OR LOWER(u.phone) LIKE '%${escapedSearch}%'
-      )`;
-    }
+    const searchPattern = searchTerm ? `%${searchTerm}%` : null;
+    const searchClause = searchPattern
+      ? sql`AND (
+        LOWER(u.first_name || ' ' || u.last_name) LIKE ${searchPattern}
+        OR LOWER(u.email) LIKE ${searchPattern}
+        OR LOWER(u.phone) LIKE ${searchPattern}
+      )`
+      : sql``;
     
     const countResult = await db.execute(sql`
       WITH 
@@ -145,7 +143,7 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
         AND u.role NOT IN ('admin', 'staff')
         AND u.archived_at IS NULL
         ${sql.raw(sourceCondition)}
-        ${sql.raw(searchCondition)}
+        ${searchClause}
       )
       SELECT COUNT(*)::int as total
       FROM visitor_data
@@ -236,12 +234,12 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
         AND u.role NOT IN ('admin', 'staff')
         AND u.archived_at IS NULL
         ${sql.raw(sourceCondition)}
-        ${sql.raw(searchCondition)}
+        ${searchClause}
       )
       SELECT *, effective_type as computed_type
       FROM visitor_base
       WHERE 1=1 ${sql.raw(typeConditionMain)}
-      ORDER BY ${sql.raw(orderByClause)}
+      ORDER BY ${orderByClause}
       LIMIT ${pageLimit}
       OFFSET ${pageOffset}
     `);

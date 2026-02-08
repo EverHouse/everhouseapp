@@ -148,8 +148,9 @@ router.post('/api/webhooks/resend', async (req: Request, res: Response) => {
   };
 
   const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
-  
-  if (webhookSecret && svixHeaders['svix-id']) {
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  if (webhookSecret) {
     try {
       const wh = new Webhook(webhookSecret);
       const rawBody = JSON.stringify(req.body);
@@ -160,6 +161,11 @@ router.post('/api/webhooks/resend', async (req: Request, res: Response) => {
       });
       return res.status(401).json({ error: 'Invalid signature' });
     }
+  } else if (isProduction) {
+    logger.error('RESEND_WEBHOOK_SECRET is not configured in production — rejecting webhook request');
+    return res.status(500).json({ error: 'Webhook signature verification is not configured' });
+  } else {
+    logger.warn('RESEND_WEBHOOK_SECRET is not configured — skipping signature verification (development mode)');
   }
 
   const event = req.body as ResendEmailEvent;
