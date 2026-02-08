@@ -1926,7 +1926,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
 router.post('/api/admin/booking/:id/guests', isStaffOrAdmin, async (req, res) => {
   try {
     const bookingId = parseInt(req.params.id);
-    const { guestName, guestEmail, slotId, forceAddAsGuest } = req.body;
+    const { guestName, guestEmail, guestPhone, slotId, forceAddAsGuest } = req.body;
     
     if (!guestName?.trim()) {
       return res.status(400).json({ error: 'Guest name is required' });
@@ -1968,10 +1968,10 @@ router.post('/api/admin/booking/:id/guests', isStaffOrAdmin, async (req, res) =>
     const nextSlotNumber = (existingGuests.rows[0]?.max_slot || 0) + 1;
     
     const insertResult = await pool.query(
-      `INSERT INTO booking_guests (booking_id, guest_name, guest_email, slot_number, created_at)
-       VALUES ($1, $2, $3, $4, NOW())
+      `INSERT INTO booking_guests (booking_id, guest_name, guest_email, guest_phone, slot_number, created_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
        RETURNING *`,
-      [bookingId, guestName.trim(), guestEmail?.trim() || null, nextSlotNumber]
+      [bookingId, guestName.trim(), guestEmail?.trim() || null, guestPhone?.trim() || null, nextSlotNumber]
     );
     
     if (slotId) {

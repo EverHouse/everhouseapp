@@ -204,17 +204,14 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
   const membersSnapshotRef = useRef<BookingMember[]>([]);
   const [activeSearchSlot, setActiveSearchSlot] = useState<number | null>(null);
   const [guestAddSlot, setGuestAddSlot] = useState<number | null>(null);
-  const [guestMode, setGuestMode] = useState<'search' | 'new'>('search');
-  const [guestSearchQuery, setGuestSearchQuery] = useState('');
-  const [guestSearchResults, setGuestSearchResults] = useState<Array<{id: string; name: string; email: string; emailRedacted: string; visitorType?: string}>>([]);
-  const [isSearchingGuests, setIsSearchingGuests] = useState(false);
-  const [guestName, setGuestName] = useState('');
+  const [guestFirstName, setGuestFirstName] = useState('');
+  const [guestLastName, setGuestLastName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
   const [isAddingGuest, setIsAddingGuest] = useState(false);
   const [guestPassesRemaining, setGuestPassesRemaining] = useState<number>(0);
   const [guestPassesTotal, setGuestPassesTotal] = useState<number>(0);
   const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
-  const guestSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [memberMatchWarning, setMemberMatchWarning] = useState<{
     slotId: number;
     guestName: string;
@@ -352,7 +349,7 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
   };
 
   const handleAddGuest = async (slotId: number, forceAddAsGuest: boolean = false) => {
-    const nameToAdd = memberMatchWarning ? memberMatchWarning.guestName : guestName;
+    const nameToAdd = memberMatchWarning ? memberMatchWarning.guestName : `${guestFirstName.trim()} ${guestLastName.trim()}`.trim();
     if (!nameToAdd.trim()) {
       setError('Please enter a guest name');
       return;
@@ -363,15 +360,17 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ guestName: nameToAdd.trim(), guestEmail: guestEmail.trim() || null, slotId, forceAddAsGuest })
+        body: JSON.stringify({ guestName: nameToAdd.trim(), guestEmail: guestEmail.trim() || null, guestPhone: guestPhone.trim() || null, slotId, forceAddAsGuest })
       });
       
       if (res.ok) {
         const data = await res.json();
         await fetchBookingMembers();
         setGuestAddSlot(null);
-        setGuestName('');
+        setGuestFirstName('');
+        setGuestLastName('');
         setGuestEmail('');
+        setGuestPhone('');
         setActiveSearchSlot(null);
         setMemberMatchWarning(null);
         if (typeof data.guestPassesRemaining === 'number') {
@@ -438,7 +437,10 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
       if (res.ok) {
         await fetchBookingMembers();
         setGuestAddSlot(null);
-        setGuestName('');
+        setGuestFirstName('');
+        setGuestLastName('');
+        setGuestEmail('');
+        setGuestPhone('');
         setActiveSearchSlot(null);
         setMemberMatchWarning(null);
         onMemberLinked?.();
@@ -452,96 +454,13 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
     }
   };
 
-  const handleGuestSearch = useCallback((query: string) => {
-    setGuestSearchQuery(query);
-    
-    if (guestSearchTimeoutRef.current) {
-      clearTimeout(guestSearchTimeoutRef.current);
-    }
-    
-    if (query.length < 2) {
-      setGuestSearchResults([]);
-      return;
-    }
-    
-    guestSearchTimeoutRef.current = setTimeout(async () => {
-      setIsSearchingGuests(true);
-      try {
-        // Search both members and past guests in parallel
-        const [membersRes, guestsRes] = await Promise.all([
-          fetch(`/api/members/search?query=${encodeURIComponent(query)}&limit=6&includeVisitors=false`, {
-            credentials: 'include'
-          }),
-          fetch(`/api/guests/search?query=${encodeURIComponent(query)}&limit=6&includeFullEmail=true`, {
-            credentials: 'include'
-          })
-        ]);
-        
-        const combinedResults: Array<{id: string; name: string; email: string; emailRedacted: string; visitorType?: string; isMember?: boolean}> = [];
-        const seenEmails = new Set<string>();
-        
-        // Add members first (they take priority)
-        if (membersRes.ok) {
-          const members = await membersRes.json();
-          for (const m of members) {
-            const email = (m.email || '').toLowerCase();
-            if (!seenEmails.has(email)) {
-              seenEmails.add(email);
-              combinedResults.push({
-                id: m.id,
-                name: m.name || `${m.firstName || ''} ${m.lastName || ''}`.trim() || 'Unknown',
-                email: m.email || '',
-                emailRedacted: m.email || '',
-                visitorType: m.tier || 'Member',
-                isMember: true
-              });
-            }
-          }
-        }
-        
-        // Add guests (visitors) that aren't already in the list
-        if (guestsRes.ok) {
-          const guests = await guestsRes.json();
-          for (const g of guests) {
-            const email = (g.email || g.emailRedacted || '').toLowerCase();
-            if (!seenEmails.has(email)) {
-              seenEmails.add(email);
-              combinedResults.push({
-                id: g.id,
-                name: g.name,
-                email: g.email || g.emailRedacted || '',
-                emailRedacted: g.emailRedacted || g.email || '',
-                visitorType: g.visitorType || 'Guest'
-              });
-            }
-          }
-        }
-        
-        setGuestSearchResults(combinedResults.slice(0, 10));
-      } catch (err) {
-        console.error('Guest search error:', err);
-      } finally {
-        setIsSearchingGuests(false);
-      }
-    }, 300);
-  }, []);
-
-  const handleSelectGuest = async (slotId: number, guest: {id: string; name: string; email: string}) => {
-    setGuestName(guest.name);
-    setGuestEmail(guest.email);
-    setGuestSearchQuery('');
-    setGuestSearchResults([]);
-    
-    await handleAddGuest(slotId, guest.name, guest.email);
-  };
-
   const resetGuestForm = () => {
     setGuestAddSlot(null);
-    setGuestName('');
+    setGuestFirstName('');
+    setGuestLastName('');
     setGuestEmail('');
-    setGuestSearchQuery('');
-    setGuestSearchResults([]);
-    setGuestMode('search');
+    setGuestPhone('');
+    setMemberMatchWarning(null);
   };
 
   // Billing section functions
@@ -1062,7 +981,7 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
           <div className="mb-3 p-2 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg flex items-center gap-2">
             <span className="material-symbols-outlined text-amber-500 text-base">warning</span>
             <p className="text-xs text-amber-600 dark:text-amber-400">
-              {validation.emptySlots} empty player slot{validation.emptySlots > 1 ? 's' : ''} - link members to complete booking assignment
+              {validation.emptySlots} empty player slot{validation.emptySlots > 1 ? 's' : ''} - assign players to complete booking
             </p>
           </div>
         )}
@@ -1229,137 +1148,66 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
                   </div>
                 ) : guestAddSlot === slot.id ? (
                   <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-1 mb-1">
-                      <button
-                        onClick={() => setGuestMode('search')}
-                        className={`px-2 py-1 text-[10px] font-medium rounded-l-lg transition-colors ${
-                          guestMode === 'search'
-                            ? 'bg-primary text-white'
-                            : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/20'
-                        }`}
-                      >
-                        Search
-                      </button>
-                      <button
-                        onClick={() => setGuestMode('new')}
-                        className={`px-2 py-1 text-[10px] font-medium rounded-r-lg transition-colors ${
-                          guestMode === 'new'
-                            ? 'bg-primary text-white'
-                            : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/20'
-                        }`}
-                      >
-                        New
-                      </button>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400">New Guest</span>
                       <button
                         onClick={resetGuestForm}
-                        className="ml-auto p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10"
+                        className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10"
                       >
                         <span className="material-symbols-outlined text-sm">close</span>
                       </button>
                     </div>
-                    
-                    {guestMode === 'search' ? (
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={guestSearchQuery}
-                          onChange={(e) => handleGuestSearch(e.target.value)}
-                          placeholder="Search members or past guests..."
-                          autoFocus
-                          className="w-full py-1.5 px-2 text-sm rounded-lg border border-gray-200 dark:border-white/20 bg-white dark:bg-black/30 text-primary dark:text-white placeholder:text-gray-400"
-                        />
-                        {isSearchingGuests && (
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 material-symbols-outlined text-sm animate-spin text-gray-400">progress_activity</span>
-                        )}
-                        {guestSearchResults.length > 0 && (
-                          <div className="absolute z-50 left-0 right-0 mt-1 rounded-lg border shadow-lg overflow-hidden max-h-40 overflow-y-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-white/20">
-                            {guestSearchResults.map((result) => {
-                              const isMember = (result as any).isMember === true;
-                              return (
-                                <button
-                                  key={result.id}
-                                  type="button"
-                                  onClick={() => {
-                                    if (isMember) {
-                                      handleLinkMember(slot.id, result.email);
-                                      resetGuestForm();
-                                    } else {
-                                      handleSelectGuest(slot.id, { id: result.id, name: result.name, email: result.email || result.emailRedacted });
-                                    }
-                                  }}
-                                  className="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-white/5 flex items-center gap-2 border-b border-gray-100 dark:border-white/5 last:border-b-0"
-                                >
-                                  <span className={`material-symbols-outlined text-base ${isMember ? 'text-green-600 dark:text-green-400' : 'text-amber-500'}`}>
-                                    {isMember ? 'verified_user' : 'person'}
-                                  </span>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-primary dark:text-white truncate">{result.name}</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{result.email || result.emailRedacted}</p>
-                                  </div>
-                                  {result.visitorType && (
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                                      isMember 
-                                        ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' 
-                                        : 'bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400'
-                                    }`}>
-                                      {result.visitorType}
-                                    </span>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                        {guestSearchQuery.length >= 2 && !isSearchingGuests && guestSearchResults.length === 0 && (
-                          <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">No results found. Try "New" to add a new guest.</p>
-                        )}
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={guestName}
-                            onChange={(e) => setGuestName(e.target.value)}
-                            placeholder="Guest name *"
-                            autoFocus
-                            className="flex-1 py-1.5 px-2 text-sm rounded-lg border border-gray-200 dark:border-white/20 bg-white dark:bg-black/30 text-primary dark:text-white placeholder:text-gray-400"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="email"
-                            value={guestEmail}
-                            onChange={(e) => setGuestEmail(e.target.value)}
-                            placeholder="Guest email (required)"
-                            className={`flex-1 py-1.5 px-2 text-sm rounded-lg border bg-white dark:bg-black/30 text-primary dark:text-white placeholder:text-gray-400 ${
-                              guestName.trim() && !guestEmail.trim() ? 'border-red-300 dark:border-red-500/50' : 'border-gray-200 dark:border-white/20'
-                            }`}
-                            required
-                          />
-                        </div>
-                        {guestName.trim() && !guestEmail.trim() && (
-                          <p className="text-[10px] text-red-600 dark:text-red-400">Email is required for guest tracking</p>
-                        )}
-                        <button
-                          onClick={() => handleAddGuest(slot.id)}
-                          disabled={isAddingGuest || !guestName.trim() || !guestEmail.trim()}
-                          className="w-full py-1.5 text-xs font-medium bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 flex items-center justify-center gap-1"
-                        >
-                          {isAddingGuest ? (
-                            <>
-                              <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-                              Adding...
-                            </>
-                          ) : (
-                            <>
-                              <span className="material-symbols-outlined text-sm">person_add</span>
-                              {guestPassesRemaining > 0 ? 'Add Guest (Free)' : `Add Guest ($${guestFeeDollars})`}
-                            </>
-                          )}
-                        </button>
-                      </>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={guestFirstName}
+                        onChange={(e) => setGuestFirstName(e.target.value)}
+                        placeholder="First name *"
+                        autoFocus
+                        className="py-1.5 px-2 text-sm rounded-lg border border-gray-200 dark:border-white/20 bg-white dark:bg-black/30 text-primary dark:text-white placeholder:text-gray-400"
+                      />
+                      <input
+                        type="text"
+                        value={guestLastName}
+                        onChange={(e) => setGuestLastName(e.target.value)}
+                        placeholder="Last name *"
+                        className="py-1.5 px-2 text-sm rounded-lg border border-gray-200 dark:border-white/20 bg-white dark:bg-black/30 text-primary dark:text-white placeholder:text-gray-400"
+                      />
+                    </div>
+                    <input
+                      type="email"
+                      value={guestEmail}
+                      onChange={(e) => setGuestEmail(e.target.value)}
+                      placeholder="Email *"
+                      className={`w-full py-1.5 px-2 text-sm rounded-lg border bg-white dark:bg-black/30 text-primary dark:text-white placeholder:text-gray-400 ${
+                        (guestFirstName.trim() || guestLastName.trim()) && !guestEmail.trim() ? 'border-red-300 dark:border-red-500/50' : 'border-gray-200 dark:border-white/20'
+                      }`}
+                      required
+                    />
+                    <input
+                      type="tel"
+                      value={guestPhone}
+                      onChange={(e) => setGuestPhone(e.target.value)}
+                      placeholder="Phone (optional)"
+                      className="w-full py-1.5 px-2 text-sm rounded-lg border border-gray-200 dark:border-white/20 bg-white dark:bg-black/30 text-primary dark:text-white placeholder:text-gray-400"
+                    />
+                    {(guestFirstName.trim() || guestLastName.trim()) && !guestEmail.trim() && (
+                      <p className="text-[10px] text-red-600 dark:text-red-400">Email is required for guest tracking</p>
                     )}
+                    <button
+                      onClick={() => handleAddGuest(slot.id)}
+                      disabled={isAddingGuest || !guestFirstName.trim() || !guestLastName.trim() || !guestEmail.trim()}
+                      className="w-full py-1.5 text-xs font-medium bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 flex items-center justify-center gap-1"
+                    >
+                      {isAddingGuest ? (
+                        <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-sm">person_add</span>
+                          {guestPassesRemaining > 0 ? 'Add Guest (Free)' : `Add Guest ($${guestFeeDollars})`}
+                        </>
+                      )}
+                    </button>
                     {guestPassesRemaining === 0 && (
                       <p className="text-[10px] text-amber-600 dark:text-amber-400">{`No guest passes remaining - $${guestFeeDollars} fee applies`}</p>
                     )}
@@ -1371,10 +1219,10 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
                       className="flex-1 flex items-center gap-2 py-1.5 px-2 text-left text-gray-400 dark:text-gray-500 hover:text-primary dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg transition-colors"
                     >
                       <span className="material-symbols-outlined text-sm">search</span>
-                      <span className="text-sm">Find member</span>
+                      <span className="text-sm">Search</span>
                     </button>
                     <button
-                      onClick={() => { setGuestAddSlot(slot.id); setGuestName(''); setGuestEmail(''); }}
+                      onClick={() => { setGuestAddSlot(slot.id); setGuestFirstName(''); setGuestLastName(''); setGuestEmail(''); setGuestPhone(''); }}
                       className={`flex items-center gap-1 py-1.5 px-2 text-xs font-medium rounded-lg transition-colors ${
                         guestPassesRemaining > 0 
                           ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-500/30'
@@ -1382,11 +1230,17 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
                       }`}
                     >
                       <span className="material-symbols-outlined text-sm">person_add</span>
-                      <span>Add Guest</span>
+                      <span>New Guest</span>
                       <span className="px-1 py-0.5 text-[10px] font-bold bg-white/50 dark:bg-black/30 rounded">
                         {guestPassesRemaining}/{guestPassesTotal}
                       </span>
                     </button>
+                    <span 
+                      className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 shrink-0"
+                      title={slot.feeNote}
+                    >
+                      ${slot.fee.toFixed(2)}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1574,7 +1428,7 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
             </div>
             
             <button
-              onClick={() => { setMemberMatchWarning(null); setGuestName(''); setGuestAddSlot(null); }}
+              onClick={() => { setMemberMatchWarning(null); setGuestFirstName(''); setGuestLastName(''); setGuestEmail(''); setGuestPhone(''); setGuestAddSlot(null); }}
               className="w-full mt-2 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             >
               Cancel

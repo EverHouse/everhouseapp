@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.10.10",
+    date: "2026-02-08",
+    title: "Empty Slot UI Improvements",
+    changes: [
+      "Improvement: The 'Find member' button on empty player slots now says 'Search' to reflect that it finds both members and visitors",
+      "Improvement: The 'Add Guest' button is now labeled 'New Guest' and goes directly to a new visitor form with First Name, Last Name, Email, and Phone fields — removed the Search/New toggle since the main search already finds existing people",
+      "Improvement: Empty player slots now display the $25 guest fee badge so staff can see the cost at a glance",
+      "Improvement: The search bar is now dismissable — staff can close it to get back to the default slot view with the New Guest button",
+      "Improvement: Empty slot warning text now says 'assign players' instead of 'link members' since guests can also fill slots",
+    ],
+  },
+  {
     version: "7.10.9",
     date: "2026-02-08",
     title: "Guest Slot Display & Owner Overage Calculation",
