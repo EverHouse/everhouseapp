@@ -22,6 +22,7 @@ export const changelog: ChangelogEntry[] = [
       "Fix: Event RSVP cancellation now verifies the logged-in member matches the request — previously accepted any email without checking the session",
       "Fix: Eventbrite sync endpoint now requires staff access — previously could be triggered without authentication",
       "Fix: Tour confirmation now only allows confirming tours that are in 'pending' status — prevents re-confirming already scheduled tours",
+      "Fix: Updated the notification type constraint to include all 40+ notification types used across the system — previously only 19 types were allowed, causing Trackman and other notifications to silently fail",
       "Verified: All admin/staff mutation routes properly protected with role-based access control",
       "Verified: All member-facing routes enforce self-access-only (members can only modify their own data)",
       "Verified: Frontend auth guards properly redirect unauthenticated users and non-staff from admin pages",
