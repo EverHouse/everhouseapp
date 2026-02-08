@@ -1233,9 +1233,6 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
                     >
                       <span className="material-symbols-outlined text-sm">person_add</span>
                       <span>New Guest</span>
-                      <span className="px-1 py-0.5 text-[10px] font-bold bg-white/50 dark:bg-black/30 rounded">
-                        {guestPassesRemaining}/{guestPassesTotal}
-                      </span>
                     </button>
                     <span 
                       className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 shrink-0"
