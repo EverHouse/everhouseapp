@@ -16,7 +16,7 @@ async function reconcilePendingSnapshots(): Promise<{ synced: number; errors: nu
        FROM booking_fee_snapshots bfs
        WHERE bfs.status = 'pending'
        AND bfs.stripe_payment_intent_id IS NOT NULL
-       AND bfs.created_at < NOW() - INTERVAL '${STALE_THRESHOLD_MINUTES} minutes'
+       AND bfs.created_at < NOW() - INTERVAL '5 minutes'
        ORDER BY bfs.created_at ASC
        LIMIT 50`,
       []

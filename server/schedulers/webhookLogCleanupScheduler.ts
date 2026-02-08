@@ -1,3 +1,5 @@
+import { getPacificHour } from '../utils/dateUtils';
+
 async function scheduleWebhookLogCleanup(): Promise<void> {
   try {
     const { cleanupOldWebhookLogs } = await import('../routes/trackmanWebhook');
@@ -10,13 +12,7 @@ async function scheduleWebhookLogCleanup(): Promise<void> {
 export function startWebhookLogCleanupScheduler(): void {
   setInterval(async () => {
     try {
-      const pacificTime = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/Los_Angeles',
-        hour: 'numeric',
-        hour12: false
-      }).format(new Date());
-      
-      if (parseInt(pacificTime) === 4) {
+      if (getPacificHour() === 4) {
         await scheduleWebhookLogCleanup();
       }
     } catch (err) {

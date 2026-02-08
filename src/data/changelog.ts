@@ -21,6 +21,8 @@ export const changelog: ChangelogEntry[] = [
       "Fix: Morning closure notifications now trigger at 8am Pacific instead of 8am UTC (was firing at midnight Pacific)",
       "Fix: Weekly cleanup now runs Sunday 3am Pacific instead of 3am UTC",
       "Fix: Daily reminders now correctly look up 'tomorrow's' bookings and events using Pacific time — previously could skip a day or show wrong day's reminders",
+      "Fix: Session cleanup scheduler (2am) and webhook log cleanup scheduler (4am) now use the standard Pacific time utility — previously used a method that could misfire at midnight",
+      "Fix: Hardened a database query in the payment reconciliation scheduler to prevent potential issues with dynamic values in SQL",
       "Improvement: Old calendar availability blocks (older than 30 days) are now automatically cleaned up during weekly maintenance — removed 72 accumulated blocks dating back to August 2025",
     ],
   },

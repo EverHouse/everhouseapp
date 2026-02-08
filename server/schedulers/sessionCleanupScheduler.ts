@@ -1,13 +1,9 @@
+import { getPacificHour } from '../utils/dateUtils';
+
 export function startSessionCleanupScheduler(): void {
   setInterval(async () => {
     try {
-      const pacificTime = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/Los_Angeles',
-        hour: 'numeric',
-        hour12: false
-      }).format(new Date());
-      
-      if (parseInt(pacificTime) === 2) {
+      if (getPacificHour() === 2) {
         const { runSessionCleanup } = await import('../core/sessionCleanup');
         await runSessionCleanup();
       }
