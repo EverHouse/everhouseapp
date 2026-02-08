@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.10.11",
+    date: "2026-02-08",
+    title: "Guest Pass Allocation for Empty Slots",
+    changes: [
+      "Fix: Available guest passes now apply to empty slots in all booking scenarios (not just session-linked bookings), reducing fees from $25 to $0 per covered slot",
+      "Fix: Guest pass remaining count now accurately reflects passes used for both named guests and empty slots in the financial summary",
+    ],
+  },
+  {
     version: "7.10.10",
     date: "2026-02-08",
     title: "Empty Slot UI Improvements",

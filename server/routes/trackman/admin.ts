@@ -11,6 +11,7 @@ import { getOrCreateStripeCustomer } from '../../core/stripe/customers';
 import { recordUsage } from '../../core/bookingService/sessionManager';
 import { updateVisitorTypeByUserId } from '../../core/visitors';
 import { PRICING } from '../../core/billing/pricingConfig';
+import { refundGuestPassForParticipant } from '../../core/billing/guestPassConsumer';
 
 const router = Router();
 
@@ -1705,8 +1706,6 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
       guestsWithFees.splice(guestsToRemove[i], 1);
     }
     
-    let guestPassesRemainingAfterBooking = ownerGuestPassesRemaining - guestPassesUsedThisBooking;
-    
     const dailyAllowance = ownerTierLimits?.daily_sim_minutes || 0;
     const isUnlimitedTier = dailyAllowance >= 999 || (ownerTierLimits?.unlimited_access ?? false);
     const allowanceText = isUnlimitedTier 
@@ -1825,7 +1824,11 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
         const ownerMember = membersWithFees.find(m => m.isPrimary);
         const nonOwnerMembers = membersWithFees.filter(m => !m.isPrimary && m.userEmail);
         const emptySlots = membersWithFees.filter(m => !m.userEmail && !m.guestInfo);
-        const emptySlotFees = emptySlots.length * PRICING.GUEST_FEE_DOLLARS;
+        const chargeableEmptySlots = Math.max(0, emptySlots.length - guestPassesAvailable);
+        const passesUsedForEmpty = emptySlots.length - chargeableEmptySlots;
+        guestPassesUsedThisBooking += passesUsedForEmpty;
+        guestPassesAvailable -= passesUsedForEmpty;
+        const emptySlotFees = chargeableEmptySlots * PRICING.GUEST_FEE_DOLLARS;
         guestFeesWithoutPass = guestsWithFees.filter(g => !g.usedGuestPass).reduce((sum, g) => sum + g.fee, 0) + emptySlotFees;
         ownerOverageFee = ownerMember?.fee || 0;
         totalPlayersOwe = nonOwnerMembers.reduce((sum, m) => sum + m.fee, 0);
@@ -1840,7 +1843,11 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
       const ownerMember = membersWithFees.find(m => m.isPrimary);
       const nonOwnerMembers = membersWithFees.filter(m => !m.isPrimary && m.userEmail);
       const emptySlots = membersWithFees.filter(m => !m.userEmail && !m.guestInfo);
-      const emptySlotFees = emptySlots.length * PRICING.GUEST_FEE_DOLLARS;
+      const chargeableEmptySlots = Math.max(0, emptySlots.length - guestPassesAvailable);
+      const passesUsedForEmpty = emptySlots.length - chargeableEmptySlots;
+      guestPassesUsedThisBooking += passesUsedForEmpty;
+      guestPassesAvailable -= passesUsedForEmpty;
+      const emptySlotFees = chargeableEmptySlots * PRICING.GUEST_FEE_DOLLARS;
       guestFeesWithoutPass = guestsWithFees.filter(g => !g.usedGuestPass).reduce((sum, g) => sum + g.fee, 0) + emptySlotFees;
       ownerOverageFee = ownerMember?.fee || 0;
       totalPlayersOwe = nonOwnerMembers.reduce((sum, m) => sum + m.fee, 0);
@@ -1852,6 +1859,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
       }));
     }
     
+    const guestPassesRemainingAfterBooking = ownerGuestPassesRemaining - guestPassesUsedThisBooking;
     const grandTotal = ownerOverageFee + guestFeesWithoutPass + totalPlayersOwe;
     
     // Check if there are any fees that have been paid (to show "Paid" indicator)
@@ -2048,28 +2056,46 @@ router.delete('/api/admin/booking/:id/guests/:guestId', isStaffOrAdmin, async (r
       // Match by session_id + display_name + participant_type='guest'
       if (sessionId) {
         const participantResult = await pool.query(
-          `SELECT id FROM booking_participants 
+          `SELECT id, used_guest_pass FROM booking_participants 
            WHERE session_id = $1 AND participant_type = 'guest' AND display_name = $2`,
           [sessionId, guestDisplayName]
         );
 
         if (participantResult.rowCount && participantResult.rowCount > 0) {
+          const participant = participantResult.rows[0];
+          if (participant.used_guest_pass === true && booking.owner_email) {
+            try {
+              await refundGuestPassForParticipant(participant.id, booking.owner_email, guestDisplayName);
+              console.log(`[RemoveGuest] Guest pass refunded for ${guestDisplayName}`);
+            } catch (err) {
+              console.error('[RemoveGuest] Failed to refund guest pass:', err);
+            }
+          }
           await pool.query(
             `DELETE FROM booking_participants WHERE id = $1`,
-            [participantResult.rows[0].id]
+            [participant.id]
           );
         }
       }
     } else if (sessionId) {
       // Fallback: Try to find in booking_participants by ID directly (backward compatibility)
       const participantResult = await pool.query(
-        `SELECT id, display_name FROM booking_participants WHERE id = $1 AND session_id = $2 AND participant_type = 'guest'`,
+        `SELECT id, display_name, used_guest_pass FROM booking_participants WHERE id = $1 AND session_id = $2 AND participant_type = 'guest'`,
         [guestId, sessionId]
       );
 
       if (participantResult.rowCount && participantResult.rowCount > 0) {
         guestFound = true;
-        guestDisplayName = participantResult.rows[0].display_name || guestDisplayName;
+        const participant = participantResult.rows[0];
+        guestDisplayName = participant.display_name || guestDisplayName;
+        if (participant.used_guest_pass === true && booking.owner_email) {
+          try {
+            await refundGuestPassForParticipant(participant.id, booking.owner_email, guestDisplayName);
+            console.log(`[RemoveGuest] Guest pass refunded for ${guestDisplayName}`);
+          } catch (err) {
+            console.error('[RemoveGuest] Failed to refund guest pass:', err);
+          }
+        }
         await pool.query(`DELETE FROM booking_participants WHERE id = $1`, [guestId]);
       }
     }
