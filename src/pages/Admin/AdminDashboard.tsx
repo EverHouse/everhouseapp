@@ -398,6 +398,7 @@ const TrainingSectionModal: React.FC<TrainingModalProps> = ({ isOpen, onClose, s
 const StaffTrainingGuide: React.FC = () => {
     const [expandedSection, setExpandedSection] = useState<string | null>(null);
     const [sections, setSections] = useState<TrainingSectionDB[]>([]);
+    const [lastUpdated, setLastUpdated] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [authError, setAuthError] = useState(false);
     const [modalOpen, setModalOpen] = useState(false);
@@ -416,7 +417,8 @@ const StaffTrainingGuide: React.FC = () => {
             const response = await fetch('/api/training-sections', { credentials: 'include' });
             if (response.ok) {
                 const data = await response.json();
-                setSections(data);
+                setSections(data.sections);
+                setLastUpdated(data.lastUpdated ?? null);
                 setAuthError(false);
             } else if (response.status === 401) {
                 setAuthError(true);
@@ -506,9 +508,15 @@ const StaffTrainingGuide: React.FC = () => {
     return (
         <div className="space-y-6 animate-pop-in pb-32">
             <div className="mb-6">
-                <p className="text-sm text-primary/80 dark:text-white/80 mb-4">
+                <p className="text-sm text-primary/80 dark:text-white/80 mb-2">
                     A complete guide to using the Ever Club Staff Portal. Tap any section to expand and view detailed instructions.
                 </p>
+                {lastUpdated && (
+                    <p className="flex items-center gap-1.5 text-xs text-primary/50 dark:text-white/50 mb-4">
+                        <span aria-hidden="true" className="material-symbols-outlined text-sm">schedule</span>
+                        Last updated: {new Date(lastUpdated).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
+                    </p>
+                )}
                 {isAdmin && (
                     <div className="flex gap-2 print:hidden">
                         <button
