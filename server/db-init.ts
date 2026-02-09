@@ -1,10 +1,9 @@
 import { sql } from 'drizzle-orm';
 import { db } from './db';
-import { pool } from './core/db';
 
 export async function setupEmailNormalization(): Promise<void> {
   try {
-    await pool.query(`
+    await db.execute(sql`
       CREATE OR REPLACE FUNCTION normalize_email()
       RETURNS TRIGGER AS $$
       BEGIN
@@ -36,10 +35,10 @@ export async function setupEmailNormalization(): Promise<void> {
 
     for (const { table, column } of tables) {
       try {
-        await pool.query(`
-          DROP TRIGGER IF EXISTS normalize_email_trigger ON ${table};
+        await db.execute(sql`
+          DROP TRIGGER IF EXISTS normalize_email_trigger ON ${sql.raw(table)};
           CREATE TRIGGER normalize_email_trigger
-          BEFORE INSERT OR UPDATE OF ${column} ON ${table}
+          BEFORE INSERT OR UPDATE OF ${sql.raw(column)} ON ${sql.raw(table)}
           FOR EACH ROW
           EXECUTE FUNCTION normalize_email();
         `);
@@ -58,28 +57,28 @@ export async function normalizeExistingEmails(): Promise<{ updated: number }> {
   let totalUpdated = 0;
   
   try {
-    const usersResult = await pool.query(`
+    const usersResult = await db.execute(sql`
       UPDATE users 
       SET email = LOWER(TRIM(email))
       WHERE email != LOWER(TRIM(email))
     `);
     totalUpdated += usersResult.rowCount || 0;
 
-    const bookingsResult = await pool.query(`
+    const bookingsResult = await db.execute(sql`
       UPDATE booking_requests 
       SET user_email = LOWER(TRIM(user_email))
       WHERE user_email IS NOT NULL AND user_email != LOWER(TRIM(user_email))
     `);
     totalUpdated += bookingsResult.rowCount || 0;
 
-    const notificationsResult = await pool.query(`
+    const notificationsResult = await db.execute(sql`
       UPDATE notifications 
       SET user_email = LOWER(TRIM(user_email))
       WHERE user_email IS NOT NULL AND user_email != LOWER(TRIM(user_email))
     `);
     totalUpdated += notificationsResult.rowCount || 0;
 
-    const pushResult = await pool.query(`
+    const pushResult = await db.execute(sql`
       UPDATE push_subscriptions 
       SET user_email = LOWER(TRIM(user_email))
       WHERE user_email IS NOT NULL AND user_email != LOWER(TRIM(user_email))
@@ -99,7 +98,7 @@ export async function cleanupOrphanedRecords(): Promise<{ notifications: number;
   let oldBookingsArchived = 0;
   
   try {
-    const notifResult = await pool.query(`
+    const notifResult = await db.execute(sql`
       DELETE FROM notifications n
       WHERE n.user_email IS NOT NULL
         AND NOT EXISTS (SELECT 1 FROM users u WHERE LOWER(u.email) = LOWER(n.user_email))
@@ -108,7 +107,7 @@ export async function cleanupOrphanedRecords(): Promise<{ notifications: number;
     notificationsDeleted = notifResult.rowCount || 0;
     console.log(`[DB Init] Cleaned up ${notificationsDeleted} orphaned notifications (older than 30 days)`);
 
-    const bookingResult = await pool.query(`
+    const bookingResult = await db.execute(sql`
       UPDATE booking_requests
       SET notes = COALESCE(notes, '') || ' [Orphaned record - no matching user]'
       WHERE user_email IS NOT NULL
@@ -128,7 +127,7 @@ export async function cleanupOrphanedRecords(): Promise<{ notifications: number;
 
 export async function createStripeTransactionCache(): Promise<void> {
   try {
-    await pool.query(`
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS stripe_transaction_cache (
         id SERIAL PRIMARY KEY,
         stripe_id TEXT UNIQUE NOT NULL,
@@ -150,10 +149,10 @@ export async function createStripeTransactionCache(): Promise<void> {
       )
     `);
     
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_stripe_cache_created_at ON stripe_transaction_cache(created_at DESC)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_stripe_cache_customer_email ON stripe_transaction_cache(customer_email)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_stripe_cache_status ON stripe_transaction_cache(status)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_stripe_cache_object_type ON stripe_transaction_cache(object_type)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_stripe_cache_created_at ON stripe_transaction_cache(created_at DESC)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_stripe_cache_customer_email ON stripe_transaction_cache(customer_email)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_stripe_cache_status ON stripe_transaction_cache(status)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_stripe_cache_object_type ON stripe_transaction_cache(object_type)`);
     
     console.log('[DB Init] stripe_transaction_cache table created/verified');
   } catch (error: any) {
@@ -206,7 +205,6 @@ export async function ensureDatabaseConstraints() {
       END $$;
     `);
     
-    // Add reschedule_booking_id column for reschedule workflow
     await db.execute(sql`
       DO $$
       BEGIN
@@ -231,7 +229,6 @@ export async function ensureDatabaseConstraints() {
       END $$;
     `);
 
-    // Add trigger to prevent double-bookings on the same resource (prevents new overlaps while preserving historical data)
     try {
       await db.execute(sql`
         CREATE OR REPLACE FUNCTION prevent_booking_session_overlap()
@@ -273,7 +270,6 @@ export async function ensureDatabaseConstraints() {
       console.warn(`[DB Init] Skipping overlap trigger: ${err.message}`);
     }
     
-    // Create performance indexes for common queries (execute each separately, with error handling)
     const indexQueries = [
       { name: 'idx_booking_requests_status', query: sql`CREATE INDEX IF NOT EXISTS idx_booking_requests_status ON booking_requests(status)` },
       { name: 'idx_booking_requests_user_email', query: sql`CREATE INDEX IF NOT EXISTS idx_booking_requests_user_email ON booking_requests(user_email)` },
@@ -301,7 +297,7 @@ export async function ensureDatabaseConstraints() {
 
 export async function seedTierFeatures(): Promise<void> {
   try {
-    const existing = await pool.query('SELECT COUNT(*) FROM tier_features');
+    const existing = await db.execute(sql`SELECT COUNT(*) FROM tier_features`);
     if (parseInt(existing.rows[0].count) > 0) {
       console.log('[DB Init] Tier features already seeded, skipping');
       return;
@@ -325,27 +321,25 @@ export async function seedTierFeatures(): Promise<void> {
       { key: 'discounted_merch', label: 'Discounted Merch', type: 'boolean' },
     ];
 
-    const tiersResult = await pool.query('SELECT id FROM membership_tiers');
-    const tierIds = tiersResult.rows.map(r => r.id);
+    const tiersResult = await db.execute(sql`SELECT id FROM membership_tiers`);
+    const tierIds = tiersResult.rows.map((r: any) => r.id);
 
     for (let i = 0; i < features.length; i++) {
       const f = features[i];
-      const featureResult = await pool.query(
-        `INSERT INTO tier_features (feature_key, display_label, value_type, sort_order, is_active)
-         VALUES ($1, $2, $3, $4, true)
-         RETURNING id`,
-        [f.key, f.label, f.type, i]
-      );
+      const featureResult = await db.execute(sql`
+        INSERT INTO tier_features (feature_key, display_label, value_type, sort_order, is_active)
+        VALUES (${f.key}, ${f.label}, ${f.type}, ${i}, true)
+        RETURNING id
+      `);
       const featureId = featureResult.rows[0].id;
 
       for (const tierId of tierIds) {
         const defaultBoolean = f.type === 'boolean' ? false : null;
         const defaultText = f.type === 'text' ? '' : null;
-        await pool.query(
-          `INSERT INTO tier_feature_values (feature_id, tier_id, value_boolean, value_number, value_text)
-           VALUES ($1, $2, $3, NULL, $4)`,
-          [featureId, tierId, defaultBoolean, defaultText]
-        );
+        await db.execute(sql`
+          INSERT INTO tier_feature_values (feature_id, tier_id, value_boolean, value_number, value_text)
+          VALUES (${featureId}, ${tierId}, ${defaultBoolean}, NULL, ${defaultText})
+        `);
       }
     }
 

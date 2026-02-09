@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin } from '../core/middleware';
-import { pool } from '../core/db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { getStripeClient } from '../core/stripe/client';
 import { sendOutstandingBalanceEmail } from '../emails/paymentEmails';
 import { getPacificMidnightUTC } from '../utils/dateUtils';
@@ -42,24 +43,28 @@ router.get('/api/financials/recent-transactions', isStaffOrAdmin, async (req: Re
     
     const cursorDate = cursor && typeof cursor === 'string' ? new Date(cursor) : null;
     
-    let dateFilter = '';
-    const queryParams: any[] = [];
-    let paramIndex = 1;
+    let stcDateFilter = sql``;
+    let genericDateFilter = sql``;
+    let purchasedDateFilter = sql``;
+    let stcCursorFilter = sql``;
+    let genericCursorFilter = sql``;
+    let purchasedCursorFilter = sql``;
     
     if (startOfDay && endOfDay) {
-      dateFilter = ` AND created_at >= to_timestamp($${paramIndex}) AND created_at < to_timestamp($${paramIndex + 1})`;
-      queryParams.push(startOfDay, endOfDay);
-      paramIndex += 2;
+      stcDateFilter = sql` AND stc.created_at >= to_timestamp(${startOfDay}) AND stc.created_at < to_timestamp(${endOfDay})`;
+      genericDateFilter = sql` AND created_at >= to_timestamp(${startOfDay}) AND created_at < to_timestamp(${endOfDay})`;
+      purchasedDateFilter = sql` AND purchased_at >= to_timestamp(${startOfDay}) AND purchased_at < to_timestamp(${endOfDay})`;
     }
     
-    let cursorFilter = '';
     if (cursorDate) {
-      cursorFilter = ` AND created_at < $${paramIndex}`;
-      queryParams.push(cursorDate);
-      paramIndex++;
+      stcCursorFilter = sql` AND stc.created_at < ${cursorDate}`;
+      genericCursorFilter = sql` AND created_at < ${cursorDate}`;
+      purchasedCursorFilter = sql` AND purchased_at < ${cursorDate}`;
     }
     
-    const unifiedQuery = `
+    const limitPlusOne = limit + 1;
+
+    const result = await db.execute(sql`
       WITH all_transactions AS (
         SELECT 
           stc.stripe_id as id,
@@ -72,7 +77,7 @@ router.get('/api/financials/recent-transactions', isStaffOrAdmin, async (req: Re
           stc.status
         FROM stripe_transaction_cache stc
         LEFT JOIN users u ON LOWER(u.email) = LOWER(stc.customer_email)
-        WHERE stc.status IN ('succeeded', 'paid')${dateFilter.replace(/created_at/g, 'stc.created_at')}${cursorFilter.replace('created_at', 'stc.created_at')}
+        WHERE stc.status IN ('succeeded', 'paid')${stcDateFilter}${stcCursorFilter}
         
         UNION ALL
         
@@ -86,7 +91,7 @@ router.get('/api/financials/recent-transactions', isStaffOrAdmin, async (req: Re
           created_at,
           'completed' as status
         FROM offline_payments
-        WHERE 1=1${dateFilter}${cursorFilter}
+        WHERE 1=1${genericDateFilter}${genericCursorFilter}
         
         UNION ALL
         
@@ -100,15 +105,12 @@ router.get('/api/financials/recent-transactions', isStaffOrAdmin, async (req: Re
           purchased_at as created_at,
           'completed' as status
         FROM day_passes
-        WHERE status = 'active'${dateFilter.replace(/created_at/g, 'purchased_at')}${cursorFilter.replace('created_at', 'purchased_at')}
+        WHERE status = 'active'${purchasedDateFilter}${purchasedCursorFilter}
       )
       SELECT * FROM all_transactions
       ORDER BY created_at DESC
-      LIMIT $${paramIndex}
-    `;
-    queryParams.push(limit + 1);
-
-    const result = await pool.query(unifiedQuery, queryParams);
+      LIMIT ${limitPlusOne}
+    `);
     
     const hasMore = result.rows.length > limit;
     const transactions: RecentTransaction[] = result.rows.slice(0, limit).map(row => ({
@@ -367,10 +369,7 @@ router.post('/api/financials/sync-member-payments', isStaffOrAdmin, async (req: 
     }
     
     // Find the user's Stripe customer ID
-    const userResult = await pool.query(
-      `SELECT id, stripe_customer_id, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)`,
-      [email]
-    );
+    const userResult = await db.execute(sql`SELECT id, stripe_customer_id, first_name, last_name FROM users WHERE LOWER(email) = LOWER(${email})`);
     
     if (userResult.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'User not found' });
@@ -516,7 +515,7 @@ router.post('/api/financials/sync-member-payments', isStaffOrAdmin, async (req: 
  */
 router.get('/api/financials/cache-stats', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const statsResult = await pool.query(`
+    const statsResult = await db.execute(sql`
       SELECT 
         COUNT(*) as total_count,
         COUNT(DISTINCT customer_email) as unique_customers,
@@ -530,7 +529,7 @@ router.get('/api/financials/cache-stats', isStaffOrAdmin, async (req: Request, r
       ORDER BY object_type, source
     `);
     
-    const totalResult = await pool.query(`
+    const totalResult = await db.execute(sql`
       SELECT 
         COUNT(*) as total_count,
         COUNT(DISTINCT customer_email) as unique_customers,
@@ -612,7 +611,7 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
     if (globalSubscriptions.data.length === 0) {
       console.log('[Financials] No subscriptions in global list - scanning database customers (for test clock support)...');
       
-      const dbResult = await pool.query(`
+      const dbResult = await db.execute(sql`
         SELECT DISTINCT email, stripe_customer_id, first_name, last_name 
         FROM users 
         WHERE stripe_customer_id IS NOT NULL 

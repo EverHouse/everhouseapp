@@ -754,7 +754,7 @@ interface OverduePayment {
 
 router.get('/api/bookings/overdue-payments', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       WITH overdue_bookings AS (
         SELECT 
           br.id as booking_id,

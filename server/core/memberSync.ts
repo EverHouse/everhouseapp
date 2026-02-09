@@ -4,7 +4,7 @@ import { memberNotes, communicationLogs, userLinkedEmails } from '../../shared/m
 import { getHubSpotClient } from './integrations';
 import { normalizeTierName, extractTierTags, TIER_NAMES } from '../../shared/constants/tiers';
 import { sql, eq, and } from 'drizzle-orm';
-import { pool, isProduction } from './db';
+import { isProduction } from './db';
 import { broadcastMemberDataUpdated, broadcastDataIntegrityUpdate } from './websocket';
 import { syncDealStageFromMindbodyStatus } from './hubspotDeals';
 import { alertOnHubSpotSyncComplete, alertOnSyncFailure } from './dataAlerts';
@@ -145,9 +145,7 @@ const SYNC_COOLDOWN = 5 * 60 * 1000;
 
 export async function initMemberSyncSettings(): Promise<void> {
   try {
-    const result = await pool.query(
-      `SELECT value FROM app_settings WHERE key = 'last_member_sync_time'`
-    );
+    const result = await db.execute(sql`SELECT value FROM app_settings WHERE key = 'last_member_sync_time'`);
     if (result.rows.length > 0 && result.rows[0].value) {
       lastSyncTime = parseInt(result.rows[0].value, 10);
       console.log(`[MemberSync] Loaded last sync time: ${new Date(lastSyncTime).toISOString()}`);
@@ -164,12 +162,9 @@ export function getLastMemberSyncTime(): number {
 export async function setLastMemberSyncTime(time: number): Promise<void> {
   lastSyncTime = time;
   try {
-    await pool.query(
-      `INSERT INTO app_settings (key, value, category, updated_at) 
-       VALUES ('last_member_sync_time', $1, 'sync', NOW())
-       ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()`,
-      [time.toString()]
-    );
+    await db.execute(sql`INSERT INTO app_settings (key, value, category, updated_at) 
+       VALUES ('last_member_sync_time', ${time.toString()}, 'sync', NOW())
+       ON CONFLICT (key) DO UPDATE SET value = ${time.toString()}, updated_at = NOW()`);
   } catch (err) {
     console.error('[MemberSync] Failed to persist last sync time:', err);
   }
@@ -440,27 +435,21 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           }
           
           try {
-            const duplicateCheck = await pool.query(
-              `SELECT id, email, first_name, last_name, membership_status, tier
+            const duplicateCheck = await db.execute(sql`SELECT id, email, first_name, last_name, membership_status, tier
                FROM users 
-               WHERE hubspot_id = $1 
-                 AND LOWER(email) != $2
+               WHERE hubspot_id = ${contact.id} 
+                 AND LOWER(email) != ${email}
                  AND archived_at IS NULL
                  AND membership_status != 'merged'
-               LIMIT 5`,
-              [contact.id, email]
-            );
+               LIMIT 5`);
             
             if (duplicateCheck.rows.length > 0) {
               for (const dup of duplicateCheck.rows) {
                 console.warn(`[MemberSync] HubSpot ID collision detected: ${email} and ${dup.email} share HubSpot contact ${contact.id}. These may be the same person.`);
                 
-                await pool.query(
-                  `INSERT INTO user_linked_emails (primary_email, linked_email, source, created_at)
-                   VALUES ($1, $2, 'hubspot_dedup', NOW())
-                   ON CONFLICT (linked_email) DO NOTHING`,
-                  [email, dup.email]
-                );
+                await db.execute(sql`INSERT INTO user_linked_emails (primary_email, linked_email, source, created_at)
+                   VALUES (${email}, ${dup.email}, 'hubspot_dedup', NOW())
+                   ON CONFLICT (linked_email) DO NOTHING`);
               }
               hubspotIdCollisions++;
             }
@@ -976,27 +965,21 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
           }
           
           try {
-            const duplicateCheck = await pool.query(
-              `SELECT id, email, first_name, last_name, membership_status, tier
+            const duplicateCheck = await db.execute(sql`SELECT id, email, first_name, last_name, membership_status, tier
                FROM users 
-               WHERE hubspot_id = $1 
-                 AND LOWER(email) != $2
+               WHERE hubspot_id = ${contact.id} 
+                 AND LOWER(email) != ${email}
                  AND archived_at IS NULL
                  AND membership_status != 'merged'
-               LIMIT 5`,
-              [contact.id, email]
-            );
+               LIMIT 5`);
             
             if (duplicateCheck.rows.length > 0) {
               for (const dup of duplicateCheck.rows) {
                 console.warn(`[MemberSync] HubSpot ID collision detected: ${email} and ${dup.email} share HubSpot contact ${contact.id}. These may be the same person.`);
                 
-                await pool.query(
-                  `INSERT INTO user_linked_emails (primary_email, linked_email, source, created_at)
-                   VALUES ($1, $2, 'hubspot_dedup', NOW())
-                   ON CONFLICT (linked_email) DO NOTHING`,
-                  [email, dup.email]
-                );
+                await db.execute(sql`INSERT INTO user_linked_emails (primary_email, linked_email, source, created_at)
+                   VALUES (${email}, ${dup.email}, 'hubspot_dedup', NOW())
+                   ON CONFLICT (linked_email) DO NOTHING`);
               }
               hubspotIdCollisions++;
             }

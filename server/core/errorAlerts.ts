@@ -1,6 +1,7 @@
 import { getResendClient } from '../utils/resend';
 import { logger } from './logger';
-import { pool } from './db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 
 const ALERT_EMAIL = process.env.ALERT_EMAIL || 'nick@evenhouse.club';
 const ALERT_COOLDOWN_MS = 4 * 60 * 60 * 1000; // 4 hours between same-type alerts
@@ -53,9 +54,7 @@ async function loadDailyStateFromDb(): Promise<void> {
   if (dbLoadAttempted) return;
   dbLoadAttempted = true;
   try {
-    const result = await pool.query(
-      `SELECT value FROM app_settings WHERE key = 'alert_rate_limits'`
-    );
+    const result = await db.execute(sql`SELECT value FROM app_settings WHERE key = 'alert_rate_limits'`);
     dbAvailable = true;
     if (result.rows.length > 0 && result.rows[0].value) {
       const saved = JSON.parse(result.rows[0].value);
@@ -80,19 +79,11 @@ async function loadDailyStateFromDb(): Promise<void> {
 async function saveDailyStateToDb(): Promise<void> {
   if (!dbAvailable) return;
   try {
-    const exists = await pool.query(
-      `SELECT 1 FROM app_settings WHERE key = 'alert_rate_limits'`
-    );
+    const exists = await db.execute(sql`SELECT 1 FROM app_settings WHERE key = 'alert_rate_limits'`);
     if (exists.rows.length > 0) {
-      await pool.query(
-        `UPDATE app_settings SET value = $1, updated_at = NOW() WHERE key = 'alert_rate_limits'`,
-        [JSON.stringify(dailyState)]
-      );
+      await db.execute(sql`UPDATE app_settings SET value = ${JSON.stringify(dailyState)}, updated_at = NOW() WHERE key = 'alert_rate_limits'`);
     } else {
-      await pool.query(
-        `INSERT INTO app_settings (key, value, category, updated_at) VALUES ('alert_rate_limits', $1, 'system', NOW())`,
-        [JSON.stringify(dailyState)]
-      );
+      await db.execute(sql`INSERT INTO app_settings (key, value, category, updated_at) VALUES ('alert_rate_limits', ${JSON.stringify(dailyState)}, 'system', NOW())`);
     }
   } catch {
     logger.warn('[ErrorAlert] Could not persist rate limits to database');

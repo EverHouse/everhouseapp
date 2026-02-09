@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { isAdmin } from '../core/middleware';
 import { runAllIntegrityChecks, getIntegritySummary, getIntegrityHistory, resolveIssue, getAuditLog, syncPush, syncPull, createIgnoreRule, createBulkIgnoreRules, removeIgnoreRule, getIgnoredIssues, getCachedIntegrityResults, runDataCleanup } from '../core/dataIntegrity';
 import { isProduction, pool } from '../core/db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { broadcastDataIntegrityUpdate } from '../core/websocket';
 import { syncAllCustomerMetadata, isPlaceholderEmail } from '../core/stripe/customers';
 import { getStripeClient } from '../core/stripe/client';
@@ -336,7 +338,7 @@ router.get('/api/data-integrity/placeholder-accounts', isAdmin, async (req, res)
     
     // Scan local database for placeholder accounts
     try {
-      const localResult = await pool.query(`
+      const localResult = await db.execute(sql`
         SELECT id, email, first_name, last_name, membership_status, created_at
         FROM users 
         WHERE email LIKE '%@visitors.evenhouse.club%'

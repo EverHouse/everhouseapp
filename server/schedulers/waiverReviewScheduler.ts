@@ -1,4 +1,5 @@
-import { pool } from '../core/db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { notifyAllStaff } from '../core/notificationService';
 import { alertOnScheduledTaskFailure } from '../core/dataAlerts';
 
@@ -21,7 +22,7 @@ export async function checkStaleWaivers(): Promise<{
   waivers: StaleWaiver[];
 }> {
   try {
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       SELECT 
         bp.id,
         bp.display_name,

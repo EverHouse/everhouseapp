@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { db } from '../../db';
-import { pool } from '../../core/db';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { getPacificMidnightUTC, getTodayPacific } from '../../utils/dateUtils';
 import { bookingRequests, tours, adminAuditLog, users, resources } from '../../../shared/schema';
@@ -118,12 +117,12 @@ router.get('/api/admin/command-center', isStaffOrAdmin, async (req, res) => {
     // Financials queries with error handling for missing columns/tables
     let financials = { todayRevenueCents: 0, overduePaymentsCount: 0, failedPaymentsCount: 0 };
     try {
-      const todayRevenue = await pool.query(`
+      const todayRevenue = await db.execute(sql`
         SELECT COALESCE(SUM(amount_cents), 0) as total_cents
         FROM stripe_transaction_cache
         WHERE status IN ('succeeded', 'paid')
-        AND created_at >= to_timestamp($1) AND created_at < to_timestamp($2)
-      `, [startOfDayUnix, endOfDayUnix]);
+        AND created_at >= to_timestamp(${startOfDayUnix}) AND created_at < to_timestamp(${endOfDayUnix})
+      `);
       financials.todayRevenueCents = parseInt(todayRevenue.rows[0]?.total_cents || '0');
     } catch { /* table may not have expected structure */ }
     
@@ -216,19 +215,19 @@ router.get('/api/admin/financials/summary', isStaffOrAdmin, async (req, res) => 
     
     // Today's revenue from Stripe cache
     try {
-      const todayRevenue = await pool.query(`
+      const todayRevenue = await db.execute(sql`
         SELECT COALESCE(SUM(amount_cents), 0) as total_cents
         FROM stripe_transaction_cache
         WHERE status IN ('succeeded', 'paid')
-        AND created_at >= to_timestamp($1)
-        AND created_at < to_timestamp($2)
-      `, [startOfDay, endOfDay]);
+        AND created_at >= to_timestamp(${startOfDay})
+        AND created_at < to_timestamp(${endOfDay})
+      `);
       results.todayRevenueCents = parseInt(todayRevenue.rows[0]?.total_cents || '0');
     } catch { /* table may not exist */ }
     
     // Overdue payments from booking sessions
     try {
-      const overdueCount = await pool.query(`
+      const overdueCount = await db.execute(sql`
         SELECT COUNT(DISTINCT bs.booking_id) as count
         FROM booking_sessions bs
         JOIN booking_requests br ON br.id = bs.booking_id
@@ -242,7 +241,7 @@ router.get('/api/admin/financials/summary', isStaffOrAdmin, async (req, res) => 
     
     // Failed payments - only query if table exists
     try {
-      const failedPayments = await pool.query(`
+      const failedPayments = await db.execute(sql`
         SELECT COUNT(*) as count
         FROM stripe_payment_intents
         WHERE status = 'requires_payment_method' OR status = 'requires_confirmation'
@@ -252,7 +251,7 @@ router.get('/api/admin/financials/summary', isStaffOrAdmin, async (req, res) => 
     
     // Pending authorizations - count uncaptured payment intents
     try {
-      const pendingAuths = await pool.query(`
+      const pendingAuths = await db.execute(sql`
         SELECT COUNT(*) as count
         FROM stripe_payment_intents
         WHERE status = 'requires_capture'
@@ -315,7 +314,7 @@ router.get('/api/admin/todays-bookings', isStaffOrAdmin, async (req, res) => {
 
 router.get('/api/staff/list', isStaffOrAdmin, async (req, res) => {
   try {
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       SELECT su.id, su.email, su.first_name, su.last_name, su.role,
              u.id as user_id
       FROM staff_users su
@@ -339,7 +338,7 @@ router.get('/api/staff/list', isStaffOrAdmin, async (req, res) => {
 
 router.get('/api/directory/team', isStaffOrAdmin, async (req, res) => {
   try {
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       SELECT 
         su.id as staff_id,
         su.email,

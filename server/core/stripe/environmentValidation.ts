@@ -1,5 +1,6 @@
 import { getStripeClient, getStripeEnvironmentInfo } from './client';
-import { pool } from '../db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 
 export async function validateStripeEnvironmentIds(): Promise<void> {
   try {
@@ -18,8 +19,8 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
     let transactionCacheCleared = false;
 
     // a) Validate membership_tiers Stripe IDs
-    const tiersResult = await pool.query(
-      `SELECT id, name, stripe_product_id, stripe_price_id, product_type FROM membership_tiers WHERE stripe_product_id IS NOT NULL`
+    const tiersResult = await db.execute(
+      sql`SELECT id, name, stripe_product_id, stripe_price_id, product_type FROM membership_tiers WHERE stripe_product_id IS NOT NULL`
     );
     const tiers = tiersResult.rows;
     tiersChecked = tiers.length;
@@ -33,9 +34,8 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
           } catch (error: any) {
             if (error.code === 'resource_missing') {
               const oldId = tier.stripe_product_id;
-              await pool.query(
-                `UPDATE membership_tiers SET stripe_product_id = NULL, stripe_price_id = NULL WHERE id = $1`,
-                [tier.id]
+              await db.execute(
+                sql`UPDATE membership_tiers SET stripe_product_id = NULL, stripe_price_id = NULL WHERE id = ${tier.id}`
               );
               console.log(`[Stripe Env] Cleared stale Stripe IDs for tier "${tier.name}" (product ${oldId} not found in ${mode} Stripe)`);
               tiersCleared++;
@@ -57,8 +57,8 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
     }
 
     // b) Validate cafe_items Stripe IDs
-    const cafeResult = await pool.query(
-      `SELECT id, name, stripe_product_id, stripe_price_id FROM cafe_items WHERE stripe_product_id IS NOT NULL`
+    const cafeResult = await db.execute(
+      sql`SELECT id, name, stripe_product_id, stripe_price_id FROM cafe_items WHERE stripe_product_id IS NOT NULL`
     );
     const cafeItems = cafeResult.rows;
     cafeChecked = cafeItems.length;
@@ -71,9 +71,8 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
             await stripe.products.retrieve(item.stripe_product_id);
           } catch (error: any) {
             if (error.code === 'resource_missing') {
-              await pool.query(
-                `UPDATE cafe_items SET stripe_product_id = NULL, stripe_price_id = NULL WHERE id = $1`,
-                [item.id]
+              await db.execute(
+                sql`UPDATE cafe_items SET stripe_product_id = NULL, stripe_price_id = NULL WHERE id = ${item.id}`
               );
               console.log(`[Stripe Env] Cleared stale Stripe IDs for cafe item "${item.name}"`);
               cafeCleared++;
@@ -92,8 +91,8 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
     }
 
     // c) Validate users stripe_subscription_id
-    const usersResult = await pool.query(
-      `SELECT id, email, stripe_subscription_id FROM users WHERE stripe_subscription_id IS NOT NULL`
+    const usersResult = await db.execute(
+      sql`SELECT id, email, stripe_subscription_id FROM users WHERE stripe_subscription_id IS NOT NULL`
     );
     const usersWithSubs = usersResult.rows;
     subsChecked = usersWithSubs.length;
@@ -106,9 +105,8 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
             await stripe.subscriptions.retrieve(user.stripe_subscription_id);
           } catch (error: any) {
             if (error.code === 'resource_missing') {
-              await pool.query(
-                `UPDATE users SET stripe_subscription_id = NULL WHERE id = $1`,
-                [user.id]
+              await db.execute(
+                sql`UPDATE users SET stripe_subscription_id = NULL WHERE id = ${user.id}`
               );
               console.log(`[Stripe Env] Cleared stale subscription ID for user "${user.email}"`);
               subsCleared++;
@@ -130,7 +128,7 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
     const totalCleared = tiersCleared + cafeCleared + subsCleared;
     if (totalCleared > 0) {
       try {
-        await pool.query(`TRUNCATE TABLE stripe_transaction_cache`);
+        await db.execute(sql`TRUNCATE TABLE stripe_transaction_cache`);
         transactionCacheCleared = true;
         console.log(`[Stripe Env] Cleared transaction cache (environment change detected)`);
       } catch (truncateErr: any) {

@@ -4,7 +4,7 @@ import { isStaffOrAdmin } from '../../core/middleware';
 import { pool } from '../../core/db';
 import { db } from '../../db';
 import { billingAuditLog, passRedemptionLogs, dayPassPurchases, users } from '../../../shared/schema';
-import { eq, gte, desc, inArray } from 'drizzle-orm';
+import { eq, gte, desc, inArray, sql } from 'drizzle-orm';
 import { getSessionUser } from '../../types/session';
 import { isExpandedProduct } from '../../types/stripe-helpers';
 import { getTodayPacific, getPacificMidnightUTC } from '../../utils/dateUtils';
@@ -111,26 +111,20 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
     const isBookingPayment = bookingId && sessionId && participantFees && Array.isArray(participantFees) && participantFees.length > 0;
 
     if (isBookingPayment) {
-      const sessionCheck = await pool.query(
-        `SELECT bs.id FROM booking_sessions bs
+      const sessionCheck = await db.execute(sql`SELECT bs.id FROM booking_sessions bs
          JOIN booking_requests br ON br.session_id = bs.id
-         WHERE bs.id = $1 AND br.id = $2`,
-        [sessionId, bookingId]
-      );
+         WHERE bs.id = ${sessionId} AND br.id = ${bookingId}`);
       if (sessionCheck.rows.length === 0) {
         return res.status(400).json({ error: 'Invalid session/booking combination' });
       }
 
-      const existingPendingSnapshot = await pool.query(
-        `SELECT bfs.id, bfs.stripe_payment_intent_id, spi.status as pi_status
+      const existingPendingSnapshot = await db.execute(sql`SELECT bfs.id, bfs.stripe_payment_intent_id, spi.status as pi_status
          FROM booking_fee_snapshots bfs
          LEFT JOIN stripe_payment_intents spi ON bfs.stripe_payment_intent_id = spi.stripe_payment_intent_id
-         WHERE bfs.booking_id = $1 AND bfs.status = 'pending'
+         WHERE bfs.booking_id = ${bookingId} AND bfs.status = 'pending'
          AND bfs.created_at > NOW() - INTERVAL '30 minutes'
          ORDER BY bfs.created_at DESC
-         LIMIT 1`,
-        [bookingId]
-      );
+         LIMIT 1`);
       
       if (existingPendingSnapshot.rows.length > 0) {
         const existing = existingPendingSnapshot.rows[0];
@@ -152,7 +146,7 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
                 } catch (cancelErr) {
                   console.warn('[Stripe] Failed to cancel stale payment intent:', cancelErr);
                 }
-                await pool.query(`DELETE FROM booking_fee_snapshots WHERE id = $1`, [existing.id]);
+                await db.execute(sql`DELETE FROM booking_fee_snapshots WHERE id = ${existing.id}`);
               } else {
                 console.log(`[Stripe] Reusing existing payment intent ${existing.stripe_payment_intent_id}`);
                 return res.json({ 
@@ -171,10 +165,7 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
       const requestedIds: number[] = participantFees.map((pf: any) => pf.id);
 
       // Get participant count for effective player count calculation
-      const participantCountResult = await pool.query(
-        `SELECT COUNT(*) as count FROM booking_participants WHERE session_id = $1`,
-        [sessionId]
-      );
+      const participantCountResult = await db.execute(sql`SELECT COUNT(*) as count FROM booking_participants WHERE session_id = ${sessionId}`);
       const actualParticipantCount = parseInt(participantCountResult.rows[0]?.count || '1');
       const effectivePlayerCount = getEffectivePlayerCount(actualParticipantCount, actualParticipantCount);
 
@@ -268,17 +259,14 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
       });
     } catch (stripeErr) {
       if (snapshotId) {
-        await pool.query(`DELETE FROM booking_fee_snapshots WHERE id = $1`, [snapshotId]);
+        await db.execute(sql`DELETE FROM booking_fee_snapshots WHERE id = ${snapshotId}`);
         console.log(`[Stripe] Deleted orphaned snapshot ${snapshotId} after PaymentIntent creation failed`);
       }
       throw stripeErr;
     }
 
     if (snapshotId) {
-      await pool.query(
-        `UPDATE booking_fee_snapshots SET stripe_payment_intent_id = $1 WHERE id = $2`,
-        [result.paymentIntentId, snapshotId]
-      );
+      await db.execute(sql`UPDATE booking_fee_snapshots SET stripe_payment_intent_id = ${result.paymentIntentId} WHERE id = ${snapshotId}`);
     }
 
     logFromRequest(req, 'record_charge', 'payment', result.paymentIntentId, email, {
@@ -406,13 +394,11 @@ router.post('/api/stripe/create-customer', isStaffOrAdmin, async (req: Request, 
 
 router.post('/api/stripe/cleanup-stale-intents', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const staleIntents = await pool.query(
-      `SELECT spi.stripe_payment_intent_id, spi.id as local_id, br.status as booking_status
+    const staleIntents = await db.execute(sql`SELECT spi.stripe_payment_intent_id, spi.id as local_id, br.status as booking_status
        FROM stripe_payment_intents spi
        LEFT JOIN booking_requests br ON spi.booking_id = br.id
        WHERE spi.status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')
-       AND (br.status = 'cancelled' OR br.id IS NULL)`
-    );
+       AND (br.status = 'cancelled' OR br.id IS NULL)`);
     
     const results: { id: string; success: boolean; error?: string }[] = [];
     
@@ -453,8 +439,7 @@ router.get('/api/stripe/payments/:email', isStaffOrAdmin, async (req: Request, r
       details: { viewedBy: staffEmail, targetEmail: email }
     });
 
-    const result = await pool.query(
-      `SELECT 
+    const result = await db.execute(sql`SELECT 
         spi.id,
         spi.stripe_payment_intent_id,
         spi.amount_cents,
@@ -467,11 +452,9 @@ router.get('/api/stripe/payments/:email', isStaffOrAdmin, async (req: Request, r
         spi.created_at
        FROM stripe_payment_intents spi
        JOIN users u ON u.id = spi.user_id
-       WHERE LOWER(u.email) = $1
+       WHERE LOWER(u.email) = ${email.toLowerCase()}
        ORDER BY spi.created_at DESC
-       LIMIT 50`,
-      [email.toLowerCase()]
-    );
+       LIMIT 50`);
 
     res.json({ payments: result.rows });
   } catch (error: any) {
@@ -489,29 +472,25 @@ router.get('/api/billing/members/search', isStaffOrAdmin, async (req: Request, r
     }
     
     const searchTerm = query.trim().toLowerCase();
+    const searchPattern = `%${searchTerm}%`;
     
-    let sql = `
+    const inactiveFilter = includeInactive !== 'true'
+      ? sql` AND (membership_status IN ('active', 'trialing', 'past_due') OR membership_status IS NULL OR stripe_subscription_id IS NOT NULL)`
+      : sql``;
+    
+    const result = await db.execute(sql`
       SELECT 
         id, email, first_name, last_name, 
         membership_tier, membership_status, 
         stripe_customer_id, hubspot_id
       FROM users 
       WHERE (
-        LOWER(COALESCE(first_name, '') || ' ' || COALESCE(last_name, '')) LIKE $1
-        OR LOWER(COALESCE(first_name, '')) LIKE $1
-        OR LOWER(COALESCE(last_name, '')) LIKE $1
-        OR LOWER(COALESCE(email, '')) LIKE $1
-      )
-    `;
-    
-    if (includeInactive !== 'true') {
-      // Include trialing and past_due as active - they still have membership access
-      sql += ` AND (membership_status IN ('active', 'trialing', 'past_due') OR membership_status IS NULL OR stripe_subscription_id IS NOT NULL)`;
-    }
-    
-    sql += ` AND archived_at IS NULL ORDER BY first_name, last_name LIMIT 10`;
-    
-    const result = await pool.query(sql, [`%${searchTerm}%`]);
+        LOWER(COALESCE(first_name, '') || ' ' || COALESCE(last_name, '')) LIKE ${searchPattern}
+        OR LOWER(COALESCE(first_name, '')) LIKE ${searchPattern}
+        OR LOWER(COALESCE(last_name, '')) LIKE ${searchPattern}
+        OR LOWER(COALESCE(email, '')) LIKE ${searchPattern}
+      )${inactiveFilter} AND archived_at IS NULL ORDER BY first_name, last_name LIMIT 10
+    `);
     
     const members = result.rows.map(row => ({
       id: row.id,
@@ -582,16 +561,12 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, async (req: Reques
         console.log(`[Stripe] ${custResult.isNew ? 'Created' : 'Found existing'} customer ${stripeCustomerId} for quick charge: ${memberEmail}`);
 
         try {
-          const existingUser = await pool.query(
-            'SELECT id, stripe_customer_id FROM users WHERE LOWER(email) = LOWER($1)',
-            [memberEmail]
-          );
+          const existingUser = await db.execute(sql`SELECT id, stripe_customer_id FROM users WHERE LOWER(email) = LOWER(${memberEmail})`);
           if (existingUser.rows.length === 0) {
             const crypto = await import('crypto');
             const visitorId = crypto.randomUUID();
-            await pool.query(
-              `INSERT INTO users (id, email, first_name, last_name, membership_status, stripe_customer_id, data_source, visitor_type, role, street_address, city, state, zip_code, created_at, updated_at)
-               VALUES ($1, $2, $3, $4, 'visitor', $5, 'APP', 'day_pass', 'visitor', $6, $7, $8, $9, NOW(), NOW())
+            await db.execute(sql`INSERT INTO users (id, email, first_name, last_name, membership_status, stripe_customer_id, data_source, visitor_type, role, street_address, city, state, zip_code, created_at, updated_at)
+               VALUES (${visitorId}, ${memberEmail}, ${firstName}, ${lastName}, 'visitor', ${stripeCustomerId}, 'APP', 'day_pass', 'visitor', ${streetAddress || null}, ${city || null}, ${state || null}, ${zipCode || null}, NOW(), NOW())
                ON CONFLICT (email) DO UPDATE SET
                  stripe_customer_id = COALESCE(users.stripe_customer_id, EXCLUDED.stripe_customer_id),
                  first_name = COALESCE(NULLIF(users.first_name, ''), EXCLUDED.first_name),
@@ -600,15 +575,10 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, async (req: Reques
                  city = COALESCE(NULLIF(EXCLUDED.city, ''), users.city),
                  state = COALESCE(NULLIF(EXCLUDED.state, ''), users.state),
                  zip_code = COALESCE(NULLIF(EXCLUDED.zip_code, ''), users.zip_code),
-                 updated_at = NOW()`,
-              [visitorId, memberEmail, firstName, lastName, stripeCustomerId, streetAddress || null, city || null, state || null, zipCode || null]
-            );
+                 updated_at = NOW()`);
             console.log(`[QuickCharge] Created visitor record for new customer: ${memberEmail}`);
           } else if (!existingUser.rows[0].stripe_customer_id) {
-            await pool.query(
-              'UPDATE users SET stripe_customer_id = $1, updated_at = NOW() WHERE id = $2',
-              [stripeCustomerId, existingUser.rows[0].id]
-            );
+            await db.execute(sql`UPDATE users SET stripe_customer_id = ${stripeCustomerId}, updated_at = NOW() WHERE id = ${existingUser.rows[0].id}`);
             console.log(`[QuickCharge] Linked Stripe customer ${stripeCustomerId} to existing user: ${memberEmail}`);
           }
         } catch (visitorErr: any) {
@@ -617,11 +587,8 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, async (req: Reques
       }
       
     } else {
-      const memberResult = await pool.query(
-        `SELECT id, email, first_name, last_name, stripe_customer_id 
-         FROM users WHERE LOWER(email) = LOWER($1)`,
-        [memberEmail]
-      );
+      const memberResult = await db.execute(sql`SELECT id, email, first_name, last_name, stripe_customer_id 
+         FROM users WHERE LOWER(email) = LOWER(${memberEmail})`);
 
       if (memberResult.rows.length === 0) {
         return res.status(404).json({ error: 'Member not found in database. Use "Charge someone not in the system" to add a new customer.' });
@@ -745,10 +712,7 @@ router.post('/api/stripe/staff/quick-charge/confirm', isStaffOrAdmin, async (req
       const dob = metadata.dob || null;
       const stripeCustomerId = typeof paymentIntent.customer === 'string' ? paymentIntent.customer : paymentIntent.customer?.id;
       
-      const tierResult = await pool.query(
-        'SELECT name FROM membership_tiers WHERE slug = $1 OR name = $1',
-        [tierSlug]
-      );
+      const tierResult = await db.execute(sql`SELECT name FROM membership_tiers WHERE slug = ${tierSlug} OR name = ${tierSlug}`);
       const validatedTierName = tierResult.rows[0]?.name || tierName;
       
       // Check if this email resolves to an existing user via linked email
@@ -756,19 +720,13 @@ router.post('/api/stripe/staff/quick-charge/confirm', isStaffOrAdmin, async (req
       const resolved = await resolveUserByEmail(memberEmail);
       if (resolved) {
         // Update existing user (found directly or via linked email)
-        await pool.query(
-          `UPDATE users SET tier = $1, billing_provider = 'stripe', stripe_customer_id = COALESCE($2, stripe_customer_id)
-           WHERE id = $3`,
-          [validatedTierName, stripeCustomerId, resolved.userId]
-        );
+        await db.execute(sql`UPDATE users SET tier = ${validatedTierName}, billing_provider = 'stripe', stripe_customer_id = COALESCE(${stripeCustomerId}, stripe_customer_id)
+           WHERE id = ${resolved.userId}`);
         console.log(`[Stripe] Updated user ${resolved.primaryEmail} with tier ${validatedTierName} after payment confirmation (matched via ${resolved.matchType})`);
       } else {
         const userId = require('crypto').randomUUID();
-        await pool.query(
-          `INSERT INTO users (id, email, first_name, last_name, phone, date_of_birth, tier, membership_status, billing_provider, stripe_customer_id, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, 'inactive', 'stripe', $8, NOW())`,
-          [userId, memberEmail.toLowerCase(), firstName, lastName, phone, dob, validatedTierName, stripeCustomerId || null]
-        );
+        await db.execute(sql`INSERT INTO users (id, email, first_name, last_name, phone, date_of_birth, tier, membership_status, billing_provider, stripe_customer_id, created_at)
+           VALUES (${userId}, ${memberEmail.toLowerCase()}, ${firstName}, ${lastName}, ${phone}, ${dob}, ${validatedTierName}, 'inactive', 'stripe', ${stripeCustomerId || null}, NOW())`);
         console.log(`[Stripe] Created user ${memberEmail} with tier ${validatedTierName} after payment confirmation`);
       }
     }
@@ -808,11 +766,8 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
     }
 
     // Get member and their Stripe customer
-    const memberResult = await pool.query(
-      `SELECT id, email, name, first_name, last_name, stripe_customer_id 
-       FROM users WHERE LOWER(email) = LOWER($1)`,
-      [memberEmail]
-    );
+    const memberResult = await db.execute(sql`SELECT id, email, name, first_name, last_name, stripe_customer_id 
+       FROM users WHERE LOWER(email) = LOWER(${memberEmail})`);
 
     if (memberResult.rows.length === 0) {
       return res.status(404).json({ error: 'Member not found' });
@@ -822,13 +777,10 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
     const memberName = member.name || [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email;
 
     // CRITICAL: Validate participantIds and compute amount from authoritative cached fees
-    const participantResult = await pool.query(
-      `SELECT bp.id, bp.session_id, bp.cached_fee_cents, bp.payment_status, bs.booking_id
+    const participantResult = await db.execute(sql`SELECT bp.id, bp.session_id, bp.cached_fee_cents, bp.payment_status, bs.booking_id
        FROM booking_participants bp
        JOIN booking_sessions bs ON bp.session_id = bs.id
-       WHERE bp.id = ANY($1::int[]) AND bp.payment_status = 'pending'`,
-      [participantIds]
-    );
+       WHERE bp.id = ANY(${participantIds}::int[]) AND bp.payment_status = 'pending'`);
 
     if (participantResult.rows.length === 0) {
       return res.status(400).json({ error: 'No pending participants found for the provided IDs' });
@@ -929,39 +881,31 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
     if (paymentIntent.status === 'succeeded') {
       // If participantIds provided, mark them as paid
       if (participantIds && Array.isArray(participantIds) && participantIds.length > 0) {
-        await pool.query(
-          `UPDATE booking_participants 
+        await db.execute(sql`UPDATE booking_participants 
            SET payment_status = 'paid', 
-               stripe_payment_intent_id = $1,
+               stripe_payment_intent_id = ${paymentIntent.id},
                paid_at = NOW()
-           WHERE id = ANY($2::int[])`,
-          [paymentIntent.id, participantIds]
-        );
+           WHERE id = ANY(${participantIds}::int[])`);
         console.log(`[Stripe] Staff charged saved card: $${(authoritativeAmountCents / 100).toFixed(2)} for ${member.email}, marked ${participantIds.length} participants as paid`);
       }
 
       // Record the payment
-      await pool.query(
-        `INSERT INTO stripe_payment_intents 
+      await db.execute(sql`INSERT INTO stripe_payment_intents 
           (payment_intent_id, member_email, member_id, amount_cents, status, purpose, description, created_by)
-         VALUES ($1, $2, $3, $4, 'succeeded', 'booking_fee', $5, $6)
-         ON CONFLICT (payment_intent_id) DO UPDATE SET status = 'succeeded', updated_at = NOW()`,
-        [paymentIntent.id, member.email, member.id, authoritativeAmountCents, 'Staff charged saved card', staffEmail]
-      );
+         VALUES (${paymentIntent.id}, ${member.email}, ${member.id}, ${authoritativeAmountCents}, 'succeeded', 'booking_fee', ${'Staff charged saved card'}, ${staffEmail})
+         ON CONFLICT (payment_intent_id) DO UPDATE SET status = 'succeeded', updated_at = NOW()`);
 
       // Log the action
-      await pool.query(
-        `INSERT INTO staff_actions (action_type, staff_email, staff_name, target_email, details, created_at)
-         VALUES ('charge_saved_card', $1, $2, $3, $4, NOW())`,
-        [staffEmail, staffName || '', member.email, JSON.stringify({
+      const staffActionDetails = JSON.stringify({
           amountCents: authoritativeAmountCents,
           cardLast4,
           cardBrand,
           paymentIntentId: paymentIntent.id,
           bookingId: resolvedBookingId,
           sessionId: resolvedSessionId
-        })]
-      );
+        });
+      await db.execute(sql`INSERT INTO staff_actions (action_type, staff_email, staff_name, target_email, details, created_at)
+         VALUES ('charge_saved_card', ${staffEmail}, ${staffName || ''}, ${member.email}, ${staffActionDetails}, NOW())`);
 
       broadcastBillingUpdate({
         action: 'payment_succeeded',
@@ -1048,11 +992,8 @@ router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, async (re
       });
     }
 
-    const memberResult = await pool.query(
-      `SELECT id, email, name, first_name, last_name, stripe_customer_id 
-       FROM users WHERE LOWER(email) = LOWER($1)`,
-      [memberEmail]
-    );
+    const memberResult = await db.execute(sql`SELECT id, email, name, first_name, last_name, stripe_customer_id 
+       FROM users WHERE LOWER(email) = LOWER(${memberEmail})`);
 
     if (memberResult.rows.length === 0) {
       return res.status(404).json({ error: 'Member not found' });
@@ -1107,11 +1048,8 @@ router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, async (re
     });
 
     if (paymentIntent.status === 'succeeded') {
-      await pool.query(
-        `INSERT INTO billing_audit_log (payment_intent_id, member_email, member_id, amount_cents, description, staff_email, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-        [paymentIntent.id, member.email, member.id, numericAmount, description || 'POS saved card charge', staffEmail]
-      );
+      await db.execute(sql`INSERT INTO billing_audit_log (payment_intent_id, member_email, member_id, amount_cents, description, staff_email, created_at)
+         VALUES (${paymentIntent.id}, ${member.email}, ${member.id}, ${numericAmount}, ${description || 'POS saved card charge'}, ${staffEmail}, NOW())`);
 
       logFromRequest(req, 'charge_saved_card', 'payment', paymentIntent.id, member.email, {
         amountCents: numericAmount,
@@ -1171,10 +1109,7 @@ router.get('/api/stripe/staff/check-saved-card/:email', isStaffOrAdmin, async (r
       details: { viewedBy: staffEmail, targetEmail: memberEmail }
     });
 
-    const memberResult = await pool.query(
-      `SELECT stripe_customer_id FROM users WHERE LOWER(email) = LOWER($1)`,
-      [memberEmail]
-    );
+    const memberResult = await db.execute(sql`SELECT stripe_customer_id FROM users WHERE LOWER(email) = LOWER(${memberEmail})`);
 
     if (memberResult.rows.length === 0 || !memberResult.rows[0].stripe_customer_id) {
       return res.json({ hasSavedCard: false });
@@ -1218,8 +1153,7 @@ router.get('/api/staff/member-balance/:email', isStaffOrAdmin, async (req: Reque
       details: { viewedBy: staffEmail, targetEmail: memberEmail }
     });
 
-    const result = await pool.query(
-      `SELECT 
+    const result = await db.execute(sql`SELECT 
         bp.id as participant_id,
         bp.session_id,
         bp.cached_fee_cents,
@@ -1233,15 +1167,12 @@ router.get('/api/staff/member-balance/:email', isStaffOrAdmin, async (req: Reque
        LEFT JOIN users pu ON pu.id = bp.user_id
        LEFT JOIN usage_ledger ul ON ul.session_id = bp.session_id 
          AND (ul.member_id = bp.user_id OR LOWER(ul.member_id) = LOWER(pu.email))
-       WHERE LOWER(bp.user_id) = $1
+       WHERE LOWER(bp.user_id) = ${memberEmail}
          AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
          AND bp.participant_type IN ('owner', 'member')
-       ORDER BY bs.session_date DESC`,
-      [memberEmail]
-    );
+       ORDER BY bs.session_date DESC`);
 
-    const guestResult = await pool.query(
-      `SELECT 
+    const guestResult = await db.execute(sql`SELECT 
         bp.id as participant_id,
         bp.session_id,
         bp.cached_fee_cents,
@@ -1254,10 +1185,8 @@ router.get('/api/staff/member-balance/:email', isStaffOrAdmin, async (req: Reque
          AND owner_bp.participant_type = 'owner'
        WHERE bp.participant_type = 'guest'
          AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
-         AND LOWER(owner_bp.user_id) = $1
-         AND bp.cached_fee_cents > 0`,
-      [memberEmail]
-    );
+         AND LOWER(owner_bp.user_id) = ${memberEmail}
+         AND bp.cached_fee_cents > 0`);
 
     const items: Array<{participantId: number; sessionId: number; sessionDate: string; resourceName: string; amountCents: number; type: string}> = [];
 
@@ -1363,10 +1292,7 @@ router.post('/api/payments/adjust-guest-passes', isStaffOrAdmin, async (req: Req
       return res.status(400).json({ error: 'Adjustment cannot be zero' });
     }
 
-    const existingResult = await pool.query(
-      'SELECT id, passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = $1',
-      [memberEmail.toLowerCase()]
-    );
+    const existingResult = await db.execute(sql`SELECT id, passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = ${memberEmail.toLowerCase()}`);
 
     let previousCount = 0;
     let newCount = 0;
@@ -1374,10 +1300,7 @@ router.post('/api/payments/adjust-guest-passes', isStaffOrAdmin, async (req: Req
 
     if (existingResult.rows.length === 0) {
       newCount = Math.max(0, adjustment);
-      await pool.query(
-        'INSERT INTO guest_passes (member_email, passes_used, passes_total) VALUES ($1, 0, $2)',
-        [memberEmail.toLowerCase(), newCount]
-      );
+      await db.execute(sql`INSERT INTO guest_passes (member_email, passes_used, passes_total) VALUES (${memberEmail.toLowerCase()}, 0, ${newCount})`);
       console.log(`[GuestPasses] Created new record for ${memberEmail} with ${newCount} passes`);
     } else {
       const current = existingResult.rows[0];
@@ -1385,10 +1308,7 @@ router.post('/api/payments/adjust-guest-passes', isStaffOrAdmin, async (req: Req
       passesUsed = current.passes_used || 0;
       newCount = Math.max(0, previousCount + adjustment);
 
-      await pool.query(
-        'UPDATE guest_passes SET passes_total = $1 WHERE id = $2',
-        [newCount, current.id]
-      );
+      await db.execute(sql`UPDATE guest_passes SET passes_total = ${newCount} WHERE id = ${current.id}`);
       console.log(`[GuestPasses] Updated ${memberEmail}: ${previousCount} -> ${newCount} (${adjustment > 0 ? '+' : ''}${adjustment})`);
     }
 
@@ -1542,13 +1462,10 @@ router.post('/api/payments/add-note', isStaffOrAdmin, async (req: Request, res: 
     const finalPerformedBy = performedBy || staffEmail;
     const finalPerformedByName = performedByName || staffName;
 
-    const piResult = await pool.query(
-      `SELECT u.email as member_email 
+    const piResult = await db.execute(sql`SELECT u.email as member_email 
        FROM stripe_payment_intents spi
        LEFT JOIN users u ON u.id = spi.user_id
-       WHERE spi.stripe_payment_intent_id = $1`,
-      [transactionId]
-    );
+       WHERE spi.stripe_payment_intent_id = ${transactionId}`);
 
     let memberEmail = 'unknown';
     if (piResult.rows.length > 0 && piResult.rows[0].member_email) {
@@ -1576,14 +1493,11 @@ router.get('/api/payments/:paymentIntentId/notes', isStaffOrAdmin, async (req: R
   try {
     const { paymentIntentId } = req.params;
 
-    const result = await pool.query(
-      `SELECT id, action_details->>'note' as note, performed_by_name, created_at
+    const result = await db.execute(sql`SELECT id, action_details->>'note' as note, performed_by_name, created_at
        FROM billing_audit_log
        WHERE action_type = 'payment_note_added'
-         AND action_details->>'paymentIntentId' = $1
-       ORDER BY created_at DESC`,
-      [paymentIntentId]
-    );
+         AND action_details->>'paymentIntentId' = ${paymentIntentId}
+       ORDER BY created_at DESC`);
 
     const notes = result.rows.map(row => ({
       id: row.id,
@@ -1634,10 +1548,7 @@ router.post('/api/payments/retry', isStaffOrAdmin, async (req: Request, res: Res
       return res.status(404).json({ error: 'Payment not found' });
     }
 
-    const retryResult = await pool.query(
-      `SELECT retry_count, requires_card_update FROM stripe_payment_intents WHERE stripe_payment_intent_id = $1`,
-      [paymentIntentId]
-    );
+    const retryResult = await db.execute(sql`SELECT retry_count, requires_card_update FROM stripe_payment_intents WHERE stripe_payment_intent_id = ${paymentIntentId}`);
     
     const currentRetryCount = retryResult.rows[0]?.retry_count || 0;
     const requiresCardUpdate = retryResult.rows[0]?.requires_card_update || false;
@@ -1682,16 +1593,13 @@ router.post('/api/payments/retry', isStaffOrAdmin, async (req: Request, res: Res
     const nowReachesLimit = newRetryCount >= MAX_RETRY_ATTEMPTS;
 
     if (confirmedIntent.status === 'succeeded') {
-      await pool.query(
-        `UPDATE stripe_payment_intents 
+      await db.execute(sql`UPDATE stripe_payment_intents 
          SET status = 'succeeded', 
              updated_at = NOW(),
-             retry_count = $2,
+             retry_count = ${newRetryCount},
              last_retry_at = NOW(),
              requires_card_update = FALSE
-         WHERE stripe_payment_intent_id = $1`,
-        [paymentIntentId, newRetryCount]
-      );
+         WHERE stripe_payment_intent_id = ${paymentIntentId}`);
 
       await db.insert(billingAuditLog).values({
         memberEmail: payment.member_email || 'unknown',
@@ -1718,17 +1626,14 @@ router.post('/api/payments/retry', isStaffOrAdmin, async (req: Request, res: Res
     } else {
       const failureReason = confirmedIntent.last_payment_error?.message || `Status: ${confirmedIntent.status}`;
       
-      await pool.query(
-        `UPDATE stripe_payment_intents 
-         SET status = $2, 
+      await db.execute(sql`UPDATE stripe_payment_intents 
+         SET status = ${confirmedIntent.status}, 
              updated_at = NOW(),
-             retry_count = $3,
+             retry_count = ${newRetryCount},
              last_retry_at = NOW(),
-             failure_reason = $4,
-             requires_card_update = $5
-         WHERE stripe_payment_intent_id = $1`,
-        [paymentIntentId, confirmedIntent.status, newRetryCount, failureReason, nowReachesLimit]
-      );
+             failure_reason = ${failureReason},
+             requires_card_update = ${nowReachesLimit}
+         WHERE stripe_payment_intent_id = ${paymentIntentId}`);
 
       await db.insert(billingAuditLog).values({
         memberEmail: payment.member_email || 'unknown',
@@ -1800,12 +1705,9 @@ router.post('/api/payments/cancel', isStaffOrAdmin, async (req: Request, res: Re
       }
     }
 
-    await pool.query(
-      `UPDATE stripe_payment_intents 
+    await db.execute(sql`UPDATE stripe_payment_intents 
        SET status = 'canceled', updated_at = NOW()
-       WHERE stripe_payment_intent_id = $1`,
-      [paymentIntentId]
-    );
+       WHERE stripe_payment_intent_id = ${paymentIntentId}`);
 
     await db.insert(billingAuditLog).values({
       memberEmail: payment.member_email || 'unknown',
@@ -1877,33 +1779,24 @@ router.post('/api/payments/refund', isStaffOrAdmin, async (req: Request, res: Re
 
     if (payment.sessionId) {
       try {
-        await pool.query(
-          `UPDATE booking_participants 
+        await db.execute(sql`UPDATE booking_participants 
            SET payment_status = 'refunded', updated_at = NOW() 
-           WHERE session_id = $1 AND stripe_payment_intent_id = $2`,
-          [payment.sessionId, paymentIntentId]
-        );
+           WHERE session_id = ${payment.sessionId} AND stripe_payment_intent_id = ${paymentIntentId}`);
         
-        let ledgerEntries = await pool.query(
-          `SELECT id, member_id, overage_fee, guest_fee, minutes_charged, stripe_payment_intent_id
+        let ledgerEntries = await db.execute(sql`SELECT id, member_id, overage_fee, guest_fee, minutes_charged, stripe_payment_intent_id
            FROM usage_ledger 
-           WHERE session_id = $1 
-             AND stripe_payment_intent_id = $2
+           WHERE session_id = ${payment.sessionId} 
+             AND stripe_payment_intent_id = ${paymentIntentId}
              AND (COALESCE(overage_fee, 0) > 0 OR COALESCE(guest_fee, 0) > 0)
-           ORDER BY created_at ASC`,
-          [payment.sessionId, paymentIntentId]
-        );
+           ORDER BY created_at ASC`);
         
         if (ledgerEntries.rows.length === 0) {
           console.warn(`[Payments] [OPS_REVIEW_REQUIRED] No ledger entries found with payment_intent_id ${paymentIntentId}, falling back to session-wide entries for session ${payment.sessionId}.`);
-          ledgerEntries = await pool.query(
-            `SELECT id, member_id, overage_fee, guest_fee, minutes_charged, stripe_payment_intent_id
+          ledgerEntries = await db.execute(sql`SELECT id, member_id, overage_fee, guest_fee, minutes_charged, stripe_payment_intent_id
              FROM usage_ledger 
-             WHERE session_id = $1 
+             WHERE session_id = ${payment.sessionId} 
                AND (COALESCE(overage_fee, 0) > 0 OR COALESCE(guest_fee, 0) > 0)
-             ORDER BY created_at ASC`,
-            [payment.sessionId]
-          );
+             ORDER BY created_at ASC`);
         }
         
         if (ledgerEntries.rows.length > 0) {
@@ -1967,18 +1860,9 @@ router.post('/api/payments/refund', isStaffOrAdmin, async (req: Request, res: Re
             const amounts = reversalAmounts[i];
             
             if (amounts.reversedOverageCents !== 0 || amounts.reversedGuestCents !== 0) {
-              await pool.query(
-                `INSERT INTO usage_ledger 
+              await db.execute(sql`INSERT INTO usage_ledger 
                  (session_id, member_id, minutes_charged, overage_fee, guest_fee, payment_method, source, stripe_payment_intent_id)
-                 VALUES ($1, $2, 0, $3, $4, 'waived', 'staff_manual', $5)`,
-                [
-                  payment.sessionId, 
-                  amounts.memberId,
-                  (-amounts.reversedOverageCents / 100).toFixed(2),
-                  (-amounts.reversedGuestCents / 100).toFixed(2),
-                  paymentIntentId
-                ]
-              );
+                 VALUES (${payment.sessionId}, ${amounts.memberId}, 0, ${(-amounts.reversedOverageCents / 100).toFixed(2)}, ${(-amounts.reversedGuestCents / 100).toFixed(2)}, 'waived', 'staff_manual', ${paymentIntentId})`);
               reversalCount++;
             }
           }
@@ -2058,8 +1942,7 @@ router.get('/api/payments/pending-authorizations', isStaffOrAdmin, async (req: R
 
 router.get('/api/payments/future-bookings-with-fees', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(`
-      SELECT 
+    const result = await db.execute(sql`SELECT 
         br.id as booking_id,
         br.user_email,
         br.user_name,
@@ -2091,8 +1974,7 @@ router.get('/api/payments/future-bookings-with-fees', isStaffOrAdmin, async (req
       AND br.request_date >= CURRENT_DATE
       AND r.type != 'conference_room'
       ORDER BY br.request_date, br.start_time
-      LIMIT 50
-    `);
+      LIMIT 50`);
 
     const futureBookings = result.rows.map(row => {
       const totalFeeCents = Math.max(
@@ -2334,16 +2216,13 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
       }
     }
 
-    const offlineResult = await pool.query(
-      `SELECT 
+    const offlineResult = await db.execute(sql`SELECT 
         action_details->>'paymentMethod' as payment_method,
         action_details->>'category' as category,
         (action_details->>'amountCents')::int as amount_cents
        FROM billing_audit_log
        WHERE action_type = 'offline_payment'
-         AND DATE(created_at AT TIME ZONE 'America/Los_Angeles') = $1`,
-      [today]
-    );
+         AND DATE(created_at AT TIME ZONE 'America/Los_Angeles') = ${today}`);
 
     for (const row of offlineResult.rows) {
       const method = row.payment_method || 'other';

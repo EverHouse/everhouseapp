@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { pool, isProduction } from '../core/db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { isAdmin } from '../core/middleware';
 
 const router = Router();
@@ -24,13 +26,13 @@ const FEATURE_KEY_TO_TIER_COLUMN: Record<string, { column: string; type: 'boolea
 
 router.get('/api/tier-features', async (req, res) => {
   try {
-    const featuresResult = await pool.query(`
+    const featuresResult = await db.execute(sql`
       SELECT id, feature_key, display_label, value_type, sort_order, is_active
       FROM tier_features
       ORDER BY sort_order ASC, id ASC
     `);
 
-    const tiersResult = await pool.query(`
+    const tiersResult = await db.execute(sql`
       SELECT id, name, slug, daily_sim_minutes, guest_passes_per_month, booking_window_days, 
              daily_conf_room_minutes, can_book_simulators, can_book_conference, can_book_wellness,
              has_group_lessons, has_extended_sessions, has_private_lesson, 
@@ -39,7 +41,7 @@ router.get('/api/tier-features', async (req, res) => {
       WHERE is_active = true AND show_in_comparison = true
     `);
 
-    const valuesResult = await pool.query(`
+    const valuesResult = await db.execute(sql`
       SELECT 
         tfv.feature_id,
         tfv.tier_id,
@@ -201,16 +203,16 @@ router.put('/api/tier-features/:id', isAdmin, async (req, res) => {
       return res.status(400).json({ error: 'valueType must be boolean, number, or text' });
     }
 
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       UPDATE tier_features SET
-        display_label = COALESCE($1, display_label),
-        value_type = COALESCE($2, value_type),
-        sort_order = COALESCE($3, sort_order),
-        is_active = COALESCE($4, is_active),
+        display_label = COALESCE(${displayLabel}, display_label),
+        value_type = COALESCE(${valueType}, value_type),
+        sort_order = COALESCE(${sortOrder}, sort_order),
+        is_active = COALESCE(${isActive}, is_active),
         updated_at = NOW()
-      WHERE id = $5
+      WHERE id = ${id}
       RETURNING id, feature_key, display_label, value_type, sort_order, is_active
-    `, [displayLabel, valueType, sortOrder, isActive, id]);
+    `);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Feature not found' });
@@ -235,10 +237,7 @@ router.delete('/api/tier-features/:id', isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await pool.query(
-      'DELETE FROM tier_features WHERE id = $1 RETURNING id',
-      [id]
-    );
+    const result = await db.execute(sql`DELETE FROM tier_features WHERE id = ${id} RETURNING id`);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Feature not found' });
@@ -256,10 +255,7 @@ router.put('/api/tier-features/:featureId/values/:tierId', isAdmin, async (req, 
     const { featureId, tierId } = req.params;
     const { value } = req.body;
 
-    const featureResult = await pool.query(
-      'SELECT value_type FROM tier_features WHERE id = $1',
-      [featureId]
-    );
+    const featureResult = await db.execute(sql`SELECT value_type FROM tier_features WHERE id = ${featureId}`);
 
     if (featureResult.rows.length === 0) {
       return res.status(404).json({ error: 'Feature not found' });
@@ -280,17 +276,17 @@ router.put('/api/tier-features/:featureId/values/:tierId', isAdmin, async (req, 
       valueText = value !== null ? String(value) : '';
     }
 
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       INSERT INTO tier_feature_values (feature_id, tier_id, value_boolean, value_number, value_text, updated_at)
-      VALUES ($1, $2, $3, $4, $5, NOW())
+      VALUES (${featureId}, ${tierId}, ${valueBoolean}, ${valueNumber}, ${valueText}, NOW())
       ON CONFLICT (feature_id, tier_id) 
       DO UPDATE SET
-        value_boolean = $3,
-        value_number = $4,
-        value_text = $5,
+        value_boolean = ${valueBoolean},
+        value_number = ${valueNumber},
+        value_text = ${valueText},
         updated_at = NOW()
       RETURNING *
-    `, [featureId, tierId, valueBoolean, valueNumber, valueText]);
+    `);
 
     const row = result.rows[0];
     let returnValue: any = null;

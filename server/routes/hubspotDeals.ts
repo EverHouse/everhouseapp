@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { isStaffOrAdmin } from '../core/middleware';
-import { isProduction, pool } from '../core/db';
+import { isProduction } from '../core/db';
 import {
   getMemberDealWithLineItems,
   getAllProductMappings,
@@ -16,7 +16,7 @@ import {
 import { syncAllMembersFromHubSpot, syncRelevantMembersFromHubSpot, syncCommunicationLogsFromHubSpot, getLastMemberSyncTime, setLastMemberSyncTime } from '../core/memberSync';
 import { db } from '../db';
 import { hubspotProductMappings, discountRules, hubspotDeals } from '../../shared/schema';
-import { eq, and, ne } from 'drizzle-orm';
+import { eq, and, ne, sql } from 'drizzle-orm';
 import { MINDBODY_TO_STAGE_MAP, HUBSPOT_STAGE_IDS } from '../core/hubspot/constants';
 import { getSessionUser } from '../types/session';
 import pLimit from 'p-limit';
@@ -253,7 +253,7 @@ router.post('/api/hubspot/push-members-to-hubspot', isStaffOrAdmin, async (req, 
     console.log('[HubSpotDeals] Push members to HubSpot triggered');
     const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
     
-    const membersResult = await pool.query(`
+    const membersResult = await db.execute(sql`
       SELECT id, email, tier, billing_provider, membership_status, hubspot_id
       FROM users
       WHERE role = 'member'
@@ -285,10 +285,7 @@ router.post('/api/hubspot/push-members-to-hubspot', isStaffOrAdmin, async (req, 
             
             if (result.success && result.contactId && !member.hubspot_id) {
               try {
-                await pool.query(
-                  'UPDATE users SET hubspot_id = $1, updated_at = NOW() WHERE id = $2 AND (hubspot_id IS NULL OR hubspot_id = \'\')',
-                  [result.contactId, member.id]
-                );
+                await db.execute(sql`UPDATE users SET hubspot_id = ${result.contactId}, updated_at = NOW() WHERE id = ${member.id} AND (hubspot_id IS NULL OR hubspot_id = '')`);
                 hubspotIdsBackfilled++;
               } catch {}
             }
@@ -322,7 +319,7 @@ router.post('/api/hubspot/remediate-deal-stages', isStaffOrAdmin, async (req, re
     
     console.log(`[HubSpotDeals] Deal stage remediation started (dryRun: ${dryRun})`);
     
-    const membersResult = await pool.query(`
+    const membersResult = await db.execute(sql`
       SELECT u.email, u.membership_status, hd.hubspot_deal_id, hd.pipeline_stage
       FROM users u
       JOIN hubspot_deals hd ON LOWER(u.email) = LOWER(hd.member_email)
@@ -432,7 +429,7 @@ router.post('/api/hubspot/remediate-deal-stages', isStaffOrAdmin, async (req, re
 
 router.get('/api/hubspot/deal-stage-summary', isStaffOrAdmin, async (req, res) => {
   try {
-    const stagesResult = await pool.query(`
+    const stagesResult = await db.execute(sql`
       SELECT 
         hd.pipeline_stage,
         COUNT(*) as count,
@@ -444,11 +441,11 @@ router.get('/api/hubspot/deal-stage-summary', isStaffOrAdmin, async (req, res) =
     `);
     
     // Include trialing and past_due as active - they still have membership access
-    const activeMembers = await pool.query(`
+    const activeMembers = await db.execute(sql`
       SELECT COUNT(*) as count FROM users WHERE role = 'member' AND (membership_status IN ('active', 'trialing', 'past_due') OR stripe_subscription_id IS NOT NULL)
     `);
     
-    const activeDeals = await pool.query(`
+    const activeDeals = await db.execute(sql`
       SELECT COUNT(*) as count FROM hubspot_deals WHERE pipeline_stage = 'closedwon'
     `);
     

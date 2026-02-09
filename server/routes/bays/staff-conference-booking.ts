@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../../core/db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { getMemberTierByEmail, getTierLimits, getDailyBookedMinutes } from '../../core/tierService';
 import { calculateOverageCents, PRICING } from '../../core/billing/pricingConfig';
@@ -27,9 +29,7 @@ router.get('/api/staff/conference-room/available-slots', isStaffOrAdmin, async (
       return res.status(400).json({ error: 'Invalid duration. Must be between 30 and 240 minutes.' });
     }
 
-    const resourceResult = await pool.query(
-      `SELECT id FROM resources WHERE type = 'conference_room' LIMIT 1`
-    );
+    const resourceResult = await db.execute(sql`SELECT id FROM resources WHERE type = 'conference_room' LIMIT 1`);
 
     if (resourceResult.rows.length === 0) {
       return res.status(404).json({ error: 'Conference room resource not found' });
@@ -37,17 +37,11 @@ router.get('/api/staff/conference-room/available-slots', isStaffOrAdmin, async (
 
     const resourceId = resourceResult.rows[0].id;
 
-    const bookingsResult = await pool.query(
-      `SELECT start_time, end_time FROM booking_requests 
-       WHERE resource_id = $1 AND request_date = $2 AND status IN ('pending', 'approved', 'attended')`,
-      [resourceId, date]
-    );
+    const bookingsResult = await db.execute(sql`SELECT start_time, end_time FROM booking_requests 
+       WHERE resource_id = ${resourceId} AND request_date = ${date} AND status IN ('pending', 'approved', 'attended')`);
 
-    const blocksResult = await pool.query(
-      `SELECT start_time, end_time FROM availability_blocks 
-       WHERE resource_id = $1 AND block_date = $2`,
-      [resourceId, date]
-    );
+    const blocksResult = await db.execute(sql`SELECT start_time, end_time FROM availability_blocks 
+       WHERE resource_id = ${resourceId} AND block_date = ${date}`);
 
     let calendarBusySlots: { start_time: string; end_time: string }[] = [];
     try {
@@ -200,9 +194,7 @@ router.post('/api/staff/conference-room/booking', isStaffOrAdmin, async (req: Re
 
     const normalizedEmail = normalizeEmail(hostEmail);
 
-    const resourceResult = await pool.query(
-      `SELECT id, name FROM resources WHERE type = 'conference_room' LIMIT 1`
-    );
+    const resourceResult = await db.execute(sql`SELECT id, name FROM resources WHERE type = 'conference_room' LIMIT 1`);
 
     if (resourceResult.rows.length === 0) {
       return res.status(404).json({ error: 'Conference room resource not found' });
@@ -222,13 +214,10 @@ router.post('/api/staff/conference-room/booking', isStaffOrAdmin, async (req: Re
       return res.status(400).json({ error: 'Booking cannot extend past midnight' });
     }
 
-    const overlapCheck = await pool.query(
-      `SELECT id FROM booking_requests 
-       WHERE resource_id = $1 AND request_date = $2 
+    const overlapCheck = await db.execute(sql`SELECT id FROM booking_requests 
+       WHERE resource_id = ${resourceId} AND request_date = ${date} 
        AND status IN ('pending', 'approved', 'attended')
-       AND (start_time < $4 AND end_time > $3)`,
-      [resourceId, date, startTimeWithSeconds, endTime]
-    );
+       AND (start_time < ${endTime} AND end_time > ${startTimeWithSeconds})`);
 
     if (overlapCheck.rows.length > 0) {
       return res.status(409).json({ error: 'This time slot conflicts with an existing booking' });

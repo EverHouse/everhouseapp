@@ -41,11 +41,10 @@ export async function getGolfInstructorEmails(): Promise<string[]> {
 
 async function cancelPendingPaymentIntentsForBooking(bookingId: number): Promise<void> {
   try {
-    const pendingIntents = await pool.query(
-      `SELECT stripe_payment_intent_id 
+    const pendingIntents = await db.execute(
+      sql`SELECT stripe_payment_intent_id 
        FROM stripe_payment_intents 
-       WHERE booking_id = $1 AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')`,
-      [bookingId]
+       WHERE booking_id = ${bookingId} AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')`
     );
     for (const row of pendingIntents.rows) {
       try {
@@ -279,8 +278,8 @@ async function loadEmailMapping(): Promise<Map<string, string>> {
   
   // Load from user_linked_emails table (staff resolutions and auto-learning)
   try {
-    const linkedEmailsResult = await pool.query(
-      `SELECT primary_email, linked_email FROM user_linked_emails`
+    const linkedEmailsResult = await db.execute(
+      sql`SELECT primary_email, linked_email FROM user_linked_emails`
     );
     
     let linkedCount = 0;

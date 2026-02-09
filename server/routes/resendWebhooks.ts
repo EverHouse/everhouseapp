@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
+import { db } from '../db';
 import { pool } from '../core/db';
+import { sql } from 'drizzle-orm';
 import { logger } from '../core/logger';
 import { Webhook } from 'svix';
 
@@ -19,7 +21,7 @@ interface ResendEmailEvent {
 }
 
 async function ensureEmailEventsTable() {
-  await pool.query(`
+  await db.execute(sql`
     CREATE TABLE IF NOT EXISTS email_events (
       id SERIAL PRIMARY KEY,
       event_id VARCHAR(255) UNIQUE,
@@ -37,7 +39,7 @@ async function ensureEmailEventsTable() {
     CREATE INDEX IF NOT EXISTS idx_email_events_created ON email_events(created_at);
   `);
   
-  await pool.query(`
+  await db.execute(sql`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email_delivery_status VARCHAR(50) DEFAULT 'active';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email_bounced_at TIMESTAMP WITH TIME ZONE;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email_marketing_opt_in BOOLEAN DEFAULT true;

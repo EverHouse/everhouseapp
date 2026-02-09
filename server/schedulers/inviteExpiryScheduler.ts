@@ -1,4 +1,6 @@
 import { pool } from '../core/db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { notifyMember } from '../core/notificationService';
 import { logger } from '../core/logger';
 import { formatDateDisplayWithDay, formatTime12Hour } from '../utils/dateUtils';
@@ -7,7 +9,7 @@ const INVITE_EXPIRY_INTERVAL_MS = 5 * 60 * 1000;
 
 async function expireUnacceptedInvites(): Promise<void> {
   try {
-    const expiredInvites = await pool.query(`
+    const expiredInvites = await db.execute(sql`
       SELECT 
         bp.id as participant_id,
         bp.user_id,

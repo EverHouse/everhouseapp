@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin, isAdmin } from '../../core/middleware';
-import { pool } from '../../core/db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { getStripeClient } from '../../core/stripe/client';
 import {
   getStripeProducts,
@@ -237,14 +238,11 @@ router.post('/api/stripe/staff/send-membership-link', isStaffOrAdmin, async (req
       return res.status(400).json({ error: 'First name and last name are required' });
     }
 
-    const tierResult = await pool.query(
-      `SELECT id, name, stripe_price_id, price_cents, billing_interval 
+    const tierResult = await db.execute(sql`SELECT id, name, stripe_price_id, price_cents, billing_interval 
        FROM membership_tiers 
-       WHERE id = $1 AND is_active = true 
+       WHERE id = ${tierId} AND is_active = true 
          AND product_type = 'subscription'
-         AND billing_interval IN ('month', 'year', 'week')`,
-      [tierId]
-    );
+         AND billing_interval IN ('month', 'year', 'week')`);
 
     if (tierResult.rows.length === 0) {
       return res.status(404).json({ error: 'Tier not found or inactive' });
@@ -363,11 +361,8 @@ router.post('/api/stripe/staff/send-reactivation-link', isStaffOrAdmin, async (r
       return res.status(400).json({ error: 'Invalid email address' });
     }
 
-    const memberResult = await pool.query(
-      `SELECT id, email, first_name, last_name, tier, last_tier, membership_status, billing_provider, stripe_customer_id
-       FROM users WHERE LOWER(email) = LOWER($1)`,
-      [memberEmail]
-    );
+    const memberResult = await db.execute(sql`SELECT id, email, first_name, last_name, tier, last_tier, membership_status, billing_provider, stripe_customer_id
+       FROM users WHERE LOWER(email) = LOWER(${memberEmail})`);
 
     if (memberResult.rows.length === 0) {
       return res.status(404).json({ error: 'Member not found' });
@@ -438,12 +433,9 @@ router.post('/api/public/day-pass/checkout', checkoutRateLimiter, async (req: Re
     const sanitizedFirstName = firstName ? String(firstName).trim().slice(0, 100) : '';
     const sanitizedLastName = lastName ? String(lastName).trim().slice(0, 100) : '';
 
-    const tierResult = await pool.query(
-      `SELECT id, name, slug, stripe_price_id, price_cents, description 
+    const tierResult = await db.execute(sql`SELECT id, name, slug, stripe_price_id, price_cents, description 
        FROM membership_tiers 
-       WHERE slug = $1 AND product_type = 'one_time' AND is_active = true`,
-      [sanitizedPassType]
-    );
+       WHERE slug = ${sanitizedPassType} AND product_type = 'one_time' AND is_active = true`);
 
     if (tierResult.rows.length === 0) {
       return res.status(404).json({ error: 'Day pass type not found' });

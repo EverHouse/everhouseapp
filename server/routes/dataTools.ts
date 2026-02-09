@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
-import { pool, isProduction } from '../core/db';
+import { isProduction } from '../core/db';
 import { users, bookingRequests, legacyPurchases, billingAuditLog, adminAuditLog } from '@shared/schema';
 import { eq, sql, and, gte, lte, desc, isNull, inArray } from 'drizzle-orm';
 import { isAdmin, isStaffOrAdmin } from '../core/middleware';
@@ -22,10 +22,7 @@ router.post('/api/data-tools/resync-member', isAdmin, async (req: Request, res: 
     
     const normalizedEmail = email.toLowerCase().trim();
     
-    const existingUser = await pool.query(
-      'SELECT id, first_name, last_name, tier, hubspot_id FROM users WHERE LOWER(email) = $1',
-      [normalizedEmail]
-    );
+    const existingUser = await db.execute(sql`SELECT id, first_name, last_name, tier, hubspot_id FROM users WHERE LOWER(email) = ${normalizedEmail}`);
     
     if (existingUser.rows.length === 0) {
       return res.status(404).json({ error: 'Member not found in database' });
@@ -83,26 +80,15 @@ router.post('/api/data-tools/resync-member', isAdmin, async (req: Request, res: 
     if (props.membership_tier) updateData.tier = props.membership_tier;
     if (props.membership_status) updateData.membershipStatus = props.membership_status;
     
-    await pool.query(
-      `UPDATE users SET 
-        hubspot_id = $1,
-        first_name = COALESCE($2, first_name),
-        last_name = COALESCE($3, last_name),
-        phone = COALESCE($4, phone),
-        tier = COALESCE($5, tier),
-        membership_status = COALESCE($6, membership_status),
+    await db.execute(sql`UPDATE users SET 
+        hubspot_id = ${hubspotContactId},
+        first_name = COALESCE(${props.firstname || null}, first_name),
+        last_name = COALESCE(${props.lastname || null}, last_name),
+        phone = COALESCE(${props.phone || null}, phone),
+        tier = COALESCE(${props.membership_tier || null}, tier),
+        membership_status = COALESCE(${props.membership_status || null}, membership_status),
         updated_at = NOW()
-      WHERE id = $7`,
-      [
-        hubspotContactId,
-        props.firstname || null,
-        props.lastname || null,
-        props.phone || null,
-        props.membership_tier || null,
-        props.membership_status || null,
-        user.id
-      ]
-    );
+      WHERE id = ${user.id}`);
     
     await db.insert(billingAuditLog).values({
       memberEmail: normalizedEmail,
@@ -185,7 +171,7 @@ router.get('/api/data-tools/available-sessions', isAdmin, async (req: Request, r
       return res.status(400).json({ error: 'date is required' });
     }
     
-    let query = `
+    const queryBuilder = sql`
       SELECT 
         br.id,
         br.user_email,
@@ -197,19 +183,17 @@ router.get('/api/data-tools/available-sessions', isAdmin, async (req: Request, r
         r.name as resource_name
       FROM booking_requests br
       LEFT JOIN resources r ON br.resource_id = r.id
-      WHERE br.request_date = $1
+      WHERE br.request_date = ${date}
       AND br.status NOT IN ('cancelled', 'declined')
     `;
-    const params: any[] = [date];
     
     if (memberEmail) {
-      query += ` AND LOWER(br.user_email) = $2`;
-      params.push((memberEmail as string).toLowerCase());
+      queryBuilder.append(sql` AND LOWER(br.user_email) = ${(memberEmail as string).toLowerCase()}`);
     }
     
-    query += ` ORDER BY br.start_time ASC LIMIT 50`;
+    queryBuilder.append(sql` ORDER BY br.start_time ASC LIMIT 50`);
     
-    const result = await pool.query(query, params);
+    const result = await db.execute(queryBuilder);
     
     res.json(result.rows.map(row => ({
       id: row.id,
@@ -245,10 +229,7 @@ router.post('/api/data-tools/link-guest-fee', isAdmin, async (req: Request, res:
       return res.status(404).json({ error: 'Guest fee not found' });
     }
     
-    const existingBooking = await pool.query(
-      'SELECT id, user_email FROM booking_requests WHERE id = $1',
-      [bookingId]
-    );
+    const existingBooking = await db.execute(sql`SELECT id, user_email FROM booking_requests WHERE id = ${bookingId}`);
     
     if (existingBooking.rows.length === 0) {
       return res.status(404).json({ error: 'Booking session not found' });
@@ -298,7 +279,7 @@ router.get('/api/data-tools/bookings-search', isStaffOrAdmin, async (req: Reques
       return res.status(400).json({ error: 'Either date or memberEmail is required' });
     }
     
-    let query = `
+    const queryBuilder = sql`
       SELECT 
         br.id,
         br.user_email,
@@ -316,25 +297,18 @@ router.get('/api/data-tools/bookings-search', isStaffOrAdmin, async (req: Reques
       LEFT JOIN resources r ON br.resource_id = r.id
       WHERE 1=1
     `;
-    const params: any[] = [];
-    let paramIndex = 1;
     
     if (date) {
-      query += ` AND br.request_date = $${paramIndex}`;
-      params.push(date);
-      paramIndex++;
+      queryBuilder.append(sql` AND br.request_date = ${date}`);
     }
     
     if (memberEmail) {
-      query += ` AND LOWER(br.user_email) = $${paramIndex}`;
-      params.push((memberEmail as string).toLowerCase());
-      paramIndex++;
+      queryBuilder.append(sql` AND LOWER(br.user_email) = ${(memberEmail as string).toLowerCase()}`);
     }
     
-    query += ` ORDER BY br.request_date DESC, br.start_time ASC LIMIT $${paramIndex}`;
-    params.push(parseInt(limit as string));
+    queryBuilder.append(sql` ORDER BY br.request_date DESC, br.start_time ASC LIMIT ${parseInt(limit as string)}`);
     
-    const result = await pool.query(query, params);
+    const result = await db.execute(queryBuilder);
     
     res.json(result.rows.map(row => ({
       id: row.id,
@@ -369,10 +343,7 @@ router.post('/api/data-tools/update-attendance', isAdmin, async (req: Request, r
       return res.status(400).json({ error: 'Invalid attendance status' });
     }
     
-    const existingBooking = await pool.query(
-      'SELECT id, user_email, reconciliation_status, reconciliation_notes FROM booking_requests WHERE id = $1',
-      [bookingId]
-    );
+    const existingBooking = await db.execute(sql`SELECT id, user_email, reconciliation_status, reconciliation_notes FROM booking_requests WHERE id = ${bookingId}`);
     
     if (existingBooking.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found' });
@@ -381,16 +352,13 @@ router.post('/api/data-tools/update-attendance', isAdmin, async (req: Request, r
     const previousStatus = existingBooking.rows[0].reconciliation_status;
     const previousNotes = existingBooking.rows[0].reconciliation_notes;
     
-    await pool.query(
-      `UPDATE booking_requests SET 
-        reconciliation_status = $1,
-        reconciliation_notes = $2,
-        reconciled_by = $3,
+    await db.execute(sql`UPDATE booking_requests SET 
+        reconciliation_status = ${attendanceStatus},
+        reconciliation_notes = ${notes || null},
+        reconciled_by = ${staffEmail},
         reconciled_at = NOW(),
         updated_at = NOW()
-      WHERE id = $4`,
-      [attendanceStatus, notes || null, staffEmail, bookingId]
-    );
+      WHERE id = ${bookingId}`);
     
     await db.insert(billingAuditLog).values({
       memberEmail: existingBooking.rows[0].user_email || 'unknown',
@@ -554,13 +522,11 @@ router.post('/api/data-tools/cleanup-mindbody-ids', isAdmin, async (req: Request
     console.log(`[DataTools] Starting mindbody_client_id cleanup (dryRun: ${dryRun}) by ${staffEmail}`);
     
     // Get all users with mindbody_client_id
-    const usersWithMindbody = await pool.query(
-      `SELECT id, email, mindbody_client_id, hubspot_id 
+    const usersWithMindbody = await db.execute(sql`SELECT id, email, mindbody_client_id, hubspot_id 
        FROM users 
        WHERE mindbody_client_id IS NOT NULL 
          AND mindbody_client_id != ''
-       ORDER BY email`
-    );
+       ORDER BY email`);
     
     if (usersWithMindbody.rows.length === 0) {
       return res.json({ 
@@ -645,13 +611,10 @@ router.post('/api/data-tools/cleanup-mindbody-ids', isAdmin, async (req: Request
       // Actually clean up the stale IDs
       const emailsToClean = toClean.map(u => u.email.toLowerCase());
       
-      const cleanResult = await pool.query(
-        `UPDATE users 
+      const cleanResult = await db.execute(sql`UPDATE users 
          SET mindbody_client_id = NULL, updated_at = NOW() 
-         WHERE LOWER(email) = ANY($1::text[])
-         RETURNING email`,
-        [emailsToClean]
-      );
+         WHERE LOWER(email) = ANY(${emailsToClean}::text[])
+         RETURNING email`);
       
       cleanedCount = cleanResult.rowCount || 0;
       
@@ -692,21 +655,19 @@ router.post('/api/data-tools/sync-members-to-hubspot', isAdmin, async (req: Requ
     console.log(`[DataTools] Starting HubSpot sync for members without contacts (dryRun: ${dryRun}) by ${staffEmail}`);
     
     // Get members without HubSpot ID
-    let query = `
+    const queryBuilder = sql`
       SELECT id, email, first_name, last_name, tier, mindbody_client_id, membership_status
       FROM users 
       WHERE hubspot_id IS NULL
     `;
-    const params: any[] = [];
     
     if (emails && Array.isArray(emails) && emails.length > 0) {
-      query += ` AND LOWER(email) = ANY($1::text[])`;
-      params.push(emails.map((e: string) => e.toLowerCase()));
+      queryBuilder.append(sql` AND LOWER(email) = ANY(${emails.map((e: string) => e.toLowerCase())}::text[])`);
     }
     
-    query += ` ORDER BY email LIMIT 100`;
+    queryBuilder.append(sql` ORDER BY email LIMIT 100`);
     
-    const membersWithoutHubspot = await pool.query(query, params);
+    const membersWithoutHubspot = await db.execute(queryBuilder);
     
     if (membersWithoutHubspot.rows.length === 0) {
       return res.json({ 
@@ -733,11 +694,7 @@ router.post('/api/data-tools/sync-members-to-hubspot', isAdmin, async (req: Requ
             member.tier || undefined
           );
           
-          // Update user with HubSpot ID
-          await pool.query(
-            'UPDATE users SET hubspot_id = $1, updated_at = NOW() WHERE id = $2',
-            [result.contactId, member.id]
-          );
+          await db.execute(sql`UPDATE users SET hubspot_id = ${result.contactId}, updated_at = NOW() WHERE id = ${member.id}`);
           
           if (result.isNew) {
             created.push({ email: member.email, contactId: result.contactId });
@@ -798,15 +755,13 @@ router.post('/api/data-tools/sync-subscription-status', isAdmin, async (req: Req
     const { getStripeClient } = await import('../core/stripe/client');
     const stripe = await getStripeClient();
     
-    const membersWithStripe = await pool.query(
-      `SELECT id, email, first_name, last_name, tier, membership_status, stripe_customer_id, billing_provider
+    const membersWithStripe = await db.execute(sql`SELECT id, email, first_name, last_name, tier, membership_status, stripe_customer_id, billing_provider
        FROM users 
        WHERE stripe_customer_id IS NOT NULL
          AND role = 'member'
          AND (billing_provider IS NULL OR billing_provider NOT IN ('mindbody', 'family_addon', 'comped'))
        ORDER BY email
-       LIMIT 500`
-    );
+       LIMIT 500`);
     
     if (membersWithStripe.rows.length === 0) {
       return res.json({ 
@@ -895,12 +850,9 @@ router.post('/api/data-tools/sync-subscription-status', isAdmin, async (req: Req
             });
             
             if (!dryRun) {
-              await pool.query(
-                `UPDATE users 
-                 SET membership_status = $1, updated_at = NOW() 
-                 WHERE id = $2`,
-                [expectedAppStatus, member.id]
-              );
+              await db.execute(sql`UPDATE users 
+                 SET membership_status = ${expectedAppStatus}, updated_at = NOW() 
+                 WHERE id = ${member.id}`);
               
               // Sync status change to HubSpot
               try {
@@ -985,13 +937,11 @@ router.post('/api/data-tools/clear-orphaned-stripe-ids', isAdmin, async (req: Re
     const { getStripeClient } = await import('../core/stripe/client');
     const stripe = await getStripeClient();
     
-    const usersWithStripe = await pool.query(
-      `SELECT id, email, first_name, last_name, stripe_customer_id, role, membership_status
+    const usersWithStripe = await db.execute(sql`SELECT id, email, first_name, last_name, stripe_customer_id, role, membership_status
        FROM users 
        WHERE stripe_customer_id IS NOT NULL
        ORDER BY email
-       LIMIT 500`
-    );
+       LIMIT 500`);
     
     if (usersWithStripe.rows.length === 0) {
       return res.json({ 
@@ -1042,10 +992,7 @@ router.post('/api/data-tools/clear-orphaned-stripe-ids', isAdmin, async (req: Re
               });
               
               if (!dryRun) {
-                await pool.query(
-                  'UPDATE users SET stripe_customer_id = NULL, updated_at = NOW() WHERE id = $1',
-                  [user.id]
-                );
+                await db.execute(sql`UPDATE users SET stripe_customer_id = NULL, updated_at = NOW() WHERE id = ${user.id}`);
                 
                 cleared.push({
                   email: user.email,
@@ -1104,26 +1051,22 @@ router.post('/api/data-tools/link-stripe-hubspot', isAdmin, async (req: Request,
     const { getOrCreateStripeCustomer } = await import('../core/stripe/customers');
     const stripe = await getStripeClient();
     
-    const stripeOnlyMembers = await pool.query(
-      `SELECT id, email, first_name, last_name, tier, stripe_customer_id
+    const stripeOnlyMembers = await db.execute(sql`SELECT id, email, first_name, last_name, tier, stripe_customer_id
        FROM users 
        WHERE stripe_customer_id IS NOT NULL
          AND (hubspot_id IS NULL OR hubspot_id = '')
          AND role = 'member'
        ORDER BY email
-       LIMIT 200`
-    );
+       LIMIT 200`);
     
-    const hubspotOnlyMembers = await pool.query(
-      `SELECT id, email, first_name, last_name, tier, hubspot_id
+    const hubspotOnlyMembers = await db.execute(sql`SELECT id, email, first_name, last_name, tier, hubspot_id
        FROM users 
        WHERE hubspot_id IS NOT NULL
          AND hubspot_id != ''
          AND (stripe_customer_id IS NULL OR stripe_customer_id = '')
          AND role = 'member'
        ORDER BY email
-       LIMIT 200`
-    );
+       LIMIT 200`);
     
     const stripeOnlyList = stripeOnlyMembers.rows.map(m => ({
       id: m.id,
@@ -1158,10 +1101,7 @@ router.post('/api/data-tools/link-stripe-hubspot', isAdmin, async (req: Request,
             member.tier || undefined
           );
           
-          await pool.query(
-            'UPDATE users SET hubspot_id = $1, updated_at = NOW() WHERE id = $2',
-            [result.contactId, member.id]
-          );
+          await db.execute(sql`UPDATE users SET hubspot_id = ${result.contactId}, updated_at = NOW() WHERE id = ${member.id}`);
           
           hubspotCreated.push({ email: member.email, contactId: result.contactId });
           
@@ -1261,15 +1201,13 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
     
     const hubspot = await getHubSpotClient();
     
-    const membersWithHubspot = await pool.query(
-      `SELECT id, email, first_name, last_name, hubspot_id
+    const membersWithHubspot = await db.execute(sql`SELECT id, email, first_name, last_name, hubspot_id
        FROM users 
        WHERE hubspot_id IS NOT NULL
          AND hubspot_id != ''
          AND role = 'member'
        ORDER BY email
-       LIMIT 1000`
-    );
+       LIMIT 1000`);
     
     if (membersWithHubspot.rows.length === 0) {
       return res.json({ 
@@ -1303,42 +1241,42 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
         try {
           const normalizedEmail = member.email.toLowerCase();
           
-          const visitCountResult = await pool.query(`
+          const visitCountResult = await db.execute(sql`
             SELECT COUNT(DISTINCT booking_id) as count FROM (
               SELECT id as booking_id FROM booking_requests
-              WHERE LOWER(user_email) = $1
+              WHERE LOWER(user_email) = ${normalizedEmail}
                 AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
                 AND status NOT IN ('cancelled', 'declined')
               UNION
               SELECT br.id as booking_id FROM booking_requests br
               JOIN booking_members bm ON br.id = bm.booking_id
-              WHERE LOWER(bm.user_email) = $1
+              WHERE LOWER(bm.user_email) = ${normalizedEmail}
                 AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
                 AND br.status NOT IN ('cancelled', 'declined')
               UNION
               SELECT br.id as booking_id FROM booking_requests br
               JOIN booking_guests bg ON br.id = bg.booking_id
-              WHERE LOWER(bg.guest_email) = $1
+              WHERE LOWER(bg.guest_email) = ${normalizedEmail}
                 AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
                 AND br.status NOT IN ('cancelled', 'declined')
             ) all_bookings
-          `, [normalizedEmail]);
+          `);
           
-          const eventCountResult = await pool.query(`
+          const eventCountResult = await db.execute(sql`
             SELECT COUNT(*) as count FROM event_rsvps er
             JOIN events e ON er.event_id = e.id
-            WHERE (LOWER(er.user_email) = $1 OR er.matched_user_id = $2)
+            WHERE (LOWER(er.user_email) = ${normalizedEmail} OR er.matched_user_id = ${member.id})
               AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
               AND er.status != 'cancelled'
-          `, [normalizedEmail, member.id]);
+          `);
           
-          const wellnessCountResult = await pool.query(`
+          const wellnessCountResult = await db.execute(sql`
             SELECT COUNT(*) as count FROM wellness_enrollments we
             JOIN wellness_classes wc ON we.class_id = wc.id
-            WHERE LOWER(we.user_email) = $1
+            WHERE LOWER(we.user_email) = ${normalizedEmail}
               AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
               AND we.status != 'cancelled'
-          `, [normalizedEmail]);
+          `);
           
           const bookingCount = parseInt(visitCountResult.rows[0]?.count || '0');
           const eventCount = parseInt(eventCountResult.rows[0]?.count || '0');
@@ -1459,7 +1397,7 @@ router.post('/api/data-tools/detect-duplicates', isAdmin, async (req: Request, r
     
     console.log(`[DataTools] Starting duplicate detection by ${staffEmail}`);
     
-    const appDuplicatesResult = await pool.query(`
+    const appDuplicatesResult = await db.execute(sql`
       SELECT LOWER(email) as normalized_email, 
              COUNT(*) as count,
              ARRAY_AGG(id) as user_ids,
@@ -1494,15 +1432,13 @@ router.post('/api/data-tools/detect-duplicates', isAdmin, async (req: Request, r
     }> = [];
     const hubspotErrors: string[] = [];
     
-    const membersWithHubspot = await pool.query(
-      `SELECT DISTINCT LOWER(email) as email, hubspot_id
+    const membersWithHubspot = await db.execute(sql`SELECT DISTINCT LOWER(email) as email, hubspot_id
        FROM users 
        WHERE hubspot_id IS NOT NULL
          AND hubspot_id != ''
          AND email IS NOT NULL
          AND archived_at IS NULL
-       LIMIT 500`
-    );
+       LIMIT 500`);
     
     const BATCH_SIZE = 10;
     const BATCH_DELAY_MS = 150;
@@ -1593,8 +1529,7 @@ router.post('/api/data-tools/sync-payment-status', isAdmin, async (req: Request,
     const hubspot = await getHubSpotClient();
     const stripe = await getStripeClient();
     
-    const membersWithBoth = await pool.query(
-      `SELECT id, email, first_name, last_name, tier, stripe_customer_id, hubspot_id
+    const membersWithBoth = await db.execute(sql`SELECT id, email, first_name, last_name, tier, stripe_customer_id, hubspot_id
        FROM users 
        WHERE stripe_customer_id IS NOT NULL
          AND stripe_customer_id != ''
@@ -1602,8 +1537,7 @@ router.post('/api/data-tools/sync-payment-status', isAdmin, async (req: Request,
          AND hubspot_id != ''
          AND role = 'member'
        ORDER BY email
-       LIMIT 500`
-    );
+       LIMIT 500`);
     
     if (membersWithBoth.rows.length === 0) {
       return res.json({ 
@@ -1790,28 +1724,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
     
     console.log(`[DataTools] Starting Trackman ghost booking fix (dryRun: ${dryRun}) by ${staffEmail}`);
     
-    let whereClause = `
-      br.trackman_booking_id IS NOT NULL
-      AND br.session_id IS NULL
-      AND br.status NOT IN ('cancelled', 'declined')
-    `;
-    const params: any[] = [];
-    let paramIndex = 1;
-    
-    if (startDate) {
-      whereClause += ` AND br.request_date >= $${paramIndex}`;
-      params.push(startDate);
-      paramIndex++;
-    }
-    
-    if (endDate) {
-      whereClause += ` AND br.request_date <= $${paramIndex}`;
-      params.push(endDate);
-      paramIndex++;
-    }
-    
-    const ghostBookingsResult = await pool.query(
-      `SELECT 
+    const ghostQuery = sql`SELECT 
         br.id,
         br.user_id,
         br.user_email,
@@ -1827,11 +1740,22 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
         u.tier
        FROM booking_requests br
        LEFT JOIN users u ON LOWER(br.user_email) = LOWER(u.email)
-       WHERE ${whereClause}
-       ORDER BY br.request_date DESC, br.start_time DESC
-       LIMIT $${paramIndex}`,
-      [...params, limit]
-    );
+       WHERE br.trackman_booking_id IS NOT NULL
+         AND br.session_id IS NULL
+         AND br.status NOT IN ('cancelled', 'declined')
+    `;
+    
+    if (startDate) {
+      ghostQuery.append(sql` AND br.request_date >= ${startDate}`);
+    }
+    
+    if (endDate) {
+      ghostQuery.append(sql` AND br.request_date <= ${endDate}`);
+    }
+    
+    ghostQuery.append(sql` ORDER BY br.request_date DESC, br.start_time DESC LIMIT ${limit}`);
+    
+    const ghostBookingsResult = await db.execute(ghostQuery);
     
     const ghostBookings = ghostBookingsResult.rows.map(row => ({
       bookingId: row.id,
@@ -1874,26 +1798,17 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
     
     for (const booking of ghostBookings) {
       try {
-        const existingSessionCheck = await pool.query(
-          `SELECT session_id FROM booking_requests WHERE id = $1 AND session_id IS NOT NULL`,
-          [booking.bookingId]
-        );
+        const existingSessionCheck = await db.execute(sql`SELECT session_id FROM booking_requests WHERE id = ${booking.bookingId} AND session_id IS NOT NULL`);
         
         if (existingSessionCheck.rows.length > 0) {
           continue;
         }
         
-        const duplicateSessionCheck = await pool.query(
-          `SELECT id FROM booking_sessions WHERE trackman_booking_id = $1`,
-          [booking.trackmanBookingId]
-        );
+        const duplicateSessionCheck = await db.execute(sql`SELECT id FROM booking_sessions WHERE trackman_booking_id = ${booking.trackmanBookingId}`);
         
         if (duplicateSessionCheck.rows.length > 0) {
           const existingSessionId = duplicateSessionCheck.rows[0].id;
-          await pool.query(
-            `UPDATE booking_requests SET session_id = $1, updated_at = NOW() WHERE id = $2`,
-            [existingSessionId, booking.bookingId]
-          );
+          await db.execute(sql`UPDATE booking_requests SET session_id = ${existingSessionId}, updated_at = NOW() WHERE id = ${booking.bookingId}`);
           
           fixed.push({
             bookingId: booking.bookingId,
@@ -1917,11 +1832,11 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
           continue;
         }
         
-        const sessionResult = await pool.query(`
+        const sessionResult = await db.execute(sql`
           INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
-          VALUES ($1, $2, $3, $4, $5, 'trackman', 'ghost_booking_fix')
+          VALUES (${booking.resourceId}, ${booking.requestDate}, ${booking.startTime}, ${booking.endTime}, ${booking.trackmanBookingId}, 'trackman', 'ghost_booking_fix')
           RETURNING id
-        `, [booking.resourceId, booking.requestDate, booking.startTime, booking.endTime, booking.trackmanBookingId]);
+        `);
         
         if (sessionResult.rows.length === 0) {
           errors.push(`Failed to create session for booking ${booking.bookingId}`);
@@ -1930,10 +1845,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
         
         const sessionId = sessionResult.rows[0].id;
         
-        await pool.query(
-          `UPDATE booking_requests SET session_id = $1, updated_at = NOW() WHERE id = $2`,
-          [sessionId, booking.bookingId]
-        );
+        await db.execute(sql`UPDATE booking_requests SET session_id = ${sessionId}, updated_at = NOW() WHERE id = ${booking.bookingId}`);
         
         const ownerTier = booking.tier || await getMemberTierByEmail(booking.userEmail, { allowInactive: true });
         
@@ -2000,23 +1912,20 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
                          new Date(`2000-01-01T${booking.startTime}`).getTime()) / 60000)
             : booking.durationMinutes || 60;
           
-          const userResult = await pool.query(
-            `SELECT id FROM users WHERE LOWER(email) = LOWER($1)`,
-            [booking.userEmail]
-          );
+          const userResult = await db.execute(sql`SELECT id FROM users WHERE LOWER(email) = LOWER(${booking.userEmail})`);
           const userId = userResult.rows[0]?.id || null;
           
-          await pool.query(`
+          await db.execute(sql`
             INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-            VALUES ($1, $2, 'owner', $3, 'pending', $4)
+            VALUES (${sessionId}, ${userId}, 'owner', ${booking.userName || booking.userEmail}, 'pending', ${slotDuration})
             ON CONFLICT (session_id, user_id) WHERE user_id IS NOT NULL DO NOTHING
-          `, [sessionId, userId, booking.userName || booking.userEmail, slotDuration]);
+          `);
           
           for (let i = 1; i < booking.playerCount; i++) {
-            await pool.query(`
+            await db.execute(sql`
               INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-              VALUES ($1, NULL, 'guest', $2, 'pending', $3)
-            `, [sessionId, `Guest ${i + 1}`, slotDuration]);
+              VALUES (${sessionId}, NULL, 'guest', ${`Guest ${i + 1}`}, 'pending', ${slotDuration})
+            `);
           }
           
           await recalculateSessionFees(sessionId);

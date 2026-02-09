@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { pool } from '../../core/db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { getSessionUser } from '../../types/session';
 import { sendNotificationToUser, broadcastBillingUpdate } from '../../core/websocket';
 import { computeFeeBreakdown, getEffectivePlayerCount } from '../../core/billing/unifiedFeeService';
@@ -17,15 +18,15 @@ router.post('/api/stripe/overage/create-payment-intent', async (req: Request, re
       return res.status(400).json({ error: 'Booking ID is required.' });
     }
     
-    const bookingResult = await pool.query(`
+    const bookingResult = await db.execute(sql`
       SELECT br.id, br.user_email, br.overage_fee_cents, br.overage_paid, br.overage_minutes,
              br.request_date, br.start_time, br.duration_minutes,
              br.session_id, br.declared_player_count,
              u.stripe_customer_id, u.id as user_id, u.first_name, u.last_name
       FROM booking_requests br
       LEFT JOIN users u ON LOWER(u.email) = LOWER(br.user_email)
-      WHERE br.id = $1
-    `, [bookingId]);
+      WHERE br.id = ${bookingId}
+    `);
     
     if (bookingResult.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found.' });
@@ -91,7 +92,7 @@ router.post('/api/stripe/overage/create-payment-intent', async (req: Request, re
       customerId = custResult.customerId;
     }
     
-    const productResult = await pool.query(`
+    const productResult = await db.execute(sql`
       SELECT stripe_price_id, stripe_product_id 
       FROM membership_tiers 
       WHERE slug = 'simulator-overage-30min' AND is_active = true
@@ -123,11 +124,11 @@ router.post('/api/stripe/overage/create-payment-intent', async (req: Request, re
       automatic_payment_methods: { enabled: true },
     });
     
-    await pool.query(`
+    await db.execute(sql`
       UPDATE booking_requests 
-      SET overage_payment_intent_id = $1, updated_at = NOW() 
-      WHERE id = $2
-    `, [paymentIntent.id, bookingId]);
+      SET overage_payment_intent_id = ${paymentIntent.id}, updated_at = NOW() 
+      WHERE id = ${bookingId}
+    `);
     
     console.log(`[Overage Payment] Created payment intent ${paymentIntent.id} for booking ${bookingId}: $${(booking.overage_fee_cents / 100).toFixed(2)}`);
     
@@ -159,10 +160,7 @@ router.post('/api/stripe/overage/confirm-payment', async (req: Request, res: Res
       return res.status(400).json({ error: 'Booking ID and payment intent ID are required.' });
     }
     
-    const ownerCheck = await pool.query(
-      'SELECT user_email FROM booking_requests WHERE id = $1',
-      [bookingId]
-    );
+    const ownerCheck = await db.execute(sql`SELECT user_email FROM booking_requests WHERE id = ${bookingId}`);
     if (ownerCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found.' });
     }
@@ -180,12 +178,12 @@ router.post('/api/stripe/overage/confirm-payment', async (req: Request, res: Res
       return res.status(400).json({ error: `Payment not complete. Status: ${paymentIntent.status}` });
     }
     
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       UPDATE booking_requests 
       SET overage_paid = true, updated_at = NOW() 
-      WHERE id = $1 AND overage_payment_intent_id = $2
+      WHERE id = ${bookingId} AND overage_payment_intent_id = ${paymentIntentId}
       RETURNING id, user_email, overage_fee_cents, overage_minutes
-    `, [bookingId, paymentIntentId]);
+    `);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found or payment intent mismatch.' });
@@ -231,11 +229,11 @@ router.get('/api/stripe/overage/check/:bookingId', async (req: Request, res: Res
       return res.status(401).json({ error: 'Authentication required.' });
     }
     
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       SELECT id, user_email, overage_minutes, overage_fee_cents, overage_paid, overage_payment_intent_id
       FROM booking_requests 
-      WHERE id = $1
-    `, [bookingId]);
+      WHERE id = ${bookingId}
+    `);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found.' });

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { pool, isProduction } from '../core/db';
+import { isProduction } from '../core/db';
 import { isStaffOrAdmin } from '../core/middleware';
 import { syncWellnessCalendarEvents, discoverCalendarIds, getCalendarIdByName, createCalendarEventOnCalendar, deleteCalendarEvent, updateCalendarEvent, CALENDAR_CONFIG } from '../core/calendar/index';
 import { db } from '../db';
@@ -57,17 +57,14 @@ async function createWellnessAvailabilityBlocks(
   const blockNotes = classTitle ? `Blocked for: ${classTitle}` : 'Blocked for wellness class';
   
   for (const resourceId of resourceIds) {
-    await pool.query(
-      `INSERT INTO availability_blocks (resource_id, block_date, start_time, end_time, block_type, notes, created_by, wellness_class_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       ON CONFLICT DO NOTHING`,
-      [resourceId, classDate, startTime, endTime || startTime, 'wellness', blockNotes, createdBy || 'system', wellnessClassId]
-    );
+    await db.execute(sql`INSERT INTO availability_blocks (resource_id, block_date, start_time, end_time, block_type, notes, created_by, wellness_class_id)
+       VALUES (${resourceId}, ${classDate}, ${startTime}, ${endTime || startTime}, ${'wellness'}, ${blockNotes}, ${createdBy || 'system'}, ${wellnessClassId})
+       ON CONFLICT DO NOTHING`);
   }
 }
 
 async function removeWellnessAvailabilityBlocks(wellnessClassId: number): Promise<void> {
-  await pool.query('DELETE FROM availability_blocks WHERE wellness_class_id = $1', [wellnessClassId]);
+  await db.execute(sql`DELETE FROM availability_blocks WHERE wellness_class_id = ${wellnessClassId}`);
 }
 
 async function updateWellnessAvailabilityBlocks(
@@ -205,14 +202,12 @@ router.post('/api/wellness-classes/backfill-calendar', isStaffOrAdmin, async (re
 
 router.get('/api/wellness-classes/needs-review', isStaffOrAdmin, async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT id, title, time, instructor, duration, category, spots, status, description, date, 
+    const result = await db.execute(sql`SELECT id, title, time, instructor, duration, category, spots, status, description, date, 
               is_active, image_url, external_url, visibility, needs_review, conflict_detected,
               block_simulators, block_conference_room 
        FROM wellness_classes 
        WHERE needs_review = true AND is_active = true
-       ORDER BY date ASC, time ASC`
-    );
+       ORDER BY date ASC, time ASC`);
     res.json(result.rows);
   } catch (error: any) {
     if (!isProduction) console.error('Fetch needs review error:', error);
@@ -227,20 +222,15 @@ router.post('/api/wellness-classes/:id/mark-reviewed', isStaffOrAdmin, async (re
     const sessionUser = getSessionUser(req);
     const reviewedBy = sessionUser?.email || 'staff';
     
-    const existing = await pool.query(
-      `SELECT title, time, date FROM wellness_classes WHERE id = $1`, [id]
-    );
+    const existing = await db.execute(sql`SELECT title, time, date FROM wellness_classes WHERE id = ${id}`);
     const originalTitle = existing.rows[0]?.title;
     const originalTime = existing.rows[0]?.time;
     const originalDate = existing.rows[0]?.date;
     
-    const result = await pool.query(
-      `UPDATE wellness_classes 
-       SET needs_review = false, reviewed_by = $1, reviewed_at = NOW(), updated_at = NOW(), review_dismissed = true, conflict_detected = false,
+    const result = await db.execute(sql`UPDATE wellness_classes 
+       SET needs_review = false, reviewed_by = ${reviewedBy}, reviewed_at = NOW(), updated_at = NOW(), review_dismissed = true, conflict_detected = false,
            locally_edited = true, app_last_modified_at = NOW()
-       WHERE id = $2 RETURNING *`,
-      [reviewedBy, id]
-    );
+       WHERE id = ${id} RETURNING *`);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Wellness class not found' });
@@ -253,78 +243,49 @@ router.post('/api/wellness-classes/:id/mark-reviewed', isStaffOrAdmin, async (re
       let bulkResult;
       
       if (updatedClass.recurring_event_id) {
-        bulkResult = await pool.query(
-          `UPDATE wellness_classes 
+        bulkResult = await db.execute(sql`UPDATE wellness_classes 
            SET needs_review = false, 
-               reviewed_by = $1, 
+               reviewed_by = ${reviewedBy}, 
                reviewed_at = NOW(), 
                updated_at = NOW(), 
                review_dismissed = true, 
                conflict_detected = false,
-               category = $3,
-               instructor = $4,
-               title = $5,
-               image_url = COALESCE($6, image_url),
-               external_url = COALESCE($7, external_url),
+               category = ${updatedClass.category},
+               instructor = ${updatedClass.instructor},
+               title = ${updatedClass.title},
+               image_url = COALESCE(${updatedClass.image_url}, image_url),
+               external_url = COALESCE(${updatedClass.external_url}, external_url),
                locally_edited = true,
                app_last_modified_at = NOW()
-           WHERE recurring_event_id = $2 
-             AND id != $8 
-             AND date >= $9
+           WHERE recurring_event_id = ${updatedClass.recurring_event_id} 
+             AND id != ${id} 
+             AND date >= ${updatedClass.date}
              AND is_active = true
-           RETURNING id`,
-          [
-            reviewedBy, 
-            updatedClass.recurring_event_id, 
-            updatedClass.category,
-            updatedClass.instructor,
-            updatedClass.title,
-            updatedClass.image_url,
-            updatedClass.external_url,
-            id,
-            updatedClass.date
-          ]
-        );
+           RETURNING id`);
       } else if (originalTitle && originalTime && originalDate) {
         const dayOfWeek = new Date(originalDate).getDay();
         
-        bulkResult = await pool.query(
-          `UPDATE wellness_classes 
+        bulkResult = await db.execute(sql`UPDATE wellness_classes 
            SET needs_review = false, 
-               reviewed_by = $1, 
+               reviewed_by = ${reviewedBy}, 
                reviewed_at = NOW(), 
                updated_at = NOW(), 
                review_dismissed = true, 
                conflict_detected = false,
-               category = $3,
-               instructor = $4,
-               title = $5,
-               image_url = COALESCE($6, image_url),
-               external_url = COALESCE($7, external_url),
+               category = ${updatedClass.category},
+               instructor = ${updatedClass.instructor},
+               title = ${updatedClass.title},
+               image_url = COALESCE(${updatedClass.image_url}, image_url),
+               external_url = COALESCE(${updatedClass.external_url}, external_url),
                locally_edited = true,
                app_last_modified_at = NOW()
-           WHERE title = $8
-             AND time = $9
-             AND EXTRACT(DOW FROM date) = $10
-             AND id != $11 
-             AND date >= $12
+           WHERE title = ${originalTitle}
+             AND time = ${originalTime}
+             AND EXTRACT(DOW FROM date) = ${dayOfWeek}
+             AND id != ${id} 
+             AND date >= ${updatedClass.date}
              AND is_active = true
-           RETURNING id`,
-          [
-            reviewedBy, 
-            null,
-            updatedClass.category,
-            updatedClass.instructor,
-            updatedClass.title,
-            updatedClass.image_url,
-            updatedClass.external_url,
-            originalTitle,
-            originalTime,
-            dayOfWeek,
-            id,
-            updatedClass.date
-          ]
-        );
+           RETURNING id`);
       }
       
       if (bulkResult) {
@@ -348,9 +309,18 @@ router.post('/api/wellness-classes/:id/mark-reviewed', isStaffOrAdmin, async (re
 router.get('/api/wellness-classes', async (req, res) => {
   try {
     const { active_only, include_archived } = req.query;
-    // Join with enrollments to get remaining spots and waitlist count
-    let query = `
-      SELECT wc.*, 
+    const sqlConditions: ReturnType<typeof sql>[] = [];
+    
+    if (include_archived !== 'true') {
+      sqlConditions.push(sql`wc.archived_at IS NULL`);
+    }
+    
+    if (active_only === 'true') {
+      sqlConditions.push(sql`wc.is_active = true`);
+      sqlConditions.push(sql`wc.date >= ${getTodayPacific()}`);
+    }
+    
+    const baseQuery = sql`SELECT wc.*, 
         COALESCE(e.enrolled_count, 0)::integer as enrolled_count,
         COALESCE(w.waitlist_count, 0)::integer as waitlist_count,
         CASE 
@@ -371,32 +341,15 @@ router.get('/api/wellness-classes', async (req, res) => {
         FROM wellness_enrollments 
         WHERE status = 'confirmed' AND is_waitlisted = true
         GROUP BY class_id
-      ) w ON wc.id = w.class_id
-    `;
+      ) w ON wc.id = w.class_id`;
     
-    // Build WHERE conditions
-    const conditions: string[] = [];
-    const params: any[] = [];
-    
-    // Filter archived records by default unless include_archived=true
-    if (include_archived !== 'true') {
-      conditions.push('wc.archived_at IS NULL');
+    let fullQuery = baseQuery;
+    if (sqlConditions.length > 0) {
+      fullQuery = sql`${baseQuery} WHERE ${sql.join(sqlConditions, sql` AND `)}`;
     }
+    fullQuery = sql`${fullQuery} ORDER BY wc.date ASC, wc.time ASC`;
     
-    if (active_only === 'true') {
-      conditions.push('wc.is_active = true');
-      params.push(getTodayPacific());
-      conditions.push(`wc.date >= $${params.length}`);
-    }
-    
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ');
-    }
-    
-    query += ' ORDER BY wc.date ASC, wc.time ASC';
-    const result = params.length > 0 
-      ? await pool.query(query, params)
-      : await pool.query(query);
+    const result = await db.execute(fullQuery);
     res.json(result.rows);
   } catch (error: any) {
     if (!isProduction) console.error('API error:', error);
@@ -481,11 +434,8 @@ router.post('/api/wellness-classes', isStaffOrAdmin, async (req, res) => {
     const newBlockSimulators = block_simulators === true || block_simulators === 'true';
     const newBlockConferenceRoom = block_conference_room === true || block_conference_room === 'true';
     
-    const result = await pool.query(
-      `INSERT INTO wellness_classes (title, time, instructor, duration, category, spots, status, description, date, google_calendar_id, image_url, external_url, block_bookings, block_simulators, block_conference_room, capacity, waitlist_enabled)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING *`,
-      [title, time, instructor, duration, category, finalSpots, status || 'available', description || null, date, googleCalendarId, image_url || null, external_url || null, block_bookings || false, newBlockSimulators, newBlockConferenceRoom, finalCapacity, waitlist_enabled || false]
-    );
+    const result = await db.execute(sql`INSERT INTO wellness_classes (title, time, instructor, duration, category, spots, status, description, date, google_calendar_id, image_url, external_url, block_bookings, block_simulators, block_conference_room, capacity, waitlist_enabled)
+       VALUES (${title}, ${time}, ${instructor}, ${duration}, ${category}, ${finalSpots}, ${status || 'available'}, ${description || null}, ${date}, ${googleCalendarId}, ${image_url || null}, ${external_url || null}, ${block_bookings || false}, ${newBlockSimulators}, ${newBlockConferenceRoom}, ${finalCapacity}, ${waitlist_enabled || false}) RETURNING *`);
     
     const createdClass = result.rows[0];
     
@@ -525,7 +475,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
     const finalSpots = spots || (capacity ? `${capacity} spots` : null);
     const finalCapacity = capacity || (spots ? parseInt(spots.toString().replace(/[^0-9]/g, '')) || null : null);
     
-    const existing = await pool.query('SELECT google_calendar_id, title, time, instructor, duration, category, date, block_bookings, block_simulators, block_conference_room, recurring_event_id FROM wellness_classes WHERE id = $1', [id]);
+    const existing = await db.execute(sql`SELECT google_calendar_id, title, time, instructor, duration, category, date, block_bookings, block_simulators, block_conference_room, recurring_event_id FROM wellness_classes WHERE id = ${id}`);
     
     const previousBlockBookings = existing.rows[0]?.block_bookings || false;
     const previousBlockSimulators = existing.rows[0]?.block_simulators || false;
@@ -538,36 +488,33 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
     const sessionUser = getSessionUser(req);
     const reviewedBy = sessionUser?.email || 'staff';
     
-    const result = await pool.query(
-      `UPDATE wellness_classes SET 
-        title = COALESCE($1, title),
-        time = COALESCE($2, time),
-        instructor = COALESCE($3, instructor),
-        duration = COALESCE($4, duration),
-        category = COALESCE($5, category),
-        spots = COALESCE($6, spots),
-        status = COALESCE($7, status),
-        description = COALESCE($8, description),
-        date = COALESCE($9, date),
-        is_active = COALESCE($10, is_active),
-        image_url = COALESCE($11, image_url),
-        external_url = COALESCE($12, external_url),
-        block_bookings = $13,
-        block_simulators = $14,
-        block_conference_room = $15,
-        capacity = $16,
-        waitlist_enabled = $17,
+    const result = await db.execute(sql`UPDATE wellness_classes SET 
+        title = COALESCE(${title}, title),
+        time = COALESCE(${time}, time),
+        instructor = COALESCE(${instructor}, instructor),
+        duration = COALESCE(${duration}, duration),
+        category = COALESCE(${category}, category),
+        spots = COALESCE(${finalSpots}, spots),
+        status = COALESCE(${status}, status),
+        description = COALESCE(${description}, description),
+        date = COALESCE(${date}, date),
+        is_active = COALESCE(${is_active}, is_active),
+        image_url = COALESCE(${image_url}, image_url),
+        external_url = COALESCE(${external_url}, external_url),
+        block_bookings = ${newBlockBookings},
+        block_simulators = ${newBlockSimulators},
+        block_conference_room = ${newBlockConferenceRoom},
+        capacity = ${finalCapacity},
+        waitlist_enabled = ${newWaitlistEnabled},
         locally_edited = true,
         app_last_modified_at = NOW(),
         updated_at = NOW(),
         conflict_detected = false,
         needs_review = false,
         review_dismissed = true,
-        reviewed_by = $19,
+        reviewed_by = ${reviewedBy},
         reviewed_at = NOW()
-       WHERE id = $18 RETURNING *`,
-      [title, time, instructor, duration, category, finalSpots, status, description, date, is_active, image_url, external_url, newBlockBookings, newBlockSimulators, newBlockConferenceRoom, finalCapacity, newWaitlistEnabled, id, reviewedBy]
-    );
+       WHERE id = ${id} RETURNING *`);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Wellness class not found' });
@@ -638,76 +585,60 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
         let recurringResult;
         
         if (existingRow?.recurring_event_id) {
-          recurringResult = await pool.query(
-            `UPDATE wellness_classes 
-             SET category = COALESCE($1, category),
-                 instructor = COALESCE($2, instructor),
-                 title = COALESCE($3, title),
-                 duration = COALESCE($4, duration),
-                 spots = COALESCE($5, spots),
-                 capacity = COALESCE($6, capacity),
-                 image_url = COALESCE($7, image_url),
-                 external_url = COALESCE($8, external_url),
-                 block_simulators = $13,
-                 block_conference_room = $14,
+          recurringResult = await db.execute(sql`UPDATE wellness_classes 
+             SET category = COALESCE(${category}, category),
+                 instructor = COALESCE(${instructor}, instructor),
+                 title = COALESCE(${title}, title),
+                 duration = COALESCE(${duration}, duration),
+                 spots = COALESCE(${finalSpots}, spots),
+                 capacity = COALESCE(${finalCapacity}, capacity),
+                 image_url = COALESCE(${image_url}, image_url),
+                 external_url = COALESCE(${external_url}, external_url),
+                 block_simulators = ${newBlockSimulators},
+                 block_conference_room = ${newBlockConferenceRoom},
                  needs_review = false,
-                 reviewed_by = $9,
+                 reviewed_by = ${reviewedBy},
                  reviewed_at = NOW(),
                  review_dismissed = true,
                  conflict_detected = false,
                  updated_at = NOW(),
                  locally_edited = true,
                  app_last_modified_at = NOW()
-             WHERE recurring_event_id = $10 
-               AND id != $11 
-               AND date > $12
+             WHERE recurring_event_id = ${existingRow.recurring_event_id} 
+               AND id != ${id} 
+               AND date > ${updated.date}
                AND is_active = true
-             RETURNING id, date, time, duration, title`,
-            [
-              category, instructor, title, duration, finalSpots, finalCapacity, 
-              image_url, external_url, reviewedBy,
-              existingRow.recurring_event_id, id, updated.date,
-              newBlockSimulators, newBlockConferenceRoom
-            ]
-          );
+             RETURNING id, date, time, duration, title`);
         } else if (existingRow?.title) {
           const dayOfWeek = new Date(existingRow.date).getDay();
           const originalTime = existingRow.time;
           
-          recurringResult = await pool.query(
-            `UPDATE wellness_classes 
-             SET category = COALESCE($1, category),
-                 instructor = COALESCE($2, instructor),
-                 title = COALESCE($3, title),
-                 duration = COALESCE($4, duration),
-                 spots = COALESCE($5, spots),
-                 capacity = COALESCE($6, capacity),
-                 image_url = COALESCE($7, image_url),
-                 external_url = COALESCE($8, external_url),
-                 block_simulators = $15,
-                 block_conference_room = $16,
+          recurringResult = await db.execute(sql`UPDATE wellness_classes 
+             SET category = COALESCE(${category}, category),
+                 instructor = COALESCE(${instructor}, instructor),
+                 title = COALESCE(${title}, title),
+                 duration = COALESCE(${duration}, duration),
+                 spots = COALESCE(${finalSpots}, spots),
+                 capacity = COALESCE(${finalCapacity}, capacity),
+                 image_url = COALESCE(${image_url}, image_url),
+                 external_url = COALESCE(${external_url}, external_url),
+                 block_simulators = ${newBlockSimulators},
+                 block_conference_room = ${newBlockConferenceRoom},
                  needs_review = false,
-                 reviewed_by = $9,
+                 reviewed_by = ${reviewedBy},
                  reviewed_at = NOW(),
                  review_dismissed = true,
                  conflict_detected = false,
                  updated_at = NOW(),
                  locally_edited = true,
                  app_last_modified_at = NOW()
-             WHERE title = $10 
-               AND time = $11
-               AND EXTRACT(DOW FROM date) = $12
-               AND id != $13 
-               AND date > $14
+             WHERE title = ${existingRow.title} 
+               AND time = ${originalTime}
+               AND EXTRACT(DOW FROM date) = ${dayOfWeek}
+               AND id != ${id} 
+               AND date > ${updated.date}
                AND is_active = true
-             RETURNING id, date, time, duration, title`,
-            [
-              category, instructor, title, duration, finalSpots, finalCapacity, 
-              image_url, external_url, reviewedBy,
-              existingRow.title, originalTime, dayOfWeek, id, updated.date,
-              newBlockSimulators, newBlockConferenceRoom
-            ]
-          );
+             RETURNING id, date, time, duration, title`);
         }
         
         if (recurringResult) {
@@ -857,10 +788,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
       
       if (hasValidInstructor && hasValidCategory && hasValidSpots) {
         try {
-          const reviewedResult = await pool.query(
-            `UPDATE wellness_classes SET needs_review = false, reviewed_by = $1, reviewed_at = NOW(), updated_at = NOW(), review_dismissed = true WHERE id = $2 RETURNING *`,
-            [userEmail, id]
-          );
+          const reviewedResult = await db.execute(sql`UPDATE wellness_classes SET needs_review = false, reviewed_by = ${userEmail}, reviewed_at = NOW(), updated_at = NOW(), review_dismissed = true WHERE id = ${id} RETURNING *`);
           if (reviewedResult.rows.length > 0) {
             Object.assign(updated, reviewedResult.rows[0]);
           }
@@ -988,12 +916,9 @@ router.post('/api/wellness-enrollments', async (req, res) => {
       return res.status(409).json({ error: 'Already enrolled in this class' });
     }
     
-    const classDataResult = await pool.query(
-      `SELECT wc.*, 
+    const classDataResult = await db.execute(sql`SELECT wc.*, 
         COALESCE((SELECT COUNT(*) FROM wellness_enrollments WHERE class_id = wc.id AND status = 'confirmed' AND is_waitlisted = false), 0)::integer as enrolled_count
-      FROM wellness_classes wc WHERE wc.id = $1`,
-      [class_id]
-    );
+      FROM wellness_classes wc WHERE wc.id = ${class_id}`);
     
     if (classDataResult.rows.length === 0) {
       return res.status(404).json({ error: 'Wellness class not found' });
@@ -1124,12 +1049,9 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res
     
     const wasNotWaitlisted = currentEnrollment.length > 0 && !currentEnrollment[0].isWaitlisted;
     
-    const classDataResult = await pool.query(
-      `SELECT wc.*, 
+    const classDataResult = await db.execute(sql`SELECT wc.*, 
         (SELECT COUNT(*) FROM wellness_enrollments WHERE class_id = wc.id AND status = 'confirmed' AND is_waitlisted = true) as waitlist_count
-      FROM wellness_classes wc WHERE wc.id = $1`,
-      [class_id]
-    );
+      FROM wellness_classes wc WHERE wc.id = ${class_id}`);
     
     if (classDataResult.rows.length === 0) {
       return res.status(404).json({ error: 'Wellness class not found' });
@@ -1162,14 +1084,11 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res
     
     // Delete the original "Wellness Class Confirmed" notification to avoid confusion
     try {
-      await pool.query(
-        `DELETE FROM notifications 
-         WHERE LOWER(user_email) = LOWER($1) 
-         AND related_id = $2 
+      await db.execute(sql`DELETE FROM notifications 
+         WHERE LOWER(user_email) = LOWER(${user_email}) 
+         AND related_id = ${parseInt(class_id)} 
          AND related_type = 'wellness_class' 
-         AND type = 'wellness_booking'`,
-        [user_email, parseInt(class_id)]
-      );
+         AND type = 'wellness_booking'`);
     } catch (cleanupErr) {
       // Non-critical - log but don't fail the cancellation
       if (!isProduction) console.warn('Failed to cleanup wellness confirmation notification:', cleanupErr);
@@ -1190,16 +1109,13 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res
       try {
         // Get the first person on waitlist (oldest entry) with row locking to prevent race conditions
         // FOR UPDATE SKIP LOCKED ensures concurrent processes pick different users
-        const waitlistedResult = await pool.query(
-          `SELECT * FROM wellness_enrollments 
-           WHERE class_id = $1 
+        const waitlistedResult = await db.execute(sql`SELECT * FROM wellness_enrollments 
+           WHERE class_id = ${parseInt(class_id)} 
              AND status = 'confirmed' 
              AND is_waitlisted = true
            ORDER BY created_at ASC
            LIMIT 1
-           FOR UPDATE SKIP LOCKED`,
-          [parseInt(class_id)]
-        );
+           FOR UPDATE SKIP LOCKED`);
         
         if (waitlistedResult.rows.length > 0) {
           const promotedUserRow = waitlistedResult.rows[0];
@@ -1260,15 +1176,12 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res
     });
     
     // Broadcast waitlist update for real-time availability refresh (spot opened)
-    const spotsQuery = await pool.query(
-      `SELECT 
+    const spotsQuery = await db.execute(sql`SELECT 
         CASE 
-          WHEN capacity IS NOT NULL THEN GREATEST(0, capacity - COALESCE((SELECT COUNT(*) FROM wellness_enrollments WHERE class_id = $1 AND status = 'confirmed' AND is_waitlisted = false), 0))
+          WHEN capacity IS NOT NULL THEN GREATEST(0, capacity - COALESCE((SELECT COUNT(*) FROM wellness_enrollments WHERE class_id = ${class_id} AND status = 'confirmed' AND is_waitlisted = false), 0))
           ELSE NULL
         END as spots_available
-       FROM wellness_classes WHERE id = $1`,
-      [class_id]
-    );
+       FROM wellness_classes WHERE id = ${class_id}`);
     const spotsAvailable = spotsQuery.rows[0]?.spots_available;
     broadcastWaitlistUpdate({ classId: parseInt(class_id), action: 'spot_opened', spotsAvailable: spotsAvailable ?? undefined });
     
@@ -1290,7 +1203,7 @@ router.delete('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
     const { id } = req.params;
     const wellnessClassId = parseInt(id);
     
-    const existing = await pool.query('SELECT google_calendar_id FROM wellness_classes WHERE id = $1', [id]);
+    const existing = await db.execute(sql`SELECT google_calendar_id FROM wellness_classes WHERE id = ${id}`);
     if (existing.rows.length > 0 && existing.rows[0].google_calendar_id) {
       try {
         const calendarId = await getCalendarIdByName(CALENDAR_CONFIG.wellness.name);
@@ -1308,10 +1221,7 @@ router.delete('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
       if (!isProduction) console.error('Failed to remove availability blocks for wellness class:', blockError);
     }
     
-    const result = await pool.query(
-      'DELETE FROM wellness_classes WHERE id = $1 RETURNING *',
-      [id]
-    );
+    const result = await db.execute(sql`DELETE FROM wellness_classes WHERE id = ${id} RETURNING *`);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Wellness class not found' });
@@ -1385,10 +1295,7 @@ router.post('/api/wellness-classes/:id/enrollments/manual', isStaffOrAdmin, asyn
     }
 
     // Get the class details for audit logging
-    const classQuery = await pool.query(
-      'SELECT id, title, instructor FROM wellness_classes WHERE id = $1',
-      [parseInt(id)]
-    );
+    const classQuery = await db.execute(sql`SELECT id, title, instructor FROM wellness_classes WHERE id = ${parseInt(id)}`);
     const classDetails = classQuery.rows[0];
 
     await db.insert(wellnessEnrollments).values({

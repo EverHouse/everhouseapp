@@ -3,7 +3,7 @@ import { eq, sql, desc } from 'drizzle-orm';
 import crypto from 'crypto';
 import { db } from '../../db';
 import { users, dayPassPurchases } from '../../../shared/schema';
-import { isProduction, pool } from '../../core/db';
+import { isProduction } from '../../core/db';
 import { isStaffOrAdmin, isAdmin } from '../../core/middleware';
 import { getSessionUser } from '../../types/session';
 import { getOrCreateStripeCustomer } from '../../core/stripe';
@@ -379,7 +379,7 @@ router.get('/api/visitors/:id/purchases', isStaffOrAdmin, async (req, res) => {
 
 router.get('/api/guests/needs-email', isStaffOrAdmin, async (req, res) => {
   try {
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       SELECT 
         g.id as guest_id,
         g.name as guest_name,
@@ -402,7 +402,7 @@ router.get('/api/guests/needs-email', isStaffOrAdmin, async (req, res) => {
     
     res.json({
       success: true,
-      guests: result.rows.map(row => ({
+      guests: result.rows.map((row: any) => ({
         guestId: row.guest_id,
         guestName: row.guest_name,
         participantId: row.participant_id,
@@ -432,10 +432,7 @@ router.patch('/api/guests/:guestId/email', isStaffOrAdmin, async (req, res) => {
     
     const normalizedEmail = email.trim().toLowerCase();
     
-    const result = await pool.query(
-      `UPDATE guests SET email = $1 WHERE id = $2 RETURNING id, name, email`,
-      [normalizedEmail, guestId]
-    );
+    const result = await db.execute(sql`UPDATE guests SET email = ${normalizedEmail} WHERE id = ${guestId} RETURNING id, name, email`);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Guest not found' });
@@ -444,7 +441,7 @@ router.patch('/api/guests/:guestId/email', isStaffOrAdmin, async (req, res) => {
     res.json({
       success: true,
       guest: result.rows[0],
-      message: `Email updated for ${result.rows[0].name}`
+      message: `Email updated for ${(result.rows[0] as any).name}`
     });
   } catch (error: any) {
     console.error('[Update Guest Email] Error:', error);
@@ -466,21 +463,15 @@ router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
     const resolved = await resolveUserByEmail(normalizedEmail);
 
     const existingUser = resolved
-      ? await pool.query(
-          'SELECT id, email, role, membership_status, first_name, last_name FROM users WHERE id = $1',
-          [resolved.userId]
-        )
-      : await pool.query(
-          'SELECT id, email, role, membership_status, first_name, last_name FROM users WHERE LOWER(email) = $1',
-          [normalizedEmail]
-        );
+      ? await db.execute(sql`SELECT id, email, role, membership_status, first_name, last_name FROM users WHERE id = ${resolved.userId}`)
+      : await db.execute(sql`SELECT id, email, role, membership_status, first_name, last_name FROM users WHERE LOWER(email) = ${normalizedEmail}`);
 
     if (resolved && resolved.matchType !== 'direct') {
       console.log(`[Visitors] Email ${normalizedEmail} resolved to existing user ${resolved.primaryEmail} via ${resolved.matchType}`);
     }
     
     if (existingUser.rows.length > 0) {
-      const user = existingUser.rows[0];
+      const user = existingUser.rows[0] as any;
       
       const isNonMemberOrLead = ['non-member', 'visitor', 'lead'].includes(user.membership_status) || 
                                 ['visitor', 'lead'].includes(user.role);
@@ -494,10 +485,7 @@ router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
           console.log(`[Visitors] Linked Stripe customer ${stripeCustomerId} to existing non-member ${normalizedEmail}`);
           
           if (user.membership_status === 'non-member') {
-            await pool.query(
-              'UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2',
-              ['visitor', user.id]
-            );
+            await db.execute(sql`UPDATE users SET role = ${'visitor'}, updated_at = NOW() WHERE id = ${user.id}`);
           }
         } catch (stripeError: any) {
           console.error('[Visitors] Failed to link Stripe customer:', stripeError);
@@ -548,13 +536,13 @@ router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
     
     const userId = crypto.randomUUID();
     
-    const insertResult = await pool.query(`
+    const insertResult = await db.execute(sql`
       INSERT INTO users (id, email, first_name, last_name, phone, role, membership_status, visitor_type, data_source, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, 'visitor', 'visitor', $6, $7, NOW(), NOW())
+      VALUES (${userId}, ${normalizedEmail}, ${firstName || null}, ${lastName || null}, ${phone || null}, 'visitor', 'visitor', ${visitorType || null}, ${dataSource || null}, NOW(), NOW())
       RETURNING id, email, first_name, last_name, phone, role, membership_status, visitor_type, data_source
-    `, [userId, normalizedEmail, firstName || null, lastName || null, phone || null, visitorType || null, dataSource || null]);
+    `);
     
-    const newUser = insertResult.rows[0];
+    const newUser = insertResult.rows[0] as any;
     let stripeCustomerId: string | null = null;
     
     if (createStripeCustomer && !isPlaceholderEmail(normalizedEmail)) {
@@ -644,22 +632,22 @@ router.get('/api/visitors/search', isStaffOrAdmin, async (req, res) => {
       )`;
     }
     
-    const results = await pool.query(`
+    const results = await db.execute(sql`
       SELECT u.id, u.email, u.first_name, u.last_name, u.phone, u.stripe_customer_id, u.role, u.membership_status,
              su.role as staff_role, su.is_active as is_staff_active
       FROM users u
       LEFT JOIN staff_users su ON LOWER(u.email) = LOWER(su.email) AND su.is_active = true
-      WHERE ${roleCondition.replace(/role/g, 'u.role').replace(/membership_status/g, 'u.membership_status').replace(/archived_at/g, 'u.archived_at')}
+      WHERE ${sql.raw(roleCondition.replace(/role/g, 'u.role').replace(/membership_status/g, 'u.membership_status').replace(/archived_at/g, 'u.archived_at'))}
       AND u.archived_at IS NULL
       AND (
-        LOWER(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) LIKE $1
-        OR LOWER(COALESCE(u.first_name, '')) LIKE $1
-        OR LOWER(COALESCE(u.last_name, '')) LIKE $1
-        OR LOWER(COALESCE(u.email, '')) LIKE $1
+        LOWER(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) LIKE ${searchTerm}
+        OR LOWER(COALESCE(u.first_name, '')) LIKE ${searchTerm}
+        OR LOWER(COALESCE(u.last_name, '')) LIKE ${searchTerm}
+        OR LOWER(COALESCE(u.email, '')) LIKE ${searchTerm}
       )
       ORDER BY u.first_name, u.last_name
-      LIMIT $2
-    `, [searchTerm, maxResults]);
+      LIMIT ${maxResults}
+    `);
     
     const visitors = results.rows.map((row: any) => {
       // Determine user type based on staff_users role and users table data
@@ -701,7 +689,7 @@ router.get('/api/visitors/search', isStaffOrAdmin, async (req, res) => {
 
 router.post('/api/visitors/backfill-types', isAdmin, async (req, res) => {
   try {
-    const dayPassResult = await pool.query(`
+    const dayPassResult = await db.execute(sql`
       UPDATE users u
       SET 
         visitor_type = 'day_pass',
@@ -722,7 +710,7 @@ router.post('/api/visitors/backfill-types', isAdmin, async (req, res) => {
       RETURNING u.id
     `);
     
-    const guestResult = await pool.query(`
+    const guestResult = await db.execute(sql`
       UPDATE users u
       SET 
         visitor_type = 'guest',
@@ -746,7 +734,7 @@ router.post('/api/visitors/backfill-types', isAdmin, async (req, res) => {
       RETURNING u.id
     `);
     
-    const leadResult = await pool.query(`
+    const leadResult = await db.execute(sql`
       UPDATE users
       SET 
         visitor_type = 'lead',
@@ -764,9 +752,9 @@ router.post('/api/visitors/backfill-types', isAdmin, async (req, res) => {
       resourceId: 'visitor_types_backfill',
       resourceName: 'Visitor Types Backfill',
       details: { 
-        dayPassCount: dayPassResult.rowCount,
-        guestCount: guestResult.rowCount,
-        leadCount: leadResult.rowCount,
+        dayPassCount: dayPassResult.rows.length,
+        guestCount: guestResult.rows.length,
+        leadCount: leadResult.rows.length,
         triggeredBy: staffEmail
       }
     });
@@ -774,9 +762,9 @@ router.post('/api/visitors/backfill-types', isAdmin, async (req, res) => {
     res.json({
       success: true,
       updated: {
-        dayPass: dayPassResult.rowCount,
-        guest: guestResult.rowCount,
-        lead: leadResult.rowCount
+        dayPass: dayPassResult.rows.length,
+        guest: guestResult.rows.length,
+        lead: leadResult.rows.length
       }
     });
   } catch (error: any) {
@@ -821,115 +809,115 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
     const visitorIdStr = String(id);
     const deletionLog: string[] = [];
     
-    await pool.query('DELETE FROM pass_redemption_logs WHERE purchase_id IN (SELECT id FROM day_pass_purchases WHERE user_id = $1 OR LOWER(purchaser_email) = $2)', [visitorIdStr, visitorEmail]);
+    await db.execute(sql`DELETE FROM pass_redemption_logs WHERE purchase_id IN (SELECT id FROM day_pass_purchases WHERE user_id = ${visitorIdStr} OR LOWER(purchaser_email) = ${visitorEmail})`);
     deletionLog.push('pass_redemption_logs');
     
-    await pool.query('DELETE FROM day_pass_purchases WHERE user_id = $1 OR LOWER(purchaser_email) = $2', [visitorIdStr, visitorEmail]);
+    await db.execute(sql`DELETE FROM day_pass_purchases WHERE user_id = ${visitorIdStr} OR LOWER(purchaser_email) = ${visitorEmail}`);
     deletionLog.push('day_pass_purchases');
     
-    await pool.query('DELETE FROM booking_guests WHERE LOWER(guest_email) = $1', [visitorEmail]);
+    await db.execute(sql`DELETE FROM booking_guests WHERE LOWER(guest_email) = ${visitorEmail}`);
     deletionLog.push('booking_guests');
     
-    await pool.query('DELETE FROM member_notes WHERE LOWER(member_email) = $1', [visitorEmail]);
+    await db.execute(sql`DELETE FROM member_notes WHERE LOWER(member_email) = ${visitorEmail}`);
     deletionLog.push('member_notes');
     
-    await pool.query('DELETE FROM communication_logs WHERE LOWER(member_email) = $1', [visitorEmail]);
+    await db.execute(sql`DELETE FROM communication_logs WHERE LOWER(member_email) = ${visitorEmail}`);
     deletionLog.push('communication_logs');
     
-    await pool.query('DELETE FROM legacy_purchases WHERE LOWER(member_email) = $1', [visitorEmail]);
+    await db.execute(sql`DELETE FROM legacy_purchases WHERE LOWER(member_email) = ${visitorEmail}`);
     deletionLog.push('legacy_purchases');
     
-    await pool.query('DELETE FROM booking_participants WHERE user_id = $1', [id]);
+    await db.execute(sql`DELETE FROM booking_participants WHERE user_id = ${id}`);
     deletionLog.push('booking_participants');
     
-    await pool.query('UPDATE event_rsvps SET matched_user_id = NULL WHERE matched_user_id = $1', [visitorIdStr]);
-    await pool.query('DELETE FROM event_rsvps WHERE LOWER(user_email) = $1', [visitorEmail]);
+    await db.execute(sql`UPDATE event_rsvps SET matched_user_id = NULL WHERE matched_user_id = ${visitorIdStr}`);
+    await db.execute(sql`DELETE FROM event_rsvps WHERE LOWER(user_email) = ${visitorEmail}`);
     deletionLog.push('event_rsvps');
     
-    await pool.query('UPDATE booking_sessions SET created_by = NULL WHERE LOWER(created_by) = $1', [visitorEmail]);
+    await db.execute(sql`UPDATE booking_sessions SET created_by = NULL WHERE LOWER(created_by) = ${visitorEmail}`);
     deletionLog.push('booking_sessions (unlinked)');
     
-    await pool.query('UPDATE guests SET created_by_member_id = NULL WHERE created_by_member_id = $1', [visitorIdStr]);
+    await db.execute(sql`UPDATE guests SET created_by_member_id = NULL WHERE created_by_member_id = ${visitorIdStr}`);
     deletionLog.push('guests (unlinked)');
     
-    await pool.query('DELETE FROM email_events WHERE LOWER(recipient_email) = $1', [visitorEmail]);
+    await db.execute(sql`DELETE FROM email_events WHERE LOWER(recipient_email) = ${visitorEmail}`);
     deletionLog.push('email_events');
     
-    await pool.query('DELETE FROM tours WHERE LOWER(guest_email) = $1', [visitorEmail]);
+    await db.execute(sql`DELETE FROM tours WHERE LOWER(guest_email) = ${visitorEmail}`);
     deletionLog.push('tours');
     
-    await pool.query('DELETE FROM trackman_unmatched_bookings WHERE LOWER(original_email) = $1 OR LOWER(resolved_email) = $1', [visitorEmail, visitorEmail]);
+    await db.execute(sql`DELETE FROM trackman_unmatched_bookings WHERE LOWER(original_email) = ${visitorEmail} OR LOWER(resolved_email) = ${visitorEmail}`);
     deletionLog.push('trackman_unmatched_bookings');
     
-    await pool.query('DELETE FROM trackman_bay_slots WHERE LOWER(customer_email) = $1', [visitorEmail]);
+    await db.execute(sql`DELETE FROM trackman_bay_slots WHERE LOWER(customer_email) = ${visitorEmail}`);
     deletionLog.push('trackman_bay_slots');
     
-    await pool.query('DELETE FROM stripe_transaction_cache WHERE LOWER(customer_email) = $1', [visitorEmail]);
+    await db.execute(sql`DELETE FROM stripe_transaction_cache WHERE LOWER(customer_email) = ${visitorEmail}`);
     deletionLog.push('stripe_transaction_cache (by email)');
     
-    await pool.query('DELETE FROM hubspot_line_items WHERE hubspot_deal_id IN (SELECT hubspot_deal_id FROM hubspot_deals WHERE LOWER(member_email) = $1)', [visitorEmail]);
+    await db.execute(sql`DELETE FROM hubspot_line_items WHERE hubspot_deal_id IN (SELECT hubspot_deal_id FROM hubspot_deals WHERE LOWER(member_email) = ${visitorEmail})`);
     deletionLog.push('hubspot_line_items');
     
-    await pool.query('DELETE FROM hubspot_deals WHERE LOWER(member_email) = $1', [visitorEmail]);
+    await db.execute(sql`DELETE FROM hubspot_deals WHERE LOWER(member_email) = ${visitorEmail}`);
     deletionLog.push('hubspot_deals');
     
-    await pool.query('DELETE FROM notifications WHERE LOWER(user_email) = $1', [visitorEmail]);
+    await db.execute(sql`DELETE FROM notifications WHERE LOWER(user_email) = ${visitorEmail}`);
     deletionLog.push('notifications');
     
-    await pool.query('DELETE FROM magic_links WHERE LOWER(email) = $1', [visitorEmail]);
+    await db.execute(sql`DELETE FROM magic_links WHERE LOWER(email) = ${visitorEmail}`);
     deletionLog.push('magic_links');
     
-    await pool.query('DELETE FROM push_subscriptions WHERE LOWER(user_email) = $1', [visitorEmail]);
+    await db.execute(sql`DELETE FROM push_subscriptions WHERE LOWER(user_email) = ${visitorEmail}`);
     deletionLog.push('push_subscriptions');
     
-    await pool.query('DELETE FROM user_dismissed_notices WHERE LOWER(user_email) = $1', [visitorEmail]);
+    await db.execute(sql`DELETE FROM user_dismissed_notices WHERE LOWER(user_email) = ${visitorEmail}`);
     deletionLog.push('user_dismissed_notices');
     
-    await pool.query('DELETE FROM form_submissions WHERE LOWER(email) = $1', [visitorEmail]);
+    await db.execute(sql`DELETE FROM form_submissions WHERE LOWER(email) = ${visitorEmail}`);
     deletionLog.push('form_submissions');
     
-    await pool.query("DELETE FROM sessions WHERE sess->'user'->>'email' = $1", [visitorEmail]);
+    await db.execute(sql`DELETE FROM sessions WHERE sess->'user'->>'email' = ${visitorEmail}`);
     deletionLog.push('sessions');
     
-    await pool.query("DELETE FROM hubspot_sync_queue WHERE LOWER(payload->>'email') = $1", [visitorEmail]);
+    await db.execute(sql`DELETE FROM hubspot_sync_queue WHERE LOWER(payload->>'email') = ${visitorEmail}`);
     deletionLog.push('hubspot_sync_queue');
     
-    await pool.query('DELETE FROM guest_check_ins WHERE LOWER(member_email) = $1 OR LOWER(guest_email) = $1', [visitorEmail, visitorEmail]);
+    await db.execute(sql`DELETE FROM guest_check_ins WHERE LOWER(member_email) = ${visitorEmail} OR LOWER(guest_email) = ${visitorEmail}`);
     deletionLog.push('guest_check_ins');
     
-    await pool.query('DELETE FROM guest_passes WHERE LOWER(member_email) = $1', [visitorEmail]);
+    await db.execute(sql`DELETE FROM guest_passes WHERE LOWER(member_email) = ${visitorEmail}`);
     deletionLog.push('guest_passes');
     
-    await pool.query('DELETE FROM account_deletion_requests WHERE user_id = $1', [id]);
+    await db.execute(sql`DELETE FROM account_deletion_requests WHERE user_id = ${id}`);
     deletionLog.push('account_deletion_requests');
     
-    await pool.query('DELETE FROM data_export_requests WHERE LOWER(user_email) = $1', [visitorEmail]);
+    await db.execute(sql`DELETE FROM data_export_requests WHERE LOWER(user_email) = ${visitorEmail}`);
     deletionLog.push('data_export_requests');
     
-    await pool.query('DELETE FROM bug_reports WHERE LOWER(user_email) = $1', [visitorEmail]);
+    await db.execute(sql`DELETE FROM bug_reports WHERE LOWER(user_email) = ${visitorEmail}`);
     deletionLog.push('bug_reports');
     
-    await pool.query('DELETE FROM terminal_payments WHERE user_id = $1 OR LOWER(user_email) = $2', [visitorIdStr, visitorEmail]);
+    await db.execute(sql`DELETE FROM terminal_payments WHERE user_id = ${visitorIdStr} OR LOWER(user_email) = ${visitorEmail}`);
     deletionLog.push('terminal_payments');
     
-    await pool.query('DELETE FROM stripe_payment_intents WHERE user_id = $1', [visitorIdStr]);
+    await db.execute(sql`DELETE FROM stripe_payment_intents WHERE user_id = ${visitorIdStr}`);
     deletionLog.push('stripe_payment_intents');
     
     if (visitor.stripeCustomerId) {
-      await pool.query('DELETE FROM stripe_transaction_cache WHERE customer_id = $1', [visitor.stripeCustomerId]);
+      await db.execute(sql`DELETE FROM stripe_transaction_cache WHERE customer_id = ${visitor.stripeCustomerId}`);
       deletionLog.push('stripe_transaction_cache');
       
-      await pool.query('DELETE FROM terminal_payments WHERE stripe_customer_id = $1', [visitor.stripeCustomerId]);
-      await pool.query('DELETE FROM stripe_payment_intents WHERE stripe_customer_id = $1', [visitor.stripeCustomerId]);
+      await db.execute(sql`DELETE FROM terminal_payments WHERE stripe_customer_id = ${visitor.stripeCustomerId}`);
+      await db.execute(sql`DELETE FROM stripe_payment_intents WHERE stripe_customer_id = ${visitor.stripeCustomerId}`);
       
-      await pool.query('DELETE FROM webhook_processed_events WHERE resource_id = $1', [visitor.stripeCustomerId]);
+      await db.execute(sql`DELETE FROM webhook_processed_events WHERE resource_id = ${visitor.stripeCustomerId}`);
       deletionLog.push('webhook_processed_events');
     }
     
-    await pool.query("DELETE FROM admin_audit_log WHERE resource_id = $1 AND resource_type = 'user'", [visitorIdStr]);
+    await db.execute(sql`DELETE FROM admin_audit_log WHERE resource_id = ${visitorIdStr} AND resource_type = 'user'`);
     deletionLog.push('admin_audit_log');
     
-    await pool.query("UPDATE billing_groups SET is_active = false WHERE LOWER(primary_email) = $1 AND is_active = true", [visitorEmail]);
+    await db.execute(sql`UPDATE billing_groups SET is_active = false WHERE LOWER(primary_email) = ${visitorEmail} AND is_active = true`);
     deletionLog.push('billing_groups (deactivated)');
     
     let stripeDeleted = false;
@@ -975,7 +963,7 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
       }
     }
     
-    await pool.query('DELETE FROM users WHERE id = $1', [id]);
+    await db.execute(sql`DELETE FROM users WHERE id = ${id}`);
     deletionLog.push('users');
     
     await logFromRequest(req, {

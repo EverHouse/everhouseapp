@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { sql, and, or, desc, eq, inArray } from 'drizzle-orm';
 import { db } from '../../db';
 import { users, staffUsers } from '../../../shared/schema';
-import { isProduction, pool } from '../../core/db';
+import { isProduction } from '../../core/db';
 import { isStaffOrAdmin, isAuthenticated } from '../../core/middleware';
 import { redactEmail } from './helpers';
 
@@ -225,69 +225,66 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
     let lastActivityMap: Record<string, string | null> = {};
     
     if (memberEmails.length > 0) {
-      const bookingsResult = await pool.query(
-        `SELECT email, COUNT(DISTINCT booking_id) as count FROM (
+      const bookingsResult = await db.execute(sql`
+        SELECT email, COUNT(DISTINCT booking_id) as count FROM (
           SELECT LOWER(user_email) as email, id as booking_id
           FROM booking_requests
-          WHERE LOWER(user_email) = ANY($1)
+          WHERE LOWER(user_email) = ANY(${memberEmails})
             AND status NOT IN ('cancelled', 'declined')
             AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           UNION
           SELECT LOWER(bg.guest_email) as email, br.id as booking_id
           FROM booking_guests bg
           JOIN booking_requests br ON bg.booking_id = br.id
-          WHERE LOWER(bg.guest_email) = ANY($1)
+          WHERE LOWER(bg.guest_email) = ANY(${memberEmails})
             AND br.status NOT IN ('cancelled', 'declined')
             AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           UNION
           SELECT LOWER(bm.user_email) as email, br.id as booking_id
           FROM booking_members bm
           JOIN booking_requests br ON bm.booking_id = br.id
-          WHERE LOWER(bm.user_email) = ANY($1)
+          WHERE LOWER(bm.user_email) = ANY(${memberEmails})
             AND bm.is_primary IS NOT TRUE
             AND br.status NOT IN ('cancelled', 'declined')
             AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
         ) all_bookings
-        GROUP BY email`,
-        [memberEmails]
-      );
+        GROUP BY email
+      `);
       for (const row of bookingsResult.rows || []) {
-        bookingCounts[row.email] = Number(row.count);
+        bookingCounts[(row as any).email] = Number((row as any).count);
       }
       
-      const eventsResult = await pool.query(
-        `SELECT LOWER(user_email) as email, COUNT(*) as count
+      const eventsResult = await db.execute(sql`
+        SELECT LOWER(user_email) as email, COUNT(*) as count
         FROM event_rsvps er
         JOIN events e ON er.event_id = e.id
-        WHERE LOWER(er.user_email) = ANY($1)
+        WHERE LOWER(er.user_email) = ANY(${memberEmails})
           AND er.status != 'cancelled'
           AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-        GROUP BY LOWER(user_email)`,
-        [memberEmails]
-      );
+        GROUP BY LOWER(user_email)
+      `);
       for (const row of eventsResult.rows || []) {
-        eventCounts[row.email] = Number(row.count);
+        eventCounts[(row as any).email] = Number((row as any).count);
       }
       
-      const wellnessResult = await pool.query(
-        `SELECT LOWER(we.user_email) as email, COUNT(*) as count
+      const wellnessResult = await db.execute(sql`
+        SELECT LOWER(we.user_email) as email, COUNT(*) as count
         FROM wellness_enrollments we
         JOIN wellness_classes wc ON we.class_id = wc.id
-        WHERE LOWER(we.user_email) = ANY($1)
+        WHERE LOWER(we.user_email) = ANY(${memberEmails})
           AND we.status != 'cancelled'
           AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-        GROUP BY LOWER(we.user_email)`,
-        [memberEmails]
-      );
+        GROUP BY LOWER(we.user_email)
+      `);
       for (const row of wellnessResult.rows || []) {
-        wellnessCounts[row.email] = Number(row.count);
+        wellnessCounts[(row as any).email] = Number((row as any).count);
       }
       
-      const lastActivityResult = await pool.query(
-        `SELECT email, MAX(last_date) as last_date FROM (
+      const lastActivityResult = await db.execute(sql`
+        SELECT email, MAX(last_date) as last_date FROM (
           SELECT LOWER(user_email) as email, MAX(request_date) as last_date
           FROM booking_requests
-          WHERE LOWER(user_email) = ANY($1) 
+          WHERE LOWER(user_email) = ANY(${memberEmails}) 
             AND status NOT IN ('cancelled', 'declined')
             AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           GROUP BY LOWER(user_email)
@@ -295,7 +292,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
           SELECT LOWER(bg.guest_email) as email, MAX(br.request_date) as last_date
           FROM booking_guests bg
           JOIN booking_requests br ON bg.booking_id = br.id
-          WHERE LOWER(bg.guest_email) = ANY($1) 
+          WHERE LOWER(bg.guest_email) = ANY(${memberEmails}) 
             AND br.status NOT IN ('cancelled', 'declined')
             AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           GROUP BY LOWER(bg.guest_email)
@@ -303,7 +300,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
           SELECT LOWER(bm.user_email) as email, MAX(br.request_date) as last_date
           FROM booking_members bm
           JOIN booking_requests br ON bm.booking_id = br.id
-          WHERE LOWER(bm.user_email) = ANY($1) 
+          WHERE LOWER(bm.user_email) = ANY(${memberEmails}) 
             AND bm.is_primary IS NOT TRUE 
             AND br.status NOT IN ('cancelled', 'declined')
             AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
@@ -312,7 +309,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
           SELECT LOWER(er.user_email) as email, MAX(e.event_date) as last_date
           FROM event_rsvps er
           JOIN events e ON er.event_id = e.id
-          WHERE LOWER(er.user_email) = ANY($1) 
+          WHERE LOWER(er.user_email) = ANY(${memberEmails}) 
             AND er.status != 'cancelled'
             AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           GROUP BY LOWER(er.user_email)
@@ -320,33 +317,32 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
           SELECT LOWER(we.user_email) as email, MAX(wc.date) as last_date
           FROM wellness_enrollments we
           JOIN wellness_classes wc ON we.class_id = wc.id
-          WHERE LOWER(we.user_email) = ANY($1) 
+          WHERE LOWER(we.user_email) = ANY(${memberEmails}) 
             AND we.status != 'cancelled'
             AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           GROUP BY LOWER(we.user_email)
         ) combined
-        GROUP BY email`,
-        [memberEmails]
-      );
+        GROUP BY email
+      `);
       for (const row of lastActivityResult.rows || []) {
-        if (row.last_date) {
-          const dateVal = row.last_date instanceof Date 
-            ? row.last_date.toISOString().split('T')[0]
-            : String(row.last_date).split('T')[0];
-          lastActivityMap[row.email] = dateVal;
+        const r = row as any;
+        if (r.last_date) {
+          const dateVal = r.last_date instanceof Date 
+            ? r.last_date.toISOString().split('T')[0]
+            : String(r.last_date).split('T')[0];
+          lastActivityMap[r.email] = dateVal;
         }
       }
     }
     
-    // Count walk-in visits per member
-    const walkInCountResult = await pool.query(`
+    const walkInCountResult = await db.execute(sql`
       SELECT LOWER(member_email) as email, COUNT(*)::int as count
       FROM walk_in_visits
       GROUP BY LOWER(member_email)
     `);
     const walkInCounts: Record<string, number> = {};
     for (const row of walkInCountResult.rows) {
-      walkInCounts[row.email] = row.count;
+      walkInCounts[(row as any).email] = (row as any).count;
     }
 
     const contacts = allMembers.map(member => {

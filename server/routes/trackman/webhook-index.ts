@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { pool } from '../../core/db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { logger } from '../../core/logger';
 import { sendNotificationToUser, broadcastToStaff } from '../../core/websocket';
 import { notifyMember } from '../../core/notificationService';
@@ -44,10 +45,7 @@ async function notifyMemberBookingConfirmed(
   bayName?: string
 ): Promise<void> {
   try {
-    const userResult = await pool.query(
-      `SELECT id, first_name, last_name, email FROM users WHERE LOWER(email) = LOWER($1)`,
-      [customerEmail]
-    );
+    const userResult = await db.execute(sql`SELECT id, first_name, last_name, email FROM users WHERE LOWER(email) = LOWER(${customerEmail})`);
     
     if (userResult.rows.length > 0) {
       const user = userResult.rows[0];
@@ -111,13 +109,10 @@ function extractTrackmanBookingId(payload: any): string | undefined {
 async function checkWebhookIdempotency(trackmanBookingId: string): Promise<boolean> {
   try {
     // Try to INSERT the webhook ID. If it already exists (CONFLICT), this will return no rows
-    const dedupResult = await pool.query(
-      `INSERT INTO trackman_webhook_dedup (trackman_booking_id, received_at)
-       VALUES ($1, NOW())
+    const dedupResult = await db.execute(sql`INSERT INTO trackman_webhook_dedup (trackman_booking_id, received_at)
+       VALUES (${trackmanBookingId}, NOW())
        ON CONFLICT (trackman_booking_id) DO NOTHING
-       RETURNING id`,
-      [trackmanBookingId]
-    );
+       RETURNING id`);
     
     const isNewWebhook = (dedupResult.rowCount || 0) > 0;
     
@@ -430,8 +425,7 @@ router.get('/api/admin/trackman-webhooks', isStaffOrAdmin, async (req: Request, 
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
     const offset = parseInt(req.query.offset as string) || 0;
     
-    const result = await pool.query(`
-      SELECT 
+    const result = await db.execute(sql`SELECT 
         twe.id,
         twe.event_type,
         twe.trackman_booking_id,
@@ -456,10 +450,9 @@ router.get('/api/admin/trackman-webhooks', isStaffOrAdmin, async (req: Request, 
       LEFT JOIN booking_requests br ON twe.matched_booking_id = br.id
       LEFT JOIN users u ON br.user_id = u.id
       ORDER BY twe.created_at DESC
-      LIMIT $1 OFFSET $2
-    `, [limit, offset]);
+      LIMIT ${limit} OFFSET ${offset}`);
     
-    const countResult = await pool.query(`SELECT COUNT(*) as total FROM trackman_webhook_events`);
+    const countResult = await db.execute(sql`SELECT COUNT(*) as total FROM trackman_webhook_events`);
     
     res.json({
       events: result.rows,
@@ -475,8 +468,7 @@ router.get('/api/admin/trackman-webhooks', isStaffOrAdmin, async (req: Request, 
 
 router.get('/api/admin/trackman-webhooks/stats', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const stats = await pool.query(`
-      SELECT 
+    const stats = await db.execute(sql`SELECT 
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE matched_booking_id IS NOT NULL) as matched,
         COUNT(*) FILTER (WHERE matched_booking_id IS NULL AND processing_error IS NULL) as unmatched,
@@ -486,17 +478,14 @@ router.get('/api/admin/trackman-webhooks/stats', isStaffOrAdmin, async (req: Req
         COUNT(*) FILTER (WHERE twe.matched_booking_id IS NOT NULL AND br.is_unmatched = true) as matched_but_unlinked
       FROM trackman_webhook_events twe
       LEFT JOIN booking_requests br ON twe.matched_booking_id = br.id
-      WHERE twe.created_at >= NOW() - INTERVAL '30 days'
-    `);
+      WHERE twe.created_at >= NOW() - INTERVAL '30 days'`);
     
-    const slotStats = await pool.query(`
-      SELECT 
+    const slotStats = await db.execute(sql`SELECT 
         COUNT(*) as total_slots,
         COUNT(*) FILTER (WHERE status = 'booked') as booked,
         COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
         COUNT(*) FILTER (WHERE slot_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date) as upcoming
-      FROM trackman_bay_slots
-    `);
+      FROM trackman_bay_slots`);
     
     res.json({
       webhookStats: stats.rows[0],
@@ -510,8 +499,7 @@ router.get('/api/admin/trackman-webhooks/stats', isStaffOrAdmin, async (req: Req
 
 router.get('/api/admin/trackman-webhook/stats', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const stats = await pool.query(`
-      SELECT 
+    const stats = await db.execute(sql`SELECT 
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE matched_booking_id IS NOT NULL) as matched,
         COUNT(*) FILTER (WHERE matched_booking_id IS NULL AND processing_error IS NULL) as unmatched,
@@ -521,17 +509,14 @@ router.get('/api/admin/trackman-webhook/stats', isStaffOrAdmin, async (req: Requ
         COUNT(*) FILTER (WHERE twe.matched_booking_id IS NOT NULL AND br.is_unmatched = true) as matched_but_unlinked
       FROM trackman_webhook_events twe
       LEFT JOIN booking_requests br ON twe.matched_booking_id = br.id
-      WHERE twe.created_at >= NOW() - INTERVAL '30 days'
-    `);
+      WHERE twe.created_at >= NOW() - INTERVAL '30 days'`);
     
-    const slotStats = await pool.query(`
-      SELECT 
+    const slotStats = await db.execute(sql`SELECT 
         COUNT(*) as total_slots,
         COUNT(*) FILTER (WHERE status = 'booked') as booked,
         COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
         COUNT(*) FILTER (WHERE slot_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date) as upcoming
-      FROM trackman_bay_slots
-    `);
+      FROM trackman_bay_slots`);
     
     res.json({
       webhookStats: stats.rows[0],
@@ -555,10 +540,7 @@ router.post('/api/admin/linked-emails', isStaffOrAdmin, async (req: Request, res
       return res.status(400).json({ error: 'Primary email and linked email cannot be the same' });
     }
     
-    const existingLink = await pool.query(
-      `SELECT id FROM user_linked_emails WHERE LOWER(linked_email) = LOWER($1)`,
-      [linkedEmail]
-    );
+    const existingLink = await db.execute(sql`SELECT id FROM user_linked_emails WHERE LOWER(linked_email) = LOWER(${linkedEmail})`);
     
     if (existingLink.rows.length > 0) {
       return res.status(409).json({ error: 'This email is already linked to a member' });
@@ -567,11 +549,8 @@ router.post('/api/admin/linked-emails', isStaffOrAdmin, async (req: Request, res
     const session = (req as any).session;
     const createdBy = session?.email || 'unknown';
     
-    await pool.query(
-      `INSERT INTO user_linked_emails (primary_email, linked_email, source, created_by)
-       VALUES ($1, $2, 'trackman_resolution', $3)`,
-      [primaryEmail.toLowerCase(), linkedEmail.toLowerCase(), createdBy]
-    );
+    await db.execute(sql`INSERT INTO user_linked_emails (primary_email, linked_email, source, created_by)
+       VALUES (${primaryEmail.toLowerCase()}, ${linkedEmail.toLowerCase()}, ${'trackman_resolution'}, ${createdBy})`);
     
     logger.info('[Linked Emails] Created email link', {
       extra: { primaryEmail, linkedEmail, createdBy }
@@ -592,19 +571,13 @@ router.get('/api/admin/linked-emails/:email', isStaffOrAdmin, async (req: Reques
       return res.status(400).json({ error: 'Email is required' });
     }
     
-    const asLinked = await pool.query(
-      `SELECT primary_email, linked_email, source, created_by, created_at
+    const asLinked = await db.execute(sql`SELECT primary_email, linked_email, source, created_by, created_at
        FROM user_linked_emails 
-       WHERE LOWER(linked_email) = LOWER($1)`,
-      [email]
-    );
+       WHERE LOWER(linked_email) = LOWER(${email})`);
     
-    const asPrimary = await pool.query(
-      `SELECT primary_email, linked_email, source, created_by, created_at
+    const asPrimary = await db.execute(sql`SELECT primary_email, linked_email, source, created_by, created_at
        FROM user_linked_emails 
-       WHERE LOWER(primary_email) = LOWER($1)`,
-      [email]
-    );
+       WHERE LOWER(primary_email) = LOWER(${email})`);
     
     res.json({
       linkedTo: asLinked.rows.length > 0 ? asLinked.rows[0].primary_email : null,
@@ -629,16 +602,17 @@ router.get('/api/availability/trackman-cache', async (req: Request, res: Respons
       return res.status(400).json({ error: 'start_date and end_date are required' });
     }
     
-    let whereClause = `WHERE slot_date >= $1 AND slot_date <= $2 AND status = 'booked'`;
-    const params: any[] = [start_date, end_date];
+    const sqlConditions: ReturnType<typeof sql>[] = [
+      sql`slot_date >= ${start_date}`,
+      sql`slot_date <= ${end_date}`,
+      sql`status = 'booked'`
+    ];
     
     if (resource_id) {
-      whereClause += ` AND resource_id = $3`;
-      params.push(resource_id);
+      sqlConditions.push(sql`resource_id = ${resource_id}`);
     }
     
-    const result = await pool.query(
-      `SELECT 
+    const result = await db.execute(sql`SELECT 
         id,
         resource_id,
         TO_CHAR(slot_date, 'YYYY-MM-DD') as slot_date,
@@ -649,10 +623,8 @@ router.get('/api/availability/trackman-cache', async (req: Request, res: Respons
         customer_name,
         player_count
        FROM trackman_bay_slots
-       ${whereClause}
-       ORDER BY slot_date, start_time`,
-      params
-    );
+       WHERE ${sql.join(sqlConditions, sql` AND `)}
+       ORDER BY slot_date, start_time`);
     
     res.json(result.rows);
   } catch (error: any) {
@@ -663,8 +635,7 @@ router.get('/api/availability/trackman-cache', async (req: Request, res: Respons
 
 router.get('/api/admin/trackman-webhook/failed', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(
-      `SELECT 
+    const result = await db.execute(sql`SELECT 
         id,
         event_type,
         trackman_booking_id,
@@ -675,8 +646,7 @@ router.get('/api/admin/trackman-webhook/failed', isStaffOrAdmin, async (req: Req
        FROM trackman_webhook_events 
        WHERE processing_error IS NOT NULL
        ORDER BY processed_at DESC
-       LIMIT 50`
-    );
+       LIMIT 50`);
     
     res.json(result.rows);
   } catch (error: any) {
@@ -693,12 +663,9 @@ router.post('/api/admin/trackman-webhook/:eventId/retry', isStaffOrAdmin, async 
       return res.status(400).json({ error: 'Invalid event ID' });
     }
     
-    const eventResult = await pool.query(
-      `SELECT id, event_type, payload, trackman_booking_id, retry_count
+    const eventResult = await db.execute(sql`SELECT id, event_type, payload, trackman_booking_id, retry_count
        FROM trackman_webhook_events 
-       WHERE id = $1`,
-      [eventId]
-    );
+       WHERE id = ${eventId}`);
     
     if (eventResult.rows.length === 0) {
       return res.status(404).json({ error: 'Event not found' });
@@ -707,13 +674,10 @@ router.post('/api/admin/trackman-webhook/:eventId/retry', isStaffOrAdmin, async 
     const event = eventResult.rows[0];
     const payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
     
-    await pool.query(
-      `UPDATE trackman_webhook_events 
+    await db.execute(sql`UPDATE trackman_webhook_events 
        SET retry_count = COALESCE(retry_count, 0) + 1, 
            last_retry_at = NOW()
-       WHERE id = $1`,
-      [eventId]
-    );
+       WHERE id = ${eventId}`);
     
     logger.info('[Trackman Webhook] Admin triggered retry', {
       extra: { eventId, eventType: event.event_type, retryCount: (event.retry_count || 0) + 1 }
@@ -747,20 +711,14 @@ router.post('/api/admin/trackman-webhook/:eventId/retry', isStaffOrAdmin, async 
     }
     
     if (success) {
-      await pool.query(
-        `UPDATE trackman_webhook_events 
+      await db.execute(sql`UPDATE trackman_webhook_events 
          SET processing_error = NULL,
-             matched_booking_id = COALESCE($2, matched_booking_id)
-         WHERE id = $1`,
-        [eventId, matchedBookingId || null]
-      );
+             matched_booking_id = COALESCE(${matchedBookingId || null}, matched_booking_id)
+         WHERE id = ${eventId}`);
     } else {
-      await pool.query(
-        `UPDATE trackman_webhook_events 
-         SET processing_error = $2
-         WHERE id = $1`,
-        [eventId, message]
-      );
+      await db.execute(sql`UPDATE trackman_webhook_events 
+         SET processing_error = ${message}
+         WHERE id = ${eventId}`);
     }
     
     res.json({ success, message, matchedBookingId });
@@ -778,12 +736,9 @@ router.post('/api/admin/trackman-webhook/:eventId/auto-match', isStaffOrAdmin, a
       return res.status(400).json({ error: 'Invalid event ID' });
     }
     
-    const eventResult = await pool.query(
-      `SELECT id, event_type, payload, trackman_booking_id, matched_booking_id
+    const eventResult = await db.execute(sql`SELECT id, event_type, payload, trackman_booking_id, matched_booking_id
        FROM trackman_webhook_events 
-       WHERE id = $1`,
-      [eventId]
-    );
+       WHERE id = ${eventId}`);
     
     if (eventResult.rows.length === 0) {
       return res.status(404).json({ error: 'Event not found' });
@@ -792,10 +747,7 @@ router.post('/api/admin/trackman-webhook/:eventId/auto-match', isStaffOrAdmin, a
     const event = eventResult.rows[0];
     
     if (event.matched_booking_id) {
-      const matchedBooking = await pool.query(
-        `SELECT id, user_email, is_unmatched FROM booking_requests WHERE id = $1`,
-        [event.matched_booking_id]
-      );
+      const matchedBooking = await db.execute(sql`SELECT id, user_email, is_unmatched FROM booking_requests WHERE id = ${event.matched_booking_id}`);
       
       if (matchedBooking.rows.length > 0 && !matchedBooking.rows[0].is_unmatched) {
         return res.json({ 
@@ -846,36 +798,30 @@ router.post('/api/admin/trackman-webhook/:eventId/auto-match', isStaffOrAdmin, a
       extra: { eventId, trackmanBookingId, date: pacificDate, start: pacificStartTime, bay: resourceId }
     });
     
-    const matchResult = await pool.query(
-      `SELECT 
+    const matchResult = await db.execute(sql`SELECT 
         id, user_email, status, start_time, end_time, request_date, resource_id,
         (SELECT CONCAT(first_name, ' ', last_name) FROM users WHERE LOWER(email) = LOWER(br.user_email) LIMIT 1) as member_name
        FROM booking_requests br
-       WHERE resource_id = $1
-         AND request_date = $2
+       WHERE resource_id = ${resourceId}
+         AND request_date = ${pacificDate}
          AND trackman_booking_id IS NULL
          AND status = 'pending'
-         AND ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) <= 1800
-       ORDER BY ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) ASC
-       LIMIT 5`,
-      [resourceId, pacificDate, pacificStartTime]
-    );
+         AND ABS(EXTRACT(EPOCH FROM (start_time::time - ${pacificStartTime}::time))) <= 1800
+       ORDER BY ABS(EXTRACT(EPOCH FROM (start_time::time - ${pacificStartTime}::time))) ASC
+       LIMIT 5`);
     
     if (matchResult.rows.length === 0) {
-      const approvedMatchResult = await pool.query(
-        `SELECT 
+      const approvedMatchResult = await db.execute(sql`SELECT 
           id, user_email, status, start_time, end_time, request_date, resource_id,
           (SELECT CONCAT(first_name, ' ', last_name) FROM users WHERE LOWER(email) = LOWER(br.user_email) LIMIT 1) as member_name
          FROM booking_requests br
-         WHERE resource_id = $1
-           AND request_date = $2
+         WHERE resource_id = ${resourceId}
+           AND request_date = ${pacificDate}
            AND trackman_booking_id IS NULL
            AND status = 'approved'
-           AND ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) <= 1800
-         ORDER BY ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) ASC
-         LIMIT 5`,
-        [resourceId, pacificDate, pacificStartTime]
-      );
+           AND ABS(EXTRACT(EPOCH FROM (start_time::time - ${pacificStartTime}::time))) <= 1800
+         ORDER BY ABS(EXTRACT(EPOCH FROM (start_time::time - ${pacificStartTime}::time))) ASC
+         LIMIT 5`);
       
       if (approvedMatchResult.rows.length === 0) {
         return res.json({
@@ -887,18 +833,15 @@ router.post('/api/admin/trackman-webhook/:eventId/auto-match', isStaffOrAdmin, a
       
       const match = approvedMatchResult.rows[0];
       
-      const updateResult = await pool.query(
-        `UPDATE booking_requests 
-         SET trackman_booking_id = $1,
+      const updateResult = await db.execute(sql`UPDATE booking_requests 
+         SET trackman_booking_id = ${trackmanBookingId},
              last_sync_source = 'staff_auto_match',
              last_trackman_sync_at = NOW(),
              was_auto_linked = true,
              staff_notes = COALESCE(staff_notes, '') || ' [Linked via Auto-Match]',
              updated_at = NOW()
-         WHERE id = $2 AND trackman_booking_id IS NULL
-         RETURNING id`,
-        [trackmanBookingId, match.id]
-      );
+         WHERE id = ${match.id} AND trackman_booking_id IS NULL
+         RETURNING id`);
       
       if (updateResult.rowCount === 0) {
         return res.json({
@@ -908,12 +851,9 @@ router.post('/api/admin/trackman-webhook/:eventId/auto-match', isStaffOrAdmin, a
         });
       }
       
-      await pool.query(
-        `UPDATE trackman_webhook_events 
-         SET matched_booking_id = $1
-         WHERE id = $2 AND (matched_booking_id IS NULL OR matched_booking_id = $3)`,
-        [match.id, eventId, event.matched_booking_id]
-      );
+      await db.execute(sql`UPDATE trackman_webhook_events 
+         SET matched_booking_id = ${match.id}
+         WHERE id = ${eventId} AND (matched_booking_id IS NULL OR matched_booking_id = ${event.matched_booking_id})`);
       
       logger.info('[Trackman Auto-Match] Successfully linked to approved booking', {
         extra: { eventId, trackmanBookingId, bookingId: match.id, memberEmail: match.user_email }
@@ -930,10 +870,9 @@ router.post('/api/admin/trackman-webhook/:eventId/auto-match', isStaffOrAdmin, a
     
     const match = matchResult.rows[0];
     
-    const pendingUpdateResult = await pool.query(
-      `UPDATE booking_requests 
+    const pendingUpdateResult = await db.execute(sql`UPDATE booking_requests 
        SET status = 'approved',
-           trackman_booking_id = $1,
+           trackman_booking_id = ${trackmanBookingId},
            reviewed_at = NOW(),
            reviewed_by = 'staff_auto_match',
            last_sync_source = 'staff_auto_match',
@@ -941,10 +880,8 @@ router.post('/api/admin/trackman-webhook/:eventId/auto-match', isStaffOrAdmin, a
            was_auto_linked = true,
            staff_notes = COALESCE(staff_notes, '') || ' [Auto-approved via Staff Auto-Match]',
            updated_at = NOW()
-       WHERE id = $2 AND trackman_booking_id IS NULL AND status = 'pending'
-       RETURNING id`,
-      [trackmanBookingId, match.id]
-    );
+       WHERE id = ${match.id} AND trackman_booking_id IS NULL AND status = 'pending'
+       RETURNING id`);
     
     if (pendingUpdateResult.rowCount === 0) {
       return res.json({
@@ -954,12 +891,9 @@ router.post('/api/admin/trackman-webhook/:eventId/auto-match', isStaffOrAdmin, a
       });
     }
     
-    await pool.query(
-      `UPDATE trackman_webhook_events 
-       SET matched_booking_id = $1
-       WHERE id = $2 AND (matched_booking_id IS NULL OR matched_booking_id = $3)`,
-      [match.id, eventId, event.matched_booking_id]
-    );
+    await db.execute(sql`UPDATE trackman_webhook_events 
+       SET matched_booking_id = ${match.id}
+       WHERE id = ${eventId} AND (matched_booking_id IS NULL OR matched_booking_id = ${event.matched_booking_id})`);
     
     // Ensure session exists for newly approved booking
     try {
@@ -1020,11 +954,9 @@ router.post('/api/admin/trackman-webhook/:eventId/auto-match', isStaffOrAdmin, a
 
 export async function cleanupOldWebhookLogs(): Promise<{ deleted: number }> {
   try {
-    const result = await pool.query(
-      `DELETE FROM trackman_webhook_events 
+    const result = await db.execute(sql`DELETE FROM trackman_webhook_events 
        WHERE processed_at < NOW() - INTERVAL '30 days'
-       RETURNING id`
-    );
+       RETURNING id`);
     
     const deleted = result.rowCount || 0;
     if (deleted > 0) {
@@ -1057,13 +989,10 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
 
-    const bookingResult = await pool.query(
-      `SELECT br.*, u.stripe_customer_id, u.tier
+    const bookingResult = await db.execute(sql`SELECT br.*, u.stripe_customer_id, u.tier
        FROM booking_requests br
        LEFT JOIN users u ON LOWER(u.email) = LOWER(br.user_email)
-       WHERE br.id = $1`,
-      [bookingId]
-    );
+       WHERE br.id = ${bookingId}`);
 
     if (bookingResult.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found' });
@@ -1077,11 +1006,7 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
 
     const fakeTrackmanId = `SIM-${Date.now()}`;
     
-    // Get resource info for realistic webhook
-    const resourceResult = await pool.query(
-      `SELECT id, name FROM resources WHERE id = $1`,
-      [booking.resource_id]
-    );
+    const resourceResult = await db.execute(sql`SELECT id, name FROM resources WHERE id = ${booking.resource_id}`);
     const resource = resourceResult.rows[0];
     const bayRef = resource?.name?.match(/\d+/)?.[0] || '1';
     // Map bay number to Trackman bay ID (approximate mapping)
@@ -1138,22 +1063,15 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
     };
     
     // Create a webhook event record so it appears in Trackman Synced section
-    const webhookEventResult = await pool.query(`
-      INSERT INTO trackman_webhook_events (
+    const webhookEventResult = await db.execute(sql`INSERT INTO trackman_webhook_events (
         event_type, 
         trackman_booking_id, 
         matched_booking_id,
         payload, 
         processed_at
       )
-      VALUES ($1, $2, $3, $4, NOW())
-      RETURNING id
-    `, [
-      'booking.confirmed',
-      fakeTrackmanId,
-      bookingId,
-      JSON.stringify(realisticPayload)
-    ]);
+      VALUES (${'booking.confirmed'}, ${fakeTrackmanId}, ${bookingId}, ${JSON.stringify(realisticPayload)}, NOW())
+      RETURNING id`);
     
     logger.info('[Simulate Confirm] Created webhook event record', {
       bookingId,
@@ -1166,24 +1084,20 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
       try {
         // Check for existing session with EXACT matching times (not just overlap)
         // This prevents reusing sessions with different durations
-        const existingSession = await pool.query(`
-          SELECT id FROM booking_sessions 
-          WHERE resource_id = $1 
-            AND session_date = $2 
-            AND start_time = $3 
-            AND end_time = $4
-          LIMIT 1
-        `, [booking.resource_id, booking.request_date, booking.start_time, booking.end_time]);
+        const existingSession = await db.execute(sql`SELECT id FROM booking_sessions 
+          WHERE resource_id = ${booking.resource_id} 
+            AND session_date = ${booking.request_date} 
+            AND start_time = ${booking.start_time} 
+            AND end_time = ${booking.end_time}
+          LIMIT 1`);
         
         if (existingSession.rows.length > 0) {
           sessionId = existingSession.rows[0].id;
           logger.info('[Simulate Confirm] Using existing session with exact times', { bookingId, sessionId });
         } else {
-          const sessionResult = await pool.query(`
-            INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
-            VALUES ($1, $2, $3, $4, $5, 'staff_manual', 'simulate_confirm')
-            RETURNING id
-          `, [booking.resource_id, booking.request_date, booking.start_time, booking.end_time, fakeTrackmanId]);
+          const sessionResult = await db.execute(sql`INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
+            VALUES (${booking.resource_id}, ${booking.request_date}, ${booking.start_time}, ${booking.end_time}, ${fakeTrackmanId}, ${'staff_manual'}, ${'simulate_confirm'})
+            RETURNING id`);
           
           if (sessionResult.rows.length > 0) {
             sessionId = sessionResult.rows[0].id;
@@ -1199,31 +1113,19 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
           );
           
           // Get user ID for owner
-          const userResult = await pool.query(
-            `SELECT id FROM users WHERE LOWER(email) = LOWER($1)`,
-            [booking.user_email]
-          );
+          const userResult = await db.execute(sql`SELECT id FROM users WHERE LOWER(email) = LOWER(${booking.user_email})`);
           const userId = userResult.rows[0]?.id || null;
           
-          // Check if owner participant already exists for this session
-          const existingOwner = await pool.query(`
-            SELECT id FROM booking_participants 
-            WHERE session_id = $1 AND (participant_type = 'owner' OR user_id = $2)
-          `, [sessionId, userId]);
+          const existingOwner = await db.execute(sql`SELECT id FROM booking_participants 
+            WHERE session_id = ${sessionId} AND (participant_type = 'owner' OR user_id = ${userId})`);
           
           if (existingOwner.rows.length === 0) {
-            // Create owner with proper slot_duration
-            await pool.query(`
-              INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-              VALUES ($1, $2, 'owner', $3, 'pending', $4)
-            `, [sessionId, userId, booking.user_name || 'Member', sessionDuration]);
+            await db.execute(sql`INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+              VALUES (${sessionId}, ${userId}, ${'owner'}, ${booking.user_name || 'Member'}, ${'pending'}, ${sessionDuration})`);
             
-            // Create guest participants
             for (let i = 1; i < playerCount; i++) {
-              await pool.query(`
-                INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-                VALUES ($1, NULL, 'guest', $2, 'pending', $3)
-              `, [sessionId, `Guest ${i + 1}`, sessionDuration]);
+              await db.execute(sql`INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+                VALUES (${sessionId}, ${null}, ${'guest'}, ${`Guest ${i + 1}`}, ${'pending'}, ${sessionDuration})`);
             }
             
             logger.info('[Simulate Confirm] Created participants', {
@@ -1258,16 +1160,13 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
       }
     }
 
-    await pool.query(
-      `UPDATE booking_requests 
+    await db.execute(sql`UPDATE booking_requests 
        SET status = 'approved', 
-           trackman_booking_id = $1,
-           session_id = COALESCE(session_id, $3),
+           trackman_booking_id = ${fakeTrackmanId},
+           session_id = COALESCE(session_id, ${sessionId}),
            notes = COALESCE(notes, '') || E'\n[Simulated confirmation for testing]',
            updated_at = NOW()
-       WHERE id = $2`,
-      [fakeTrackmanId, bookingId, sessionId]
-    );
+       WHERE id = ${bookingId}`);
 
     if (booking.overage_fee_cents > 0 && booking.stripe_customer_id) {
       try {
@@ -1286,10 +1185,7 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
           }
         });
         
-        await pool.query(
-          `UPDATE booking_requests SET overage_paid = $1 WHERE id = $2`,
-          [paymentResult.success, bookingId]
-        );
+        await db.execute(sql`UPDATE booking_requests SET overage_paid = ${paymentResult.success} WHERE id = ${bookingId}`);
         logger.info('[Simulate Confirm] Charged overage fee via invoice (uses customer balance)', {
           bookingId,
           invoiceId: paymentResult.invoiceId,
@@ -1371,14 +1267,12 @@ router.post('/api/admin/trackman-webhooks/backfill', isAdmin, async (req, res) =
   try {
     logger.info('[Trackman Backfill] Starting backfill of past webhook events');
     
-    const unmatchedEvents = await pool.query(`
-      SELECT 
+    const unmatchedEvents = await db.execute(sql`SELECT 
         id, trackman_booking_id, payload, created_at
       FROM trackman_webhook_events 
       WHERE matched_booking_id IS NULL 
         AND payload IS NOT NULL
-      ORDER BY created_at DESC
-    `);
+      ORDER BY created_at DESC`);
     
     const results = {
       total: unmatchedEvents.rows.length,
@@ -1435,16 +1329,10 @@ router.post('/api/admin/trackman-webhooks/backfill', isAdmin, async (req, res) =
         
         const durationMinutes = calculateDurationMinutes(startTime, endTime);
         
-        const existingByTrackman = await pool.query(
-          `SELECT id FROM booking_requests WHERE trackman_booking_id = $1`,
-          [event.trackman_booking_id]
-        );
+        const existingByTrackman = await db.execute(sql`SELECT id FROM booking_requests WHERE trackman_booking_id = ${event.trackman_booking_id}`);
         
         if (existingByTrackman.rows.length > 0) {
-          await pool.query(
-            `UPDATE trackman_webhook_events SET matched_booking_id = $1 WHERE id = $2`,
-            [existingByTrackman.rows[0].id, event.id]
-          );
+          await db.execute(sql`UPDATE trackman_webhook_events SET matched_booking_id = ${existingByTrackman.rows[0].id} WHERE id = ${event.id}`);
           results.skipped++;
           results.details.push({ 
             trackmanId: event.trackman_booking_id, 
@@ -1454,37 +1342,30 @@ router.post('/api/admin/trackman-webhooks/backfill', isAdmin, async (req, res) =
           continue;
         }
         
-        const matchingBooking = await pool.query(`
-          SELECT id, user_email, user_name, trackman_booking_id
+        const matchingBooking = await db.execute(sql`SELECT id, user_email, user_name, trackman_booking_id
           FROM booking_requests 
-          WHERE request_date = $1 
-            AND start_time = $2
-            AND (resource_id = $3 OR $3 IS NULL)
+          WHERE request_date = ${requestDate} 
+            AND start_time = ${startTime}
+            AND (resource_id = ${resourceId} OR ${resourceId} IS NULL)
             AND trackman_booking_id IS NULL
             AND status NOT IN ('cancelled', 'declined')
-          LIMIT 1
-        `, [requestDate, startTime, resourceId]);
+          LIMIT 1`);
         
         if (matchingBooking.rows.length > 0) {
           const existingBooking = matchingBooking.rows[0];
           
-          await pool.query(`
-            UPDATE booking_requests 
-            SET trackman_booking_id = $1,
-                trackman_player_count = $2,
-                trackman_external_id = $3,
+          await db.execute(sql`UPDATE booking_requests 
+            SET trackman_booking_id = ${event.trackman_booking_id},
+                trackman_player_count = ${playerCount},
+                trackman_external_id = ${externalBookingId},
                 is_unmatched = false,
                 staff_notes = COALESCE(staff_notes, '') || ' [Linked via backfill]',
                 last_sync_source = 'trackman_webhook',
                 last_trackman_sync_at = NOW(),
                 updated_at = NOW()
-            WHERE id = $4
-          `, [event.trackman_booking_id, playerCount, externalBookingId, existingBooking.id]);
+            WHERE id = ${existingBooking.id}`);
           
-          await pool.query(
-            `UPDATE trackman_webhook_events SET matched_booking_id = $1 WHERE id = $2`,
-            [existingBooking.id, event.id]
-          );
+          await db.execute(sql`UPDATE trackman_webhook_events SET matched_booking_id = ${existingBooking.id} WHERE id = ${event.id}`);
           
           results.linked++;
           results.details.push({ 
@@ -1495,48 +1376,30 @@ router.post('/api/admin/trackman-webhooks/backfill', isAdmin, async (req, res) =
           });
         } else {
           // Use ON CONFLICT to handle race conditions with concurrent reprocess requests
-          const newBooking = await pool.query(`
-            INSERT INTO booking_requests 
+          const newBooking = await db.execute(sql`INSERT INTO booking_requests 
             (request_date, start_time, end_time, duration_minutes, resource_id,
              user_email, user_name, status, trackman_booking_id, trackman_external_id,
              trackman_player_count, is_unmatched, 
              origin, last_sync_source, last_trackman_sync_at, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, 'approved', $8, $9, $10, true,
+            VALUES (${requestDate}, ${startTime}, ${endTime}, ${durationMinutes}, ${resourceId}, ${customerEmail || ''}, ${customerName}, 'approved', ${event.trackman_booking_id}, ${externalBookingId || null}, ${playerCount}, true,
                     'trackman_webhook', 'trackman_webhook', NOW(), NOW(), NOW())
             ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO UPDATE SET
               last_trackman_sync_at = NOW(),
               updated_at = NOW()
-            RETURNING id, (xmax = 0) AS was_inserted
-          `, [
-            requestDate,
-            startTime,
-            endTime,
-            durationMinutes,
-            resourceId,
-            customerEmail || '',
-            customerName,
-            event.trackman_booking_id,
-            externalBookingId || null,
-            playerCount
-          ]);
+            RETURNING id, (xmax = 0) AS was_inserted`);
           
           if (newBooking.rows.length > 0) {
             const bookingId = newBooking.rows[0].id;
             
-            await pool.query(
-              `UPDATE trackman_webhook_events SET matched_booking_id = $1 WHERE id = $2`,
-              [bookingId, event.id]
-            );
+            await db.execute(sql`UPDATE trackman_webhook_events SET matched_booking_id = ${bookingId} WHERE id = ${event.id}`);
             
             try {
-              const sessionResult = await pool.query(`
-                INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
-                VALUES ($1, $2, $3, $4, $5, 'trackman', 'trackman_reprocess')
-                RETURNING id
-              `, [resourceId, requestDate, startTime, endTime, event.trackman_booking_id]);
+              const sessionResult = await db.execute(sql`INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
+                VALUES (${resourceId}, ${requestDate}, ${startTime}, ${endTime}, ${event.trackman_booking_id}, ${'trackman'}, ${'trackman_reprocess'})
+                RETURNING id`);
               
               if (sessionResult.rows.length > 0) {
-                await pool.query(`UPDATE booking_requests SET session_id = $1 WHERE id = $2`, [sessionResult.rows[0].id, bookingId]);
+                await db.execute(sql`UPDATE booking_requests SET session_id = ${sessionResult.rows[0].id} WHERE id = ${bookingId}`);
               }
             } catch (sessionErr) {
             }
@@ -1609,13 +1472,11 @@ router.post('/api/trackman/replay-webhooks-to-dev', isAdmin, async (req, res) =>
     
     logger.info('[Trackman Replay] Starting replay to dev', { dev_url, limit });
     
-    const events = await pool.query(`
-      SELECT id, trackman_booking_id, payload, created_at
+    const events = await db.execute(sql`SELECT id, trackman_booking_id, payload, created_at
       FROM trackman_webhook_events
       WHERE payload IS NOT NULL
       ORDER BY created_at ASC
-      LIMIT $1
-    `, [limit]);
+      LIMIT ${limit}`);
     
     if (events.rows.length === 0) {
       return res.json({ success: true, message: 'No webhook events to replay', sent: 0 });

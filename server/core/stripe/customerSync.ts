@@ -1,4 +1,5 @@
-import { pool } from '../db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { isPlaceholderEmail, getOrCreateStripeCustomer } from './customers';
 
 export interface CustomerSyncResult {
@@ -28,7 +29,7 @@ export async function syncStripeCustomersForMindBodyMembers(): Promise<CustomerS
   try {
     console.log('[Stripe Customer Sync] Starting sync for MindBody members...');
     
-    const membersResult = await pool.query(`
+    const membersResult = await db.execute(sql`
       SELECT id, email, first_name, last_name, tier, stripe_customer_id
       FROM users
       WHERE billing_provider = 'mindbody'
@@ -103,7 +104,7 @@ export async function getCustomerSyncStatus(): Promise<{
   alreadySynced: number;
   total: number;
 }> {
-  const result = await pool.query(`
+  const result = await db.execute(sql`
     SELECT 
       COUNT(*) FILTER (WHERE stripe_customer_id IS NULL) as needs_sync,
       COUNT(*) FILTER (WHERE stripe_customer_id IS NOT NULL) as already_synced,

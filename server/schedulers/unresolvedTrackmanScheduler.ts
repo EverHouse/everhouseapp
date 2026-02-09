@@ -1,4 +1,3 @@
-import { pool } from '../core/db';
 import { db } from '../db';
 import { systemSettings } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
@@ -46,15 +45,13 @@ async function checkUnresolvedTrackmanBookings(): Promise<void> {
         console.log('[Unresolved Trackman Check] Starting scheduled check...');
         
         try {
-          const result = await pool.query(
-            `SELECT created_at
+          const result = await db.execute(sql`SELECT created_at
              FROM booking_requests
              WHERE (origin = 'trackman_webhook' OR origin = 'trackman_import')
                AND user_id IS NULL
                AND (status = 'pending' OR status = 'unmatched')
                AND created_at < NOW() - INTERVAL '24 hours'
-             ORDER BY created_at ASC`
-          );
+             ORDER BY created_at ASC`);
           
           const unresolved = result.rows;
           

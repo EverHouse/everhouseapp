@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import * as crypto from 'crypto';
-import { pool, isProduction } from '../core/db';
+import { isProduction } from '../core/db';
 import { getHubSpotClient } from '../core/integrations';
 import { db } from '../db';
 import { formSubmissions, users } from '../../shared/schema';
@@ -417,35 +417,29 @@ async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
   let wellnessVisitsMap: Record<string, number> = {};
   
   // Get user data including id for matched_user_id joins
-  const dbResult = await pool.query(
-    `SELECT id, email, join_date, joined_on, mindbody_client_id, manually_linked_emails 
-     FROM users WHERE LOWER(email) = ANY($1)`,
-    [emails]
-  );
+  const dbResult = await db.execute(sql`SELECT id, email, join_date, joined_on, mindbody_client_id, manually_linked_emails 
+     FROM users WHERE LOWER(email) = ANY(${emails})`);
   for (const row of dbResult.rows) {
     dbUserMap[row.email.toLowerCase()] = row;
   }
   
   // Get last visit date - most recent PAST date from bookings or experiences
-  const lastActivityResult = await pool.query(
-    `SELECT email, MAX(activity_date) as last_activity FROM (
+  const lastActivityResult = await db.execute(sql`SELECT email, MAX(activity_date) as last_activity FROM (
       SELECT LOWER(user_email) as email, request_date as activity_date
       FROM booking_requests 
-      WHERE LOWER(user_email) = ANY($1) AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND status NOT IN ('cancelled', 'declined')
+      WHERE LOWER(user_email) = ANY(${emails}) AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND status NOT IN ('cancelled', 'declined')
       UNION ALL
       SELECT LOWER(er.user_email) as email, e.event_date as activity_date
       FROM event_rsvps er
       JOIN events e ON er.event_id = e.id
-      WHERE LOWER(er.user_email) = ANY($1) AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND er.status != 'cancelled'
+      WHERE LOWER(er.user_email) = ANY(${emails}) AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND er.status != 'cancelled'
       UNION ALL
       SELECT LOWER(we.user_email) as email, wc.date as activity_date
       FROM wellness_enrollments we
       JOIN wellness_classes wc ON we.class_id = wc.id
-      WHERE LOWER(we.user_email) = ANY($1) AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND we.status != 'cancelled'
+      WHERE LOWER(we.user_email) = ANY(${emails}) AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND we.status != 'cancelled'
     ) combined
-    GROUP BY email`,
-    [emails]
-  );
+    GROUP BY email`);
   for (const row of lastActivityResult.rows) {
     if (row.last_activity) {
       const date = row.last_activity instanceof Date ? row.last_activity : new Date(row.last_activity);
@@ -454,51 +448,42 @@ async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
   }
   
   // Count past bookings (excluding cancelled/declined)
-  const pastBookingsResult = await pool.query(
-    `SELECT LOWER(user_email) as email, COUNT(*)::int as count
+  const pastBookingsResult = await db.execute(sql`SELECT LOWER(user_email) as email, COUNT(*)::int as count
      FROM booking_requests
-     WHERE LOWER(user_email) = ANY($1)
+     WHERE LOWER(user_email) = ANY(${emails})
        AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
        AND status NOT IN ('cancelled', 'declined')
-     GROUP BY LOWER(user_email)`,
-    [emails]
-  );
+     GROUP BY LOWER(user_email)`);
   for (const row of pastBookingsResult.rows) {
     pastBookingsMap[row.email] = row.count;
   }
   
   // Count past event RSVPs (excluding cancelled) - include both email and matched_user_id
-  const eventVisitsResult = await pool.query(
-    `SELECT u.email, COUNT(DISTINCT er.id)::int as count
+  const eventVisitsResult = await db.execute(sql`SELECT u.email, COUNT(DISTINCT er.id)::int as count
      FROM users u
      JOIN event_rsvps er ON (LOWER(er.user_email) = LOWER(u.email) OR er.matched_user_id = u.id)
      JOIN events e ON er.event_id = e.id
-     WHERE LOWER(u.email) = ANY($1)
+     WHERE LOWER(u.email) = ANY(${emails})
        AND er.status != 'cancelled'
        AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-     GROUP BY u.email`,
-    [emails]
-  );
+     GROUP BY u.email`);
   for (const row of eventVisitsResult.rows) {
     eventVisitsMap[row.email.toLowerCase()] = row.count;
   }
   
   // Count past wellness enrollments (excluding cancelled)
-  const wellnessVisitsResult = await pool.query(
-    `SELECT LOWER(we.user_email) as email, COUNT(*)::int as count
+  const wellnessVisitsResult = await db.execute(sql`SELECT LOWER(we.user_email) as email, COUNT(*)::int as count
      FROM wellness_enrollments we
      JOIN wellness_classes wc ON we.class_id = wc.id
-     WHERE LOWER(we.user_email) = ANY($1)
+     WHERE LOWER(we.user_email) = ANY(${emails})
        AND we.status != 'cancelled'
        AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-     GROUP BY LOWER(we.user_email)`,
-    [emails]
-  );
+     GROUP BY LOWER(we.user_email)`);
   for (const row of wellnessVisitsResult.rows) {
     wellnessVisitsMap[row.email] = row.count;
   }
   
-  const walkInCountResult = await pool.query(`
+  const walkInCountResult = await db.execute(sql`
     SELECT LOWER(member_email) as email, COUNT(*)::int as count
     FROM walk_in_visits
     GROUP BY LOWER(member_email)
@@ -777,19 +762,13 @@ router.post('/api/hubspot/forms/:formType', async (req, res) => {
       
       const memberEmail = memberEmailField.value;
       
-      const updateResult = await pool.query(
-        `UPDATE guest_passes 
+      const updateResult = await db.execute(sql`UPDATE guest_passes 
          SET passes_used = passes_used + 1 
-         WHERE member_email = $1 AND passes_used < passes_total
-         RETURNING passes_used, passes_total`,
-        [memberEmail]
-      );
+         WHERE member_email = ${memberEmail} AND passes_used < passes_total
+         RETURNING passes_used, passes_total`);
       
       if (updateResult.rows.length === 0) {
-        const passCheck = await pool.query(
-          'SELECT passes_used, passes_total FROM guest_passes WHERE member_email = $1',
-          [memberEmail]
-        );
+        const passCheck = await db.execute(sql`SELECT passes_used, passes_total FROM guest_passes WHERE member_email = ${memberEmail}`);
         
         if (passCheck.rows.length === 0) {
           return res.status(400).json({ error: 'Guest pass record not found. Please contact staff.' });
@@ -1214,23 +1193,14 @@ router.post('/webhooks', async (req, res) => {
                 // Don't allow HubSpot to downgrade status to 'non-member' if user has active Stripe subscription
                 // Stripe is the source of truth for billing status
                 if (newStatus === 'non-member') {
-                  const stripeCheck = await pool.query(
-                    `SELECT stripe_subscription_id FROM users WHERE LOWER(email) = $1`,
-                    [email]
-                  );
+                  const stripeCheck = await db.execute(sql`SELECT stripe_subscription_id FROM users WHERE LOWER(email) = ${email}`);
                   if (stripeCheck.rows.length > 0 && stripeCheck.rows[0].stripe_subscription_id) {
                     console.log(`[HubSpot Webhook] Skipping status change to 'non-member' for ${email} - has active Stripe subscription`);
                   } else {
-                    const prevStatusResult = await pool.query(
-                      'SELECT membership_status, first_name, last_name FROM users WHERE LOWER(email) = $1',
-                      [email]
-                    );
+                    const prevStatusResult = await db.execute(sql`SELECT membership_status, first_name, last_name FROM users WHERE LOWER(email) = ${email}`);
                     const prevStatus = prevStatusResult.rows[0]?.membership_status;
 
-                    await pool.query(
-                      `UPDATE users SET membership_status = $1, updated_at = NOW() WHERE LOWER(email) = $2`,
-                      [newStatus, email]
-                    );
+                    await db.execute(sql`UPDATE users SET membership_status = ${newStatus}, updated_at = NOW() WHERE LOWER(email) = ${email}`);
                     console.log(`[HubSpot Webhook] Updated DB membership_status for ${email} to: ${newStatus}`);
 
                     if (prevStatus && prevStatus !== 'non-member' && prevStatus !== 'visitor') {
@@ -1245,10 +1215,7 @@ router.post('/webhooks', async (req, res) => {
                     }
                   }
                 } else {
-                  await pool.query(
-                    `UPDATE users SET membership_status = $1, updated_at = NOW() WHERE LOWER(email) = $2`,
-                    [newStatus, email]
-                  );
+                  await db.execute(sql`UPDATE users SET membership_status = ${newStatus}, updated_at = NOW() WHERE LOWER(email) = ${email}`);
                   console.log(`[HubSpot Webhook] Updated DB membership_status for ${email} to: ${newStatus}`);
 
                   // Notify staff of membership status changes from HubSpot/MindBody
@@ -1256,10 +1223,7 @@ router.post('/webhooks', async (req, res) => {
                   const inactiveStatuses = ['expired', 'terminated', 'cancelled', 'canceled', 'inactive', 'churned', 'declined', 'suspended', 'frozen', 'non-member'];
                   
                   // Get member name for notification
-                  const memberResult = await pool.query(
-                    'SELECT first_name, last_name, tier FROM users WHERE LOWER(email) = $1',
-                    [email]
-                  );
+                  const memberResult = await db.execute(sql`SELECT first_name, last_name, tier FROM users WHERE LOWER(email) = ${email}`);
                   const memberRow = memberResult.rows[0];
                   const hubspotMemberName = memberRow 
                     ? `${memberRow.first_name || ''} ${memberRow.last_name || ''}`.trim() || email 
@@ -1285,10 +1249,7 @@ router.post('/webhooks', async (req, res) => {
               } else if (propertyName === 'membership_tier') {
                 const normalizedTier = normalizeTierName(propertyValue || '');
                 if (normalizedTier) {
-                  await pool.query(
-                    `UPDATE users SET tier = $1, updated_at = NOW() WHERE LOWER(email) = $2`,
-                    [normalizedTier, email]
-                  );
+                  await db.execute(sql`UPDATE users SET tier = ${normalizedTier}, updated_at = NOW() WHERE LOWER(email) = ${email}`);
                   console.log(`[HubSpot Webhook] Updated DB tier for ${email} to: ${normalizedTier}`);
                 }
               }
@@ -1419,7 +1380,7 @@ router.post('/api/hubspot/sync-billing-providers', isStaffOrAdmin, async (req, r
     const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
     
     // Get all members with HubSpot IDs and billing info
-    const membersResult = await pool.query(`
+    const membersResult = await db.execute(sql`
       SELECT email, membership_status, billing_provider, tier, hubspot_id, first_name, last_name
       FROM users
       WHERE hubspot_id IS NOT NULL 

@@ -1,4 +1,5 @@
-import { pool } from './db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import type { PoolClient } from 'pg';
 import { broadcastBillingUpdate, broadcastDayPassUpdate, sendNotificationToUser } from './websocket';
 import { notifyPaymentSuccess, notifyPaymentFailed, notifyStaffPaymentFailed, notifyMember, notifyAllStaff } from './notificationService';
@@ -46,12 +47,9 @@ export async function queueJob(
 ): Promise<number> {
   const { priority = 0, maxRetries = 3, scheduledFor = new Date(), webhookEventId } = options;
   
-  const result = await pool.query(
-    `INSERT INTO job_queue (job_type, payload, priority, max_retries, scheduled_for, webhook_event_id)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING id`,
-    [jobType, JSON.stringify(payload), priority, maxRetries, scheduledFor, webhookEventId]
-  );
+  const result = await db.execute(sql`INSERT INTO job_queue (job_type, payload, priority, max_retries, scheduled_for, webhook_event_id)
+     VALUES (${jobType}, ${JSON.stringify(payload)}, ${priority}, ${maxRetries}, ${scheduledFor}, ${webhookEventId})
+     RETURNING id`);
   
   return result.rows[0].id;
 }
@@ -79,22 +77,14 @@ export async function queueJobs(
 ): Promise<number[]> {
   if (jobs.length === 0) return [];
   
-  const values: any[] = [];
-  const placeholders: string[] = [];
-  
-  jobs.forEach((job, i) => {
-    const offset = i * 6;
+  const valuesSql = jobs.map(job => {
     const { priority = 0, maxRetries = 3, scheduledFor = new Date(), webhookEventId } = job.options || {};
-    values.push(job.jobType, JSON.stringify(job.payload), priority, maxRetries, scheduledFor, webhookEventId);
-    placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6})`);
+    return sql`(${job.jobType}, ${JSON.stringify(job.payload)}, ${priority}, ${maxRetries}, ${scheduledFor}, ${webhookEventId})`;
   });
   
-  const result = await pool.query(
-    `INSERT INTO job_queue (job_type, payload, priority, max_retries, scheduled_for, webhook_event_id)
-     VALUES ${placeholders.join(', ')}
-     RETURNING id`,
-    values
-  );
+  const result = await db.execute(sql`INSERT INTO job_queue (job_type, payload, priority, max_retries, scheduled_for, webhook_event_id)
+     VALUES ${sql.join(valuesSql, sql`, `)}
+     RETURNING id`);
   
   return result.rows.map(r => r.id);
 }
@@ -103,21 +93,18 @@ async function claimJobs(): Promise<Array<{ id: number; jobType: string; payload
   const now = new Date();
   const lockExpiry = new Date(now.getTime() - LOCK_TIMEOUT_MS);
   
-  const result = await pool.query(
-    `UPDATE job_queue
-     SET locked_at = $1, locked_by = $2
+  const result = await db.execute(sql`UPDATE job_queue
+     SET locked_at = ${now}, locked_by = ${WORKER_ID}
      WHERE id IN (
        SELECT id FROM job_queue
        WHERE status = 'pending'
-         AND scheduled_for <= $1
-         AND (locked_at IS NULL OR locked_at < $3)
+         AND scheduled_for <= ${now}
+         AND (locked_at IS NULL OR locked_at < ${lockExpiry})
        ORDER BY priority DESC, scheduled_for ASC
-       LIMIT $4
+       LIMIT ${BATCH_SIZE}
        FOR UPDATE SKIP LOCKED
      )
-     RETURNING id, job_type, payload, retry_count, max_retries`,
-    [now, WORKER_ID, lockExpiry, BATCH_SIZE]
-  );
+     RETURNING id, job_type, payload, retry_count, max_retries`);
   
   return result.rows.map(r => ({
     id: r.id,
@@ -129,25 +116,16 @@ async function claimJobs(): Promise<Array<{ id: number; jobType: string; payload
 }
 
 async function markJobCompleted(jobId: number): Promise<void> {
-  await pool.query(
-    `UPDATE job_queue SET status = 'completed', processed_at = NOW(), locked_at = NULL, locked_by = NULL WHERE id = $1`,
-    [jobId]
-  );
+  await db.execute(sql`UPDATE job_queue SET status = 'completed', processed_at = NOW(), locked_at = NULL, locked_by = NULL WHERE id = ${jobId}`);
 }
 
 async function markJobFailed(jobId: number, error: string, retryCount: number, maxRetries: number): Promise<void> {
   if (retryCount + 1 >= maxRetries) {
-    await pool.query(
-      `UPDATE job_queue SET status = 'failed', last_error = $1, retry_count = retry_count + 1, locked_at = NULL, locked_by = NULL WHERE id = $2`,
-      [error, jobId]
-    );
+    await db.execute(sql`UPDATE job_queue SET status = 'failed', last_error = ${error}, retry_count = retry_count + 1, locked_at = NULL, locked_by = NULL WHERE id = ${jobId}`);
   } else {
     const backoffMs = Math.min(1000 * Math.pow(2, retryCount), 60000);
     const nextScheduled = new Date(Date.now() + backoffMs);
-    await pool.query(
-      `UPDATE job_queue SET last_error = $1, retry_count = retry_count + 1, scheduled_for = $2, locked_at = NULL, locked_by = NULL WHERE id = $3`,
-      [error, nextScheduled, jobId]
-    );
+    await db.execute(sql`UPDATE job_queue SET last_error = ${error}, retry_count = retry_count + 1, scheduled_for = ${nextScheduled}, locked_at = NULL, locked_by = NULL WHERE id = ${jobId}`);
   }
 }
 
@@ -277,13 +255,10 @@ export function stopJobProcessor(): void {
 }
 
 export async function cleanupOldJobs(daysToKeep: number = 7): Promise<number> {
-  const result = await pool.query(
-    `DELETE FROM job_queue 
+  const result = await db.execute(sql`DELETE FROM job_queue 
      WHERE status IN ('completed', 'failed') 
-       AND processed_at < NOW() - INTERVAL '1 day' * $1
-     RETURNING id`,
-    [daysToKeep]
-  );
+       AND processed_at < NOW() - INTERVAL '1 day' * ${daysToKeep}
+     RETURNING id`);
   
   if (result.rowCount && result.rowCount > 0) {
     console.log(`[JobQueue] Cleaned up ${result.rowCount} old jobs`);
@@ -298,9 +273,7 @@ export async function getJobQueueStats(): Promise<{
   completed: number;
   failed: number;
 }> {
-  const result = await pool.query(
-    `SELECT status, COUNT(*)::int as count FROM job_queue GROUP BY status`
-  );
+  const result = await db.execute(sql`SELECT status, COUNT(*)::int as count FROM job_queue GROUP BY status`);
   
   const stats = { pending: 0, processing: 0, completed: 0, failed: 0 };
   for (const row of result.rows) {

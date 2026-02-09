@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../../core/db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { logFromRequest } from '../../core/auditLog';
 import { logger } from '../../core/logger';
@@ -20,17 +22,14 @@ router.post('/api/admin/booking/:id/reschedule/start', isStaffOrAdmin, async (re
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
 
-    const result = await pool.query(
-      `SELECT br.id, br.user_email, br.user_name, br.status, br.resource_id,
+    const result = await db.execute(sql`SELECT br.id, br.user_email, br.user_name, br.status, br.resource_id,
               br.request_date, br.start_time, br.end_time, br.duration_minutes,
               br.notes, br.staff_notes, br.trackman_booking_id, br.is_relocating,
               br.declared_player_count, br.guest_count, br.session_id,
               r.name as resource_name
        FROM booking_requests br
        LEFT JOIN resources r ON br.resource_id = r.id
-       WHERE br.id = $1`,
-      [bookingId]
-    );
+       WHERE br.id = ${bookingId}`);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found' });
@@ -53,10 +52,7 @@ router.post('/api/admin/booking/:id/reschedule/start', isStaffOrAdmin, async (re
       return res.status(400).json({ error: 'Cannot reschedule a booking that has already started or is in the past' });
     }
 
-    await pool.query(
-      `UPDATE booking_requests SET is_relocating = true, relocating_started_at = NOW(), updated_at = NOW() WHERE id = $1`,
-      [bookingId]
-    );
+    await db.execute(sql`UPDATE booking_requests SET is_relocating = true, relocating_started_at = NOW(), updated_at = NOW() WHERE id = ${bookingId}`);
 
     return res.json({
       success: true,
@@ -97,16 +93,13 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
       return res.status(400).json({ error: 'Missing required fields: resource_id, request_date, start_time, end_time, duration_minutes, trackman_booking_id' });
     }
 
-    const bookingResult = await pool.query(
-      `SELECT br.id, br.user_email, br.user_name, br.status, br.resource_id,
+    const bookingResult = await db.execute(sql`SELECT br.id, br.user_email, br.user_name, br.status, br.resource_id,
               br.request_date, br.start_time, br.end_time, br.duration_minutes,
               br.is_relocating, br.trackman_booking_id,
               r.name as resource_name
        FROM booking_requests br
        LEFT JOIN resources r ON br.resource_id = r.id
-       WHERE br.id = $1`,
-      [bookingId]
-    );
+       WHERE br.id = ${bookingId}`);
 
     if (bookingResult.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found' });
@@ -122,19 +115,16 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
       return res.status(400).json({ error: 'Booking is not in reschedule mode. Please start the reschedule first.' });
     }
 
-    const conflictResult = await pool.query(
-      `SELECT id FROM booking_requests
-       WHERE resource_id = $1
-         AND request_date = $2
+    const conflictResult = await db.execute(sql`SELECT id FROM booking_requests
+       WHERE resource_id = ${resource_id}
+         AND request_date = ${request_date}
          AND status IN ('approved', 'confirmed', 'attended')
-         AND id != $3
+         AND id != ${bookingId}
          AND (
-           (start_time <= $4 AND end_time > $4)
-           OR (start_time < $5 AND end_time >= $5)
-           OR (start_time >= $4 AND end_time <= $5)
-         )`,
-      [resource_id, request_date, bookingId, start_time, end_time]
-    );
+           (start_time <= ${start_time} AND end_time > ${start_time})
+           OR (start_time < ${end_time} AND end_time >= ${end_time})
+           OR (start_time >= ${start_time} AND end_time <= ${end_time})
+         )`);
 
     if (conflictResult.rows.length > 0) {
       return res.status(409).json({ error: 'Time slot conflicts with existing booking' });
@@ -225,23 +215,17 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
       }
 
       try {
-        const staleIntents = await pool.query(
-          `SELECT id, stripe_payment_intent_id FROM stripe_payment_intents
-           WHERE session_id = $1
+        const staleIntents = await db.execute(sql`SELECT id, stripe_payment_intent_id FROM stripe_payment_intents
+           WHERE session_id = ${updated.session_id}
              AND purpose = 'prepayment'
-             AND status NOT IN ('canceled', 'cancelled', 'refunded', 'failed', 'succeeded')`,
-          [updated.session_id]
-        );
+             AND status NOT IN ('canceled', 'cancelled', 'refunded', 'failed', 'succeeded')`);
 
         if (staleIntents.rows.length > 0) {
           const stripe = await getStripeClient();
           for (const intent of staleIntents.rows) {
             try {
               await stripe.paymentIntents.cancel(intent.stripe_payment_intent_id);
-              await pool.query(
-                `UPDATE stripe_payment_intents SET status = 'canceled', updated_at = NOW() WHERE id = $1`,
-                [intent.id]
-              );
+              await db.execute(sql`UPDATE stripe_payment_intents SET status = 'canceled', updated_at = NOW() WHERE id = ${intent.id}`);
               logger.info('[Reschedule] Canceled stale prepayment intent after reschedule', {
                 extra: { bookingId, sessionId: updated.session_id, paymentIntentId: intent.stripe_payment_intent_id }
               });
@@ -259,10 +243,7 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
       }
     }
 
-    const newBayResult = await pool.query(
-      `SELECT name FROM resources WHERE id = $1`,
-      [resource_id]
-    );
+    const newBayResult = await db.execute(sql`SELECT name FROM resources WHERE id = ${resource_id}`);
     const newBayName = newBayResult.rows[0]?.name || 'Unknown';
 
     logFromRequest(req, {
@@ -304,10 +285,8 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
       });
       const notifMessage = `Your booking has been rescheduled to ${displayDate} at ${formatTime12Hour(start_time)} – ${formatTime12Hour(end_time)} (${newBayName}).`;
 
-      pool.query(
-        `INSERT INTO notifications (user_email, title, message, type, related_id, related_type)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [booking.user_email, 'Booking Rescheduled', notifMessage, 'booking_rescheduled', bookingId, 'booking']
+      db.execute(sql`INSERT INTO notifications (user_email, title, message, type, related_id, related_type)
+         VALUES (${booking.user_email}, ${'Booking Rescheduled'}, ${notifMessage}, ${'booking_rescheduled'}, ${bookingId}, ${'booking'})`
       ).catch(() => {});
 
       sendPushNotification(booking.user_email, {
@@ -342,10 +321,7 @@ router.post('/api/admin/booking/:id/reschedule/cancel', isStaffOrAdmin, async (r
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
 
-    await pool.query(
-      `UPDATE booking_requests SET is_relocating = false, relocating_started_at = NULL, updated_at = NOW() WHERE id = $1`,
-      [bookingId]
-    );
+    await db.execute(sql`UPDATE booking_requests SET is_relocating = false, relocating_started_at = NULL, updated_at = NOW() WHERE id = ${bookingId}`);
 
     return res.json({ success: true });
   } catch (err) {
@@ -356,13 +332,11 @@ router.post('/api/admin/booking/:id/reschedule/cancel', isStaffOrAdmin, async (r
 
 export async function clearStaleRelocations(): Promise<number> {
   try {
-    const result = await pool.query(
-      `UPDATE booking_requests 
+    const result = await db.execute(sql`UPDATE booking_requests 
        SET is_relocating = false, relocating_started_at = null,
            staff_notes = COALESCE(staff_notes, '') || ' [Reschedule abandoned - auto-cleared after 30m]'
        WHERE is_relocating = true 
-       AND relocating_started_at < NOW() - INTERVAL '30 minutes'`
-    );
+       AND relocating_started_at < NOW() - INTERVAL '30 minutes'`);
     const count = result.rowCount || 0;
     if (count > 0) {
       logger.info(`[Reschedule] Auto-cleared ${count} stale relocating booking(s)`);

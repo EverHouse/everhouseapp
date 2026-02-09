@@ -1,9 +1,10 @@
-import { pool } from './db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { logger } from './logger';
 
 export async function cleanupExpiredSessions(): Promise<number> {
   try {
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       DELETE FROM session 
       WHERE expire < NOW()
       RETURNING sid
@@ -38,7 +39,7 @@ export async function getSessionStats(): Promise<{
   newestActive: Date | null;
 }> {
   try {
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       SELECT 
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE expire > NOW()) as active,
@@ -48,7 +49,7 @@ export async function getSessionStats(): Promise<{
       FROM session
     `);
     
-    const row = result.rows[0];
+    const row = result.rows[0] as any;
     
     return {
       total: parseInt(row.total) || 0,

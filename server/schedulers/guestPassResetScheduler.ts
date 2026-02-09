@@ -1,18 +1,16 @@
-import { pool } from '../core/db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { getPacificHour, getPacificDayOfMonth, getPacificDateParts } from '../utils/dateUtils';
 
 const RESET_HOUR = 3;
 
 async function tryClaimResetSlot(monthKey: string): Promise<boolean> {
   try {
-    const result = await pool.query(
-      `INSERT INTO system_settings (key, value, updated_at)
-       VALUES ('last_guest_pass_reset', $1, NOW())
-       ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()
-       WHERE system_settings.value IS DISTINCT FROM $1
-       RETURNING key`,
-      [monthKey]
-    );
+    const result = await db.execute(sql`INSERT INTO system_settings (key, value, updated_at)
+       VALUES ('last_guest_pass_reset', ${monthKey}, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = ${monthKey}, updated_at = NOW()
+       WHERE system_settings.value IS DISTINCT FROM ${monthKey}
+       RETURNING key`);
     return (result.rowCount || 0) > 0;
   } catch (err) {
     console.error('[Guest Pass Reset] Failed to claim reset slot:', err);
@@ -40,13 +38,11 @@ async function resetGuestPasses(): Promise<void> {
     
     console.log('[Guest Pass Reset] Starting monthly reset...');
     
-    const result = await pool.query(
-      `UPDATE guest_passes 
+    const result = await db.execute(sql`UPDATE guest_passes 
        SET passes_used = 0, 
            updated_at = NOW()
        WHERE passes_used > 0
-       RETURNING member_email, passes_total`
-    );
+       RETURNING member_email, passes_total`);
     
     if (result.rowCount === 0) {
       console.log('[Guest Pass Reset] No passes needed resetting');

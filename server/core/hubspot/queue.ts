@@ -1,4 +1,5 @@
-import { pool } from '../db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { logger } from '../logger';
 
 export type HubSpotOperation = 
@@ -27,11 +28,8 @@ export async function enqueueHubSpotSync(
   try {
     // If idempotency key provided, check for existing pending job
     if (idempotencyKey) {
-      const existing = await pool.query(
-        `SELECT id FROM hubspot_sync_queue 
-         WHERE idempotency_key = $1 AND status IN ('pending', 'processing')`,
-        [idempotencyKey]
-      );
+      const existing = await db.execute(sql`SELECT id FROM hubspot_sync_queue 
+         WHERE idempotency_key = ${idempotencyKey} AND status IN ('pending', 'processing')`);
       if (existing.rows.length > 0) {
         logger.info('[HubSpot Queue] Duplicate job skipped', { 
           extra: { idempotencyKey, existingId: existing.rows[0].id }
@@ -40,12 +38,9 @@ export async function enqueueHubSpotSync(
       }
     }
     
-    const result = await pool.query(
-      `INSERT INTO hubspot_sync_queue (operation, payload, priority, max_retries, idempotency_key)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id`,
-      [operation, JSON.stringify(payload), priority, maxRetries, idempotencyKey]
-    );
+    const result = await db.execute(sql`INSERT INTO hubspot_sync_queue (operation, payload, priority, max_retries, idempotency_key)
+       VALUES (${operation}, ${JSON.stringify(payload)}, ${priority}, ${maxRetries}, ${idempotencyKey})
+       RETURNING id`);
     
     logger.info('[HubSpot Queue] Job enqueued', { 
       extra: { jobId: result.rows[0].id, operation, idempotencyKey }
@@ -78,18 +73,18 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
   
   // Atomically claim pending jobs using UPDATE ... RETURNING
   // This prevents race conditions with parallel workers
-  const result = await pool.query(`
+  const result = await db.execute(sql`
     UPDATE hubspot_sync_queue
     SET status = 'processing', updated_at = NOW()
     WHERE id IN (
       SELECT id FROM hubspot_sync_queue
       WHERE (status = 'pending' OR (status = 'failed' AND next_retry_at <= NOW()))
       ORDER BY priority ASC, created_at ASC
-      LIMIT $1
+      LIMIT ${batchSize}
       FOR UPDATE SKIP LOCKED
     )
     RETURNING id, operation, payload, retry_count, max_retries
-  `, [batchSize]);
+  `);
   
   if (result.rows.length === 0) {
     return stats;
@@ -107,12 +102,9 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
       await executeHubSpotOperation(job.operation, job.payload);
       
       // Mark as completed
-      await pool.query(
-        `UPDATE hubspot_sync_queue 
+      await db.execute(sql`UPDATE hubspot_sync_queue 
          SET status = 'completed', completed_at = NOW(), updated_at = NOW() 
-         WHERE id = $1`,
-        [job.id]
-      );
+         WHERE id = ${job.id}`);
       
       stats.succeeded++;
       logger.info('[HubSpot Queue] Job completed', { 
@@ -127,14 +119,11 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
         errorMsg.includes('401');
       
       if (isUnrecoverable) {
-        await pool.query(
-          `UPDATE hubspot_sync_queue 
+        await db.execute(sql`UPDATE hubspot_sync_queue 
            SET status = 'dead', 
-               last_error = $2,
+               last_error = ${`Unrecoverable error - ${errorMsg}`},
                updated_at = NOW() 
-           WHERE id = $1`,
-          [job.id, `Unrecoverable error - ${errorMsg}`]
-        );
+           WHERE id = ${job.id}`);
         
         logger.error('[HubSpot Queue] Job dead (unrecoverable error - skipping retries)', { 
           error,
@@ -163,16 +152,13 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
       if (shouldRetry) {
         // Schedule retry with exponential backoff
         const nextRetry = getNextRetryTime(newRetryCount);
-        await pool.query(
-          `UPDATE hubspot_sync_queue 
+        await db.execute(sql`UPDATE hubspot_sync_queue 
            SET status = 'failed', 
-               retry_count = $2, 
-               last_error = $3, 
-               next_retry_at = $4,
+               retry_count = ${newRetryCount}, 
+               last_error = ${error.message}, 
+               next_retry_at = ${nextRetry},
                updated_at = NOW() 
-           WHERE id = $1`,
-          [job.id, newRetryCount, error.message, nextRetry]
-        );
+           WHERE id = ${job.id}`);
         
         logger.warn('[HubSpot Queue] Job failed, will retry', { 
           extra: { 
@@ -184,14 +170,11 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
         });
       } else {
         // Mark as dead (exceeded retries)
-        await pool.query(
-          `UPDATE hubspot_sync_queue 
+        await db.execute(sql`UPDATE hubspot_sync_queue 
            SET status = 'dead', 
-               last_error = $2,
+               last_error = ${error.message},
                updated_at = NOW() 
-           WHERE id = $1`,
-          [job.id, error.message]
-        );
+           WHERE id = ${job.id}`);
         
         logger.error('[HubSpot Queue] Job dead (max retries exceeded)', { 
           error,
@@ -286,7 +269,7 @@ async function executeHubSpotOperation(operation: string, payload: any): Promise
 // Recover jobs stuck in 'processing' status (server crash recovery)
 export async function recoverStuckProcessingJobs(): Promise<number> {
   try {
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       UPDATE hubspot_sync_queue
       SET status = 'failed', 
           retry_count = retry_count + 1,
@@ -319,7 +302,7 @@ export async function getQueueStats(): Promise<{
   dead: number;
   completedToday: number;
 }> {
-  const result = await pool.query(`
+  const result = await db.execute(sql`
     SELECT 
       COUNT(*) FILTER (WHERE status = 'pending') as pending,
       COUNT(*) FILTER (WHERE status = 'processing') as processing,

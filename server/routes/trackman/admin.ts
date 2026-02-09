@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { pool } from '../../core/db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { sendPushNotification } from '../push';
 import { getGuestPassesRemaining } from '../guestPasses';
 import { getMemberTierByEmail, getTierLimits, getDailyBookedMinutes, getTotalDailyUsageMinutes } from '../../core/tierService';
@@ -22,54 +24,47 @@ router.get('/api/admin/trackman/unmatched', isStaffOrAdmin, async (req, res) => 
     const offsetNum = parseInt(offset as string) || 0;
     const categoryFilter = (category as string).toLowerCase();
     
-    let whereClause = `WHERE br.is_unmatched = true`;
-    const params: any[] = [];
-    let paramIndex = 1;
+    const sqlConditions: ReturnType<typeof sql>[] = [sql`br.is_unmatched = true`];
     
     if (resolved === 'false') {
-      whereClause += ` AND (br.user_email IS NULL OR br.user_email = '' OR br.user_email LIKE 'unmatched-%@%' OR br.user_email LIKE '%@trackman.local')`;
+      sqlConditions.push(sql`(br.user_email IS NULL OR br.user_email = '' OR br.user_email LIKE 'unmatched-%@%' OR br.user_email LIKE '%@trackman.local')`);
     }
     
     if (search) {
-      whereClause += ` AND (
-        br.staff_notes ILIKE $${paramIndex} OR 
-        br.trackman_customer_notes ILIKE $${paramIndex} OR
-        br.trackman_booking_id::text ILIKE $${paramIndex}
-      )`;
-      params.push(`%${search}%`);
-      paramIndex++;
+      const searchPattern = `%${search}%`;
+      sqlConditions.push(sql`(
+        br.staff_notes ILIKE ${searchPattern} OR 
+        br.trackman_customer_notes ILIKE ${searchPattern} OR
+        br.trackman_booking_id::text ILIKE ${searchPattern}
+      )`);
     }
     
-    // Category filtering
     if (categoryFilter === 'matchable') {
-      whereClause += ` AND EXISTS (
+      sqlConditions.push(sql`EXISTS (
         SELECT 1 FROM users u 
         WHERE LOWER(u.email) = LOWER(REGEXP_REPLACE(br.trackman_customer_notes, '.*Original email:\\s*([^,\\s]+).*', '\\1'))
-      )`;
+      )`);
     } else if (categoryFilter === 'events') {
-      whereClause += ` AND (
+      sqlConditions.push(sql`(
         br.user_name ILIKE ANY(ARRAY['%birthday%', '%event%', '%party%', '%club%'])
         OR br.trackman_customer_notes ILIKE ANY(ARRAY['%birthday%', '%event%', '%party%', '%club%'])
-      )`;
+      )`);
     } else if (categoryFilter === 'visitors') {
-      // Visitors: NOT matchable AND NOT events
-      whereClause += ` AND NOT EXISTS (
+      sqlConditions.push(sql`NOT EXISTS (
         SELECT 1 FROM users u 
         WHERE LOWER(u.email) = LOWER(REGEXP_REPLACE(br.trackman_customer_notes, '.*Original email:\\s*([^,\\s]+).*', '\\1'))
       ) AND NOT (
         br.user_name ILIKE ANY(ARRAY['%birthday%', '%event%', '%party%', '%club%'])
         OR br.trackman_customer_notes ILIKE ANY(ARRAY['%birthday%', '%event%', '%party%', '%club%'])
-      )`;
+      )`);
     }
     
-    const countResult = await pool.query(
-      `SELECT COUNT(*) FROM booking_requests br ${whereClause}`,
-      params
-    );
+    const whereFragment = sql.join(sqlConditions, sql` AND `);
+    
+    const countResult = await db.execute(sql`SELECT COUNT(*) FROM booking_requests br WHERE ${whereFragment}`);
     const totalCount = parseInt(countResult.rows[0].count);
     
-    const result = await pool.query(
-      `SELECT 
+    const result = await db.execute(sql`SELECT 
         br.id,
         br.trackman_booking_id,
         br.request_date as booking_date,
@@ -93,11 +88,9 @@ router.get('/api/admin/trackman/unmatched', isStaffOrAdmin, async (req, res) => 
         ) as is_event
       FROM booking_requests br
       LEFT JOIN resources r ON br.resource_id = r.id
-      ${whereClause}
+      WHERE ${whereFragment}
       ORDER BY br.request_date DESC, br.start_time DESC
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
-      [...params, limitNum, offsetNum]
-    );
+      LIMIT ${limitNum} OFFSET ${offsetNum}`);
     
     const parsedResults = result.rows.map(row => {
       let userName = 'Unknown';
@@ -163,8 +156,7 @@ router.post('/api/admin/trackman/unmatched/auto-resolve', isStaffOrAdmin, async 
     const staffEmail = (req as any).session?.user?.email || 'admin';
     
     // Find all matchable bookings with their matching user
-    const matchableResult = await pool.query(`
-      SELECT 
+    const matchableResult = await db.execute(sql`SELECT 
         br.id as booking_id,
         br.trackman_booking_id,
         br.trackman_customer_notes,
@@ -183,8 +175,7 @@ router.post('/api/admin/trackman/unmatched/auto-resolve', isStaffOrAdmin, async 
       WHERE br.is_unmatched = true
         AND (br.user_email IS NULL OR br.user_email = '' OR br.user_email LIKE 'unmatched-%@%' OR br.user_email LIKE '%@trackman.local')
       ORDER BY br.request_date DESC
-      LIMIT 100
-    `);
+      LIMIT 100`);
     
     if (matchableResult.rows.length === 0) {
       return res.json({ 
@@ -200,23 +191,14 @@ router.post('/api/admin/trackman/unmatched/auto-resolve', isStaffOrAdmin, async 
     for (const row of matchableResult.rows) {
       try {
         // Update booking to link to the matched user
-        await pool.query(
-          `UPDATE booking_requests 
-           SET user_id = $1, 
-               user_email = $2, 
-               user_name = $3,
+        await db.execute(sql`UPDATE booking_requests 
+           SET user_id = ${row.user_id}, 
+               user_email = ${row.user_email}, 
+               user_name = ${`${row.first_name} ${row.last_name}`},
                is_unmatched = false,
-               staff_notes = COALESCE(staff_notes, '') || $4,
+               staff_notes = COALESCE(staff_notes, '') || ${` [Auto-resolved by ${staffEmail} on ${new Date().toISOString()}]`},
                updated_at = NOW()
-           WHERE id = $5`,
-          [
-            row.user_id,
-            row.user_email,
-            `${row.first_name} ${row.last_name}`,
-            ` [Auto-resolved by ${staffEmail} on ${new Date().toISOString()}]`,
-            row.booking_id
-          ]
-        );
+           WHERE id = ${row.booking_id}`);
         
         resolvedCount++;
       } catch (err: any) {
@@ -265,19 +247,13 @@ router.post('/api/admin/trackman/unmatched/bulk-dismiss', isStaffOrAdmin, async 
     const validReasons = ['external_booking', 'visitor', 'event', 'duplicate', 'test_data', 'other'];
     const dismissReason = validReasons.includes(reason) ? reason : 'external_booking';
     
-    const result = await pool.query(
-      `UPDATE booking_requests 
+    const result = await db.execute(sql`UPDATE booking_requests 
        SET is_unmatched = false,
-           staff_notes = COALESCE(staff_notes, '') || $1,
+           staff_notes = COALESCE(staff_notes, '') || ${` [Dismissed as ${dismissReason} by ${staffEmail} on ${new Date().toISOString()}]`},
            updated_at = NOW()
-       WHERE id = ANY($2::int[])
+       WHERE id = ANY(${bookingIds}::int[])
          AND is_unmatched = true
-       RETURNING id, trackman_booking_id`,
-      [
-        ` [Dismissed as ${dismissReason} by ${staffEmail} on ${new Date().toISOString()}]`,
-        bookingIds
-      ]
-    );
+       RETURNING id, trackman_booking_id`);
     
     const dismissedCount = result.rowCount || 0;
     
@@ -314,21 +290,14 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
       return res.status(400).json({ error: 'Email is required (memberEmail or email)' });
     }
     
-    const memberResult = await pool.query(
-      `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.stripe_customer_id, u.tier, u.archived_at,
+    const memberResult = await db.execute(sql`SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.stripe_customer_id, u.tier, u.archived_at,
               su.role as staff_role, su.is_active as is_staff_active
        FROM users u
        LEFT JOIN staff_users su ON LOWER(su.email) = LOWER(u.email) AND su.is_active = true
-       WHERE LOWER(u.email) = LOWER($1)`,
-      [resolveEmail.toLowerCase()]
-    );
+       WHERE LOWER(u.email) = LOWER(${resolveEmail.toLowerCase()})`);
     
     if (memberResult.rows.length === 0) {
-      // Check if this email exists in staff_users but not users table
-      const staffCheck = await pool.query(
-        `SELECT id, email, first_name, last_name, role FROM staff_users WHERE LOWER(email) = LOWER($1) AND is_active = true`,
-        [resolveEmail.toLowerCase()]
-      );
+      const staffCheck = await db.execute(sql`SELECT id, email, first_name, last_name, role FROM staff_users WHERE LOWER(email) = LOWER(${resolveEmail.toLowerCase()}) AND is_active = true`);
       
       if (staffCheck.rows.length > 0) {
         return res.status(404).json({ 
@@ -350,23 +319,17 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
     const isVisitor = member.role === 'visitor' && !member.staff_role;
     const staffEmail = (req as any).session?.user?.email || 'admin';
     
-    let bookingResult = await pool.query(
-      `SELECT id, trackman_booking_id, staff_notes, trackman_customer_notes, request_date, start_time, end_time, 
+    let bookingResult = await db.execute(sql`SELECT id, trackman_booking_id, staff_notes, trackman_customer_notes, request_date, start_time, end_time, 
               duration_minutes, resource_id, session_id
-       FROM booking_requests WHERE id = $1`,
-      [id]
-    );
+       FROM booking_requests WHERE id = ${id}`);
     
     let booking = bookingResult.rows[0];
     let fromLegacyTable = false;
     
     if (!booking) {
-      const legacyResult = await pool.query(
-        `SELECT id, trackman_booking_id, user_name, original_email, booking_date, 
+      const legacyResult = await db.execute(sql`SELECT id, trackman_booking_id, user_name, original_email, booking_date, 
                 start_time, end_time, duration_minutes, bay_number, notes
-         FROM trackman_unmatched_bookings WHERE id = $1 AND resolved_at IS NULL`,
-        [id]
-      );
+         FROM trackman_unmatched_bookings WHERE id = ${id} AND resolved_at IS NULL`);
       
       if (legacyResult.rows.length === 0) {
         return res.status(404).json({ error: 'Booking not found in either booking requests or unmatched bookings' });
@@ -382,11 +345,10 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
       }
       
       // Use ON CONFLICT to handle race conditions (e.g., if booking was already created via CSV import)
-      const createResult = await pool.query(
-        `INSERT INTO booking_requests (
+      const createResult = await db.execute(sql`INSERT INTO booking_requests (
           user_id, user_email, user_name, resource_id, request_date, start_time, end_time,
           duration_minutes, status, trackman_booking_id, is_unmatched, staff_notes, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'approved', $9, false, $10, NOW(), NOW())
+        ) VALUES (${member.id}, ${member.email}, ${`${member.first_name} ${member.last_name}`}, ${resourceId}, ${legacy.booking_date}, ${legacy.start_time}, ${legacy.end_time}, ${legacy.duration_minutes || 60}, 'approved', ${legacy.trackman_booking_id}, false, ${`[Resolved from legacy unmatched by ${staffEmail}] ${legacy.notes || ''}`}, NOW(), NOW())
         ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO UPDATE SET
           user_id = EXCLUDED.user_id,
           user_email = EXCLUDED.user_email,
@@ -394,67 +356,32 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
           is_unmatched = false,
           staff_notes = booking_requests.staff_notes || ' ' || EXCLUDED.staff_notes,
           updated_at = NOW()
-        RETURNING id, trackman_booking_id, staff_notes, request_date, start_time, end_time, duration_minutes, resource_id`,
-        [
-          member.id,
-          member.email,
-          `${member.first_name} ${member.last_name}`,
-          resourceId,
-          legacy.booking_date,
-          legacy.start_time,
-          legacy.end_time,
-          legacy.duration_minutes || 60,
-          legacy.trackman_booking_id,
-          `[Resolved from legacy unmatched by ${staffEmail}] ${legacy.notes || ''}`
-        ]
-      );
+        RETURNING id, trackman_booking_id, staff_notes, request_date, start_time, end_time, duration_minutes, resource_id`);
       
       booking = createResult.rows[0];
       
-      await pool.query(
-        `UPDATE trackman_unmatched_bookings SET resolved_at = NOW(), resolved_email = $1 WHERE id = $2`,
-        [member.email, id]
-      );
+      await db.execute(sql`UPDATE trackman_unmatched_bookings SET resolved_at = NOW(), resolved_email = ${member.email} WHERE id = ${id}`);
     } else {
-      await pool.query(
-        `UPDATE booking_requests 
-         SET user_id = $1, 
-             user_email = $2, 
+      await db.execute(sql`UPDATE booking_requests 
+         SET user_id = ${member.id}, 
+             user_email = ${member.email}, 
              is_unmatched = false,
-             staff_notes = COALESCE(staff_notes, '') || $3,
+             staff_notes = COALESCE(staff_notes, '') || ${` [Resolved by ${staffEmail} on ${new Date().toISOString()}]`},
              updated_at = NOW()
-         WHERE id = $4`,
-        [
-          member.id, 
-          member.email, 
-          ` [Resolved by ${staffEmail} on ${new Date().toISOString()}]`,
-          id
-        ]
-      );
+         WHERE id = ${id}`);
     }
     
-    await pool.query(
-      `UPDATE booking_requests 
-       SET user_id = $1, 
-           user_email = $2, 
+    await db.execute(sql`UPDATE booking_requests 
+       SET user_id = ${member.id}, 
+           user_email = ${member.email}, 
            is_unmatched = false,
-           staff_notes = COALESCE(staff_notes, '') || $3,
+           staff_notes = COALESCE(staff_notes, '') || ${` [Resolved by ${staffEmail} on ${new Date().toISOString()}]`},
            updated_at = NOW()
-       WHERE id = $4`,
-      [
-        member.id, 
-        member.email, 
-        ` [Resolved by ${staffEmail} on ${new Date().toISOString()}]`,
-        id
-      ]
-    );
+       WHERE id = ${id}`);
     
     let originalEmailForLearning: string | null = null;
     if (fromLegacyTable) {
-      const legacyData = await pool.query(
-        `SELECT original_email FROM trackman_unmatched_bookings WHERE id = $1`,
-        [id]
-      );
+      const legacyData = await db.execute(sql`SELECT original_email FROM trackman_unmatched_bookings WHERE id = ${id}`);
       if (legacyData.rows[0]?.original_email) {
         originalEmailForLearning = legacyData.rows[0].original_email.toLowerCase().trim();
       }
@@ -489,50 +416,33 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
       if (originalEmailForLearning.toLowerCase() !== member.email.toLowerCase() && 
           !isPlaceholderEmail(originalEmailForLearning)) {
         try {
-          const existingLink = await pool.query(
-            `SELECT id FROM user_linked_emails WHERE LOWER(linked_email) = LOWER($1)`,
-            [originalEmailForLearning]
-          );
+          const existingLink = await db.execute(sql`SELECT id FROM user_linked_emails WHERE LOWER(linked_email) = LOWER(${originalEmailForLearning})`);
           
           if (existingLink.rows.length === 0) {
-            await pool.query(
-              `INSERT INTO user_linked_emails (primary_email, linked_email, source, created_by)
-               VALUES ($1, $2, 'staff_resolution', $3)`,
-              [member.email.toLowerCase(), originalEmailForLearning, staffEmail]
-            );
+            await db.execute(sql`INSERT INTO user_linked_emails (primary_email, linked_email, source, created_by)
+               VALUES (${member.email.toLowerCase()}, ${originalEmailForLearning}, ${'staff_resolution'}, ${staffEmail})`);
             console.log(`[Email Learning] Linked ${originalEmailForLearning} -> ${member.email} by ${staffEmail}`);
             
             // Auto-resolve other unresolved bookings with the same original email
-            const otherUnresolvedResult = await pool.query(
-              `SELECT id, trackman_booking_id 
+            const otherUnresolvedResult = await db.execute(sql`SELECT id, trackman_booking_id 
                FROM booking_requests 
                WHERE is_unmatched = true 
-               AND id != $1
+               AND id != ${id}
                AND (
-                 trackman_customer_notes ILIKE $2
-                 OR user_email ILIKE $3
-               )`,
-              [id, `%${originalEmailForLearning}%`, `%${originalEmailForLearning.split('@')[0]}%`]
-            );
+                 trackman_customer_notes ILIKE ${`%${originalEmailForLearning}%`}
+                 OR user_email ILIKE ${`%${originalEmailForLearning.split('@')[0]}%`}
+               )`);
             
             let autoResolvedCount = 0;
             for (const otherBooking of otherUnresolvedResult.rows) {
               try {
-                await pool.query(
-                  `UPDATE booking_requests 
-                   SET user_id = $1, 
-                       user_email = $2, 
+                await db.execute(sql`UPDATE booking_requests 
+                   SET user_id = ${member.id}, 
+                       user_email = ${member.email}, 
                        is_unmatched = false,
-                       staff_notes = COALESCE(staff_notes, '') || $3,
+                       staff_notes = COALESCE(staff_notes, '') || ${` [Auto-resolved via linked email by ${staffEmail} on ${new Date().toISOString()}]`},
                        updated_at = NOW()
-                   WHERE id = $4`,
-                  [
-                    member.id, 
-                    member.email, 
-                    ` [Auto-resolved via linked email by ${staffEmail} on ${new Date().toISOString()}]`,
-                    otherBooking.id
-                  ]
-                );
+                   WHERE id = ${otherBooking.id}`);
                 autoResolvedCount++;
               } catch (autoErr: any) {
                 console.error(`[Email Learning] Failed to auto-resolve booking ${otherBooking.id}:`, autoErr.message);
@@ -560,23 +470,18 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
         const bookingDateStr = typeof bookingDate === 'string' ? bookingDate : 
           new Date(bookingDate).toISOString().split('T')[0];
         
-        const existingDayPass = await pool.query(
-          `SELECT id, stripe_payment_intent_id FROM day_pass_purchases 
-           WHERE user_id = $1 
+        const existingDayPass = await db.execute(sql`SELECT id, stripe_payment_intent_id FROM day_pass_purchases 
+           WHERE user_id = ${member.id} 
            AND product_type = 'day-pass-golf-sim'
            AND (
-             (booking_date = $2::date OR (booking_date IS NULL AND DATE(created_at AT TIME ZONE 'America/Los_Angeles') = $2::date))
-             OR trackman_booking_id = $3
+             (booking_date = ${bookingDateStr}::date OR (booking_date IS NULL AND DATE(created_at AT TIME ZONE 'America/Los_Angeles') = ${bookingDateStr}::date))
+             OR trackman_booking_id = ${booking.trackman_booking_id}
            )
-           AND (status IS NULL OR status != 'cancelled')`,
-          [member.id, bookingDateStr, booking.trackman_booking_id]
-        );
+           AND (status IS NULL OR status != 'cancelled')`);
         
         if (existingDayPass.rows.length === 0) {
-          const dayPassResult = await pool.query(
-            `SELECT price_cents, stripe_price_id, name FROM membership_tiers 
-             WHERE slug = 'day-pass-golf-sim' AND is_active = true`
-          );
+          const dayPassResult = await db.execute(sql`SELECT price_cents, stripe_price_id, name FROM membership_tiers 
+             WHERE slug = 'day-pass-golf-sim' AND is_active = true`);
           
           if (dayPassResult.rows.length > 0) {
             const dayPass = dayPassResult.rows[0];
@@ -659,12 +564,9 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
               console.log(`[Trackman Resolve] Day pass invoice sent for visitor ${member.email}: $${(amountCents / 100).toFixed(2)}`);
             }
             
-            await pool.query(
-              `INSERT INTO day_pass_purchases 
+            await db.execute(sql`INSERT INTO day_pass_purchases 
                (user_id, product_type, quantity, amount_cents, stripe_payment_intent_id, booking_date, status, trackman_booking_id, created_at)
-               VALUES ($1, 'day-pass-golf-sim', 1, $2, $3, $4, $5, $6, NOW())`,
-              [member.id, amountCents, paymentIntentId, bookingDateStr, paymentStatus, booking.trackman_booking_id]
-            );
+               VALUES (${member.id}, ${'day-pass-golf-sim'}, 1, ${amountCents}, ${paymentIntentId}, ${bookingDateStr}, ${paymentStatus}, ${booking.trackman_booking_id}, NOW())`);
             
             updateVisitorTypeByUserId(member.id, 'day_pass', 'day_pass_purchase', new Date(bookingDateStr))
               .catch(err => console.error('[VisitorType] Failed to update day_pass type:', err));
@@ -675,18 +577,13 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
         
         let sessionId = booking.session_id;
         if (!sessionId) {
-          const sessionResult = await pool.query(`
-            INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
-            VALUES ($1, $2, $3, $4, $5, 'trackman', 'staff_resolve')
-            RETURNING id
-          `, [booking.resource_id, bookingDateStr, booking.start_time, booking.end_time, booking.trackman_booking_id]);
+          const sessionResult = await db.execute(sql`INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
+            VALUES (${booking.resource_id}, ${bookingDateStr}, ${booking.start_time}, ${booking.end_time}, ${booking.trackman_booking_id}, ${'trackman'}, ${'staff_resolve'})
+            RETURNING id`);
           
           if (sessionResult.rows.length > 0) {
             sessionId = sessionResult.rows[0].id;
-            await pool.query(
-              `UPDATE booking_requests SET session_id = $1 WHERE id = $2`,
-              [sessionId, booking.id]
-            );
+            await db.execute(sql`UPDATE booking_requests SET session_id = ${sessionId} WHERE id = ${booking.id}`);
           }
         }
         
@@ -704,8 +601,6 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
       }
     }
     
-    // CRITICAL FIX: Create session for MEMBERS too (not just visitors)
-    // Ensure all resolved bookings have proper billing tracking
     if (!isVisitor) {
       try {
         const bookingDateStr = typeof booking.request_date === 'string' ? booking.request_date : 
@@ -713,20 +608,15 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
         
         let sessionId = booking.session_id;
         if (!sessionId) {
-          const sessionResult = await pool.query(`
-            INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
-            VALUES ($1, $2, $3, $4, $5, 'trackman', 'staff_resolve')
+          const sessionResult = await db.execute(sql`INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
+            VALUES (${booking.resource_id}, ${bookingDateStr}, ${booking.start_time}, ${booking.end_time}, ${booking.trackman_booking_id}, ${'trackman'}, ${'staff_resolve'})
             ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL 
             DO UPDATE SET updated_at = NOW()
-            RETURNING id
-          `, [booking.resource_id, bookingDateStr, booking.start_time, booking.end_time, booking.trackman_booking_id]);
+            RETURNING id`);
           
           if (sessionResult.rows.length > 0) {
             sessionId = sessionResult.rows[0].id;
-            await pool.query(
-              `UPDATE booking_requests SET session_id = $1 WHERE id = $2`,
-              [sessionId, booking.id]
-            );
+            await db.execute(sql`UPDATE booking_requests SET session_id = ${sessionId} WHERE id = ${booking.id}`);
           }
         }
         
@@ -738,23 +628,15 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
             : booking.duration_minutes || 60;
           
           // Check if participant already exists
-          const existingParticipant = await pool.query(
-            `SELECT id FROM booking_participants WHERE session_id = $1 AND participant_type = 'owner'`,
-            [sessionId]
-          );
+          const existingParticipant = await db.execute(sql`SELECT id FROM booking_participants WHERE session_id = ${sessionId} AND participant_type = 'owner'`);
           
           if (existingParticipant.rows.length === 0) {
-            await pool.query(`
-              INSERT INTO booking_participants (session_id, user_id, display_name, participant_type, slot_duration)
-              VALUES ($1, $2, $3, 'owner', $4)
-            `, [sessionId, member.id, `${member.first_name} ${member.last_name}`, slotDuration]);
+            await db.execute(sql`INSERT INTO booking_participants (session_id, user_id, display_name, participant_type, slot_duration)
+              VALUES (${sessionId}, ${member.id}, ${`${member.first_name} ${member.last_name}`}, ${'owner'}, ${slotDuration})`);
           } else {
-            // Update existing owner participant
-            await pool.query(`
-              UPDATE booking_participants 
-              SET user_id = $1, display_name = $2
-              WHERE session_id = $3 AND participant_type = 'owner'
-            `, [member.id, `${member.first_name} ${member.last_name}`, sessionId]);
+            await db.execute(sql`UPDATE booking_participants 
+              SET user_id = ${member.id}, display_name = ${`${member.first_name} ${member.last_name}`}
+              WHERE session_id = ${sessionId} AND participant_type = 'owner'`);
           }
           
           // Recalculate fees for the session now that we have an owner
@@ -766,10 +648,7 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
           }
           
           // IDEMPOTENCY: Check existing usage and handle ownership
-          const existingUsage = await pool.query(
-            `SELECT id, member_id FROM usage_ledger WHERE session_id = $1 AND usage_type = 'base' LIMIT 1`,
-            [sessionId]
-          );
+          const existingUsage = await db.execute(sql`SELECT id, member_id FROM usage_ledger WHERE session_id = ${sessionId} AND usage_type = 'base' LIMIT 1`);
           
           if (existingUsage.rows.length === 0) {
             await recordUsage(sessionId, {
@@ -783,10 +662,7 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
             // OWNERSHIP CORRECTION: If existing usage belongs to a different member, update it
             const existingMemberId = existingUsage.rows[0].member_id;
             if (existingMemberId !== member.id) {
-              await pool.query(
-                `UPDATE usage_ledger SET member_id = $1 WHERE session_id = $2 AND usage_type = 'base'`,
-                [member.id, sessionId]
-              );
+              await db.execute(sql`UPDATE usage_ledger SET member_id = ${member.id} WHERE session_id = ${sessionId} AND usage_type = 'base'`);
               console.log(`[Trackman Resolve] Corrected usage ownership: ${existingMemberId} -> ${member.id} for session ${sessionId}`);
             } else {
               console.log(`[Trackman Resolve] Session ${sessionId} already has correct usage ledger, skipping`);
@@ -845,73 +721,45 @@ router.post('/api/admin/trackman/auto-resolve-same-email', isStaffOrAdmin, async
     // First, resolve bookings in booking_requests table (current system)
     let bookingRequestsResolved = 0;
     if (resolveToEmail) {
-      const memberResult = await pool.query(
-        `SELECT id, email, first_name, last_name, role FROM users WHERE LOWER(email) = LOWER($1)`,
-        [resolveToEmail]
-      );
+      const memberResult = await db.execute(sql`SELECT id, email, first_name, last_name, role FROM users WHERE LOWER(email) = LOWER(${resolveToEmail})`);
       
       if (memberResult.rows.length > 0) {
         const member = memberResult.rows[0];
         
-        // Find unmatched bookings in booking_requests with same original email in notes/customer_notes
-        const bookingRequestsResult = await pool.query(
-          `SELECT id, trackman_booking_id 
+        const bookingRequestsResult = await db.execute(sql`SELECT id, trackman_booking_id 
            FROM booking_requests 
            WHERE is_unmatched = true 
-           AND ($1::text IS NULL OR trackman_booking_id != $1)
+           AND (${excludeTrackmanId || null}::text IS NULL OR trackman_booking_id != ${excludeTrackmanId || null})
            AND (
-             trackman_customer_notes ILIKE $2
-             OR staff_notes ILIKE $2
-           )`,
-          [excludeTrackmanId || null, `%${originalEmail}%`]
-        );
+             trackman_customer_notes ILIKE ${`%${originalEmail}%`}
+             OR staff_notes ILIKE ${`%${originalEmail}%`}
+           )`);
         
         for (const booking of bookingRequestsResult.rows) {
           try {
-            // Check if this is for a golf instructor - if so, convert to availability block
             if (member.role === 'golf_instructor' || 
-                (await pool.query(`SELECT 1 FROM staff_users WHERE LOWER(email) = LOWER($1) AND role = 'golf_instructor' AND is_active = true`, [member.email])).rows.length > 0) {
-              // Convert to availability block instead of regular booking
-              const bookingDetails = await pool.query(
-                `SELECT request_date, start_time, end_time, resource_id FROM booking_requests WHERE id = $1`,
-                [booking.id]
-              );
+                (await db.execute(sql`SELECT 1 FROM staff_users WHERE LOWER(email) = LOWER(${member.email}) AND role = 'golf_instructor' AND is_active = true`)).rows.length > 0) {
+              const bookingDetails = await db.execute(sql`SELECT request_date, start_time, end_time, resource_id FROM booking_requests WHERE id = ${booking.id}`);
               if (bookingDetails.rows.length > 0) {
                 const bd = bookingDetails.rows[0];
-                await pool.query(
-                  `INSERT INTO facility_closures (title, affected_areas, start_date, end_date, is_active, created_by)
-                   VALUES ($1, 'simulators', $2, $2, true, $3)
+                await db.execute(sql`INSERT INTO facility_closures (title, affected_areas, start_date, end_date, is_active, created_by)
+                   VALUES (${`Lesson: ${member.first_name} ${member.last_name}`}, ${'simulators'}, ${bd.request_date}, ${bd.request_date}, true, ${staffEmail})
                    ON CONFLICT DO NOTHING
-                   RETURNING id`,
-                  [`Lesson: ${member.first_name} ${member.last_name}`, bd.request_date, staffEmail]
-                );
-                await pool.query(
-                  `INSERT INTO availability_blocks (resource_id, block_date, start_time, end_time, block_type, notes, created_by)
-                   VALUES ($1, $2, $3, $4, 'blocked', $5, $6)
-                   ON CONFLICT DO NOTHING`,
-                  [bd.resource_id, bd.request_date, bd.start_time, bd.end_time, `Lesson: ${member.first_name} ${member.last_name} [Auto-resolved by ${staffEmail}]`, staffEmail]
-                );
+                   RETURNING id`);
+                await db.execute(sql`INSERT INTO availability_blocks (resource_id, block_date, start_time, end_time, block_type, notes, created_by)
+                   VALUES (${bd.resource_id}, ${bd.request_date}, ${bd.start_time}, ${bd.end_time}, ${'blocked'}, ${`Lesson: ${member.first_name} ${member.last_name} [Auto-resolved by ${staffEmail}]`}, ${staffEmail})
+                   ON CONFLICT DO NOTHING`);
               }
-              await pool.query(`DELETE FROM booking_requests WHERE id = $1`, [booking.id]);
+              await db.execute(sql`DELETE FROM booking_requests WHERE id = ${booking.id}`);
             } else {
-              // Regular member - update the booking
-              await pool.query(
-                `UPDATE booking_requests 
-                 SET user_id = $1, 
-                     user_email = $2, 
-                     user_name = $3,
+              await db.execute(sql`UPDATE booking_requests 
+                 SET user_id = ${member.id}, 
+                     user_email = ${member.email}, 
+                     user_name = ${`${member.first_name} ${member.last_name}`},
                      is_unmatched = false,
-                     staff_notes = COALESCE(staff_notes, '') || $4,
+                     staff_notes = COALESCE(staff_notes, '') || ${` [Auto-resolved via same email by ${staffEmail} on ${new Date().toISOString()}]`},
                      updated_at = NOW()
-                 WHERE id = $5`,
-                [
-                  member.id, 
-                  member.email,
-                  `${member.first_name} ${member.last_name}`,
-                  ` [Auto-resolved via same email by ${staffEmail} on ${new Date().toISOString()}]`,
-                  booking.id
-                ]
-              );
+                 WHERE id = ${booking.id}`);
             }
             bookingRequestsResolved++;
           } catch (err: any) {
@@ -926,15 +774,12 @@ router.post('/api/admin/trackman/auto-resolve-same-email', isStaffOrAdmin, async
     }
     
     // Also check legacy trackman_unmatched_bookings table
-    const unmatchedResult = await pool.query(
-      `SELECT id, trackman_booking_id, user_name, original_email, booking_date, 
+    const unmatchedResult = await db.execute(sql`SELECT id, trackman_booking_id, user_name, original_email, booking_date, 
               start_time, end_time, duration_minutes, bay_number, notes
        FROM trackman_unmatched_bookings 
-       WHERE LOWER(TRIM(original_email)) = LOWER(TRIM($1)) 
+       WHERE LOWER(TRIM(original_email)) = LOWER(TRIM(${originalEmail})) 
          AND resolved_at IS NULL
-         AND ($2::text IS NULL OR trackman_booking_id != $2)`,
-      [originalEmail, excludeTrackmanId || null]
-    );
+         AND (${excludeTrackmanId || null}::text IS NULL OR trackman_booking_id != ${excludeTrackmanId || null})`);
     
     if (unmatchedResult.rows.length === 0 && bookingRequestsResolved === 0) {
       return res.json({ success: true, autoResolved: 0, message: 'No additional bookings to auto-resolve' });
@@ -952,12 +797,9 @@ router.post('/api/admin/trackman/auto-resolve-same-email', isStaffOrAdmin, async
         let targetEmail = resolveToEmail;
         
         if (!targetEmail) {
-          const emailMappingResult = await pool.query(
-            `SELECT ule.primary_email as email FROM user_linked_emails ule
-             WHERE LOWER(ule.linked_email) = LOWER($1)
-             LIMIT 1`,
-            [originalEmail]
-          );
+          const emailMappingResult = await db.execute(sql`SELECT ule.primary_email as email FROM user_linked_emails ule
+             WHERE LOWER(ule.linked_email) = LOWER(${originalEmail})
+             LIMIT 1`);
           
           if (emailMappingResult.rows.length > 0) {
             targetEmail = emailMappingResult.rows[0].email;
@@ -966,10 +808,7 @@ router.post('/api/admin/trackman/auto-resolve-same-email', isStaffOrAdmin, async
         
         if (!targetEmail) continue;
         
-        const memberResult = await pool.query(
-          `SELECT id, email, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)`,
-          [targetEmail]
-        );
+        const memberResult = await db.execute(sql`SELECT id, email, first_name, last_name FROM users WHERE LOWER(email) = LOWER(${targetEmail})`);
         
         if (memberResult.rows.length === 0) continue;
         
@@ -980,11 +819,10 @@ router.post('/api/admin/trackman/auto-resolve-same-email', isStaffOrAdmin, async
           if (bayNum >= 1 && bayNum <= 4) resourceId = bayNum;
         }
         
-        await pool.query(
-          `INSERT INTO booking_requests (
+        await db.execute(sql`INSERT INTO booking_requests (
             user_id, user_email, user_name, resource_id, request_date, start_time, end_time,
             duration_minutes, status, trackman_booking_id, is_unmatched, staff_notes, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'approved', $9, false, $10, NOW(), NOW())
+          ) VALUES (${member.id}, ${member.email}, ${`${member.first_name} ${member.last_name}`}, ${resourceId}, ${booking.booking_date}, ${booking.start_time}, ${booking.end_time}, ${booking.duration_minutes || 60}, 'approved', ${booking.trackman_booking_id}, false, ${`[Auto-resolved from same email by ${staffEmail}] ${booking.notes || ''}`}, NOW(), NOW())
           ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO UPDATE SET
             user_id = EXCLUDED.user_id,
             user_email = EXCLUDED.user_email,
@@ -992,25 +830,9 @@ router.post('/api/admin/trackman/auto-resolve-same-email', isStaffOrAdmin, async
             is_unmatched = false,
             staff_notes = booking_requests.staff_notes || ' ' || EXCLUDED.staff_notes,
             updated_at = NOW()
-          RETURNING id`,
-          [
-            member.id,
-            member.email,
-            `${member.first_name} ${member.last_name}`,
-            resourceId,
-            booking.booking_date,
-            booking.start_time,
-            booking.end_time,
-            booking.duration_minutes || 60,
-            booking.trackman_booking_id,
-            `[Auto-resolved from same email by ${staffEmail}] ${booking.notes || ''}`
-          ]
-        );
+          RETURNING id`);
         
-        await pool.query(
-          `UPDATE trackman_unmatched_bookings SET resolved_at = NOW(), resolved_email = $1, resolved_by = $2 WHERE id = $3`,
-          [member.email, staffEmail, booking.id]
-        );
+        await db.execute(sql`UPDATE trackman_unmatched_bookings SET resolved_at = NOW(), resolved_email = ${member.email}, resolved_by = ${staffEmail} WHERE id = ${booking.id}`);
         
         autoResolved++;
       } catch (bookingErr: any) {
@@ -1050,17 +872,14 @@ router.delete('/api/admin/trackman/linked-email', isStaffOrAdmin, async (req, re
       return res.status(400).json({ error: 'memberEmail and linkedEmail are required' });
     }
     
-    const result = await pool.query(
-      `UPDATE users 
+    const result = await db.execute(sql`UPDATE users 
        SET manually_linked_emails = (
          SELECT COALESCE(jsonb_agg(to_jsonb(elem)), '[]'::jsonb)
          FROM jsonb_array_elements_text(COALESCE(manually_linked_emails, '[]'::jsonb)) elem
-         WHERE elem != $1
+         WHERE elem != ${linkedEmail}
        )
-       WHERE LOWER(email) = LOWER($2)
-       RETURNING manually_linked_emails`,
-      [linkedEmail, memberEmail]
-    );
+       WHERE LOWER(email) = LOWER(${memberEmail})
+       RETURNING manually_linked_emails`);
     
     if (result.rowCount === 0) {
       return res.status(404).json({ error: 'Member not found' });
@@ -1082,35 +901,29 @@ router.get('/api/admin/trackman/matched', isStaffOrAdmin, async (req, res) => {
     const offset = parseInt(req.query.offset as string) || 0;
     const search = (req.query.search as string || '').trim().toLowerCase();
     
-    let whereClause = `
-      (br.trackman_booking_id IS NOT NULL OR br.notes LIKE '%[Trackman Import ID:%')
-      AND br.status NOT IN ('cancelled', 'declined')
-      AND (
+    const matchedConditions: ReturnType<typeof sql>[] = [
+      sql`(br.trackman_booking_id IS NOT NULL OR br.notes LIKE '%[Trackman Import ID:%')`,
+      sql`br.status NOT IN ('cancelled', 'declined')`,
+      sql`(
         COALESCE(br.trackman_player_count, 1) = 1
         OR (
           br.session_id IS NOT NULL
           AND (SELECT COUNT(*) FROM booking_participants bp WHERE bp.session_id = br.session_id) >= COALESCE(br.trackman_player_count, 1)
         )
-      )
-    `;
-    const queryParams: any[] = [];
+      )`
+    ];
     
     if (search) {
-      whereClause += ` AND (LOWER(br.user_name) LIKE $1 OR LOWER(br.user_email) LIKE $1 OR LOWER(u.first_name || ' ' || u.last_name) LIKE $1)`;
-      queryParams.push(`%${search}%`);
+      const searchPattern = `%${search}%`;
+      matchedConditions.push(sql`(LOWER(br.user_name) LIKE ${searchPattern} OR LOWER(br.user_email) LIKE ${searchPattern} OR LOWER(u.first_name || ' ' || u.last_name) LIKE ${searchPattern})`);
     }
     
-    const countResult = await pool.query(
-      `SELECT COUNT(*) as total FROM booking_requests br LEFT JOIN users u ON LOWER(br.user_email) = LOWER(u.email) WHERE ${whereClause}`,
-      queryParams
-    );
+    const matchedWhere = sql.join(matchedConditions, sql` AND `);
+    
+    const countResult = await db.execute(sql`SELECT COUNT(*) as total FROM booking_requests br LEFT JOIN users u ON LOWER(br.user_email) = LOWER(u.email) WHERE ${matchedWhere}`);
     const totalCount = parseInt(countResult.rows[0].total, 10);
     
-    const limitParam = queryParams.length + 1;
-    const offsetParam = queryParams.length + 2;
-    
-    const result = await pool.query(
-      `SELECT 
+    const result = await db.execute(sql`SELECT 
         br.id,
         br.user_email,
         br.user_name,
@@ -1148,11 +961,9 @@ router.get('/api/admin/trackman/matched', isStaffOrAdmin, async (req, res) => {
         END as filled_slots
        FROM booking_requests br
        LEFT JOIN users u ON LOWER(br.user_email) = LOWER(u.email)
-       WHERE ${whereClause}
+       WHERE ${matchedWhere}
        ORDER BY br.request_date DESC, br.start_time DESC
-       LIMIT $${limitParam} OFFSET $${offsetParam}`,
-      [...queryParams, limit, offset]
-    );
+       LIMIT ${limit} OFFSET ${offset}`);
     
     const data = result.rows.map(row => {
       const totalSlots = parseInt(row.total_slots) || 1;
@@ -1374,14 +1185,11 @@ router.post('/api/admin/trackman/unmatch-member', isStaffOrAdmin, async (req, re
       });
     }
     
-    const bookingsResult = await pool.query(
-      `SELECT id, notes, user_name 
+    const bookingsResult = await db.execute(sql`SELECT id, notes, user_name 
        FROM booking_requests 
-       WHERE LOWER(user_email) = $1
+       WHERE LOWER(user_email) = ${normalizedEmail}
          AND (notes LIKE '%[Trackman Import ID:%' OR trackman_booking_id IS NOT NULL)
-         AND status IN ('approved', 'pending', 'attended', 'no_show')`,
-      [normalizedEmail]
-    );
+         AND status IN ('approved', 'pending', 'attended', 'no_show')`);
     
     if (bookingsResult.rowCount === 0) {
       return res.json({ 
@@ -1400,19 +1208,12 @@ router.post('/api/admin/trackman/unmatch-member', isStaffOrAdmin, async (req, re
       const trackmanIdMatch = booking.notes?.match(/\[Trackman Import ID:(\d+)\]/);
       const trackmanId = trackmanIdMatch ? trackmanIdMatch[1] : booking.id;
       
-      await pool.query(
-        `UPDATE booking_requests 
+      await db.execute(sql`UPDATE booking_requests 
          SET user_email = NULL,
-             user_name = $1,
+             user_name = ${originalName},
              is_unmatched = true,
-             staff_notes = COALESCE(staff_notes, '') || $2
-         WHERE id = $3`,
-        [
-          originalName,
-          ` [Unmatched from ${normalizedEmail} by ${unmatchedBy} on ${new Date().toISOString()}]`,
-          booking.id
-        ]
-      );
+             staff_notes = COALESCE(staff_notes, '') || ${` [Unmatched from ${normalizedEmail} by ${unmatchedBy} on ${new Date().toISOString()}]`}
+         WHERE id = ${booking.id}`);
       affectedCount++;
     }
     
@@ -1442,17 +1243,14 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
   try {
     const { id } = req.params;
     
-    const bookingResult = await pool.query(
-      `SELECT br.guest_count, br.trackman_player_count, br.declared_player_count, br.resource_id, br.user_email as owner_email,
+    const bookingResult = await db.execute(sql`SELECT br.guest_count, br.trackman_player_count, br.declared_player_count, br.resource_id, br.user_email as owner_email,
               br.user_name as owner_name, br.duration_minutes, br.request_date, br.session_id, br.status,
               r.capacity as resource_capacity,
               EXTRACT(EPOCH FROM (bs.end_time - bs.start_time)) / 60 as session_duration_minutes
        FROM booking_requests br
        LEFT JOIN resources r ON br.resource_id = r.id
        LEFT JOIN booking_sessions bs ON br.session_id = bs.id
-       WHERE br.id = $1`,
-      [id]
-    );
+       WHERE br.id = ${id}`);
     
     if (bookingResult.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found' });
@@ -1482,14 +1280,11 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
       ownerGuestPassesRemaining = await getGuestPassesRemaining(ownerEmail, ownerTier || undefined);
     }
     
-    let membersResult = await pool.query(
-      `SELECT bm.*, u.first_name, u.last_name, u.email as member_email, u.tier as user_tier
+    let membersResult = await db.execute(sql`SELECT bm.*, u.first_name, u.last_name, u.email as member_email, u.tier as user_tier
        FROM booking_members bm
        LEFT JOIN users u ON LOWER(bm.user_email) = LOWER(u.email)
-       WHERE bm.booking_id = $1
-       ORDER BY bm.slot_number`,
-      [id]
-    );
+       WHERE bm.booking_id = ${id}
+       ORDER BY bm.slot_number`);
     
     const targetPlayerCount = declaredPlayerCount || trackmanPlayerCount || 1;
     const isUnmatchedOwner = !ownerEmail || ownerEmail.includes('unmatched@') || ownerEmail.includes('@trackman.import');
@@ -1502,37 +1297,25 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
         if (!existingSlotNumbers.has(i)) {
           const isPrimary = i === 1;
           const userEmail = (i === 1 && !isUnmatchedOwner) ? ownerEmail : null;
-          await pool.query(
-            `INSERT INTO booking_members (booking_id, slot_number, is_primary, user_email, created_at)
-             VALUES ($1, $2, $3, $4, NOW())
-             ON CONFLICT (booking_id, slot_number) DO NOTHING`,
-            [id, i, isPrimary, userEmail]
-          );
+          await db.execute(sql`INSERT INTO booking_members (booking_id, slot_number, is_primary, user_email, created_at)
+             VALUES (${id}, ${i}, ${isPrimary}, ${userEmail}, NOW())
+             ON CONFLICT (booking_id, slot_number) DO NOTHING`);
         }
       }
       
-      membersResult = await pool.query(
-        `SELECT bm.*, u.first_name, u.last_name, u.email as member_email, u.tier as user_tier
+      membersResult = await db.execute(sql`SELECT bm.*, u.first_name, u.last_name, u.email as member_email, u.tier as user_tier
          FROM booking_members bm
          LEFT JOIN users u ON LOWER(bm.user_email) = LOWER(u.email)
-         WHERE bm.booking_id = $1
-         ORDER BY bm.slot_number`,
-        [id]
-      );
+         WHERE bm.booking_id = ${id}
+         ORDER BY bm.slot_number`);
     }
     
-    const guestsResult = await pool.query(
-      `SELECT * FROM booking_guests WHERE booking_id = $1 ORDER BY slot_number`,
-      [id]
-    );
+    const guestsResult = await db.execute(sql`SELECT * FROM booking_guests WHERE booking_id = ${id} ORDER BY slot_number`);
     
     const bookingData = bookingResult.rows[0];
     let participantsCount = 0;
     if (bookingData.session_id) {
-      const participantsResult = await pool.query(
-        `SELECT COUNT(*) as count FROM booking_participants WHERE session_id = $1`,
-        [bookingData.session_id]
-      );
+      const participantsResult = await db.execute(sql`SELECT COUNT(*) as count FROM booking_participants WHERE session_id = ${bookingData.session_id}`);
       participantsCount = parseInt(participantsResult.rows[0]?.count) || 0;
     }
     
@@ -1722,8 +1505,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     
     const sessionId = bookingResult.rows[0]?.session_id;
     if (sessionId) {
-      const participantsResult = await pool.query(`
-        SELECT 
+      const participantsResult = await db.execute(sql`SELECT 
           bp.id as participant_id,
           bp.display_name,
           bp.participant_type,
@@ -1735,9 +1517,8 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
           u.email as user_email
         FROM booking_participants bp
         LEFT JOIN users u ON u.id = bp.user_id
-        WHERE bp.session_id = $1
-        ORDER BY bp.participant_type, bp.created_at
-      `, [sessionId]);
+        WHERE bp.session_id = ${sessionId}
+        ORDER BY bp.participant_type, bp.created_at`);
       
       if (participantsResult.rows.length > 0) {
         const allParticipantIds = participantsResult.rows.map(p => p.participant_id);
@@ -1859,13 +1640,11 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     let hasPaidFees = false;
     let hasOriginalFees = false;
     if (sessionId) {
-      const paidCheck = await pool.query(`
-        SELECT 
+      const paidCheck = await db.execute(sql`SELECT 
           COUNT(*) FILTER (WHERE payment_status = 'paid' AND cached_fee_cents > 0) as paid_count,
           COUNT(*) FILTER (WHERE cached_fee_cents > 0 OR payment_status = 'paid') as total_with_fees
         FROM booking_participants 
-        WHERE session_id = $1
-      `, [sessionId]);
+        WHERE session_id = ${sessionId}`);
       hasPaidFees = parseInt(paidCheck.rows[0]?.paid_count || '0') > 0;
       hasOriginalFees = parseInt(paidCheck.rows[0]?.total_with_fees || '0') > 0;
     }
@@ -1934,10 +1713,7 @@ router.post('/api/admin/booking/:id/guests', isStaffOrAdmin, async (req, res) =>
     }
     
     if (guestEmail && !forceAddAsGuest) {
-      const memberMatch = await pool.query(
-        `SELECT id, email, first_name, last_name, tier FROM users WHERE LOWER(email) = LOWER($1)`,
-        [guestEmail.trim()]
-      );
+      const memberMatch = await db.execute(sql`SELECT id, email, first_name, last_name, tier FROM users WHERE LOWER(email) = LOWER(${guestEmail.trim()})`);
       if (memberMatch.rowCount && memberMatch.rowCount > 0) {
         const member = memberMatch.rows[0];
         return res.status(409).json({
@@ -1952,43 +1728,28 @@ router.post('/api/admin/booking/:id/guests', isStaffOrAdmin, async (req, res) =>
       }
     }
     
-    const bookingResult = await pool.query(
-      `SELECT b.*, u.id as owner_id FROM bookings b 
+    const bookingResult = await db.execute(sql`SELECT b.*, u.id as owner_id FROM bookings b 
        LEFT JOIN users u ON LOWER(u.email) = LOWER(b.user_email) 
-       WHERE b.id = $1`,
-      [bookingId]
-    );
+       WHERE b.id = ${bookingId}`);
     if (bookingResult.rowCount === 0) {
       return res.status(404).json({ error: 'Booking not found' });
     }
     
-    const existingGuests = await pool.query(
-      `SELECT MAX(slot_number) as max_slot FROM booking_guests WHERE booking_id = $1`,
-      [bookingId]
-    );
+    const existingGuests = await db.execute(sql`SELECT MAX(slot_number) as max_slot FROM booking_guests WHERE booking_id = ${bookingId}`);
     const nextSlotNumber = (existingGuests.rows[0]?.max_slot || 0) + 1;
     
-    const insertResult = await pool.query(
-      `INSERT INTO booking_guests (booking_id, guest_name, guest_email, guest_phone, slot_number, created_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())
-       RETURNING *`,
-      [bookingId, guestName.trim(), guestEmail?.trim() || null, guestPhone?.trim() || null, nextSlotNumber]
-    );
+    const insertResult = await db.execute(sql`INSERT INTO booking_guests (booking_id, guest_name, guest_email, guest_phone, slot_number, created_at)
+       VALUES (${bookingId}, ${guestName.trim()}, ${guestEmail?.trim() || null}, ${guestPhone?.trim() || null}, ${nextSlotNumber}, NOW())
+       RETURNING *`);
     
     if (slotId) {
-      await pool.query(
-        `DELETE FROM booking_members WHERE id = $1 AND booking_id = $2`,
-        [slotId, bookingId]
-      );
+      await db.execute(sql`DELETE FROM booking_members WHERE id = ${slotId} AND booking_id = ${bookingId}`);
     }
     
     const ownerEmail = bookingResult.rows[0].user_email;
     let guestPassesRemaining = 0;
     if (ownerEmail) {
-      const passesResult = await pool.query(
-        `SELECT guest_passes_remaining FROM users WHERE LOWER(email) = LOWER($1)`,
-        [ownerEmail]
-      );
+      const passesResult = await db.execute(sql`SELECT guest_passes_remaining FROM users WHERE LOWER(email) = LOWER(${ownerEmail})`);
       if (passesResult.rowCount && passesResult.rowCount > 0) {
         guestPassesRemaining = passesResult.rows[0].guest_passes_remaining || 0;
       }
@@ -2011,12 +1772,9 @@ router.delete('/api/admin/booking/:id/guests/:guestId', isStaffOrAdmin, async (r
     const guestId = parseInt(req.params.guestId);
     const staffEmail = (req as any).session?.user?.email || 'admin';
 
-    const bookingResult = await pool.query(
-      `SELECT br.id, br.session_id, br.guest_count, br.user_email as owner_email
+    const bookingResult = await db.execute(sql`SELECT br.id, br.session_id, br.guest_count, br.user_email as owner_email
        FROM booking_requests br
-       WHERE br.id = $1`,
-      [bookingId]
-    );
+       WHERE br.id = ${bookingId}`);
 
     if (bookingResult.rowCount === 0) {
       return res.status(404).json({ error: 'Booking not found' });
@@ -2028,31 +1786,18 @@ router.delete('/api/admin/booking/:id/guests/:guestId', isStaffOrAdmin, async (r
     let guestDisplayName = 'Unknown guest';
     let guestFound = false;
 
-    // Step 1: Try to find the guest in booking_guests (frontend passes booking_guests.id)
-    const guestBookingResult = await pool.query(
-      `SELECT id, guest_name, guest_email FROM booking_guests WHERE id = $1 AND booking_id = $2`,
-      [guestId, bookingId]
-    );
+    const guestBookingResult = await db.execute(sql`SELECT id, guest_name, guest_email FROM booking_guests WHERE id = ${guestId} AND booking_id = ${bookingId}`);
 
     if (guestBookingResult.rowCount && guestBookingResult.rowCount > 0) {
       guestFound = true;
       const guestRecord = guestBookingResult.rows[0];
       guestDisplayName = guestRecord.guest_name || guestDisplayName;
 
-      // Delete from booking_guests
-      await pool.query(
-        `DELETE FROM booking_guests WHERE id = $1`,
-        [guestId]
-      );
+      await db.execute(sql`DELETE FROM booking_guests WHERE id = ${guestId}`);
 
-      // Step 2: Find and delete corresponding booking_participants entry
-      // Match by session_id + display_name + participant_type='guest'
       if (sessionId) {
-        const participantResult = await pool.query(
-          `SELECT id, used_guest_pass FROM booking_participants 
-           WHERE session_id = $1 AND participant_type = 'guest' AND display_name = $2`,
-          [sessionId, guestDisplayName]
-        );
+        const participantResult = await db.execute(sql`SELECT id, used_guest_pass FROM booking_participants 
+           WHERE session_id = ${sessionId} AND participant_type = 'guest' AND display_name = ${guestDisplayName}`);
 
         if (participantResult.rowCount && participantResult.rowCount > 0) {
           const participant = participantResult.rows[0];
@@ -2064,18 +1809,11 @@ router.delete('/api/admin/booking/:id/guests/:guestId', isStaffOrAdmin, async (r
               console.error('[RemoveGuest] Failed to refund guest pass:', err);
             }
           }
-          await pool.query(
-            `DELETE FROM booking_participants WHERE id = $1`,
-            [participant.id]
-          );
+          await db.execute(sql`DELETE FROM booking_participants WHERE id = ${participant.id}`);
         }
       }
     } else if (sessionId) {
-      // Fallback: Try to find in booking_participants by ID directly (backward compatibility)
-      const participantResult = await pool.query(
-        `SELECT id, display_name, used_guest_pass FROM booking_participants WHERE id = $1 AND session_id = $2 AND participant_type = 'guest'`,
-        [guestId, sessionId]
-      );
+      const participantResult = await db.execute(sql`SELECT id, display_name, used_guest_pass FROM booking_participants WHERE id = ${guestId} AND session_id = ${sessionId} AND participant_type = 'guest'`);
 
       if (participantResult.rowCount && participantResult.rowCount > 0) {
         guestFound = true;
@@ -2089,7 +1827,7 @@ router.delete('/api/admin/booking/:id/guests/:guestId', isStaffOrAdmin, async (r
             console.error('[RemoveGuest] Failed to refund guest pass:', err);
           }
         }
-        await pool.query(`DELETE FROM booking_participants WHERE id = $1`, [guestId]);
+        await db.execute(sql`DELETE FROM booking_participants WHERE id = ${guestId}`);
       }
     }
 
@@ -2097,12 +1835,8 @@ router.delete('/api/admin/booking/:id/guests/:guestId', isStaffOrAdmin, async (r
       return res.status(404).json({ error: 'Guest not found in booking_guests or booking_participants' });
     }
 
-    // Step 3: Decrement guest_count on booking_requests
     if (booking.guest_count && booking.guest_count > 0) {
-      await pool.query(
-        `UPDATE booking_requests SET guest_count = GREATEST(0, guest_count - 1), updated_at = NOW() WHERE id = $1`,
-        [bookingId]
-      );
+      await db.execute(sql`UPDATE booking_requests SET guest_count = GREATEST(0, guest_count - 1), updated_at = NOW() WHERE id = ${bookingId}`);
     }
 
     // Step 4: Recalculate fees for the session
@@ -2138,10 +1872,7 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
       return res.status(400).json({ error: 'memberEmail is required' });
     }
     
-    const slotResult = await pool.query(
-      `SELECT * FROM booking_members WHERE id = $1 AND booking_id = $2`,
-      [slotId, bookingId]
-    );
+    const slotResult = await db.execute(sql`SELECT * FROM booking_members WHERE id = ${slotId} AND booking_id = ${bookingId}`);
     
     if (slotResult.rowCount === 0) {
       return res.status(404).json({ error: 'Slot not found' });
@@ -2155,32 +1886,22 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
       return res.status(400).json({ error: 'Slot is already linked to a different member' });
     }
     
-    await pool.query(
-      `UPDATE booking_members 
-       SET user_email = $1, linked_at = NOW(), linked_by = $2 
-       WHERE id = $3`,
-      [memberEmail.toLowerCase(), linkedBy, slotId]
-    );
+    await db.execute(sql`UPDATE booking_members 
+       SET user_email = ${memberEmail.toLowerCase()}, linked_at = NOW(), linked_by = ${linkedBy} 
+       WHERE id = ${slotId}`);
     
-    const bookingResult = await pool.query(
-      `SELECT request_date, start_time, end_time, status, session_id FROM booking_requests WHERE id = $1`,
-      [bookingId]
-    );
+    const bookingResult = await db.execute(sql`SELECT request_date, start_time, end_time, status, session_id FROM booking_requests WHERE id = ${bookingId}`);
     
     if (bookingResult.rows[0]?.session_id) {
       const sessionId = bookingResult.rows[0].session_id;
       const booking = bookingResult.rows[0];
       
-      // Calculate slot duration from booking times
       const slotDuration = booking.start_time && booking.end_time
         ? Math.round((new Date(`2000-01-01T${booking.end_time}`).getTime() - 
                      new Date(`2000-01-01T${booking.start_time}`).getTime()) / 60000)
         : 60;
       
-      const memberInfo = await pool.query(
-        `SELECT id, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)`,
-        [memberEmail]
-      );
+      const memberInfo = await db.execute(sql`SELECT id, first_name, last_name FROM users WHERE LOWER(email) = LOWER(${memberEmail})`);
       
       if (!memberInfo.rows[0]?.id) {
         console.warn(`[Link Member] User not found for email ${memberEmail}`);
@@ -2190,36 +1911,24 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
       const userId = memberInfo.rows[0].id;
       const displayName = `${memberInfo.rows[0].first_name || ''} ${memberInfo.rows[0].last_name || ''}`.trim() || memberEmail;
       
-      const existingParticipant = await pool.query(
-        `SELECT id FROM booking_participants WHERE session_id = $1 AND user_id = $2`,
-        [sessionId, userId]
-      );
+      const existingParticipant = await db.execute(sql`SELECT id FROM booking_participants WHERE session_id = ${sessionId} AND user_id = ${userId}`);
       
       if (existingParticipant.rowCount === 0) {
-        const matchingGuest = await pool.query(
-          `SELECT bp.id, bp.display_name, g.email as guest_email
+        const matchingGuest = await db.execute(sql`SELECT bp.id, bp.display_name, g.email as guest_email
            FROM booking_participants bp
            LEFT JOIN guests g ON bp.guest_id = g.id
-           WHERE bp.session_id = $1 
+           WHERE bp.session_id = ${sessionId} 
              AND bp.participant_type = 'guest'
-             AND (LOWER(bp.display_name) = LOWER($2) OR LOWER(g.email) = LOWER($3))`,
-          [sessionId, displayName, memberEmail]
-        );
+             AND (LOWER(bp.display_name) = LOWER(${displayName}) OR LOWER(g.email) = LOWER(${memberEmail}))`);
         
         if (matchingGuest.rowCount && matchingGuest.rowCount > 0) {
           const guestIds = matchingGuest.rows.map(r => r.id);
-          await pool.query(
-            `DELETE FROM booking_participants WHERE id = ANY($1)`,
-            [guestIds]
-          );
+          await db.execute(sql`DELETE FROM booking_participants WHERE id = ANY(${guestIds})`);
           console.log(`[Link Member] Removed ${guestIds.length} duplicate guest entries for member ${memberEmail} in session ${sessionId}`);
         }
         
-        await pool.query(
-          `INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, invite_status, slot_duration)
-           VALUES ($1, $2, 'member', $3, 'pending', 'confirmed', $4)`,
-          [sessionId, userId, displayName, slotDuration]
-        );
+        await db.execute(sql`INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, invite_status, slot_duration)
+           VALUES (${sessionId}, ${userId}, 'member', ${displayName}, 'pending', 'confirmed', ${slotDuration})`);
       }
       
       // Recalculate fees after adding participant
@@ -2239,18 +1948,8 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
       if (bookingDateTime > now && booking.status === 'approved') {
         const notificationMessage = `You've been added to a simulator booking on ${new Date(bookingDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}.`;
         
-        await pool.query(
-          `INSERT INTO notifications (user_email, title, message, type, related_id, related_type)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [
-            memberEmail.toLowerCase(),
-            'Added to Booking',
-            notificationMessage,
-            'booking_approved',
-            bookingId,
-            'booking_request'
-          ]
-        );
+        await db.execute(sql`INSERT INTO notifications (user_email, title, message, type, related_id, related_type)
+           VALUES (${memberEmail.toLowerCase()}, ${'Added to Booking'}, ${notificationMessage}, ${'booking_approved'}, ${bookingId}, ${'booking_request'})`);
         
         sendPushNotification(memberEmail.toLowerCase(), {
           title: 'Added to Booking',
@@ -2280,10 +1979,7 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/unlink', isStaffOrAdmi
   try {
     const { bookingId, slotId } = req.params;
     
-    const slotResult = await pool.query(
-      `SELECT * FROM booking_members WHERE id = $1 AND booking_id = $2`,
-      [slotId, bookingId]
-    );
+    const slotResult = await db.execute(sql`SELECT * FROM booking_members WHERE id = ${slotId} AND booking_id = ${bookingId}`);
     
     if (slotResult.rowCount === 0) {
       return res.status(404).json({ error: 'Slot not found' });
@@ -2296,34 +1992,21 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/unlink', isStaffOrAdmi
     
     const memberEmail = slot.user_email;
     
-    await pool.query(
-      `UPDATE booking_members 
+    await db.execute(sql`UPDATE booking_members 
        SET user_email = NULL, linked_at = NULL, linked_by = NULL 
-       WHERE id = $1`,
-      [slotId]
-    );
+       WHERE id = ${slotId}`);
     
-    const bookingResult = await pool.query(
-      `SELECT session_id FROM booking_requests WHERE id = $1`,
-      [bookingId]
-    );
+    const bookingResult = await db.execute(sql`SELECT session_id FROM booking_requests WHERE id = ${bookingId}`);
     
     if (bookingResult.rows[0]?.session_id) {
       const sessionId = bookingResult.rows[0].session_id;
       
-      // Look up user ID from email first
-      const userResult = await pool.query(
-        `SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-        [memberEmail]
-      );
+      const userResult = await db.execute(sql`SELECT id FROM users WHERE LOWER(email) = LOWER(${memberEmail}) LIMIT 1`);
       
       if (userResult.rows.length > 0) {
         const userId = userResult.rows[0].id;
-        await pool.query(
-          `DELETE FROM booking_participants 
-           WHERE session_id = $1 AND user_id = $2 AND participant_type = 'member'`,
-          [sessionId, userId]
-        );
+        await db.execute(sql`DELETE FROM booking_participants 
+           WHERE session_id = ${sessionId} AND user_id = ${userId} AND participant_type = 'member'`);
         
         // Recalculate session fees after removing participant
         try {
@@ -2380,8 +2063,7 @@ router.get('/api/admin/trackman/potential-matches', isStaffOrAdmin, async (req, 
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
     
-    const unmatchedResult = await pool.query(
-      `SELECT 
+    const unmatchedResult = await db.execute(sql`SELECT 
         tub.id, tub.trackman_booking_id, tub.user_name, tub.original_email, 
         TO_CHAR(tub.booking_date, 'YYYY-MM-DD') as booking_date,
         tub.start_time, tub.end_time, tub.bay_number, tub.player_count, tub.status, tub.notes, tub.created_at
@@ -2392,25 +2074,20 @@ router.get('/api/admin/trackman/potential-matches', isStaffOrAdmin, async (req, 
            WHERE br.trackman_booking_id = tub.trackman_booking_id::text
          )
        ORDER BY tub.booking_date DESC, tub.start_time DESC
-       LIMIT $1 OFFSET $2`,
-      [limit, offset]
-    );
+       LIMIT ${limit} OFFSET ${offset}`);
     
     const potentialMatches: any[] = [];
     
     for (const unmatched of unmatchedResult.rows) {
-      const matchingBookings = await pool.query(
-        `SELECT br.id, br.user_email, br.user_name, br.start_time, br.end_time, br.status,
+      const matchingBookings = await db.execute(sql`SELECT br.id, br.user_email, br.user_name, br.start_time, br.end_time, br.status,
                 u.first_name, u.last_name
          FROM booking_requests br
          LEFT JOIN users u ON LOWER(br.user_email) = LOWER(u.email)
-         WHERE br.request_date = $1
-           AND ABS(EXTRACT(EPOCH FROM (br.start_time::time - $2::time))) <= 1800
+         WHERE br.request_date = ${unmatched.booking_date}
+           AND ABS(EXTRACT(EPOCH FROM (br.start_time::time - ${unmatched.start_time}::time))) <= 1800
            AND br.trackman_booking_id IS NULL
            AND br.status NOT IN ('cancelled', 'declined')
-         LIMIT 5`,
-        [unmatched.booking_date, unmatched.start_time]
-      );
+         LIMIT 5`);
       
       if (matchingBookings.rows.length > 0) {
         potentialMatches.push({
@@ -2539,12 +2216,9 @@ router.get('/api/admin/trackman/fuzzy-matches/:id', isStaffOrAdmin, async (req, 
   try {
     const { id } = req.params;
     
-    const unmatchedResult = await pool.query(
-      `SELECT id, user_name, original_email, notes, match_attempt_reason
+    const unmatchedResult = await db.execute(sql`SELECT id, user_name, original_email, notes, match_attempt_reason
        FROM trackman_unmatched_bookings
-       WHERE id = $1`,
-      [id]
-    );
+       WHERE id = ${id}`);
     
     if (unmatchedResult.rowCount === 0) {
       return res.status(404).json({ error: 'Unmatched booking not found' });
@@ -2564,35 +2238,29 @@ router.get('/api/admin/trackman/fuzzy-matches/:id', isStaffOrAdmin, async (req, 
     let suggestions: any[] = [];
     
     if (firstName && lastName) {
-      const result = await pool.query(
-        `SELECT id, email, first_name, last_name, membership_status, trackman_email
+      const result = await db.execute(sql`SELECT id, email, first_name, last_name, membership_status, trackman_email
          FROM users
          WHERE (
-           (LOWER(first_name) LIKE $1 AND LOWER(last_name) LIKE $2)
-           OR (LOWER(first_name) LIKE $2 AND LOWER(last_name) LIKE $1)
-           OR LOWER(first_name || ' ' || last_name) LIKE $3
-           OR LOWER(last_name || ' ' || first_name) LIKE $3
+           (LOWER(first_name) LIKE ${`%${firstName}%`} AND LOWER(last_name) LIKE ${`%${lastName}%`})
+           OR (LOWER(first_name) LIKE ${`%${lastName}%`} AND LOWER(last_name) LIKE ${`%${firstName}%`})
+           OR LOWER(first_name || ' ' || last_name) LIKE ${`%${userName}%`}
+           OR LOWER(last_name || ' ' || first_name) LIKE ${`%${userName}%`}
          )
          AND membership_status IS NOT NULL
          ORDER BY 
            CASE WHEN membership_status = 'active' THEN 0 ELSE 1 END,
            first_name, last_name
-         LIMIT 10`,
-        [`%${firstName}%`, `%${lastName}%`, `%${userName}%`]
-      );
+         LIMIT 10`);
       suggestions = result.rows;
     } else if (firstName) {
-      const result = await pool.query(
-        `SELECT id, email, first_name, last_name, membership_status, trackman_email
+      const result = await db.execute(sql`SELECT id, email, first_name, last_name, membership_status, trackman_email
          FROM users
-         WHERE (LOWER(first_name) LIKE $1 OR LOWER(last_name) LIKE $1)
+         WHERE (LOWER(first_name) LIKE ${`%${firstName}%`} OR LOWER(last_name) LIKE ${`%${firstName}%`})
          AND membership_status IS NOT NULL
          ORDER BY 
            CASE WHEN membership_status = 'active' THEN 0 ELSE 1 END,
            first_name, last_name
-         LIMIT 10`,
-        [`%${firstName}%`]
-      );
+         LIMIT 10`);
       suggestions = result.rows;
     }
     
@@ -2624,8 +2292,7 @@ router.get('/api/admin/trackman/requires-review', isStaffOrAdmin, async (req, re
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
     
-    const result = await pool.query(
-      `SELECT 
+    const result = await db.execute(sql`SELECT 
         tub.id,
         tub.trackman_booking_id as "trackmanBookingId",
         tub.user_name as "userName",
@@ -2646,20 +2313,16 @@ router.get('/api/admin/trackman/requires-review', isStaffOrAdmin, async (req, re
            WHERE br.trackman_booking_id = tub.trackman_booking_id::text
          )
        ORDER BY tub.booking_date DESC, tub.start_time DESC
-       LIMIT $1 OFFSET $2`,
-      [limit, offset]
-    );
+       LIMIT ${limit} OFFSET ${offset}`);
     
-    const countResult = await pool.query(
-      `SELECT COUNT(*) as total 
+    const countResult = await db.execute(sql`SELECT COUNT(*) as total 
        FROM trackman_unmatched_bookings tub
        WHERE tub.resolved_at IS NULL 
          AND tub.match_attempt_reason LIKE '%REQUIRES_REVIEW%'
          AND NOT EXISTS (
            SELECT 1 FROM booking_requests br 
            WHERE br.trackman_booking_id = tub.trackman_booking_id::text
-         )`
-    );
+         )`);
     
     res.json({ 
       data: result.rows,
@@ -2678,19 +2341,15 @@ router.get('/api/admin/trackman/requires-review', isStaffOrAdmin, async (req, re
 router.get('/api/admin/backfill-sessions/preview', isStaffOrAdmin, async (req, res) => {
   try {
     // Get count and sample of bookings without sessions
-    const countResult = await pool.query(`
-      SELECT COUNT(*) as total
+    const countResult = await db.execute(sql`SELECT COUNT(*) as total
       FROM booking_requests br
       WHERE br.session_id IS NULL
         AND br.status IN ('attended', 'approved', 'confirmed')
-        AND br.resource_id IS NOT NULL
-    `);
+        AND br.resource_id IS NOT NULL`);
     
     const totalCount = parseInt(countResult.rows[0].total);
     
-    // Get first 10 samples with details
-    const samplesResult = await pool.query(`
-      SELECT 
+    const samplesResult = await db.execute(sql`SELECT 
         br.id,
         br.user_email,
         br.user_name,
@@ -2710,8 +2369,7 @@ router.get('/api/admin/backfill-sessions/preview', isStaffOrAdmin, async (req, r
         AND br.status IN ('attended', 'approved', 'confirmed')
         AND br.resource_id IS NOT NULL
       ORDER BY br.request_date DESC, br.start_time DESC
-      LIMIT 10
-    `);
+      LIMIT 10`);
     
     res.json({
       totalCount,
@@ -2965,8 +2623,7 @@ router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => 
 // This is needed because production may have duplicates from race conditions
 router.get('/api/admin/trackman/duplicate-bookings', isStaffOrAdmin, async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT 
+    const result = await db.execute(sql`SELECT 
         trackman_booking_id,
         COUNT(*) as duplicate_count,
         array_agg(id ORDER BY created_at) as booking_ids,
@@ -2977,8 +2634,7 @@ router.get('/api/admin/trackman/duplicate-bookings', isStaffOrAdmin, async (req,
       WHERE trackman_booking_id IS NOT NULL
       GROUP BY trackman_booking_id
       HAVING COUNT(*) > 1
-      ORDER BY COUNT(*) DESC
-    `);
+      ORDER BY COUNT(*) DESC`);
 
     res.json({
       duplicatesFound: result.rows.length,
@@ -3151,8 +2807,7 @@ router.post('/api/trackman/admin/cleanup-lessons', isStaffOrAdmin, async (req, r
     let resolvedUnmatched = 0;
 
     // 1. Find bookings that look like lessons based on patterns
-    const lessonBookings = await pool.query(`
-      SELECT 
+    const lessonBookings = await db.execute(sql`SELECT 
         br.id,
         br.user_name,
         br.user_email,
@@ -3166,15 +2821,14 @@ router.post('/api/trackman/admin/cleanup-lessons', isStaffOrAdmin, async (req, r
       FROM booking_requests br
       WHERE br.status != 'cancelled'
         AND (
-          LOWER(br.user_email) = ANY($1)
+          LOWER(br.user_email) = ANY(${INSTRUCTOR_EMAILS})
           OR LOWER(br.user_name) LIKE '%lesson%'
           OR LOWER(br.notes) LIKE '%lesson%'
           OR (LOWER(br.user_name) LIKE '%rebecca%' AND LOWER(br.user_name) LIKE '%lee%')
           OR (LOWER(br.user_name) LIKE '%tim%' AND LOWER(br.user_name) LIKE '%silverman%')
         )
       ORDER BY br.request_date DESC
-      LIMIT 500
-    `, [INSTRUCTOR_EMAILS]);
+      LIMIT 500`);
 
     log(`[Lesson Cleanup] Found ${lessonBookings.rows.length} lesson bookings to process.`);
 
@@ -3187,76 +2841,44 @@ router.post('/api/trackman/admin/cleanup-lessons', isStaffOrAdmin, async (req, r
       const endTime = booking.end_time || booking.start_time;
 
       // Check if block already exists
-      const existingBlock = await pool.query(`
-        SELECT ab.id FROM availability_blocks ab
+      const existingBlock = await db.execute(sql`SELECT ab.id FROM availability_blocks ab
         JOIN facility_closures fc ON ab.closure_id = fc.id
-        WHERE ab.resource_id = $1
-          AND ab.block_date = $2
-          AND ab.start_time < $4::time
-          AND ab.end_time > $3::time
+        WHERE ab.resource_id = ${booking.resource_id}
+          AND ab.block_date = ${bookingDate}
+          AND ab.start_time < ${endTime}::time
+          AND ab.end_time > ${booking.start_time}::time
           AND fc.notice_type = 'private_event'
           AND fc.is_active = true
-        LIMIT 1
-      `, [booking.resource_id, bookingDate, booking.start_time, endTime]);
+        LIMIT 1`);
 
       const blockAlreadyExists = existingBlock.rows.length > 0;
 
       if (!dryRun) {
-        // Create block if it doesn't exist
         if (!blockAlreadyExists) {
-          // Create Facility Closure with trackman reference
-          const closureResult = await pool.query(`
-            INSERT INTO facility_closures 
+          const closureResult = await db.execute(sql`INSERT INTO facility_closures 
               (resource_id, start_date, end_date, start_time, end_time, reason, notice_type, is_active, created_by)
-            VALUES ($1, $2, $2, $3, $4, $5, 'private_event', true, $6)
-            RETURNING id
-          `, [
-            booking.resource_id, 
-            bookingDate, 
-            booking.start_time, 
-            endTime,
-            `Lesson (Converted): ${booking.user_name} [TM:${booking.trackman_booking_id || booking.id}]`,
-            'system_cleanup'
-          ]);
+            VALUES (${booking.resource_id}, ${bookingDate}, ${bookingDate}, ${booking.start_time}, ${endTime}, ${`Lesson (Converted): ${booking.user_name} [TM:${booking.trackman_booking_id || booking.id}]`}, 'private_event', true, ${'system_cleanup'})
+            RETURNING id`);
 
-          // Create Availability Block
-          await pool.query(`
-            INSERT INTO availability_blocks 
+          await db.execute(sql`INSERT INTO availability_blocks 
               (closure_id, resource_id, block_date, start_time, end_time, reason)
-            VALUES ($1, $2, $3, $4, $5, $6)
-          `, [
-            closureResult.rows[0].id,
-            booking.resource_id,
-            bookingDate,
-            booking.start_time,
-            endTime,
-            `Lesson - ${booking.user_name}`
-          ]);
+            VALUES (${closureResult.rows[0].id}, ${booking.resource_id}, ${bookingDate}, ${booking.start_time}, ${endTime}, ${`Lesson - ${booking.user_name}`})`);
         }
 
-        // ALWAYS cancel the booking and clean up financial artifacts (even if block exists)
-        // Soft delete the booking (mark as cancelled with cleanup note)
-        await pool.query(`
-          UPDATE booking_requests 
+        await db.execute(sql`UPDATE booking_requests 
           SET status = 'cancelled',
-              staff_notes = COALESCE(staff_notes, '') || ' [Converted to Availability Block by ${sessionUser}]',
+              staff_notes = COALESCE(staff_notes, '') || ${` [Converted to Availability Block by ${sessionUser}]`},
               updated_at = NOW()
-          WHERE id = $1
-        `, [booking.id]);
+          WHERE id = ${booking.id}`);
 
-        // Clean up booking participants and members
-        await pool.query(`DELETE FROM booking_members WHERE booking_id = $1`, [booking.id]);
-        await pool.query(`DELETE FROM booking_guests WHERE booking_id = $1`, [booking.id]);
-        await pool.query(`DELETE FROM booking_participants WHERE booking_id = $1`, [booking.id]);
+        await db.execute(sql`DELETE FROM booking_members WHERE booking_id = ${booking.id}`);
+        await db.execute(sql`DELETE FROM booking_guests WHERE booking_id = ${booking.id}`);
+        await db.execute(sql`DELETE FROM booking_participants WHERE booking_id = ${booking.id}`);
 
-        // Clean up financial artifacts: usage_ledger entries
-        await pool.query(`DELETE FROM usage_ledger WHERE booking_id = $1`, [booking.id]);
+        await db.execute(sql`DELETE FROM usage_ledger WHERE booking_id = ${booking.id}`);
 
-        // Cancel any pending payment intents
-        const pendingIntents = await pool.query(`
-          SELECT stripe_payment_intent_id FROM stripe_payment_intents 
-          WHERE booking_id = $1 AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')
-        `, [booking.id]);
+        const pendingIntents = await db.execute(sql`SELECT stripe_payment_intent_id FROM stripe_payment_intents 
+          WHERE booking_id = ${booking.id} AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')`);
         
         for (const intent of pendingIntents.rows) {
           try {
@@ -3267,8 +2889,7 @@ router.post('/api/trackman/admin/cleanup-lessons', isStaffOrAdmin, async (req, r
           }
         }
 
-        // Clean up booking sessions linked to this booking
-        await pool.query(`DELETE FROM booking_sessions WHERE booking_id = $1`, [booking.id]);
+        await db.execute(sql`DELETE FROM booking_sessions WHERE booking_id = ${booking.id}`);
       }
 
       log(`[Lesson Cleanup] ${blockAlreadyExists ? 'Block exists, cleaned up booking' : 'Converted Booking'} #${booking.id} (${booking.user_name}).`);
@@ -3276,8 +2897,7 @@ router.post('/api/trackman/admin/cleanup-lessons', isStaffOrAdmin, async (req, r
     }
 
     // 2. Resolve unmatched lesson entries from the queue
-    const unmatchedLessons = await pool.query(`
-      SELECT id, user_name, booking_date, start_time, end_time, bay_number, notes, trackman_booking_id
+    const unmatchedLessons = await db.execute(sql`SELECT id, user_name, booking_date, start_time, end_time, bay_number, notes, trackman_booking_id
       FROM trackman_unmatched_bookings
       WHERE resolved_at IS NULL
         AND (
@@ -3286,8 +2906,7 @@ router.post('/api/trackman/admin/cleanup-lessons', isStaffOrAdmin, async (req, r
           OR (LOWER(user_name) LIKE '%rebecca%')
           OR (LOWER(user_name) LIKE '%tim%' AND LOWER(user_name) LIKE '%silverman%')
         )
-      LIMIT 500
-    `);
+      LIMIT 500`);
 
     log(`[Lesson Cleanup] Found ${unmatchedLessons.rows.length} unmatched lesson entries to resolve.`);
 
@@ -3301,56 +2920,32 @@ router.post('/api/trackman/admin/cleanup-lessons', isStaffOrAdmin, async (req, r
             : item.booking_date;
 
           // Check if block already exists
-          const existingBlock = await pool.query(`
-            SELECT ab.id FROM availability_blocks ab
+          const existingBlock = await db.execute(sql`SELECT ab.id FROM availability_blocks ab
             JOIN facility_closures fc ON ab.closure_id = fc.id
-            WHERE ab.resource_id = $1
-              AND ab.block_date = $2
-              AND ab.start_time < $4::time
-              AND ab.end_time > $3::time
+            WHERE ab.resource_id = ${resourceId}
+              AND ab.block_date = ${bookingDate}
+              AND ab.start_time < ${item.end_time || item.start_time}::time
+              AND ab.end_time > ${item.start_time}::time
               AND fc.notice_type = 'private_event'
               AND fc.is_active = true
-            LIMIT 1
-          `, [resourceId, bookingDate, item.start_time, item.end_time || item.start_time]);
+            LIMIT 1`);
 
           if (existingBlock.rows.length === 0) {
-            // Create block with Trackman ID reference for audit trail
-            const closureResult = await pool.query(`
-              INSERT INTO facility_closures 
+            const closureResult = await db.execute(sql`INSERT INTO facility_closures 
                 (resource_id, start_date, end_date, start_time, end_time, reason, notice_type, is_active, created_by)
-              VALUES ($1, $2, $2, $3, $4, $5, 'private_event', true, $6)
-              RETURNING id
-            `, [
-              resourceId,
-              bookingDate,
-              item.start_time,
-              item.end_time || item.start_time,
-              `Lesson: ${item.user_name} [TM:${item.trackman_booking_id || item.id}]`,
-              'system_cleanup'
-            ]);
+              VALUES (${resourceId}, ${bookingDate}, ${bookingDate}, ${item.start_time}, ${item.end_time || item.start_time}, ${`Lesson: ${item.user_name} [TM:${item.trackman_booking_id || item.id}]`}, 'private_event', true, ${'system_cleanup'})
+              RETURNING id`);
 
-            await pool.query(`
-              INSERT INTO availability_blocks 
+            await db.execute(sql`INSERT INTO availability_blocks 
                 (closure_id, resource_id, block_date, start_time, end_time, reason)
-              VALUES ($1, $2, $3, $4, $5, $6)
-            `, [
-              closureResult.rows[0].id,
-              resourceId,
-              bookingDate,
-              item.start_time,
-              item.end_time || item.start_time,
-              `Lesson - ${item.user_name}`
-            ]);
+              VALUES (${closureResult.rows[0].id}, ${resourceId}, ${bookingDate}, ${item.start_time}, ${item.end_time || item.start_time}, ${`Lesson - ${item.user_name}`})`);
           }
 
-          // Mark as resolved
-          await pool.query(`
-            UPDATE trackman_unmatched_bookings
+          await db.execute(sql`UPDATE trackman_unmatched_bookings
             SET resolved_at = NOW(),
-                resolved_by = $1,
+                resolved_by = ${sessionUser},
                 match_attempt_reason = 'Converted to Availability Block (Lesson Cleanup)'
-            WHERE id = $2
-          `, [sessionUser, item.id]);
+            WHERE id = ${item.id}`);
         }
 
         log(`[Lesson Cleanup] Resolved unmatched lesson #${item.id} (${item.user_name}).`);

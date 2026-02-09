@@ -3,7 +3,7 @@ import { syncCompanyToHubSpot, queuePaymentSyncToHubSpot, queueDayPassSyncToHubS
 import { pool } from '../db';
 import { db } from '../../db';
 import { groupMembers } from '../../../shared/models/hubspot-billing';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { notifyPaymentSuccess, notifyPaymentFailed, notifyStaffPaymentFailed, notifyMember, notifyAllStaff } from '../notificationService';
 import { sendPaymentReceiptEmail, sendPaymentFailedEmail } from '../../emails/paymentEmails';
 import { sendMembershipRenewalEmail, sendMembershipFailedEmail } from '../../emails/membershipEmails';
@@ -157,12 +157,12 @@ interface CacheTransactionParams {
 
 export async function upsertTransactionCache(params: CacheTransactionParams): Promise<void> {
   try {
-    await pool.query(
-      `INSERT INTO stripe_transaction_cache 
+    await db.execute(
+      sql`INSERT INTO stripe_transaction_cache 
        (stripe_id, object_type, amount_cents, currency, status, created_at, updated_at, 
         customer_id, customer_email, customer_name, description, metadata, source, 
         payment_intent_id, charge_id, invoice_id)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, $12, $13, $14, $15)
+       VALUES (${params.stripeId}, ${params.objectType}, ${params.amountCents}, ${params.currency || 'usd'}, ${params.status}, ${params.createdAt}, NOW(), ${params.customerId || null}, ${params.customerEmail || null}, ${params.customerName || null}, ${params.description || null}, ${params.metadata ? JSON.stringify(params.metadata) : null}, ${params.source || 'webhook'}, ${params.paymentIntentId || null}, ${params.chargeId || null}, ${params.invoiceId || null})
        ON CONFLICT (stripe_id) DO UPDATE SET
          status = EXCLUDED.status,
          amount_cents = EXCLUDED.amount_cents,
@@ -170,24 +170,7 @@ export async function upsertTransactionCache(params: CacheTransactionParams): Pr
          customer_name = COALESCE(EXCLUDED.customer_name, stripe_transaction_cache.customer_name),
          description = COALESCE(EXCLUDED.description, stripe_transaction_cache.description),
          metadata = COALESCE(EXCLUDED.metadata, stripe_transaction_cache.metadata),
-         updated_at = NOW()`,
-      [
-        params.stripeId,
-        params.objectType,
-        params.amountCents,
-        params.currency || 'usd',
-        params.status,
-        params.createdAt,
-        params.customerId || null,
-        params.customerEmail || null,
-        params.customerName || null,
-        params.description || null,
-        params.metadata ? JSON.stringify(params.metadata) : null,
-        params.source || 'webhook',
-        params.paymentIntentId || null,
-        params.chargeId || null,
-        params.invoiceId || null,
-      ]
+         updated_at = NOW()`
     );
   } catch (err) {
     console.error('[Stripe Cache] Error upserting transaction cache:', err);
