@@ -781,6 +781,7 @@ async function autoLinkEmailToOwner(aliasEmail: string, ownerEmail: string, reas
 
 async function createTrackmanSessionAndParticipants(input: SessionCreationInput): Promise<void> {
   try {
+    try {
     // Gather all participants with resolved user IDs
     const participantInputs: ParticipantInput[] = [];
     const memberData: { userId: string; tier: string }[] = [];
@@ -1136,8 +1137,68 @@ async function createTrackmanSessionAndParticipants(input: SessionCreationInput)
     }
 
     process.stderr.write(`[Trackman Import] Created session #${session.id} with ${participants.length} participants for Trackman ID ${input.trackmanBookingId}\n`);
-  } catch (error: any) {
-    process.stderr.write(`[Trackman Import] Error creating session for ${input.trackmanBookingId}: ${error.message}\n`);
+    } catch (innerError: any) {
+      process.stderr.write(`[Trackman Import] Full session creation failed for booking ${input.bookingId}, falling back to owner-only session: ${innerError.message}\n`);
+
+      try {
+        const fallbackOwnerUserId = await getUserIdByEmail(input.ownerEmail);
+
+        const { session: fallbackSession } = await createSession(
+          {
+            resourceId: input.resourceId,
+            sessionDate: input.sessionDate,
+            startTime: input.startTime,
+            endTime: input.endTime,
+            trackmanBookingId: input.trackmanBookingId,
+            createdBy: 'trackman_import_fallback'
+          },
+          [{
+            userId: fallbackOwnerUserId || undefined,
+            participantType: 'owner',
+            displayName: input.ownerName || input.ownerEmail,
+            slotDuration: input.durationMinutes
+          }],
+          'trackman_import'
+        );
+
+        await db.update(bookingRequests)
+          .set({ sessionId: fallbackSession.id })
+          .where(eq(bookingRequests.id, input.bookingId));
+
+        if (input.isPast) {
+          await db.execute(sql`UPDATE booking_participants SET payment_status = 'paid', paid_at = NOW() WHERE session_id = ${fallbackSession.id}`);
+        } else {
+          await db.execute(sql`UPDATE booking_participants SET payment_status = 'pending' WHERE session_id = ${fallbackSession.id}`);
+        }
+
+        const [bookingForNote] = await db.select({ staffNotes: bookingRequests.staffNotes })
+          .from(bookingRequests)
+          .where(eq(bookingRequests.id, input.bookingId));
+        const existingNotes = bookingForNote?.staffNotes || '';
+        const failureNote = `[SESSION_PARTIAL] Full session creation failed at ${new Date().toISOString()}. Created owner-only session. Error: ${innerError.message}. Additional participants may need to be added manually.`;
+        const updatedNotes = existingNotes ? `${existingNotes}\n${failureNote}` : failureNote;
+        await db.update(bookingRequests)
+          .set({ staffNotes: updatedNotes })
+          .where(eq(bookingRequests.id, input.bookingId));
+
+        process.stderr.write(`[Trackman Import] Fallback owner-only session ${fallbackSession.id} created for booking ${input.bookingId}\n`);
+      } catch (fallbackError: any) {
+        process.stderr.write(`[Trackman Import] CRITICAL: Even fallback session creation failed for booking ${input.bookingId}: ${fallbackError.message}\n`);
+        try {
+          const [bookingForCriticalNote] = await db.select({ staffNotes: bookingRequests.staffNotes })
+            .from(bookingRequests)
+            .where(eq(bookingRequests.id, input.bookingId));
+          const existingCriticalNotes = bookingForCriticalNote?.staffNotes || '';
+          const criticalNote = `[SESSION_CREATION_FAILED] Session creation completely failed at ${new Date().toISOString()}. Error: ${innerError.message}. Fallback error: ${fallbackError.message}. Please create a session manually.`;
+          const updatedCriticalNotes = existingCriticalNotes ? `${existingCriticalNotes}\n${criticalNote}` : criticalNote;
+          await db.update(bookingRequests)
+            .set({ staffNotes: updatedCriticalNotes })
+            .where(eq(bookingRequests.id, input.bookingId));
+        } catch {}
+      }
+    }
+  } catch (outerError: any) {
+    process.stderr.write(`[Trackman Import] Unexpected error in session creation for booking ${input.bookingId}: ${outerError.message}\n`);
   }
 }
 
@@ -2394,13 +2455,18 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
               });
               guestSlot++;
               
-              // Deduct guest pass from booking owner
-              // For upcoming bookings: send notification; for past bookings: deduct silently
-              const guestPassResult = await useGuestPass(matchedEmail, guest.name || undefined, isUpcoming);
-              if (!guestPassResult.success) {
-                process.stderr.write(`[Trackman Import] Guest pass deduction failed for ${matchedEmail} (guest: ${guest.name}): ${guestPassResult.error}\n`);
+              // Guest pass logic: only try to use a guest pass if the guest has identifying info
+              // (first name, last name, or email). Guests with no info at all always get a fee charged.
+              const hasGuestInfo = !!(guest.name?.trim() || guest.email?.trim());
+              if (hasGuestInfo) {
+                const guestPassResult = await useGuestPass(matchedEmail, guest.name || undefined, isUpcoming);
+                if (!guestPassResult.success) {
+                  process.stderr.write(`[Trackman Import] Guest pass deduction failed for ${matchedEmail} (guest: ${guest.name}): ${guestPassResult.error}\n`);
+                } else {
+                  process.stderr.write(`[Trackman Import] Deducted guest pass for ${matchedEmail} (guest: ${guest.name}), ${guestPassResult.remaining} remaining\n`);
+                }
               } else {
-                process.stderr.write(`[Trackman Import] Deducted guest pass for ${matchedEmail} (guest: ${guest.name}), ${guestPassResult.remaining} remaining\n`);
+                process.stderr.write(`[Trackman Import] Guest has no identifying info - skipping guest pass, fee will be charged for ${matchedEmail}\n`);
               }
             }
             
@@ -2978,13 +3044,18 @@ async function insertBookingIfNotExists(
       });
       guestSlotNumber++;
       
-      // Deduct guest pass from booking owner
-      // For upcoming bookings: send notification; for past bookings: deduct silently
-      const guestPassResult = await useGuestPass(memberEmail, guests[i].name || undefined, isUpcoming);
-      if (!guestPassResult.success) {
-        process.stderr.write(`[Trackman Import] Guest pass deduction failed for ${memberEmail} (guest: ${guests[i].name}): ${guestPassResult.error}\n`);
+      // Guest pass logic: only try to use a guest pass if the guest has identifying info
+      // (first name, last name, or email). Guests with no info at all always get a fee charged.
+      const hasGuestInfo = !!(guests[i].name?.trim() || guests[i].email?.trim());
+      if (hasGuestInfo) {
+        const guestPassResult = await useGuestPass(memberEmail, guests[i].name || undefined, isUpcoming);
+        if (!guestPassResult.success) {
+          process.stderr.write(`[Trackman Import] Guest pass deduction failed for ${memberEmail} (guest: ${guests[i].name}): ${guestPassResult.error}\n`);
+        } else {
+          process.stderr.write(`[Trackman Import] Deducted guest pass for ${memberEmail} (guest: ${guests[i].name}), ${guestPassResult.remaining} remaining\n`);
+        }
       } else {
-        process.stderr.write(`[Trackman Import] Deducted guest pass for ${memberEmail} (guest: ${guests[i].name}), ${guestPassResult.remaining} remaining\n`);
+        process.stderr.write(`[Trackman Import] Guest has no identifying info - skipping guest pass, fee will be charged for ${memberEmail}\n`);
       }
     }
   }

@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.12.0",
+    date: "2026-02-09",
+    title: "Session Reliability & Data Integrity Hardening",
+    changes: [
+      "Fix: Session creation now retries automatically and flags bookings with a staff note if it ultimately fails — no more silent billing gaps",
+      "Fix: Trackman CSV import falls back to a minimal owner-only session on failure instead of silently skipping billing",
+      "Fix: Google Calendar conference room sync now creates billing sessions for approved bookings",
+      "Fix: Delete user now properly cleans up booking participants and removes empty sessions to prevent orphaned data",
+      "Fix: Guest pass deduction in Trackman imports only applies when guests have identifying info (name or email); unidentified guests always get a fee charged",
+      "Fix: Cleaned up orphaned test data (2 orphaned participants, 7 empty sessions)",
+      "Removed: Deleted unused GuestEntryModal component (dead code cleanup)",
+    ],
+  },
+  {
     version: "7.11.7",
     date: "2026-02-09",
     title: "Fix False Positives in Session Integrity Check",

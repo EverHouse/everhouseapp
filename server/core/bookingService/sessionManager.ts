@@ -3,6 +3,7 @@ import { pool } from '../db';
 import { 
   bookingSessions, 
   bookingParticipants, 
+  bookingRequests,
   usageLedger,
   guests,
   users,
@@ -106,7 +107,8 @@ export async function ensureSessionForBooking(params: {
   createdBy: string;
 }, client?: any): Promise<{ sessionId: number; created: boolean; error?: string }> {
   const q = client || pool;
-  try {
+
+  const attemptSessionCreation = async (): Promise<{ sessionId: number; created: boolean }> => {
     const existingSession = await q.query(
       `SELECT id FROM booking_sessions
        WHERE resource_id = $1 AND session_date = $2 AND start_time = $3
@@ -159,9 +161,42 @@ export async function ensureSessionForBooking(params: {
     );
 
     return { sessionId, created };
-  } catch (error: any) {
-    console.error('[ensureSessionForBooking]', error);
-    return { sessionId: 0, created: false, error: error.message || String(error) };
+  };
+
+  try {
+    return await attemptSessionCreation();
+  } catch (firstError: any) {
+    console.error('[ensureSessionForBooking] First attempt failed, retrying in 500ms...', firstError);
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    try {
+      return await attemptSessionCreation();
+    } catch (retryError: any) {
+      const errorMsg = retryError.message || String(retryError);
+      console.error('[ensureSessionForBooking] Retry also failed, flagging booking for staff review', retryError);
+
+      try {
+        const existing = await db
+          .select({ staffNotes: bookingRequests.staffNotes })
+          .from(bookingRequests)
+          .where(eq(bookingRequests.id, params.bookingId))
+          .limit(1);
+
+        const existingNotes = existing[0]?.staffNotes || '';
+        const failureNote = `[SESSION_CREATION_FAILED] Automatic session creation failed at ${new Date().toISOString()}. Error: ${errorMsg}. Please create a session manually.`;
+        const updatedNotes = existingNotes ? `${existingNotes}\n${failureNote}` : failureNote;
+
+        await db
+          .update(bookingRequests)
+          .set({ staffNotes: updatedNotes })
+          .where(eq(bookingRequests.id, params.bookingId));
+      } catch (noteError: any) {
+        console.error('[ensureSessionForBooking] Failed to write staff note on booking', noteError);
+      }
+
+      return { sessionId: 0, created: false, error: errorMsg };
+    }
   }
 }
 

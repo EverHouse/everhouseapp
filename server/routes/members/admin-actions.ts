@@ -428,20 +428,40 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
     await db.execute(sql`DELETE FROM wellness_enrollments WHERE LOWER(user_email) = ${normalizedEmail}`);
     deletionLog.push('wellness_enrollments');
     
+    const sessionIdsResult = await db.execute(sql`SELECT DISTINCT session_id FROM booking_requests WHERE (LOWER(user_email) = ${normalizedEmail} OR user_id = ${userId}) AND session_id IS NOT NULL`);
+    const sessionIds = (sessionIdsResult.rows as any[]).map((r: any) => r.session_id);
+    deletionLog.push(`booking_session_ids_found (${sessionIds.length})`);
+
     await db.execute(sql`DELETE FROM booking_fee_snapshots WHERE booking_id IN (SELECT id FROM booking_requests WHERE LOWER(user_email) = ${normalizedEmail} OR user_id = ${userId})`);
-    deletionLog.push('booking_fee_snapshots');
-    
+    deletionLog.push('booking_fee_snapshots (by booking)');
+
+    await db.execute(sql`DELETE FROM booking_participants WHERE user_id = ${userId}`);
+    deletionLog.push('booking_participants (deleted)');
+
+    if (sessionIds.length > 0) {
+      const sessionIdList = sql.join(sessionIds.map(id => sql`${id}`), sql`, `);
+
+      await db.execute(sql`DELETE FROM booking_fee_snapshots WHERE session_id IN (SELECT bs.id FROM booking_sessions bs WHERE NOT EXISTS (SELECT 1 FROM booking_participants bp WHERE bp.session_id = bs.id) AND bs.id IN (${sessionIdList}))`);
+      deletionLog.push('booking_fee_snapshots (empty sessions)');
+
+      await db.execute(sql`UPDATE booking_requests SET session_id = NULL WHERE session_id IN (SELECT bs.id FROM booking_sessions bs WHERE NOT EXISTS (SELECT 1 FROM booking_participants bp WHERE bp.session_id = bs.id) AND bs.id IN (${sessionIdList}))`);
+      deletionLog.push('booking_requests (unlinked from empty sessions)');
+
+      await db.execute(sql`DELETE FROM usage_ledger WHERE session_id IN (SELECT bs.id FROM booking_sessions bs WHERE NOT EXISTS (SELECT 1 FROM booking_participants bp WHERE bp.session_id = bs.id) AND bs.id IN (${sessionIdList}))`);
+      deletionLog.push('usage_ledger (empty sessions)');
+
+      await db.execute(sql`DELETE FROM booking_sessions WHERE id IN (SELECT bs.id FROM booking_sessions bs WHERE NOT EXISTS (SELECT 1 FROM booking_participants bp WHERE bp.session_id = bs.id) AND bs.id IN (${sessionIdList}))`);
+      deletionLog.push('booking_sessions (empty, deleted)');
+    }
+
     await db.execute(sql`DELETE FROM booking_requests WHERE LOWER(user_email) = ${normalizedEmail} OR user_id = ${userId}`);
     deletionLog.push('booking_requests');
-    
+
     await db.execute(sql`DELETE FROM booking_members WHERE LOWER(user_email) = ${normalizedEmail}`);
     deletionLog.push('booking_members');
-    
-    await db.execute(sql`UPDATE booking_participants SET user_id = NULL WHERE user_id = ${userId}`);
-    deletionLog.push('booking_participants (unlinked)');
-    
+
     await db.execute(sql`UPDATE booking_sessions SET created_by = NULL WHERE LOWER(created_by) = ${normalizedEmail}`);
-    deletionLog.push('booking_sessions (unlinked)');
+    deletionLog.push('booking_sessions (created_by unlinked)');
     
     await db.execute(sql`UPDATE guests SET created_by_member_id = NULL WHERE created_by_member_id = ${userIdStr}`);
     deletionLog.push('guests (unlinked)');

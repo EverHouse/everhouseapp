@@ -6,6 +6,7 @@ import { getTodayPacific, getPacificMidnightUTC } from '../../../utils/dateUtils
 import { CALENDAR_CONFIG, ConferenceRoomBooking, MemberMatchResult, CalendarEventData } from '../config';
 import { getCalendarIdByName } from '../cache';
 import { getConferenceRoomId } from '../../affectedAreas';
+import { ensureSessionForBooking } from '../../bookingService/sessionManager';
 
 export async function getConferenceRoomBookingsFromCalendar(
   memberName?: string,
@@ -479,8 +480,27 @@ export async function syncConferenceRoomCalendarToBookings(options?: { monthsBac
             .set(updates)
             .where(eq(bookingRequests.id, matchedBooking.id));
           linked++;
+
+          if (!matchedBooking.sessionId) {
+            try {
+              await ensureSessionForBooking({
+                bookingId: matchedBooking.id,
+                resourceId: conferenceRoomId,
+                sessionDate: eventDate,
+                startTime: startTime + ':00',
+                endTime: endTime + ':00',
+                ownerEmail: (memberEmail || matchedBooking.userEmail || 'unknown@calendar.sync').toLowerCase(),
+                ownerName: memberName || matchedBooking.userName || undefined,
+                ownerUserId: memberId || matchedBooking.userId || undefined,
+                source: 'staff_manual',
+                createdBy: 'calendar_sync'
+              });
+            } catch (sessionErr) {
+              console.error('[Conference Room Sync] Failed to ensure session for linked booking:', sessionErr);
+            }
+          }
         } else {
-          await db.insert(bookingRequests).values({
+          const [newBooking] = await db.insert(bookingRequests).values({
             userEmail: memberEmail || 'unknown@mindbody.com',
             userName: memberName,
             userId: memberId,
@@ -492,8 +512,27 @@ export async function syncConferenceRoomCalendarToBookings(options?: { monthsBac
             notes: `Synced from Google Calendar: ${summary}`,
             status: eventStatus,
             calendarEventId: googleEventId,
-          });
+          }).returning({ id: bookingRequests.id });
           created++;
+
+          if (newBooking) {
+            try {
+              await ensureSessionForBooking({
+                bookingId: newBooking.id,
+                resourceId: conferenceRoomId,
+                sessionDate: eventDate,
+                startTime: startTime + ':00',
+                endTime: endTime + ':00',
+                ownerEmail: (memberEmail || 'unknown@mindbody.com').toLowerCase(),
+                ownerName: memberName || undefined,
+                ownerUserId: memberId || undefined,
+                source: 'staff_manual',
+                createdBy: 'calendar_sync'
+              });
+            } catch (sessionErr) {
+              console.error('[Conference Room Sync] Failed to ensure session for new booking:', sessionErr);
+            }
+          }
         }
       }
     } while (pageToken);
