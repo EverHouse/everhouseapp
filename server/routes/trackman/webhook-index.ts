@@ -1082,74 +1082,53 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
     let sessionId = booking.session_id;
     if (!sessionId && booking.resource_id) {
       try {
-        // Check for existing session with EXACT matching times (not just overlap)
-        // This prevents reusing sessions with different durations
-        const existingSession = await db.execute(sql`SELECT id FROM booking_sessions 
-          WHERE resource_id = ${booking.resource_id} 
-            AND session_date = ${booking.request_date} 
-            AND start_time = ${booking.start_time} 
-            AND end_time = ${booking.end_time}
-          LIMIT 1`);
-        
-        if (existingSession.rows.length > 0) {
-          sessionId = existingSession.rows[0].id;
-          logger.info('[Simulate Confirm] Using existing session with exact times', { bookingId, sessionId });
-        } else {
-          const sessionResult = await db.execute(sql`INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
-            VALUES (${booking.resource_id}, ${booking.request_date}, ${booking.start_time}, ${booking.end_time}, ${fakeTrackmanId}, ${'staff_manual'}, ${'simulate_confirm'})
-            RETURNING id`);
-          
-          if (sessionResult.rows.length > 0) {
-            sessionId = sessionResult.rows[0].id;
-          }
-        }
-        
+        const userResult = await db.execute(sql`SELECT id FROM users WHERE LOWER(email) = LOWER(${booking.user_email})`);
+        const userId = userResult.rows[0]?.id || null;
+
+        const sessionResult = await ensureSessionForBooking({
+          bookingId,
+          resourceId: booking.resource_id,
+          sessionDate: booking.request_date,
+          startTime: booking.start_time,
+          endTime: booking.end_time,
+          ownerEmail: booking.user_email || '',
+          ownerName: booking.user_name,
+          ownerUserId: userId?.toString() || undefined,
+          trackmanBookingId: fakeTrackmanId,
+          source: 'staff_manual',
+          createdBy: 'simulate_confirm'
+        });
+        sessionId = sessionResult.sessionId || null;
+
         if (sessionId) {
-          const isNewSession = !existingSession.rows.length;
           const playerCount = booking.declared_player_count || 1;
           const sessionDuration = Math.round(
             (new Date(`2000-01-01T${booking.end_time}`).getTime() - 
              new Date(`2000-01-01T${booking.start_time}`).getTime()) / 60000
           );
-          
-          // Get user ID for owner
-          const userResult = await db.execute(sql`SELECT id FROM users WHERE LOWER(email) = LOWER(${booking.user_email})`);
-          const userId = userResult.rows[0]?.id || null;
-          
-          const existingOwner = await db.execute(sql`SELECT id FROM booking_participants 
-            WHERE session_id = ${sessionId} AND (participant_type = 'owner' OR user_id = ${userId})`);
-          
-          if (existingOwner.rows.length === 0) {
+
+          for (let i = 1; i < playerCount; i++) {
             await db.execute(sql`INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-              VALUES (${sessionId}, ${userId}, ${'owner'}, ${booking.user_name || 'Member'}, ${'pending'}, ${sessionDuration})`);
-            
-            for (let i = 1; i < playerCount; i++) {
-              await db.execute(sql`INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-                VALUES (${sessionId}, ${null}, ${'guest'}, ${`Guest ${i + 1}`}, ${'pending'}, ${sessionDuration})`);
-            }
-            
-            logger.info('[Simulate Confirm] Created participants', {
+              VALUES (${sessionId}, ${null}, ${'guest'}, ${`Guest ${i + 1}`}, ${'pending'}, ${sessionDuration})`);
+          }
+
+          if (playerCount > 1) {
+            logger.info('[Simulate Confirm] Created guest participants', {
               bookingId,
               sessionId,
-              playerCount,
-              sessionDuration,
-              isNewSession
+              guestCount: playerCount - 1,
+              sessionDuration
             });
-          } else {
-            logger.info('[Simulate Confirm] Owner participant already exists', { bookingId, sessionId });
           }
-          
-          // Always recalculate fees whether new or existing session
+
           try {
             const feeResult = await recalculateSessionFees(sessionId);
-            // Store the calculated total fee for the response
             if (feeResult?.totalSessionFee) {
               (booking as any).calculatedTotalFeeCents = feeResult.totalSessionFee;
             }
             logger.info('[Simulate Confirm] Calculated fees for session', {
               sessionId,
-              feeResult: feeResult?.totalSessionFee || 0,
-              isNewSession
+              feeResult: feeResult?.totalSessionFee || 0
             });
           } catch (feeError) {
             logger.warn('[Simulate Confirm] Failed to calculate fees (non-blocking)', { error: feeError });
@@ -1393,16 +1372,18 @@ router.post('/api/admin/trackman-webhooks/backfill', isAdmin, async (req, res) =
             
             await db.execute(sql`UPDATE trackman_webhook_events SET matched_booking_id = ${bookingId} WHERE id = ${event.id}`);
             
-            try {
-              const sessionResult = await db.execute(sql`INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
-                VALUES (${resourceId}, ${requestDate}, ${startTime}, ${endTime}, ${event.trackman_booking_id}, ${'trackman'}, ${'trackman_reprocess'})
-                RETURNING id`);
-              
-              if (sessionResult.rows.length > 0) {
-                await db.execute(sql`UPDATE booking_requests SET session_id = ${sessionResult.rows[0].id} WHERE id = ${bookingId}`);
-              }
-            } catch (sessionErr) {
-            }
+            await ensureSessionForBooking({
+              bookingId,
+              resourceId,
+              sessionDate: requestDate,
+              startTime,
+              endTime,
+              ownerEmail: customerEmail || '',
+              ownerName: customerName,
+              trackmanBookingId: event.trackman_booking_id,
+              source: 'trackman',
+              createdBy: 'trackman_reprocess'
+            });
             
             results.created++;
             results.details.push({ 

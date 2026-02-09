@@ -2,7 +2,7 @@ import { pool } from '../db';
 import { findMatchingUser, upsertVisitor } from './matchingService';
 import { updateVisitorType, VisitorType } from './typeService';
 import { getMemberTierByEmail } from '../tierService';
-import { recordUsage } from '../bookingService/sessionManager';
+import { recordUsage, ensureSessionForBooking } from '../bookingService/sessionManager';
 
 export interface BookingTypeInfo {
   keyword: string | null;
@@ -365,62 +365,39 @@ async function createBookingSessionForAutoMatch(
       return null;
     }
     
-    // Create the booking session
-    const sessionResult = await client.query(`
-      INSERT INTO booking_sessions (
-        resource_id, session_date, start_time, end_time, 
-        trackman_booking_id, source, created_by
-      )
-      VALUES ($1, $2, $3, $4, $5, 'trackman', 'auto_match')
-      ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL
-      DO UPDATE SET updated_at = NOW()
-      RETURNING id
-    `, [
-      resourceId, 
-      booking.bookingDate, 
-      booking.startTime, 
-      booking.endTime || booking.startTime,
-      booking.trackmanBookingId
-    ]);
+    const sessionResult = await ensureSessionForBooking({
+      bookingId: booking.id,
+      resourceId,
+      sessionDate: booking.bookingDate,
+      startTime: booking.startTime,
+      endTime: booking.endTime || booking.startTime,
+      ownerEmail: email,
+      ownerName: displayName,
+      ownerUserId: userId?.toString(),
+      trackmanBookingId: booking.trackmanBookingId || undefined,
+      source: 'trackman',
+      createdBy: 'auto_match'
+    }, client);
     
-    if (sessionResult.rows.length === 0) {
+    if (!sessionResult.sessionId || sessionResult.error) {
       await client.query('ROLLBACK');
       return null;
     }
     
-    const sessionId = sessionResult.rows[0].id;
+    const sessionId = sessionResult.sessionId;
     
-    // Calculate slot duration from booking times
-    const slotDuration = booking.durationMinutes || 
-      (booking.startTime && booking.endTime
-        ? Math.round((new Date(`2000-01-01T${booking.endTime}`).getTime() - 
-                     new Date(`2000-01-01T${booking.startTime}`).getTime()) / 60000)
-        : 60);
-    
-    // Add participant as owner
-    await client.query(`
-      INSERT INTO booking_participants (session_id, user_id, display_name, participant_type, slot_duration)
-      VALUES ($1, $2, $3, 'owner', $4)
-      ON CONFLICT (session_id, participant_type) WHERE participant_type = 'owner'
-      DO UPDATE SET user_id = EXCLUDED.user_id, display_name = EXCLUDED.display_name, slot_duration = EXCLUDED.slot_duration
-    `, [sessionId, userId, displayName, slotDuration]);
-    
-    // Check if user is an active member and record initial usage
-    // Note: Actual fees will be calculated at check-in based on daily usage
     const memberTier = await getMemberTierByEmail(email);
     
     if (memberTier) {
-      // Member: record usage with tier - fees calculated at check-in based on daily allowance
       await recordUsage(sessionId, {
         memberId: userId,
         minutesCharged: booking.durationMinutes,
-        overageFee: 0, // Initial - actual overage calculated at check-in
+        overageFee: 0,
         guestFee: 0,
         tierAtBooking: memberTier
       }, 'trackman');
       console.log(`[AutoMatch] Created session ${sessionId} for member ${email} (${memberTier})`);
     } else {
-      // Non-member (visitor): record usage without tier - visitor fees apply at check-in
       await recordUsage(sessionId, {
         memberId: userId,
         minutesCharged: booking.durationMinutes,
@@ -949,42 +926,22 @@ async function autoMatchBookingRequests(
       let sessionId: number | null = null;
       if (isFuture && row.resource_id) {
         try {
-          const sessionResult = await pool.query(`
-            INSERT INTO booking_sessions (
-              resource_id, session_date, start_time, end_time, 
-              trackman_booking_id, source, created_by
-            )
-            VALUES ($1, $2, $3, $4, $5, 'trackman', 'auto_match')
-            ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL
-            DO UPDATE SET updated_at = NOW()
-            RETURNING id
-          `, [
-            row.resource_id, 
-            row.booking_date, 
-            row.start_time, 
-            row.end_time || row.start_time,
-            row.trackman_booking_id
-          ]);
+          const sessionResult = await ensureSessionForBooking({
+            bookingId: row.id,
+            resourceId: row.resource_id,
+            sessionDate: row.booking_date,
+            startTime: row.start_time,
+            endTime: row.end_time || row.start_time,
+            ownerEmail: visitor.email || '',
+            ownerName: userName || visitor.email,
+            ownerUserId: visitor.id?.toString(),
+            trackmanBookingId: row.trackman_booking_id,
+            source: 'trackman',
+            createdBy: 'auto_match'
+          });
+          sessionId = sessionResult.sessionId || null;
           
-          if (sessionResult.rows.length > 0) {
-            sessionId = sessionResult.rows[0].id;
-            
-            // Calculate slot duration
-            const slotDuration = row.duration_minutes || 
-              (row.start_time && row.end_time
-                ? Math.round((new Date(`2000-01-01T${row.end_time}`).getTime() - 
-                             new Date(`2000-01-01T${row.start_time}`).getTime()) / 60000)
-                : 60);
-            
-            // Add participant
-            await pool.query(`
-              INSERT INTO booking_participants (session_id, user_id, display_name, participant_type, slot_duration)
-              VALUES ($1, $2, $3, 'owner', $4)
-              ON CONFLICT (session_id, participant_type) WHERE participant_type = 'owner'
-              DO UPDATE SET user_id = EXCLUDED.user_id, display_name = EXCLUDED.display_name, slot_duration = EXCLUDED.slot_duration
-            `, [sessionId, visitor.id, userName, slotDuration]);
-            
-            // Record usage for visitor
+          if (sessionId) {
             await recordUsage(sessionId, {
               memberId: visitor.id,
               minutesCharged: row.duration_minutes || 60,
@@ -1014,7 +971,7 @@ async function autoMatchBookingRequests(
       `, [
         row.id,
         visitor.id,
-        visitor.email, // Use visitor's actual email (not generated)
+        visitor.email,
         sessionId,
         matchNote
       ]);

@@ -1791,7 +1791,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
     const fixed: Array<{ bookingId: number; sessionId: number; userEmail: string }> = [];
     const errors: string[] = [];
     
-    const { createSession, recordUsage, linkParticipants } = await import('../core/bookingService/sessionManager');
+    const { createSession, recordUsage, linkParticipants, ensureSessionForBooking } = await import('../core/bookingService/sessionManager');
     const { getMemberTierByEmail } = await import('../core/tierService');
     const { calculateFullSessionBilling } = await import('../core/bookingService/usageCalculator');
     const { recalculateSessionFees } = await import('../core/billing/unifiedFeeService');
@@ -1832,20 +1832,25 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
           continue;
         }
         
-        const sessionResult = await db.execute(sql`
-          INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
-          VALUES (${booking.resourceId}, ${booking.requestDate}, ${booking.startTime}, ${booking.endTime}, ${booking.trackmanBookingId}, 'trackman', 'ghost_booking_fix')
-          RETURNING id
-        `);
-        
-        if (sessionResult.rows.length === 0) {
+        const sessionResult = await ensureSessionForBooking({
+          bookingId: booking.bookingId,
+          resourceId: booking.resourceId,
+          sessionDate: booking.requestDate,
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          ownerEmail: booking.userEmail || '',
+          ownerName: booking.userName || booking.userEmail,
+          trackmanBookingId: booking.trackmanBookingId,
+          source: 'trackman',
+          createdBy: 'ghost_booking_fix'
+        });
+
+        if (!sessionResult.sessionId || sessionResult.error) {
           errors.push(`Failed to create session for booking ${booking.bookingId}`);
           continue;
         }
-        
-        const sessionId = sessionResult.rows[0].id;
-        
-        await db.execute(sql`UPDATE booking_requests SET session_id = ${sessionId}, updated_at = NOW() WHERE id = ${booking.bookingId}`);
+
+        const sessionId = sessionResult.sessionId;
         
         const ownerTier = booking.tier || await getMemberTierByEmail(booking.userEmail, { allowInactive: true });
         

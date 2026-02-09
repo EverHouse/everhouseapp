@@ -13,6 +13,25 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.13.0",
+    date: "2026-02-09",
+    title: "Complete Session Creation Safety Coverage",
+    isMajor: true,
+    changes: [
+      "Fix: ALL session creation paths now go through ensureSessionForBooking — a single hardened function with automatic retry and staff-note flagging on failure",
+      "Fix: Staff check-in (2 paths) — check-in context and add-participant now use hardened session creation instead of raw database inserts",
+      "Fix: Booking approval check-in and dev_confirm paths now use hardened session creation with retry safety",
+      "Fix: Trackman webhook billing (2 paths) — pending booking link and new booking creation now retry on failure instead of silently failing",
+      "Fix: Trackman webhook simulate-confirm and reprocess-backfill now use hardened session creation — eliminated a completely silent empty catch block in reprocess",
+      "Fix: Trackman admin resolve (visitor + member) and backfill tool now use hardened session creation with retry",
+      "Fix: Visitor auto-match (2 paths) — both transactional and non-transactional auto-match session creation now use hardened path",
+      "Fix: Ghost booking fix tool now uses hardened session creation instead of raw database insert",
+      "Improvement: ensureSessionForBooking now checks for existing sessions by Trackman booking ID in addition to resource/date/time — prevents duplicate session conflicts",
+      "Improvement: ensureSessionForBooking INSERT now uses ON CONFLICT for Trackman booking ID dedup — handles race conditions atomically",
+      "Result: Zero raw INSERT INTO booking_sessions in the codebase outside of ensureSessionForBooking — every session creation path has retry + staff-note safety",
+    ],
+  },
+  {
     version: "7.12.0",
     date: "2026-02-09",
     title: "Session Reliability & Data Integrity Hardening",

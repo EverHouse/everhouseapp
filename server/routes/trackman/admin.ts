@@ -10,7 +10,7 @@ import { computeFeeBreakdown, applyFeeBreakdownToParticipants, recalculateSessio
 import { logFromRequest } from '../../core/auditLog';
 import { getStripeClient } from '../../core/stripe/client';
 import { getOrCreateStripeCustomer } from '../../core/stripe/customers';
-import { recordUsage } from '../../core/bookingService/sessionManager';
+import { recordUsage, ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { updateVisitorTypeByUserId } from '../../core/visitors';
 import { PRICING } from '../../core/billing/pricingConfig';
 import { refundGuestPassForParticipant } from '../../core/billing/guestPassConsumer';
@@ -577,14 +577,20 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
         
         let sessionId = booking.session_id;
         if (!sessionId) {
-          const sessionResult = await db.execute(sql`INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
-            VALUES (${booking.resource_id}, ${bookingDateStr}, ${booking.start_time}, ${booking.end_time}, ${booking.trackman_booking_id}, ${'trackman'}, ${'staff_resolve'})
-            RETURNING id`);
-          
-          if (sessionResult.rows.length > 0) {
-            sessionId = sessionResult.rows[0].id;
-            await db.execute(sql`UPDATE booking_requests SET session_id = ${sessionId} WHERE id = ${booking.id}`);
-          }
+          const sessionResult = await ensureSessionForBooking({
+            bookingId: booking.id,
+            resourceId: booking.resource_id,
+            sessionDate: bookingDateStr,
+            startTime: booking.start_time,
+            endTime: booking.end_time,
+            ownerEmail: member.email || '',
+            ownerName: `${member.first_name} ${member.last_name}`,
+            ownerUserId: member.id?.toString(),
+            trackmanBookingId: booking.trackman_booking_id,
+            source: 'trackman',
+            createdBy: 'staff_resolve'
+          });
+          sessionId = sessionResult.sessionId || null;
         }
         
         if (sessionId) {
@@ -608,37 +614,23 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
         
         let sessionId = booking.session_id;
         if (!sessionId) {
-          const sessionResult = await db.execute(sql`INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
-            VALUES (${booking.resource_id}, ${bookingDateStr}, ${booking.start_time}, ${booking.end_time}, ${booking.trackman_booking_id}, ${'trackman'}, ${'staff_resolve'})
-            ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL 
-            DO UPDATE SET updated_at = NOW()
-            RETURNING id`);
-          
-          if (sessionResult.rows.length > 0) {
-            sessionId = sessionResult.rows[0].id;
-            await db.execute(sql`UPDATE booking_requests SET session_id = ${sessionId} WHERE id = ${booking.id}`);
-          }
+          const sessionResult = await ensureSessionForBooking({
+            bookingId: booking.id,
+            resourceId: booking.resource_id,
+            sessionDate: bookingDateStr,
+            startTime: booking.start_time,
+            endTime: booking.end_time,
+            ownerEmail: member.email || '',
+            ownerName: `${member.first_name} ${member.last_name}`,
+            ownerUserId: member.id?.toString(),
+            trackmanBookingId: booking.trackman_booking_id,
+            source: 'trackman',
+            createdBy: 'staff_resolve'
+          });
+          sessionId = sessionResult.sessionId || null;
         }
         
         if (sessionId) {
-          // Calculate slot duration from booking times
-          const slotDuration = booking.start_time && booking.end_time
-            ? Math.round((new Date(`2000-01-01T${booking.end_time}`).getTime() - 
-                         new Date(`2000-01-01T${booking.start_time}`).getTime()) / 60000)
-            : booking.duration_minutes || 60;
-          
-          // Check if participant already exists
-          const existingParticipant = await db.execute(sql`SELECT id FROM booking_participants WHERE session_id = ${sessionId} AND participant_type = 'owner'`);
-          
-          if (existingParticipant.rows.length === 0) {
-            await db.execute(sql`INSERT INTO booking_participants (session_id, user_id, display_name, participant_type, slot_duration)
-              VALUES (${sessionId}, ${member.id}, ${`${member.first_name} ${member.last_name}`}, ${'owner'}, ${slotDuration})`);
-          } else {
-            await db.execute(sql`UPDATE booking_participants 
-              SET user_id = ${member.id}, display_name = ${`${member.first_name} ${member.last_name}`}
-              WHERE session_id = ${sessionId} AND participant_type = 'owner'`);
-          }
-          
           // Recalculate fees for the session now that we have an owner
           try {
             await recalculateSessionFees(sessionId, 'assign_to_member');
@@ -2454,111 +2446,37 @@ router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => 
       try {
         await client.query(`SAVEPOINT ${savepointName}`);
         
-        // First check if an existing session already covers this time slot
-        // Match on start_time only since actual session duration may differ from request
-        const existingSessionResult = await client.query(`
-          SELECT id FROM booking_sessions
-          WHERE resource_id = $1
-            AND session_date = $2
-            AND start_time = $3
-          LIMIT 1
-        `, [
-          booking.resource_id,
-          booking.request_date,
-          booking.start_time
-        ]);
-        
-        let sessionId: number;
-        let linkedExisting = false;
-        
-        if (existingSessionResult.rows.length > 0) {
-          // Session already exists - just link the booking to it
-          sessionId = existingSessionResult.rows[0].id;
-          linkedExisting = true;
-        } else {
-          // Determine source based on origin or presence of trackman_booking_id
-          let source = 'member_request';
-          if (booking.trackman_booking_id) {
-            source = 'trackman_import';
-          }
-          
-          // Create booking_session
-          const sessionResult = await client.query(`
-            INSERT INTO booking_sessions (
-              resource_id, 
-              session_date, 
-              start_time, 
-              end_time, 
-              trackman_booking_id,
-              source, 
-              created_by,
-              created_at,
-              updated_at
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-            RETURNING id
-          `, [
-            booking.resource_id,
-            booking.request_date,
-            booking.start_time,
-            booking.end_time,
-            booking.trackman_booking_id,
-            source,
-            'backfill_tool'
-          ]);
-          
-          sessionId = sessionResult.rows[0].id;
-        }
-        
-        // Create owner participant if we have user info (skip if already exists)
-        // Mark as 'paid' since these are historical bookings being backfilled
         const displayName = booking.user_name || booking.user_email || 'Unknown';
         const userId = booking.owner_user_id || booking.user_id;
         
-        // Calculate slot duration from booking times
-        const slotDuration = booking.start_time && booking.end_time
-          ? Math.round((new Date(`2000-01-01T${booking.end_time}`).getTime() - 
-                       new Date(`2000-01-01T${booking.start_time}`).getTime()) / 60000)
-          : 60;
-        
-        if (!linkedExisting) {
-          // Only add participant for newly created sessions
-          await client.query(`
-            INSERT INTO booking_participants (
-              session_id,
-              user_id,
-              participant_type,
-              display_name,
-              invite_status,
-              payment_status,
-              invited_at,
-              created_at,
-              paid_at,
-              slot_duration
-            )
-            VALUES ($1, $2, 'owner', $3, 'accepted', 'paid', NOW(), NOW(), NOW(), $4)
-          `, [
-            sessionId,
-            userId,
-            displayName,
-            slotDuration
-          ]);
+        let source = 'member_request';
+        if (booking.trackman_booking_id) {
+          source = 'trackman_import';
         }
         
-        // Link session back to booking_request
-        await client.query(`
-          UPDATE booking_requests 
-          SET session_id = $1, updated_at = NOW()
-          WHERE id = $2
-        `, [sessionId, booking.id]);
+        const sessionResult = await ensureSessionForBooking({
+          bookingId: booking.id,
+          resourceId: booking.resource_id,
+          sessionDate: booking.request_date,
+          startTime: booking.start_time,
+          endTime: booking.end_time,
+          ownerEmail: booking.user_email || '',
+          ownerName: displayName,
+          ownerUserId: userId?.toString(),
+          trackmanBookingId: booking.trackman_booking_id,
+          source: source,
+          createdBy: 'backfill_tool'
+        }, client);
+        
+        const sessionId = sessionResult.sessionId;
         
         // Release savepoint on success
         await client.query(`RELEASE SAVEPOINT ${savepointName}`);
         
-        if (linkedExisting) {
-          sessionsLinked++;
-        } else {
+        if (sessionResult.created) {
           sessionsCreated++;
+        } else {
+          sessionsLinked++;
         }
       } catch (bookingError: any) {
         // Rollback to savepoint so we can continue with next booking

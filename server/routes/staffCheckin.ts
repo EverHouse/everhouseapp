@@ -16,6 +16,7 @@ import { PRICING } from '../core/billing/pricingConfig';
 import { enforceSocialTierRules, type ParticipantForValidation } from '../core/bookingService/tierRules';
 import { broadcastMemberStatsUpdated } from '../core/websocket';
 import { updateHubSpotContactVisitCount } from '../core/memberSync';
+import { ensureSessionForBooking } from '../core/bookingService/sessionManager';
 
 const router = Router();
 
@@ -132,62 +133,29 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
         if (bookingDetails.rows.length > 0) {
           const bd = bookingDetails.rows[0];
           
-          // Calculate booking duration for slot_duration
           const bookingDuration = Math.round(
             (new Date(`2000-01-01T${bd.end_time}`).getTime() - 
              new Date(`2000-01-01T${bd.start_time}`).getTime()) / 60000
           );
           
-          // Check for existing session with EXACT matching times (not just overlap)
-          // This prevents reusing sessions with different durations
-          const existingSession = await pool.query(`
-            SELECT id FROM booking_sessions 
-            WHERE resource_id = $1 
-              AND session_date = $2 
-              AND start_time = $3 
-              AND end_time = $4
-            LIMIT 1
-          `, [bd.resource_id, bd.request_date, bd.start_time, bd.end_time]);
-          
-          if (existingSession.rows.length > 0) {
-            // Use existing session with exact times
-            sessionId = existingSession.rows[0].id;
-            await pool.query(`UPDATE booking_requests SET session_id = $1 WHERE id = $2`, [sessionId, bookingId]);
-            console.log(`[Checkin Context] Linked booking ${bookingId} to existing session ${sessionId} with exact times`);
-          } else {
-            // Create new session
-            const sessionResult = await pool.query(`
-              INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, source, created_by)
-              VALUES ($1, $2, $3, $4, 'staff_manual', 'checkin_context')
-              RETURNING id
-            `, [bd.resource_id, bd.request_date, bd.start_time, bd.end_time]);
-            
-            if (sessionResult.rows.length > 0) {
-              sessionId = sessionResult.rows[0].id;
-              await pool.query(`UPDATE booking_requests SET session_id = $1 WHERE id = $2`, [sessionId, bookingId]);
-              console.log(`[Checkin Context] Created session ${sessionId} for booking ${bookingId} (${bookingDuration} min)`);
-            }
-          }
+          const userResult = await pool.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1)`, [bd.user_email]);
+          const userId = userResult.rows[0]?.id || null;
+
+          const sessionResult = await ensureSessionForBooking({
+            bookingId,
+            resourceId: bd.resource_id,
+            sessionDate: bd.request_date,
+            startTime: bd.start_time,
+            endTime: bd.end_time,
+            ownerEmail: bd.user_email || bd.owner_email || '',
+            ownerName: bd.user_name,
+            ownerUserId: userId?.toString() || undefined,
+            source: 'staff_manual',
+            createdBy: 'checkin_context'
+          });
+          sessionId = sessionResult.sessionId || null;
           
           if (sessionId) {
-            // Ensure owner participant exists
-            const userResult = await pool.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1)`, [bd.user_email]);
-            const userId = userResult.rows[0]?.id || null;
-            
-            const existingOwner = await pool.query(`
-              SELECT id FROM booking_participants 
-              WHERE session_id = $1 AND participant_type = 'owner'
-              LIMIT 1
-            `, [sessionId]);
-            
-            if (existingOwner.rows.length === 0) {
-              // Use actual booking duration for slot_duration
-              await pool.query(`
-                INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-                VALUES ($1, $2, 'owner', $3, 'pending', $4)
-              `, [sessionId, userId, bd.user_name || 'Member', bookingDuration]);
-            }
-            
             // Ensure guest participants exist
             const playerCount = bd.declared_player_count || 1;
             const existingGuests = await pool.query(`
@@ -1059,7 +1027,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
     }
 
     const bookingResult = await pool.query(`
-      SELECT br.session_id, br.user_email as owner_email, br.start_time, br.end_time
+      SELECT br.session_id, br.resource_id, br.request_date, br.user_email as owner_email, br.user_name, br.start_time, br.end_time
       FROM booking_requests br
       WHERE br.id = $1
     `, [bookingId]);
@@ -1078,19 +1046,21 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       : 60; // fallback to 60 if times missing
 
     if (!sessionId) {
-      const sessionResult = await pool.query(`
-        INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, source, created_by)
-        SELECT resource_id, request_date, start_time, end_time, 'staff_manual', $2
-        FROM booking_requests WHERE id = $1
-        RETURNING id
-      `, [bookingId, staffEmail]);
-      
-      sessionId = sessionResult.rows[0].id;
-      
-      await pool.query(
-        `UPDATE booking_requests SET session_id = $1 WHERE id = $2`,
-        [sessionId, bookingId]
-      );
+      const sessionResult = await ensureSessionForBooking({
+        bookingId,
+        resourceId: booking.resource_id,
+        sessionDate: booking.request_date,
+        startTime: booking.start_time,
+        endTime: booking.end_time,
+        ownerEmail: booking.owner_email || booking.user_email || '',
+        ownerName: booking.user_name,
+        source: 'staff_manual',
+        createdBy: staffEmail
+      });
+      sessionId = sessionResult.sessionId || null;
+      if (!sessionId || sessionResult.error) {
+        return res.status(500).json({ error: 'Failed to create billing session. Staff has been notified.' });
+      }
     }
 
     if (participantType === 'guest') {

@@ -14,7 +14,7 @@ import { sendNotificationToUser, broadcastAvailabilityUpdate, broadcastMemberSta
 import { getSessionUser } from '../../types/session';
 import { refundGuestPass } from '../guestPasses';
 import { updateHubSpotContactVisitCount } from '../../core/memberSync';
-import { createSessionWithUsageTracking } from '../../core/bookingService/sessionManager';
+import { createSessionWithUsageTracking, ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { computeFeeBreakdown, applyFeeBreakdownToParticipants, recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { PaymentStatusService } from '../../core/billing/PaymentStatusService';
 import { cancelPaymentIntent, getStripeClient } from '../../core/stripe';
@@ -1167,67 +1167,27 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
     // Auto-fix: If session is missing, create it now so check-in can proceed
     if (newStatus === 'attended' && !existing.session_id && existing.resource_id) {
       try {
-        // Calculate booking duration from times
-        const bookingDuration = Math.round(
-          (new Date(`2000-01-01T${existing.end_time}`).getTime() - 
-           new Date(`2000-01-01T${existing.start_time}`).getTime()) / 60000
-        );
-        
-        // 1. Check for existing session with EXACT matching times AND same owner
-        // Never link to sessions belonging to other members
         const userResult = await pool.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1)`, [existing.user_email]);
         const userId = userResult.rows[0]?.id || null;
-        
-        const existingSession = await pool.query(`
-          SELECT bs.id FROM booking_sessions bs
-          LEFT JOIN booking_participants bp ON bp.session_id = bs.id AND bp.participant_type = 'owner'
-          WHERE bs.resource_id = $1 
-            AND bs.session_date = $2 
-            AND bs.start_time = $3 
-            AND bs.end_time = $4
-            AND (bp.user_id IS NULL OR bp.user_id = $5)
-          LIMIT 1
-        `, [existing.resource_id, existing.request_date, existing.start_time, existing.end_time, userId]);
 
-        let newSessionId: number;
-        if (existingSession.rows.length > 0) {
-          newSessionId = existingSession.rows[0].id;
-          console.log(`[Checkin] Using existing session ${newSessionId} with exact times for same member booking ${bookingId}`);
-        } else {
-          // 2. Create new session with valid source enum
-          const sessionResult = await pool.query(`
-            INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, source, created_by)
-            VALUES ($1, $2, $3, $4, 'staff_manual', $5)
-            RETURNING id
-          `, [existing.resource_id, existing.request_date, existing.start_time, existing.end_time, staffEmail]);
-          newSessionId = sessionResult.rows[0].id;
-        }
-
-        if (newSessionId) {
-          // 3. Link session to booking
-          await pool.query(`UPDATE booking_requests SET session_id = $1 WHERE id = $2`, [newSessionId, bookingId]);
-          existing.session_id = newSessionId;
-
-          // 4. Create Owner Participant if not exists (userId already defined above)
-          const existingOwner = await pool.query(`
-            SELECT id FROM booking_participants WHERE session_id = $1 AND participant_type = 'owner'
-          `, [newSessionId]);
-          
-          if (existingOwner.rows.length === 0) {
-            // Use actual booking duration for slot_duration, not hard-coded 60
-            await pool.query(`
-              INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-              VALUES ($1, $2, 'owner', $3, 'pending', $4)
-            `, [newSessionId, userId, existing.user_name || 'Member', bookingDuration]);
-          }
-
-          // 5. Calculate Fees
-          await recalculateSessionFees(newSessionId, 'checkin_auto');
-          console.log(`[Checkin] Auto-created session ${newSessionId} for booking ${bookingId} (${bookingDuration} min)`);
+        const sessionResult = await ensureSessionForBooking({
+          bookingId,
+          resourceId: existing.resource_id,
+          sessionDate: existing.request_date,
+          startTime: existing.start_time,
+          endTime: existing.end_time,
+          ownerEmail: existing.user_email || existing.owner_email || '',
+          ownerName: existing.user_name,
+          ownerUserId: userId?.toString() || undefined,
+          source: 'staff_manual',
+          createdBy: staffEmail
+        });
+        if (sessionResult.sessionId) {
+          existing.session_id = sessionResult.sessionId;
+          await recalculateSessionFees(sessionResult.sessionId, 'checkin_auto');
         }
       } catch (err) {
         console.error('[Checkin] Failed to auto-create session:', err);
-        // Continue - let the strict check below handle the error if it failed
       }
     }
     
@@ -1508,43 +1468,21 @@ router.post('/api/admin/bookings/:id/dev-confirm', isStaffOrAdmin, async (req, r
     let sessionId = booking.session_id;
     let totalFeeCents = 0;
     
-    // Create or find session - first try exact match, then overlapping, then create new
+    // Create or find session using ensureSessionForBooking
     if (!sessionId && booking.resource_id) {
-      // First: Check for exact time match
-      const exactSession = await pool.query(`
-        SELECT id FROM booking_sessions 
-        WHERE resource_id = $1 
-          AND session_date = $2 
-          AND start_time = $3 
-          AND end_time = $4
-        LIMIT 1
-      `, [booking.resource_id, booking.request_date, booking.start_time, booking.end_time]);
-      
-      if (exactSession.rows.length > 0) {
-        // Only use exact match if it belongs to the same member
-        const ownerCheck = await pool.query(`
-          SELECT bp.user_id FROM booking_participants bp
-          WHERE bp.session_id = $1 AND bp.participant_type = 'owner'
-          LIMIT 1
-        `, [exactSession.rows[0].id]);
-        
-        if (ownerCheck.rows.length === 0 || ownerCheck.rows[0].user_id === booking.user_id) {
-          sessionId = exactSession.rows[0].id;
-        }
-      }
-      
-      // If no suitable exact match, create new session (never link to overlapping sessions from other members)
-      if (!sessionId) {
-        const sessionResult = await pool.query(`
-          INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, source, created_by)
-          VALUES ($1, $2, $3, $4, 'staff_manual', 'dev_confirm')
-          RETURNING id
-        `, [booking.resource_id, booking.request_date, booking.start_time, booking.end_time]);
-        
-        if (sessionResult.rows.length > 0) {
-          sessionId = sessionResult.rows[0].id;
-        }
-      }
+      const sessionResult = await ensureSessionForBooking({
+        bookingId,
+        resourceId: booking.resource_id,
+        sessionDate: booking.request_date,
+        startTime: booking.start_time,
+        endTime: booking.end_time,
+        ownerEmail: booking.user_email || booking.owner_email || '',
+        ownerName: booking.user_name,
+        ownerUserId: booking.user_id?.toString() || undefined,
+        source: 'staff_manual',
+        createdBy: 'dev_confirm'
+      });
+      sessionId = sessionResult.sessionId || null;
       
       if (sessionId) {
         const sessionDuration = Math.round(
@@ -1553,118 +1491,100 @@ router.post('/api/admin/bookings/:id/dev-confirm', isStaffOrAdmin, async (req, r
         );
         const playerCount = booking.declared_player_count || 1;
         
-        // Check if owner already exists
-        const existingOwner = await pool.query(`
-          SELECT id FROM booking_participants 
-          WHERE session_id = $1 AND (participant_type = 'owner' OR user_id = $2)
-        `, [sessionId, booking.user_id]);
+        // Create participants from request_participants if available
+        const requestParticipants = booking.request_participants as Array<{
+          email?: string;
+          type: 'member' | 'guest';
+          userId?: string;
+          name?: string;
+        }> | null;
         
-        if (existingOwner.rows.length === 0) {
-          // Create owner participant
-          await pool.query(`
-            INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-            VALUES ($1, $2, 'owner', $3, 'pending', $4)
-          `, [sessionId, booking.user_id, booking.user_name || 'Member', sessionDuration]);
-          
-          // Create participants from request_participants if available
-          const requestParticipants = booking.request_participants as Array<{
-            email?: string;
-            type: 'member' | 'guest';
-            userId?: string;
-            name?: string;
-          }> | null;
-          
-          let participantsCreated = 0;
-          if (requestParticipants && Array.isArray(requestParticipants)) {
-            for (const rp of requestParticipants) {
-              if (!rp || typeof rp !== 'object') continue;
-              
-              // Resolve user info for members
-              let resolvedUserId = rp.userId || null;
-              let resolvedName = rp.name || '';
-              let participantType = rp.type === 'member' ? 'member' : 'guest';
-              
-              // If we have userId but no name, look it up
-              if (resolvedUserId && !resolvedName) {
-                const userResult = await pool.query(
-                  `SELECT name, first_name, last_name, email FROM users WHERE id = $1`,
-                  [resolvedUserId]
-                );
-                if (userResult.rows.length > 0) {
-                  const u = userResult.rows[0];
-                  resolvedName = u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email || 'Member';
-                }
+        let participantsCreated = 0;
+        if (requestParticipants && Array.isArray(requestParticipants)) {
+          for (const rp of requestParticipants) {
+            if (!rp || typeof rp !== 'object') continue;
+            
+            let resolvedUserId = rp.userId || null;
+            let resolvedName = rp.name || '';
+            let participantType = rp.type === 'member' ? 'member' : 'guest';
+            
+            if (resolvedUserId && !resolvedName) {
+              const userResult = await pool.query(
+                `SELECT name, first_name, last_name, email FROM users WHERE id = $1`,
+                [resolvedUserId]
+              );
+              if (userResult.rows.length > 0) {
+                const u = userResult.rows[0];
+                resolvedName = u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email || 'Member';
               }
-              
-              // If no userId but we have email, try to resolve
-              if (!resolvedUserId && rp.email) {
-                const userResult = await pool.query(
-                  `SELECT id, name, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)`,
-                  [rp.email]
-                );
-                if (userResult.rows.length > 0) {
-                  resolvedUserId = userResult.rows[0].id;
-                  participantType = 'member';
-                  if (!resolvedName) {
-                    const u = userResult.rows[0];
-                    resolvedName = u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim();
-                  }
-                }
-              }
-              
-              // Use a fallback name if still empty
-              if (!resolvedName) {
-                resolvedName = rp.email || `Player ${participantsCreated + 2}`;
-              }
-              
-              await pool.query(`
-                INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-                VALUES ($1, $2, $3, $4, 'pending', $5)
-              `, [sessionId, resolvedUserId, participantType, resolvedName, sessionDuration]);
-              
-              participantsCreated++;
             }
-            console.log(`[Dev Confirm] Created ${participantsCreated} participants from request_participants`);
-          }
-          
-          // If not enough participants from request_participants, create generic guests for remaining slots
-          const remainingSlots = playerCount - 1 - participantsCreated;
-          for (let i = 0; i < remainingSlots; i++) {
+            
+            if (!resolvedUserId && rp.email) {
+              const userResult = await pool.query(
+                `SELECT id, name, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)`,
+                [rp.email]
+              );
+              if (userResult.rows.length > 0) {
+                resolvedUserId = userResult.rows[0].id;
+                participantType = 'member';
+                if (!resolvedName) {
+                  const u = userResult.rows[0];
+                  resolvedName = u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim();
+                }
+              }
+            }
+            
+            if (!resolvedName) {
+              resolvedName = rp.email || `Player ${participantsCreated + 2}`;
+            }
+            
             await pool.query(`
               INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-              VALUES ($1, NULL, 'guest', $2, 'pending', $3)
-            `, [sessionId, `Guest ${participantsCreated + i + 2}`, sessionDuration]);
+              VALUES ($1, $2, $3, $4, 'pending', $5)
+            `, [sessionId, resolvedUserId, participantType, resolvedName, sessionDuration]);
+            
+            participantsCreated++;
           }
-          
-          // Add request_participants to booking_members so they appear on dashboards
-          if (requestParticipants && Array.isArray(requestParticipants)) {
-            let slotNumber = 2;
-            for (const rp of requestParticipants) {
-              if (!rp || typeof rp !== 'object') continue;
-              
-              let participantEmail = rp.email?.toLowerCase()?.trim() || '';
-              if (!participantEmail && rp.userId) {
-                const userResult = await pool.query(
-                  `SELECT email FROM users WHERE id = $1`,
-                  [rp.userId]
-                );
-                if (userResult.rows.length > 0) {
-                  participantEmail = userResult.rows[0].email?.toLowerCase() || '';
-                }
+          console.log(`[Dev Confirm] Created ${participantsCreated} participants from request_participants`);
+        }
+        
+        // If not enough participants from request_participants, create generic guests for remaining slots
+        const remainingSlots = playerCount - 1 - participantsCreated;
+        for (let i = 0; i < remainingSlots; i++) {
+          await pool.query(`
+            INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+            VALUES ($1, NULL, 'guest', $2, 'pending', $3)
+          `, [sessionId, `Guest ${participantsCreated + i + 2}`, sessionDuration]);
+        }
+        
+        // Add request_participants to booking_members so they appear on dashboards
+        if (requestParticipants && Array.isArray(requestParticipants)) {
+          let slotNumber = 2;
+          for (const rp of requestParticipants) {
+            if (!rp || typeof rp !== 'object') continue;
+            
+            let participantEmail = rp.email?.toLowerCase()?.trim() || '';
+            if (!participantEmail && rp.userId) {
+              const userResult = await pool.query(
+                `SELECT email FROM users WHERE id = $1`,
+                [rp.userId]
+              );
+              if (userResult.rows.length > 0) {
+                participantEmail = userResult.rows[0].email?.toLowerCase() || '';
               }
-              
-              if (participantEmail && participantEmail !== booking.user_email?.toLowerCase()) {
-                try {
-                  await pool.query(`
-                    INSERT INTO booking_members (booking_id, user_email, slot_number, is_primary, created_at)
-                    VALUES ($1, $2, $3, false, NOW())
-                    ON CONFLICT DO NOTHING
-                  `, [bookingId, participantEmail, slotNumber]);
-                  slotNumber++;
-                  console.log(`[Dev Confirm] Added participant ${participantEmail} to booking_members for booking ${bookingId}`);
-                } catch (memberError) {
-                  console.error(`[Dev Confirm] Failed to add participant to booking_members:`, memberError);
-                }
+            }
+            
+            if (participantEmail && participantEmail !== booking.user_email?.toLowerCase()) {
+              try {
+                await pool.query(`
+                  INSERT INTO booking_members (booking_id, user_email, slot_number, is_primary, created_at)
+                  VALUES ($1, $2, $3, false, NOW())
+                  ON CONFLICT DO NOTHING
+                `, [bookingId, participantEmail, slotNumber]);
+                slotNumber++;
+                console.log(`[Dev Confirm] Added participant ${participantEmail} to booking_members for booking ${bookingId}`);
+              } catch (memberError) {
+                console.error(`[Dev Confirm] Failed to add participant to booking_members:`, memberError);
               }
             }
           }

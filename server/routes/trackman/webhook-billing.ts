@@ -213,47 +213,26 @@ export async function createBookingForMember(
       } else {
         let newSessionId: number | null = null;
         try {
-          // Use ON CONFLICT to handle race conditions atomically
-          const sessionResult = await pool.query(`
-            INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
-            VALUES ($1, $2, $3, $4, $5, 'trackman', 'trackman_webhook')
-            ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL 
-            DO UPDATE SET updated_at = NOW()
-            RETURNING id
-          `, [resourceId, slotDate, startTime, endTime, trackmanBookingId]);
+          const sessionResult = await ensureSessionForBooking({
+            bookingId: pendingBookingId,
+            resourceId,
+            sessionDate: slotDate,
+            startTime,
+            endTime,
+            ownerEmail: member.email,
+            ownerName: customerName || [member.firstName, member.lastName].filter(Boolean).join(' ') || member.email,
+            trackmanBookingId,
+            source: 'trackman',
+            createdBy: 'trackman_webhook'
+          });
           
-          if (sessionResult.rows.length > 0) {
-            newSessionId = sessionResult.rows[0].id;
-          } else {
-            // Fallback: look up existing session
-            const existingSession = await pool.query(
-              `SELECT id FROM booking_sessions WHERE trackman_booking_id = $1`,
-              [trackmanBookingId]
-            );
-            newSessionId = existingSession.rows[0]?.id || null;
-          }
+          newSessionId = sessionResult.sessionId || null;
           
-          if (newSessionId) {
-            await pool.query(`UPDATE booking_requests SET session_id = $1 WHERE id = $2`, [newSessionId, pendingBookingId]);
-            
-            // Calculate slot duration from Trackman times
+          if (newSessionId && !sessionResult.error) {
             const slotDuration = startTime && endTime
               ? Math.round((new Date(`2000-01-01T${endTime}`).getTime() - 
                            new Date(`2000-01-01T${startTime}`).getTime()) / 60000)
               : 60;
-            
-            const userResult = await pool.query(
-              `SELECT id FROM users WHERE LOWER(email) = LOWER($1)`,
-              [member.email]
-            );
-            const userId = userResult.rows[0]?.id || null;
-            const memberName = customerName || [member.firstName, member.lastName].filter(Boolean).join(' ') || member.email;
-            
-            await pool.query(`
-              INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-              VALUES ($1, $2, 'owner', $3, 'pending', $4)
-              ON CONFLICT (session_id, user_id) WHERE user_id IS NOT NULL DO NOTHING
-            `, [newSessionId, userId, memberName, slotDuration]);
             
             for (let i = 1; i < playerCount; i++) {
               await pool.query(`
@@ -269,6 +248,13 @@ export async function createBookingForMember(
             
             if (feeBreakdown.totals.totalCents > 0) {
               try {
+                const userResult = await pool.query(
+                  `SELECT id FROM users WHERE LOWER(email) = LOWER($1)`,
+                  [member.email]
+                );
+                const userId = userResult.rows[0]?.id || null;
+                const memberName = customerName || [member.firstName, member.lastName].filter(Boolean).join(' ') || member.email;
+                
                 await createPrepaymentIntent({
                   sessionId: newSessionId,
                   bookingId: pendingBookingId,
@@ -284,21 +270,7 @@ export async function createBookingForMember(
             }
           }
         } catch (sessionErr) {
-          // Recovery: try to find/link existing session even if INSERT failed
-          logger.warn('[Trackman Webhook] Session creation hit error, attempting recovery', { extra: { bookingId: pendingBookingId, error: sessionErr } });
-          
-          const recoveryQuery = await pool.query(
-            `SELECT id FROM booking_sessions WHERE trackman_booking_id = $1`,
-            [trackmanBookingId]
-          );
-          
-          if (recoveryQuery.rows.length > 0) {
-            newSessionId = recoveryQuery.rows[0].id;
-            await pool.query(`UPDATE booking_requests SET session_id = $1 WHERE id = $2`, [newSessionId, pendingBookingId]);
-            logger.info('[Trackman Webhook] Recovered session for linked booking', { extra: { bookingId: pendingBookingId, sessionId: newSessionId } });
-          } else {
-            logger.error('[Trackman Webhook] CRITICAL: Could not create or find session for linked booking', { extra: { bookingId: pendingBookingId, trackmanBookingId } });
-          }
+          logger.error('[Trackman Webhook] Failed to ensure session for linked booking', { extra: { bookingId: pendingBookingId, trackmanBookingId, error: sessionErr } });
         }
       }
       
@@ -431,29 +403,22 @@ export async function createBookingForMember(
       let sessionId: number | null = null;
       
       try {
-        // Use ON CONFLICT to handle race conditions atomically
-        const sessionResult = await pool.query(`
-          INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
-          VALUES ($1, $2, $3, $4, $5, 'trackman', 'trackman_webhook')
-          ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL 
-          DO UPDATE SET updated_at = NOW()
-          RETURNING id
-        `, [resourceId, slotDate, startTime, endTime, trackmanBookingId]);
+        const sessionResult = await ensureSessionForBooking({
+          bookingId,
+          resourceId,
+          sessionDate: slotDate,
+          startTime,
+          endTime,
+          ownerEmail: member.email,
+          ownerName: memberName,
+          trackmanBookingId,
+          source: 'trackman',
+          createdBy: 'trackman_webhook'
+        });
         
-        if (sessionResult.rows.length > 0) {
-          sessionId = sessionResult.rows[0].id;
-        } else {
-          // Fallback: look up existing session
-          const existingSession = await pool.query(
-            `SELECT id FROM booking_sessions WHERE trackman_booking_id = $1`,
-            [trackmanBookingId]
-          );
-          sessionId = existingSession.rows[0]?.id || null;
-        }
+        sessionId = sessionResult.sessionId || null;
         
-        if (sessionId) {
-          await pool.query(`UPDATE booking_requests SET session_id = $1 WHERE id = $2`, [sessionId, bookingId]);
-          
+        if (sessionId && !sessionResult.error) {
           try {
             const ownerTier = await getMemberTierByEmail(member.email, { allowInactive: true });
             
@@ -512,23 +477,10 @@ export async function createBookingForMember(
             });
             
             try {
-              // Calculate slot duration from Trackman times
               const slotDuration = startTime && endTime
                 ? Math.round((new Date(`2000-01-01T${endTime}`).getTime() - 
                              new Date(`2000-01-01T${startTime}`).getTime()) / 60000)
                 : 60;
-              
-              const userResult = await pool.query(
-                `SELECT id FROM users WHERE LOWER(email) = LOWER($1)`,
-                [member.email]
-              );
-              const userId = userResult.rows[0]?.id || null;
-              
-              await pool.query(`
-                INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-                VALUES ($1, $2, 'owner', $3, 'pending', $4)
-                ON CONFLICT (session_id, user_id) WHERE user_id IS NOT NULL DO NOTHING
-              `, [sessionId, userId, memberName, slotDuration]);
               
               for (let i = 1; i < playerCount; i++) {
                 await pool.query(`
@@ -538,11 +490,11 @@ export async function createBookingForMember(
               }
               
               await recalculateSessionFees(sessionId);
-              logger.info('[Trackman Webhook] Created participants and cached fees', {
+              logger.info('[Trackman Webhook] Created guest participants and cached fees', {
                 extra: { sessionId, playerCount, slotDuration }
               });
             } catch (participantErr) {
-              logger.warn('[Trackman Webhook] Failed to create participants (non-blocking)', { 
+              logger.warn('[Trackman Webhook] Failed to create guest participants (non-blocking)', { 
                 extra: { sessionId, error: participantErr } 
               });
             }
@@ -553,21 +505,7 @@ export async function createBookingForMember(
           }
         }
       } catch (sessionErr) {
-        // Recovery: try to find/link existing session even if INSERT failed
-        logger.warn('[Trackman Webhook] Session creation hit error, attempting recovery', { extra: { bookingId, error: sessionErr } });
-        
-        const recoveryQuery = await pool.query(
-          `SELECT id FROM booking_sessions WHERE trackman_booking_id = $1`,
-          [trackmanBookingId]
-        );
-        
-        if (recoveryQuery.rows.length > 0) {
-          sessionId = recoveryQuery.rows[0].id;
-          await pool.query(`UPDATE booking_requests SET session_id = $1 WHERE id = $2`, [sessionId, bookingId]);
-          logger.info('[Trackman Webhook] Recovered session for booking', { extra: { bookingId, sessionId } });
-        } else {
-          logger.error('[Trackman Webhook] CRITICAL: Could not create or find session for booking', { extra: { bookingId, trackmanBookingId } });
-        }
+        logger.error('[Trackman Webhook] Failed to ensure session for booking', { extra: { bookingId, trackmanBookingId, error: sessionErr } });
       }
       
       const bayNameForNotification = `Bay ${resourceId}`;

@@ -109,22 +109,39 @@ export async function ensureSessionForBooking(params: {
   const q = client || pool;
 
   const attemptSessionCreation = async (): Promise<{ sessionId: number; created: boolean }> => {
-    const existingSession = await q.query(
-      `SELECT id FROM booking_sessions
-       WHERE resource_id = $1 AND session_date = $2 AND start_time = $3
-       LIMIT 1`,
-      [params.resourceId, params.sessionDate, params.startTime]
-    );
-
-    let sessionId: number;
+    let sessionId: number | null = null;
     let created = false;
 
-    if (existingSession.rows.length > 0) {
-      sessionId = existingSession.rows[0].id;
-    } else {
+    if (params.trackmanBookingId) {
+      const trackmanMatch = await q.query(
+        `SELECT id FROM booking_sessions
+         WHERE trackman_booking_id = $1
+         LIMIT 1`,
+        [params.trackmanBookingId]
+      );
+      if (trackmanMatch.rows.length > 0) {
+        sessionId = trackmanMatch.rows[0].id;
+      }
+    }
+
+    if (!sessionId) {
+      const existingSession = await q.query(
+        `SELECT id FROM booking_sessions
+         WHERE resource_id = $1 AND session_date = $2 AND start_time = $3
+         LIMIT 1`,
+        [params.resourceId, params.sessionDate, params.startTime]
+      );
+      if (existingSession.rows.length > 0) {
+        sessionId = existingSession.rows[0].id;
+      }
+    }
+
+    if (!sessionId) {
       const insertResult = await q.query(
         `INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+         ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL
+         DO UPDATE SET updated_at = NOW()
          RETURNING id`,
         [params.resourceId, params.sessionDate, params.startTime, params.endTime, params.trackmanBookingId || null, params.source, params.createdBy]
       );
