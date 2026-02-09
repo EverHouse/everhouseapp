@@ -1547,6 +1547,8 @@ const EventsAdminContent: React.FC = () => {
     );
 };
 
+const INITIAL_DISPLAY_COUNT = 20;
+
 const WellnessAdminContent: React.FC = () => {
     const queryClient = useQueryClient();
     const [activeCategory, setActiveCategory] = useState('all');
@@ -1566,9 +1568,16 @@ const WellnessAdminContent: React.FC = () => {
     const [classToDelete, setClassToDelete] = useState<WellnessClass | null>(null);
     const [deletingClassId, setDeletingClassId] = useState<number | null>(null);
     const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+    const [showAllUpcoming, setShowAllUpcoming] = useState(false);
+    const [showAllPast, setShowAllPast] = useState(false);
     const { showToast } = useToast();
 
     const categories = ['Classes', 'MedSpa', 'Recovery', 'Therapy', 'Nutrition', 'Personal Training', 'Mindfulness', 'Outdoors', 'General'];
+
+    useEffect(() => {
+        setShowAllUpcoming(false);
+        setShowAllPast(false);
+    }, [activeCategory]);
 
     const markTouched = (field: string) => {
         setTouchedFields(prev => new Set(prev).add(field));
@@ -1985,7 +1994,7 @@ const WellnessAdminContent: React.FC = () => {
                                 <h3 className="font-bold text-primary dark:text-white">Upcoming ({upcomingClasses.length})</h3>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {upcomingClasses.map((cls, index) => (
+                                {upcomingClasses.slice(0, showAllUpcoming ? upcomingClasses.length : INITIAL_DISPLAY_COUNT).map((cls, index) => (
                                     <div key={cls.id} onClick={() => openEdit(cls)} className={`bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 flex flex-col gap-3 relative overflow-hidden cursor-pointer hover:border-primary/30 transition-all animate-list-item-delay-${Math.min(index + 1, 10)}`}>
                                         <div className="flex gap-4">
                                             <div className="w-20 h-20 rounded-lg bg-[#CCB8E4]/20 dark:bg-[#CCB8E4]/10 flex-shrink-0 overflow-hidden flex items-center justify-center">
@@ -2020,6 +2029,11 @@ const WellnessAdminContent: React.FC = () => {
                                     </div>
                                 ))}
                             </div>
+                            {!showAllUpcoming && upcomingClasses.length > INITIAL_DISPLAY_COUNT && (
+                                <button onClick={() => setShowAllUpcoming(true)} className="w-full mt-3 py-2.5 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 text-sm font-medium text-primary dark:text-white hover:bg-gray-50 dark:hover:bg-white/15 transition-colors">
+                                    Show all {upcomingClasses.length} classes
+                                </button>
+                            )}
                         </div>
                     )}
                     
@@ -2030,7 +2044,7 @@ const WellnessAdminContent: React.FC = () => {
                                 <h3 className="font-bold text-gray-500 dark:text-gray-400">Past ({pastClasses.length})</h3>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-70">
-                                {pastClasses.map((cls, index) => (
+                                {pastClasses.slice(0, showAllPast ? pastClasses.length : INITIAL_DISPLAY_COUNT).map((cls, index) => (
                                     <div key={cls.id} onClick={() => openEdit(cls)} className={`bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 flex flex-col gap-3 relative overflow-hidden cursor-pointer hover:border-primary/30 transition-all animate-list-item-delay-${Math.min(index + 1, 10)}`}>
                                         <div className="flex gap-4">
                                             <div className="w-20 h-20 rounded-lg bg-[#CCB8E4]/20 dark:bg-[#CCB8E4]/10 flex-shrink-0 overflow-hidden flex items-center justify-center">
@@ -2063,6 +2077,11 @@ const WellnessAdminContent: React.FC = () => {
                                     </div>
                                 ))}
                             </div>
+                            {!showAllPast && pastClasses.length > INITIAL_DISPLAY_COUNT && (
+                                <button onClick={() => setShowAllPast(true)} className="w-full mt-3 py-2.5 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 text-sm font-medium text-primary dark:text-white hover:bg-gray-50 dark:hover:bg-white/15 transition-colors">
+                                    Show all {pastClasses.length} past classes
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>

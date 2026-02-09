@@ -13,6 +13,14 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.11.3",
+    date: "2026-02-09",
+    title: "Wellness Tab Mobile Fix",
+    changes: [
+      "Fix: Wellness tab on the Calendar page no longer crashes on mobile — classes now load in batches of 20 with a 'Show more' button instead of rendering all 370+ at once",
+    ],
+  },
+  {
     version: "7.11.2",
     date: "2026-02-09",
     title: "Better Trackman Notification Messages",
