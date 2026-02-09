@@ -10,6 +10,7 @@ import { db } from '../../db';
 import { resources, dayPassPurchases, passRedemptionLogs } from '../../../shared/schema';
 import { eq } from 'drizzle-orm';
 import { getSessionUser } from '../../types/session';
+import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 
 const router = Router();
 
@@ -225,6 +226,25 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
         createdAt: dbRow.created_at,
         updatedAt: dbRow.updated_at
       };
+
+      // Ensure session exists for approved day pass bookings
+      if (isDayPassPayment && row.resourceId) {
+        try {
+          await ensureSessionForBooking({
+            bookingId: row.id,
+            resourceId: row.resourceId,
+            sessionDate: request_date,
+            startTime: start_time,
+            endTime: row.endTime || end_time,
+            ownerEmail: user_email.toLowerCase(),
+            ownerName: user_name || row.userName || undefined,
+            source: 'staff_manual',
+            createdBy: 'staff_manual_day_pass'
+          });
+        } catch (sessionErr) {
+          console.error('[StaffManualBooking] Failed to ensure session:', sessionErr);
+        }
+      }
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;

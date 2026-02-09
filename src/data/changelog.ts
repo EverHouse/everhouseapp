@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.11.0",
+    date: "2026-02-09",
+    title: "Booking Session Integrity Hardening",
+    isMajor: true,
+    changes: [
+      "Fix: Created centralized session-creation helper used across all booking status paths — ensures every approved/confirmed booking always gets a billing session",
+      "Fix: Closed 5 code paths where bookings could become approved without billing sessions — Trackman auto-match (2 paths), resource confirmation, conference room auto-confirm, and staff day pass bookings",
+      "Fix: Upgraded 2 Trackman webhook paths that silently ignored session creation failures — bookings now revert to pending instead of staying approved without a session",
+      "Fix: All 7 hardened paths use dedup logic so existing sessions are reused instead of creating duplicates",
+      "Improvement: Eliminated root cause of 'active bookings without sessions' data integrity issue that was blocking revenue tracking",
+    ],
+  },
+  {
     version: "7.10.16",
     date: "2026-02-08",
     title: "Guest Pass: Only Apply When Guest Info Entered",

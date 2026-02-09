@@ -92,6 +92,79 @@ export async function createSession(
   }
 }
 
+export async function ensureSessionForBooking(params: {
+  bookingId: number;
+  resourceId: number;
+  sessionDate: string;
+  startTime: string;
+  endTime: string;
+  ownerEmail: string;
+  ownerName?: string;
+  ownerUserId?: string;
+  trackmanBookingId?: string;
+  source: string;
+  createdBy: string;
+}, client?: any): Promise<{ sessionId: number; created: boolean; error?: string }> {
+  const q = client || pool;
+  try {
+    const existingSession = await q.query(
+      `SELECT id FROM booking_sessions
+       WHERE resource_id = $1 AND session_date = $2 AND start_time = $3
+       LIMIT 1`,
+      [params.resourceId, params.sessionDate, params.startTime]
+    );
+
+    let sessionId: number;
+    let created = false;
+
+    if (existingSession.rows.length > 0) {
+      sessionId = existingSession.rows[0].id;
+    } else {
+      const insertResult = await q.query(
+        `INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+         RETURNING id`,
+        [params.resourceId, params.sessionDate, params.startTime, params.endTime, params.trackmanBookingId || null, params.source, params.createdBy]
+      );
+      sessionId = insertResult.rows[0].id;
+      created = true;
+    }
+
+    const existingOwner = await q.query(
+      `SELECT id FROM booking_participants
+       WHERE session_id = $1 AND participant_type = 'owner'
+       LIMIT 1`,
+      [sessionId]
+    );
+
+    if (existingOwner.rows.length === 0) {
+      let slotDuration = 60;
+      try {
+        const [startH, startM] = params.startTime.split(':').map(Number);
+        const [endH, endM] = params.endTime.split(':').map(Number);
+        slotDuration = (endH * 60 + endM) - (startH * 60 + startM);
+        if (slotDuration <= 0) slotDuration = 60;
+      } catch {}
+
+      await q.query(
+        `INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, slot_duration, invite_status, invited_at)
+         VALUES ($1, $2, 'owner', $3, $4, 'accepted', NOW())`,
+        [sessionId, params.ownerUserId || null, params.ownerName || params.ownerEmail, slotDuration]
+      );
+    }
+
+    await q.query(
+      `UPDATE booking_requests SET session_id = $1, updated_at = NOW() WHERE id = $2`,
+      [sessionId, params.bookingId]
+    );
+
+    return { sessionId, created };
+  } catch (error: any) {
+    console.error('[ensureSessionForBooking]', error);
+    return { sessionId: 0, created: false, error: error.message || String(error) };
+  }
+}
+
 export async function linkParticipants(
   sessionId: number,
   participants: ParticipantInput[],

@@ -6,7 +6,7 @@ import { notifyMember } from '../../core/notificationService';
 import { refundGuestPass } from '../guestPasses';
 import { calculateFullSessionBilling } from '../../core/bookingService/usageCalculator';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
-import { recordUsage, createSessionWithUsageTracking } from '../../core/bookingService/sessionManager';
+import { recordUsage, createSessionWithUsageTracking, ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { getMemberTierByEmail } from '../../core/tierService';
 import { linkAndNotifyParticipants } from '../../core/bookingEvents';
 import { calculateDurationMinutes, NormalizedBookingFields } from './webhook-helpers';
@@ -892,6 +892,24 @@ export async function tryMatchByBayDateTime(
       }
     });
     
+    // Ensure session exists for newly approved booking
+    try {
+      await ensureSessionForBooking({
+        bookingId,
+        resourceId,
+        sessionDate: slotDate,
+        startTime: booking.start_time,
+        endTime: booking.end_time,
+        ownerEmail: memberEmail,
+        ownerName: memberName || undefined,
+        trackmanBookingId,
+        source: 'trackman',
+        createdBy: 'trackman_auto_match'
+      });
+    } catch (sessionErr) {
+      logger.warn('[Trackman Webhook] Failed to ensure session for bay/date/time match', { extra: { bookingId, error: sessionErr } });
+    }
+
     return { matched: true, bookingId, memberEmail, memberName };
   } catch (e) {
     logger.error('[Trackman Webhook] Failed to match by bay/date/time', { error: e as Error });

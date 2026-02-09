@@ -26,6 +26,7 @@ import {
   createUnmatchedBookingRequest,
 } from './webhook-handlers';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
+import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { 
   updateBaySlotCache, 
   linkByExternalBookingId,
@@ -960,6 +961,24 @@ router.post('/api/admin/trackman-webhook/:eventId/auto-match', isStaffOrAdmin, a
       [match.id, eventId, event.matched_booking_id]
     );
     
+    // Ensure session exists for newly approved booking
+    try {
+      await ensureSessionForBooking({
+        bookingId: match.id,
+        resourceId,
+        sessionDate: pacificDate,
+        startTime: match.start_time || pacificStartTime,
+        endTime: match.end_time || pacificStartTime,
+        ownerEmail: match.user_email,
+        ownerName: match.member_name || undefined,
+        trackmanBookingId,
+        source: 'trackman',
+        createdBy: 'staff_auto_match'
+      });
+    } catch (sessionErr) {
+      logger.warn('[Trackman Auto-Match] Failed to ensure session', { extra: { bookingId: match.id, error: sessionErr } });
+    }
+
     try {
       await notifyMemberBookingConfirmed(
         match.user_email,

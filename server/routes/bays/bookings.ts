@@ -19,6 +19,7 @@ import { getGuestPassesRemaining } from '../guestPasses';
 import { computeFeeBreakdown, getEffectivePlayerCount } from '../../core/billing/unifiedFeeService';
 import { PRICING } from '../../core/billing/pricingConfig';
 import { createGuestPassHold, releaseGuestPassHold } from '../../core/billing/guestPassHoldService';
+import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 
 const router = Router();
 
@@ -706,6 +707,25 @@ router.post('/api/booking-requests', async (req, res) => {
       client.release();
     }
     
+    // Ensure session exists for auto-confirmed conference room bookings
+    if (isConferenceRoom && row.resourceId) {
+      try {
+        await ensureSessionForBooking({
+          bookingId: row.id,
+          resourceId: row.resourceId,
+          sessionDate: request_date,
+          startTime: start_time,
+          endTime: row.endTime || end_time,
+          ownerEmail: user_email.toLowerCase(),
+          ownerName: user_name || undefined,
+          source: 'member_request',
+          createdBy: 'conference_room_auto_confirm'
+        });
+      } catch (sessionErr) {
+        console.error('[Conference Room] Failed to ensure session:', sessionErr);
+      }
+    }
+
     let resourceName = 'Bay';
     if (row.resourceId) {
       try {

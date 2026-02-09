@@ -23,6 +23,7 @@ import { logFromRequest, logMemberAction } from '../core/auditLog';
 import { recalculateSessionFees } from '../core/billing/unifiedFeeService';
 import { cancelPaymentIntent, getStripeClient } from '../core/stripe';
 import { createPrepaymentIntent } from '../core/billing/prepaymentService';
+import { ensureSessionForBooking } from '../core/bookingService/sessionManager';
 
 interface CancellationCascadeResult {
   participantsNotified: number;
@@ -681,6 +682,31 @@ router.put('/api/bookings/:id/approve', isStaffOrAdmin, async (req, res) => {
         .where(eq(bookingRequests.id, bookingId))
         .returning();
       
+      // Ensure session exists for confirmed booking
+      if (updated.resourceId) {
+        try {
+          const dateStr = typeof updated.requestDate === 'string'
+            ? updated.requestDate
+            : updated.requestDate instanceof Date
+              ? updated.requestDate.toISOString().split('T')[0]
+              : '';
+          await ensureSessionForBooking({
+            bookingId: updated.id,
+            resourceId: updated.resourceId,
+            sessionDate: dateStr,
+            startTime: updated.startTime || '',
+            endTime: updated.endTime || '',
+            ownerEmail: updated.userEmail || '',
+            ownerName: updated.userName || undefined,
+            trackmanBookingId: updated.trackmanBookingId || undefined,
+            source: 'member_request',
+            createdBy: 'resource_confirmation'
+          });
+        } catch (sessionErr) {
+          console.error('[Resource Confirmation] Failed to ensure session:', sessionErr);
+        }
+      }
+
       return updated;
     });
     

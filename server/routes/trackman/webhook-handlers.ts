@@ -29,7 +29,7 @@ import {
 } from './webhook-billing';
 import { refundGuestPass } from '../guestPasses';
 import { sendPushNotificationToStaff } from '../push';
-import { createSessionWithUsageTracking } from '../../core/bookingService/sessionManager';
+import { createSessionWithUsageTracking, ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { logSystemAction } from '../../core/auditLog';
 import { createPrepaymentIntent } from '../../core/billing/prepaymentService';
@@ -39,7 +39,7 @@ export async function tryAutoApproveBooking(
   slotDate: string,
   startTime: string,
   trackmanBookingId: string
-): Promise<{ matched: boolean; bookingId?: number; resourceId?: number; sessionId?: number }> {
+): Promise<{ matched: boolean; bookingId?: number; resourceId?: number; sessionId?: number; sessionFailed?: boolean }> {
   try {
     const result = await pool.query(
       `SELECT br.id, br.user_email, br.user_name, br.staff_notes, br.resource_id, 
@@ -95,78 +95,31 @@ export async function tryAutoApproveBooking(
     let createdSessionId: number | undefined;
     
     if (!pendingBooking.session_id && resourceId) {
-      try {
-        const sessionResult = await createSessionWithUsageTracking(
-          {
-            ownerEmail: pendingBooking.user_email,
-            resourceId: resourceId,
-            sessionDate: slotDate,
-            startTime: pendingBooking.start_time,
-            endTime: pendingBooking.end_time,
-            durationMinutes: pendingBooking.duration_minutes || 60,
-            participants: [{
-              userId: pendingBooking.user_id || undefined,
-              participantType: 'owner',
-              displayName: pendingBooking.user_name || pendingBooking.user_email
-            }],
-            trackmanBookingId: trackmanBookingId
-          },
-          'trackman_webhook'
-        );
-        
-        if (sessionResult.success && sessionResult.session) {
-          createdSessionId = sessionResult.session.id;
-          
-          await pool.query(
-            `UPDATE booking_requests SET session_id = $1 WHERE id = $2`,
-            [createdSessionId, bookingId]
-          );
-          
-          try {
-            const breakdown = await recalculateSessionFees(createdSessionId, 'approval');
-            logger.info('[Trackman Webhook] Applied unified fees for auto-approved session', {
-              extra: { 
-                sessionId: createdSessionId, 
-                bookingId, 
-                totalCents: breakdown.totals.totalCents 
-              }
-            });
-            
-            if (breakdown.totals.totalCents > 0) {
-              try {
-                await createPrepaymentIntent({
-                  sessionId: createdSessionId,
-                  bookingId,
-                  userId: pendingBooking.user_id || null,
-                  userEmail: pendingBooking.user_email,
-                  userName: pendingBooking.user_name || pendingBooking.user_email,
-                  totalFeeCents: breakdown.totals.totalCents,
-                  feeBreakdown: { overageCents: breakdown.totals.overageCents, guestCents: breakdown.totals.guestCents }
-                });
-              } catch (prepayError) {
-                logger.warn('[Trackman Webhook] Failed to create prepayment intent', {
-                  extra: { sessionId: createdSessionId, error: prepayError }
-                });
-              }
-            }
-          } catch (feeError) {
-            logger.warn('[Trackman Webhook] Failed to calculate fees for auto-approved session', {
-              extra: { sessionId: createdSessionId, error: feeError }
-            });
-          }
-          
-          logger.info('[Trackman Webhook] Created session for auto-approved booking', {
-            extra: { sessionId: createdSessionId, bookingId, trackmanBookingId }
-          });
-        } else {
-          logger.warn('[Trackman Webhook] Session creation failed for auto-approved booking', {
-            extra: { bookingId, error: sessionResult.error }
-          });
-        }
-      } catch (sessionError) {
-        logger.warn('[Trackman Webhook] Failed to create session for auto-approved booking', {
-          extra: { bookingId, error: sessionError }
+      const sessionResult = await ensureSessionForBooking({
+        bookingId,
+        resourceId,
+        sessionDate: slotDate,
+        startTime: pendingBooking.start_time,
+        endTime: pendingBooking.end_time,
+        ownerEmail: pendingBooking.user_email,
+        ownerName: pendingBooking.user_name || undefined,
+        ownerUserId: pendingBooking.user_id || undefined,
+        trackmanBookingId,
+        source: 'trackman',
+        createdBy: 'trackman_webhook'
+      });
+
+      if (sessionResult.sessionId) {
+        createdSessionId = sessionResult.sessionId;
+      } else {
+        logger.warn('[Trackman Webhook] Session creation failed for matched pending booking, reverting to pending', {
+          extra: { bookingId, trackmanBookingId, error: sessionResult.error }
         });
+        await pool.query(
+          `UPDATE booking_requests SET status = 'pending', updated_at = NOW() WHERE id = $1`,
+          [bookingId]
+        );
+        return { matched: true, bookingId, sessionFailed: true };
       }
     }
     
@@ -613,21 +566,29 @@ export async function createUnmatchedBookingRequest(
         return { created: false, bookingId };
       }
       
-      // Only create session for newly inserted bookings
-      try {
-        const sessionResult = await pool.query(`
-          INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by)
-          VALUES ($1, $2, $3, $4, $5, 'trackman', 'trackman_webhook')
-          RETURNING id
-        `, [resourceId, slotDate, startTime, endTime, trackmanBookingId]);
-        
-        if (sessionResult.rows.length > 0) {
-          await pool.query(`UPDATE booking_requests SET session_id = $1 WHERE id = $2`, 
-            [sessionResult.rows[0].id, bookingId]);
+      if (bookingStatus === 'approved') {
+        const sessionResult = await ensureSessionForBooking({
+          bookingId,
+          resourceId: resourceId!,
+          sessionDate: slotDate,
+          startTime,
+          endTime,
+          ownerEmail: customerEmail || '',
+          ownerName: customerName || 'Unknown (Trackman)',
+          trackmanBookingId,
+          source: 'trackman',
+          createdBy: 'trackman_webhook'
+        });
+
+        if (!sessionResult.sessionId) {
+          logger.warn('[Trackman Webhook] Session creation failed for unmatched booking, reverting to pending', {
+            extra: { bookingId, trackmanBookingId, error: sessionResult.error }
+          });
+          await pool.query(
+            `UPDATE booking_requests SET status = 'pending', updated_at = NOW() WHERE id = $1`,
+            [bookingId]
+          );
         }
-      } catch (sessionErr) {
-        logger.warn('[Trackman Webhook] Failed to create billing session for unmatched booking', 
-          { extra: { bookingId, error: sessionErr } });
       }
       
       logger.info('[Trackman Webhook] Created unmatched booking_request to block calendar', {
