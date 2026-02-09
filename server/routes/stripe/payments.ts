@@ -969,7 +969,6 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
         amount: authoritativeAmountCents
       });
 
-      console.log(`[Stripe] Staff ${staffEmail} charged saved card (${cardBrand} ****${cardLast4}) for ${member.email}: $${(authoritativeAmountCents / 100).toFixed(2)}`);
 
       res.json({ 
         success: true, 
