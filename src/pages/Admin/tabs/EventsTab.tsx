@@ -665,6 +665,8 @@ const EventsAdminContent: React.FC = () => {
     const [success, setSuccess] = useState<string | null>(null);
     
     const [needsReviewExpanded, setNeedsReviewExpanded] = useState(true);
+    const [showPastEvents, setShowPastEvents] = useState(false);
+    const [showAllPastEvents, setShowAllPastEvents] = useState(false);
 
     const { data: events = [], isLoading } = useQuery({
         queryKey: ['admin-events'],
@@ -1452,12 +1454,18 @@ const EventsAdminContent: React.FC = () => {
                     
                     {pastEvents.length > 0 && (
                         <div className="animate-slide-up-stagger" style={{ '--stagger-index': upcomingEvents.length + 2 } as React.CSSProperties}>
-                            <div className="flex items-center gap-2 mb-3">
+                            <button 
+                                onClick={() => setShowPastEvents(!showPastEvents)}
+                                className="flex items-center gap-2 mb-3 w-full text-left group"
+                            >
                                 <span aria-hidden="true" className="material-symbols-outlined text-gray-600 dark:text-gray-500">history</span>
                                 <h3 className="font-bold text-gray-500 dark:text-gray-400">Past ({pastEvents.length})</h3>
-                            </div>
+                                <span aria-hidden="true" className={`material-symbols-outlined text-gray-400 dark:text-gray-500 text-[18px] transition-transform ${showPastEvents ? 'rotate-180' : ''}`}>expand_more</span>
+                            </button>
+                            {showPastEvents && (
+                            <>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-70">
-                                {pastEvents.map((event, index) => {
+                                {pastEvents.slice(0, showAllPastEvents ? pastEvents.length : 20).map((event, index) => {
                                     const isPending = pendingEventIds.has(event.id);
                                     return (
                                     <div key={event.id} onClick={() => openEdit(event)} className={`bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border flex flex-col gap-3 relative overflow-hidden transition-all animate-slide-up-stagger ${
@@ -1526,6 +1534,13 @@ const EventsAdminContent: React.FC = () => {
                                     );
                                 })}
                             </div>
+                            {!showAllPastEvents && pastEvents.length > 20 && (
+                                <button onClick={() => setShowAllPastEvents(true)} className="w-full mt-3 py-2.5 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 text-sm font-medium text-primary dark:text-white hover:bg-gray-50 dark:hover:bg-white/15 transition-colors">
+                                    Show all {pastEvents.length} past events
+                                </button>
+                            )}
+                            </>
+                            )}
                         </div>
                     )}
                 </div>
@@ -1570,6 +1585,7 @@ const WellnessAdminContent: React.FC = () => {
     const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
     const [showAllUpcoming, setShowAllUpcoming] = useState(false);
     const [showAllPast, setShowAllPast] = useState(false);
+    const [showPastClasses, setShowPastClasses] = useState(false);
     const { showToast } = useToast();
 
     const categories = ['Classes', 'MedSpa', 'Recovery', 'Therapy', 'Nutrition', 'Personal Training', 'Mindfulness', 'Outdoors', 'General'];
@@ -2039,10 +2055,16 @@ const WellnessAdminContent: React.FC = () => {
                     
                     {pastClasses.length > 0 && (
                         <div className="animate-content-enter-delay-3">
-                            <div className="flex items-center gap-2 mb-3">
+                            <button 
+                                onClick={() => setShowPastClasses(!showPastClasses)}
+                                className="flex items-center gap-2 mb-3 w-full text-left group"
+                            >
                                 <span aria-hidden="true" className="material-symbols-outlined text-gray-600 dark:text-gray-500">history</span>
                                 <h3 className="font-bold text-gray-500 dark:text-gray-400">Past ({pastClasses.length})</h3>
-                            </div>
+                                <span aria-hidden="true" className={`material-symbols-outlined text-gray-400 dark:text-gray-500 text-[18px] transition-transform ${showPastClasses ? 'rotate-180' : ''}`}>expand_more</span>
+                            </button>
+                            {showPastClasses && (
+                            <>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-70">
                                 {pastClasses.slice(0, showAllPast ? pastClasses.length : INITIAL_DISPLAY_COUNT).map((cls, index) => (
                                     <div key={cls.id} onClick={() => openEdit(cls)} className={`bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 flex flex-col gap-3 relative overflow-hidden cursor-pointer hover:border-primary/30 transition-all animate-list-item-delay-${Math.min(index + 1, 10)}`}>
@@ -2081,6 +2103,8 @@ const WellnessAdminContent: React.FC = () => {
                                 <button onClick={() => setShowAllPast(true)} className="w-full mt-3 py-2.5 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 text-sm font-medium text-primary dark:text-white hover:bg-gray-50 dark:hover:bg-white/15 transition-colors">
                                     Show all {pastClasses.length} past classes
                                 </button>
+                            )}
+                            </>
                             )}
                         </div>
                     )}

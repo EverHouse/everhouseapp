@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.11.4",
+    date: "2026-02-09",
+    title: "Past Events & Wellness Hidden by Default",
+    changes: [
+      "Improvement: Past events and past wellness classes are now collapsed by default — tap the 'Past' header to reveal them",
+      "Improvement: Past events also load in batches of 20 with a 'Show more' button, matching the wellness tab behavior",
+    ],
+  },
+  {
     version: "7.11.3",
     date: "2026-02-09",
     title: "Wellness Tab Mobile Fix",
