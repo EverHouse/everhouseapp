@@ -100,25 +100,48 @@ const UpdatesTab: React.FC = () => {
     }, [fetchNotifications]);
 
     const getStaffNotificationRoute = (notif: StaffNotification): string | null => {
-        if (notif.type === 'booking' || notif.type === 'booking_request' || 
-            notif.type === 'booking_cancelled' || notif.type === 'booking_approved' ||
-            notif.type === 'booking_declined') {
-            return '/admin/bookings';
-        }
-        if (notif.type === 'event_rsvp' || notif.type === 'event_rsvp_cancelled') {
-            return '/admin/calendar';
-        }
-        if (notif.type === 'tour_scheduled' || notif.type === 'tour_reminder') {
-            return '/admin/tours';
-        }
-        if (notif.type === 'wellness_booking' || notif.type === 'wellness_enrollment' || 
-            notif.type === 'wellness_cancellation') {
-            return '/admin/calendar';
-        }
-        if (notif.type === 'closure') {
-            return '/admin/notices';
-        }
-        return null;
+        const routeMap: Record<string, string> = {
+            booking: '/admin/bookings',
+            booking_request: '/admin/bookings',
+            booking_approved: '/admin/bookings',
+            booking_declined: '/admin/bookings',
+            booking_cancelled: '/admin/bookings',
+            booking_reminder: '/admin/bookings',
+            booking_invite: '/admin/bookings',
+            booking_pending: '/admin/bookings',
+            trackman_booking: '/admin/bookings',
+            trackman_unmatched: '/admin/trackman',
+            event: '/admin/calendar',
+            event_rsvp: '/admin/calendar',
+            event_rsvp_cancelled: '/admin/calendar',
+            event_reminder: '/admin/calendar',
+            wellness: '/admin/calendar',
+            wellness_booking: '/admin/calendar',
+            wellness_enrollment: '/admin/calendar',
+            wellness_cancellation: '/admin/calendar',
+            wellness_reminder: '/admin/calendar',
+            tour_scheduled: '/admin/tours',
+            tour_reminder: '/admin/tours',
+            tour: '/admin/tours',
+            payment_success: '/admin/financials',
+            payment_failed: '/admin/financials',
+            payment_receipt: '/admin/financials',
+            outstanding_balance: '/admin/financials',
+            fee_waived: '/admin/financials',
+            membership_renewed: '/admin/directory',
+            membership_failed: '/admin/financials',
+            membership_past_due: '/admin/financials',
+            membership_cancelled: '/admin/directory',
+            membership_terminated: '/admin/directory',
+            new_member: '/admin/directory',
+            member_status_change: '/admin/directory',
+            card_expiring: '/admin/financials',
+            day_pass: '/admin/bookings',
+            guest_pass: '/admin/bookings',
+            system: '/admin/data-integrity',
+            closure: '/admin/notices',
+        };
+        return routeMap[notif.type] || null;
     };
 
     const handleNotificationClick = async (notif: StaffNotification) => {

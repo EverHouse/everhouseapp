@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.11.1",
+    date: "2026-02-09",
+    title: "Notification Click Navigation",
+    changes: [
+      "Fix: Clicking notifications now takes you to the relevant page — Unmatched Trackman alerts go to Trackman, payment alerts go to Financials, member alerts go to Directory, system alerts go to Data Integrity, and so on",
+      "Fix: Marking individual notifications as read no longer fails with a server error",
+    ],
+  },
+  {
     version: "7.11.0",
     date: "2026-02-09",
     title: "Booking Session Integrity Hardening",

@@ -34,6 +34,7 @@ export type NotificationType =
   | 'card_expiring'
   | 'day_pass'
   | 'trackman_booking'
+  | 'trackman_unmatched'
   | 'new_member'
   | 'member_status_change'
   | 'account_deletion';

@@ -105,9 +105,8 @@ router.get('/api/notifications/count', isAuthenticated, async (req, res) => {
 router.put('/api/notifications/:id/read', isAuthenticated, async (req, res) => {
   try {
     const { id } = req.params;
-    const { user_email } = req.body;
+    const user_email = req.body?.user_email;
     
-    // Allow staff to mark notifications for any user (consistent with mark-all-read)
     const effective = await getEffectiveEmail(req, user_email);
     
     if (!effective) {
