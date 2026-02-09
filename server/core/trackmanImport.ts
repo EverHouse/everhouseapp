@@ -3767,37 +3767,46 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
   }
 
   // 2. Resolve unmatched lesson entries from the trackman_unmatched_bookings queue
-  const unmatchedResult = await pool.query(`
-    SELECT id, user_name, booking_date, start_time, end_time, bay_number, notes, trackman_booking_id
-    FROM trackman_unmatched_bookings
-    WHERE resolved_at IS NULL
-      AND (
-        LOWER(user_name) LIKE '%lesson%'
-        OR LOWER(notes) LIKE '%lesson%'
+  const unmatchedRows = await db.select({
+    id: trackmanUnmatchedBookings.id,
+    userName: trackmanUnmatchedBookings.userName,
+    bookingDate: trackmanUnmatchedBookings.bookingDate,
+    startTime: trackmanUnmatchedBookings.startTime,
+    endTime: trackmanUnmatchedBookings.endTime,
+    bayNumber: trackmanUnmatchedBookings.bayNumber,
+    notes: trackmanUnmatchedBookings.notes,
+    trackmanBookingId: trackmanUnmatchedBookings.trackmanBookingId,
+  })
+    .from(trackmanUnmatchedBookings)
+    .where(and(
+      sql`${trackmanUnmatchedBookings.resolvedAt} IS NULL`,
+      or(
+        ilike(trackmanUnmatchedBookings.userName, '%lesson%'),
+        ilike(trackmanUnmatchedBookings.notes, '%lesson%')
       )
-    LIMIT 500
-  `);
+    ))
+    .limit(500);
 
-  const unmatched = unmatchedResult.rows;
+  const unmatched = unmatchedRows;
   log(`[Lesson Cleanup] Found ${unmatched.length} unmatched lesson entries to resolve.`);
 
   for (const item of unmatched) {
-    const resourceId = parseInt(item.bay_number) || null;
+    const resourceId = parseInt(item.bayNumber) || null;
     
     if (!resourceId || resourceId <= 0) {
-      log(`[Lesson Cleanup] Skipping Unmatched Item #${item.id} - invalid bay number: ${item.bay_number}`);
+      log(`[Lesson Cleanup] Skipping Unmatched Item #${item.id} - invalid bay number: ${item.bayNumber}`);
       skipped++;
       continue;
     }
 
-    if (!item.booking_date || !item.start_time) {
+    if (!item.bookingDate || !item.startTime) {
       skipped++;
       continue;
     }
 
-    const bookingDate = item.booking_date instanceof Date 
-      ? item.booking_date.toISOString().split('T')[0]
-      : item.booking_date;
+    const bookingDate = item.bookingDate instanceof Date 
+      ? item.bookingDate.toISOString().split('T')[0]
+      : item.bookingDate;
 
     if (!dryRun) {
       // Check if block already exists
@@ -3811,11 +3820,11 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
           AND fc.notice_type = 'private_event'
           AND fc.is_active = true
         LIMIT 1
-      `, [resourceId, bookingDate, item.start_time, item.end_time || item.start_time]);
+      `, [resourceId, bookingDate, item.startTime, item.endTime || item.startTime]);
 
       if (existingBlock.rows.length === 0) {
-        const closureTitle = `Lesson: ${item.user_name || 'Unknown'}`;
-        const closureReason = `Lesson: ${item.user_name || 'Unknown'} [TM:${item.trackman_booking_id || item.id}]`;
+        const closureTitle = `Lesson: ${item.userName || 'Unknown'}`;
+        const closureReason = `Lesson: ${item.userName || 'Unknown'} [TM:${item.trackmanBookingId || item.id}]`;
         
         // Create Facility Closure
         const closureResult = await pool.query(`
@@ -3826,8 +3835,8 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
         `, [
           closureTitle,
           bookingDate,
-          item.start_time,
-          item.end_time || item.start_time,
+          item.startTime,
+          item.endTime || item.startTime,
           closureReason,
           'system_cleanup'
         ]);
@@ -3841,9 +3850,9 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
           closureResult.rows[0].id,
           resourceId,
           bookingDate,
-          item.start_time,
-          item.end_time || item.start_time,
-          `Lesson - ${item.user_name || 'Unknown'}`
+          item.startTime,
+          item.endTime || item.startTime,
+          `Lesson - ${item.userName || 'Unknown'}`
         ]);
       }
 
@@ -3857,7 +3866,7 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
       `, [item.id]);
     }
 
-    log(`[Lesson Cleanup] Resolved unmatched lesson #${item.id} (${item.user_name || 'Unknown'}).`);
+    log(`[Lesson Cleanup] Resolved unmatched lesson #${item.id} (${item.userName || 'Unknown'}).`);
     resolvedUnmatched++;
   }
 

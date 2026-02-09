@@ -3,7 +3,8 @@ import { syncCompanyToHubSpot, queuePaymentSyncToHubSpot, queueDayPassSyncToHubS
 import { pool } from '../db';
 import { db } from '../../db';
 import { groupMembers } from '../../../shared/models/hubspot-billing';
-import { eq, sql } from 'drizzle-orm';
+import { eq, sql, lt } from 'drizzle-orm';
+import { webhookProcessedEvents } from '../../../shared/models/system';
 import { notifyPaymentSuccess, notifyPaymentFailed, notifyStaffPaymentFailed, notifyMember, notifyAllStaff } from '../notificationService';
 import { sendPaymentReceiptEmail, sendPaymentFailedEmail } from '../../emails/paymentEmails';
 import { sendMembershipRenewalEmail, sendMembershipFailedEmail } from '../../emails/membershipEmails';
@@ -179,11 +180,11 @@ export async function upsertTransactionCache(params: CacheTransactionParams): Pr
 
 async function cleanupOldProcessedEvents(): Promise<void> {
   try {
-    const result = await pool.query(
-      `DELETE FROM webhook_processed_events WHERE processed_at < NOW() - INTERVAL '7 days' RETURNING id`
-    );
-    if (result.rowCount && result.rowCount > 0) {
-      console.log(`[Stripe Webhook] Cleaned up ${result.rowCount} old processed events (>${EVENT_DEDUP_WINDOW_DAYS} days)`);
+    const result = await db.delete(webhookProcessedEvents)
+      .where(lt(webhookProcessedEvents.processedAt, sql`NOW() - INTERVAL '7 days'`))
+      .returning({ id: webhookProcessedEvents.id });
+    if (result.length > 0) {
+      console.log(`[Stripe Webhook] Cleaned up ${result.length} old processed events (>${EVENT_DEDUP_WINDOW_DAYS} days)`);
     }
   } catch (err) {
     console.error('[Stripe Webhook] Error cleaning up old events:', err);

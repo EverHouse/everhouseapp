@@ -44,7 +44,11 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
     };
     const nullsLast = sortBy === 'name' || sortBy === 'totalSpent' || sortBy === 'purchaseCount' ? '' : ' NULLS LAST';
     const sortColumn = sortColumnMap[sortBy as string] || 'last_purchase_date';
-    const orderByClause = sql.raw(`${sortColumn} ${sortOrder}${nullsLast}`);
+    const validSortOrders = ['ASC', 'DESC'] as const;
+    const safeSortOrder = validSortOrders.includes(sortOrder as any) ? sortOrder : 'DESC';
+    const validColumns = [...Object.values(sortColumnMap), 'last_purchase_date'];
+    const safeSortColumn = validColumns.includes(sortColumn) ? sortColumn : 'last_purchase_date';
+    const orderByClause = sql.raw(`${safeSortColumn} ${safeSortOrder}${nullsLast}`);
     
     let sourceCondition = '';
     if (sourceFilter === 'stripe') {
