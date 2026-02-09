@@ -29,10 +29,13 @@ router.get('/api/admin/command-center', isStaffOrAdmin, async (req, res) => {
       pendingToursData,
       recentActivityData
     ] = await Promise.all([
-      // Count pending bookings
+      // Count pending bookings (exclude unmatched Trackman bookings)
       db.select({ count: count() })
         .from(bookingRequests)
-        .where(eq(bookingRequests.status, 'pending_approval')),
+        .where(and(
+          eq(bookingRequests.status, 'pending_approval'),
+          sql`(${bookingRequests.isUnmatched} = false OR ${bookingRequests.isUnmatched} IS NULL)`
+        )),
       
       // Pending requests with user and resource info
       db.select({
@@ -50,11 +53,14 @@ router.get('/api/admin/command-center', isStaffOrAdmin, async (req, res) => {
         .from(bookingRequests)
         .leftJoin(users, eq(users.id, bookingRequests.userId))
         .leftJoin(resources, eq(resources.id, bookingRequests.resourceId))
-        .where(inArray(bookingRequests.status, ['pending', 'pending_approval']))
+        .where(and(
+          inArray(bookingRequests.status, ['pending', 'pending_approval']),
+          sql`(${bookingRequests.isUnmatched} = false OR ${bookingRequests.isUnmatched} IS NULL)`
+        ))
         .orderBy(desc(bookingRequests.createdAt))
         .limit(20),
       
-      // Today's bookings
+      // Today's bookings (exclude unmatched Trackman bookings)
       db.select({
         id: bookingRequests.id,
         requestDate: bookingRequests.requestDate,
@@ -72,7 +78,8 @@ router.get('/api/admin/command-center', isStaffOrAdmin, async (req, res) => {
         .leftJoin(users, eq(users.id, bookingRequests.userId))
         .where(and(
           eq(bookingRequests.requestDate, today),
-          notInArray(bookingRequests.status, ['cancelled', 'declined'])
+          notInArray(bookingRequests.status, ['cancelled', 'declined']),
+          sql`(${bookingRequests.isUnmatched} = false OR ${bookingRequests.isUnmatched} IS NULL)`
         ))
         .orderBy(asc(bookingRequests.startTime)),
       
@@ -160,13 +167,17 @@ router.get('/api/admin/dashboard-summary', isStaffOrAdmin, async (req, res) => {
     const [pendingBookings, todaysBookings, activeMembers, pendingTours] = await Promise.all([
       db.select({ count: count() })
         .from(bookingRequests)
-        .where(eq(bookingRequests.status, 'pending')),
+        .where(and(
+          eq(bookingRequests.status, 'pending'),
+          sql`(${bookingRequests.isUnmatched} = false OR ${bookingRequests.isUnmatched} IS NULL)`
+        )),
       
       db.select({ count: count() })
         .from(bookingRequests)
         .where(and(
           eq(bookingRequests.requestDate, today),
-          eq(bookingRequests.status, 'approved')
+          eq(bookingRequests.status, 'approved'),
+          sql`(${bookingRequests.isUnmatched} = false OR ${bookingRequests.isUnmatched} IS NULL)`
         )),
       
       db.select({ count: count() })
@@ -296,7 +307,8 @@ router.get('/api/admin/todays-bookings', isStaffOrAdmin, async (req, res) => {
       .leftJoin(users, eq(users.id, bookingRequests.userId))
       .where(and(
         eq(bookingRequests.requestDate, today),
-        notInArray(bookingRequests.status, ['cancelled', 'declined'])
+        notInArray(bookingRequests.status, ['cancelled', 'declined']),
+        sql`(${bookingRequests.isUnmatched} = false OR ${bookingRequests.isUnmatched} IS NULL)`
       ))
       .orderBy(asc(bookingRequests.startTime));
     

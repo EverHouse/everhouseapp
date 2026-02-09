@@ -55,6 +55,13 @@ router.get('/api/booking-requests', async (req, res) => {
     
     const conditions: any[] = [];
     
+    conditions.push(
+      or(
+        eq(bookingRequests.isUnmatched, false),
+        sql`${bookingRequests.isUnmatched} IS NULL`
+      )
+    );
+    
     if (user_email && !include_all) {
       const userEmailLower = (user_email as string).toLowerCase();
       conditions.push(

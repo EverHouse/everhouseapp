@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.11.5",
+    date: "2026-02-09",
+    title: "Fix Unknown Trackman Bookings in Request Queue",
+    changes: [
+      "Fix: Unmatched Trackman webhook bookings no longer appear as pending requests in the Bookings page — they belong only in the Trackman Needs Assignment area",
+      "Fix: Command Center pending count and today's bookings no longer include unmatched Trackman entries",
+      "Fix: Calendar approved bookings view no longer shows unmatched Trackman bookings",
+    ],
+  },
+  {
     version: "7.11.4",
     date: "2026-02-09",
     title: "Past Events & Wellness Hidden by Default",

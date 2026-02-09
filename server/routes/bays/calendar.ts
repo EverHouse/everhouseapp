@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../../db';
 import { pool } from '../../core/db';
 import { bookingRequests, resources } from '../../../shared/schema';
-import { eq, and, or, gte, lte, asc } from 'drizzle-orm';
+import { eq, and, or, gte, lte, asc, sql } from 'drizzle-orm';
 import { getConferenceRoomBookingsFromCalendar } from '../../core/calendar/index';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { getConferenceRoomId } from '../../core/affectedAreas';
@@ -59,6 +59,10 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
         eq(bookingRequests.status, 'approved'),
         eq(bookingRequests.status, 'confirmed'),
         eq(bookingRequests.status, 'attended')
+      ),
+      or(
+        eq(bookingRequests.isUnmatched, false),
+        sql`${bookingRequests.isUnmatched} IS NULL`
       )
     ];
     

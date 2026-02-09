@@ -603,7 +603,13 @@ router.get('/api/pending-bookings', isStaffOrAdmin, async (req, res) => {
         .from(bookingRequests)
         .innerJoin(resources, eq(bookingRequests.resourceId, resources.id))
         .leftJoin(users, eq(bookingRequests.userEmail, users.email))
-        .where(eq(bookingRequests.status, 'pending_approval'))
+        .where(and(
+          eq(bookingRequests.status, 'pending_approval'),
+          or(
+            eq(bookingRequests.isUnmatched, false),
+            sql`${bookingRequests.isUnmatched} IS NULL`
+          )
+        ))
         .orderBy(desc(bookingRequests.createdAt))
     );
     res.json(result);
