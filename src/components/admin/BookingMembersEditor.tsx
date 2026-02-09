@@ -1019,7 +1019,9 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
                   <div className="flex items-center gap-1.5 shrink-0 ml-2">
                     <span
                       className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${
-                        member.fee === 0
+                        member.fee === 0 && member.guestInfo?.usedGuestPass
+                          ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400'
+                          : member.fee === 0
                           ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400'
                           : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'
                       }`}
@@ -1028,7 +1030,7 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
                       ${member.fee.toFixed(2)}
                     </span>
                     <span className="text-[9px] text-gray-500 dark:text-gray-400 max-w-[80px] truncate" title={member.feeNote}>
-                      {member.feeNote}
+                      {member.fee === 0 && member.guestInfo?.usedGuestPass ? 'Guest Pass Used' : member.fee > 0 ? (member.feeNote.includes('Guest Pass') ? `$${member.fee} fee` : member.feeNote) : member.feeNote}
                     </span>
                     <button
                       onClick={() => handleRemoveGuest({ id: member.guestInfo!.guestId, bookingId: member.bookingId, guestName: member.guestInfo!.guestName, guestEmail: member.guestInfo!.guestEmail, slotNumber: member.slotNumber, fee: member.fee, feeNote: member.feeNote } as BookingGuest)}
@@ -1286,7 +1288,7 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
                       ${guest.fee.toFixed(2)}
                     </span>
                     <span className="text-[9px] text-gray-500 dark:text-gray-400 max-w-[80px] truncate" title={guest.feeNote}>
-                      {guest.feeNote}
+                      {guest.fee === 0 && guest.feeNote.includes('Guest Pass') ? 'Guest Pass Used' : guest.fee > 0 && guest.feeNote.includes('Guest Pass') ? `$${guest.fee} fee` : guest.feeNote}
                     </span>
                     <button
                       onClick={() => handleRemoveGuest(guest)}

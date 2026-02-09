@@ -1586,6 +1586,26 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
           guestsWithFees[i].feeNote = gp.used_guest_pass ? 'Guest Pass Used' : (participantFee > 0 ? `No passes - $${PRICING.GUEST_FEE_DOLLARS} due` : 'No charge');
         }
         
+        const guestParticipantsByGuestId = new Map<number, typeof guestParticipants[0]>();
+        for (const gp of guestParticipants) {
+          if (gp.guest_id) guestParticipantsByGuestId.set(gp.guest_id, gp);
+        }
+        for (const member of membersWithFees) {
+          if (member.guestInfo) {
+            const gp = guestParticipantsByGuestId.get(member.guestInfo.guestId);
+            if (gp) {
+              const participantFee = feeMap.get(gp.participant_id) || 0;
+              const passUsed = gp.used_guest_pass || false;
+              const note = passUsed ? 'Guest Pass Used' : (participantFee > 0 ? `No passes - $${PRICING.GUEST_FEE_DOLLARS} due` : 'No charge');
+              member.guestInfo.fee = participantFee;
+              member.guestInfo.usedGuestPass = passUsed;
+              member.guestInfo.feeNote = note;
+              member.fee = participantFee;
+              member.feeNote = note;
+            }
+          }
+        }
+        
         guestPassesUsedThisBooking = guestParticipants.filter(gp => gp.used_guest_pass).length;
         guestPassesRemainingAfterBooking = ownerGuestPassesRemaining - guestPassesUsedThisBooking;
         

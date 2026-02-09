@@ -883,7 +883,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
                             )}
                           </div>
                         )}
-                        {(p.overageFee > 0 || p.guestFee > 0) && (
+                        {(p.overageFee > 0 || p.guestFee > 0 || (p.guestPassUsed && p.totalFee === 0)) && (
                           <div className="flex flex-wrap gap-2">
                             {p.overageFee > 0 && (
                               <span className="inline-flex items-center px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded">
@@ -895,7 +895,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
                                 Guest Fee: ${p.guestFee.toFixed(2)}
                               </span>
                             )}
-                            {p.guestPassUsed && (
+                            {p.guestPassUsed && p.totalFee === 0 && (
                               <span className="inline-flex items-center px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
                                 <span className="material-symbols-outlined text-xs mr-0.5">confirmation_number</span>
                                 Pass Used

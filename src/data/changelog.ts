@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.15.3",
+    date: "2026-02-09",
+    title: "Guest Pass Badge Display Fix",
+    changes: [
+      "Fix: Guest roster slots no longer show the green 'Guest Pass Used' badge when the guest actually has a $25 fee — the badge now only appears when a pass was truly applied and the fee is $0",
+      "Fix: When a billing session exists, guest fee data from the session now properly overrides speculative calculations, preventing stale 'Guest Pass Used' labels on guests who were charged",
+      "Fix: Financial Summary and individual guest slot displays are now always in sync — no more showing $0 per guest while the summary correctly shows $75 total",
+    ],
+  },
+  {
     version: "7.15.2",
     date: "2026-02-09",
     title: "Unmatched Booking Resolution & Import Completeness",
