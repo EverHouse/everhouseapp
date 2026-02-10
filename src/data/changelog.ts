@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.16.1",
+    date: "2026-02-10",
+    title: "Financial Summary Fee Display Fix",
+    changes: [
+      "Fix: Financial summary in the Manage Players modal was showing fees at 1/100th their actual value (e.g., $0.75 instead of $75.00) — fees now display correctly in dollars",
+      "Fix: Per-player fee display in roster slots also corrected to show proper dollar amounts",
+    ],
+  },
+  {
     version: "7.16.0",
     date: "2026-02-10",
     title: "Unified Player Management Modal",

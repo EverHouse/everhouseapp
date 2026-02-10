@@ -1429,7 +1429,7 @@ export function TrackmanLinkModal({
               </p>
               {member.fee > 0 && (
                 <p className="text-xs text-amber-600 dark:text-amber-400">
-                  ${(member.fee / 100).toFixed(2)} — {member.feeNote}
+                  ${member.fee.toFixed(2)} — {member.feeNote}
                 </p>
               )}
               {member.fee === 0 && member.feeNote && (
@@ -1666,13 +1666,13 @@ export function TrackmanLinkModal({
           {fs.ownerOverageFee > 0 && (
             <div className="flex justify-between text-primary/70 dark:text-white/70">
               <span>Owner overage fee</span>
-              <span>${(fs.ownerOverageFee / 100).toFixed(2)}</span>
+              <span>${fs.ownerOverageFee.toFixed(2)}</span>
             </div>
           )}
           {fs.guestFeesWithoutPass > 0 && (
             <div className="flex justify-between text-primary/70 dark:text-white/70">
               <span>Guest fees (no pass)</span>
-              <span>${(fs.guestFeesWithoutPass / 100).toFixed(2)}</span>
+              <span>${fs.guestFeesWithoutPass.toFixed(2)}</span>
             </div>
           )}
           {guestPassesUsed > 0 && (
@@ -1689,19 +1689,19 @@ export function TrackmanLinkModal({
                     {p.name}
                     {p.tier && <TierBadge tier={p.tier} size="sm" />}
                   </span>
-                  <span>{p.fee > 0 ? `$${(p.fee / 100).toFixed(2)}` : p.feeNote || 'Included'}</span>
+                  <span>{p.fee > 0 ? `$${p.fee.toFixed(2)}` : p.feeNote || 'Included'}</span>
                 </div>
               ))}
             </div>
           )}
           <div className="pt-1 border-t border-primary/10 dark:border-white/10 flex justify-between font-semibold text-sm text-primary dark:text-white">
             <span>Owner Pays</span>
-            <span>${(fs.totalOwnerOwes / 100).toFixed(2)}</span>
+            <span>${fs.totalOwnerOwes.toFixed(2)}</span>
           </div>
           {fs.grandTotal > 0 && fs.grandTotal !== fs.totalOwnerOwes && (
             <div className="flex justify-between text-primary/70 dark:text-white/70">
               <span>Grand Total</span>
-              <span>${(fs.grandTotal / 100).toFixed(2)}</span>
+              <span>${fs.grandTotal.toFixed(2)}</span>
             </div>
           )}
         </div>
@@ -1712,7 +1712,7 @@ export function TrackmanLinkModal({
             className="w-full mt-2 py-2 px-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors flex items-center justify-center gap-1"
           >
             <span className="material-symbols-outlined text-sm">payments</span>
-            Collect ${(fs.grandTotal / 100).toFixed(2)}
+            Collect ${fs.grandTotal.toFixed(2)}
           </button>
         )}
       </div>
