@@ -1,7 +1,7 @@
 import { getHubSpotAccessToken } from '../integrations';
 import { db } from '../../db';
 import { formSubmissions } from '../../../shared/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and, gte, lte } from 'drizzle-orm';
 
 const HUBSPOT_FORMS: Record<string, string> = {
   'tour-request': process.env.HUBSPOT_FORM_TOUR_REQUEST || '',
@@ -163,6 +163,27 @@ export async function syncHubSpotFormSubmissions(): Promise<{
 
         const email = getFieldValue(submission.values, 'email') || '';
         if (!email) {
+          continue;
+        }
+
+        const submittedAt = new Date(submission.submittedAt);
+        const windowStart = new Date(submission.submittedAt - 5 * 60 * 1000);
+        const windowEnd = new Date(submission.submittedAt + 5 * 60 * 1000);
+        const localMatch = await db.select({ id: formSubmissions.id })
+          .from(formSubmissions)
+          .where(and(
+            eq(formSubmissions.email, email),
+            eq(formSubmissions.formType, formType),
+            gte(formSubmissions.createdAt, windowStart),
+            lte(formSubmissions.createdAt, windowEnd),
+          ))
+          .limit(1);
+
+        if (localMatch.length > 0) {
+          await db.update(formSubmissions)
+            .set({ hubspotSubmissionId: submission.conversionId })
+            .where(eq(formSubmissions.id, localMatch[0].id));
+          result.skippedDuplicate++;
           continue;
         }
 
