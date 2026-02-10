@@ -1996,9 +1996,7 @@ router.patch('/api/admin/booking/:bookingId/player-count', isStaffOrAdmin, async
       WHERE id = $2
     `, [playerCount, bookingId]);
 
-    // If player count increased, create empty booking_members slots for the additional players
     if (playerCount > previousCount) {
-      // Get current max slot number
       const slotResult = await pool.query(
         `SELECT COALESCE(MAX(slot_number), 0) as max_slot, COUNT(*) as count FROM booking_members WHERE booking_id = $1`,
         [bookingId]
@@ -2008,7 +2006,6 @@ router.patch('/api/admin/booking/:bookingId/player-count', isStaffOrAdmin, async
       const slotsToCreate = playerCount - currentMemberCount;
       
       if (slotsToCreate > 0) {
-        // Create empty placeholder slots (user_email = null means "unassigned member slot")
         for (let i = 0; i < slotsToCreate; i++) {
           const nextSlot = maxSlot + i + 1;
           await pool.query(`
@@ -2019,6 +2016,19 @@ router.patch('/api/admin/booking/:bookingId/player-count', isStaffOrAdmin, async
         }
         logger.info('[roster] Created empty booking member slots', {
           extra: { bookingId, slotsCreated: slotsToCreate, previousCount, newCount: playerCount }
+        });
+      }
+    } else if (playerCount < previousCount) {
+      const deleted = await pool.query(`
+        DELETE FROM booking_members 
+        WHERE booking_id = $1 
+          AND slot_number > $2 
+          AND is_primary = false 
+          AND (user_email IS NULL OR user_email = '')
+      `, [bookingId, playerCount]);
+      if (deleted.rowCount && deleted.rowCount > 0) {
+        logger.info('[roster] Cleaned up empty slots after player count decrease', {
+          extra: { bookingId, slotsRemoved: deleted.rowCount, previousCount, newCount: playerCount }
         });
       }
     }

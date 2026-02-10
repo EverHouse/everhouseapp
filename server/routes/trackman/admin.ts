@@ -1596,6 +1596,8 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     let totalPlayersOwe = 0;
     let playerBreakdownFromSession: Array<{ name: string; tier: string | null; fee: number; feeNote: string }> = [];
     
+    const feeEligibleMembers = membersWithFees.filter(m => m.slotNumber <= expectedPlayerCount);
+    
     if (sessionId) {
       const participantsResult = await db.execute(sql`SELECT 
           bp.id as participant_id,
@@ -1711,15 +1713,15 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
         guestPassesUsedThisBooking = guestParticipants.filter(gp => gp.used_guest_pass).length;
         guestPassesRemainingAfterBooking = ownerGuestPassesRemaining - guestPassesUsedThisBooking;
         
-        const emptyMemberSlots = membersWithFees.filter(m => !m.userEmail && !m.guestInfo);
+        const emptyMemberSlots = feeEligibleMembers.filter(m => !m.userEmail && !m.guestInfo);
         const guestParticipantCount = participantsResult.rows.filter(p => p.participant_type === 'guest').length;
         const unaccountedEmptySlots = Math.max(0, emptyMemberSlots.length - guestParticipantCount);
         const emptySlotFees = unaccountedEmptySlots * PRICING.GUEST_FEE_DOLLARS;
         guestFeesWithoutPass += emptySlotFees;
       } else {
-        const ownerMember = membersWithFees.find(m => m.isPrimary);
-        const nonOwnerMembers = membersWithFees.filter(m => !m.isPrimary && m.userEmail);
-        const emptySlots = membersWithFees.filter(m => !m.userEmail && !m.guestInfo);
+        const ownerMember = feeEligibleMembers.find(m => m.isPrimary);
+        const nonOwnerMembers = feeEligibleMembers.filter(m => !m.isPrimary && m.userEmail);
+        const emptySlots = feeEligibleMembers.filter(m => !m.userEmail && !m.guestInfo);
         const emptySlotFees = emptySlots.length * PRICING.GUEST_FEE_DOLLARS;
         guestFeesWithoutPass = guestsWithFees.filter(g => !g.usedGuestPass).reduce((sum, g) => sum + g.fee, 0) + emptySlotFees;
         ownerOverageFee = ownerMember?.fee || 0;
@@ -1732,9 +1734,9 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
         }));
       }
     } else {
-      const ownerMember = membersWithFees.find(m => m.isPrimary);
-      const nonOwnerMembers = membersWithFees.filter(m => !m.isPrimary && m.userEmail);
-      const emptySlots = membersWithFees.filter(m => !m.userEmail && !m.guestInfo);
+      const ownerMember = feeEligibleMembers.find(m => m.isPrimary);
+      const nonOwnerMembers = feeEligibleMembers.filter(m => !m.isPrimary && m.userEmail);
+      const emptySlots = feeEligibleMembers.filter(m => !m.userEmail && !m.guestInfo);
       const emptySlotFees = emptySlots.length * PRICING.GUEST_FEE_DOLLARS;
       guestFeesWithoutPass = guestsWithFees.filter(g => !g.usedGuestPass).reduce((sum, g) => sum + g.fee, 0) + emptySlotFees;
       ownerOverageFee = ownerMember?.fee || 0;
@@ -1789,7 +1791,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
         filledMemberSlots,
         guestCount: effectiveGuestCount,
         playerCountMismatch,
-        emptySlots: membersWithFees.filter(m => !m.userEmail && !m.guestInfo).length
+        emptySlots: feeEligibleMembers.filter(m => !m.userEmail && !m.guestInfo).length
       },
       tierLimits: ownerTierLimits ? {
         can_book_simulators: ownerTierLimits.can_book_simulators,

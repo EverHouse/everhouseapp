@@ -21,6 +21,7 @@ export const changelog: ChangelogEntry[] = [
       "Fix: Trackman-imported bookings (like Mark Mikami's) no longer show an infinite loading spinner when opening payment options — the system now finds the member's account even when the import didn't link the user ID",
       "Fix: Pay with Card form now loads for Trackman-imported members who have an email on file but were missing an internal user link",
       "Fix: Orphaned payment intents no longer pile up in Stripe — if staff opens 'Pay with Card' but then cancels or switches to a different payment method (like card reader), the original payment intent is now automatically cancelled instead of being left as 'Incomplete'",
+      "Fix: Guest fees no longer appear for fully-assigned bookings — when all player slots are filled with members, the system correctly shows $0 instead of charging for orphaned extra slots that were left over from player count changes",
       "Improvement: Payment processing now resolves member identity by email when user ID isn't available, preventing payment failures for imported bookings",
     ],
   },
