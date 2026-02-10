@@ -397,6 +397,21 @@ export function UnifiedBookingSheet({
     }
   }, [isOpen, isManageMode, fetchRosterData]);
 
+  const checkSavedCard = useCallback(async (email: string) => {
+    try {
+      setCheckingCard(true);
+      const res = await fetch(`/api/stripe/staff/check-saved-card/${encodeURIComponent(email)}`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setSavedCardInfo(data);
+      }
+    } catch (err) {
+      console.error('Failed to check saved card:', err);
+    } finally {
+      setCheckingCard(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (isOpen && isManageMode && ownerEmail) {
       checkSavedCard(ownerEmail);
@@ -773,21 +788,6 @@ export function UnifiedBookingSheet({
       setIsAddingManageGuest(false);
     }
   };
-
-  const checkSavedCard = useCallback(async (email: string) => {
-    try {
-      setCheckingCard(true);
-      const res = await fetch(`/api/stripe/staff/check-saved-card/${encodeURIComponent(email)}`, { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setSavedCardInfo(data);
-      }
-    } catch (err) {
-      console.error('Failed to check saved card:', err);
-    } finally {
-      setCheckingCard(false);
-    }
-  }, []);
 
   const handleInlineMarkPaid = async () => {
     if (!bookingId) return;

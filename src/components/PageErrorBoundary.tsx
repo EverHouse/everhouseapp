@@ -68,6 +68,20 @@ class PageErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error(`[PageErrorBoundary${this.props.pageName ? ` - ${this.props.pageName}` : ''}] Error:`, error, errorInfo);
     
+    try {
+      fetch('/api/client-error', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          page: this.props.pageName || 'unknown',
+          error: error.message,
+          stack: error.stack?.substring(0, 2000),
+          componentStack: errorInfo.componentStack?.substring(0, 2000)
+        })
+      }).catch(() => {});
+    } catch {}
+    
     if (isChunkLoadError(error)) {
       const reloadCount = getReloadCount();
       

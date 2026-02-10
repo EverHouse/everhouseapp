@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.20.1",
+    date: "2026-02-10",
+    title: "Critical Page Crash Fix",
+    changes: [
+      "Fix: Resolved crash on Bookings, Data Integrity, and Dashboard pages caused by a function ordering error in the booking sheet component",
+      "Improvement: Added automatic error reporting — page crashes now send details to the server for faster diagnosis",
+    ],
+  },
+  {
     version: "7.20.0",
     date: "2026-02-10",
     title: "Trackman Booking ID Standardization & Payment Safety",

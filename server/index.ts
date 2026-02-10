@@ -348,6 +348,14 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
+app.post('/api/client-error', (req, res) => {
+  const { page, error, stack, componentStack } = req.body || {};
+  console.error(`[CLIENT ERROR] Page: ${page}, Error: ${error}`);
+  if (stack) console.error(`[CLIENT ERROR] Stack: ${stack}`);
+  if (componentStack) console.error(`[CLIENT ERROR] Component: ${componentStack}`);
+  res.json({ ok: true });
+});
+
 registerRoutes(app);
 
 if (isProduction) {
