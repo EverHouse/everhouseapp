@@ -2306,7 +2306,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
             updated_at = NOW() 
           WHERE LOWER(email) = LOWER($2) 
           RETURNING id`,
-          [tierSlug, email, customerId, subscription.id, subscriptionPeriodEnd]
+          [tierName || tierSlug, email, customerId, subscription.id, subscriptionPeriodEnd]
         );
           
           if (updateResult.rowCount && updateResult.rowCount > 0) {
