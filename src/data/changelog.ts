@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.20.4",
+    date: "2026-02-10",
+    title: "Terminal Payment Reconciliation & Trackman Import Fix",
+    changes: [
+      "Fix: Terminal card reader payments now correctly mark all participants as 'paid' — previously Stripe showed 'Succeeded' but the booking still displayed 'Collect $25' because the payment status wasn't synced back",
+      "Fix: Trackman-imported bookings (like Mark Mikami's) no longer show an infinite loading spinner when opening payment options — the system now finds the member's account even when the import didn't link the user ID",
+      "Fix: Pay with Card form now loads for Trackman-imported members who have an email on file but were missing an internal user link",
+      "Improvement: Payment processing now resolves member identity by email when user ID isn't available, preventing payment failures for imported bookings",
+    ],
+  },
+  {
     version: "7.20.3",
     date: "2026-02-10",
     title: "Card Terminal Reader & Payment Reliability",
