@@ -51,6 +51,15 @@ const IdScannerModal: React.FC<IdScannerModalProps> = ({ isOpen, onClose, onScan
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [editedData, setEditedData] = useState<ScanResult['data']>({
+    firstName: null,
+    lastName: null,
+    dateOfBirth: null,
+    streetAddress: null,
+    city: null,
+    state: null,
+    zipCode: null,
+  });
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -173,6 +182,7 @@ const IdScannerModal: React.FC<IdScannerModalProps> = ({ isOpen, onClose, onScan
 
       const result = await res.json();
       setScanResult(result);
+      setEditedData(result.data);
       setState('results');
     } catch (err: any) {
       setError(err.message || 'Failed to scan ID');
@@ -188,20 +198,20 @@ const IdScannerModal: React.FC<IdScannerModalProps> = ({ isOpen, onClose, onScan
   }, []);
 
   const handleUseInfo = useCallback(() => {
-    if (!scanResult) return;
+    if (!editedData) return;
 
     onScanComplete({
-      firstName: scanResult.data.firstName || '',
-      lastName: scanResult.data.lastName || '',
-      dateOfBirth: scanResult.data.dateOfBirth || '',
-      streetAddress: scanResult.data.streetAddress || '',
-      city: scanResult.data.city || '',
-      state: scanResult.data.state || '',
-      zipCode: scanResult.data.zipCode || '',
+      firstName: editedData.firstName || '',
+      lastName: editedData.lastName || '',
+      dateOfBirth: editedData.dateOfBirth || '',
+      streetAddress: editedData.streetAddress || '',
+      city: editedData.city || '',
+      state: editedData.state || '',
+      zipCode: editedData.zipCode || '',
       imageBase64,
       imageMimeType,
     });
-  }, [scanResult, imageBase64, imageMimeType, onScanComplete]);
+  }, [editedData, imageBase64, imageMimeType, onScanComplete]);
 
   const handleClose = useCallback(() => {
     stopCamera();
@@ -444,37 +454,85 @@ const IdScannerModal: React.FC<IdScannerModalProps> = ({ isOpen, onClose, onScan
                     </div>
                   )}
 
-                  <div className={`rounded-xl border p-4 space-y-3 ${cardClass}`}>
+                  <div className={`rounded-xl border p-4 space-y-4 ${cardClass}`}>
                     <h4 className={`font-medium text-sm ${textClass} flex items-center gap-2`}>
                       <span className="material-symbols-outlined text-emerald-600 text-lg">person</span>
                       Extracted Information
                     </h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { label: 'First Name', value: scanResult.data.firstName },
-                        { label: 'Last Name', value: scanResult.data.lastName },
-                        { label: 'Date of Birth', value: scanResult.data.dateOfBirth },
-                        { label: 'State', value: scanResult.data.state },
-                      ].map(({ label, value }) => (
-                        <div key={label}>
-                          <div className={`text-xs ${subtextClass}`}>{label}</div>
-                          <div className={`text-sm font-medium ${value ? textClass : 'text-red-400 italic'}`}>
-                            {value || 'Not detected'}
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { label: 'First Name', key: 'firstName' },
+                          { label: 'Last Name', key: 'lastName' },
+                          { label: 'Date of Birth', key: 'dateOfBirth' },
+                          { label: 'State', key: 'state' },
+                        ].map(({ label, key }) => (
+                          <div key={key}>
+                            <label className={`text-xs ${subtextClass} block mb-1.5`}>{label}</label>
+                            <input
+                              type="text"
+                              value={editedData[key as keyof ScanResult['data']] || ''}
+                              onChange={(e) => setEditedData({
+                                ...editedData,
+                                [key]: e.target.value || null,
+                              })}
+                              className={`w-full px-2.5 py-2 rounded-lg border text-sm transition-colors ${
+                                isDark
+                                  ? 'bg-white/5 border-white/10 text-white placeholder-gray-500 focus:border-white/20 focus:outline-none'
+                                  : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400 focus:border-gray-300 focus:outline-none'
+                              }`}
+                              placeholder="Not detected"
+                            />
                           </div>
+                        ))}
+                      </div>
+
+                      <div className="space-y-2">
+                        <div>
+                          <label className={`text-xs ${subtextClass} block mb-1.5`}>Street Address</label>
+                          <input
+                            type="text"
+                            value={editedData.streetAddress || ''}
+                            onChange={(e) => setEditedData({
+                              ...editedData,
+                              streetAddress: e.target.value || null,
+                            })}
+                            className={`w-full px-2.5 py-2 rounded-lg border text-sm transition-colors ${
+                              isDark
+                                ? 'bg-white/5 border-white/10 text-white placeholder-gray-500 focus:border-white/20 focus:outline-none'
+                                : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400 focus:border-gray-300 focus:outline-none'
+                            }`}
+                            placeholder="Not detected"
+                          />
                         </div>
-                      ))}
-                    </div>
-                    {scanResult.data.streetAddress && (
-                      <div>
-                        <div className={`text-xs ${subtextClass}`}>Address</div>
-                        <div className={`text-sm font-medium ${textClass}`}>
-                          {scanResult.data.streetAddress}
-                          {scanResult.data.city && `, ${scanResult.data.city}`}
-                          {scanResult.data.state && `, ${scanResult.data.state}`}
-                          {scanResult.data.zipCode && ` ${scanResult.data.zipCode}`}
+
+                        <div className="grid grid-cols-3 gap-3">
+                          {[
+                            { label: 'City', key: 'city' },
+                            { label: 'State', key: 'state' },
+                            { label: 'Zip Code', key: 'zipCode' },
+                          ].map(({ label, key }) => (
+                            <div key={key}>
+                              <label className={`text-xs ${subtextClass} block mb-1.5`}>{label}</label>
+                              <input
+                                type="text"
+                                value={editedData[key as keyof ScanResult['data']] || ''}
+                                onChange={(e) => setEditedData({
+                                  ...editedData,
+                                  [key]: e.target.value || null,
+                                })}
+                                className={`w-full px-2.5 py-2 rounded-lg border text-sm transition-colors ${
+                                  isDark
+                                    ? 'bg-white/5 border-white/10 text-white placeholder-gray-500 focus:border-white/20 focus:outline-none'
+                                    : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400 focus:border-gray-300 focus:outline-none'
+                                }`}
+                                placeholder="Not detected"
+                              />
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    )}
+                    </div>
                   </div>
 
                   <div className="flex gap-3">
