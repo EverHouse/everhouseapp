@@ -15,6 +15,7 @@ interface TerminalPaymentProps {
   userId: string | null;
   description?: string;
   paymentMetadata?: Record<string, string>;
+  cartItems?: Array<{ productId: string; name: string; priceCents: number; quantity: number }>;
   onSuccess: (paymentIntentId: string) => void;
   onError: (message: string) => void;
   onCancel: () => void;
@@ -27,6 +28,7 @@ export function TerminalPayment({
   userId,
   description,
   paymentMetadata,
+  cartItems,
   onSuccess, 
   onError,
   onCancel 
@@ -178,7 +180,8 @@ export function TerminalPayment({
             amount,
             currency: 'usd',
             description,
-            metadata: paymentMetadata
+            metadata: paymentMetadata,
+            cartItems
           })
         });
       }

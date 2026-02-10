@@ -162,6 +162,104 @@ export async function createPaymentIntent(
   };
 }
 
+export interface CartLineItem {
+  productId: string;
+  name: string;
+  priceCents: number;
+  quantity: number;
+}
+
+export interface CreatePOSInvoiceParams {
+  customerId: string;
+  description: string;
+  cartItems: CartLineItem[];
+  metadata?: Record<string, string>;
+  receiptEmail?: string;
+}
+
+export interface InvoicePaymentResult {
+  invoiceId: string;
+  paymentIntentId: string;
+  clientSecret: string;
+  status: string;
+}
+
+export async function createInvoiceWithLineItems(params: CreatePOSInvoiceParams): Promise<InvoicePaymentResult> {
+  const stripe = await getStripeClient();
+  const { customerId, description, cartItems, metadata = {}, receiptEmail } = params;
+
+  const cartTotal = cartItems.reduce((sum, item) => sum + (item.priceCents * item.quantity), 0);
+
+  const invoice = await stripe.invoices.create({
+    customer: customerId,
+    auto_advance: false,
+    collection_method: 'charge_automatically',
+    description,
+    metadata: {
+      ...metadata,
+      source: 'pos',
+    },
+    pending_invoice_items_behavior: 'exclude',
+  });
+
+  try {
+    for (const item of cartItems) {
+      await stripe.invoiceItems.create({
+        customer: customerId,
+        invoice: invoice.id,
+        description: item.name,
+        unit_amount: item.priceCents,
+        quantity: item.quantity,
+        currency: 'usd',
+        metadata: {
+          productId: item.productId,
+        },
+      });
+    }
+
+    const finalizedInvoice = await stripe.invoices.finalizeInvoice(invoice.id);
+
+    const paymentIntentId = typeof finalizedInvoice.payment_intent === 'string'
+      ? finalizedInvoice.payment_intent
+      : finalizedInvoice.payment_intent?.id;
+
+    if (!paymentIntentId) {
+      throw new Error('Invoice finalization did not create a PaymentIntent');
+    }
+
+    if (receiptEmail) {
+      await stripe.paymentIntents.update(paymentIntentId, {
+        receipt_email: receiptEmail,
+      });
+    }
+
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+    console.log(`[Stripe] Created invoice ${invoice.id} with ${cartItems.length} line items, PI: ${paymentIntentId}, total: ${cartTotal}`);
+
+    return {
+      invoiceId: finalizedInvoice.id,
+      paymentIntentId,
+      clientSecret: paymentIntent.client_secret!,
+      status: paymentIntent.status,
+    };
+  } catch (error) {
+    try {
+      const currentInvoice = await stripe.invoices.retrieve(invoice.id);
+      if (currentInvoice.status === 'draft') {
+        await stripe.invoices.del(invoice.id);
+        console.log(`[POS Invoice] Deleted draft invoice ${invoice.id} after error`);
+      } else if (currentInvoice.status === 'open') {
+        await stripe.invoices.voidInvoice(invoice.id);
+        console.log(`[POS Invoice] Voided open invoice ${invoice.id} after error`);
+      }
+    } catch (cleanupErr: any) {
+      console.error(`[POS Invoice] Failed to clean up invoice ${invoice.id}:`, cleanupErr.message);
+    }
+    throw error;
+  }
+}
+
 export async function confirmPaymentSuccess(
   paymentIntentId: string,
   performedBy: string,

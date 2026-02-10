@@ -15,7 +15,9 @@ import {
   confirmPaymentSuccess,
   getPaymentIntentStatus,
   cancelPaymentIntent,
-  getOrCreateStripeCustomer
+  getOrCreateStripeCustomer,
+  createInvoiceWithLineItems,
+  type CartLineItem
 } from '../../core/stripe';
 import { computeFeeBreakdown, applyFeeBreakdownToParticipants, getEffectivePlayerCount } from '../../core/billing/unifiedFeeService';
 import {
@@ -532,7 +534,7 @@ router.get('/api/billing/members/search', isStaffOrAdmin, async (req: Request, r
 
 router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { memberEmail, memberName, amountCents, description, productId, isNewCustomer, firstName, lastName, phone, dob, tierSlug, tierName, createUser, streetAddress, city, state, zipCode } = req.body;
+    const { memberEmail, memberName, amountCents, description, productId, isNewCustomer, firstName, lastName, phone, dob, tierSlug, tierName, createUser, streetAddress, city, state, zipCode, cartItems } = req.body;
     const { sessionUser, staffEmail } = getStaffInfo(req);
 
     if (!memberEmail || amountCents === undefined || amountCents === null) {
@@ -644,6 +646,56 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, async (req: Reques
       } catch (productError: any) {
         console.error(`[Stripe] Warning: Could not retrieve product ${productId}:`, productError.message);
         return res.status(400).json({ error: `Product ${productId} not found in Stripe` });
+      }
+    }
+
+    if (Array.isArray(cartItems) && cartItems.length > 0 && stripeCustomerId) {
+      try {
+        const invoiceResult = await createInvoiceWithLineItems({
+          customerId: stripeCustomerId,
+          description: finalDescription,
+          cartItems: cartItems as CartLineItem[],
+          metadata: {
+            staffInitiated: 'true',
+            staffEmail: staffEmail,
+            chargeType: 'quick_charge',
+            memberId: member?.id?.toString() || 'guest',
+            memberEmail: customerEmail,
+            memberName: resolvedName,
+            isNewCustomer: isNewCustomer ? 'true' : 'false',
+          },
+          receiptEmail: customerEmail
+        });
+
+        const dbUserId = member?.id?.toString() || `guest-${stripeCustomerId}`;
+        try {
+          await pool.query(
+            `INSERT INTO stripe_payment_intents 
+             (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, description, status, product_id, product_name)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             ON CONFLICT (stripe_payment_intent_id) DO NOTHING`,
+            [dbUserId, invoiceResult.paymentIntentId, stripeCustomerId, Math.round(numericAmount), 'one_time_purchase', finalDescription, 'pending', productId || null, finalProductName || null]
+          );
+        } catch (dbErr: any) {
+          console.warn('[QuickCharge] Non-blocking: Could not save local payment record:', dbErr.message);
+        }
+
+        logFromRequest(req, 'initiate_charge', 'payment', invoiceResult.paymentIntentId, customerEmail, {
+          amountCents: numericAmount,
+          description: finalDescription,
+          invoiceId: invoiceResult.invoiceId,
+          productId: productId || null,
+          productName: finalProductName || null,
+          isNewCustomer: !!isNewCustomer,
+          source: 'pos_quick_charge_invoice'
+        });
+
+        return res.json({
+          clientSecret: invoiceResult.clientSecret,
+          paymentIntentId: invoiceResult.paymentIntentId
+        });
+      } catch (invoiceErr: any) {
+        console.error('[QuickCharge] Invoice creation failed, falling back to bare PI:', invoiceErr.message);
       }
     }
 
@@ -997,7 +1049,7 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
 
 router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { memberEmail, memberName, amountCents, description, productId } = req.body;
+    const { memberEmail, memberName, amountCents, description, productId, cartItems } = req.body;
     const { staffEmail, staffName, sessionUser } = getStaffInfo(req);
 
     if (!memberEmail || !amountCents) {
@@ -1063,6 +1115,62 @@ router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, async (re
     const paymentMethod = paymentMethods.data[0];
     const cardLast4 = paymentMethod.card?.last4 || '****';
     const cardBrand = paymentMethod.card?.brand || 'card';
+
+    if (Array.isArray(cartItems) && cartItems.length > 0) {
+      try {
+        const invoiceResult = await createInvoiceWithLineItems({
+          customerId: member.stripe_customer_id,
+          description: description || 'POS purchase',
+          cartItems: cartItems as CartLineItem[],
+          metadata: {
+            type: 'staff_pos_saved_card',
+            staffEmail,
+            staffName: staffName || staffEmail,
+            memberId: member.id?.toString() || '',
+            memberEmail: member.email,
+            memberName: resolvedName,
+            source: 'pos',
+          }
+        });
+
+        const paymentIntent = await stripe.paymentIntents.confirm(invoiceResult.paymentIntentId, {
+          payment_method: paymentMethod.id,
+          off_session: true,
+        });
+
+        if (paymentIntent.status === 'succeeded') {
+          await db.execute(sql`INSERT INTO billing_audit_log (payment_intent_id, member_email, member_id, amount_cents, description, staff_email, created_at)
+             VALUES (${paymentIntent.id}, ${member.email}, ${member.id}, ${numericAmount}, ${description || 'POS saved card charge'}, ${staffEmail}, NOW())`);
+
+          logFromRequest(req, 'charge_saved_card', 'payment', paymentIntent.id, member.email, {
+            amountCents: numericAmount,
+            description: description || 'POS saved card charge',
+            invoiceId: invoiceResult.invoiceId,
+            cardLast4,
+            cardBrand,
+            source: 'pos'
+          });
+
+          return res.json({
+            success: true,
+            paymentIntentId: paymentIntent.id,
+            cardLast4,
+            cardBrand
+          });
+        } else if (paymentIntent.status === 'requires_action') {
+          return res.status(400).json({
+            error: 'Card requires additional verification. Use Online Card instead so the customer can authenticate.',
+            requiresAction: true
+          });
+        } else {
+          return res.status(400).json({
+            error: `Payment not completed (status: ${paymentIntent.status}). Try Online Card instead.`
+          });
+        }
+      } catch (invoiceErr: any) {
+        console.error('[Stripe] Invoice creation failed for saved card POS, falling back to bare PI:', invoiceErr.message);
+      }
+    }
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: numericAmount,

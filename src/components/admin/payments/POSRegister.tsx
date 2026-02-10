@@ -240,6 +240,15 @@ const POSRegister: React.FC = () => {
         payload.productId = cartItems[0].productId;
       }
 
+      if (cartItems.length > 0) {
+        payload.cartItems = cartItems.map(item => ({
+          productId: item.productId,
+          name: item.name,
+          priceCents: item.priceCents,
+          quantity: item.quantity,
+        }));
+      }
+
       if (customer.isNewCustomer) {
         payload.isNewCustomer = true;
         payload.firstName = (customer as any).firstName;
@@ -330,6 +339,12 @@ const POSRegister: React.FC = () => {
           amountCents: totalCents,
           description: buildDescription(),
           productId: cartItems.length === 1 ? cartItems[0].productId : undefined,
+          cartItems: cartItems.map(item => ({
+            productId: item.productId,
+            name: item.name,
+            priceCents: item.priceCents,
+            quantity: item.quantity,
+          })),
         }),
       });
 
@@ -946,6 +961,12 @@ const POSRegister: React.FC = () => {
               ...(getCustomerInfo()?.email ? { ownerEmail: getCustomerInfo()!.email } : {}),
               ...(getCustomerInfo()?.name ? { ownerName: getCustomerInfo()!.name } : {}),
             }}
+            cartItems={cartItems.map(item => ({
+              productId: item.productId,
+              name: item.name,
+              priceCents: item.priceCents,
+              quantity: item.quantity,
+            }))}
             onSuccess={handleTerminalSuccess}
             onError={(msg) => setError(msg)}
             onCancel={() => setSelectedPaymentMethod(null)}

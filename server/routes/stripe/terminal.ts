@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { getStripeClient } from '../../core/stripe/client';
+import { createInvoiceWithLineItems, type CartLineItem } from '../../core/stripe/payments';
 import { logFromRequest } from '../../core/auditLog';
 import { pool } from '../../core/db';
 
@@ -93,7 +94,7 @@ router.post('/api/stripe/terminal/create-simulated-reader', isStaffOrAdmin, asyn
 
 router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { readerId, amount, currency = 'usd', description, metadata } = req.body;
+    const { readerId, amount, currency = 'usd', description, metadata, cartItems } = req.body;
     
     if (!readerId) {
       return res.status(400).json({ error: 'Reader ID is required' });
@@ -192,16 +193,51 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
       }
     }
 
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount),
-      currency,
-      payment_method_types: ['card_present'],
-      capture_method: 'automatic',
-      description: finalDescription,
-      metadata: finalMetadata,
-      ...(customerId ? { customer: customerId } : {}),
-      ...(metadata?.ownerEmail ? { receipt_email: metadata.ownerEmail } : {})
-    });
+    let paymentIntent: any;
+    let invoiceId: string | null = null;
+
+    if (Array.isArray(cartItems) && cartItems.length > 0 && customerId) {
+      try {
+        const invoiceResult = await createInvoiceWithLineItems({
+          customerId,
+          description: finalDescription,
+          cartItems: cartItems as CartLineItem[],
+          metadata: finalMetadata,
+          receiptEmail: metadata?.ownerEmail
+        });
+
+        invoiceId = invoiceResult.invoiceId;
+
+        paymentIntent = await stripe.paymentIntents.update(invoiceResult.paymentIntentId, {
+          payment_method_types: ['card_present'],
+          capture_method: 'automatic',
+          metadata: finalMetadata,
+        });
+      } catch (invoiceErr: any) {
+        console.error('[Terminal] Invoice creation failed, falling back to bare PI:', invoiceErr.message);
+        paymentIntent = await stripe.paymentIntents.create({
+          amount: Math.round(amount),
+          currency,
+          payment_method_types: ['card_present'],
+          capture_method: 'automatic',
+          description: finalDescription,
+          metadata: finalMetadata,
+          ...(customerId ? { customer: customerId } : {}),
+          ...(metadata?.ownerEmail ? { receipt_email: metadata.ownerEmail } : {})
+        });
+      }
+    } else {
+      paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount),
+        currency,
+        payment_method_types: ['card_present'],
+        capture_method: 'automatic',
+        description: finalDescription,
+        metadata: finalMetadata,
+        ...(customerId ? { customer: customerId } : {}),
+        ...(metadata?.ownerEmail ? { receipt_email: metadata.ownerEmail } : {})
+      });
+    }
     
     if (customerId || metadata?.ownerEmail) {
       try {
