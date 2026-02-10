@@ -1,7 +1,7 @@
 export { getStripeClient, getStripePublishableKey, getStripeSecretKey, getStripeSync } from './client';
 export { getOrCreateStripeCustomer, getStripeCustomerByEmail, updateCustomerPaymentMethod } from './customers';
 export { createPaymentIntent, confirmPaymentSuccess, getPaymentIntentStatus, cancelPaymentIntent, chargeWithBalance, createBalanceAwarePayment, generatePaymentIdempotencyKey, createInvoiceWithLineItems, type PaymentPurpose, type CreatePaymentIntentParams, type PaymentIntentResult, type CartLineItem, type CreatePOSInvoiceParams, type InvoicePaymentResult } from './payments';
-export { processStripeWebhook } from './webhooks';
+export { processStripeWebhook, replayStripeEvent } from './webhooks';
 export { syncPaymentToHubSpot, type SyncPaymentParams } from './hubspotSync';
 export { 
   fetchHubSpotProducts, 

@@ -12,13 +12,15 @@ import {
   syncMembershipTiersToStripe,
   getTierSyncStatus,
   syncDiscountRulesToStripeCoupons,
-  getDiscountSyncStatus
+  getDiscountSyncStatus,
+  replayStripeEvent
 } from '../../core/stripe';
 import { checkExpiringCards } from '../../core/billing/cardExpiryChecker';
 import { checkStaleWaivers } from '../../schedulers/waiverReviewScheduler';
 import { getBillingClassificationSummary, getMembersNeedingStripeMigration } from '../../scripts/classifyMemberBilling';
 import { escapeHtml, checkSyncCooldown } from './helpers';
 import { sensitiveActionRateLimiter, checkoutRateLimiter } from '../../middleware/rateLimiting';
+import { logFromRequest } from '../../core/auditLog';
 
 const router = Router();
 
@@ -522,6 +524,41 @@ router.post('/api/stripe/sync-customers', isStaffOrAdmin, sensitiveActionRateLim
   } catch (error: any) {
     console.error('[Stripe Customer Sync] Error:', error);
     res.status(500).json({ error: 'Failed to sync customers' });
+  }
+});
+
+router.post('/api/admin/stripe/replay-webhook', isAdmin, async (req: Request, res: Response) => {
+  try {
+    const { eventId, forceReplay } = req.body;
+
+    if (!eventId || typeof eventId !== 'string' || !eventId.startsWith('evt_')) {
+      return res.status(400).json({ success: false, error: 'Invalid eventId. Must start with evt_' });
+    }
+
+    const result = await replayStripeEvent(eventId, forceReplay === true);
+
+    logFromRequest(req, {
+      action: 'replay_webhook',
+      resourceType: 'system',
+      resourceId: eventId,
+      resourceName: `Webhook replay: ${result.eventType}`,
+      details: {
+        eventId,
+        forceReplay: forceReplay === true,
+        success: result.success,
+        eventType: result.eventType,
+        message: result.message
+      }
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('[Stripe Admin] Error replaying webhook event:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to replay webhook event',
+      details: error.message
+    });
   }
 });
 

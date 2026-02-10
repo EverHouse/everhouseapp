@@ -300,6 +300,105 @@ export async function processStripeWebhook(
   }
 }
 
+export async function replayStripeEvent(
+  eventId: string,
+  forceReplay: boolean = false
+): Promise<{ success: boolean; eventType: string; message: string }> {
+  const stripe = await getStripeClient();
+  const event = await stripe.events.retrieve(eventId);
+
+  const resourceId = extractResourceId(event);
+  const client = await pool.connect();
+  let deferredActions: DeferredAction[] = [];
+
+  try {
+    await client.query('BEGIN');
+
+    if (!forceReplay) {
+      const claimResult = await tryClaimEvent(client, event.id, event.type, event.created, resourceId);
+
+      if (!claimResult.claimed) {
+        await client.query('ROLLBACK');
+        console.log(`[Stripe Webhook Replay] Skipping ${claimResult.reason} event: ${event.id} (${event.type})`);
+        return { success: false, eventType: event.type, message: `Event already processed (${claimResult.reason}). Use forceReplay=true to override.` };
+      }
+    }
+
+    if (resourceId) {
+      const orderOk = await checkResourceEventOrder(client, resourceId, event.type, event.created);
+      if (!orderOk) {
+        await client.query('ROLLBACK');
+        console.log(`[Stripe Webhook Replay] Skipping out-of-order event: ${event.id} (${event.type}) for resource ${resourceId}`);
+        return { success: false, eventType: event.type, message: `Event is out of order for resource ${resourceId}` };
+      }
+    }
+
+    console.log(`[Stripe Webhook Replay] Processing event: ${event.id} (${event.type})`);
+
+    if (event.type === 'payment_intent.succeeded') {
+      deferredActions = await handlePaymentIntentSucceeded(client, event.data.object);
+    } else if (event.type === 'payment_intent.payment_failed') {
+      deferredActions = await handlePaymentIntentFailed(client, event.data.object);
+    } else if (event.type === 'payment_intent.canceled') {
+      deferredActions = await handlePaymentIntentCanceled(client, event.data.object);
+    } else if (event.type === 'charge.refunded') {
+      deferredActions = await handleChargeRefunded(client, event.data.object);
+    } else if (event.type === 'invoice.payment_succeeded') {
+      deferredActions = await handleInvoicePaymentSucceeded(client, event.data.object);
+    } else if (event.type === 'invoice.payment_failed') {
+      deferredActions = await handleInvoicePaymentFailed(client, event.data.object);
+    } else if (event.type === 'invoice.created' || event.type === 'invoice.finalized' || event.type === 'invoice.updated') {
+      deferredActions = await handleInvoiceLifecycle(client, event.data.object, event.type);
+    } else if (event.type === 'invoice.voided' || event.type === 'invoice.marked_uncollectible') {
+      deferredActions = await handleInvoiceVoided(client, event.data.object, event.type);
+    } else if (event.type === 'checkout.session.completed') {
+      deferredActions = await handleCheckoutSessionCompleted(client, event.data.object);
+    } else if (event.type === 'customer.subscription.created') {
+      deferredActions = await handleSubscriptionCreated(client, event.data.object);
+    } else if (event.type === 'customer.subscription.updated') {
+      deferredActions = await handleSubscriptionUpdated(client, event.data.object, event.data.previous_attributes);
+    } else if (event.type === 'customer.subscription.deleted') {
+      deferredActions = await handleSubscriptionDeleted(client, event.data.object);
+    } else if (event.type === 'charge.dispute.created') {
+      deferredActions = await handleChargeDisputeCreated(client, event.data.object);
+    } else if (event.type === 'charge.dispute.closed') {
+      deferredActions = await handleChargeDisputeClosed(client, event.data.object);
+    } else if (event.type === 'product.updated') {
+      deferredActions = await handleProductUpdated(client, event.data.object);
+    } else if (event.type === 'product.created') {
+      deferredActions = await handleProductCreated(client, event.data.object);
+    } else if (event.type === 'product.deleted') {
+      deferredActions = await handleProductDeleted(client, event.data.object);
+    } else if (event.type === 'price.updated' || event.type === 'price.created') {
+      deferredActions = await handlePriceChange(client, event.data.object);
+    } else if (event.type === 'coupon.updated' || event.type === 'coupon.created') {
+      const coupon = event.data.object as any;
+      if (coupon.id === 'FAMILY20' && coupon.percent_off) {
+        updateFamilyDiscountPercent(coupon.percent_off);
+        console.log(`[Stripe Webhook Replay] FAMILY20 coupon ${event.type}: ${coupon.percent_off}% off`);
+      }
+    } else if (event.type === 'coupon.deleted') {
+      const coupon = event.data.object as any;
+      if (coupon.id === 'FAMILY20') {
+        console.log('[Stripe Webhook Replay] FAMILY20 coupon deleted - will be recreated on next use');
+      }
+    }
+
+    await client.query('COMMIT');
+    console.log(`[Stripe Webhook Replay] Event ${event.id} committed successfully`);
+
+    await executeDeferredActions(deferredActions);
+
+    return { success: true, eventType: event.type, message: `Successfully replayed event ${event.id} (${event.type})` };
+  } catch (handlerError) {
+    await client.query('ROLLBACK');
+    console.error(`[Stripe Webhook Replay] Handler failed for ${event.type} (${event.id}), rolled back:`, handlerError);
+    throw handlerError;
+  } finally {
+    client.release();
+  }
+}
+
 async function handleChargeRefunded(client: PoolClient, charge: any): Promise<DeferredAction[]> {
   const { id, amount, amount_refunded, currency, customer, payment_intent, created, refunded } = charge;
   const deferredActions: DeferredAction[] = [];

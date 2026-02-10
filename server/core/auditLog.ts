@@ -127,7 +127,8 @@ export type AuditAction =
   | 'staff_view_member_card_info'
   | 'large_charge_approved'
   | 'cancellation_requested'
-  | 'complete_cancellation';
+  | 'complete_cancellation'
+  | 'replay_webhook';
 
 export type ActorType = 'staff' | 'member' | 'system';
 
