@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.18.1",
+    date: "2026-02-10",
+    title: "Booking Notes, Payment-Gated Check-In & Button Reorder",
+    changes: [
+      "Feature: Trackman notes and staff notes are now displayed in the booking sheet — amber block for Trackman notes, purple block for staff notes",
+      "Feature: Check In button is disabled until all fees are collected — a clear message explains that payment must be processed first",
+      "Improvement: Check In, Reschedule, and Cancel buttons now appear below the Financial Summary and Collect button, so the payment flow comes first naturally",
+    ],
+  },
+  {
     version: "7.18.0",
     date: "2026-02-10",
     title: "Complete Booking Sheet — One Place for Everything",

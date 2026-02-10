@@ -71,6 +71,7 @@ interface ManageModeRosterData {
   tierLimits?: { guest_passes_per_month: number };
   guestPassContext?: { passesBeforeBooking: number; passesUsedThisBooking: number };
   financialSummary?: FinancialSummary;
+  bookingNotes?: { notes: string | null; staffNotes: string | null };
 }
 
 interface VisitorSearchResult {
@@ -1889,6 +1890,26 @@ export function UnifiedBookingSheet({
                 </div>
               </div>
 
+              {rosterData?.bookingNotes?.notes && (
+                <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-900/10">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-base">description</span>
+                    <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Trackman Notes</span>
+                  </div>
+                  <p className="text-sm text-amber-800 dark:text-amber-200 whitespace-pre-wrap">{rosterData.bookingNotes.notes}</p>
+                </div>
+              )}
+
+              {rosterData?.bookingNotes?.staffNotes && (
+                <div className="p-3 rounded-xl border border-purple-200 dark:border-purple-500/20 bg-purple-50 dark:bg-purple-900/10">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="material-symbols-outlined text-purple-600 dark:text-purple-400 text-base">sticky_note_2</span>
+                    <span className="text-xs font-medium text-purple-700 dark:text-purple-300">Staff Notes</span>
+                  </div>
+                  <p className="text-sm text-purple-800 dark:text-purple-200 whitespace-pre-wrap">{rosterData.bookingNotes.staffNotes}</p>
+                </div>
+              )}
+
               {!isConferenceRoom && (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -1935,12 +1956,19 @@ export function UnifiedBookingSheet({
                 </div>
               )}
 
+              {renderManageModeFinancialSummary()}
+
               {(onCheckIn || onReschedule || onCancelBooking) && bookingId && (
                 <div className="flex gap-2">
                   {onCheckIn && bookingStatus !== 'attended' && bookingStatus !== 'cancelled' && (
                     <button
                       onClick={() => onCheckIn(bookingId)}
-                      className="flex-1 py-2 px-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium flex items-center justify-center gap-1.5 transition-colors"
+                      disabled={!!(rosterData?.financialSummary && rosterData.financialSummary.grandTotal > 0 && !rosterData.financialSummary.allPaid)}
+                      className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                        rosterData?.financialSummary && rosterData.financialSummary.grandTotal > 0 && !rosterData.financialSummary.allPaid
+                          ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                          : 'bg-green-600 hover:bg-green-700 text-white'
+                      }`}
                     >
                       <span className="material-symbols-outlined text-sm">how_to_reg</span>
                       Check In
@@ -1976,7 +2004,13 @@ export function UnifiedBookingSheet({
                 </div>
               )}
 
-              {renderManageModeFinancialSummary()}
+              {onCheckIn && bookingStatus !== 'attended' && bookingStatus !== 'cancelled' && 
+                rosterData?.financialSummary && rosterData.financialSummary.grandTotal > 0 && !rosterData.financialSummary.allPaid && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs">info</span>
+                  Payment must be collected before check-in
+                </p>
+              )}
             </>
           )}
         </div>

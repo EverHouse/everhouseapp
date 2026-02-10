@@ -1237,6 +1237,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     
     const bookingResult = await db.execute(sql`SELECT br.guest_count, br.trackman_player_count, br.declared_player_count, br.resource_id, br.user_email as owner_email,
               br.user_name as owner_name, br.duration_minutes, br.request_date, br.session_id, br.status,
+              br.notes, br.staff_notes,
               r.capacity as resource_capacity,
               EXTRACT(EPOCH FROM (bs.end_time - bs.start_time)) / 60 as session_duration_minutes
        FROM booking_requests br
@@ -1668,6 +1669,10 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     
     res.json({
       ownerGuestPassesRemaining,
+      bookingNotes: {
+        notes: bookingResult.rows[0]?.notes || null,
+        staffNotes: bookingResult.rows[0]?.staff_notes || null,
+      },
       bookingInfo: {
         durationMinutes,
         perPersonMins,
