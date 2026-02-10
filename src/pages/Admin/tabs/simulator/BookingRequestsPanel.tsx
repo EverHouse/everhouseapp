@@ -512,6 +512,11 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                     <span aria-hidden="true" className="material-symbols-outlined text-lg">check_circle</span>
                                                                     Checked In
                                                                 </span>
+                                                            ) : !isConferenceRoom && isToday && (booking as any).fee_snapshot_paid ? (
+                                                                <span className="flex-1 py-2.5 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 rounded-xl text-sm font-medium flex items-center justify-center gap-2">
+                                                                    <span aria-hidden="true" className="material-symbols-outlined text-lg">check_circle</span>
+                                                                    Paid
+                                                                </span>
                                                             ) : !isConferenceRoom && isToday && (() => {
                                                                 const declPlayers = (booking as any).declared_player_count || 1;
                                                                 const filledPlayers = (booking as any).filled_player_count || 0;

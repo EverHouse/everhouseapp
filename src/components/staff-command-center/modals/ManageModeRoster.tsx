@@ -305,7 +305,9 @@ export function ManageModeRoster({
             </div>
             <div>
               <p className="text-sm text-primary/50 dark:text-white/50">Empty Slot</p>
-              <p className="text-xs text-amber-600 dark:text-amber-400">${guestFeeDollars} fee applies</p>
+              <p className={`text-xs ${rosterData?.financialSummary?.allPaid ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                {rosterData?.financialSummary?.allPaid ? `$${guestFeeDollars} — Paid` : `$${guestFeeDollars} fee applies`}
+              </p>
             </div>
           </div>
           <div className="flex gap-1.5">

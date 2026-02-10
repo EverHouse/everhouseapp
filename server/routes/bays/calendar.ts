@@ -147,6 +147,7 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
     
     let paymentStatusMap = new Map<number, { hasUnpaidFees: boolean; totalOwed: number }>();
     let filledSlotsMap = new Map<number, number>();
+    let feeSnapshotPaidSet = new Set<number>();
     
     if (bookingIds.length > 0) {
       const paymentStatusResult = await pool.query(`
@@ -163,11 +164,20 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
         WHERE br.id = ANY($1)
       `, [bookingIds]);
       
+      const feeSnapshotResult = await pool.query(`
+        SELECT br.id as booking_id
+        FROM booking_requests br
+        INNER JOIN booking_fee_snapshots bfs ON bfs.session_id = br.session_id AND bfs.status = 'completed'
+        WHERE br.id = ANY($1)
+      `, [bookingIds]);
+      feeSnapshotPaidSet = new Set<number>(feeSnapshotResult.rows.map((r: any) => r.booking_id));
+
       for (const row of paymentStatusResult.rows) {
         const totalOwed = parseFloat(row.total_owed) || 0;
+        const snapshotPaid = feeSnapshotPaidSet.has(row.booking_id);
         paymentStatusMap.set(row.booking_id, {
-          hasUnpaidFees: totalOwed > 0,
-          totalOwed
+          hasUnpaidFees: snapshotPaid ? false : totalOwed > 0,
+          totalOwed: snapshotPaid ? 0 : totalOwed
         });
       }
       
@@ -199,6 +209,7 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
         ...b,
         has_unpaid_fees: paymentStatusMap.get(b.id)?.hasUnpaidFees || false,
         total_owed: paymentStatusMap.get(b.id)?.totalOwed || 0,
+        fee_snapshot_paid: feeSnapshotPaidSet.has(b.id),
         unfilled_slots: unfilledSlots,
         filled_player_count: filledSlots
       };
