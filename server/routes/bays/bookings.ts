@@ -413,6 +413,8 @@ router.post('/api/booking-requests', async (req, res) => {
       }
     }
     
+    const isStaffRequest = await isStaffOrAdminCheck(sessionEmail);
+    
     if (typeof duration_minutes !== 'number' || !Number.isInteger(duration_minutes) || duration_minutes <= 0 || duration_minutes > 480) {
       return res.status(400).json({ error: 'Invalid duration. Must be a whole number between 1 and 480 minutes.' });
     }
@@ -435,6 +437,24 @@ router.post('/api/booking-requests', async (req, res) => {
     let resourceType = 'simulator';
     try {
       await client.query('BEGIN');
+      
+      if (!isStaffRequest) {
+        await client.query(
+          `SELECT pg_advisory_xact_lock(hashtext($1))`,
+          [requestEmail]
+        );
+        const pendingCheck = await client.query(
+          `SELECT COUNT(*)::int AS cnt FROM booking_requests
+           WHERE LOWER(user_email) = LOWER($1) AND status = 'pending'`,
+          [requestEmail]
+        );
+        if (pendingCheck.rows[0].cnt > 0) {
+          await client.query('ROLLBACK');
+          return res.status(409).json({
+            error: 'You already have a pending request. Please wait for it to be approved or denied before requesting another slot.'
+          });
+        }
+      }
       
       await client.query(
         `SELECT id FROM booking_requests 

@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.25.1",
+    date: "2026-02-10",
+    title: "Booking Spam Prevention",
+    changes: [
+      "Feature: Members are now limited to one pending booking request at a time — additional requests are blocked until the first is approved or denied",
+      "Queue Management: Prevents members from stacking multiple pending requests and holding too many potential slots",
+      "Staff Exemption: Staff and admin users can still create multiple bookings as needed for manual scheduling",
+    ],
+  },
+  {
     version: "7.25.0",
     date: "2026-02-10",
     title: "Staff = VIP Rule — Automatic Tier Enforcement",
