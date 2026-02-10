@@ -30,9 +30,7 @@ export function estimateFeeByTier(
         includedMinutes = 60;
     }
     
-    const perPersonMinutes = Math.floor(durationMinutes / playerCount);
-    
-    const ownerOverageMinutes = Math.max(0, perPersonMinutes - includedMinutes);
+    const ownerOverageMinutes = Math.max(0, durationMinutes - includedMinutes);
     
     const ownerOverageBlocks = ownerOverageMinutes > 0 ? Math.ceil(ownerOverageMinutes / 30) : 0;
     const ownerOverageFee = ownerOverageBlocks * overageRate;

@@ -521,9 +521,9 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                     const declPlayers = (booking as any).declared_player_count || 1;
                                                                     const filledPlayers = (booking as any).filled_player_count || 0;
                                                                     const dbOwed = booking.total_owed || 0;
-                                                                    const estimatedFee = (filledPlayers < declPlayers) 
-                                                                      ? estimateFeeByTier((booking as any).tier, booking.duration_minutes || 0, declPlayers, guestFeeDollars, overageRatePerBlockDollars)
-                                                                      : (dbOwed > 0 ? dbOwed : estimateFeeByTier((booking as any).tier, booking.duration_minutes || 0, declPlayers, guestFeeDollars, overageRatePerBlockDollars));
+                                                                    const estimatedFee = dbOwed > 0 
+                                                                      ? dbOwed 
+                                                                      : estimateFeeByTier((booking as any).tier, booking.duration_minutes || 0, declPlayers, guestFeeDollars, overageRatePerBlockDollars);
                                                                     const isEstimate = !booking.has_unpaid_fees && dbOwed === 0;
                                                                     return (
                                                                         <button
