@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.32.0",
+    date: "2026-02-10",
+    title: "Visitor Directory Cleanup & Archive System",
+    isMajor: true,
+    changes: [
+      "Feature: Archived 2,308 non-transacting contacts (no Stripe customer or MindBody history) to declutter the visitors directory — down from ~2,800 contacts to ~470 active contacts with real transaction history",
+      "Feature: Active/Archived toggle on visitors tab — staff can switch between viewing current active contacts and the archived list at any time",
+      "Improvement: HubSpot sync now skips creating new local user records for contacts that have no membership status, no Stripe customer, and no MindBody client ID — prevents re-importing non-transacting contacts",
+      "Improvement: Auto-unarchive — when an archived contact makes a purchase (day pass, terminal payment, etc.) and gets a Stripe customer record, they are automatically restored to the active directory",
+      "Safety: Trackman import matching still searches all users including archived — historical booking data links are preserved",
+      "Safety: 11 contacts with booking participation records were preserved even though they lacked Stripe/MindBody IDs",
+    ],
+  },
+  {
     version: "7.31.8",
     date: "2026-02-10",
     title: "Trackman Import Matching & Unresolved Table Improvements",
