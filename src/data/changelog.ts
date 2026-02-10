@@ -24,6 +24,7 @@ export const changelog: ChangelogEntry[] = [
       "Feature: Booking type detection — conference room bookings automatically hide Trackman, roster, and financial sections; lesson and staff block bookings show only the owner slot",
       "Feature: Dual-mode operation — 'assign' mode for linking members to bookings and 'manage' mode for editing rosters and reviewing financials",
       "Improvement: All four entry points (Simulator tab, Trackman tab, Staff Command Center, Data Integrity) now use the unified component for consistent behavior everywhere",
+      "Improvement: Tapping a booking on the calendar grid now opens the Unified Booking Sheet directly — no more intermediate 'Booking Details' popup to click through",
       "Fix: Financial summary was showing fees at 1/100th their actual value — now displays correct dollar amounts",
     ],
   },

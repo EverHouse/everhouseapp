@@ -1008,7 +1008,36 @@ const SimulatorTab: React.FC = () => {
                 if (res.ok) {
                     const data = await res.json();
                     if (data && data.length > 0) {
-                        setSelectedCalendarBooking(data[0]);
+                        const booking = data[0];
+                        const email = (booking.user_email || '').toLowerCase();
+                        const isPlaceholderEmail = !email || 
+                            email.includes('@trackman.local') ||
+                            email.includes('@visitors.evenhouse.club') ||
+                            email.startsWith('unmatched-') ||
+                            email.startsWith('golfnow-') ||
+                            email.startsWith('classpass-') ||
+                            email === 'unmatched@trackman.import';
+                        const isUnmatched = booking.is_unmatched === true ||
+                            isPlaceholderEmail ||
+                            booking.user_name === 'Unknown (Trackman)';
+                        setTrackmanLinkModal({
+                            isOpen: true,
+                            trackmanBookingId: booking.trackman_booking_id || null,
+                            bookingId: booking.id,
+                            mode: isUnmatched ? 'assign' as const : 'manage' as const,
+                            bayName: booking.bay_name || booking.resource_name,
+                            bookingDate: formatDateShortAdmin(booking.request_date),
+                            timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
+                            matchedBookingId: Number(booking.id),
+                            currentMemberName: isUnmatched ? undefined : (booking.user_name || undefined),
+                            currentMemberEmail: isUnmatched ? undefined : (booking.user_email || undefined),
+                            ownerName: booking.user_name || undefined,
+                            ownerEmail: booking.user_email || undefined,
+                            declaredPlayerCount: booking.declared_player_count || booking.player_count || 1,
+                            isRelink: !isUnmatched,
+                            importedName: booking.user_name || booking.userName,
+                            notes: booking.notes || booking.note,
+                        });
                     }
                 }
             } catch (err) {
@@ -2272,7 +2301,24 @@ const SimulatorTab: React.FC = () => {
                                                                             : 'glass-card border border-primary/10 dark:border-white/25 hover:shadow-md'
                                                             } transition-all duration-200`} 
                                                             style={{ '--stagger-index': index } as React.CSSProperties}
-                                                            onClick={() => !isOptimisticNew && !isActionPending && setSelectedCalendarBooking(booking)}
+                                                            onClick={() => !isOptimisticNew && !isActionPending && setTrackmanLinkModal({
+                                                                isOpen: true,
+                                                                trackmanBookingId: (booking as any).trackman_booking_id || null,
+                                                                bookingId: booking.id,
+                                                                mode: isUnmatched ? 'assign' as const : 'manage' as const,
+                                                                bayName: bookingResource?.name || booking.bay_name || booking.resource_name,
+                                                                bookingDate: formatDateShortAdmin(booking.request_date),
+                                                                timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
+                                                                matchedBookingId: Number(booking.id),
+                                                                currentMemberName: isUnmatched ? undefined : (booking.user_name || undefined),
+                                                                currentMemberEmail: isUnmatched ? undefined : (booking.user_email || undefined),
+                                                                ownerName: booking.user_name || undefined,
+                                                                ownerEmail: booking.user_email || undefined,
+                                                                declaredPlayerCount: (booking as any).declared_player_count || (booking as any).player_count || 1,
+                                                                isRelink: !isUnmatched,
+                                                                importedName: (booking as any).user_name || (booking as any).userName,
+                                                                notes: (booking as any).notes || (booking as any).note,
+                                                            })}
                                                         >
                                                             {(isActionPending || isOptimisticNew) && (
                                                                 <div className="flex items-center gap-2 mb-2 text-sm text-primary/70 dark:text-white/70">
@@ -2680,7 +2726,10 @@ const SimulatorTab: React.FC = () => {
                                             const isTrackmanMatched = !!(booking as any)?.trackman_booking_id || (booking?.notes && booking.notes.includes('[Trackman Import ID:'));
                                             const hasKnownInactiveStatus = bookingMemberStatus && bookingMemberStatus.toLowerCase() !== 'active' && bookingMemberStatus.toLowerCase() !== 'unknown';
                                             const isInactiveMember = booking && bookingEmail && isTrackmanMatched && hasKnownInactiveStatus;
-                                            const isUnmatched = !!(booking as any)?.is_unmatched;
+                                            const isUnmatched = !!(booking as any)?.is_unmatched || (booking && (() => {
+                                                const e = (booking.user_email || '').toLowerCase();
+                                                return !e || e.includes('@trackman.local') || e.includes('@visitors.evenhouse.club') || e.startsWith('unmatched-') || e.startsWith('golfnow-') || e.startsWith('classpass-') || e === 'unmatched@trackman.import' || booking.user_name === 'Unknown (Trackman)';
+                                            })());
                                             const declaredPlayers = (booking as any)?.declared_player_count ?? 1;
                                             const unfilledSlots = (booking as any)?.unfilled_slots ?? 0;
                                             const filledSlots = Math.max(0, declaredPlayers - unfilledSlots);
@@ -2699,17 +2748,24 @@ const SimulatorTab: React.FC = () => {
                                                             initialMode: resource.type === 'conference_room' ? 'conference' : 'member'
                                                         });
                                                         setStaffManualBookingModalOpen(true);
-                                                    } : booking ? (isUnmatched ? () => setTrackmanLinkModal({
+                                                    } : booking ? () => setTrackmanLinkModal({
                                                         isOpen: true,
                                                         trackmanBookingId: (booking as any).trackman_booking_id || null,
+                                                        bookingId: booking.id,
+                                                        mode: isUnmatched ? 'assign' as const : 'manage' as const,
                                                         bayName: resource.type === 'conference_room' ? 'Conference Room' : resource.name,
                                                         bookingDate: formatDateShortAdmin(booking.request_date),
                                                         timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
                                                         matchedBookingId: Number(booking.id),
-                                                        isRelink: false,
+                                                        currentMemberName: isUnmatched ? undefined : ((booking as any).user_name || undefined),
+                                                        currentMemberEmail: isUnmatched ? undefined : ((booking as any).user_email || undefined),
+                                                        ownerName: (booking as any).user_name || undefined,
+                                                        ownerEmail: (booking as any).user_email || undefined,
+                                                        declaredPlayerCount: (booking as any).declared_player_count || (booking as any).player_count || 1,
+                                                        isRelink: !isUnmatched,
                                                         importedName: (booking as any).user_name || (booking as any).userName,
-                                                        notes: (booking as any).notes || (booking as any).note
-                                                    }) : () => setSelectedCalendarBooking(booking)) : pendingRequest ? () => setTrackmanModal({ isOpen: true, booking: pendingRequest }) : undefined}
+                                                        notes: (booking as any).notes || (booking as any).note,
+                                                    }) : pendingRequest ? () => setTrackmanModal({ isOpen: true, booking: pendingRequest }) : undefined}
                                                     className={`h-7 sm:h-8 rounded ${
                                                         closure
                                                             ? 'bg-red-100 dark:bg-red-500/20 border border-red-300 dark:border-red-500/30'
