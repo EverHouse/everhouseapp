@@ -895,9 +895,6 @@ const SimulatorTab: React.FC = () => {
     const [editingTrackmanId, setEditingTrackmanId] = useState(false);
     const [trackmanIdDraft, setTrackmanIdDraft] = useState('');
     const [savingTrackmanId, setSavingTrackmanId] = useState(false);
-    const [editingPlayerCount, setEditingPlayerCount] = useState(false);
-    const [playerCountDraft, setPlayerCountDraft] = useState<number>(1);
-    const [savingPlayerCount, setSavingPlayerCount] = useState(false);
     const [membersEditorKey, setMembersEditorKey] = useState(0);
     const [rescheduleModal, setRescheduleModal] = useState<{ isOpen: boolean; booking: any | null }>({ isOpen: false, booking: null });
     const [feeEstimate, setFeeEstimate] = useState<{
@@ -994,9 +991,6 @@ const SimulatorTab: React.FC = () => {
         setEditingTrackmanId(false);
         setTrackmanIdDraft('');
         setSavingTrackmanId(false);
-        setEditingPlayerCount(false);
-        setPlayerCountDraft(1);
-        setSavingPlayerCount(false);
     }, [selectedCalendarBooking]);
 
     useEffect(() => {
@@ -3260,82 +3254,24 @@ const SimulatorTab: React.FC = () => {
                         <div className="grid grid-cols-2 gap-3">
                             {(selectedCalendarBooking as any)?.declared_player_count && (
                                 <div 
-                                    className={`p-3 bg-accent/10 dark:bg-accent/20 rounded-lg border border-accent/30 ${!editingPlayerCount ? 'cursor-pointer hover:bg-accent/20 dark:hover:bg-accent/30 transition-colors' : ''}`}
+                                    className="p-3 bg-accent/10 dark:bg-accent/20 rounded-lg border border-accent/30 cursor-pointer hover:bg-accent/20 dark:hover:bg-accent/30 transition-colors"
                                     onClick={() => {
-                                        if (!editingPlayerCount) {
-                                            setPlayerCountDraft((selectedCalendarBooking as any).declared_player_count);
-                                            setEditingPlayerCount(true);
+                                        const el = document.getElementById('booking-members-editor');
+                                        if (el) {
+                                            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                            el.classList.add('ring-2', 'ring-accent', 'ring-offset-2');
+                                            setTimeout(() => el.classList.remove('ring-2', 'ring-accent', 'ring-offset-2'), 2000);
                                         }
                                     }}
                                 >
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-1">
                                         Players
-                                        {!editingPlayerCount && (
-                                            <span className="material-symbols-outlined text-xs text-accent">edit</span>
-                                        )}
+                                        <span className="material-symbols-outlined text-xs text-accent">arrow_downward</span>
                                     </p>
-                                    {editingPlayerCount ? (
-                                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                            <select
-                                                value={playerCountDraft}
-                                                onChange={(e) => setPlayerCountDraft(parseInt(e.target.value, 10))}
-                                                className="px-2 py-1 text-sm rounded border border-accent/50 bg-white dark:bg-gray-800 text-primary dark:text-white flex-1"
-                                                disabled={savingPlayerCount}
-                                            >
-                                                {[1, 2, 3, 4].map(n => (
-                                                    <option key={n} value={n}>{n}</option>
-                                                ))}
-                                            </select>
-                                            <button
-                                                onClick={async () => {
-                                                    if (!selectedCalendarBooking) return;
-                                                    setSavingPlayerCount(true);
-                                                    const bookingId = typeof selectedCalendarBooking.id === 'string' 
-                                                        ? parseInt(String(selectedCalendarBooking.id).replace('cal_', ''), 10) 
-                                                        : selectedCalendarBooking.id;
-                                                    try {
-                                                        const res = await fetch(`/api/admin/booking/${bookingId}/player-count`, {
-                                                            method: 'PATCH',
-                                                            headers: { 'Content-Type': 'application/json' },
-                                                            credentials: 'include',
-                                                            body: JSON.stringify({ playerCount: playerCountDraft })
-                                                        });
-                                                        if (res.ok) {
-                                                            setSelectedCalendarBooking({
-                                                                ...selectedCalendarBooking,
-                                                                declared_player_count: playerCountDraft
-                                                            } as any);
-                                                            setEditingPlayerCount(false);
-                                                            setMembersEditorKey(prev => prev + 1);
-                                                            handleRefresh();
-                                                        }
-                                                    } catch (err) {
-                                                        console.error('Failed to update player count:', err);
-                                                    } finally {
-                                                        setSavingPlayerCount(false);
-                                                    }
-                                                }}
-                                                disabled={savingPlayerCount}
-                                                className="p-1 rounded hover:bg-green-100 dark:hover:bg-green-500/20 text-green-600 dark:text-green-400"
-                                            >
-                                                <span className="material-symbols-outlined text-sm">
-                                                    {savingPlayerCount ? 'progress_activity' : 'check'}
-                                                </span>
-                                            </button>
-                                            <button
-                                                onClick={() => setEditingPlayerCount(false)}
-                                                disabled={savingPlayerCount}
-                                                className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400"
-                                            >
-                                                <span className="material-symbols-outlined text-sm">close</span>
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <p className="font-medium text-primary dark:text-white text-sm flex items-center gap-1">
-                                            <span className="material-symbols-outlined text-accent text-base">group</span>
-                                            {(selectedCalendarBooking as any).declared_player_count} {(selectedCalendarBooking as any).declared_player_count === 1 ? 'player' : 'players'}
-                                        </p>
-                                    )}
+                                    <p className="font-medium text-primary dark:text-white text-sm flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-accent text-base">group</span>
+                                        {(selectedCalendarBooking as any).declared_player_count} {(selectedCalendarBooking as any).declared_player_count === 1 ? 'player' : 'players'}
+                                    </p>
                                 </div>
                             )}
                             {(selectedCalendarBooking as any)?.booking_source && (
@@ -3522,6 +3458,7 @@ const SimulatorTab: React.FC = () => {
 
                     {selectedCalendarBooking && (
                         <BookingMembersEditor 
+                            id="booking-members-editor"
                             key={`members-editor-${selectedCalendarBooking.id}-${membersEditorKey}`}
                             bookingId={selectedCalendarBooking.id}
                             onMemberLinked={() => {

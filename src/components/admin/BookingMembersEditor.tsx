@@ -104,6 +104,7 @@ interface BillingContext {
 }
 
 interface BookingMembersEditorProps {
+  id?: string;
   bookingId: number | string;
   onMemberLinked?: () => void;
   onCollectPayment?: (bookingId: number) => void;
@@ -185,6 +186,7 @@ function getBayName(resourceId: number): string {
 }
 
 const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({ 
+  id,
   bookingId, 
   onMemberLinked, 
   onCollectPayment,
@@ -809,7 +811,7 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" id={id}>
       {/* Booking Context Header - Only shown when showHeader is true */}
       {showHeader && bookingContext && (
         <div className="p-3 bg-primary/5 dark:bg-white/5 rounded-lg border border-primary/10 dark:border-white/10">
@@ -963,13 +965,64 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
           <span className="material-symbols-outlined text-primary dark:text-white text-lg">group</span>
           <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">Players</p>
           {!showHeader && validation && (
-            <span className={`ml-auto px-2 py-0.5 text-[10px] font-bold rounded-full ${
-              isRosterComplete 
-                ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' 
-                : 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400'
-            }`}>
-              {filledSlotCount}/{expectedCount}
-            </span>
+            <>
+              <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                isRosterComplete 
+                  ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' 
+                  : 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400'
+              }`}>
+                {filledSlotCount}/{expectedCount}
+              </span>
+              <div className="ml-auto flex items-center gap-2">
+                {isEditingPlayerCount ? (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={editingPlayerCount}
+                      onChange={(e) => setEditingPlayerCount(parseInt(e.target.value, 10))}
+                      className="px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-primary dark:text-white"
+                      disabled={isUpdatingPlayerCount}
+                    >
+                      {[1, 2, 3, 4].map(n => (
+                        <option key={n} value={n}>{n} Player{n !== 1 ? 's' : ''}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleSavePlayerCount}
+                      disabled={isUpdatingPlayerCount}
+                      className="p-1 rounded hover:bg-green-100 dark:hover:bg-green-500/20 text-green-600 dark:text-green-400"
+                      title="Save"
+                    >
+                      <span className="material-symbols-outlined text-sm">
+                        {isUpdatingPlayerCount ? 'progress_activity' : 'check'}
+                      </span>
+                    </button>
+                    <button
+                      onClick={handleCancelEditPlayerCount}
+                      disabled={isUpdatingPlayerCount}
+                      className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400"
+                      title="Cancel"
+                    >
+                      <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <span className={`text-sm font-medium ${
+                      isRosterComplete ? 'text-green-700 dark:text-green-300' : 'text-amber-700 dark:text-amber-300'
+                    }`}>
+                      {expectedCount} Player{expectedCount !== 1 ? 's' : ''} Expected
+                    </span>
+                    <button
+                      onClick={handleStartEditPlayerCount}
+                      className="p-1 rounded hover:bg-gray-200 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400"
+                      title="Edit player count"
+                    >
+                      <span className="material-symbols-outlined text-sm">edit</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
 

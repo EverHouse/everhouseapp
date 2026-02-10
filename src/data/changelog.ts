@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.15.4",
+    date: "2026-02-10",
+    title: "Unified Player Count Editing",
+    changes: [
+      "Improvement: Player count in booking details now scrolls to the roster editor below instead of having its own separate dropdown — one place to manage players instead of two",
+      "Improvement: Roster editor now always shows the player count with an edit button, so staff can change it directly from the players list in both the booking details modal and the check-in flow",
+      "Cleanup: Removed duplicate player count editing state from the booking details modal",
+    ],
+  },
+  {
     version: "7.15.3",
     date: "2026-02-09",
     title: "Guest Pass Badge Display Fix",
