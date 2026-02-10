@@ -1826,9 +1826,9 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     guestPassesRemainingAfterBooking = ownerGuestPassesRemaining - guestPassesUsedThisBooking;
     const grandTotal = ownerOverageFee + guestFeesWithoutPass + totalPlayersOwe;
     
-    // Check if there are any fees that have been paid (to show "Paid" indicator)
     let hasPaidFees = false;
     let hasOriginalFees = false;
+    let hasCompletedFeeSnapshot = false;
     if (sessionId) {
       const paidCheck = await db.execute(sql`SELECT 
           COUNT(*) FILTER (WHERE payment_status = 'paid' AND cached_fee_cents > 0) as paid_count,
@@ -1837,10 +1837,14 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
         WHERE session_id = ${sessionId}`);
       hasPaidFees = parseInt(paidCheck.rows[0]?.paid_count || '0') > 0;
       hasOriginalFees = parseInt(paidCheck.rows[0]?.total_with_fees || '0') > 0;
+
+      const snapshotCheck = await db.execute(sql`SELECT id, total_cents FROM booking_fee_snapshots WHERE session_id = ${sessionId} AND status = 'completed' ORDER BY created_at DESC LIMIT 1`);
+      if (snapshotCheck.rows.length > 0) {
+        hasCompletedFeeSnapshot = true;
+      }
     }
     
-    // All fees are paid if there were original fees and no outstanding balance
-    const allPaid = hasOriginalFees && grandTotal === 0 && hasPaidFees;
+    const allPaid = hasCompletedFeeSnapshot || (hasOriginalFees && grandTotal === 0 && hasPaidFees);
     
     const isOwnerStaff = ownerEmail ? staffEmailSet.has(ownerEmail.toLowerCase()) : false;
     

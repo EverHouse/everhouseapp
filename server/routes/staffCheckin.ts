@@ -645,6 +645,31 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
       }
 
       if (action === 'confirm_all') {
+        try {
+          const existingSnapshot = await pool.query(
+            `SELECT id FROM booking_fee_snapshots WHERE session_id = $1 AND status = 'completed' LIMIT 1`,
+            [sessionId]
+          );
+          if (existingSnapshot.rows.length === 0) {
+            const breakdown = await computeFeeBreakdown({ sessionId, source: 'checkin' as const });
+            const participantFees = breakdown.participants
+              .filter(p => p.participantId)
+              .map(p => ({ id: p.participantId, amountCents: p.totalCents }));
+            const totalCents = breakdown.totalCents;
+
+            await pool.query(`
+              INSERT INTO booking_fee_snapshots (booking_id, session_id, participant_fees, total_cents, status, created_at)
+              VALUES ($1, $2, $3, $4, 'completed', NOW())
+            `, [bookingId, sessionId, JSON.stringify(participantFees), totalCents]);
+
+            console.log(`[StaffCheckin] Created fee snapshot for booking ${bookingId}, session ${sessionId}, total ${totalCents} cents`);
+          } else {
+            console.log(`[StaffCheckin] Fee snapshot already exists for session ${sessionId}, skipping`);
+          }
+        } catch (snapshotErr) {
+          console.error('[StaffCheckin] Failed to create fee snapshot:', snapshotErr);
+        }
+
         await notifyMember({
           userEmail: booking.owner_email,
           title: 'Checked In',
