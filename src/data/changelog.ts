@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.31.5",
+    date: "2026-02-10",
+    title: "Booking Fee Display & Email Sender Fixes",
+    changes: [
+      "Fix: Booking card fee button now includes guest fees for unfilled player slots — previously only showed the owner's overage fee from the database, ignoring estimated fees for empty slots",
+      "Fix: Calendar grid fee display also updated to include unfilled slot fees",
+      "Improvement: All outgoing emails now consistently show 'Ever Club' as the sender name instead of 'noreply' or inconsistent variations",
+    ],
+  },
+  {
     version: "7.31.4",
     date: "2026-02-10",
     title: "POS Receipt Line Items",

@@ -365,7 +365,8 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                         const hasUnpaidFees = ((booking as any)?.has_unpaid_fees === true) || 
                                                             (dbTotalOwed > 0) || 
                                                             (filledSlotsInner < declaredPlayersInner && estimatedFromTier > 0);
-                                                        const totalOwed = dbTotalOwed > 0 ? dbTotalOwed : (filledSlotsInner < declaredPlayersInner ? estimatedFromTier : 0);
+                                                        const unfilledGuestFees = Math.max(0, declaredPlayersInner - filledSlotsInner) * guestFeeDollars;
+                                                        const totalOwed = dbTotalOwed > 0 ? dbTotalOwed + unfilledGuestFees : (filledSlotsInner < declaredPlayersInner ? estimatedFromTier : 0);
                                                         const isPartialRoster = !isConference && declaredPlayersInner > 1 && filledSlotsInner < declaredPlayersInner;
                                                         const textColor = isConference 
                                                             ? 'text-purple-700 dark:text-purple-300' 
