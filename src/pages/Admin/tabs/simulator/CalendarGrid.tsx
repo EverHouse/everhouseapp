@@ -31,6 +31,7 @@ export interface CalendarGridProps {
     activeView: 'requests' | 'calendar';
     guestFeeDollars: number;
     overageRatePerBlockDollars: number;
+    tierMinutes: Record<string, number>;
 }
 
 const CalendarGrid: React.FC<CalendarGridProps> = ({
@@ -60,6 +61,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
     activeView,
     guestFeeDollars,
     overageRatePerBlockDollars,
+    tierMinutes,
 }) => {
     const timeSlots = useMemo(() => {
         const slots: string[] = [];
@@ -360,7 +362,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                         const unfilledSlotsInner = (booking as any)?.unfilled_slots ?? 0;
                                                         const declaredPlayersInner = (booking as any)?.declared_player_count ?? 1;
                                                         const filledSlotsInner = Math.max(0, declaredPlayersInner - unfilledSlotsInner);
-                                                        const estimatedFromTier = estimateFeeByTier((booking as any)?.tier, (booking as any)?.duration_minutes || 0, declaredPlayersInner, guestFeeDollars, overageRatePerBlockDollars);
+                                                        const estimatedFromTier = estimateFeeByTier((booking as any)?.tier, (booking as any)?.duration_minutes || 0, declaredPlayersInner, guestFeeDollars, overageRatePerBlockDollars, tierMinutes);
                                                         const dbTotalOwed = (booking as any)?.total_owed ?? 0;
                                                         const hasUnpaidFees = ((booking as any)?.has_unpaid_fees === true) || 
                                                             (dbTotalOwed > 0) || 

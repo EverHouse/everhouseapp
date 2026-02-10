@@ -29,6 +29,7 @@ export interface BookingRequestsPanelProps {
     confirm: (opts: { title: string; message: string; confirmText: string; variant: string }) => Promise<boolean>;
     guestFeeDollars: number;
     overageRatePerBlockDollars: number;
+    tierMinutes: Record<string, number>;
     optimisticNewBooking: BookingRequest | null;
     startDate: string;
     endDate: string;
@@ -62,6 +63,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
     confirm,
     guestFeeDollars,
     overageRatePerBlockDollars,
+    tierMinutes,
     optimisticNewBooking,
     startDate,
     endDate,
@@ -514,7 +516,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                 const declPlayers = (booking as any).declared_player_count || 1;
                                                                 const filledPlayers = (booking as any).filled_player_count || 0;
                                                                 const dbOwed = booking.total_owed || 0;
-                                                                const estimatedFee = estimateFeeByTier((booking as any).tier, booking.duration_minutes || 0, declPlayers, guestFeeDollars, overageRatePerBlockDollars);
+                                                                const estimatedFee = estimateFeeByTier((booking as any).tier, booking.duration_minutes || 0, declPlayers, guestFeeDollars, overageRatePerBlockDollars, tierMinutes);
                                                                 return booking.has_unpaid_fees === true || dbOwed > 0 || (filledPlayers < declPlayers && estimatedFee > 0);
                                                             })() ? (
                                                                 (() => {
@@ -525,7 +527,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                     const unfilledGuestFees = unfilledSlots * guestFeeDollars;
                                                                     const estimatedFee = dbOwed > 0 
                                                                       ? dbOwed + unfilledGuestFees
-                                                                      : estimateFeeByTier((booking as any).tier, booking.duration_minutes || 0, declPlayers, guestFeeDollars, overageRatePerBlockDollars);
+                                                                      : estimateFeeByTier((booking as any).tier, booking.duration_minutes || 0, declPlayers, guestFeeDollars, overageRatePerBlockDollars, tierMinutes);
                                                                     const isEstimate = !booking.has_unpaid_fees && dbOwed === 0;
                                                                     return (
                                                                         <button

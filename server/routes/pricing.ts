@@ -24,6 +24,25 @@ router.get('/api/pricing', async (req, res) => {
   };
 
   try {
+    const subscriptionTiers = await db.select({
+      name: membershipTiers.name,
+      dailySimMinutes: membershipTiers.dailySimMinutes,
+    })
+      .from(membershipTiers)
+      .where(eq(membershipTiers.productType, 'subscription'));
+
+    const tierMinutes: Record<string, number> = {};
+    for (const t of subscriptionTiers) {
+      if (t.name) {
+        tierMinutes[t.name.toLowerCase()] = t.dailySimMinutes ?? 0;
+      }
+    }
+    response.tierMinutes = tierMinutes;
+  } catch (e) {
+    response.tierMinutes = {};
+  }
+
+  try {
     const dayPassProducts = await db.select()
       .from(membershipTiers)
       .where(eq(membershipTiers.productType, 'one_time'));

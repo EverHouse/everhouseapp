@@ -42,7 +42,7 @@ const SimulatorTab: React.FC = () => {
     const { setPageReady } = usePageReady();
     const { user, actualUser, members } = useData();
     const queryClient = useQueryClient();
-    const { guestFeeDollars, overageRatePerBlockDollars } = usePricing();
+    const { guestFeeDollars, overageRatePerBlockDollars, tierMinutes } = usePricing();
     
     const navigateToTab = useCallback((tab: TabType) => {
         if (tabToPath[tab]) {
@@ -1103,6 +1103,7 @@ const SimulatorTab: React.FC = () => {
                         confirm={confirm}
                         guestFeeDollars={guestFeeDollars}
                         overageRatePerBlockDollars={overageRatePerBlockDollars}
+                        tierMinutes={tierMinutes}
                         optimisticNewBooking={optimisticNewBooking}
                         startDate={startDate}
                         endDate={endDate}
@@ -1140,6 +1141,7 @@ const SimulatorTab: React.FC = () => {
                         activeView={activeView}
                         guestFeeDollars={guestFeeDollars}
                         overageRatePerBlockDollars={overageRatePerBlockDollars}
+                        tierMinutes={tierMinutes}
                     />
                 </div>
             )}

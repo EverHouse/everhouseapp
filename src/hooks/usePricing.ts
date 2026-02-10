@@ -14,6 +14,7 @@ interface PricingConfig {
     tiers: CorporateTier[];
   };
   dayPassPrices: Record<string, number>;
+  tierMinutes: Record<string, number>;
 }
 
 export function usePricing() {
@@ -42,6 +43,7 @@ export function usePricing() {
       return pricing.basePriceDollars;
     },
     dayPassPrices: data?.dayPassPrices ?? {},
+    tierMinutes: data?.tierMinutes ?? {},
     corporateTiers: data?.corporatePricing?.tiers ?? [],
     corporateBasePrice: data?.corporatePricing?.basePriceDollars ?? 350,
   };

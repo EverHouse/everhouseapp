@@ -1545,7 +1545,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
           };
         }
       } else {
-        fee = 25;
+        fee = PRICING.GUEST_FEE_DOLLARS;
         feeNote = `Pending assignment - $${PRICING.GUEST_FEE_DOLLARS}`;
       }
       

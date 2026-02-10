@@ -6,7 +6,8 @@ export function estimateFeeByTier(
     durationMinutes: number,
     declaredPlayerCount: number = 1,
     guestFeeRate: number = 25,
-    overageRate: number = 25
+    overageRate: number = 25,
+    tierMinutesMap?: Record<string, number>
 ): number {
     if (durationMinutes <= 0) return 0;
     
@@ -19,12 +20,18 @@ export function estimateFeeByTier(
     
     const tierLower = tier.toLowerCase();
     
-    if (tierLower === 'vip') {
+    if (tierMinutesMap && tierMinutesMap[tierLower] !== undefined && tierMinutesMap[tierLower] >= 999) {
+        return guestFees;
+    }
+    
+    if (tierLower === 'vip' && (!tierMinutesMap || tierMinutesMap[tierLower] === undefined)) {
         return guestFees;
     }
     
     let includedMinutes = 0;
-    if (tierLower === 'corporate' || tierLower === 'premium') {
+    if (tierMinutesMap && tierMinutesMap[tierLower] !== undefined) {
+        includedMinutes = tierMinutesMap[tierLower];
+    } else if (tierLower === 'corporate' || tierLower === 'premium') {
         includedMinutes = 90;
     } else if (tierLower === 'core') {
         includedMinutes = 60;
