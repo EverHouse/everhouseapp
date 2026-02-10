@@ -88,11 +88,19 @@ export async function syncGoogleCalendarEvents(): Promise<{ synced: number; crea
         continue;
       }
       
-      const location = event.location || appMetadata.location || null;
+      const DEFAULT_LOCATION = '15771 Red Hill Ave, Ste 500, Tustin, CA 92780';
+      const location = event.location || appMetadata.location || DEFAULT_LOCATION;
       
+      const isAppCreated = !!(extProps['ehApp_type'] || extProps['ehApp_id']);
       const hasBracketPrefix = /^\[.+\]/.test(rawTitle);
       const hasSufficientMetadata = !!(location || appMetadata.imageUrl || appMetadata.externalUrl || description);
-      const needsReview = !hasBracketPrefix || !hasSufficientMetadata;
+      const needsReview = isAppCreated ? false : (!hasBracketPrefix || !hasSufficientMetadata);
+      
+      const enrichedDescription = extractedCategory && description && !description.startsWith(`[${extractedCategory}]`)
+        ? `[${extractedCategory}] ${description}`
+        : extractedCategory && !description
+        ? `[${extractedCategory}]`
+        : description;
       
       const existing = await pool.query(
         `SELECT id, locally_edited, app_last_modified_at, google_event_updated_at,
@@ -123,7 +131,7 @@ export async function syncGoogleCalendarEvents(): Promise<{ synced: number; crea
                google_event_etag = $12, google_event_updated_at = $13, last_synced_at = NOW(),
                locally_edited = false, app_last_modified_at = NULL
                WHERE google_calendar_id = $14`,
-              [title, description, eventDate, startTime, endTime, location,
+              [title, enrichedDescription, eventDate, startTime, endTime, location,
                appMetadata.imageUrl, appMetadata.externalUrl, appMetadata.maxAttendees,
                appMetadata.visibility, appMetadata.requiresRsvp,
                googleEtag, googleUpdatedAt, googleEventId, extractedCategory]
@@ -235,7 +243,7 @@ export async function syncGoogleCalendarEvents(): Promise<{ synced: number; crea
              needs_review = CASE WHEN $15 THEN needs_review ELSE CASE WHEN $17 THEN true ELSE $16 END END,
              conflict_detected = CASE WHEN $17 THEN true ELSE conflict_detected END
              WHERE google_calendar_id = $14`,
-            [title, description, eventDate, startTime, endTime, location,
+            [title, enrichedDescription, eventDate, startTime, endTime, location,
              appMetadata.imageUrl, appMetadata.externalUrl, appMetadata.maxAttendees,
              appMetadata.visibility, appMetadata.requiresRsvp,
              googleEtag, googleUpdatedAt, googleEventId, reviewDismissed, shouldSetNeedsReview, isConflict, extractedCategory]
@@ -248,7 +256,7 @@ export async function syncGoogleCalendarEvents(): Promise<{ synced: number; crea
            source, visibility, requires_rsvp, google_calendar_id, image_url, external_url, max_attendees,
            google_event_etag, google_event_updated_at, last_synced_at, needs_review)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), $17)`,
-          [title, description, eventDate, startTime, endTime, location, extractedCategory || 'Social', 'google_calendar', 
+          [title, enrichedDescription, eventDate, startTime, endTime, location, extractedCategory || 'Social', 'google_calendar', 
            appMetadata.visibility || 'public', appMetadata.requiresRsvp || false, googleEventId,
            appMetadata.imageUrl, appMetadata.externalUrl, appMetadata.maxAttendees,
            googleEtag, googleUpdatedAt, needsReview]

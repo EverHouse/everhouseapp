@@ -104,6 +104,7 @@ The application is built with a React 19 frontend (Vite, Tailwind CSS) and an Ex
 - **Apple Messages for Business**: Direct messaging link (contact page).
 
 ## Recent Changes
+- **v7.30.0 (2026-02-10)**: Calendar Sync Improvements — app-created events no longer flagged as drafts when synced to dev, deleted/cancelled Google Calendar events properly removed, default location set to club address, bracket category prefix added to description, staff notes error messages shortened.
 - **v7.29.0 (2026-02-10)**: Unified Booking Sheet & Fee Button Fix — fee button on booking cards now opens the Unified Booking Sheet instead of the old billing modal, shows full estimated total (owner overage + guest fees), and Mark Paid works inline. Overdue Payments moved to top of Transactions tab with badge indicator, amounts include unfilled guest fees, and open the Unified Booking Sheet.
 - **v7.28.0 (2026-02-10)**: Data Integrity Fix Actions — Unlink HubSpot duplicates, delete orphaned guest passes, fee snapshots, and booking participants directly from the Data Integrity page. Fixed integrity check crash and made Stripe cleanup tool visible in Data Tools.
 - **v7.27.0 (2026-02-10)**: Stripe Customer Cleanup & Prevention — admin tool to scan/delete empty Stripe customers, stopped premature customer creation in day pass checkout (uses customer_email instead), visitor creation, bulk sync, CSV import, and visitor matching. Metadata sync now includes firstName/lastName.

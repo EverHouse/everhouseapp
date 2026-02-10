@@ -112,15 +112,18 @@ export async function syncWellnessCalendarEvents(): Promise<{ synced: number; cr
       const spots = appMetadata.spots || '10 spots';
       const status = appMetadata.status || 'Open';
       
+      const isAppCreated = !!(extProps['ehApp_type'] || extProps['ehApp_id']);
       let needsReview = false;
-      if (!rawTitle.includes(' - ') && !rawTitle.toLowerCase().includes(' with ')) {
-        needsReview = true;
-      }
-      if (instructor === 'TBD') {
-        needsReview = true;
-      }
-      if (category === 'Wellness') {
-        needsReview = true;
+      if (!isAppCreated) {
+        if (!rawTitle.includes(' - ') && !rawTitle.toLowerCase().includes(' with ')) {
+          needsReview = true;
+        }
+        if (instructor === 'TBD') {
+          needsReview = true;
+        }
+        if (category === 'Wellness') {
+          needsReview = true;
+        }
       }
       
       const existing = await pool.query(

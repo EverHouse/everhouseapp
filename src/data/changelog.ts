@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.30.0",
+    date: "2026-02-10",
+    title: "Calendar Sync Improvements",
+    changes: [
+      "Fix: Events created in the production app and synced to Google Calendar no longer show up as drafts/needs review in dev — the sync now recognizes app-created events and trusts they were already reviewed",
+      "Fix: Deleted or cancelled Google Calendar events are now properly removed from the database during sync (previously, cancelled events could linger)",
+      "Improvement: Events synced from Google Calendar now default to the club address (15771 Red Hill Ave, Ste 500, Tustin, CA 92780) when no location is set, so staff don't have to enter it manually every time",
+      "Improvement: When an event has a bracket prefix like [Social] in its Google Calendar title, the category tag is now included in the description for better visibility",
+      "Fix: Session creation failure messages no longer dump raw database errors into Staff Notes — replaced with short, readable notes",
+    ],
+  },
+  {
     version: "7.29.0",
     date: "2026-02-10",
     title: "Unified Booking Sheet & Fee Button Fix",
