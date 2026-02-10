@@ -90,7 +90,8 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
       declared_player_count: bookingRequests.declaredPlayerCount,
       member_notes: bookingRequests.memberNotes,
       guest_count: bookingRequests.guestCount,
-      is_unmatched: bookingRequests.isUnmatched
+      is_unmatched: bookingRequests.isUnmatched,
+      trackman_customer_notes: bookingRequests.trackmanCustomerNotes,
     })
     .from(bookingRequests)
     .leftJoin(resources, eq(bookingRequests.resourceId, resources.id))

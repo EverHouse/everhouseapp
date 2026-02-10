@@ -61,6 +61,7 @@ interface BookingContextType {
   resourceName?: string;
   durationMinutes?: number;
   notes?: string;
+  trackmanCustomerNotes?: string;
 }
 
 interface ManageModeRosterData {
@@ -71,7 +72,7 @@ interface ManageModeRosterData {
   tierLimits?: { guest_passes_per_month: number };
   guestPassContext?: { passesBeforeBooking: number; passesUsedThisBooking: number };
   financialSummary?: FinancialSummary;
-  bookingNotes?: { notes: string | null; staffNotes: string | null };
+  bookingNotes?: { notes: string | null; staffNotes: string | null; trackmanNotes: string | null };
 }
 
 interface VisitorSearchResult {
@@ -1911,6 +1912,16 @@ export function UnifiedBookingSheet({
                 </div>
               )}
 
+              {(rosterData?.bookingNotes?.trackmanNotes || bookingContext?.trackmanCustomerNotes) && (
+                <div className="p-3 rounded-xl border border-blue-200 dark:border-blue-500/20 bg-blue-50 dark:bg-blue-900/10">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-base">sell</span>
+                    <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Trackman Notes</span>
+                  </div>
+                  <p className="text-sm text-blue-800 dark:text-blue-200 whitespace-pre-wrap">{rosterData?.bookingNotes?.trackmanNotes || bookingContext?.trackmanCustomerNotes}</p>
+                </div>
+              )}
+
               {rosterData?.bookingNotes?.staffNotes && (
                 <div className="p-3 rounded-xl border border-purple-200 dark:border-purple-500/20 bg-purple-50 dark:bg-purple-900/10">
                   <div className="flex items-center gap-2 mb-1">
@@ -2299,12 +2310,22 @@ export function UnifiedBookingSheet({
         )}
 
         {notes && (
-          <div className="p-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-lg">
-            <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-1 flex items-center gap-1">
-              <span className="material-symbols-outlined text-sm">notes</span>
-              Notes
+          <div className="p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-500/20 rounded-lg">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-300 mb-1 flex items-center gap-1">
+              <span className="material-symbols-outlined text-sm">description</span>
+              Booking Notes
             </p>
-            <p className="text-sm text-blue-700 dark:text-blue-400 whitespace-pre-wrap">{notes}</p>
+            <p className="text-sm text-amber-700 dark:text-amber-400 whitespace-pre-wrap">{notes}</p>
+          </div>
+        )}
+
+        {bookingContext?.trackmanCustomerNotes && (
+          <div className="p-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-500/20 rounded-lg">
+            <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-1 flex items-center gap-1">
+              <span className="material-symbols-outlined text-sm">sell</span>
+              Trackman Notes
+            </p>
+            <p className="text-sm text-blue-700 dark:text-blue-400 whitespace-pre-wrap">{bookingContext.trackmanCustomerNotes}</p>
           </div>
         )}
 

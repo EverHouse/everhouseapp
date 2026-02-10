@@ -13,12 +13,13 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "7.18.2",
+    version: "7.18.3",
     date: "2026-02-10",
-    title: "Booking Notes, Inactive Member Warning & Payment-Gated Check-In",
+    title: "Complete Notes Display, Inactive Member Warning & Payment-Gated Check-In",
     changes: [
-      "Feature: Member booking notes and staff notes are now displayed in the booking sheet — amber block for the member's request notes, purple block for internal staff notes",
-      "Feature: Inactive member warning — a red banner now appears at the top of the booking sheet when the booking owner's membership is not active, showing their current status",
+      "Feature: All three types of booking notes now display in the booking sheet — amber for the member's request notes, blue for Trackman customer notes (imported from CSV), and purple for internal staff notes",
+      "Feature: Trackman customer notes are now included in both assign mode and manage mode, so staff can see imported notes when matching unmatched bookings",
+      "Feature: Inactive member warning — a red banner appears at the top of the booking sheet when the booking owner's membership is not active",
       "Feature: Check In button is disabled until all fees are collected — a clear message explains that payment must be processed first",
       "Improvement: Check In, Reschedule, and Cancel buttons now appear below the Financial Summary and Collect button, so the payment flow comes first naturally",
     ],
