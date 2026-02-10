@@ -93,38 +93,6 @@ const PrivateHire: React.FC = () => {
          </div>
        </section>
 
-       <div className="px-4 pb-8 space-y-6">
-          <div className="flex items-center justify-between px-2 pb-2 animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
-             <h3 className="text-lg font-bold text-primary">Available Spaces</h3>
-             <span className="text-xs font-bold text-primary/50 bg-[#E8E8E0] px-2 py-1 rounded uppercase tracking-widest">Select One</span>
-          </div>
-          
-          <SpaceCard
-            title="The Main Hall"
-            cap="600 Max"
-            img="/images/events-crowd-optimized.webp"
-            tags={['AV System', 'Full Bar', 'Stage']}
-            desc="Our signature space featuring vaulted ceilings, abundant natural light, and a dedicated stage area."
-            index={0}
-          />
-          <SpaceCard
-            title="The Private Dining Room"
-            cap="30 Seated"
-            img="/images/private-dining-optimized.webp"
-            tags={['Private Service', 'Custom Menu']}
-            desc="An exclusive enclave for business meetings or family gatherings, offering complete privacy."
-            index={1}
-          />
-          <SpaceCard
-            title="The Terrace"
-            cap="60 Standing"
-            img="/images/terrace-optimized.webp"
-            tags={['Lush Setting', 'Cocktail Hours']}
-            desc="Enjoy the California breeze in our lush outdoor setting, perfect for cocktail hours."
-            index={2}
-          />
-       </div>
-
        <section className="py-20 px-4 md:px-6 bg-[#F2F2EC]">
          <div className="max-w-7xl mx-auto">
            <div className="text-center mb-12 px-2">
@@ -159,6 +127,38 @@ const PrivateHire: React.FC = () => {
            </div>
          </div>
        </section>
+
+       <div className="px-4 pb-8 space-y-6">
+          <div className="flex items-center justify-between px-2 pb-2 animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
+             <h3 className="text-lg font-bold text-primary">Available Spaces</h3>
+             <span className="text-xs font-bold text-primary/50 bg-[#E8E8E0] px-2 py-1 rounded uppercase tracking-widest">Select One</span>
+          </div>
+          
+          <SpaceCard
+            title="The Main Hall"
+            cap="600 Max"
+            img="/images/events-crowd-optimized.webp"
+            tags={['AV System', 'Full Bar', 'Stage']}
+            desc="Our signature space featuring vaulted ceilings, abundant natural light, and a dedicated stage area."
+            index={0}
+          />
+          <SpaceCard
+            title="The Private Dining Room"
+            cap="30 Seated"
+            img="/images/private-dining-optimized.webp"
+            tags={['Private Service', 'Custom Menu']}
+            desc="An exclusive enclave for business meetings or family gatherings, offering complete privacy."
+            index={1}
+          />
+          <SpaceCard
+            title="The Terrace"
+            cap="60 Standing"
+            img="/images/terrace-optimized.webp"
+            tags={['Lush Setting', 'Cocktail Hours']}
+            desc="Enjoy the California breeze in our lush outdoor setting, perfect for cocktail hours."
+            index={2}
+          />
+       </div>
 
        </div>
        
