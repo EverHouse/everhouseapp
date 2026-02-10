@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.31.6",
+    date: "2026-02-10",
+    title: "Billing Audit — Dynamic Pricing & Hardcoded Fee Fixes",
+    changes: [
+      "Fix: Trackman admin pending-assignment slot fee now uses the real guest fee from Stripe instead of a hardcoded $25 — prevents drift if pricing changes",
+      "Improvement: Staff simulator fee estimates now pull tier-specific daily minutes from the database instead of hardcoded values — tier limits (VIP, Premium, Corporate, Core, Base, Social) are fully dynamic",
+      "Improvement: Pricing API now exposes tier included minutes alongside guest fee and overage rate — all three pricing dimensions sourced from database",
+      "Safety: Frontend fee estimator retains hardcoded fallbacks if pricing API is unavailable — no regression on network failure",
+    ],
+  },
+  {
     version: "7.31.5",
     date: "2026-02-10",
     title: "Booking Fee Display & Email Sender Fixes",
