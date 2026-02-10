@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.23.0",
+    date: "2026-02-10",
+    title: "Deep Logic Extraction — Booking Sheet Under 400 Lines",
+    isMajor: true,
+    changes: [
+      "Refactor: Created useUnifiedBookingLogic custom hook (1,312 lines) — ALL state management, data fetching, and handler functions moved out of the booking sheet component",
+      "Refactor: Created AssignModeSlots component — player slot rendering, member search, visitor creation, and guest placeholder UI extracted into its own module",
+      "Refactor: Created ManageModeRoster component — manage mode slot rendering with member linking, guest forms, and member match resolution extracted",
+      "Refactor: Created AssignModeFooter component — fee estimation display, event marking with notice selection, and staff assignment list extracted",
+      "Achievement: UnifiedBookingSheet.tsx reduced from 2,245 lines to 371 lines (83% reduction) — now a pure view layer that calls one hook and assembles sub-components",
+      "Architecture: Booking sheet now follows hooks + view pattern — all business logic lives in the hook, all rendering is handled by focused sub-components",
+    ],
+  },
+  {
     version: "7.22.0",
     date: "2026-02-10",
     title: "Codebase Cleanup & Booking Sheet Modularization",
