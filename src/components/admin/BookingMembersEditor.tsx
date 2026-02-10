@@ -1266,7 +1266,7 @@ const BookingMembersEditor: React.FC<BookingMembersEditorProps> = ({
                       )}
                     </button>
                     {guestPassesRemaining === 0 && (
-                      <p className="text-[10px] text-amber-600 dark:text-amber-400">{`No guest passes remaining - $${guestFeeDollars} fee applies`}</p>
+                      <p className={`text-[10px] ${financialSummary?.allPaid ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>{financialSummary?.allPaid ? `$${guestFeeDollars} — Paid` : `No guest passes remaining - $${guestFeeDollars} fee applies`}</p>
                     )}
                   </div>
                 ) : (

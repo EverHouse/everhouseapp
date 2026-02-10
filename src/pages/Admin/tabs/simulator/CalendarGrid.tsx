@@ -362,11 +362,12 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                         const unfilledSlotsInner = (booking as any)?.unfilled_slots ?? 0;
                                                         const declaredPlayersInner = (booking as any)?.declared_player_count ?? 1;
                                                         const filledSlotsInner = Math.max(0, declaredPlayersInner - unfilledSlotsInner);
-                                                        const estimatedFromTier = estimateFeeByTier((booking as any)?.tier, (booking as any)?.duration_minutes || 0, declaredPlayersInner, guestFeeDollars, overageRatePerBlockDollars, tierMinutes);
+                                                        const snapshotPaid = (booking as any)?.fee_snapshot_paid === true;
+                                                        const estimatedFromTier = snapshotPaid ? 0 : estimateFeeByTier((booking as any)?.tier, (booking as any)?.duration_minutes || 0, declaredPlayersInner, guestFeeDollars, overageRatePerBlockDollars, tierMinutes);
                                                         const dbTotalOwed = (booking as any)?.total_owed ?? 0;
-                                                        const hasUnpaidFees = ((booking as any)?.has_unpaid_fees === true) || 
+                                                        const hasUnpaidFees = !snapshotPaid && (((booking as any)?.has_unpaid_fees === true) || 
                                                             (dbTotalOwed > 0) || 
-                                                            (filledSlotsInner < declaredPlayersInner && estimatedFromTier > 0);
+                                                            (filledSlotsInner < declaredPlayersInner && estimatedFromTier > 0));
                                                         const unfilledGuestFees = Math.max(0, declaredPlayersInner - filledSlotsInner) * guestFeeDollars;
                                                         const totalOwed = dbTotalOwed > 0 ? dbTotalOwed + unfilledGuestFees : (filledSlotsInner < declaredPlayersInner ? estimatedFromTier : 0);
                                                         const isPartialRoster = !isConference && declaredPlayersInner > 1 && filledSlotsInner < declaredPlayersInner;
