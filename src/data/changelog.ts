@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.18.0",
+    date: "2026-02-10",
+    title: "Complete Booking Sheet — One Place for Everything",
+    isMajor: true,
+    changes: [
+      "Major: The Unified Booking Sheet is now the ONLY place for all booking operations — the old 'Booking Details' popup has been completely removed",
+      "Feature: Booking context header — date, time, bay, duration, Trackman ID, and status badge are shown prominently at the top of every booking",
+      "Feature: Action buttons — Check In, Reschedule, and Cancel Booking are now built into the booking sheet, with smart visibility based on booking status",
+      "Fix: Player count sync — changing player count from 4 to 2 now immediately hides slots 3 & 4 from the UI instead of leaving them visible",
+      "Cleanup: Deleted the old TrackmanLinkModal.tsx and the 520-line Booking Details modal block — zero dead code remaining",
+      "Cleanup: Removed 5 dead state variables (selectedCalendarBooking, editingTrackmanId, trackmanIdDraft, savingTrackmanId, isCancellingFromModal)",
+    ],
+  },
+  {
     version: "7.17.0",
     date: "2026-02-10",
     title: "Unified Booking Sheet & Staff Fee Exemption",

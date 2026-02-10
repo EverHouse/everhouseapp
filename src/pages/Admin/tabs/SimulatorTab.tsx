@@ -882,17 +882,14 @@ const SimulatorTab: React.FC = () => {
     const [prefillResourceId, setPrefillResourceId] = useState<number | null>(null);
     const [prefillDate, setPrefillDate] = useState<string | null>(null);
     const [prefillStartTime, setPrefillStartTime] = useState<string | null>(null);
-    const [selectedCalendarBooking, setSelectedCalendarBooking] = useState<BookingRequest | null>(null);
-    const [isCancellingFromModal, setIsCancellingFromModal] = useState(false);
+    
     const [scheduledFilter, setScheduledFilter] = useState<'all' | 'today' | 'tomorrow' | 'week'>('all');
     const [markStatusModal, setMarkStatusModal] = useState<{ booking: BookingRequest | null; confirmNoShow: boolean }>({ booking: null, confirmNoShow: false });
     
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
-    const [editingTrackmanId, setEditingTrackmanId] = useState(false);
-    const [trackmanIdDraft, setTrackmanIdDraft] = useState('');
-    const [savingTrackmanId, setSavingTrackmanId] = useState(false);
+    
     const [rescheduleModal, setRescheduleModal] = useState<{ isOpen: boolean; booking: any | null }>({ isOpen: false, booking: null });
     const [feeEstimate, setFeeEstimate] = useState<{
       totalFee: number;
@@ -932,6 +929,8 @@ const SimulatorTab: React.FC = () => {
         ownerName?: string;
         ownerEmail?: string;
         declaredPlayerCount?: number;
+        bookingStatus?: string;
+        bookingContext?: { requestDate?: string; startTime?: string; endTime?: string; resourceId?: number; resourceName?: string; durationMinutes?: number; notes?: string };
     }>({ isOpen: false, trackmanBookingId: null });
     const [cancelConfirmModal, setCancelConfirmModal] = useState<{
         isOpen: boolean;
@@ -989,12 +988,6 @@ const SimulatorTab: React.FC = () => {
     }, [isLoading, calendarDate]);
 
     useEffect(() => {
-        setEditingTrackmanId(false);
-        setTrackmanIdDraft('');
-        setSavingTrackmanId(false);
-    }, [selectedCalendarBooking]);
-
-    useEffect(() => {
         if (!isLoading) {
             setPageReady(true);
         }
@@ -1037,6 +1030,8 @@ const SimulatorTab: React.FC = () => {
                             isRelink: !isUnmatched,
                             importedName: booking.user_name || booking.userName,
                             notes: booking.notes || booking.note,
+                            bookingStatus: booking.status,
+                            bookingContext: { requestDate: booking.request_date, startTime: booking.start_time, endTime: booking.end_time, resourceId: booking.resource_id, resourceName: booking.bay_name || booking.resource_name, durationMinutes: booking.duration_minutes },
                         });
                     }
                 }
@@ -1064,7 +1059,7 @@ const SimulatorTab: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        if (actionModal || showTrackmanConfirm || selectedCalendarBooking || markStatusModal.booking) {
+        if (actionModal || showTrackmanConfirm || markStatusModal.booking) {
             document.body.style.overflow = 'hidden';
         } else {
             document.body.style.overflow = '';
@@ -1072,7 +1067,7 @@ const SimulatorTab: React.FC = () => {
         return () => {
             document.body.style.overflow = '';
         };
-    }, [actionModal, showTrackmanConfirm, selectedCalendarBooking, markStatusModal.booking]);
+    }, [actionModal, showTrackmanConfirm, markStatusModal.booking]);
 
     // React Query handles data fetching - use invalidateQueries to refresh
     const handleRefresh = useCallback(() => {
@@ -2318,6 +2313,8 @@ const SimulatorTab: React.FC = () => {
                                                                 isRelink: !isUnmatched,
                                                                 importedName: (booking as any).user_name || (booking as any).userName,
                                                                 notes: (booking as any).notes || (booking as any).note,
+                                                                bookingStatus: booking.status,
+                                                                bookingContext: { requestDate: booking.request_date, startTime: booking.start_time, endTime: booking.end_time, resourceId: booking.resource_id || undefined, resourceName: (bookingResource?.name || booking.bay_name || booking.resource_name) || undefined, durationMinutes: booking.duration_minutes || undefined },
                                                             })}
                                                         >
                                                             {(isActionPending || isOptimisticNew) && (
@@ -2765,6 +2762,8 @@ const SimulatorTab: React.FC = () => {
                                                         isRelink: !isUnmatched,
                                                         importedName: (booking as any).user_name || (booking as any).userName,
                                                         notes: (booking as any).notes || (booking as any).note,
+                                                        bookingStatus: (booking as any).status,
+                                                        bookingContext: { requestDate: booking.request_date, startTime: booking.start_time, endTime: booking.end_time, resourceId: booking.resource_id || undefined, resourceName: (resource.type === 'conference_room' ? 'Conference Room' : resource.name) || undefined, durationMinutes: (booking as any).duration_minutes || undefined },
                                                     }) : pendingRequest ? () => setTrackmanModal({ isOpen: true, booking: pendingRequest }) : undefined}
                                                     className={`h-7 sm:h-8 rounded ${
                                                         closure
@@ -3164,556 +3163,6 @@ const SimulatorTab: React.FC = () => {
                 />
             )}
 
-            <ModalShell isOpen={!!selectedCalendarBooking} onClose={() => setSelectedCalendarBooking(null)} title="Booking Details">
-                <div className="p-6 space-y-3">
-                    {(() => {
-                        const email = selectedCalendarBooking?.user_email?.toLowerCase() || '';
-                        const memberStatus = email ? memberStatusMap[email] : null;
-                        // Prefer member directory name over Trackman import name
-                        const modalDisplayName = email && memberNameMap[email] 
-                            ? memberNameMap[email] 
-                            : selectedCalendarBooking?.user_name || 'Unknown';
-                        const isTrackmanMatched = !!(selectedCalendarBooking as any)?.trackman_booking_id || (selectedCalendarBooking?.notes && selectedCalendarBooking.notes.includes('[Trackman Import ID:'));
-                        const hasKnownInactiveStatus = memberStatus && memberStatus.toLowerCase() !== 'active' && memberStatus.toLowerCase() !== 'unknown';
-                        const shouldShowWarning = email && isTrackmanMatched && hasKnownInactiveStatus;
-                        return shouldShowWarning ? (
-                            <div className="p-3 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 rounded-lg flex items-start gap-2">
-                                <span aria-hidden="true" className="material-symbols-outlined text-orange-500 dark:text-orange-400 text-lg flex-shrink-0">warning</span>
-                                <div>
-                                    <p className="font-medium text-orange-700 dark:text-orange-300 text-sm">
-                                        Member Status: {(memberStatus || 'Unknown').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                                    </p>
-                                    <p className="text-xs text-orange-600 dark:text-orange-400">This member is not currently active. Please verify their membership before proceeding.</p>
-                                </div>
-                            </div>
-                        ) : null;
-                    })()}
-                    <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
-                        <div className="flex items-center justify-between">
-                            {(() => {
-                                const email = selectedCalendarBooking?.user_email?.toLowerCase() || '';
-                                const isUnmatched = (selectedCalendarBooking as any)?.is_unmatched || 
-                                    email.includes('unmatched@') || 
-                                    email.includes('@trackman.import') ||
-                                    selectedCalendarBooking?.user_name === 'Unknown (Trackman)';
-                                const displayName = isUnmatched 
-                                    ? null 
-                                    : (email && memberNameMap[email] ? memberNameMap[email] : selectedCalendarBooking?.user_name);
-                                
-                                if (isUnmatched) {
-                                    return (
-                                        <div className="flex items-center gap-2">
-                                            <span aria-hidden="true" className="material-symbols-outlined text-amber-500 dark:text-amber-400 text-lg">person_off</span>
-                                            <div>
-                                                <p className="font-bold text-amber-600 dark:text-amber-400">Unassigned</p>
-                                                <p className="text-sm text-amber-500/70 dark:text-amber-500/60">Needs member assignment</p>
-                                            </div>
-                                        </div>
-                                    );
-                                }
-                                return (
-                                    <div className="flex items-center gap-2">
-                                        <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white text-lg">person</span>
-                                        <div>
-                                            <p className="font-bold text-primary dark:text-white">{displayName || 'Unknown'}</p>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">{selectedCalendarBooking?.user_email}</p>
-                                        </div>
-                                    </div>
-                                );
-                            })()}
-                            <button
-                                onClick={() => {
-                                    if (!selectedCalendarBooking) return;
-                                    const bookingId = typeof selectedCalendarBooking.id === 'string' 
-                                        ? parseInt(String(selectedCalendarBooking.id).replace('cal_', '')) 
-                                        : selectedCalendarBooking.id as number;
-                                    const email = selectedCalendarBooking?.user_email?.toLowerCase() || '';
-                                    const isPlaceholderEmail = !email || 
-                                        email.includes('@trackman.local') ||
-                                        email.includes('@visitors.evenhouse.club') ||
-                                        email.startsWith('unmatched-') ||
-                                        email.startsWith('golfnow-') ||
-                                        email.startsWith('classpass-') ||
-                                        email.includes('unmatched@') || 
-                                        email.includes('@trackman.import');
-                                    const isUnmatched = (selectedCalendarBooking as any)?.is_unmatched || 
-                                        isPlaceholderEmail ||
-                                        selectedCalendarBooking?.user_name === 'Unknown (Trackman)';
-                                    const currentName = isUnmatched ? undefined : (() => {
-                                        return email && memberNameMap[email] ? memberNameMap[email] : selectedCalendarBooking?.user_name || 'Unknown';
-                                    })();
-                                    setTrackmanLinkModal({
-                                        isOpen: true,
-                                        trackmanBookingId: (selectedCalendarBooking as any)?.trackman_booking_id || null,
-                                        bayName: selectedCalendarBooking.bay_name || selectedCalendarBooking.resource_name,
-                                        bookingDate: formatDateShortAdmin(selectedCalendarBooking.request_date),
-                                        timeSlot: `${formatTime12Hour(selectedCalendarBooking.start_time)} - ${formatTime12Hour(selectedCalendarBooking.end_time)}`,
-                                        matchedBookingId: bookingId,
-                                        currentMemberName: isUnmatched ? undefined : currentName,
-                                        currentMemberEmail: isUnmatched ? undefined : selectedCalendarBooking.user_email,
-                                        isRelink: true,
-                                        importedName: (selectedCalendarBooking as any)?.user_name || (selectedCalendarBooking as any)?.userName,
-                                        notes: (selectedCalendarBooking as any)?.notes || (selectedCalendarBooking as any)?.note
-                                    });
-                                    setSelectedCalendarBooking(null);
-                                }}
-                                className="p-2 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors"
-                                title={(() => {
-                                    const email = selectedCalendarBooking?.user_email?.toLowerCase() || '';
-                                    const isPlaceholderEmail = !email || 
-                                        email.includes('@trackman.local') ||
-                                        email.includes('@visitors.evenhouse.club') ||
-                                        email.startsWith('unmatched-') ||
-                                        email.startsWith('golfnow-') ||
-                                        email.startsWith('classpass-') ||
-                                        email.includes('unmatched@') || 
-                                        email.includes('@trackman.import');
-                                    const isUnmatched = (selectedCalendarBooking as any)?.is_unmatched || 
-                                        isPlaceholderEmail ||
-                                        selectedCalendarBooking?.user_name === 'Unknown (Trackman)';
-                                    return isUnmatched ? "Assign member to booking" : "Change booking owner";
-                                })()}
-                            >
-                                <span className="material-symbols-outlined text-sm">{(() => {
-                                    const email = selectedCalendarBooking?.user_email?.toLowerCase() || '';
-                                    const isPlaceholderEmail = !email || 
-                                        email.includes('@trackman.local') ||
-                                        email.includes('@visitors.evenhouse.club') ||
-                                        email.startsWith('unmatched-') ||
-                                        email.startsWith('golfnow-') ||
-                                        email.startsWith('classpass-') ||
-                                        email.includes('unmatched@') || 
-                                        email.includes('@trackman.import');
-                                    const isUnmatched = (selectedCalendarBooking as any)?.is_unmatched || 
-                                        isPlaceholderEmail ||
-                                        selectedCalendarBooking?.user_name === 'Unknown (Trackman)';
-                                    return isUnmatched ? "person_add" : "edit";
-                                })()}</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Date</p>
-                            <p className="font-medium text-primary dark:text-white text-sm">{selectedCalendarBooking && formatDateShortAdmin(selectedCalendarBooking.request_date)}</p>
-                        </div>
-                        <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Time</p>
-                            <p className="font-medium text-primary dark:text-white text-sm">
-                                {selectedCalendarBooking && formatTime12Hour(selectedCalendarBooking.start_time)} - {selectedCalendarBooking && formatTime12Hour(selectedCalendarBooking.end_time)}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Duration</p>
-                            <p className="font-medium text-primary dark:text-white text-sm">{selectedCalendarBooking?.duration_minutes} min</p>
-                        </div>
-                        <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Bay/Resource</p>
-                            <p className="font-medium text-primary dark:text-white text-sm">{selectedCalendarBooking?.bay_name || selectedCalendarBooking?.resource_name || '-'}</p>
-                        </div>
-                    </div>
-
-                    {((selectedCalendarBooking as any)?.declared_player_count || (selectedCalendarBooking as any)?.booking_source || (selectedCalendarBooking as any)?.guest_count) && (
-                        <div className="grid grid-cols-2 gap-3">
-                            {(selectedCalendarBooking as any)?.declared_player_count && (
-                                <div 
-                                    className="p-3 bg-accent/10 dark:bg-accent/20 rounded-lg border border-accent/30 cursor-pointer hover:bg-accent/20 dark:hover:bg-accent/30 transition-colors"
-                                    onClick={() => {
-                                        const el = document.getElementById('booking-members-editor');
-                                        if (el) {
-                                            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                            el.classList.add('ring-2', 'ring-accent', 'ring-offset-2');
-                                            setTimeout(() => el.classList.remove('ring-2', 'ring-accent', 'ring-offset-2'), 2000);
-                                        }
-                                    }}
-                                >
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-1">
-                                        Players
-                                        <span className="material-symbols-outlined text-xs text-accent">arrow_downward</span>
-                                    </p>
-                                    <p className="font-medium text-primary dark:text-white text-sm flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-accent text-base">group</span>
-                                        {(selectedCalendarBooking as any).declared_player_count} {(selectedCalendarBooking as any).declared_player_count === 1 ? 'player' : 'players'}
-                                    </p>
-                                </div>
-                            )}
-                            {(selectedCalendarBooking as any)?.booking_source && (
-                                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Booking Source</p>
-                                    <p className="font-medium text-primary dark:text-white text-sm">{(selectedCalendarBooking as any).booking_source}</p>
-                                </div>
-                            )}
-                            {(selectedCalendarBooking as any)?.guest_count !== undefined && (selectedCalendarBooking as any).guest_count > 0 && (
-                                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Guest Count</p>
-                                    <p className="font-medium text-primary dark:text-white text-sm">{(selectedCalendarBooking as any).guest_count}</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {(selectedCalendarBooking as any)?.member_notes && (
-                        <div className="p-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-lg">
-                            <p className="text-xs text-blue-600 dark:text-blue-400 mb-1 flex items-center gap-1">
-                                <span className="material-symbols-outlined text-sm">chat</span>
-                                Member Notes
-                            </p>
-                            <p className="font-medium text-primary dark:text-white text-sm">{(selectedCalendarBooking as any).member_notes}</p>
-                        </div>
-                    )}
-
-                    {selectedCalendarBooking?.guardian_name && (
-                        <div className="p-3 bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/30 rounded-lg">
-                            <p className="text-xs text-purple-600 dark:text-purple-400 mb-2 flex items-center gap-1">
-                                <span className="material-symbols-outlined text-sm">family_restroom</span>
-                                Guardian Consent (Minor Booking)
-                            </p>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                                <div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">Guardian Name</p>
-                                    <p className="font-medium text-primary dark:text-white">{selectedCalendarBooking.guardian_name}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">Relationship</p>
-                                    <p className="font-medium text-primary dark:text-white">{selectedCalendarBooking.guardian_relationship}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">Phone</p>
-                                    <p className="font-medium text-primary dark:text-white">{selectedCalendarBooking.guardian_phone}</p>
-                                </div>
-                                {selectedCalendarBooking.guardian_consent_at && (
-                                    <div>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">Consent Given</p>
-                                        <p className="font-medium text-primary dark:text-white text-xs">
-                                            {new Date(selectedCalendarBooking.guardian_consent_at).toLocaleString()}
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {selectedCalendarBooking?.notes && (
-                        <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Notes</p>
-                            <p className="font-medium text-primary dark:text-white text-sm">{selectedCalendarBooking.notes}</p>
-                        </div>
-                    )}
-
-                    {(selectedCalendarBooking as any)?.created_by_staff_id && (
-                        <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Created by Staff</p>
-                            <p className="font-medium text-primary dark:text-white text-sm">{(selectedCalendarBooking as any).created_by_staff_id}</p>
-                        </div>
-                    )}
-
-                    {(() => {
-                        const selectedResource = selectedCalendarBooking?.resource_id 
-                            ? resources.find(r => r.id === selectedCalendarBooking.resource_id) 
-                            : null;
-                        const isConferenceBooking = selectedResource?.type === 'conference_room' || 
-                            selectedCalendarBooking?.notes?.includes('Conference room booking');
-                        
-                        if (isConferenceBooking) return null;
-                        
-                        return (
-                            <div className="p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg">
-                                <div className="flex items-center justify-between">
-                                    <p className="text-xs text-amber-700 dark:text-amber-400 mb-1 flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-sm">sports_golf</span>
-                                        Trackman Booking ID
-                                    </p>
-                                    {!editingTrackmanId && (selectedCalendarBooking as any)?.trackman_booking_id && (
-                                        <button
-                                            onClick={() => {
-                                                setTrackmanIdDraft((selectedCalendarBooking as any)?.trackman_booking_id || '');
-                                                setEditingTrackmanId(true);
-                                            }}
-                                            className="p-1 rounded hover:bg-amber-200 dark:hover:bg-amber-500/20 hover:shadow-sm transition-all duration-200"
-                                            title="Edit Trackman ID"
-                                        >
-                                            <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-sm">edit</span>
-                                        </button>
-                                    )}
-                                </div>
-                                {editingTrackmanId ? (
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <input
-                                            type="text"
-                                            value={trackmanIdDraft}
-                                            onChange={(e) => setTrackmanIdDraft(e.target.value)}
-                                            placeholder="e.g., TM-12345"
-                                            className="flex-1 px-3 py-2 rounded-lg border border-amber-300 dark:border-amber-500/50 bg-white dark:bg-black/20 text-primary dark:text-white text-sm placeholder-gray-400 dark:placeholder-gray-500"
-                                            disabled={savingTrackmanId}
-                                            autoFocus
-                                        />
-                                        <button
-                                            onClick={async () => {
-                                                if (!selectedCalendarBooking) return;
-                                                setSavingTrackmanId(true);
-                                                const bookingId = typeof selectedCalendarBooking.id === 'string' 
-                                                    ? parseInt(String(selectedCalendarBooking.id).replace('cal_', ''), 10) 
-                                                    : selectedCalendarBooking.id;
-                                                try {
-                                                    const res = await fetch(`/api/booking-requests/${bookingId}`, {
-                                                        method: 'PUT',
-                                                        headers: { 'Content-Type': 'application/json' },
-                                                        credentials: 'include',
-                                                        body: JSON.stringify({ trackman_booking_id: trackmanIdDraft || null })
-                                                    });
-                                                    if (res.ok) {
-                                                        setSelectedCalendarBooking({
-                                                            ...selectedCalendarBooking,
-                                                            trackman_booking_id: trackmanIdDraft || null
-                                                        } as BookingRequest);
-                                                        setEditingTrackmanId(false);
-                                                        handleRefresh();
-                                                        showToast('Trackman ID updated', 'success');
-                                                    } else {
-                                                        const errData = await res.json();
-                                                        showToast(errData.error || 'Failed to update Trackman ID', 'error');
-                                                    }
-                                                } catch (err) {
-                                                    showToast('Failed to update Trackman ID', 'error');
-                                                } finally {
-                                                    setSavingTrackmanId(false);
-                                                }
-                                            }}
-                                            disabled={savingTrackmanId}
-                                            className="p-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white hover:shadow-md active:scale-95 transition-all duration-200 disabled:opacity-50"
-                                            title="Save"
-                                        >
-                                            {savingTrackmanId ? (
-                                                <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-                                            ) : (
-                                                <span className="material-symbols-outlined text-sm">check</span>
-                                            )}
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setEditingTrackmanId(false);
-                                                setTrackmanIdDraft('');
-                                            }}
-                                            disabled={savingTrackmanId}
-                                            className="p-2 rounded-lg border border-gray-300 dark:border-white/20 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
-                                            title="Cancel"
-                                        >
-                                            <span className="material-symbols-outlined text-sm text-gray-600 dark:text-gray-400">close</span>
-                                        </button>
-                                    </div>
-                                ) : (selectedCalendarBooking as any)?.trackman_booking_id ? (
-                                    <p className="font-medium text-primary dark:text-white text-sm">{(selectedCalendarBooking as any).trackman_booking_id}</p>
-                                ) : (
-                                    <button
-                                        onClick={() => {
-                                            setTrackmanIdDraft('');
-                                            setEditingTrackmanId(true);
-                                        }}
-                                        className="text-sm text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium flex items-center gap-1"
-                                    >
-                                        <span className="material-symbols-outlined text-sm">add</span>
-                                        Add Trackman ID
-                                    </button>
-                                )}
-                            </div>
-                        );
-                    })()}
-
-                    {selectedCalendarBooking && (
-                        <button
-                            onClick={() => {
-                                setTrackmanLinkModal({
-                                    isOpen: true,
-                                    trackmanBookingId: null,
-                                    bookingId: selectedCalendarBooking.id,
-                                    mode: 'manage' as const,
-                                    ownerName: (selectedCalendarBooking as any).user_name || (selectedCalendarBooking as any).member_name,
-                                    ownerEmail: (selectedCalendarBooking as any).user_email || (selectedCalendarBooking as any).member_email,
-                                    declaredPlayerCount: (selectedCalendarBooking as any).declared_player_count || (selectedCalendarBooking as any).player_count || 1,
-                                });
-                            }}
-                            className="w-full py-2.5 px-4 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors border border-blue-200 dark:border-blue-500/20"
-                        >
-                            <span className="material-symbols-outlined text-lg">group</span>
-                            Manage Players
-                        </button>
-                    )}
-                    
-                    <div className="flex flex-col gap-2 pt-3">
-                        {(() => {
-                            const isUpcoming = (() => {
-                                if (!selectedCalendarBooking) return false;
-                                const now = new Date();
-                                const pacificNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
-                                const bookingDate = new Date(selectedCalendarBooking.request_date + 'T00:00:00');
-                                if (bookingDate > pacificNow) return true;
-                                if (bookingDate.toDateString() === pacificNow.toDateString()) {
-                                    const [h, m] = selectedCalendarBooking.start_time.split(':').map(Number);
-                                    const startMinutes = h * 60 + m;
-                                    const nowMinutes = pacificNow.getHours() * 60 + pacificNow.getMinutes();
-                                    return startMinutes > nowMinutes;
-                                }
-                                return false;
-                            })();
-                            const isCancelled = selectedCalendarBooking?.status === 'cancelled';
-                            const isCancellationPending = selectedCalendarBooking?.status === 'cancellation_pending';
-                            const selectedResource = selectedCalendarBooking?.resource_id ? resources.find(r => r.id === selectedCalendarBooking.resource_id) : null;
-                            const isSimulator = !selectedResource || selectedResource.type === 'simulator';
-                            if (!isUpcoming || isCancelled || !isSimulator) return null;
-                            if (isCancellationPending) {
-                                return (
-                                    <button
-                                        onClick={async () => {
-                                            if (!selectedCalendarBooking) return;
-                                            const confirmed = await confirm({
-                                                title: 'Complete Cancellation',
-                                                message: 'Complete this cancellation? This will cancel the billing session and refund any charges.',
-                                                confirmText: 'Complete Cancellation',
-                                                variant: 'warning'
-                                            });
-                                            if (!confirmed) return;
-                                            
-                                            setIsCancellingFromModal(true);
-                                            try {
-                                                const res = await fetch(`/api/booking-requests/${selectedCalendarBooking.id}/complete-cancellation`, {
-                                                    method: 'PUT',
-                                                    headers: { 'Content-Type': 'application/json' },
-                                                    credentials: 'include'
-                                                });
-                                                
-                                                if (!res.ok) {
-                                                    const errData = await res.json();
-                                                    throw new Error(errData.error || 'Failed to complete cancellation');
-                                                }
-                                                
-                                                showToast('Cancellation completed successfully', 'success');
-                                                queryClient.invalidateQueries({ queryKey: simulatorKeys.approvedBookings(startDate, endDate) });
-                                                queryClient.invalidateQueries({ queryKey: simulatorKeys.allRequests() });
-                                                setSelectedCalendarBooking(null);
-                                            } catch (err: any) {
-                                                showToast(err.message || 'Failed to complete cancellation', 'error');
-                                            } finally {
-                                                setIsCancellingFromModal(false);
-                                            }
-                                        }}
-                                        disabled={isCancellingFromModal}
-                                        className="flex-1 py-3 px-4 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {isCancellingFromModal ? (
-                                            <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
-                                        ) : (
-                                            <span aria-hidden="true" className="material-symbols-outlined text-sm">check_circle</span>
-                                        )}
-                                        Complete Cancellation
-                                    </button>
-                                );
-                            }
-                            return (
-                                <button
-                                    onClick={() => {
-                                        setRescheduleModal({ isOpen: true, booking: selectedCalendarBooking });
-                                        setSelectedCalendarBooking(null);
-                                    }}
-                                    className="flex-1 py-3 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-medium flex items-center justify-center gap-2"
-                                >
-                                    <span aria-hidden="true" className="material-symbols-outlined text-sm">schedule</span>
-                                    Reschedule
-                                </button>
-                            );
-                        })()}
-                        {selectedCalendarBooking?.status !== 'cancellation_pending' && <button
-                            onClick={async () => {
-                                if (!selectedCalendarBooking) return;
-                                const confirmed = await confirm({
-                                    title: 'Cancel Booking',
-                                    message: `Cancel booking for ${selectedCalendarBooking.user_name || selectedCalendarBooking.user_email}?`,
-                                    confirmText: 'Cancel Booking',
-                                    variant: 'warning'
-                                });
-                                if (!confirmed) return;
-                                    
-                                    setIsCancellingFromModal(true);
-                                    try {
-                                        const res = await fetch(`/api/booking-requests/${selectedCalendarBooking.id}`, {
-                                            method: 'PUT',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            credentials: 'include',
-                                            body: JSON.stringify({
-                                                status: 'cancelled',
-                                                staff_notes: 'Cancelled from calendar view',
-                                                cancelled_by: actualUser?.email || user?.email
-                                            })
-                                        });
-                                        
-                                        if (!res.ok) {
-                                            const errData = await res.json();
-                                            throw new Error(errData.error || 'Failed to cancel booking');
-                                        }
-                                        
-                                        try {
-                                            await fetch('/api/notifications', {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({
-                                                    user_email: selectedCalendarBooking.user_email,
-                                                    title: 'Booking Cancelled',
-                                                    message: `Your booking for ${formatDateShortAdmin(selectedCalendarBooking.request_date)} at ${formatTime12Hour(selectedCalendarBooking.start_time)} has been cancelled by staff.`,
-                                                    type: 'booking_cancelled',
-                                                    related_id: selectedCalendarBooking.id,
-                                                    related_type: 'booking'
-                                                })
-                                            });
-                                        } catch (notifErr) {
-                                            console.error('Failed to create cancellation notification:', notifErr);
-                                        }
-                                        
-                                        queryClient.invalidateQueries({ queryKey: simulatorKeys.approvedBookings(startDate, endDate) });
-                                        queryClient.invalidateQueries({ queryKey: simulatorKeys.allRequests() });
-                                        setSelectedCalendarBooking(null);
-                                    } catch (err: any) {
-                                        console.error('Failed to cancel booking:', err);
-                                        alert(err.message || 'Failed to cancel booking');
-                                    } finally {
-                                        setIsCancellingFromModal(false);
-                                    }
-                                }}
-                                disabled={isCancellingFromModal}
-                                className="flex-1 py-3 px-4 rounded-lg bg-red-500 hover:bg-red-600 text-white font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {isCancellingFromModal ? (
-                                    <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
-                                ) : (
-                                    <span aria-hidden="true" className="material-symbols-outlined text-sm">close</span>
-                                )}
-                                Cancel
-                            </button>}
-                        {(() => {
-                            const isTrackmanBooking = !!(selectedCalendarBooking as any)?.trackman_booking_id || (selectedCalendarBooking?.notes && selectedCalendarBooking.notes.includes('[Trackman Import ID:'));
-                            const emailLower = selectedCalendarBooking?.user_email?.toLowerCase() || '';
-                            const hasMatchedMember = selectedCalendarBooking?.user_email && 
-                                !emailLower.includes('unmatched@') &&
-                                !emailLower.includes('unmatched-') &&
-                                !emailLower.includes('@trackman.local') &&
-                                !emailLower.includes('anonymous@') &&
-                                !emailLower.includes('booking@');
-                            
-return null;
-                        })()}
-                        <button
-                            onClick={() => setSelectedCalendarBooking(null)}
-                            className="w-full py-2 px-4 rounded-lg text-gray-500 dark:text-gray-400 text-sm font-medium hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
-                            disabled={isCancellingFromModal}
-                        >
-                            Close
-                        </button>
-                    </div>
-                </div>
-            </ModalShell>
-
             <ModalShell isOpen={!!markStatusModal.booking} onClose={() => setMarkStatusModal({ booking: null, confirmNoShow: false })} showCloseButton={false}>
                 <div className="p-6 space-y-4">
                     <div className="text-center">
@@ -3854,6 +3303,60 @@ return null;
               onRosterUpdated={() => handleRefresh()}
               onOpenBillingModal={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
               onCollectPayment={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
+              bookingStatus={trackmanLinkModal.bookingStatus}
+              bookingContext={trackmanLinkModal.bookingContext}
+              onReschedule={(booking) => {
+                setTrackmanLinkModal({ isOpen: false, trackmanBookingId: null });
+                setRescheduleModal({ isOpen: true, booking });
+              }}
+              onCancelBooking={async (bookingId) => {
+                const confirmed = await confirm({
+                  title: 'Cancel Booking',
+                  message: 'Are you sure you want to cancel this booking?',
+                  confirmText: 'Cancel Booking',
+                  variant: 'warning'
+                });
+                if (!confirmed) return;
+                try {
+                  const res = await fetch(`/api/booking-requests/${bookingId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                      status: 'cancelled',
+                      staff_notes: 'Cancelled from booking sheet',
+                      cancelled_by: actualUser?.email || user?.email
+                    })
+                  });
+                  if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.error || 'Failed to cancel booking');
+                  }
+                  showToast('Booking cancelled successfully', 'success');
+                  setTrackmanLinkModal({ isOpen: false, trackmanBookingId: null });
+                  handleRefresh();
+                } catch (err: any) {
+                  showToast(err.message || 'Failed to cancel booking', 'error');
+                }
+              }}
+              onCheckIn={async (bookingId) => {
+                try {
+                  const res = await fetch(`/api/bookings/${bookingId}/checkin`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include'
+                  });
+                  if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.error || 'Check-in failed');
+                  }
+                  showToast('Check-in complete', 'success');
+                  setTrackmanLinkModal({ isOpen: false, trackmanBookingId: null });
+                  handleRefresh();
+                } catch (err: any) {
+                  showToast(err.message || 'Check-in failed', 'error');
+                }
+              }}
             />
 
             {rescheduleModal.isOpen && rescheduleModal.booking && (

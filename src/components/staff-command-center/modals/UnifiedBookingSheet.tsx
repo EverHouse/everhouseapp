@@ -126,6 +126,10 @@ export interface UnifiedBookingSheetProps {
   onRosterUpdated?: () => void;
   onCheckinComplete?: () => void;
   onCollectPayment?: (bookingId: number) => void;
+  onReschedule?: (booking: { id: number; request_date: string; start_time: string; end_time: string; resource_id: number; resource_name?: string; user_name?: string; user_email?: string }) => void;
+  onCancelBooking?: (bookingId: number) => void;
+  onCheckIn?: (bookingId: number) => void;
+  bookingStatus?: string;
 }
 
 export function UnifiedBookingSheet({
@@ -156,6 +160,10 @@ export function UnifiedBookingSheet({
   onRosterUpdated,
   onCheckinComplete,
   onCollectPayment,
+  onReschedule,
+  onCancelBooking,
+  onCheckIn,
+  bookingStatus,
 }: UnifiedBookingSheetProps) {
   const resolvedBookingType: BookingType = bookingType || 'simulator';
   const isConferenceRoom = resolvedBookingType === 'conference_room';
@@ -1763,17 +1771,17 @@ export function UnifiedBookingSheet({
     const validation = rosterData?.validation;
     const filledCount = validation ? validation.actualPlayerCount : 0;
     const totalCount = validation ? validation.expectedPlayerCount : (declaredPlayerCount || 1);
-    const filledMembers = rosterData?.members.filter(m => m.userEmail || m.guestInfo) || [];
+    const filledMembers = (rosterData?.members.filter(m => (m.userEmail || m.guestInfo) && m.slotNumber <= editingPlayerCount) || []);
     const emptySlotNumbers: number[] = [];
     if (rosterData?.members) {
       for (const m of rosterData.members) {
-        if (!m.userEmail && !m.guestInfo) {
+        if (!m.userEmail && !m.guestInfo && m.slotNumber <= editingPlayerCount) {
           emptySlotNumbers.push(m.slotNumber);
         }
       }
     }
 
-    const manageModeTitle = `Manage Players - ${ownerName || 'Booking'}`;
+    const manageModeTitle = ownerName || 'Booking Details';
 
     const manageModeFooter = (
       <div className="p-4 space-y-2">
@@ -1828,6 +1836,59 @@ export function UnifiedBookingSheet({
             </div>
           ) : (
             <>
+              <div className="p-3 bg-gradient-to-r from-primary/5 to-primary/10 dark:from-white/5 dark:to-white/10 rounded-xl border border-primary/10 dark:border-white/10">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {(bookingContext?.resourceName || bayName) && (
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary/60 dark:text-white/60 text-base">sports_golf</span>
+                      <span className="font-medium text-primary dark:text-white">{bookingContext?.resourceName || bayName}</span>
+                    </div>
+                  )}
+                  {(bookingContext?.requestDate || bookingDate) && (
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary/60 dark:text-white/60 text-base">calendar_today</span>
+                      <span className="text-primary/80 dark:text-white/80">{bookingContext?.requestDate || bookingDate}</span>
+                    </div>
+                  )}
+                  {(bookingContext?.startTime && bookingContext?.endTime) ? (
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary/60 dark:text-white/60 text-base">schedule</span>
+                      <span className="text-primary/80 dark:text-white/80">{bookingContext.startTime} - {bookingContext.endTime}</span>
+                    </div>
+                  ) : timeSlot ? (
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary/60 dark:text-white/60 text-base">schedule</span>
+                      <span className="text-primary/80 dark:text-white/80">{timeSlot}</span>
+                    </div>
+                  ) : null}
+                  {bookingContext?.durationMinutes && (
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary/60 dark:text-white/60 text-base">timer</span>
+                      <span className="text-primary/80 dark:text-white/80">{bookingContext.durationMinutes} min</span>
+                    </div>
+                  )}
+                  {trackmanBookingId && (
+                    <div className="flex items-center gap-2">
+                      <TrackmanIcon className="w-4 h-4 text-primary/60 dark:text-white/60" />
+                      <span className="text-primary/80 dark:text-white/80 text-xs">{trackmanBookingId}</span>
+                    </div>
+                  )}
+                  {bookingStatus && (
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary/60 dark:text-white/60 text-base">info</span>
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                        bookingStatus === 'attended' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                        bookingStatus === 'cancelled' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                        bookingStatus === 'confirmed' || bookingStatus === 'approved' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
+                        'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300'
+                      }`}>
+                        {bookingStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {!isConferenceRoom && (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -1861,35 +1922,6 @@ export function UnifiedBookingSheet({
 
               {!isConferenceRoom && renderManageModeGuestPassInfo()}
 
-              {bookingContext && (
-                <div className="p-3 bg-primary/5 dark:bg-white/5 rounded-xl text-xs text-primary/70 dark:text-white/70 grid grid-cols-2 gap-2">
-                  {bookingContext.resourceName && (
-                    <p className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-xs">sports_golf</span>
-                      {bookingContext.resourceName}
-                    </p>
-                  )}
-                  {bookingContext.requestDate && (
-                    <p className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-xs">calendar_today</span>
-                      {bookingContext.requestDate}
-                    </p>
-                  )}
-                  {bookingContext.startTime && bookingContext.endTime && (
-                    <p className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-xs">schedule</span>
-                      {bookingContext.startTime} - {bookingContext.endTime}
-                    </p>
-                  )}
-                  {bookingContext.durationMinutes && (
-                    <p className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-xs">timer</span>
-                      {bookingContext.durationMinutes} min
-                    </p>
-                  )}
-                </div>
-              )}
-
               {!isConferenceRoom && (
                 <div className="space-y-2">
                   {filledMembers.map((member, idx) => renderManageModeSlot(member, idx))}
@@ -1900,6 +1932,47 @@ export function UnifiedBookingSheet({
               {isConferenceRoom && filledMembers.length > 0 && (
                 <div className="space-y-2">
                   {filledMembers.filter(m => m.isPrimary).map((member, idx) => renderManageModeSlot(member, idx))}
+                </div>
+              )}
+
+              {(onCheckIn || onReschedule || onCancelBooking) && bookingId && (
+                <div className="flex gap-2">
+                  {onCheckIn && bookingStatus !== 'attended' && bookingStatus !== 'cancelled' && (
+                    <button
+                      onClick={() => onCheckIn(bookingId)}
+                      className="flex-1 py-2 px-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-sm">how_to_reg</span>
+                      Check In
+                    </button>
+                  )}
+                  {onReschedule && bookingStatus !== 'cancelled' && (
+                    <button
+                      onClick={() => onReschedule({
+                        id: bookingId,
+                        request_date: bookingContext?.requestDate || '',
+                        start_time: bookingContext?.startTime || '',
+                        end_time: bookingContext?.endTime || '',
+                        resource_id: bookingContext?.resourceId || 0,
+                        resource_name: bookingContext?.resourceName || bayName,
+                        user_name: ownerName,
+                        user_email: ownerEmail,
+                      })}
+                      className="flex-1 py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-sm">event_repeat</span>
+                      Reschedule
+                    </button>
+                  )}
+                  {onCancelBooking && bookingStatus !== 'cancelled' && bookingStatus !== 'cancellation_pending' && (
+                    <button
+                      onClick={() => onCancelBooking(bookingId)}
+                      className="flex-1 py-2 px-3 rounded-lg border border-red-300 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-sm">cancel</span>
+                      Cancel Booking
+                    </button>
+                  )}
                 </div>
               )}
 
