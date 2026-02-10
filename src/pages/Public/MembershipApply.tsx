@@ -92,7 +92,7 @@ const MembershipApply: React.FC = () => {
         { name: 'lastname', value: formData.lastname },
         { name: 'email', value: formData.email },
         { name: 'phone', value: formData.phone },
-        { name: 'membership_tier', value: formData.membership_tier },
+        { name: 'membership_interest', value: formData.membership_tier },
         { name: 'message', value: formData.message },
         { name: 'marketing_consent', value: formData.consent ? 'Yes' : 'No' }
       ];
