@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.32.2",
+    date: "2026-02-10",
+    title: "HubSpot Form Submissions Sync",
+    changes: [
+      "Feature: Added automatic sync of HubSpot form submissions — inquiries submitted on the production app now appear in all environments",
+      "Feature: Sync runs every 30 minutes and can also be triggered manually from the admin tools",
+    ],
+  },
+  {
     version: "7.32.1",
     date: "2026-02-10",
     title: "Private Hire Page Updates",

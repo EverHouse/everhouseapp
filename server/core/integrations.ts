@@ -4,7 +4,7 @@ import { google } from 'googleapis';
 let hubspotConnectionSettings: any;
 let googleCalendarConnectionSettings: any;
 
-async function getHubSpotAccessToken() {
+export async function getHubSpotAccessToken() {
   const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // Refresh 5 minutes before expiry
   
   if (hubspotConnectionSettings) {

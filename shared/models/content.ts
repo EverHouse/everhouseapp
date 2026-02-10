@@ -173,6 +173,7 @@ export const formSubmissions = pgTable("form_submissions", {
   metadata: jsonb("metadata"),
   status: varchar("status").default("new"),
   notes: text("notes"),
+  hubspotSubmissionId: varchar("hubspot_submission_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

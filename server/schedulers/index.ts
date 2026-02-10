@@ -12,6 +12,7 @@ import { startInviteExpiryScheduler } from './inviteExpiryScheduler';
 import { startCommunicationLogsScheduler } from './communicationLogsScheduler';
 import { startWebhookLogCleanupScheduler } from './webhookLogCleanupScheduler';
 import { startHubSpotQueueScheduler } from './hubspotQueueScheduler';
+import { startHubSpotFormSyncScheduler } from './hubspotFormSyncScheduler';
 import { startSessionCleanupScheduler } from './sessionCleanupScheduler';
 import { startUnresolvedTrackmanScheduler } from './unresolvedTrackmanScheduler';
 import { startGuestPassResetScheduler } from './guestPassResetScheduler';
@@ -38,6 +39,7 @@ export function initSchedulers(): void {
   startSessionCleanupScheduler();
   startUnresolvedTrackmanScheduler();
   startHubSpotQueueScheduler();
+  startHubSpotFormSyncScheduler();
   startMemberSyncScheduler();
   startDuplicateCleanupScheduler();
   startGuestPassResetScheduler();

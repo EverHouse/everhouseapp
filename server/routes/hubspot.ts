@@ -1512,5 +1512,16 @@ router.get('/api/hubspot/products', isStaffOrAdmin, async (req, res) => {
   }
 });
 
+router.post('/api/admin/hubspot/sync-form-submissions', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { syncHubSpotFormSubmissions } = await import('../core/hubspot/formSync');
+    const result = await syncHubSpotFormSubmissions();
+    res.json(result);
+  } catch (error: any) {
+    console.error('[HubSpot FormSync] Manual sync error:', error);
+    res.status(500).json({ error: 'Failed to sync form submissions' });
+  }
+});
+
 export { fetchAllHubSpotContacts };
 export default router;
