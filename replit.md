@@ -18,7 +18,7 @@ The Ever Club Members App is a private members club application for golf and wel
 - Do not make changes to the file `Y`.
 
 ## System Architecture
-The application is built with a React 19 frontend (Vite, Tailwind CSS) and an Express.js backend, utilizing a PostgreSQL database. Current app version: 7.28.0 (package.json version: 3.14).
+The application is built with a React 19 frontend (Vite, Tailwind CSS) and an Express.js backend, utilizing a PostgreSQL database. Current app version: 7.29.0 (package.json version: 3.14).
 
 ### UI/UX Decisions
 - **Design System**: Liquid Glass (iOS-inspired glassmorphism) with WCAG AA compliance.
@@ -104,6 +104,7 @@ The application is built with a React 19 frontend (Vite, Tailwind CSS) and an Ex
 - **Apple Messages for Business**: Direct messaging link (contact page).
 
 ## Recent Changes
+- **v7.29.0 (2026-02-10)**: Unified Booking Sheet & Fee Button Fix — fee button on booking cards now opens the Unified Booking Sheet instead of the old billing modal, shows full estimated total (owner overage + guest fees), and Mark Paid works inline.
 - **v7.28.0 (2026-02-10)**: Data Integrity Fix Actions — Unlink HubSpot duplicates, delete orphaned guest passes, fee snapshots, and booking participants directly from the Data Integrity page. Fixed integrity check crash and made Stripe cleanup tool visible in Data Tools.
 - **v7.27.0 (2026-02-10)**: Stripe Customer Cleanup & Prevention — admin tool to scan/delete empty Stripe customers, stopped premature customer creation in day pass checkout (uses customer_email instead), visitor creation, bulk sync, CSV import, and visitor matching. Metadata sync now includes firstName/lastName.
 - **v7.26.0 (2026-02-10)**: Silent Failure Audit & Data Safety Net — safeDbOperation/safeDbTransaction wrappers, fixed 7 empty catch blocks, 4 new orphan record integrity checks, transactions on tier change/suspend/archive endpoints.

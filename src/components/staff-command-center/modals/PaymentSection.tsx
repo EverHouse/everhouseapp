@@ -29,8 +29,6 @@ interface PaymentSectionProps {
   handleInlineStripeSuccess: () => void;
   handleChargeCardOnFile: () => void;
   handleWaiveFees: () => void;
-  onCollectPayment?: (bookingId: number) => void;
-
   renderTierBadge: (tier: string | null | undefined, membershipStatus?: string | null) => React.ReactNode;
 }
 
@@ -57,7 +55,6 @@ export function PaymentSection({
   handleInlineStripeSuccess,
   handleChargeCardOnFile,
   handleWaiveFees,
-  onCollectPayment,
   renderTierBadge,
 }: PaymentSectionProps) {
   const { showToast } = useToast();
@@ -272,7 +269,27 @@ export function PaymentSection({
                 </button>
 
                 <button
-                  onClick={() => { if (bookingId && onCollectPayment) onCollectPayment(bookingId); }}
+                  onClick={async () => {
+                    if (!bookingId) return;
+                    setInlinePaymentAction('mark-paid');
+                    try {
+                      const res = await fetch(`/api/bookings/${bookingId}/payments`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ action: 'confirm_all' })
+                      });
+                      if (res.ok) {
+                        showToast('Payment confirmed — marked as paid', 'success');
+                      } else {
+                        showToast('Failed to confirm payment', 'error');
+                      }
+                    } catch (err) {
+                      showToast('Failed to confirm payment', 'error');
+                    } finally {
+                      setInlinePaymentAction(null);
+                    }
+                  }}
                   disabled={!!inlinePaymentAction}
                   className="w-full py-2 px-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
                 >

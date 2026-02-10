@@ -65,7 +65,6 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
     ownerEmail,
     bookingContext,
     checkinMode,
-    onCollectPayment,
     onReschedule,
     onCancelBooking,
     onCheckIn,
@@ -238,7 +237,6 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
                 handleInlineStripeSuccess={logic.handleInlineStripeSuccess}
                 handleChargeCardOnFile={logic.handleInlineChargeSavedCard}
                 handleWaiveFees={logic.handleInlineWaiveAll}
-                onCollectPayment={onCollectPayment}
                 renderTierBadge={logic.renderTierBadge}
               />
               </ErrorBoundary>

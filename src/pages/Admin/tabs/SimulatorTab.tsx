@@ -14,7 +14,6 @@ import ModalShell from '../../../components/ModalShell';
 import { useToast } from '../../../components/Toast';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { TabType, tabToPath } from '../layout/types';
-import { CheckinBillingModal } from '../../../components/staff-command-center/modals/CheckinBillingModal';
 import { TrackmanBookingModal } from '../../../components/staff-command-center/modals/TrackmanBookingModal';
 import { UnifiedBookingSheet } from '../../../components/staff-command-center/modals/UnifiedBookingSheet';
 import { StaffManualBookingModal, type StaffManualBookingData } from '../../../components/staff-command-center/modals/StaffManualBookingModal';
@@ -907,7 +906,6 @@ const SimulatorTab: React.FC = () => {
       note: string;
     } | null>(null);
     const [isFetchingFeeEstimate, setIsFetchingFeeEstimate] = useState(false);
-    const [billingModal, setBillingModal] = useState<{isOpen: boolean; bookingId: number | null}>({isOpen: false, bookingId: null});
     const [trackmanModal, setTrackmanModal] = useState<{ isOpen: boolean; booking: BookingRequest | null }>({ isOpen: false, booking: null });
     const { confirm, ConfirmDialogComponent } = useConfirmDialog();
     const [bookingSheet, setBookingSheet] = useState<{ 
@@ -1273,7 +1271,12 @@ const SimulatorTab: React.FC = () => {
                         mode: 'manage' as const,
                     });
                 } else if (result.requiresPayment) {
-                    setBillingModal({ isOpen: true, bookingId });
+                    setBookingSheet({
+                        isOpen: true,
+                        trackmanBookingId: null,
+                        bookingId,
+                        mode: 'manage' as const,
+                    });
                 }
                 if (newStatus === 'attended') {
                     checkinInProgressRef.current.delete(bookingId);
@@ -2422,13 +2425,20 @@ const SimulatorTab: React.FC = () => {
                                                                         const declPlayers = (booking as any).declared_player_count || 1;
                                                                         const filledPlayers = (booking as any).filled_player_count || 0;
                                                                         const dbOwed = booking.total_owed || 0;
-                                                                        const estimatedFee = dbOwed > 0 ? dbOwed : (filledPlayers < declPlayers ? estimateFeeByTier((booking as any).tier, booking.duration_minutes || 0, declPlayers, guestFeeDollars, overageRatePerBlockDollars) : 0);
+                                                                        const estimatedFee = (filledPlayers < declPlayers) 
+                                                                          ? estimateFeeByTier((booking as any).tier, booking.duration_minutes || 0, declPlayers, guestFeeDollars, overageRatePerBlockDollars)
+                                                                          : (dbOwed > 0 ? dbOwed : estimateFeeByTier((booking as any).tier, booking.duration_minutes || 0, declPlayers, guestFeeDollars, overageRatePerBlockDollars));
                                                                         const isEstimate = !booking.has_unpaid_fees && dbOwed === 0;
                                                                         return (
                                                                             <button
                                                                                 onClick={() => {
                                                                                     const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
-                                                                                    setBillingModal({ isOpen: true, bookingId });
+                                                                                    setBookingSheet({
+                                                                                        isOpen: true,
+                                                                                        trackmanBookingId: null,
+                                                                                        bookingId,
+                                                                                        mode: 'manage' as const,
+                                                                                    });
                                                                                 }}
                                                                                 className="flex-1 py-2.5 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:bg-amber-200 dark:hover:bg-amber-500/30 hover:shadow-md active:scale-95 transition-all duration-200"
                                                                             >
@@ -3205,15 +3215,6 @@ const SimulatorTab: React.FC = () => {
                 </div>
             </ModalShell>
 
-            <CheckinBillingModal
-              isOpen={billingModal.isOpen}
-              onClose={() => setBillingModal({isOpen: false, bookingId: null})}
-              bookingId={billingModal.bookingId || 0}
-              onCheckinComplete={() => {
-                setBillingModal({isOpen: false, bookingId: null});
-                handleRefresh();
-              }}
-            />
             
 
             <TrackmanBookingModal
@@ -3261,8 +3262,6 @@ const SimulatorTab: React.FC = () => {
                 handleRefresh();
               }}
               onRosterUpdated={() => handleRefresh()}
-              onOpenBillingModal={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
-              onCollectPayment={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
               bookingStatus={bookingSheet.bookingStatus}
               bookingContext={bookingSheet.bookingContext}
               ownerMembershipStatus={bookingSheet.ownerMembershipStatus}

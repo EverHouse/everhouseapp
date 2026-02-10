@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.29.0",
+    date: "2026-02-10",
+    title: "Unified Booking Sheet & Fee Button Fix",
+    changes: [
+      "Fix: The '$X Due' fee button on booking cards now opens the Unified Booking Sheet instead of the old separate billing sheet — one consistent experience for managing bookings and payments",
+      "Fix: Fee button now shows the full estimated total (owner overage + guest fees) instead of just the owner's cached fee, matching what the Unified Booking Sheet shows",
+      "Fix: Check-in payment flow now opens the Unified Booking Sheet when payment is required, instead of the old billing modal",
+      "Fix: 'Mark Paid (Cash/External)' button now works inline within the Unified Booking Sheet instead of opening a separate modal",
+      "Cleanup: Removed old billing modal from the Simulator page (still available elsewhere during transition)",
+    ],
+  },
+  {
     version: "7.28.0",
     date: "2026-02-10",
     title: "Data Integrity Fix Actions",
