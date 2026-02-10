@@ -55,22 +55,42 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
     console.log(`[Stripe Subscriptions] Invoice status: ${invoice?.status}, Invoice ID: ${invoice?.id}`);
     console.log(`[Stripe Subscriptions] Initial payment intent: ${paymentIntent?.id || 'none'}, Setup intent: ${pendingSetupIntent?.id || 'none'}`);
     
-    // If no payment intent exists and invoice requires payment, create one manually
+    if (paymentIntent?.id) {
+      try {
+        const piMetadata: Record<string, string> = {
+          ...paymentIntent.metadata,
+          invoice_id: invoice?.id || '',
+          subscription_id: subscription.id,
+          subscriptionId: subscription.id,
+          source: 'membership_invoice_payment',
+        };
+        if (metadata?.userId) piMetadata.userId = metadata.userId;
+        if (metadata?.memberEmail) piMetadata.email = metadata.memberEmail;
+        
+        await stripe.paymentIntents.update(paymentIntent.id, { metadata: piMetadata });
+        console.log(`[Stripe Subscriptions] Updated invoice PI ${paymentIntent.id} with membership metadata`);
+      } catch (metaErr: any) {
+        console.error(`[Stripe Subscriptions] Failed to update PI metadata:`, metaErr.message);
+      }
+    }
+    
     if (!paymentIntent && invoice && invoice.amount_due > 0) {
       console.log(`[Stripe Subscriptions] No payment intent found, creating one for invoice amount: ${invoice.amount_due}`);
       
       try {
-        // Create a PaymentIntent for the invoice amount
         const newPaymentIntent = await stripe.paymentIntents.create({
           amount: invoice.amount_due,
           currency: invoice.currency || 'usd',
           customer: customerId,
           description: 'Subscription creation',
-          setup_future_usage: 'off_session', // Save payment method for future billing
+          setup_future_usage: 'off_session',
           metadata: {
             invoice_id: invoice.id,
             subscription_id: subscription.id,
+            subscriptionId: subscription.id,
             source: 'membership_inline_payment',
+            ...(metadata?.userId ? { userId: metadata.userId } : {}),
+            ...(metadata?.memberEmail ? { email: metadata.memberEmail } : {}),
           },
         });
         

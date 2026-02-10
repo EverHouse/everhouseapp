@@ -156,6 +156,8 @@ export function MemberFlow({
         
         if (data.clientSecret) {
           setClientSecret(data.clientSecret);
+          const piId = data.clientSecret.split('_secret_')[0];
+          if (piId) setPaymentIntentId(piId);
         }
         setSubscriptionId(data.subscriptionId);
         setCreatedUserId(data.userId);
@@ -833,7 +835,7 @@ export function MemberFlow({
               <TerminalPayment
                 amount={totalPrice}
                 subscriptionId={form.joinExistingGroup ? null : subscriptionId}
-                existingPaymentIntentId={form.joinExistingGroup ? (paymentIntentId || undefined) : undefined}
+                existingPaymentIntentId={paymentIntentId || undefined}
                 userId={createdUserId}
                 description={form.joinExistingGroup ? `${selectedTier?.name || 'Membership'} (Group Add-on)` : undefined}
                 onSuccess={async (piId) => {

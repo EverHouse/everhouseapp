@@ -759,14 +759,39 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
       });
     }
 
+    let readerLabel = readerId;
     try {
-      await stripe.paymentIntents.update(paymentIntentId, {
-        payment_method_types: ['card_present'],
-        automatic_payment_methods: { enabled: false }
-      } as any);
+      const readerObj = await stripe.terminal.readers.retrieve(readerId);
+      readerLabel = readerObj.label || readerId;
+    } catch {}
+
+    const updateParams: any = {
+      payment_method_types: ['card_present'],
+      automatic_payment_methods: { enabled: false },
+      metadata: {
+        ...paymentIntent.metadata,
+        readerId,
+        readerLabel,
+        terminalPayment: 'true',
+      },
+    };
+    if (paymentIntent.setup_future_usage) {
+      updateParams.setup_future_usage = '';
+    }
+
+    try {
+      await stripe.paymentIntents.update(paymentIntentId, updateParams);
     } catch (updateErr: any) {
+      console.log(`[Terminal] First update attempt failed, trying stepwise:`, updateErr.message);
       await stripe.paymentIntents.update(paymentIntentId, {
-        automatic_payment_methods: { enabled: false }
+        automatic_payment_methods: { enabled: false },
+        ...(paymentIntent.setup_future_usage ? { setup_future_usage: '' } : {}),
+        metadata: {
+          ...paymentIntent.metadata,
+          readerId,
+          readerLabel,
+          terminalPayment: 'true',
+        },
       } as any);
       await stripe.paymentIntents.update(paymentIntentId, {
         payment_method_types: ['card_present']

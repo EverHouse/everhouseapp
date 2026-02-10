@@ -140,7 +140,17 @@ export function TerminalPayment({
     try {
       let res: Response;
 
-      if (subscriptionId) {
+      if (existingPaymentIntentId) {
+        res = await fetch('/api/stripe/terminal/process-existing-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            readerId: selectedReader,
+            paymentIntentId: existingPaymentIntentId
+          })
+        });
+      } else if (subscriptionId) {
         res = await fetch('/api/stripe/terminal/process-subscription-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -149,16 +159,6 @@ export function TerminalPayment({
             readerId: selectedReader,
             subscriptionId,
             userId
-          })
-        });
-      } else if (existingPaymentIntentId) {
-        res = await fetch('/api/stripe/terminal/process-existing-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            readerId: selectedReader,
-            paymentIntentId: existingPaymentIntentId
           })
         });
       } else {
