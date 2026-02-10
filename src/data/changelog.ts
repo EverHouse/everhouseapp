@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.31.4",
+    date: "2026-02-10",
+    title: "POS Receipt Line Items",
+    changes: [
+      "Improvement: POS purchases now show individual line items on Stripe receipts and dashboard — instead of a single lump sum with concatenated description",
+      "Improvement: All three POS payment methods (card reader, online card, saved card) now create Stripe Invoices with itemized products",
+      "Improvement: Stripe receipts now include per-item name, quantity, and price for cafe/POS purchases",
+      "Safety: Invoice items are isolated per transaction — failed transactions cannot leak items into future charges",
+      "Safety: Failed invoice creation automatically cleans up draft invoices before falling back to standard payment",
+    ],
+  },
+  {
     version: "7.31.3",
     date: "2026-02-10",
     title: "Fee Display Fix & Code Cleanup",
