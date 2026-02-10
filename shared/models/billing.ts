@@ -24,6 +24,7 @@ export interface FeeLineItem {
   tierName?: string;
   dailyAllowance?: number;
   usedMinutesToday?: number;
+  isStaff?: boolean;
 }
 
 export interface FeeBreakdown {

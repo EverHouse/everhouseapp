@@ -280,15 +280,27 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
     }
   }
 
-  // Batch fetch member tiers - only for members with active benefits
+  // Batch fetch member tiers, roles, and membership status
+  // Staff/admin users are always treated as having unlimited access ($0 fees)
   const tierMap = new Map<string, string>();
+  const roleMap = new Map<string, string>();
   if (emailList.length > 0) {
     const tiersResult = await pool.query(
-      `SELECT LOWER(email) as email, tier FROM users WHERE LOWER(email) = ANY($1::text[]) AND membership_status IN ('active', 'trial', 'past_due')`,
+      `SELECT LOWER(email) as email, tier, role, membership_status FROM users WHERE LOWER(email) = ANY($1::text[])`,
       [emailList.map(e => e.toLowerCase())]
     );
-    tiersResult.rows.forEach(r => tierMap.set(r.email, r.tier));
+    tiersResult.rows.forEach(r => {
+      if (r.tier && ['active', 'trial', 'past_due'].includes(r.membership_status)) {
+        tierMap.set(r.email, r.tier);
+      }
+      if (r.role) roleMap.set(r.email, r.role);
+    });
   }
+
+  const isStaffRole = (email: string): boolean => {
+    const role = roleMap.get(email.toLowerCase());
+    return role === 'staff' || role === 'admin';
+  };
 
   // Batch fetch daily usage - use booking_requests for preview mode (no sessionId)
   // because usage_ledger is only populated after session creation
@@ -534,6 +546,19 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
       
       lineItem.minutesAllocated = minutesPerParticipant;
       
+      // "Pro in the Slot" rule: Staff/admin added as a guest are always $0
+      const guestEmail = participant.email ? participant.email.toLowerCase() : '';
+      if (guestEmail && isStaffRole(guestEmail)) {
+        lineItem.guestCents = 0;
+        lineItem.totalCents = 0;
+        lineItem.isStaff = true;
+        logger.info('[FeeBreakdown] Staff in guest slot — $0 fee (Pro in the Slot rule)', {
+          extra: { guestEmail, participantId: (participant as any).participantId }
+        });
+        lineItems.push(lineItem);
+        continue;
+      }
+      
       // Only charge guest fee if participant has NO user_id (i.e., not a member)
       // Members incorrectly marked as guests should not be charged guest fees
       // This matches the logic in feeCalculator.ts for consistency
@@ -563,6 +588,19 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
       lineItem.minutesAllocated = minutesPerParticipant;
       
       const ownerEmail = await resolveToEmail(participant.email || participant.userId || hostEmail);
+
+      // "Staff is Free" rule: Staff/admin owners always have unlimited access
+      if (isStaffRole(ownerEmail)) {
+        lineItem.isStaff = true;
+        lineItem.tierName = 'Staff';
+        lineItem.overageCents = 0;
+        lineItem.totalCents = 0;
+        logger.info('[FeeBreakdown] Staff owner — $0 fee (Staff is Free rule)', {
+          extra: { ownerEmail }
+        });
+        lineItems.push(lineItem);
+        continue;
+      }
       // Use batched tier data, fallback to individual query if not found
       let tierName = tierMap.get(ownerEmail.toLowerCase());
       if (!tierName && ownerEmail) {
@@ -633,6 +671,19 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
       lineItem.minutesAllocated = minutesPerParticipant;
       
       const memberEmail = await resolveToEmail(participant.email || participant.userId);
+
+      // "Staff is Free" rule: Staff/admin members added to bookings pay $0
+      if (memberEmail && isStaffRole(memberEmail)) {
+        lineItem.isStaff = true;
+        lineItem.tierName = 'Staff';
+        lineItem.overageCents = 0;
+        lineItem.totalCents = 0;
+        logger.info('[FeeBreakdown] Staff member in slot — $0 fee (Staff is Free rule)', {
+          extra: { memberEmail }
+        });
+        lineItems.push(lineItem);
+        continue;
+      }
       // Use batched tier data, fallback to individual query if not found
       let tierName = tierMap.get(memberEmail.toLowerCase());
       if (!tierName && memberEmail) {
@@ -682,7 +733,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
 
   if (nonMemberMinutes > 0 && !isConferenceRoom) {
     const ownerLineItem = lineItems.find(li => li.participantType === 'owner');
-    if (ownerLineItem) {
+    if (ownerLineItem && !ownerLineItem.isStaff) {
       ownerLineItem.minutesAllocated += nonMemberMinutes;
 
       const dailyAllowance = ownerLineItem.dailyAllowance ?? 0;

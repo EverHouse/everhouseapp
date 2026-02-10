@@ -1518,50 +1518,52 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
         const breakdown = await recalculateSessionFees(sessionId, 'trackman');
         
         const feeMap = new Map<number, number>();
+        const staffFlagMap = new Map<number, boolean>();
         for (const p of breakdown.participants) {
           if (p.participantId) {
             feeMap.set(p.participantId, p.totalCents / 100);
+            if (p.isStaff) staffFlagMap.set(p.participantId, true);
           }
         }
         
-        const emailToFeeMap = new Map<string, { fee: number; feeNote: string; isPaid?: boolean }>();
+        const emailToFeeMap = new Map<string, { fee: number; feeNote: string; isPaid?: boolean; isStaff?: boolean }>();
         
         for (const p of participantsResult.rows) {
           const participantFee = feeMap.get(p.participant_id) || 0;
           const email = p.user_email?.toLowerCase();
           const isPaid = p.payment_status === 'paid';
+          const participantIsStaff = staffFlagMap.get(p.participant_id) || false;
           
           if (p.participant_type === 'owner') {
-            // Only count unpaid fees toward the collectible total
-            ownerOverageFee = isPaid ? 0 : participantFee;
+            ownerOverageFee = (isPaid || participantIsStaff) ? 0 : participantFee;
             if (email) {
               emailToFeeMap.set(email, {
-                fee: participantFee,
-                feeNote: isPaid ? 'Paid' : (participantFee > 0 ? 'Overage fee' : 'Within daily allowance'),
-                isPaid
+                fee: participantIsStaff ? 0 : participantFee,
+                feeNote: participantIsStaff ? 'Staff — included' : (isPaid ? 'Paid' : (participantFee > 0 ? 'Overage fee' : 'Within daily allowance')),
+                isPaid,
+                isStaff: participantIsStaff
               });
             }
           } else if (p.participant_type === 'member') {
-            // Only count unpaid fees toward the collectible total
-            if (!isPaid) {
+            if (!isPaid && !participantIsStaff) {
               totalPlayersOwe += participantFee;
             }
             playerBreakdownFromSession.push({
               name: p.display_name || 'Unknown Member',
-              tier: p.user_tier || null,
-              fee: isPaid ? 0 : participantFee,
-              feeNote: isPaid ? 'Paid' : (participantFee > 0 ? 'Overage fee' : 'Within allowance')
+              tier: participantIsStaff ? 'Staff' : (p.user_tier || null),
+              fee: (isPaid || participantIsStaff) ? 0 : participantFee,
+              feeNote: participantIsStaff ? 'Staff — included' : (isPaid ? 'Paid' : (participantFee > 0 ? 'Overage fee' : 'Within allowance'))
             });
             if (email) {
               emailToFeeMap.set(email, {
-                fee: participantFee,
-                feeNote: isPaid ? 'Paid' : (participantFee > 0 ? 'Overage fee' : 'Within daily allowance'),
-                isPaid
+                fee: participantIsStaff ? 0 : participantFee,
+                feeNote: participantIsStaff ? 'Staff — included' : (isPaid ? 'Paid' : (participantFee > 0 ? 'Overage fee' : 'Within daily allowance')),
+                isPaid,
+                isStaff: participantIsStaff
               });
             }
           } else if (p.participant_type === 'guest') {
-            // Only count unpaid guest fees
-            if (!p.user_id && !p.used_guest_pass && participantFee > 0 && !isPaid) {
+            if (!p.user_id && !p.used_guest_pass && participantFee > 0 && !isPaid && !participantIsStaff) {
               guestFeesWithoutPass += participantFee;
             }
           }
