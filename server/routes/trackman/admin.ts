@@ -1511,7 +1511,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
       const isInactiveMember = membershipStatus && membershipStatus !== 'active' && !row.is_primary;
       
       if (isInactiveMember && fee > 0) {
-        feeNote = `${membershipStatus} member — fee charged to host`;
+        feeNote = `${membershipStatus} — $${fee} charged to host`;
       }
       
       return {
@@ -1675,7 +1675,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
             if (email) {
               emailToFeeMap.set(email, {
                 fee: (isInactive || participantIsStaff) ? 0 : participantFee,
-                feeNote: isInactive ? `${memberStatus} member — fee charged to host` : (participantIsStaff ? 'Staff — included' : (isPaid ? 'Paid' : (participantFee > 0 ? 'Overage fee' : 'Within daily allowance'))),
+                feeNote: isInactive ? `${memberStatus} — $${participantFee} charged to host` : (participantIsStaff ? 'Staff — included' : (isPaid ? 'Paid' : (participantFee > 0 ? 'Overage fee' : 'Within daily allowance'))),
                 isPaid,
                 isStaff: participantIsStaff
               });
