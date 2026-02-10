@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.26.1",
+    date: "2026-02-10",
+    title: "Session Backfill & Roster Reliability",
+    changes: [
+      "Fix: Session backfill now uses overlap detection to find existing sessions with different Trackman IDs but overlapping time ranges — prevents 'No bookings could be resolved' errors",
+      "Fix: Backfill endpoint properly handles session creation failures — rolls back savepoint instead of attempting release on error state",
+      "Fix: Transaction-aware retry logic — when called within a transaction, session creation throws immediately instead of retrying on an aborted PostgreSQL transaction",
+    ],
+  },
+  {
     version: "7.26.0",
     date: "2026-02-10",
     title: "Silent Failure Audit & Data Safety Net",

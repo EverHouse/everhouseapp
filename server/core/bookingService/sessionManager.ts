@@ -137,6 +137,25 @@ export async function ensureSessionForBooking(params: {
     }
 
     if (!sessionId) {
+      const overlapSession = await q.query(
+        `SELECT id FROM booking_sessions
+         WHERE resource_id = $1 AND session_date = $2
+         AND tsrange(
+           (session_date + start_time)::timestamp,
+           (session_date + end_time)::timestamp, '[)'
+         ) && tsrange(
+           ($2::date + $3::time)::timestamp,
+           ($2::date + $4::time)::timestamp, '[)'
+         )
+         LIMIT 1`,
+        [params.resourceId, params.sessionDate, params.startTime, params.endTime]
+      );
+      if (overlapSession.rows.length > 0) {
+        sessionId = overlapSession.rows[0].id;
+      }
+    }
+
+    if (!sessionId) {
       const insertResult = await q.query(
         `INSERT INTO booking_sessions (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
@@ -183,6 +202,10 @@ export async function ensureSessionForBooking(params: {
   try {
     return await attemptSessionCreation();
   } catch (firstError: any) {
+    if (client) {
+      throw firstError;
+    }
+
     console.error('[ensureSessionForBooking] First attempt failed, retrying in 500ms...', firstError);
 
     await new Promise(resolve => setTimeout(resolve, 500));

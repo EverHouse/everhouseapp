@@ -2672,9 +2672,15 @@ router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => 
           createdBy: 'backfill_tool'
         }, client);
         
-        const sessionId = sessionResult.sessionId;
+        if (sessionResult.sessionId === 0 && sessionResult.error) {
+          await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          errors.push({
+            bookingId: booking.id,
+            error: sessionResult.error
+          });
+          continue;
+        }
         
-        // Release savepoint on success
         await client.query(`RELEASE SAVEPOINT ${savepointName}`);
         
         if (sessionResult.created) {
