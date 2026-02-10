@@ -1414,13 +1414,12 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
       email: string;
       first_name: string | null;
       last_name: string | null;
-      name: string | null;
       membership_status: string | null;
       tier_name: string | null;
       hubspot_id: string | null;
       lifetime_visits: number | null;
     }>(`
-      SELECT u.id, u.email, u.first_name, u.last_name, u.name, u.membership_status, u.tier_name, u.hubspot_id, u.lifetime_visits
+      SELECT u.id, u.email, u.first_name, u.last_name, u.membership_status, u.tier_name, u.hubspot_id, u.lifetime_visits
       FROM users u
       WHERE u.id = $1
       LIMIT 1
@@ -1431,7 +1430,7 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
     }
 
     const member = memberResult.rows[0];
-    const displayName = member.name || [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email.split('@')[0];
+    const displayName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email.split('@')[0];
 
     const recentCheckin = await pool.query(
       `SELECT id, created_at FROM walk_in_visits WHERE member_email = $1 AND created_at > NOW() - INTERVAL '2 minutes' LIMIT 1`,
