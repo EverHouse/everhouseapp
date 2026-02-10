@@ -175,11 +175,12 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
       }
     }
     
+    const isBookingFee = metadata?.paymentType === 'booking_fee';
     const finalMetadata = {
       ...(metadata || {}),
       source: metadata?.source || 'terminal',
       email: metadata?.ownerEmail || '',
-      purpose: 'one_time_purchase'
+      purpose: isBookingFee ? 'booking_fee' : 'one_time_purchase'
     };
 
     let finalDescription = description || 'Terminal payment';
@@ -247,21 +248,25 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
     
     if (customerId || metadata?.ownerEmail) {
       try {
+        const bookingIdVal = isBookingFee && metadata?.bookingId ? parseInt(metadata.bookingId) || null : null;
+        const sessionIdVal = isBookingFee && metadata?.sessionId ? parseInt(metadata.sessionId) || null : null;
         await pool.query(
           `INSERT INTO stripe_payment_intents 
-           (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, description, status, product_id, product_name)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, description, status, product_id, product_name, booking_id, session_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
            ON CONFLICT (stripe_payment_intent_id) DO NOTHING`,
           [
             metadata?.userId || `guest-${customerId || 'terminal'}`,
             paymentIntent.id,
             customerId || null,
             Math.round(amount),
-            'one_time_purchase',
+            isBookingFee ? 'booking_fee' : 'one_time_purchase',
             finalDescription,
             'pending',
             null,
-            metadata?.items || null
+            metadata?.items || null,
+            bookingIdVal,
+            sessionIdVal
           ]
         );
       } catch (dbErr: any) {

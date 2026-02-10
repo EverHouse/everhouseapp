@@ -652,9 +652,39 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
           );
           if (existingSnapshot.rows.length === 0) {
             const breakdown = await computeFeeBreakdown({ sessionId, source: 'checkin' as const });
-            const participantFees = breakdown.participants
-              .filter(p => p.participantId)
-              .map(p => ({ id: p.participantId, amountCents: p.totalCents }));
+            const participantFees: Array<{id: number | null; amountCents: number; type: string; description: string}> = [];
+            for (const p of breakdown.participants) {
+              if (!p.participantId) continue;
+              if (p.totalCents <= 0) continue;
+              let feeType = 'booking_fee';
+              let feeDesc = p.displayName || 'Fee';
+              if (p.overageCents > 0 && p.guestCents === 0) {
+                feeType = 'overage';
+                feeDesc = `${p.displayName || 'Owner'} overage`;
+              } else if (p.guestCents > 0 && p.overageCents === 0) {
+                feeType = 'guest_fee';
+                feeDesc = `Guest: ${p.displayName || 'Guest'}`;
+              } else if (p.overageCents > 0 && p.guestCents > 0) {
+                feeType = 'overage_and_guest';
+                feeDesc = `${p.displayName || 'Member'} overage + guest fee`;
+              }
+              participantFees.push({ id: p.participantId, amountCents: p.totalCents, type: feeType, description: feeDesc });
+            }
+            if (breakdown.totals && breakdown.totals.guestCents > 0) {
+              const emptySlotTotal = breakdown.participants
+                .filter(p => !p.participantId && p.guestCents > 0)
+                .reduce((sum, p) => sum + p.guestCents, 0);
+              if (emptySlotTotal > 0) {
+                const slotCount = breakdown.participants.filter(p => !p.participantId && p.guestCents > 0).length;
+                const perSlot = slotCount > 0 ? (emptySlotTotal / slotCount / 100).toFixed(0) : '';
+                participantFees.push({
+                  id: null,
+                  amountCents: emptySlotTotal,
+                  type: 'guest_fee',
+                  description: `${slotCount} empty slot${slotCount > 1 ? 's' : ''}${perSlot ? ` × $${perSlot}` : ''}`
+                });
+              }
+            }
             const totalCents = breakdown.totalCents;
 
             await pool.query(`

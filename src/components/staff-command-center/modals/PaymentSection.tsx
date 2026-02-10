@@ -204,36 +204,67 @@ export function PaymentSection({
                 );
               })()
             ) : inlinePaymentAction === 'terminal' ? (
-              <TerminalPayment
-                amount={Math.round(fs.grandTotal * 100)}
-                userId={rosterData?.ownerId || fetchedContext?.ownerUserId || null}
-                description={`${bayName || fetchedContext?.bayName || 'Booking'} • ${bookingDate || fetchedContext?.bookingDate || ''}`}
-                paymentMetadata={{
-                  bookingId: String(bookingId),
-                  ...(rosterData?.sessionId ? { sessionId: String(rosterData.sessionId) } : {}),
-                  ownerEmail: ownerEmail || fetchedContext?.ownerEmail || rosterData?.members?.find(m => m.isPrimary)?.userEmail || '',
-                  userId: rosterData?.ownerId || fetchedContext?.ownerUserId || '',
-                  paymentType: 'booking_fee',
-                }}
-                onSuccess={async (paymentIntentId) => {
-                  try {
-                    await fetch(`/api/bookings/${bookingId}/payments`, {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      credentials: 'include',
-                      body: JSON.stringify({ action: 'confirm_all' })
-                    });
-                  } catch (err) {
-                    console.error('Failed to mark participants as paid after terminal payment:', err);
+              (() => {
+                const feeLines: string[] = [];
+                if (fs.ownerOverageFee > 0) {
+                  feeLines.push(`Overage — $${fs.ownerOverageFee.toFixed(2)}`);
+                }
+                if (fs.playerBreakdown) {
+                  for (const p of fs.playerBreakdown) {
+                    if (p.fee > 0) {
+                      feeLines.push(`${p.name} — $${p.fee.toFixed(2)}`);
+                    }
                   }
-                  showToast('Terminal payment successful!', 'success');
-                  handleInlineStripeSuccess();
-                }}
-                onError={(message) => {
-                  showToast(message || 'Terminal payment failed', 'error');
-                }}
-                onCancel={() => setInlinePaymentAction(null)}
-              />
+                }
+                if (fs.guestFeesWithoutPass > 0) {
+                  const slotCount = rosterData?.validation?.emptySlots || 0;
+                  if (slotCount > 0) {
+                    feeLines.push(`Empty slots (${slotCount}) — $${fs.guestFeesWithoutPass.toFixed(2)}`);
+                  } else {
+                    feeLines.push(`Guest fees — $${fs.guestFeesWithoutPass.toFixed(2)}`);
+                  }
+                }
+                const feeBreakdownStr = feeLines.join('; ');
+                const baseDesc = `${bayName || fetchedContext?.bayName || 'Booking'} • ${bookingDate || fetchedContext?.bookingDate || ''}`;
+                const terminalDesc = feeLines.length > 0
+                  ? `${baseDesc} | ${feeBreakdownStr}`.substring(0, 1000)
+                  : baseDesc;
+                const metaBreakdown = feeBreakdownStr.length > 500 ? feeBreakdownStr.substring(0, 497) + '...' : feeBreakdownStr;
+
+                return (
+                  <TerminalPayment
+                    amount={Math.round(fs.grandTotal * 100)}
+                    userId={rosterData?.ownerId || fetchedContext?.ownerUserId || null}
+                    description={terminalDesc}
+                    paymentMetadata={{
+                      bookingId: String(bookingId),
+                      ...(rosterData?.sessionId ? { sessionId: String(rosterData.sessionId) } : {}),
+                      ownerEmail: ownerEmail || fetchedContext?.ownerEmail || rosterData?.members?.find(m => m.isPrimary)?.userEmail || '',
+                      userId: rosterData?.ownerId || fetchedContext?.ownerUserId || '',
+                      paymentType: 'booking_fee',
+                      ...(metaBreakdown ? { feeBreakdown: metaBreakdown } : {}),
+                    }}
+                    onSuccess={async (paymentIntentId) => {
+                      try {
+                        await fetch(`/api/bookings/${bookingId}/payments`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({ action: 'confirm_all' })
+                        });
+                      } catch (err) {
+                        console.error('Failed to mark participants as paid after terminal payment:', err);
+                      }
+                      showToast('Terminal payment successful!', 'success');
+                      handleInlineStripeSuccess();
+                    }}
+                    onError={(message) => {
+                      showToast(message || 'Terminal payment failed', 'error');
+                    }}
+                    onCancel={() => setInlinePaymentAction(null)}
+                  />
+                );
+              })()
             ) : (
               <div className="space-y-2">
                 {savedCardInfo?.hasSavedCard && (
