@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.30.2",
+    date: "2026-02-10",
+    title: "Timezone & Reliability Fixes",
+    changes: [
+      "Fix: Future bookings query now uses Pacific time instead of server time — no more wrong bookings showing near midnight",
+      "Fix: User merge safety check now uses Pacific time — correctly detects active sessions regardless of server timezone",
+      "Fix: Removed dead duplicate billing portal route that could cause confusion during maintenance",
+      "Fix: Trackman auto-session failure notes now log a warning if the note itself can't be saved, so staff isn't left in the dark",
+      "Fix: Payment confirmation now gracefully handles corrupted fee data instead of crashing mid-transaction",
+    ],
+  },
+  {
     version: "7.30.1",
     date: "2026-02-10",
     title: "Bug Fixes & Performance",

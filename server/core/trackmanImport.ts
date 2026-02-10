@@ -1187,7 +1187,7 @@ async function createTrackmanSessionAndParticipants(input: SessionCreationInput)
           await db.update(bookingRequests)
             .set({ staffNotes: updatedCriticalNotes })
             .where(eq(bookingRequests.id, input.bookingId));
-        } catch {}
+        } catch (noteErr: any) { console.warn('[TrackmanImport] Failed to save session creation failure note:', noteErr?.message || noteErr); }
       }
     }
   } catch (outerError: any) {

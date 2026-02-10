@@ -2011,7 +2011,7 @@ router.get('/api/payments/future-bookings-with-fees', isStaffOrAdmin, async (req
       LEFT JOIN resources r ON r.id = br.bay_id
       LEFT JOIN users u ON LOWER(u.email) = LOWER(br.user_email)
       WHERE br.status IN ('approved', 'confirmed')
-      AND br.request_date >= CURRENT_DATE
+      AND br.request_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
       AND r.type != 'conference_room'
       ORDER BY br.request_date, br.start_time
       LIMIT 50`);

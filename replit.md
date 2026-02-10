@@ -78,6 +78,11 @@ The application is built with a React 19 frontend (Vite, Tailwind CSS) and an Ex
 - **User Merge**: Duplicate member merging.
 - **Staff = VIP Rule**: All staff/admin/golf_instructor users are automatically treated as VIP members. Auth enforces `tier='VIP'` and `membership_status='active'` on every login. Booking fee service has a safety net that checks `staff_users` table and applies $0 fees. Roster UI shows "Staff" badge (display label) while database stores "VIP" (benefits tier) — intentional dual representation. `BookingMember.isStaff` flag is the explicit source of truth for staff detection.
 
+## Recent Changes
+- **v7.30.2 (2026-02-10)**: Timezone & Reliability Fixes — future bookings query and user merge active session check now use Pacific time instead of UTC, removed dead duplicate billing portal route, Trackman session failure notes log warnings on save failure, payment confirmation handles corrupted fee data gracefully.
+- **v7.30.1 (2026-02-10)**: Bug Fixes & Performance — closure sync no longer re-deactivates ~60 already-inactive closures every cycle, HubSpot products endpoint handles missing scopes gracefully, member-billing endpoint returns empty data instead of 404 for members without subscriptions.
+- **v7.30.0 (2026-02-10)**: Calendar Sync Improvements — app-created events no longer flagged as drafts when synced to dev, deleted/cancelled Google Calendar events properly removed, default location set to club address.
+
 ## External Dependencies
 - **Stripe**: Payment collection, subscription management, webhooks, terminal/POS, product catalog sync, dynamic pricing.
 - **Resend**: Email-based OTP verification, automated alerts, transactional emails.

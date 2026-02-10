@@ -445,39 +445,6 @@ router.post('/api/my/billing/migrate-to-stripe', requireAuth, async (req, res) =
   }
 });
 
-router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
-  try {
-    const sessionUser = req.session.user;
-    const isStaff = sessionUser.role === 'admin' || sessionUser.role === 'staff';
-    const targetEmail = (req.body.email && isStaff) ? String(req.body.email) : sessionUser.email;
-    
-    const result = await pool.query(
-      `SELECT stripe_customer_id FROM users WHERE LOWER(email) = $1`,
-      [targetEmail.toLowerCase()]
-    );
-    
-    const member = result.rows[0];
-    if (!member || !member.stripe_customer_id) {
-      return res.status(400).json({ error: 'No Stripe customer found for this member' });
-    }
-    
-    const stripe = await getStripeClient();
-    
-    const replitDomains = process.env.REPLIT_DOMAINS?.split(',')[0];
-    const baseUrl = replitDomains ? `https://${replitDomains}` : 'http://localhost:5000';
-    
-    const portalSession = await stripe.billingPortal.sessions.create({
-      customer: member.stripe_customer_id,
-      return_url: `${baseUrl}/member/billing`,
-    });
-    
-    res.json({ url: portalSession.url });
-  } catch (error: any) {
-    console.error('[MyBilling] Portal session error:', error);
-    res.status(500).json({ error: 'Failed to create billing portal session' });
-  }
-});
-
 router.get('/api/my/balance', requireAuth, async (req, res) => {
   try {
     const email = req.session.user.email;

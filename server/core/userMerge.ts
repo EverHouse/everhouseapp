@@ -359,9 +359,9 @@ export async function executeMerge(
       FROM booking_participants bp
       JOIN booking_sessions bs ON bp.session_id = bs.id
       WHERE bp.user_id = $1
-        AND bs.session_date = CURRENT_DATE
-        AND bs.start_time <= CURRENT_TIME
-        AND bs.end_time > CURRENT_TIME
+        AND bs.session_date = (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
+        AND bs.start_time <= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::time
+        AND bs.end_time > (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::time
     `, [secondaryUserId]);
 
     if (activeSession.rows.length > 0) {

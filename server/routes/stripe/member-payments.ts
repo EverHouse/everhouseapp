@@ -391,7 +391,12 @@ router.post('/api/member/bookings/:id/confirm-payment', async (req: Request, res
         return res.status(400).json({ error: confirmResult.error || 'Payment verification failed' });
       }
 
-      const participantFees = JSON.parse(snapshot.participant_fees || '[]');
+      let participantFees: any[] = [];
+      try {
+        participantFees = JSON.parse(snapshot.participant_fees || '[]');
+      } catch (parseErr) {
+        console.error('[MemberPayments] Failed to parse participant_fees for snapshot', snapshot.id, ':', parseErr);
+      }
       const participantIds = participantFees.map((pf: any) => pf.id);
 
       if (participantIds.length > 0) {
