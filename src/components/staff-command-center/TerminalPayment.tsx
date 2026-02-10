@@ -75,11 +75,6 @@ export function TerminalPayment({
     };
   }, [fetchReaders]);
 
-  useEffect(() => {
-    if (status === 'success') {
-    }
-  }, [status]);
-
   const createSimulatedReader = async () => {
     try {
       setCreatingSimulated(true);
