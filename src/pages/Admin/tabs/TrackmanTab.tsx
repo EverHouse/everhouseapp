@@ -579,11 +579,11 @@ const TrackmanTab: React.FC = () => {
               <table className="w-full text-sm">
                 <thead className="bg-white/80 dark:bg-white/10 sticky top-0 z-10">
                   <tr className="border-b border-primary/10 dark:border-white/10">
+                    <th className="text-left py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide hidden lg:table-cell">Booking ID</th>
                     <th className="text-left py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Date/Time</th>
                     <th className="text-left py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Trackman Name</th>
                     <th className="text-left py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Email</th>
                     <th className="text-left py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Bay</th>
-                    <th className="text-left py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide hidden lg:table-cell">Booking ID</th>
                     <th className="text-right py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Action</th>
                   </tr>
                 </thead>
@@ -610,6 +610,11 @@ const TrackmanTab: React.FC = () => {
                           }`} 
                           style={{ '--stagger-index': idx } as React.CSSProperties}
                         >
+                          <td className="py-2 px-3 hidden lg:table-cell">
+                            <span className="text-xs font-mono text-primary/70 dark:text-white/70">
+                              {booking.trackmanBookingId || booking.trackman_booking_id || '—'}
+                            </span>
+                          </td>
                           <td className="py-2 px-3 text-primary dark:text-white whitespace-nowrap">
                             <div className="text-sm font-medium">{formatDateDisplayWithDay(booking.bookingDate || booking.booking_date)}</div>
                             <div className="text-xs text-primary/60 dark:text-white/60">{formatTime12Hour(booking.startTime || booking.start_time)} - {formatTime12Hour(booking.endTime || booking.end_time)}</div>
@@ -621,11 +626,6 @@ const TrackmanTab: React.FC = () => {
                             <div className="truncate max-w-[180px]">{booking.originalEmail || booking.original_email || 'No email'}</div>
                           </td>
                           <td className="py-2 px-3 text-primary dark:text-white font-medium">{booking.bayNumber || booking.bay_number}</td>
-                          <td className="py-2 px-3 hidden lg:table-cell">
-                            <span className="text-xs font-mono text-primary/70 dark:text-white/70">
-                              {booking.trackmanBookingId || booking.trackman_booking_id || '—'}
-                            </span>
-                          </td>
                           <td className="py-2 px-3 text-right">
                             <button
                               onClick={() => setAssignPlayersModal({ booking, isOpen: true })}
