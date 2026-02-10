@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.33.3",
+    date: "2026-02-10",
+    title: "Activation Link Endpoint Fix",
+    changes: [
+      "Fix: Activation link endpoint now properly handles existing members — previously always failed with 'member already exists' error",
+      "Improvement: If the member is fully active with a subscription, the endpoint gives a clear message that no link is needed",
+      "Improvement: If the member exists but hasn't completed subscription setup (cancelled, terminated, etc.), the link can now be resent",
+      "Improvement: Staff can now easily resend activation links when needed without hitting 'member already exists' errors",
+    ],
+  },
+  {
     version: "7.33.2",
     date: "2026-02-10",
     title: "Trial Onboarding Email Flow",
