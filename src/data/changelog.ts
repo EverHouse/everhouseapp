@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.33.1",
+    date: "2026-02-10",
+    title: "Terminal Card Saving Gap Coverage",
+    changes: [
+      "Fix: Card now saves correctly even when membership is activated by a background process before staff confirms — previously the card save was skipped entirely in this scenario",
+      "Fix: Subscription payment pending amount now correctly reflects any coupon or discount applied (was showing full price before)",
+      "Fix: Receipt emails now included for terminal subscription payments collected from the billing tab",
+      "Fix: Corrected internal data type for member ID in billing tab to prevent potential lookup mismatches",
+    ],
+  },
+  {
     version: "7.33.0",
     date: "2026-02-10",
     title: "Terminal Card Saving & Billing Improvements",

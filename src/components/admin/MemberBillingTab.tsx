@@ -28,7 +28,7 @@ interface GuestCheckInItem {
 
 interface MemberBillingTabProps {
   memberEmail: string;
-  memberId?: number;
+  memberId?: string;
   currentTier?: string;
   onTierUpdate?: (tier: string) => void;
   guestPassInfo?: { remainingPasses: number; totalUsed: number } | null;
@@ -1057,6 +1057,13 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
           const subscriptionAmountCents = billingInfo?.activeSubscription?.planAmount || 0;
           const hasBookingFees = outstandingData && outstandingData.totalOutstandingCents > 0;
 
+          const coupon = billingInfo?.activeSubscription?.discount?.coupon;
+          const pendingAmount = coupon?.percentOff
+            ? Math.round(subscriptionAmountCents * (1 - coupon.percentOff / 100))
+            : coupon?.amountOff
+              ? Math.max(0, subscriptionAmountCents - coupon.amountOff)
+              : subscriptionAmountCents;
+
           if (!hasBookingFees && hasIncompleteSubscription && subscriptionAmountCents > 0) {
             return (
               <div className={`flex items-center justify-between p-3 rounded-lg ${isDark ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-amber-50 border border-amber-200'}`}>
@@ -1067,7 +1074,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
                   </span>
                 </div>
                 <span className={`text-lg font-bold ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
-                  ${(subscriptionAmountCents / 100).toFixed(2)}
+                  ${(pendingAmount / 100).toFixed(2)}
                 </span>
               </div>
             );
@@ -1086,19 +1093,28 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         })()}
         {outstandingData && outstandingData.totalOutstandingCents > 0 && (
           <div className="space-y-3">
-            {billingInfo?.activeSubscription?.status === 'incomplete' && (billingInfo?.activeSubscription?.planAmount || 0) > 0 && (
-              <div className={`flex items-center justify-between p-3 rounded-lg ${isDark ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-amber-50 border border-amber-200'}`}>
-                <div className="flex items-center gap-2">
-                  <span className={`material-symbols-outlined text-base ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>pending</span>
-                  <span className={`text-sm ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
-                    Subscription payment pending
+            {billingInfo?.activeSubscription?.status === 'incomplete' && (billingInfo?.activeSubscription?.planAmount || 0) > 0 && (() => {
+              const subAmountCents = billingInfo!.activeSubscription!.planAmount || 0;
+              const subCoupon = billingInfo!.activeSubscription!.discount?.coupon;
+              const discountedAmount = subCoupon?.percentOff
+                ? Math.round(subAmountCents * (1 - subCoupon.percentOff / 100))
+                : subCoupon?.amountOff
+                  ? Math.max(0, subAmountCents - subCoupon.amountOff)
+                  : subAmountCents;
+              return (
+                <div className={`flex items-center justify-between p-3 rounded-lg ${isDark ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-amber-50 border border-amber-200'}`}>
+                  <div className="flex items-center gap-2">
+                    <span className={`material-symbols-outlined text-base ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>pending</span>
+                    <span className={`text-sm ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+                      Subscription payment pending
+                    </span>
+                  </div>
+                  <span className={`text-lg font-bold ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
+                    ${(discountedAmount / 100).toFixed(2)}
                   </span>
                 </div>
-                <span className={`text-lg font-bold ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
-                  ${((billingInfo.activeSubscription.planAmount || 0) / 100).toFixed(2)}
-                </span>
-              </div>
-            )}
+              );
+            })()}
             <div className={`flex items-center justify-between p-3 rounded-lg ${isDark ? 'bg-red-500/10 border border-red-500/30' : 'bg-red-50 border border-red-200'}`}>
               <span className={`text-sm font-medium ${isDark ? 'text-red-400' : 'text-red-700'}`}>Total Outstanding</span>
               <span className={`text-lg font-bold ${isDark ? 'text-red-400' : 'text-red-700'}`}>
@@ -1683,7 +1699,8 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
             <TerminalPayment
               amount={collectPaymentAmount}
               subscriptionId={billingInfo.activeSubscription.id}
-              userId={memberId ? String(memberId) : null}
+              userId={memberId || null}
+              email={memberEmail}
               description={`${billingInfo.activeSubscription.planName || 'Membership'} subscription payment`}
               onSuccess={async (piId) => {
                 try {
@@ -1694,7 +1711,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
                     body: JSON.stringify({
                       paymentIntentId: piId,
                       subscriptionId: billingInfo.activeSubscription!.id,
-                      userId: memberId ? String(memberId) : null,
+                      userId: memberId || null,
                       invoiceId: null
                     })
                   });

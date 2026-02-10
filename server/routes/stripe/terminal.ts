@@ -623,17 +623,6 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
       console.log(`[Terminal] Payment record created for PI ${paymentIntentId}`);
     }
     
-    if (existingUser?.membershipStatus === 'active') {
-      console.log(`[Terminal] User ${userId} already active, payment record ensured, returning early`);
-      return res.json({
-        success: true,
-        membershipStatus: 'active',
-        subscriptionId,
-        paymentIntentId,
-        alreadyActivated: true
-      });
-    }
-    
     let cardSaved = false;
     if (paymentIntent.payment_method) {
       try {
@@ -681,6 +670,18 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
       } catch (attachError: any) {
         console.error('[Terminal] Error saving payment method for future billing:', attachError.message);
       }
+    }
+    
+    if (existingUser?.membershipStatus === 'active') {
+      console.log(`[Terminal] User ${userId} already active, payment record ensured, card save attempted, returning early`);
+      return res.json({
+        success: true,
+        membershipStatus: 'active',
+        subscriptionId,
+        paymentIntentId,
+        alreadyActivated: true,
+        cardSaved
+      });
     }
     
     await db.update(users)

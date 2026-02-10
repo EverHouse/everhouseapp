@@ -14,6 +14,7 @@ interface TerminalPaymentProps {
   existingPaymentIntentId?: string;
   userId: string | null;
   description?: string;
+  email?: string;
   paymentMetadata?: Record<string, string>;
   cartItems?: Array<{ productId: string; name: string; priceCents: number; quantity: number }>;
   onSuccess: (paymentIntentId: string) => void;
@@ -27,6 +28,7 @@ export function TerminalPayment({
   existingPaymentIntentId,
   userId,
   description,
+  email,
   paymentMetadata,
   cartItems,
   onSuccess, 
@@ -158,7 +160,8 @@ export function TerminalPayment({
           body: JSON.stringify({
             readerId: selectedReader,
             subscriptionId,
-            userId
+            userId,
+            email
           })
         });
       } else {
