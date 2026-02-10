@@ -1415,11 +1415,11 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
       first_name: string | null;
       last_name: string | null;
       membership_status: string | null;
-      tier_name: string | null;
+      tier: string | null;
       hubspot_id: string | null;
       lifetime_visits: number | null;
     }>(`
-      SELECT u.id, u.email, u.first_name, u.last_name, u.membership_status, u.tier_name, u.hubspot_id, u.lifetime_visits
+      SELECT u.id, u.email, u.first_name, u.last_name, u.membership_status, u.tier, u.hubspot_id, u.lifetime_visits
       FROM users u
       WHERE u.id = $1
       LIMIT 1
@@ -1478,7 +1478,7 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
 
     logFromRequest(req, 'qr_walkin_checkin', 'member', memberId, displayName, {
       memberEmail: member.email,
-      tier: member.tier_name,
+      tier: member.tier,
       lifetimeVisits: newVisitCount,
       type: 'walk_in'
     });
@@ -1489,7 +1489,7 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
       success: true,
       memberName: displayName,
       memberEmail: member.email,
-      tier: member.tier_name,
+      tier: member.tier,
       lifetimeVisits: newVisitCount,
       pinnedNotes,
       membershipStatus: member.membership_status
