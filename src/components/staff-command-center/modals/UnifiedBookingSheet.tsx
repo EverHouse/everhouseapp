@@ -5,6 +5,7 @@ import { MemberSearchInput, SelectedMember } from '../../shared/MemberSearchInpu
 import { useToast } from '../../Toast';
 import { usePricing } from '../../../hooks/usePricing';
 import TierBadge from '../../TierBadge';
+import { StripePaymentForm } from '../../stripe/StripePaymentForm';
 
 export type BookingType = 'simulator' | 'conference_room' | 'lesson' | 'staff_block';
 export type SheetMode = 'assign' | 'manage';
@@ -73,6 +74,8 @@ interface ManageModeRosterData {
   guestPassContext?: { passesBeforeBooking: number; passesUsedThisBooking: number };
   financialSummary?: FinancialSummary;
   bookingNotes?: { notes: string | null; staffNotes: string | null; trackmanNotes: string | null };
+  sessionId?: number;
+  ownerId?: string;
 }
 
 interface VisitorSearchResult {
@@ -218,6 +221,13 @@ export function UnifiedBookingSheet({
   const [isLinkingMember, setIsLinkingMember] = useState(false);
   const [savingChanges, setSavingChanges] = useState(false);
   const membersSnapshotRef = useRef<BookingMember[]>([]);
+  const [showInlinePayment, setShowInlinePayment] = useState(false);
+  const [inlinePaymentAction, setInlinePaymentAction] = useState<string | null>(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [savedCardInfo, setSavedCardInfo] = useState<{hasSavedCard: boolean; cardLast4?: string; cardBrand?: string} | null>(null);
+  const [checkingCard, setCheckingCard] = useState(false);
+  const [waiverReason, setWaiverReason] = useState('');
+  const [showWaiverInput, setShowWaiverInput] = useState(false);
 
   const isManageMode = mode === 'manage';
 
@@ -372,6 +382,12 @@ export function UnifiedBookingSheet({
       setMemberMatchWarning(null);
       setManageModeSearchSlot(null);
       setSavingChanges(false);
+      setShowInlinePayment(false);
+      setInlinePaymentAction(null);
+      setPaymentSuccess(false);
+      setSavedCardInfo(null);
+      setShowWaiverInput(false);
+      setWaiverReason('');
     }
   }, [isOpen]);
 
@@ -380,6 +396,12 @@ export function UnifiedBookingSheet({
       fetchRosterData();
     }
   }, [isOpen, isManageMode, fetchRosterData]);
+
+  useEffect(() => {
+    if (isOpen && isManageMode && ownerEmail) {
+      checkSavedCard(ownerEmail);
+    }
+  }, [isOpen, isManageMode, ownerEmail, checkSavedCard]);
 
   useEffect(() => {
     const fetchStaffList = async () => {
@@ -750,6 +772,116 @@ export function UnifiedBookingSheet({
     } finally {
       setIsAddingManageGuest(false);
     }
+  };
+
+  const checkSavedCard = useCallback(async (email: string) => {
+    try {
+      setCheckingCard(true);
+      const res = await fetch(`/api/stripe/staff/check-saved-card/${encodeURIComponent(email)}`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setSavedCardInfo(data);
+      }
+    } catch (err) {
+      console.error('Failed to check saved card:', err);
+    } finally {
+      setCheckingCard(false);
+    }
+  }, []);
+
+  const handleInlineMarkPaid = async () => {
+    if (!bookingId) return;
+    setInlinePaymentAction('mark-paid');
+    try {
+      const res = await fetch(`/api/bookings/${bookingId}/payments`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'confirm_all' })
+      });
+      if (res.ok) {
+        showToast('Payment confirmed', 'success');
+        setPaymentSuccess(true);
+        setShowInlinePayment(false);
+        await fetchRosterData();
+      } else {
+        showToast('Failed to confirm payment', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to confirm payment', 'error');
+    } finally {
+      setInlinePaymentAction(null);
+    }
+  };
+
+  const handleInlineChargeSavedCard = async () => {
+    if (!bookingId || !rosterData || !savedCardInfo?.hasSavedCard) return;
+    const pendingParticipants = rosterData.financialSummary?.playerBreakdown?.filter((p: any) => p.fee > 0) || [];
+    setInlinePaymentAction('charge-card');
+    try {
+      const res = await fetch('/api/stripe/staff/charge-saved-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          memberEmail: ownerEmail,
+          bookingId,
+          sessionId: rosterData.sessionId
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(data.message || 'Card charged successfully', 'success');
+        setPaymentSuccess(true);
+        setShowInlinePayment(false);
+        await fetchRosterData();
+      } else {
+        if (data.noSavedCard || data.noStripeCustomer) {
+          showToast('No saved card on file', 'warning');
+          setSavedCardInfo({ hasSavedCard: false });
+        } else {
+          showToast(data.error || 'Failed to charge card', 'error');
+        }
+      }
+    } catch (err) {
+      showToast('Failed to charge card', 'error');
+    } finally {
+      setInlinePaymentAction(null);
+    }
+  };
+
+  const handleInlineWaiveAll = async () => {
+    if (!bookingId || !waiverReason.trim()) return;
+    setInlinePaymentAction('waive');
+    try {
+      const res = await fetch(`/api/bookings/${bookingId}/payments`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'waive_all', reason: waiverReason.trim() })
+      });
+      if (res.ok) {
+        showToast('All fees waived', 'success');
+        setPaymentSuccess(true);
+        setShowInlinePayment(false);
+        setShowWaiverInput(false);
+        setWaiverReason('');
+        await fetchRosterData();
+      } else {
+        showToast('Failed to waive fees', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to waive fees', 'error');
+    } finally {
+      setInlinePaymentAction(null);
+    }
+  };
+
+  const handleInlineStripeSuccess = async () => {
+    showToast('Payment successful!', 'success');
+    setPaymentSuccess(true);
+    setShowInlinePayment(false);
+    await fetchRosterData();
   };
 
   const handleManageModeRemoveGuest = async (guestId: number) => {
@@ -1742,14 +1874,124 @@ export function UnifiedBookingSheet({
           )}
         </div>
 
-        {!fs.allPaid && fs.grandTotal > 0 && bookingId && onCollectPayment && (
+        {paymentSuccess && fs.allPaid && (
+          <div className="mt-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-500/30 rounded-lg flex items-center gap-2">
+            <span className="material-symbols-outlined text-green-600 dark:text-green-400 text-base">check_circle</span>
+            <span className="text-sm font-medium text-green-700 dark:text-green-300">Payment collected — ready for check-in</span>
+          </div>
+        )}
+
+        {!fs.allPaid && fs.grandTotal > 0 && bookingId && !showInlinePayment && (
           <button
-            onClick={() => onCollectPayment(bookingId)}
+            onClick={() => setShowInlinePayment(true)}
             className="w-full mt-2 py-2 px-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors flex items-center justify-center gap-1"
           >
             <span className="material-symbols-outlined text-sm">payments</span>
             Collect ${fs.grandTotal.toFixed(2)}
           </button>
+        )}
+
+        {showInlinePayment && !fs.allPaid && fs.grandTotal > 0 && bookingId && (
+          <div className="mt-2 space-y-2 p-3 bg-primary/5 dark:bg-white/5 rounded-lg border border-primary/10 dark:border-white/10">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm font-medium text-primary dark:text-white flex items-center gap-1">
+                <span className="material-symbols-outlined text-sm">payments</span>
+                Collect ${fs.grandTotal.toFixed(2)}
+              </span>
+              <button onClick={() => { setShowInlinePayment(false); setInlinePaymentAction(null); setShowWaiverInput(false); setWaiverReason(''); }} className="text-primary/50 dark:text-white/50 hover:text-primary dark:hover:text-white">
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+
+            {inlinePaymentAction === 'stripe' ? (
+              <StripePaymentForm
+                amount={fs.grandTotal}
+                description={`${bayName || 'Booking'} • ${bookingDate || ''}`}
+                userId={rosterData?.ownerId || ''}
+                userEmail={ownerEmail || ''}
+                memberName={ownerName || ''}
+                purpose="overage_fee"
+                bookingId={bookingId}
+                sessionId={rosterData?.sessionId}
+                participantFees={rosterData?.financialSummary?.playerBreakdown?.filter((p: any) => p.fee > 0).map((p: any, i: number) => ({ id: i, amount: p.fee })) || []}
+                onSuccess={handleInlineStripeSuccess}
+                onCancel={() => setInlinePaymentAction(null)}
+              />
+            ) : (
+              <div className="space-y-2">
+                {savedCardInfo?.hasSavedCard && (
+                  <button
+                    onClick={handleInlineChargeSavedCard}
+                    disabled={!!inlinePaymentAction}
+                    className="w-full py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    {inlinePaymentAction === 'charge-card' ? (
+                      <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Charging...</>
+                    ) : (
+                      <><span className="material-symbols-outlined text-sm">credit_card</span> Charge Card on File ({savedCardInfo.cardBrand} •••• {savedCardInfo.cardLast4})</>
+                    )}
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setInlinePaymentAction('stripe')}
+                  disabled={!!inlinePaymentAction}
+                  className="w-full py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-sm">credit_card</span>
+                  Pay with Card (${fs.grandTotal.toFixed(2)})
+                </button>
+
+                <button
+                  onClick={handleInlineMarkPaid}
+                  disabled={!!inlinePaymentAction}
+                  className="w-full py-2 px-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  {inlinePaymentAction === 'mark-paid' ? (
+                    <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Confirming...</>
+                  ) : (
+                    <><span className="material-symbols-outlined text-sm">payments</span> Mark Paid (Cash/External)</>
+                  )}
+                </button>
+
+                {!showWaiverInput ? (
+                  <button
+                    onClick={() => setShowWaiverInput(true)}
+                    disabled={!!inlinePaymentAction}
+                    className="w-full py-2 px-3 rounded-lg border border-gray-300 dark:border-white/20 text-primary/70 dark:text-white/70 hover:bg-gray-50 dark:hover:bg-white/5 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-sm">money_off</span>
+                    Waive All Fees
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={waiverReason}
+                      onChange={(e) => setWaiverReason(e.target.value)}
+                      placeholder="Reason for waiving fees..."
+                      className="w-full py-2 px-3 rounded-lg border border-gray-300 dark:border-white/20 bg-white dark:bg-white/5 text-sm text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setShowWaiverInput(false); setWaiverReason(''); }}
+                        className="flex-1 py-1.5 px-3 rounded-lg border border-gray-300 dark:border-white/20 text-primary/70 dark:text-white/70 text-sm"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleInlineWaiveAll}
+                        disabled={!waiverReason.trim() || !!inlinePaymentAction}
+                        className="flex-1 py-1.5 px-3 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium disabled:opacity-50"
+                      >
+                        {inlinePaymentAction === 'waive' ? 'Waiving...' : 'Confirm Waive'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
     );
@@ -1902,25 +2144,33 @@ export function UnifiedBookingSheet({
                 </div>
               </div>
 
-              {(rosterData?.bookingNotes?.notes || notes) && (
-                <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-900/10">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-base">description</span>
-                    <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Booking Notes</span>
-                  </div>
-                  <p className="text-sm text-amber-800 dark:text-amber-200 whitespace-pre-wrap">{rosterData?.bookingNotes?.notes || notes}</p>
-                </div>
-              )}
-
-              {(rosterData?.bookingNotes?.trackmanNotes || bookingContext?.trackmanCustomerNotes) && (
-                <div className="p-3 rounded-xl border border-blue-200 dark:border-blue-500/20 bg-blue-50 dark:bg-blue-900/10">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-base">sell</span>
-                    <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Trackman Notes</span>
-                  </div>
-                  <p className="text-sm text-blue-800 dark:text-blue-200 whitespace-pre-wrap">{rosterData?.bookingNotes?.trackmanNotes || bookingContext?.trackmanCustomerNotes}</p>
-                </div>
-              )}
+              {(() => {
+                const bookingNotesText = (rosterData?.bookingNotes?.notes || notes || '').trim();
+                const trackmanNotesText = (rosterData?.bookingNotes?.trackmanNotes || bookingContext?.trackmanCustomerNotes || '').trim();
+                const showTrackman = trackmanNotesText && bookingNotesText !== trackmanNotesText && !bookingNotesText.includes(trackmanNotesText) && !trackmanNotesText.includes(bookingNotesText);
+                return (
+                  <>
+                    {bookingNotesText && (
+                      <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-900/10">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-base">description</span>
+                          <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Booking Notes</span>
+                        </div>
+                        <p className="text-sm text-amber-800 dark:text-amber-200 whitespace-pre-wrap">{bookingNotesText}</p>
+                      </div>
+                    )}
+                    {showTrackman && (
+                      <div className="p-3 rounded-xl border border-blue-200 dark:border-blue-500/20 bg-blue-50 dark:bg-blue-900/10">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-base">sell</span>
+                          <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Trackman Notes</span>
+                        </div>
+                        <p className="text-sm text-blue-800 dark:text-blue-200 whitespace-pre-wrap">{trackmanNotesText}</p>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               {rosterData?.bookingNotes?.staffNotes && (
                 <div className="p-3 rounded-xl border border-purple-200 dark:border-purple-500/20 bg-purple-50 dark:bg-purple-900/10">
@@ -2309,25 +2559,33 @@ export function UnifiedBookingSheet({
           </div>
         )}
 
-        {notes && (
-          <div className="p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-500/20 rounded-lg">
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-300 mb-1 flex items-center gap-1">
-              <span className="material-symbols-outlined text-sm">description</span>
-              Booking Notes
-            </p>
-            <p className="text-sm text-amber-700 dark:text-amber-400 whitespace-pre-wrap">{notes}</p>
-          </div>
-        )}
-
-        {bookingContext?.trackmanCustomerNotes && (
-          <div className="p-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-500/20 rounded-lg">
-            <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-1 flex items-center gap-1">
-              <span className="material-symbols-outlined text-sm">sell</span>
-              Trackman Notes
-            </p>
-            <p className="text-sm text-blue-700 dark:text-blue-400 whitespace-pre-wrap">{bookingContext.trackmanCustomerNotes}</p>
-          </div>
-        )}
+        {(() => {
+          const bNotes = (notes || '').trim();
+          const tNotes = (bookingContext?.trackmanCustomerNotes || '').trim();
+          const showTrackmanAssign = tNotes && bNotes !== tNotes && !bNotes.includes(tNotes) && !tNotes.includes(bNotes);
+          return (
+            <>
+              {bNotes && (
+                <div className="p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-500/20 rounded-lg">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300 mb-1 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm">description</span>
+                    Booking Notes
+                  </p>
+                  <p className="text-sm text-amber-700 dark:text-amber-400 whitespace-pre-wrap">{bNotes}</p>
+                </div>
+              )}
+              {showTrackmanAssign && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-500/20 rounded-lg">
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-1 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm">sell</span>
+                    Trackman Notes
+                  </p>
+                  <p className="text-sm text-blue-700 dark:text-blue-400 whitespace-pre-wrap">{tNotes}</p>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {!isConferenceRoom && (
           <div className="space-y-3">

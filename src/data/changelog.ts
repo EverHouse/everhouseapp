@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.19.0",
+    date: "2026-02-10",
+    title: "Inline Payment Flow & Smart Notes Deduplication",
+    isMajor: true,
+    changes: [
+      "Major: Payment collection now happens directly inside the booking sheet — no more separate billing popup with inconsistent fee amounts",
+      "Feature: Four payment options available inline — Charge Card on File, Pay with Card (Stripe), Mark Paid (Cash/External), and Waive All Fees with reason",
+      "Feature: After successful payment, a green confirmation message appears inline and the Check In button becomes enabled — all without closing the sheet",
+      "Feature: Smart notes deduplication — when Booking Notes and Trackman Notes contain the same text (or one contains the other), only one block is shown to avoid wasted space",
+      "Improvement: Payment amounts in the booking sheet are always consistent — the Collect button uses the exact total calculated from the roster's financial summary",
+    ],
+  },
+  {
     version: "7.18.3",
     date: "2026-02-10",
     title: "Complete Notes Display, Inactive Member Warning & Payment-Gated Check-In",

@@ -1237,6 +1237,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     
     const bookingResult = await db.execute(sql`SELECT br.guest_count, br.trackman_player_count, br.declared_player_count, br.resource_id, br.user_email as owner_email,
               br.user_name as owner_name, br.duration_minutes, br.request_date, br.session_id, br.status,
+              br.user_id as owner_user_id,
               br.notes, br.staff_notes, br.trackman_customer_notes,
               r.capacity as resource_capacity,
               EXTRACT(EPOCH FROM (bs.end_time - bs.start_time)) / 60 as session_duration_minutes
@@ -1255,6 +1256,8 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     const resourceCapacity = bookingResult.rows[0]?.resource_capacity || null;
     const ownerEmail = bookingResult.rows[0]?.owner_email;
     const ownerName = bookingResult.rows[0]?.owner_name;
+    const sessionId = bookingResult.rows[0]?.session_id || null;
+    const ownerUserId = bookingResult.rows[0]?.owner_user_id || null;
     const sessionDurationMinutes = bookingResult.rows[0]?.session_duration_minutes;
     const bookingDuration = bookingResult.rows[0]?.duration_minutes || 60;
     const durationMinutes = Math.max(bookingDuration, sessionDurationMinutes || 0);
@@ -1496,7 +1499,6 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     let totalPlayersOwe = 0;
     let playerBreakdownFromSession: Array<{ name: string; tier: string | null; fee: number; feeNote: string }> = [];
     
-    const sessionId = bookingResult.rows[0]?.session_id;
     if (sessionId) {
       const participantsResult = await db.execute(sql`SELECT 
           bp.id as participant_id,
@@ -1668,6 +1670,8 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     const allPaid = hasOriginalFees && grandTotal === 0 && hasPaidFees;
     
     res.json({
+      sessionId,
+      ownerId: ownerUserId,
       ownerGuestPassesRemaining,
       bookingNotes: {
         notes: bookingResult.rows[0]?.notes || null,
