@@ -35,7 +35,9 @@ A **Booking** (`booking_requests`) is just a calendar reservation. A **BookingSe
 
 - **Mandatory function**: `ensureSessionForBooking()` in `server/core/bookingService/sessionManager.ts`
 - Call this after every booking approval, Trackman link, or CSV import
-- It retries once on failure, then flags the booking for staff review (never silently fails)
+- **3-step lookup chain** (v7.26.1): (1) match by `trackman_booking_id`, (2) match by `resource_id + session_date + start_time`, (3) match by time range overlap. Only INSERTs if all 3 fail.
+- **Transaction-aware**: throws immediately on failure when called with a `client` (no retry). 500ms retry only with pool connections.
+- Flags booking for staff review on persistent failure (never silently fails)
 - Also: `createSessionWithUsageTracking()` — creates session + usage ledger entries + guest pass deductions atomically
 
 ### 3. No Ghost Sessions
@@ -74,6 +76,14 @@ All billing webhooks must check `event.id` to ensure we never process the same p
 - **Transaction wrapping**: The entire webhook handler runs inside `BEGIN`/`COMMIT`. If the handler fails, `ROLLBACK` ensures the claim is also rolled back, so Stripe can retry.
 - **Stripe API idempotency**: When creating payment intents, pass `idempotencyKey` to `stripe.paymentIntents.create()` (see `server/core/stripe/payments.ts`)
 - **Cleanup**: Old processed events are pruned by scheduled maintenance
+
+**CRITICAL — PaymentIntent dedup for bookings**:
+Before creating ANY Stripe PaymentIntent for a booking, ALWAYS query `stripe_payment_intents` for an existing open intent:
+```sql
+SELECT * FROM stripe_payment_intents
+WHERE booking_id = $1 AND status NOT IN ('succeeded', 'canceled', 'refunded')
+```
+If one exists, return it instead of creating a new one. `prepaymentService.ts` implements this pattern — follow it everywhere. Include `metadata.bookingId` on ALL payment intents for traceability.
 
 ### 6. Guest Fees
 Guest fees are calculated based on filled slots in a booking that do NOT have a valid member assigned.
@@ -522,6 +532,18 @@ These files reference billing concepts incidentally. They are documented here fo
 
 ---
 
+## Fee Order of Operations (Cross-Reference)
+
+See `booking-import-standards/SKILL.md` Rule 15a for the MANDATORY fee calculation order:
+Status → Staff → Active Membership → Tier → Unlimited → Social → Usage → Overage Blocks
+
+**Key reminders:**
+- Cancelled bookings = $0 (no further checks)
+- Staff = $0 (no further checks)
+- Inactive member = treated as guest, fee charged to HOST (not to the inactive participant)
+
+---
+
 ## Anti-Patterns — NEVER Do These
 
 1. **Never hardcode `$25`, `2500`, or any dollar amount** — always use `PRICING.*` from `pricingConfig.ts`
@@ -535,3 +557,4 @@ These files reference billing concepts incidentally. They are documented here fo
 9. **Never update `booking_sessions` or `stripe_payment_intents` outside a transaction**
 10. **Never skip idempotency checks in webhook handlers** — always call `tryClaimEvent()`
 11. **Never parse webhook body as JSON before signature verification** — it must be a raw `Buffer`
+12. **Never create a PaymentIntent without checking for an existing open intent** — query `stripe_payment_intents` first (Commandment 5)

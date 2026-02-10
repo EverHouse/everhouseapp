@@ -25,12 +25,24 @@ These rules were established through production debugging and must be followed w
 ### Rule 1 — Every booking MUST have a billing session
 
 Use `ensureSessionForBooking()` from `sessionManager.ts` for ALL session creation. This function has:
-- Built-in retry (500ms delay, then second attempt)
-- Staff-note safety: on double failure, writes `[SESSION_CREATION_FAILED]` to booking's `staff_notes` for manual review
+- 3-step lookup chain (established v7.26.1):
+  1. Match by `trackman_booking_id` (exact)
+  2. Match by `resource_id + session_date + start_time` (exact)
+  3. Match by `resource_id + session_date + time range overlap` (tsrange intersection)
+- Only INSERTs if all 3 lookups fail
 - `ON CONFLICT (trackman_booking_id)` to handle race conditions
-- Lookup chain: check by `trackman_booking_id` first, then by `resource_id + session_date + start_time`, then INSERT
+- Staff-note safety: on failure, writes `[SESSION_CREATION_FAILED]` to booking's `staff_notes`
+- Transaction-aware: when called with a `client` (transaction), throws immediately on failure (no retry). The 500ms retry only applies when using the default pool connection.
 
 **NEVER** write raw `INSERT INTO booking_sessions` anywhere outside this function. Every entry point that creates or links a booking must call `ensureSessionForBooking()`.
+
+### Rule 1a — Overlap detection prevents double-booking trigger failures
+
+The `booking_sessions` table has a `prevent_booking_session_overlap` trigger that rejects INSERTs when time ranges overlap on the same bay. The 3-step lookup in `ensureSessionForBooking()` handles this by finding overlapping sessions BEFORE attempting INSERT. If an overlapping session exists (different Trackman ID but overlapping time), the booking links to that existing session. The booking keeps its own `trackman_booking_id` in `booking_requests` — only `session_id` is shared.
+
+### Rule 1b — Backfill endpoint error handling
+
+The backfill endpoint (`POST /api/admin/backfill-sessions` in `server/routes/trackman/admin.ts`) uses savepoints per-booking so individual failures don't abort the entire transaction. When `ensureSessionForBooking` returns `sessionId: 0` with an error, the endpoint rolls back to the savepoint, records the error, and continues to the next booking. Errors are returned in the response for staff visibility.
 
 ### Rule 2 — All 26+ entry points covered
 
@@ -100,6 +112,26 @@ When adding new booking queries, always ask: "Does this query need to handle can
 ---
 
 ## Section 3: CSV Import & Data Parsing
+
+### Rule 8a — `trackman_booking_id` is THE key for all Trackman matching
+
+The `trackman_booking_id` field (stored as VARCHAR on `booking_requests`, `booking_sessions`, `booking_members`, `booking_guests`) is the **stable unique identifier** from Trackman. It is used for:
+- CSV import deduplication: `ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO NOTHING`
+- Webhook matching: `tryAutoApproveBooking()` matches by `trackman_booking_id`
+- Session creation: `ensureSessionForBooking()` first checks `booking_sessions.trackman_booking_id`
+- Ghost booking detection: CSV import checks if a ghost booking already exists with the same `trackman_booking_id` before creating a new one
+
+**NEVER** match Trackman bookings by name, time alone, or other fuzzy criteria. `trackman_booking_id` is the only reliable key.
+
+### Rule 8b — CSV Backfill Strategy: Update-then-Insert
+
+The CSV import uses a strict **Update-first, Insert-second** strategy to prevent duplicates:
+
+1. **Ghost match by `trackman_booking_id`**: Check if a booking already exists with this Trackman ID. If yes, UPDATE it (merge member data, update status, populate roster).
+2. **Placeholder merge by time/resource (±2 min)**: Check if a webhook-created placeholder exists at the same bay/date/time. If yes, UPDATE it with the CSV data (Rule 12).
+3. **Insert new**: Only if both checks fail, INSERT a new `booking_requests` row with `ON CONFLICT (trackman_booking_id) DO NOTHING` as a safety net.
+
+This ordering guarantees no duplicate bookings for the same Trackman slot.
 
 ### Rule 9 — Parse M|email|name from Notes field
 
@@ -175,6 +207,21 @@ The 1-hour constraint prevents accidentally flipping legacy pending bookings fro
 ### Rule 15 — Unified fee calculation via computeFeeBreakdown()
 
 ALL fee calculations go through `computeFeeBreakdown()` in `unifiedFeeService.ts`. Never calculate fees inline or in route handlers.
+
+### Rule 15a — Fee Order of Operations (CRITICAL)
+
+Fee calculation MUST follow this exact order. Getting this wrong causes incorrect charges.
+
+1. **Status Check**: Is the booking in a billable status (`approved`, `confirmed`, `attended`)? If `cancelled`, `declined`, or `cancellation_pending` — STOP. Fee is $0.
+2. **Staff Check**: Is the participant a staff member? Check `staff_users` table by email. If staff → $0, no further checks.
+3. **Active Membership Check**: Does the participant have `membership_status IN ('active', 'trial', 'past_due')`? If NOT active, treat as guest (guest fee applies, charged to the booking HOST).
+4. **Tier Lookup**: Get the participant's tier and tier limits via `getTierLimits()`.
+5. **Unlimited Check**: If tier has `daily_sim_minutes >= 999` or `unlimited_access = true` → $0.
+6. **Social Tier Check**: If tier is `Social`, ALL minutes are overage (no included daily allowance).
+7. **Daily Usage Check**: Calculate `usedToday` via `getTotalDailyUsageMinutes()`, then compute overage = `MAX(0, (usedToday + perPersonMins) - dailyAllowance)`.
+8. **Overage Blocks**: Round overage up to 30-minute blocks, multiply by `PRICING.OVERAGE_RATE_DOLLARS` (sourced from Stripe).
+
+**NEVER** skip step 1 (status check). A cancelled booking must never generate fees. **NEVER** skip step 3 (active membership check). An inactive member is treated as a guest.
 
 ### Rule 16 — Duration uses GREATEST(session, booking)
 

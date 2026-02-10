@@ -685,6 +685,67 @@ Response field names must EXACTLY match frontend TypeScript interfaces. Before r
 
 ---
 
+## Section 16: Single Source of Truth — Booking Action Architecture
+
+**Established February 2026. This is ABSOLUTE. No exceptions.**
+
+### The Pattern
+
+ALL booking actions (Check-in, Cancel, Pay/Charge) in the frontend are centralized into TWO hooks:
+
+| Hook | Location | Responsibility |
+|------|----------|----------------|
+| `useBookingActions` | `src/hooks/useBookingActions.ts` | Low-level API calls for check-in, cancel, and card charging. Returns `checkInBooking`, `checkInWithToast`, `staffCancelBooking`, `staffCancelWithToast`, `chargeCardOnFile`, `chargeCardWithToast`, `invalidateBookingQueries` |
+| `useUnifiedBookingLogic` | `src/components/staff-command-center/modals/useUnifiedBookingLogic.ts` | High-level orchestration for the Unified Booking Sheet (manage mode, roster, fees, player counts). Internally uses `useBookingActions` |
+
+### BANNED Patterns — Do NOT write any of these:
+
+1. **Raw `fetch()` calls to booking endpoints in UI components.** Pages like `Dashboard.tsx`, `SimulatorTab.tsx`, `BookingQueuesSection.tsx`, or calendar views must NEVER contain `fetch('/api/bookings/...')` for check-in, cancel, or payment. Import and use `useBookingActions()` instead.
+
+2. **Local `handleCheckIn` / `handleCancel` / `handlePay` functions in page components.** If a component needs a check-in button, it calls `checkInWithToast(bookingId)` from `useBookingActions()`. It does NOT define its own async fetch logic.
+
+3. **Duplicating query invalidation logic.** `useBookingActions` already calls `invalidateBookingQueries()` after every successful action. Components must NOT manually call `queryClient.invalidateQueries()` for booking data after using these hooks.
+
+### Allowed exceptions:
+
+- **Member-facing cancel** in `Dashboard.tsx` and `BookGolf.tsx` uses its own `handleCancelBooking` because member cancellation has different UX (confirmation dialog, reason prompt) and hits `/api/bookings/:id/member-cancel`. This is the ONLY exception.
+- **Tour check-in** in `ToursTab.tsx` hits a separate `/api/tours/:id/checkin` endpoint — tours are not bookings.
+
+### Why this exists:
+
+Before this pattern, check-in logic was duplicated in 4+ places with subtle differences (some forgot payment checks, some didn't invalidate queries, some had wrong status handling). This caused silent failures where bookings appeared checked in on one screen but not another.
+
+---
+
+## Section 17: Safe Database Operation Wrappers
+
+**Established v7.26.0**
+
+| Wrapper | Location | Purpose |
+|---------|----------|---------|
+| `safeDbOperation()` | `server/core/safeDbOperation.ts` | Wraps single DB operations with structured error logging. Use instead of empty `try/catch {}` blocks. |
+| `safeDbTransaction()` | `server/core/safeDbOperation.ts` | Wraps multi-statement DB operations in a transaction with automatic rollback on failure. |
+
+**BANNED:** Empty `catch {}` blocks anywhere in server code. Every error must be either thrown, logged via `safeDbOperation`, or handled with a meaningful fallback.
+
+---
+
+## Section 18: Session Overlap Detection
+
+**Established v7.26.1**
+
+`ensureSessionForBooking()` in `server/core/bookingService/sessionManager.ts` uses a **3-step lookup chain** before attempting INSERT:
+
+1. Match by `trackman_booking_id` (exact)
+2. Match by `resource_id + session_date + start_time` (exact)
+3. Match by `resource_id + session_date + time range overlap` (tsrange intersection)
+
+Only if all 3 fail does it INSERT a new session. This prevents the `prevent_booking_session_overlap` trigger from rejecting inserts when adjacent sessions already exist on the same bay.
+
+When called inside a transaction (with a `client` parameter), the function does NOT retry on failure — it throws immediately so the caller's savepoint/rollback handling works correctly. The 500ms retry is only used with the default pool connection.
+
+---
+
 ## The Refactoring Rule
 
 **CRITICAL**: If you are asked to move files, rename folders, or refactor code structure, you MUST update this skill file (`.agents/skills/project-architecture/SKILL.md`) at the end of the task to reflect the new paths. This keeps the map accurate across sessions.
