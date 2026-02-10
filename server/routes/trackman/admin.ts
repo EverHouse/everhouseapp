@@ -1674,8 +1674,8 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
             });
             if (email) {
               emailToFeeMap.set(email, {
-                fee: participantIsStaff ? 0 : participantFee,
-                feeNote: participantIsStaff ? 'Staff — included' : (isPaid ? 'Paid' : (participantFee > 0 ? 'Overage fee' : 'Within daily allowance')),
+                fee: (isInactive || participantIsStaff) ? 0 : participantFee,
+                feeNote: isInactive ? `${memberStatus} member — fee charged to host` : (participantIsStaff ? 'Staff — included' : (isPaid ? 'Paid' : (participantFee > 0 ? 'Overage fee' : 'Within daily allowance'))),
                 isPaid,
                 isStaff: participantIsStaff
               });
