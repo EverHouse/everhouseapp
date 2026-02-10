@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.20.0",
+    date: "2026-02-10",
+    title: "Trackman Booking ID Standardization & Payment Safety",
+    isMajor: true,
+    changes: [
+      "Major: Staff now paste the short Trackman Booking ID (the number you see in the portal, like 19510379) instead of the long UUID — simpler, faster, less error-prone",
+      "Feature: 'Book on Trackman' modal and 'Manual Booking' flow both updated with new labels, shorter ID placeholder, and relaxed validation for the numeric format",
+      "Feature: Stripe payment idempotency — if a payment session already exists for a booking, the system reuses it instead of creating a duplicate charge",
+      "Feature: Saved card charges now check for already-collected payments to prevent accidental double-charges",
+      "Feature: Conference room prepayments detect existing payments and return them instead of creating duplicates, with 'conference_booking' metadata for tracking",
+      "Improvement: CSV import backfill already matches webhook-created bookings by Trackman Booking ID and fills in member data without creating duplicates or touching payment links",
+    ],
+  },
+  {
     version: "7.19.0",
     date: "2026-02-10",
     title: "Inline Payment Flow & Smart Notes Deduplication",

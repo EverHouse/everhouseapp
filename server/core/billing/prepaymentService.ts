@@ -46,7 +46,22 @@ export async function createPrepaymentIntent(
     );
 
     if (existingIntent.rows.length > 0) {
-      logger.info('[Prepayment] Skipping - existing prepayment intent', { extra: { sessionId } });
+      logger.info('[Prepayment] Skipping - existing prepayment intent by session_id', { extra: { sessionId } });
+      return null;
+    }
+
+    const existingByBooking = await pool.query(
+      `SELECT stripe_payment_intent_id, status 
+       FROM stripe_payment_intents 
+       WHERE booking_id = $1 
+       AND purpose = 'prepayment' 
+       AND status NOT IN ('canceled', 'cancelled', 'refunded', 'failed', 'succeeded')
+       LIMIT 1`,
+      [bookingId]
+    );
+
+    if (existingByBooking.rows.length > 0) {
+      logger.info('[Prepayment] Skipping - existing prepayment intent by booking_id', { extra: { bookingId, existingPaymentIntentId: existingByBooking.rows[0].stripe_payment_intent_id } });
       return null;
     }
 

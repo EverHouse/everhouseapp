@@ -39,7 +39,7 @@ export interface StaffManualBookingData {
     name?: string;
     email?: string;
   }>;
-  trackmanExternalId: string;
+  trackmanBookingId: string;
 }
 
 interface StaffManualBookingModalProps {
@@ -423,12 +423,12 @@ export function StaffManualBookingModal({
 
     const trimmedId = externalId.trim();
     if (!trimmedId) {
-      setError('Please paste the Trackman External Booking ID');
+      setError('Please paste the Trackman Booking ID');
       return;
     }
 
-    if (trimmedId.length < 10) {
-      setError('The ID looks too short. Please paste the full External Booking ID from Trackman.');
+    if (trimmedId.length < 5) {
+      setError('The ID looks too short.');
       return;
     }
 
@@ -449,7 +449,7 @@ export function StaffManualBookingModal({
           name: p.member?.name,
           email: p.member?.email
         })),
-        trackmanExternalId: trimmedId
+        trackmanBookingId: trimmedId
       };
 
       await onSubmit(data);
@@ -865,18 +865,18 @@ export function StaffManualBookingModal({
 
                   <div className="border-t border-gray-200 dark:border-white/10 pt-5">
                     <label htmlFor="externalId" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Paste External Booking ID from Trackman
+                      Paste Trackman Booking ID
                     </label>
                     <input
                       id="externalId"
                       type="text"
                       value={externalId}
                       onChange={(e) => setExternalId(e.target.value)}
-                      placeholder="e.g., 019bdde0-e12e-7d41-910a-731855716740"
+                      placeholder="e.g., 19510379"
                       className="w-full px-4 py-3 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all"
                     />
                     <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                      After creating the booking in Trackman, copy the "Linked Booking" ID and paste it here.
+                      After creating the booking in Trackman, copy the Booking ID and paste it here.
                     </p>
                   </div>
                 </div>

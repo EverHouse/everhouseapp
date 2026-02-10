@@ -829,6 +829,24 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
     const resolvedSessionId = participantResult.rows[0].session_id;
     const resolvedBookingId = participantResult.rows[0].booking_id;
 
+    if (resolvedBookingId) {
+      const existingPaymentResult = await db.execute(sql`
+        SELECT stripe_payment_intent_id, status, amount_cents 
+        FROM stripe_payment_intents 
+        WHERE booking_id = ${resolvedBookingId} 
+        AND status = 'succeeded'
+        AND purpose IN ('prepayment', 'booking_fee')
+        LIMIT 1`);
+
+      if (existingPaymentResult.rows.length > 0) {
+        const existingPayment = existingPaymentResult.rows[0];
+        return res.status(409).json({ 
+          error: 'Payment already collected for this booking',
+          existingPaymentId: existingPayment.stripe_payment_intent_id
+        });
+      }
+    }
+
     if (!member.stripe_customer_id) {
       return res.status(400).json({ 
         error: 'Member does not have a Stripe account. They need to make a payment first to save their card.',

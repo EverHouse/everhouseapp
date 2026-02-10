@@ -228,7 +228,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
     }
   };
 
-  const handleTrackmanConfirm = async (bookingId: number | string, trackmanExternalId: string) => {
+  const handleTrackmanConfirm = async (bookingId: number | string, trackmanBookingId: string) => {
     const apiId = typeof bookingId === 'string' ? parseInt(String(bookingId).replace('cal_', '')) : bookingId;
     const booking = data.pendingRequests.find(r => r.id === bookingId);
     
@@ -254,7 +254,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         credentials: 'include',
         body: JSON.stringify({ 
           status: 'approved',
-          trackman_external_id: trackmanExternalId
+          trackman_booking_id: trackmanBookingId,
+          trackman_external_id: trackmanBookingId
         })
       });
       if (res.ok) {
@@ -447,7 +448,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         durationMinutes: bookingData.durationMinutes,
         declaredPlayerCount: bookingData.declaredPlayerCount,
         participants: bookingData.participants,
-        trackmanExternalId: bookingData.trackmanExternalId
+        trackman_booking_id: bookingData.trackmanBookingId,
+        trackman_external_id: bookingData.trackmanBookingId
       })
     });
     

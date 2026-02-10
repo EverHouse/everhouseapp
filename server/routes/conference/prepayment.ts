@@ -137,6 +137,53 @@ router.post('/api/member/conference/prepay/create-intent', async (req: Request, 
       return res.status(400).json({ error: 'Amount must be at least 50 cents' });
     }
 
+    const existingPrepayment = await pool.query(
+      `SELECT id, status, payment_intent_id 
+       FROM conference_prepayments 
+       WHERE member_email = $1 
+       AND booking_date = $2 
+       AND start_time = $3 
+       AND status NOT IN ('refunded', 'expired', 'failed')
+       LIMIT 1`,
+      [normalizedEmail, date, startTime]
+    );
+
+    if (existingPrepayment.rows.length > 0) {
+      const existing = existingPrepayment.rows[0];
+
+      if (existing.status === 'succeeded' || existing.status === 'completed') {
+        return res.json({
+          paymentRequired: false,
+          alreadyPaid: true,
+          prepaymentId: existing.id
+        });
+      }
+
+      if (existing.status === 'pending' && existing.payment_intent_id) {
+        try {
+          const stripe = await getStripeClient();
+          const existingPI = await stripe.paymentIntents.retrieve(existing.payment_intent_id);
+          if (existingPI.status === 'requires_payment_method' || existingPI.status === 'requires_confirmation' || existingPI.status === 'requires_action') {
+            logger.info('[ConferencePrepay] Reusing existing pending payment intent', {
+              extra: { prepaymentId: existing.id, paymentIntentId: existing.payment_intent_id }
+            });
+            return res.json({
+              clientSecret: existingPI.client_secret,
+              paymentIntentId: existingPI.id,
+              totalCents,
+              prepaymentId: existing.id,
+              paymentRequired: true,
+              reused: true
+            });
+          }
+        } catch (err) {
+          logger.warn('[ConferencePrepay] Failed to retrieve existing payment intent, creating new one', {
+            extra: { paymentIntentId: existing.payment_intent_id }
+          });
+        }
+      }
+    }
+
     const userResult = await pool.query(
       `SELECT id, stripe_customer_id, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)`,
       [normalizedEmail]
@@ -227,6 +274,7 @@ router.post('/api/member/conference/prepay/create-intent', async (req: Request, 
       purpose: 'overage_fee',
       description,
       metadata: {
+        type: 'conference_booking',
         conferenceRoomPrepayment: 'true',
         bookingDate: date,
         startTime,

@@ -1086,7 +1086,7 @@ const SimulatorTab: React.FC = () => {
         return () => window.removeEventListener('booking-update', handleBookingUpdate);
     }, [handleRefresh]);
 
-    const handleTrackmanConfirm = useCallback(async (bookingId: number | string, trackmanExternalId: string) => {
+    const handleTrackmanConfirm = useCallback(async (bookingId: number | string, trackmanBookingId: string) => {
         const apiId = typeof bookingId === 'string' ? parseInt(String(bookingId).replace('cal_', '')) : bookingId;
         const booking = requests.find(r => r.id === bookingId);
 
@@ -1097,7 +1097,8 @@ const SimulatorTab: React.FC = () => {
                 credentials: 'include',
                 body: JSON.stringify({ 
                     status: 'approved',
-                    trackman_external_id: trackmanExternalId
+                    trackman_booking_id: trackmanBookingId,
+                    trackman_external_id: trackmanBookingId
                 })
             });
             if (res.ok) {
@@ -1193,7 +1194,8 @@ const SimulatorTab: React.FC = () => {
                     duration_minutes: data.durationMinutes,
                     declared_player_count: data.declaredPlayerCount,
                     request_participants: requestParticipants,
-                    trackman_external_id: data.trackmanExternalId
+                    trackman_booking_id: data.trackmanBookingId,
+                    trackman_external_id: data.trackmanBookingId
                 })
             });
 

@@ -76,6 +76,32 @@ export async function createPaymentIntent(
     customerId = result.customerId;
   }
 
+  if (bookingId) {
+    const existingIntentResult = await pool.query(
+      `SELECT stripe_payment_intent_id, status, amount_cents 
+       FROM stripe_payment_intents 
+       WHERE booking_id = $1 
+       AND amount_cents = $2
+       AND purpose IN ('prepayment', 'booking_fee')
+       AND status NOT IN ('canceled', 'cancelled', 'refunded', 'failed', 'succeeded')
+       LIMIT 1`,
+      [bookingId, amountCents]
+    );
+
+    if (existingIntentResult.rows.length > 0) {
+      const existingIntent = existingIntentResult.rows[0];
+      const stripeClient = await getStripeClient();
+      const existingPI = await stripeClient.paymentIntents.retrieve(existingIntent.stripe_payment_intent_id);
+      console.log(`[Stripe] Reusing existing PaymentIntent ${existingPI.id} for booking #${bookingId}`);
+      return {
+        paymentIntentId: existingPI.id,
+        clientSecret: existingPI.client_secret!,
+        customerId,
+        status: existingPI.status
+      };
+    }
+  }
+
   const stripe = await getStripeClient();
 
   const stripeMetadata: Record<string, string> = {

@@ -25,17 +25,19 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
       duration_minutes,
       declared_player_count,
       request_participants,
-      trackman_external_id,
       dayPassPurchaseId,
       paymentStatus
     } = req.body;
+    const trackman_booking_id_val = req.body.trackman_booking_id;
+    const trackman_external_id_val = req.body.trackman_external_id;
+    const trackman_id = trackman_booking_id_val || trackman_external_id_val;
     
     if (!user_email || !request_date || !start_time || !duration_minutes) {
       return res.status(400).json({ error: 'Missing required fields: user_email, request_date, start_time, duration_minutes' });
     }
     
-    if (!trackman_external_id) {
-      return res.status(400).json({ error: 'Missing required field: trackman_external_id' });
+    if (!trackman_id) {
+      return res.status(400).json({ error: 'Missing required field: trackman_booking_id (or trackman_external_id)' });
     }
     
     const parsedDate = new Date(request_date + 'T00:00:00');
@@ -162,9 +164,9 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
           user_email, user_name, resource_id, 
           request_date, start_time, duration_minutes, end_time,
           declared_player_count, request_participants,
-          trackman_external_id, origin,
+          trackman_booking_id, trackman_external_id, origin,
           status, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
         RETURNING *`,
         [
           user_email.toLowerCase(),
@@ -176,7 +178,8 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
           end_time,
           declared_player_count && declared_player_count >= 1 && declared_player_count <= 4 ? declared_player_count : null,
           sanitizedParticipants.length > 0 ? JSON.stringify(sanitizedParticipants) : '[]',
-          trackman_external_id,
+          trackman_booking_id_val || trackman_external_id_val,
+          trackman_external_id_val || null,
           'staff_manual',
           bookingStatus
         ]
@@ -284,7 +287,7 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
     const dayPassNote = dayPassRedeemed ? ' [Day Pass]' : '';
     
     const staffTitle = 'Staff Manual Booking Created';
-    const staffMessage = `${row.userName || row.userEmail}${playerCount} - ${resourceName} on ${formattedDate} at ${formattedTime12h} for ${durationDisplay}${dayPassNote} (Trackman: ${trackman_external_id})`;
+    const staffMessage = `${row.userName || row.userEmail}${playerCount} - ${resourceName} on ${formattedDate} at ${formattedTime12h} for ${durationDisplay}${dayPassNote} (Trackman: ${trackman_id})`;
     
     res.status(201).json({
       id: row.id,
@@ -323,7 +326,7 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
       });
       
       logFromRequest(req, 'create_booking', 'booking', String(row.id), row.userName || row.userEmail, {
-        trackman_external_id: trackman_external_id,
+        trackman_booking_id: trackman_id,
         origin: 'staff_manual',
         resource_id: row.resourceId,
         request_date: row.requestDate,
