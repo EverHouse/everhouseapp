@@ -6,6 +6,7 @@ import { useToast } from '../../Toast';
 import { usePricing } from '../../../hooks/usePricing';
 import TierBadge from '../../TierBadge';
 import { StripePaymentForm } from '../../stripe/StripePaymentForm';
+import { TerminalPayment } from '../TerminalPayment';
 
 export type BookingType = 'simulator' | 'conference_room' | 'lesson' | 'staff_block';
 export type SheetMode = 'assign' | 'manage';
@@ -1954,17 +1955,66 @@ export function UnifiedBookingSheet({
             </div>
 
             {inlinePaymentAction === 'stripe' ? (
-              <StripePaymentForm
-                amount={fs.grandTotal}
+              (() => {
+                const resolvedUserId = rosterData?.ownerId || fetchedContext?.ownerUserId || '';
+                const resolvedUserEmail = ownerEmail || fetchedContext?.ownerEmail || rosterData?.members?.find(m => m.isPrimary)?.userEmail || '';
+                if (!resolvedUserId && !resolvedUserEmail) {
+                  return (
+                    <div className="text-center py-4 space-y-2">
+                      <span className="material-symbols-outlined text-3xl text-red-500">error</span>
+                      <p className="text-sm text-red-600 dark:text-red-400">Unable to load member payment info. Try closing and reopening this booking.</p>
+                      <button onClick={() => setInlinePaymentAction(null)} className="py-2 px-4 rounded-lg text-sm font-medium text-primary/70 dark:text-white/70 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
+                        <span className="material-symbols-outlined text-sm align-middle mr-1">arrow_back</span>Go Back
+                      </button>
+                    </div>
+                  );
+                }
+                if (!resolvedUserId || !resolvedUserEmail) {
+                  return (
+                    <div className="flex items-center justify-center py-6">
+                      <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary dark:border-white border-t-transparent" />
+                      <span className="ml-2 text-sm text-primary/60 dark:text-white/60">Loading payment info...</span>
+                    </div>
+                  );
+                }
+                return (
+                  <StripePaymentForm
+                    amount={fs.grandTotal}
+                    description={`${bayName || fetchedContext?.bayName || 'Booking'} • ${bookingDate || fetchedContext?.bookingDate || ''}`}
+                    userId={resolvedUserId}
+                    userEmail={resolvedUserEmail}
+                    memberName={ownerName || fetchedContext?.ownerName || rosterData?.members?.find(m => m.isPrimary)?.memberName || ''}
+                    purpose="overage_fee"
+                    bookingId={bookingId}
+                    sessionId={rosterData?.sessionId}
+                    participantFees={rosterData?.financialSummary?.playerBreakdown?.filter((p: any) => p.fee > 0).map((p: any, i: number) => ({ id: i, amount: p.fee })) || []}
+                    onSuccess={handleInlineStripeSuccess}
+                    onCancel={() => setInlinePaymentAction(null)}
+                  />
+                );
+              })()
+            ) : inlinePaymentAction === 'terminal' ? (
+              <TerminalPayment
+                amount={Math.round(fs.grandTotal * 100)}
+                userId={rosterData?.ownerId || fetchedContext?.ownerUserId || null}
                 description={`${bayName || fetchedContext?.bayName || 'Booking'} • ${bookingDate || fetchedContext?.bookingDate || ''}`}
-                userId={rosterData?.ownerId || fetchedContext?.ownerUserId || ''}
-                userEmail={ownerEmail || fetchedContext?.ownerEmail || rosterData?.members?.find(m => m.isPrimary)?.userEmail || ''}
-                memberName={ownerName || fetchedContext?.ownerName || rosterData?.members?.find(m => m.isPrimary)?.memberName || ''}
-                purpose="overage_fee"
-                bookingId={bookingId}
-                sessionId={rosterData?.sessionId}
-                participantFees={rosterData?.financialSummary?.playerBreakdown?.filter((p: any) => p.fee > 0).map((p: any, i: number) => ({ id: i, amount: p.fee })) || []}
-                onSuccess={handleInlineStripeSuccess}
+                paymentMetadata={{
+                  bookingId: String(bookingId),
+                  ...(rosterData?.sessionId ? { sessionId: String(rosterData.sessionId) } : {}),
+                  ownerEmail: ownerEmail || fetchedContext?.ownerEmail || rosterData?.members?.find(m => m.isPrimary)?.userEmail || '',
+                  userId: rosterData?.ownerId || fetchedContext?.ownerUserId || '',
+                  paymentType: 'booking_fee',
+                }}
+                onSuccess={async (paymentIntentId) => {
+                  showToast('Terminal payment successful!', 'success');
+                  setPaymentSuccess(true);
+                  setShowInlinePayment(false);
+                  setInlinePaymentAction(null);
+                  await fetchRosterData();
+                }}
+                onError={(message) => {
+                  showToast(message || 'Terminal payment failed', 'error');
+                }}
                 onCancel={() => setInlinePaymentAction(null)}
               />
             ) : (
@@ -1990,6 +2040,15 @@ export function UnifiedBookingSheet({
                 >
                   <span className="material-symbols-outlined text-sm">credit_card</span>
                   Pay with Card (${fs.grandTotal.toFixed(2)})
+                </button>
+
+                <button
+                  onClick={() => setInlinePaymentAction('terminal')}
+                  disabled={!!inlinePaymentAction}
+                  className="w-full py-2 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-sm">contactless</span>
+                  Card Reader (${fs.grandTotal.toFixed(2)})
                 </button>
 
                 <button

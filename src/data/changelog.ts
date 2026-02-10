@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.20.3",
+    date: "2026-02-10",
+    title: "Card Terminal Reader & Payment Reliability",
+    changes: [
+      "Feature: Card terminal reader option is back in the booking sheet — staff can now tap 'Card Reader' to process payments using the physical Stripe terminal, right alongside online card payment and cash options",
+      "Fix: 'Missing required fields' error when clicking 'Pay with Card' is resolved — the payment form now waits for member data to fully load before creating the payment session, with a clear message if data can't be found",
+      "Fix: Stale Stripe customer IDs (from test environments) are now auto-cleared across all lookup paths — linked email and HubSpot matches are validated against Stripe before use",
+      "Improvement: Payment options now show a loading state while member info loads, preventing premature payment attempts with incomplete data",
+    ],
+  },
+  {
     version: "7.20.2",
     date: "2026-02-10",
     title: "Booking Sheet Reliability & Stale Stripe Customer Fix",
