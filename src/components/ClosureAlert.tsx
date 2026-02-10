@@ -113,9 +113,7 @@ const ClosureAlert: React.FC = () => {
     }
   };
 
-  const isBlocking = (areas: string | null): boolean => {
-    return isBlockingClosure(areas);
-  };
+  const isBlocking = isBlockingClosure;
 
   const formatTime12Hour = (time: string): string => {
     if (!time) return '';

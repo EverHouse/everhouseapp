@@ -11,6 +11,7 @@ import AvailabilityBlocksContent from '../components/AvailabilityBlocksContent';
 import { AnimatedPage } from '../../../components/motion';
 import { useConfirmDialog } from '../../../components/ConfirmDialog';
 import { fetchWithCredentials, postWithCredentials, deleteWithCredentials, putWithCredentials } from '../../../hooks/queries/useFetch';
+import { isBlockingClosure } from '../../../utils/closureUtils';
 
 interface BlocksClosure {
     id: number;
@@ -502,9 +503,7 @@ const BlocksTab: React.FC = () => {
         return formatted.join(', ');
     };
 
-    const isBlocking = (areas: string | null): boolean => {
-        return areas !== 'none' && areas !== '' && areas !== null;
-    };
+    const isBlocking = isBlockingClosure;
 
     const getAffectedAreasList = (areas: string | null): string[] => {
         if (!areas || areas === 'none') return [];

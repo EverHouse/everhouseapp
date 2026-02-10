@@ -6,6 +6,7 @@ import { SlideUpDrawer } from '../../SlideUpDrawer';
 import { formatPhoneInput } from '../../../utils/formatting';
 import IdScannerModal from '../modals/IdScannerModal';
 import { MemberFlow } from './newUser/MemberFlow';
+import { VisitorFlow } from './newUser/VisitorFlow';
 import {
   Mode,
   MemberStep,
@@ -32,7 +33,7 @@ export function NewUserDrawer({
   const { setDrawerOpen } = useBottomNav();
   const { showToast } = useToast();
   
-  const [mode] = useState<Mode>('member');
+  const [mode, setMode] = useState<Mode>(defaultMode);
   const [memberStep, setMemberStep] = useState<MemberStep>('form');
   const [visitorStep, setVisitorStep] = useState<VisitorStep>('form');
   
@@ -250,9 +251,33 @@ export function NewUserDrawer({
       maxHeight="full"
     >
       <div className="px-4 pt-2 pb-4">
-        <div className="flex items-center gap-2 mb-4">
-          <span className="material-symbols-outlined text-sm text-emerald-600">badge</span>
-          <span className={`font-medium text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>New Member</span>
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => handleModeChange('member')}
+            className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+              mode === 'member'
+                ? 'bg-emerald-600 text-white'
+                : isDark
+                  ? 'bg-white/5 text-gray-400 hover:bg-white/10'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+            }`}
+          >
+            <span className="material-symbols-outlined text-sm align-middle mr-1">badge</span>
+            New Member
+          </button>
+          <button
+            onClick={() => handleModeChange('visitor')}
+            className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+              mode === 'visitor'
+                ? 'bg-emerald-600 text-white'
+                : isDark
+                  ? 'bg-white/5 text-gray-400 hover:bg-white/10'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+            }`}
+          >
+            <span className="material-symbols-outlined text-sm align-middle mr-1">confirmation_number</span>
+            Day Pass
+          </button>
         </div>
 
         <div className="flex items-center gap-2 mb-4">
@@ -315,6 +340,7 @@ export function NewUserDrawer({
           </div>
         )}
 
+        {mode === 'member' ? (
         <MemberFlow
           step={memberStep}
           setPendingUserToCleanup={setPendingUserToCleanup}
@@ -351,6 +377,30 @@ export function NewUserDrawer({
           scannedIdImage={scannedIdImage}
           onShowIdScanner={() => setShowIdScanner(true)}
         />
+        ) : (
+        <VisitorFlow
+          step={visitorStep}
+          form={visitorForm}
+          setForm={setVisitorForm}
+          products={dayPassProducts}
+          isDark={isDark}
+          isLoading={isLoading}
+          setIsLoading={setIsLoading}
+          setError={setError}
+          setStep={setVisitorStep}
+          onSuccess={(user) => {
+            setCreatedUser(user);
+            setVisitorStep('success');
+            onSuccess?.({ ...user, mode: 'visitor' });
+          }}
+          createdUser={createdUser}
+          onClose={handleClose}
+          onBookNow={onBookNow}
+          showToast={showToast}
+          scannedIdImage={scannedIdImage}
+          onShowIdScanner={() => setShowIdScanner(true)}
+        />
+        )}
       </div>
     </SlideUpDrawer>
     <IdScannerModal

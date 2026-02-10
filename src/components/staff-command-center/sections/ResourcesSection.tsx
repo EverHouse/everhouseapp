@@ -31,11 +31,8 @@ export const ResourcesSection: React.FC<ResourcesSectionProps> = ({
     if (tabToPath[tab]) navigate(tabToPath[tab]);
   }, [navigate]);
 
-  const isBlocking = (areas: string | null | undefined): boolean => {
-    return isBlockingClosure(areas);
-  };
-
-  const getSecondaryTag = (closure: Closure) => getNoticeSecondaryTag(closure);
+  const isBlocking = isBlockingClosure;
+  const getSecondaryTag = getNoticeSecondaryTag;
 
   const NoticeBoardCard = () => (
     <div className={`${variant === 'desktop' ? 'h-full' : ''} bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4 ${variant === 'desktop' ? 'flex flex-col' : ''}`}>
@@ -245,11 +242,8 @@ export const NoticeBoardWidget: React.FC<{
   const navigateToTab = useCallback((tab: TabType) => {
     if (tabToPath[tab]) navigate(tabToPath[tab]);
   }, [navigate]);
-  const isBlocking = (areas: string | null | undefined): boolean => {
-    return isBlockingClosure(areas);
-  };
-
-  const getSecondaryTag = (closure: Closure) => getNoticeSecondaryTag(closure);
+  const isBlocking = isBlockingClosure;
+  const getSecondaryTag = getNoticeSecondaryTag;
 
   return (
     <div className="h-full min-h-[140px] bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4 flex flex-col">
