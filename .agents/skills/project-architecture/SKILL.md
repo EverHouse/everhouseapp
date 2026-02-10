@@ -72,16 +72,16 @@ Organized into 11 subdirectories:
 
 | Directory | Contains |
 |-----------|----------|
-| `admin/` | Admin-specific UI (member drawers, data tools, settings panels). Sub-dirs: `billing/`, `payments/` |
+| `admin/` | Admin-specific UI (member drawers, data tools, settings panels). Sub-dirs: `billing/`, `payments/`. **DEPRECATED**: `BookingMembersEditor.tsx` — inline roster editor, replaced by Unified Player Modal |
 | `billing/` | Payment forms, fee displays, invoice views |
-| `booking/` | Booking cards, calendar views, slot pickers, roster editors |
+| `booking/` | Booking cards, calendar views, slot pickers |
 | `icons/` | Custom SVG icon components |
 | `layout/` | Header, sidebar, page wrappers |
 | `motion/` | Animation wrappers, parallax, staggered entry |
 | `profile/` | Member profile sections, tier badges, settings |
 | `shared/` | Reusable generic components (buttons, modals, inputs) |
 | `skeletons/` | Loading skeleton placeholders |
-| `staff-command-center/` | Staff dashboard widgets, quick actions. Sub-dirs: `drawers/`, `hooks/`, `modals/`, `sections/` |
+| `staff-command-center/` | Staff dashboard widgets, quick actions. Sub-dirs: `drawers/`, `hooks/`, `modals/`, `sections/`. **Key modal**: `PlayerManagementModal.tsx` (formerly `TrackmanLinkModal.tsx`) — the SINGLE AUTHORITY for all roster edits. **DEPRECATED**: `CompleteRosterModal.tsx` — replaced by Unified Player Modal |
 | `stripe/` | Stripe Elements wrappers, payment forms |
 | `ui/` | Design system primitives (Liquid Glass styled) |
 
@@ -99,6 +99,42 @@ Plus root-level standalone components:
 - `ErrorBoundary.tsx`, `PageErrorBoundary.tsx`, `FeatureErrorBoundary.tsx`
 - `WalkingGolferLoader.tsx`, `WalkingGolferSpinner.tsx` — Branded loading states
 - And others (Avatar, Logo, SEO, Toggle, Input, etc.)
+
+### Unified Player Modal Architecture
+
+**CRITICAL ARCHITECTURAL STANDARD — Established February 2026**
+
+The **Unified Player Modal** (`PlayerManagementModal.tsx`, formerly `TrackmanLinkModal.tsx`) in `src/components/staff-command-center/modals/` is the **SINGLE AUTHORITY** for all player, roster, owner, and guest management on bookings.
+
+**The Rule:** If the user asks to edit players, guests, or owners, ALWAYS route them to the Unified Player Modal. Do not create inline editors, separate roster popups, or new modals for player management.
+
+**Two Modes:**
+- **Mode A (Assign Players):** For unlinked/new bookings — search and assign owner + players, then "Assign & Confirm"
+- **Mode B (Manage Players):** For existing bookings — pre-fills roster from `/api/admin/booking/:id/members`, allows editing, then "Save Changes"
+
+**Features absorbed into this single modal:**
+- Owner assignment (slot 1, required)
+- Player slot management (slots 2-4, optional)
+- Guest placeholder creation and named guest forms
+- Member search and reassignment
+- Guest pass tracking and auto-application
+- Financial summary with real-time fee recalculation
+- Inline payment collection via Stripe
+- Fee waiver flow with required reason
+- Quick Add from Notes (parse player names from booking notes)
+- Player count editing (1-4 slots)
+- Check-in flow integration
+
+**DEPRECATED components (do NOT use or extend):**
+- `src/components/admin/BookingMembersEditor.tsx` — Was an inline roster editor embedded in booking details modals. Replaced by Unified Player Modal Mode B.
+- `src/components/staff-command-center/modals/CompleteRosterModal.tsx` — Was a check-in roster completion popup that wrapped BookingMembersEditor. Replaced by Unified Player Modal with check-in context.
+
+**All triggers route to the Unified Player Modal:**
+- Owner edit pencil icon → opens Mode B
+- "Manage Players" button → opens Mode B
+- Player count edit click → opens Mode B
+- Check-in with incomplete roster → opens Mode B with check-in context
+- Unlinked Trackman booking assignment → opens Mode A
 
 ### State Management
 

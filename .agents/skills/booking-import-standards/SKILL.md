@@ -191,7 +191,32 @@ This is why Rule 10 (parsing `G|name` tags) is critical: filling guest slots wit
 
 ---
 
-## Section 5: Roster Protection
+## Section 5: Unified Player Management
+
+### Rule 20 — Single-Modal Roster Management
+
+All booking roster edits, owner assignments, and guest additions must be performed exclusively via the **Unified Player Modal** (`PlayerManagementModal.tsx`, formerly `TrackmanLinkModal.tsx`).
+
+**NEVER** create separate inline roster editors or "complete roster" popups. The Unified Modal is the single source of truth for:
+- Validating slot counts (declared player count vs filled slots)
+- Guest pass usage tracking and auto-application
+- Fee updates and real-time recalculation
+- Owner assignment (slot 1, required) and player slots (2-4, optional)
+- Check-in roster completion flow
+
+**Deprecated approaches (do NOT use):**
+- `BookingMembersEditor.tsx` — inline editor formerly embedded in booking details modals
+- `CompleteRosterModal.tsx` — check-in roster popup that wrapped BookingMembersEditor
+
+When importing CSV data or processing webhooks, the backend still populates `booking_members` and `booking_guests` tables directly (Rules 10a, 12). But all **staff-facing UI** for viewing and editing rosters goes through the Unified Player Modal.
+
+**Two modal modes:**
+- **Mode A (Assign Players):** Unlinked bookings — "Assign & Confirm" button
+- **Mode B (Manage Players):** Existing bookings — pre-fills roster from `/api/admin/booking/:id/members`, "Save Changes" button
+
+---
+
+## Section 6: Roster Protection
 
 ### Rule 18 — Optimistic locking with roster_version
 
@@ -205,7 +230,7 @@ This prevents concurrent roster edits from silently overwriting each other.
 
 ---
 
-## Section 6: Prepayment Lifecycle
+## Section 7: Prepayment Lifecycle
 
 ### Rule 19 — Prepayment after approval
 
@@ -227,3 +252,4 @@ When adding any new booking-related code, verify:
 - [ ] For CSV import: Does it immediately populate booking_members AND booking_participants? (Rule 10a)
 - [ ] For CSV import: Does it force `approved` status for member-linked bookings? (Rule 13)
 - [ ] For CSV import: Does it attempt placeholder merge before creating new? (Rule 12)
+- [ ] For staff UI: Does roster editing go through the Unified Player Modal? (Rule 20)
