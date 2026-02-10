@@ -410,7 +410,7 @@ router.post('/api/auth/verify-member', async (req, res) => {
     // For Stripe-billed members: verify with Stripe and auto-correct status if needed
     if (hasDbUser && isStripeBilled && !isStaffOrAdmin) {
       let dbMemberStatus = (dbUser[0].membershipStatus || '').toLowerCase();
-      const activeStatuses = ['active', 'trialing', 'past_due', 'paused'];
+      const activeStatuses = ['active', 'trialing', 'past_due'];
       
       // If database status doesn't match active statuses, verify with Stripe directly
       if (!activeStatuses.includes(dbMemberStatus) && dbUser[0].stripeSubscriptionId) {
@@ -452,8 +452,7 @@ router.post('/api/auth/verify-member', async (req, res) => {
       const statusMap: { [key: string]: string } = {
         'active': 'Active',
         'trialing': 'Trialing',
-        'past_due': 'Past Due',
-        'paused': 'Paused'
+        'past_due': 'Past Due'
       };
       const member = {
         id: dbUser[0].id,
@@ -512,7 +511,7 @@ router.post('/api/auth/verify-member', async (req, res) => {
     // Include trialing and past_due as active - they still have membership access
     if (!isStaffOrAdmin && !isStripeBilled && contact) {
       const status = (contact.properties.membership_status || '').toLowerCase();
-      const activeStatuses = ['active', 'trialing', 'past_due', 'paused'];
+      const activeStatuses = ['active', 'trialing', 'past_due'];
       if (!activeStatuses.includes(status) && status !== '') {
         return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
       }
@@ -541,8 +540,7 @@ router.post('/api/auth/verify-member', async (req, res) => {
     const statusMap: { [key: string]: string } = {
       'active': 'Active',
       'trialing': 'Trialing',
-      'past_due': 'Past Due',
-      'paused': 'Paused'
+      'past_due': 'Past Due'
     };
     const memberStatusStr = isStaffOrAdmin ? 'active' : ((dbUser[0]?.membershipStatus || contact?.properties.membership_status || '').toLowerCase());
     
@@ -598,7 +596,7 @@ router.post('/api/auth/request-otp', async (req, res) => {
     // For Stripe-billed members: verify with Stripe and auto-correct status if needed
     if (hasDbUser && isStripeBilled && !isStaffOrAdmin) {
       const dbMemberStatus = (dbUser[0].membershipStatus || '').toLowerCase();
-      const activeStatuses = ['active', 'trialing', 'past_due', 'paused'];
+      const activeStatuses = ['active', 'trialing', 'past_due'];
       
       // If database status doesn't match active statuses, verify with Stripe directly
       if (!activeStatuses.includes(dbMemberStatus) && dbUser[0].stripeSubscriptionId) {
@@ -669,7 +667,7 @@ router.post('/api/auth/request-otp', async (req, res) => {
         firstName = contact.properties.firstname || firstName;
         
         // Include trialing and past_due as active - they still have membership access
-        const activeStatuses = ['active', 'trialing', 'past_due', 'paused'];
+        const activeStatuses = ['active', 'trialing', 'past_due'];
         if (!activeStatuses.includes(status) && status !== '' && !isStaffOrAdmin) {
           return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
         }
@@ -908,7 +906,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
       // For Stripe-billed members: use database as source of truth
       if (hasDbUser && isStripeBilled) {
         const dbMemberStatus = (dbUser[0].membershipStatus || '').toLowerCase();
-        const activeStatuses = ['active', 'trialing', 'past_due', 'paused'];
+        const activeStatuses = ['active', 'trialing', 'past_due'];
         
         if (!activeStatuses.includes(dbMemberStatus)) {
           return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
@@ -917,8 +915,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
         const statusMap: { [key: string]: string } = {
           'active': 'Active',
           'trialing': 'Trialing',
-          'past_due': 'Past Due',
-          'paused': 'Paused'
+          'past_due': 'Past Due'
         };
         member = {
           id: dbUser[0].id,
@@ -965,7 +962,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
         // Include trialing and past_due as active - they still have membership access
         if (!isStripeBilled && contact) {
           const hubspotStatus = (contact.properties.membership_status || '').toLowerCase();
-          const activeStatuses = ['active', 'trialing', 'past_due', 'paused'];
+          const activeStatuses = ['active', 'trialing', 'past_due'];
           if (!activeStatuses.includes(hubspotStatus) && hubspotStatus !== '') {
             return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
           }
@@ -977,8 +974,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
         const statusMap: { [key: string]: string } = {
           'active': 'Active',
           'trialing': 'Trialing',
-          'past_due': 'Past Due',
-          'paused': 'Paused'
+          'past_due': 'Past Due'
         };
         const memberStatusStr = (hasDbUser ? dbUser[0].membershipStatus : contact?.properties.membership_status || '').toLowerCase();
         
