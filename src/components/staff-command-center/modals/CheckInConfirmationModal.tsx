@@ -42,7 +42,7 @@ const CheckInConfirmationModal: React.FC<CheckInConfirmationModalProps> = ({
   if (!isOpen) return null;
 
   const statusLower = membershipStatus?.toLowerCase() || '';
-  const isActive = statusLower === 'active';
+  const isActive = statusLower === 'active' || statusLower === 'trialing';
   const isExpired = statusLower === 'expired';
   const isInactive = ['cancelled', 'suspended', 'inactive', 'unpaid', 'terminated', 'past_due', 'paused'].includes(statusLower);
   const showWarning = !isActive && statusLower !== '';
