@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.31.8",
+    date: "2026-02-10",
+    title: "Trackman Import Matching & Unresolved Table Improvements",
+    changes: [
+      "Fix: Trackman CSV import now matches bookings to non-members and visitors from the local database — previously only HubSpot contacts were checked, so users with valid trackman_email mappings who weren't in HubSpot would fail to match",
+      "Improvement: Unresolved Trackman bookings table now shows Booking ID column instead of redundant Status column — all rows are unmatched by definition, so the Trackman booking ID is more useful for reference",
+    ],
+  },
+  {
     version: "7.31.7",
     date: "2026-02-10",
     title: "Outstanding Balance & Payment Receipt Details",

@@ -1267,6 +1267,36 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
   }
   process.stderr.write(`[Trackman Import] Using ${membersByEmail.size} HubSpot members for matching (includes former members)\n`);
 
+  // Supplement membersByEmail with local database users (non-members, visitors, etc.)
+  try {
+    const localUsers = await db.select({
+      email: users.email,
+      firstName: users.firstName,
+      lastName: users.lastName
+    }).from(users).where(sql`email IS NOT NULL AND email != ''`);
+    
+    let addedFromDb = 0;
+    for (const user of localUsers) {
+      if (user.email) {
+        const lowerEmail = user.email.toLowerCase();
+        if (!membersByEmail.has(lowerEmail)) {
+          membersByEmail.set(lowerEmail, user.email);
+          addedFromDb++;
+          // Also add to membersByName
+          const fullName = `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().trim();
+          if (fullName) {
+            const existing = membersByName.get(fullName) || [];
+            existing.push(user.email);
+            membersByName.set(fullName, existing);
+          }
+        }
+      }
+    }
+    process.stderr.write(`[Trackman Import] Added ${addedFromDb} additional users from local database to membersByEmail (total: ${membersByEmail.size})\n`);
+  } catch (err: any) {
+    process.stderr.write(`[Trackman Import] Error loading local users: ${err.message}\n`);
+  }
+
   const emailMapping = await loadEmailMapping();
   process.stderr.write(`[Trackman Import] Email mapping loaded with ${emailMapping.size} entries, membersByEmail has ${membersByEmail.size} entries\n`);
 

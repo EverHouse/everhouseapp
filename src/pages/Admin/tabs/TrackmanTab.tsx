@@ -583,7 +583,7 @@ const TrackmanTab: React.FC = () => {
                     <th className="text-left py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Trackman Name</th>
                     <th className="text-left py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Email</th>
                     <th className="text-left py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Bay</th>
-                    <th className="text-left py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide hidden lg:table-cell">Status</th>
+                    <th className="text-left py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide hidden lg:table-cell">Booking ID</th>
                     <th className="text-right py-2.5 px-3 font-semibold text-primary dark:text-white text-xs uppercase tracking-wide">Action</th>
                   </tr>
                 </thead>
@@ -622,16 +622,9 @@ const TrackmanTab: React.FC = () => {
                           </td>
                           <td className="py-2 px-3 text-primary dark:text-white font-medium">{booking.bayNumber || booking.bay_number}</td>
                           <td className="py-2 px-3 hidden lg:table-cell">
-                            {isLinking ? (
-                              <span className="text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-500/10 px-2 py-1 rounded-full inline-flex items-center gap-1">
-                                <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
-                                Linking to {linkingEmail?.split('@')[0]}...
-                              </span>
-                            ) : (
-                              <span className="text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 px-2 py-1 rounded-full truncate max-w-[200px] inline-block">
-                                {booking.matchAttemptReason || booking.match_attempt_reason || 'No match'}
-                              </span>
-                            )}
+                            <span className="text-xs font-mono text-primary/70 dark:text-white/70">
+                              {booking.trackmanBookingId || booking.trackman_booking_id || '—'}
+                            </span>
                           </td>
                           <td className="py-2 px-3 text-right">
                             <button
