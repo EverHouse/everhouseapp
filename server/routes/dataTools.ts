@@ -2032,6 +2032,7 @@ router.post('/api/data-tools/cleanup-stripe-customers', isAdmin, async (req: Req
     
     const emptyCustomers: typeof allCustomers = [];
     let checked = 0;
+    let skippedActiveCount = 0;
     
     for (const customer of allCustomers) {
       try {
@@ -2047,6 +2048,13 @@ router.post('/api/data-tools/cleanup-stripe-customers', isAdmin, async (req: Req
         const paymentIntents = await stripe.paymentIntents.list({ customer: customer.id, limit: 1 });
         if (paymentIntents.data.length > 0) { checked++; continue; }
         
+        const dbUser = await db.execute(sql`SELECT id, membership_status FROM users WHERE stripe_customer_id = ${customer.id} LIMIT 1`);
+        if (dbUser.rows.length > 0 && dbUser.rows[0].membership_status === 'active') {
+          skippedActiveCount++;
+          checked++;
+          continue;
+        }
+        
         emptyCustomers.push(customer);
         checked++;
       } catch (err: any) {
@@ -2056,21 +2064,24 @@ router.post('/api/data-tools/cleanup-stripe-customers', isAdmin, async (req: Req
     }
     
     console.log(`[DataTools] Found ${emptyCustomers.length} customers with zero transactions out of ${allCustomers.length} total`);
+    console.log(`[DataTools] Skipping ${skippedActiveCount} active members with zero transactions (keeping for future charges)`);
     
     if (dryRun) {
       logFromRequest(req, 'cleanup_stripe_customers', 'stripe', null, undefined, {
         action: 'preview',
         totalCustomers: allCustomers.length,
         emptyFound: emptyCustomers.length,
+        skippedActiveCount,
         staffEmail
       });
       
       return res.json({
         success: true,
         dryRun: true,
-        message: `Found ${emptyCustomers.length} Stripe customers with zero transactions (out of ${allCustomers.length} total)`,
+        message: `Found ${emptyCustomers.length} Stripe customers with zero transactions (out of ${allCustomers.length} total). Skipped ${skippedActiveCount} active members.`,
         totalCustomers: allCustomers.length,
         emptyCount: emptyCustomers.length,
+        skippedActiveCount,
         customers: emptyCustomers.map(c => ({
           id: c.id,
           email: c.email,
@@ -2105,6 +2116,7 @@ router.post('/api/data-tools/cleanup-stripe-customers', isAdmin, async (req: Req
       action: 'execute',
       totalCustomers: allCustomers.length,
       emptyFound: emptyCustomers.length,
+      skippedActiveCount,
       deleted,
       errorCount: errors.length,
       staffEmail
@@ -2115,9 +2127,10 @@ router.post('/api/data-tools/cleanup-stripe-customers', isAdmin, async (req: Req
     res.json({
       success: true,
       dryRun: false,
-      message: `Deleted ${deleted} of ${emptyCustomers.length} empty Stripe customers`,
+      message: `Deleted ${deleted} of ${emptyCustomers.length} empty Stripe customers. Skipped ${skippedActiveCount} active members.`,
       totalCustomers: allCustomers.length,
       emptyCount: emptyCustomers.length,
+      skippedActiveCount,
       deleted: deletedList,
       deletedCount: deleted,
       errors: errors.slice(0, 20)

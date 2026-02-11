@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.37.0",
+    date: "2026-02-11",
+    title: "Stripe Customer Cleanup & Lazy Customer Creation",
+    changes: [
+      "Improvement: Stripe customer cleanup tool now preserves active members — only removes non-active members and orphaned customers with zero transaction history",
+      "Improvement: Cleanup preview now shows how many active members were skipped, so staff can see they're being protected",
+      "Improvement: All fee-charging flows (overage fees, guest fees, prepayments, day passes) automatically create a Stripe customer if one doesn't exist yet — no manual setup needed",
+      "Fix: Hard delete for unmatched bookings was failing because of an incorrect database table name — now works correctly",
+    ],
+  },
+  {
     version: "7.36.0",
     date: "2026-02-11",
     title: "Trackman Import Fixes, Email Sender Name & Booking Deletion",

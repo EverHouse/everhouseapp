@@ -35,6 +35,7 @@ interface SyncToolsPanelProps {
     dryRun?: boolean;
     totalCustomers?: number;
     emptyCount?: number;
+    skippedActiveCount?: number;
     customers?: Array<{ id: string; email: string | null; name: string | null; created: string }>;
     deleted?: Array<{ id: string; email: string | null }>;
     deletedCount?: number;
@@ -249,6 +250,11 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
                 <p className={`text-xs ${stripeCleanupResult.success ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
                   {stripeCleanupResult.message}
                 </p>
+                {stripeCleanupResult.skippedActiveCount != null && stripeCleanupResult.skippedActiveCount > 0 && (
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                    Skipped {stripeCleanupResult.skippedActiveCount} active members (kept for future billing)
+                  </p>
+                )}
                 {stripeCleanupResult.dryRun && stripeCleanupResult.customers && stripeCleanupResult.customers.length > 0 && (
                   <div className="mt-2 max-h-40 overflow-y-auto text-xs bg-white dark:bg-white/10 rounded p-2">
                     <p className="font-medium mb-1">{stripeCleanupResult.emptyCount} empty customers found:</p>

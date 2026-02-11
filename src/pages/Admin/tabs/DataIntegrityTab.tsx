@@ -74,6 +74,7 @@ const DataIntegrityTab: React.FC = () => {
     dryRun?: boolean;
     totalCustomers?: number;
     emptyCount?: number;
+    skippedActiveCount?: number;
     customers?: Array<{ id: string; email: string | null; name: string | null; created: string }>;
     deleted?: Array<{ id: string; email: string | null }>;
     deletedCount?: number;
