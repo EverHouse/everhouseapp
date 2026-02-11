@@ -957,8 +957,10 @@ const Dashboard: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-300 backdrop-blur-sm z-20 rounded-[1.5rem]">
-                    <span className="font-bold text-sm text-white">{isExpired ? 'Renew Membership' : 'View Membership Details'}</span>
+                  <div className="absolute bottom-0 left-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 p-4 pointer-events-none">
+                    <div className="w-full py-2 px-4 rounded-xl bg-black/40 backdrop-blur-md border border-white/20 text-center" style={{ boxShadow: '0 -4px 16px rgba(0,0,0,0.1)' }}>
+                      <span className="font-bold text-sm text-white/90">{isExpired ? 'Renew Membership' : 'View Membership Details'}</span>
+                    </div>
                   </div>
                 </div>
               );
