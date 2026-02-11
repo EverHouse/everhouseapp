@@ -2283,9 +2283,9 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
       let tierSlug: string | null = null;
       let tierName: string | null = null;
       
-      // First check subscription metadata for tier info (used by dynamic pricing like corporate)
-      const metadataTierSlug = subscription.metadata?.tier_slug;
-      const metadataTierName = subscription.metadata?.tier_name;
+      // First check subscription metadata for tier info (supports both snake_case and camelCase keys)
+      const metadataTierSlug = subscription.metadata?.tier_slug || subscription.metadata?.tierSlug;
+      const metadataTierName = subscription.metadata?.tier_name || subscription.metadata?.tier;
       
       if (metadataTierSlug) {
         // Look up tier by slug from metadata
@@ -2459,6 +2459,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
       await pool.query(
         `UPDATE users SET 
           stripe_subscription_id = $1,
+          stripe_customer_id = COALESCE(stripe_customer_id, $5),
           stripe_current_period_end = COALESCE($2, stripe_current_period_end),
           billing_provider = 'stripe',
           membership_status = CASE 
@@ -2468,9 +2469,9 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
           join_date = CASE WHEN join_date IS NULL AND $3 = 'active' THEN NOW() ELSE join_date END,
           updated_at = NOW()
         WHERE LOWER(email) = LOWER($4)`,
-        [subscription.id, subscriptionPeriodEnd, mappedStatus, email]
+        [subscription.id, subscriptionPeriodEnd, mappedStatus, email, customerId]
       );
-      console.log(`[Stripe Webhook] Updated existing user ${email}: subscription=${subscription.id}, status=${mappedStatus} (stripe: ${subscription.status}), shouldActivate=${shouldActivate}`);
+      console.log(`[Stripe Webhook] Updated existing user ${email}: subscription=${subscription.id}, customerId=${customerId}, status=${mappedStatus} (stripe: ${subscription.status}), shouldActivate=${shouldActivate}`);
     }
 
     const memberName = `${first_name || ''} ${last_name || ''}`.trim() || email;
