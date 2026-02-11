@@ -31,6 +31,8 @@ export type JobType =
   | 'sync_day_pass_to_hubspot'
   | 'upsert_transaction_cache'
   | 'update_member_tier'
+  | 'stripe_credit_refund'
+  | 'stripe_credit_consume'
   | 'generic_async_task';
 
 interface QueueJobOptions {
@@ -197,6 +199,41 @@ async function executeJob(job: { id: number; jobType: string; payload: any; retr
         const { upsertTransactionCache } = await import('./stripe/transactionCache');
         await upsertTransactionCache(payload);
         break;
+      case 'stripe_credit_refund': {
+        const { getStripeClient } = await import('./stripe/client');
+        const stripeRefund = await getStripeClient();
+        await stripeRefund.refunds.create({
+          payment_intent: payload.paymentIntentId,
+          amount: payload.amountCents,
+          reason: 'requested_by_customer',
+          metadata: {
+            type: 'account_credit_applied',
+            originalPaymentIntent: payload.paymentIntentId,
+            email: payload.email
+          }
+        }, {
+          idempotencyKey: `credit_refund_${payload.paymentIntentId}_${payload.amountCents}`
+        });
+        console.log(`[JobQueue] Applied credit refund of $${(payload.amountCents / 100).toFixed(2)} for ${payload.email}`);
+        break;
+      }
+      case 'stripe_credit_consume': {
+        const { getStripeClient: getStripeForConsume } = await import('./stripe/client');
+        const stripeConsume = await getStripeForConsume();
+        await stripeConsume.customers.createBalanceTransaction(
+          payload.customerId,
+          {
+            amount: payload.amountCents,
+            currency: 'usd',
+            description: `Account credit applied to payment ${payload.paymentIntentId}`,
+          },
+          {
+            idempotencyKey: `credit_consume_${payload.paymentIntentId}_${payload.amountCents}`
+          }
+        );
+        console.log(`[JobQueue] Consumed account credit of $${(payload.amountCents / 100).toFixed(2)} for ${payload.email}`);
+        break;
+      }
       case 'update_member_tier':
         const { processMemberTierUpdate } = await import('./memberTierUpdateProcessor');
         await processMemberTierUpdate(payload);

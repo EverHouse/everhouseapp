@@ -1059,73 +1059,24 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: a
   // Process pending credit refund if exists (legacy path for backwards compatibility with in-flight payments)
   const pendingCreditRefund = metadata?.pendingCreditRefund ? parseInt(metadata.pendingCreditRefund, 10) : 0;
   if (pendingCreditRefund > 0 && customerId) {
-    const localCreditAmount = pendingCreditRefund;
-    const localCustomerId = customerId;
-    const localPiId = id;
-    const localEmail = metadata?.email || '';
-    
-    deferredActions.push(async () => {
-      try {
-        const stripe = await getStripeClient();
-        
-        // Refund the credit portion back to the customer
-        const refund = await stripe.refunds.create({
-          payment_intent: localPiId,
-          amount: localCreditAmount,
-          reason: 'requested_by_customer',
-          metadata: {
-            type: 'account_credit_applied',
-            originalPaymentIntent: localPiId,
-            email: localEmail
-          }
-        });
-        
-        console.log(`[Stripe Webhook] Applied credit refund of $${(localCreditAmount / 100).toFixed(2)} for ${localEmail}, refund: ${refund.id}`);
-      } catch (refundError: any) {
-        console.error(`[Stripe Webhook] Failed to apply credit refund:`, refundError.message);
-        // Log for manual reconciliation
-        await pool.query(
-          `INSERT INTO audit_log (action, resource_type, resource_id, details, created_at)
-           VALUES ('credit_refund_failed', 'payment', $1, $2, NOW())`,
-          [localPiId, JSON.stringify({ email: localEmail, amount: localCreditAmount, error: refundError.message })]
-        );
-      }
-    });
+    await queueJobInTransaction(client, 'stripe_credit_refund', {
+      paymentIntentId: id,
+      amountCents: pendingCreditRefund,
+      email: metadata?.email || ''
+    }, { webhookEventId: id, priority: 2, maxRetries: 5 });
+    console.log(`[Stripe Webhook] Queued credit refund of $${(pendingCreditRefund / 100).toFixed(2)} for ${metadata?.email || 'unknown'}`);
   }
 
   // Process credit consumption if exists (new path: card charged reduced amount, consume credit from balance)
   const creditToConsume = metadata?.creditToConsume ? parseInt(metadata.creditToConsume, 10) : 0;
   if (creditToConsume > 0 && customerId) {
-    const localCreditAmount = creditToConsume;
-    const localCustomerId = customerId;
-    const localPiId = id;
-    const localEmail = metadata?.email || '';
-    
-    deferredActions.push(async () => {
-      try {
-        const stripe = await getStripeClient();
-        
-        // Consume the credit by creating a positive balance transaction (reduces negative balance)
-        const balanceTx = await stripe.customers.createBalanceTransaction(
-          localCustomerId,
-          {
-            amount: localCreditAmount,
-            currency: 'usd',
-            description: `Account credit applied to payment ${localPiId}`,
-          }
-        );
-        
-        console.log(`[Stripe Webhook] Consumed account credit of $${(localCreditAmount / 100).toFixed(2)} for ${localEmail}, balance tx: ${balanceTx.id}`);
-      } catch (creditError: any) {
-        console.error(`[Stripe Webhook] Failed to consume account credit:`, creditError.message);
-        // Log for manual reconciliation
-        await pool.query(
-          `INSERT INTO audit_log (action, resource_type, resource_id, details, created_at)
-           VALUES ('credit_consume_failed', 'payment', $1, $2, NOW())`,
-          [localPiId, JSON.stringify({ email: localEmail, amount: localCreditAmount, error: creditError.message })]
-        );
-      }
-    });
+    await queueJobInTransaction(client, 'stripe_credit_consume', {
+      customerId,
+      paymentIntentId: id,
+      amountCents: creditToConsume,
+      email: metadata?.email || ''
+    }, { webhookEventId: id, priority: 2, maxRetries: 5 });
+    console.log(`[Stripe Webhook] Queued credit consumption of $${(creditToConsume / 100).toFixed(2)} for ${metadata?.email || 'unknown'}`);
   }
 
   // Audit log for successful payment
@@ -2221,7 +2172,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
       : null;
 
     // First try to find user by stripe_customer_id
-    let userResult = await pool.query(
+    let userResult = await client.query(
       'SELECT email, first_name, last_name, tier, membership_status FROM users WHERE stripe_customer_id = $1',
       [customerId]
     );
@@ -2230,7 +2181,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
     const purchaserEmail = subscription.metadata?.purchaser_email?.toLowerCase();
     if (userResult.rows.length === 0 && purchaserEmail) {
       console.log(`[Stripe Webhook] No user found by customer ID, trying by email from metadata: ${purchaserEmail}`);
-      userResult = await pool.query(
+      userResult = await client.query(
         'SELECT email, first_name, last_name, tier, membership_status FROM users WHERE LOWER(email) = LOWER($1)',
         [purchaserEmail]
       );
@@ -2289,7 +2240,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
       
       if (metadataTierSlug) {
         // Look up tier by slug from metadata
-        const tierResult = await pool.query(
+        const tierResult = await client.query(
           'SELECT slug, name FROM membership_tiers WHERE slug = $1',
           [metadataTierSlug]
         );
@@ -2307,7 +2258,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
       
       // Fallback to price ID lookup if no metadata
       if (!tierSlug && priceId) {
-        const tierResult = await pool.query(
+        const tierResult = await client.query(
           'SELECT slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
           [priceId]
         );
@@ -2339,7 +2290,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
       if (resolvedSub && resolvedSub.matchType !== 'direct') {
         // This email is a linked email for an existing user — update the existing user instead
         console.log(`[Stripe Webhook] Email ${customerEmail} resolved to existing user ${resolvedSub.primaryEmail} via ${resolvedSub.matchType}`);
-        await pool.query(
+        await client.query(
           `UPDATE users SET 
             stripe_customer_id = $1, stripe_subscription_id = $2, membership_status = $3,
             billing_provider = 'stripe', stripe_current_period_end = COALESCE($4, stripe_current_period_end),
@@ -2349,7 +2300,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
         );
         console.log(`[Stripe Webhook] Updated existing user ${resolvedSub.primaryEmail} via linked email with tier ${tierName || 'none'}, subscription ${subscription.id}`);
       } else {
-        await pool.query(
+        await client.query(
           `INSERT INTO users (email, first_name, last_name, phone, tier, membership_status, stripe_customer_id, stripe_subscription_id, billing_provider, stripe_current_period_end, join_date, created_at, updated_at)
            VALUES ($1, $2, $3, $8, $4, $7, $5, $6, 'stripe', $9, NOW(), NOW(), NOW())
            ON CONFLICT (email) DO UPDATE SET 
@@ -2456,7 +2407,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
       const shouldActivate = ['pending', 'inactive', 'non-member', null].includes(currentStatus) && 
                               (subscription.status === 'active' || subscription.status === 'trialing');
 
-      await pool.query(
+      await client.query(
         `UPDATE users SET 
           stripe_subscription_id = $1,
           stripe_customer_id = COALESCE(stripe_customer_id, $5),
@@ -2506,7 +2457,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
     const metadataTierName = subscription.metadata?.tier_name || subscription.metadata?.tier;
     
     if (metadataTierSlug) {
-      const tierResult = await pool.query(
+      const tierResult = await client.query(
         'SELECT slug, name FROM membership_tiers WHERE slug = $1',
         [metadataTierSlug]
       );
@@ -2523,7 +2474,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
     
     // Fallback to price ID lookup
     if (!activationTierSlug && priceId) {
-      const tierResult = await pool.query(
+      const tierResult = await client.query(
         'SELECT slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
         [priceId]
       );
@@ -2540,7 +2491,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
         const tierName = activationTierName;
           
         // Update user's tier, billing_provider, and conditionally activate if membership_status is pending/inactive/null/non-member
-        const updateResult = await pool.query(
+        const updateResult = await client.query(
           `UPDATE users SET 
             tier = $1, 
             billing_provider = 'stripe',
@@ -2605,7 +2556,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
 
           // Update hubspot deal status
           try {
-            const dealUpdateResult = await pool.query(
+            const dealUpdateResult = await client.query(
               `UPDATE hubspot_deals SET last_payment_status = 'current', last_payment_check = NOW() WHERE LOWER(member_email) = LOWER($1) RETURNING id`,
               [email]
             );
@@ -2632,14 +2583,14 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
               const tierKeywords = ['vip', 'premium', 'corporate', 'core', 'social'];
               for (const keyword of tierKeywords) {
                 if (productName.includes(keyword)) {
-                  const keywordTierResult = await pool.query(
+                  const keywordTierResult = await client.query(
                     'SELECT slug, name FROM membership_tiers WHERE LOWER(slug) = $1 OR LOWER(name) = $1',
                     [keyword]
                   );
                   if (keywordTierResult.rows.length > 0) {
                     const { name: tierName } = keywordTierResult.rows[0];
                     
-                    const updateResult = await pool.query(
+                    const updateResult = await client.query(
                       `UPDATE users SET 
                         tier = $1, 
                         membership_status = CASE 
@@ -2689,7 +2640,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
       let queryParams: any[] = [email];
       
       if (priceId) {
-        const tierResult = await pool.query(
+        const tierResult = await client.query(
           'SELECT slug FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
           [priceId]
         );
@@ -2699,7 +2650,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
         }
       }
       
-      await pool.query(
+      await client.query(
         `UPDATE users SET 
           grace_period_start = NULL,
           grace_period_email_count = 0,
@@ -2714,7 +2665,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
     }
 
     if (subscription.status === 'trialing') {
-      const userIdResult = await pool.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [email]);
+      const userIdResult = await client.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [email]);
       if (userIdResult.rows.length > 0) {
         const userId = userIdResult.rows[0].id;
         const trialEndDate = subscription.trial_end 
@@ -2774,7 +2725,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
       );
     }
 
-    const userResult = await pool.query(
+    const userResult = await client.query(
       'SELECT id, email, first_name, last_name, tier FROM users WHERE stripe_customer_id = $1',
       [customerId]
     );
@@ -2788,7 +2739,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
     const memberName = `${first_name || ''} ${last_name || ''}`.trim() || email;
 
     if (currentPriceId) {
-      let tierResult = await pool.query(
+      let tierResult = await client.query(
         'SELECT slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
         [currentPriceId]
       );
@@ -2810,7 +2761,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
             const tierKeywords = ['vip', 'premium', 'corporate', 'core', 'social'];
             for (const keyword of tierKeywords) {
               if (productName.includes(keyword)) {
-                const keywordTierResult = await pool.query(
+                const keywordTierResult = await client.query(
                   'SELECT slug, name FROM membership_tiers WHERE LOWER(slug) = $1 OR LOWER(name) = $1',
                   [keyword]
                 );
@@ -2830,7 +2781,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
       
       // Compare names (users.tier stores the display name like 'Social', not slug)
       if (newTierName && newTierName !== currentTier) {
-        await pool.query(
+        await client.query(
           'UPDATE users SET tier = $1, billing_provider = $3, stripe_current_period_end = COALESCE($4, stripe_current_period_end), updated_at = NOW() WHERE id = $2',
           [newTierName, userId, 'stripe', subscriptionPeriodEnd]
         );
@@ -2880,7 +2831,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
     }
 
     if (status === 'active') {
-      await pool.query(
+      await client.query(
         `UPDATE users SET membership_status = 'active', stripe_current_period_end = COALESCE($2, stripe_current_period_end), updated_at = NOW() 
          WHERE id = $1 
          AND (membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'past_due'))
@@ -2901,7 +2852,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
       
       // Reactivate sub-members (family/corporate employees) if they were suspended/past_due
       try {
-        const groupResult = await pool.query(
+        const groupResult = await client.query(
           `SELECT bg.id, bg.group_name, bg.type FROM billing_groups bg 
            WHERE LOWER(bg.primary_email) = LOWER($1) AND bg.is_active = true`,
           [email]
@@ -2911,7 +2862,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
           const group = groupResult.rows[0];
           
           // Reactivate all sub-members that were suspended/past_due due to billing issues
-          const subMembersResult = await pool.query(
+          const subMembersResult = await client.query(
             `UPDATE users u SET membership_status = 'active', updated_at = NOW()
              FROM group_members gm
              WHERE gm.billing_group_id = $1 
@@ -2950,7 +2901,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
         console.error('[Stripe Webhook] HubSpot sync failed for status active:', hubspotError);
       }
     } else if (status === 'past_due') {
-      await pool.query(
+      await client.query(
         `UPDATE users SET membership_status = 'past_due', stripe_current_period_end = COALESCE($2, stripe_current_period_end), updated_at = NOW() WHERE id = $1`,
         [userId, subscriptionPeriodEnd]
       );
@@ -2973,7 +2924,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
       
       // Propagate past_due status to sub-members (family/corporate employees)
       try {
-        const groupResult = await pool.query(
+        const groupResult = await client.query(
           `SELECT bg.id, bg.group_name, bg.type FROM billing_groups bg 
            WHERE LOWER(bg.primary_email) = LOWER($1) AND bg.is_active = true`,
           [email]
@@ -2983,7 +2934,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
           const group = groupResult.rows[0];
           
           // Update all active sub-members to past_due status
-          const subMembersResult = await pool.query(
+          const subMembersResult = await client.query(
             `UPDATE users u SET membership_status = 'past_due', updated_at = NOW()
              FROM group_members gm
              WHERE gm.billing_group_id = $1 
@@ -3024,7 +2975,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
     } else if (status === 'canceled') {
       console.log(`[Stripe Webhook] Subscription canceled for ${email} - handled by subscription.deleted webhook`);
     } else if (status === 'unpaid') {
-      await pool.query(
+      await client.query(
         `UPDATE users SET membership_status = 'suspended', stripe_current_period_end = COALESCE($2, stripe_current_period_end), updated_at = NOW() WHERE id = $1`,
         [userId, subscriptionPeriodEnd]
       );
@@ -3047,7 +2998,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
       
       // Propagate suspension to sub-members (family/corporate employees)
       try {
-        const groupResult = await pool.query(
+        const groupResult = await client.query(
           `SELECT bg.id, bg.group_name, bg.type FROM billing_groups bg 
            WHERE LOWER(bg.primary_email) = LOWER($1) AND bg.is_active = true`,
           [email]
@@ -3057,7 +3008,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
           const group = groupResult.rows[0];
           
           // Suspend all active sub-members
-          const subMembersResult = await pool.query(
+          const subMembersResult = await client.query(
             `UPDATE users u SET membership_status = 'suspended', updated_at = NOW()
              FROM group_members gm
              WHERE gm.billing_group_id = $1 
@@ -3127,7 +3078,7 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: any):
       // Don't throw - continue to process other cancellation logic
     }
 
-    const userResult = await pool.query(
+    const userResult = await client.query(
       'SELECT email, first_name, last_name, membership_status FROM users WHERE stripe_customer_id = $1',
       [customerId]
     );
@@ -3142,7 +3093,7 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: any):
     const wasTrialing = previousStatus === 'trialing';
 
     if (wasTrialing) {
-      const pauseResult = await pool.query(
+      const pauseResult = await client.query(
         `UPDATE users SET 
           membership_status = 'paused',
           stripe_subscription_id = NULL,
@@ -3190,7 +3141,7 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: any):
     }
 
     // Check if there was a billing group and notify staff of orphaned members
-    const billingGroupResult = await pool.query(
+    const billingGroupResult = await client.query(
       `SELECT bg.id, bg.group_name, bg.is_active
        FROM billing_groups bg
        WHERE LOWER(bg.primary_email) = LOWER($1)`,
@@ -3201,7 +3152,7 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: any):
       const billingGroup = billingGroupResult.rows[0];
       
       // Get count of members that were just deactivated for notification
-      const deactivatedMembersResult = await pool.query(
+      const deactivatedMembersResult = await client.query(
         `SELECT gm.member_email
          FROM group_members gm
          WHERE gm.billing_group_id = $1 AND gm.is_active = false 
@@ -3228,7 +3179,7 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: any):
 
       // Deactivate the billing group itself
       if (billingGroup.is_active) {
-        await pool.query(
+        await client.query(
           `UPDATE billing_groups SET is_active = false, updated_at = NOW() WHERE id = $1`,
           [billingGroup.id]
         );
@@ -3236,7 +3187,7 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: any):
       }
     }
 
-    const cancelResult = await pool.query(
+    const cancelResult = await client.query(
       `UPDATE users SET 
         last_tier = tier,
         tier = NULL,
