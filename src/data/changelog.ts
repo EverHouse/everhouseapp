@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.44.1",
+    date: "2026-02-11",
+    title: "Conference Room Reschedule Fix",
+    changes: [
+      "Fixed: Rescheduling a conference room booking now shows conference rooms in the dropdown instead of simulator bays",
+      "Fixed: Reschedule labels dynamically show 'Room' instead of 'Bay' for conference room bookings",
+      "Fixed: Rescheduling a conference room no longer asks for a Trackman Booking ID — that only applies to simulator bookings",
+    ],
+  },
+  {
     version: "7.44.0",
     date: "2026-02-11",
     title: "Conference Room Booking Fixes",

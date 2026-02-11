@@ -44,9 +44,15 @@ export function RescheduleBookingModal({ isOpen, onClose, booking, resources, on
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [rescheduleStarted, setRescheduleStarted] = useState(false);
 
-  const simulatorResources = useMemo(
-    () => resources.filter(r => !r.type || r.type === 'simulator'),
-    [resources]
+  const isConferenceRoom = useMemo(() => {
+    if (!booking?.resource_id) return false;
+    const currentResource = resources.find(r => r.id === booking.resource_id);
+    return currentResource?.type === 'conference_room';
+  }, [booking, resources]);
+
+  const filteredResources = useMemo(
+    () => resources.filter(r => isConferenceRoom ? r.type === 'conference_room' : (!r.type || r.type === 'simulator')),
+    [resources, isConferenceRoom]
   );
 
   const newDuration = useMemo(() => calculateDuration(newStartTime, newEndTime), [newStartTime, newEndTime]);
@@ -55,8 +61,8 @@ export function RescheduleBookingModal({ isOpen, onClose, booking, resources, on
 
   const newBayName = useMemo(() => {
     if (!newResourceId) return '';
-    return simulatorResources.find(r => r.id === newResourceId)?.name || '';
-  }, [newResourceId, simulatorResources]);
+    return filteredResources.find(r => r.id === newResourceId)?.name || '';
+  }, [newResourceId, filteredResources]);
 
   useEffect(() => {
     if (isOpen && booking) {
@@ -106,23 +112,27 @@ export function RescheduleBookingModal({ isOpen, onClose, booking, resources, on
   }, [booking, rescheduleStarted, onClose]);
 
   const handleConfirm = useCallback(async () => {
-    if (!booking || !newResourceId || !newDate || !newStartTime || !newEndTime || !newTrackmanId.trim()) return;
+    if (!booking || !newResourceId || !newDate || !newStartTime || !newEndTime || (!isConferenceRoom && !newTrackmanId.trim())) return;
     setIsConfirming(true);
     setErrorMsg(null);
 
     try {
+      const body: any = {
+        resource_id: newResourceId,
+        request_date: newDate,
+        start_time: newStartTime,
+        end_time: newEndTime,
+        duration_minutes: newDuration
+      };
+      if (!isConferenceRoom) {
+        body.trackman_booking_id = newTrackmanId.trim();
+      }
+
       const res = await fetch(`/api/admin/booking/${booking.id}/reschedule/confirm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          resource_id: newResourceId,
-          request_date: newDate,
-          start_time: newStartTime,
-          end_time: newEndTime,
-          duration_minutes: newDuration,
-          trackman_booking_id: newTrackmanId.trim()
-        })
+        body: JSON.stringify(body)
       });
 
       if (!res.ok) {
@@ -137,12 +147,12 @@ export function RescheduleBookingModal({ isOpen, onClose, booking, resources, on
     } finally {
       setIsConfirming(false);
     }
-  }, [booking, newResourceId, newDate, newStartTime, newEndTime, newTrackmanId, newDuration, newBayName, showToast, onSuccess]);
+  }, [booking, newResourceId, newDate, newStartTime, newEndTime, newTrackmanId, newDuration, newBayName, showToast, onSuccess, isConferenceRoom]);
 
   if (!booking) return null;
 
   const canContinue = newResourceId && newDate && newStartTime && newEndTime && newDuration > 0;
-  const canConfirm = canContinue && newTrackmanId.trim().length > 0;
+  const canConfirm = canContinue && (isConferenceRoom || newTrackmanId.trim().length > 0);
 
   return (
     <SlideUpDrawer isOpen={isOpen} onClose={handleClose} title="Reschedule Booking">
@@ -167,7 +177,7 @@ export function RescheduleBookingModal({ isOpen, onClose, booking, resources, on
                   <p className="font-medium text-primary dark:text-white">{booking.user_name || booking.user_email || 'Unknown'}</p>
                 </div>
                 <div>
-                  <span className="text-gray-500 dark:text-gray-400">Bay</span>
+                  <span className="text-gray-500 dark:text-gray-400">{isConferenceRoom ? 'Room' : 'Bay'}</span>
                   <p className="font-medium text-primary dark:text-white">{booking.bay_name || 'Unassigned'}</p>
                 </div>
                 <div>
@@ -184,18 +194,18 @@ export function RescheduleBookingModal({ isOpen, onClose, booking, resources, on
             <div className="space-y-4">
               <h4 className="text-sm font-semibold text-primary dark:text-white flex items-center gap-2">
                 <span className="material-symbols-outlined text-lg text-accent" aria-hidden="true">edit_calendar</span>
-                New Bay & Time
+                {isConferenceRoom ? 'New Room & Time' : 'New Bay & Time'}
               </h4>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Bay</label>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">{isConferenceRoom ? 'Room' : 'Bay'}</label>
                 <select
                   value={newResourceId || ''}
                   onChange={e => setNewResourceId(Number(e.target.value))}
                   className="w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-primary dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 >
-                  <option value="">Select bay...</option>
-                  {simulatorResources.map(r => (
+                  <option value="">{isConferenceRoom ? 'Select room...' : 'Select bay...'}</option>
+                  {filteredResources.map(r => (
                     <option key={r.id} value={r.id}>{r.name}</option>
                   ))}
                 </select>
@@ -251,13 +261,17 @@ export function RescheduleBookingModal({ isOpen, onClose, booking, resources, on
             <button
               onClick={() => {
                 setErrorMsg(null);
-                setStep(2);
+                if (isConferenceRoom) {
+                  handleConfirm();
+                } else {
+                  setStep(2);
+                }
               }}
-              disabled={!canContinue}
+              disabled={!canConfirm}
               className="w-full py-3 px-4 rounded-lg bg-accent hover:bg-accent/90 text-white font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <span className="material-symbols-outlined text-sm" aria-hidden="true">arrow_forward</span>
-              Continue
+              <span className="material-symbols-outlined text-sm" aria-hidden="true">{isConferenceRoom ? 'check' : 'arrow_forward'}</span>
+              {isConferenceRoom ? 'Confirm Reschedule' : 'Continue'}
             </button>
           </>
         )}
@@ -275,8 +289,8 @@ export function RescheduleBookingModal({ isOpen, onClose, booking, resources, on
                   <p className="font-medium text-blue-800 dark:text-blue-200">{booking.user_name || booking.user_email || 'Unknown'}</p>
                 </div>
                 <div>
-                  <span className="text-blue-500/70 dark:text-blue-400/70">Bay</span>
-                  <p className="font-medium text-blue-800 dark:text-blue-200">{newBayName || 'Select bay'}</p>
+                  <span className="text-blue-500/70 dark:text-blue-400/70">{isConferenceRoom ? 'Room' : 'Bay'}</span>
+                  <p className="font-medium text-blue-800 dark:text-blue-200">{newBayName || (isConferenceRoom ? 'Select room' : 'Select bay')}</p>
                 </div>
                 <div>
                   <span className="text-blue-500/70 dark:text-blue-400/70">Date</span>
