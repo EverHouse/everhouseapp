@@ -915,7 +915,8 @@ const BlocksTab: React.FC = () => {
                             return (
                                 <div 
                                     key={closure.id}
-                                    className="bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 border-l-4 border-l-cyan-500 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden group animate-slide-up-stagger"
+                                    onClick={() => handleEditClosure(closure)}
+                                    className="bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 border-l-4 border-l-cyan-500 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden group animate-slide-up-stagger cursor-pointer"
                                     style={{ '--stagger-index': index } as React.CSSProperties}
                                 >
                                     <div className="p-4 flex items-start justify-between gap-3">
@@ -938,19 +939,22 @@ const BlocksTab: React.FC = () => {
                                                 </div>
                                             )}
                                         </div>
-                                        <button
-                                            onClick={(e) => handleEditClosure(closure, e)}
-                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-500 text-white text-sm font-medium hover:bg-cyan-600 active:scale-95 transition-all flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"
+                                        <div
+                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-500 text-white text-sm font-medium flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"
                                         >
                                             <span aria-hidden="true" className="material-symbols-outlined text-base">edit</span>
                                             Edit
-                                        </button>
+                                        </div>
                                     </div>
                                 </div>
                             );
                         })}
                     </div>
                 </div>
+            )}
+
+            {needsReviewClosures.length > 0 && (configuredClosures.length > 0 || closuresLoading) && (
+                <div className="h-4" />
             )}
 
             {closuresLoading ? (
