@@ -78,7 +78,7 @@ DEV_LOGIN_ENABLED = "true"
 ENABLE_TEST_LOGIN = "true"
 
 [userenv.production]
-PORT = "5001"
+PORT = "5000"
 
 
 [deployment]
