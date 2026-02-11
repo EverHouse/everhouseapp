@@ -1828,17 +1828,48 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         
         // If there are changes, update the booking
         if (changes.length > 0) {
-          await db.update(bookingRequests)
-            .set(updateFields)
-            .where(eq(bookingRequests.id, existing.id));
-          
-          process.stderr.write(`[Trackman Import] Updated booking #${existing.id} (Trackman ID: ${row.bookingId}): ${changes.join(', ')}${isWebhookCreated ? ' [webhook backfill]' : ''}\n`);
-          updatedRows++;
+          try {
+            await db.update(bookingRequests)
+              .set(updateFields)
+              .where(eq(bookingRequests.id, existing.id));
+            
+            process.stderr.write(`[Trackman Import] Updated booking #${existing.id} (Trackman ID: ${row.bookingId}): ${changes.join(', ')}${isWebhookCreated ? ' [webhook backfill]' : ''}\n`);
+            updatedRows++;
+          } catch (updateErr: any) {
+            const errMsg = updateErr.cause?.message || updateErr.message || '';
+            if (errMsg.includes('booking_requests_no_overlap') || errMsg.includes('exclusion constraint')) {
+              delete updateFields.startTime;
+              delete updateFields.endTime;
+              delete updateFields.durationMinutes;
+              const timeChanges = changes.filter(c => c.startsWith('start:') || c.startsWith('end:') || c.startsWith('duration:'));
+              const otherChanges = changes.filter(c => !c.startsWith('start:') && !c.startsWith('end:') && !c.startsWith('duration:'));
+              
+              if (Object.keys(updateFields).length > 0) {
+                await db.update(bookingRequests)
+                  .set(updateFields)
+                  .where(eq(bookingRequests.id, existing.id));
+              }
+              
+              process.stderr.write(`[Trackman Import] Booking #${existing.id}: skipped time update (${timeChanges.join(', ')}) - overlaps with another booking on the same bay${otherChanges.length > 0 ? `. Other updates applied: ${otherChanges.join(', ')}` : ''}\n`);
+              updatedRows++;
+            } else {
+              throw updateErr;
+            }
+          }
         } else {
           // No field changes, but still update sync tracking
-          await db.update(bookingRequests)
-            .set(updateFields)
-            .where(eq(bookingRequests.id, existing.id));
+          try {
+            await db.update(bookingRequests)
+              .set(updateFields)
+              .where(eq(bookingRequests.id, existing.id));
+          } catch (updateErr: any) {
+            const errMsg = updateErr.cause?.message || updateErr.message || '';
+            if (errMsg.includes('booking_requests_no_overlap') || errMsg.includes('exclusion constraint')) {
+              process.stderr.write(`[Trackman Import] Booking #${existing.id}: sync tracking update skipped due to overlap constraint\n`);
+            } else {
+              throw updateErr;
+            }
+          }
           matchedRows++;
         }
         
@@ -3054,7 +3085,8 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         unmatchedRows++;
       }
     } catch (err: any) {
-      errors.push(`Row ${i}: ${err.message}`);
+      const dbError = err.cause?.message || err.message;
+      errors.push(`Row ${i}: ${dbError}`);
       skippedRows++;
     }
   }
@@ -4067,7 +4099,7 @@ export async function rescanUnmatchedBookings(performedBy: string = 'system'): P
         }
       }
     } catch (err: any) {
-      errors.push(`Error processing booking ${booking.trackmanBookingId}: ${err.message}`);
+      errors.push(`Error processing booking ${booking.trackmanBookingId}: ${err.cause?.message || err.message}`);
     }
   }
   

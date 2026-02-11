@@ -201,7 +201,7 @@ export async function ensureDatabaseConstraints() {
         END IF;
         
         ALTER TABLE booking_requests ADD CONSTRAINT booking_requests_duration_minutes_check 
-          CHECK (duration_minutes IN (30, 60, 90, 120, 150, 180, 210, 240, 270, 300));
+          CHECK (duration_minutes IN (30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360));
       END $$;
     `);
     

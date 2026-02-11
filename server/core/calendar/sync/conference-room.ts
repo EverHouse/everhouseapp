@@ -429,7 +429,7 @@ export async function syncConferenceRoomCalendarToBookings(options?: { monthsBac
         const [endHour, endMin] = endTime.split(':').map(Number);
         const rawDuration = (endHour * 60 + endMin) - (startHour * 60 + startMin);
         // Round to nearest allowed duration (30-minute increments: 30, 60, 90, 120, 150, 180, 210, 240, 270, 300)
-        const allowedDurations = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300];
+        const allowedDurations = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360];
         const durationMinutes = rawDuration <= 0 ? 60 : 
           allowedDurations.reduce((prev, curr) => 
             Math.abs(curr - rawDuration) < Math.abs(prev - rawDuration) ? curr : prev

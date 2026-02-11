@@ -2732,9 +2732,9 @@ router.post('/api/staff/bookings/manual', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Invalid booking source' });
     }
 
-    const validDurations = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300];
+    const validDurations = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360];
     if (!validDurations.includes(duration_minutes)) {
-      return res.status(400).json({ error: 'Invalid duration. Must be between 30 and 300 minutes in 30-minute increments.' });
+      return res.status(400).json({ error: 'Invalid duration. Must be between 30 and 360 minutes in 30-minute increments.' });
     }
 
     const [member] = await db.select()
