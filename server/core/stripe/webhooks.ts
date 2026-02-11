@@ -2464,12 +2464,12 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
               const { syncMemberToHubSpot } = await import('../hubspot/stages');
               await syncMemberToHubSpot({
                 email,
-                status: status, // Use actual subscription status (active, trialing, past_due)
+                status: subscription.status, // Use actual subscription status (active, trialing, past_due)
                 billingProvider: 'stripe',
                 tier: tierName,
                 memberSince: new Date()
               });
-              console.log(`[Stripe Webhook] Synced existing user ${email} to HubSpot: tier=${tierName}, status=${status}, billing=stripe, memberSince=now`);
+              console.log(`[Stripe Webhook] Synced existing user ${email} to HubSpot: tier=${tierName}, status=${subscription.status}, billing=stripe, memberSince=now`);
             } catch (hubspotError) {
               console.error('[Stripe Webhook] HubSpot sync failed for existing user subscription:', hubspotError);
             }
