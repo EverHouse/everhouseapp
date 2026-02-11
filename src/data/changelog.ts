@@ -13,10 +13,13 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "7.38.0",
+    version: "7.38.1",
     date: "2026-02-11",
-    title: "Activation Controls & Charge Saved Card",
+    title: "Activation Link Fix + Charge Saved Card",
     changes: [
+      "Fix: Members who completed payment through an activation link were stuck in 'pending' status and didn't appear in the directory — the system now automatically activates them and links their subscription when payment completes",
+      "Fix: Subscription webhook now properly updates existing pending members with their subscription ID and active status, instead of only sending notifications without activating them",
+      "Fix: Tier detection from subscription metadata now works for all checkout flows (activation links, staff invites, corporate) regardless of metadata key format",
       "Feature: Staff can now send activation emails and copy activation links directly from a member's billing tab when their subscription is awaiting payment",
       "Feature: Collect Payment modal now offers two options — Card Reader (terminal) or Charge Saved Card — so staff can charge a member's card on file without needing the physical reader",
       "Improvement: Charge Saved Card shows the specific card that will be charged (brand, last 4 digits, expiry) before confirming",

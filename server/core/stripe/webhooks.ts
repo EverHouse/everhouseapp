@@ -1923,6 +1923,58 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: any):
       }
     }
 
+    // Handle activation link checkout - activate pending user after payment completion
+    if (session.metadata?.source === 'activation_link') {
+      const userId = session.metadata?.userId;
+      const memberEmail = session.metadata?.memberEmail?.toLowerCase();
+      const customerId = session.customer as string;
+      const subscriptionId = session.subscription as string;
+      const tierSlugMeta = session.metadata?.tierSlug;
+      const tierNameMeta = session.metadata?.tier;
+
+      console.log(`[Stripe Webhook] Processing activation_link checkout: session=${session.id}, user=${userId}, email=${memberEmail}, subscription=${subscriptionId}`);
+
+      if (userId && memberEmail) {
+        try {
+          const updateResult = await pool.query(
+            `UPDATE users SET 
+              membership_status = 'active',
+              stripe_customer_id = COALESCE(stripe_customer_id, $1),
+              stripe_subscription_id = $2,
+              billing_provider = 'stripe',
+              tier = COALESCE($3, tier),
+              join_date = COALESCE(join_date, NOW()),
+              updated_at = NOW()
+            WHERE id = $4 OR LOWER(email) = LOWER($5)
+            RETURNING id, email`,
+            [customerId, subscriptionId, tierNameMeta || tierSlugMeta, userId, memberEmail]
+          );
+
+          if (updateResult.rowCount && updateResult.rowCount > 0) {
+            const updatedEmail = updateResult.rows[0].email;
+            console.log(`[Stripe Webhook] Activation link checkout: activated user ${updatedEmail} with subscription ${subscriptionId}`);
+
+            try {
+              const { syncMemberToHubSpot } = await import('../hubspot/stages');
+              await syncMemberToHubSpot({
+                email: updatedEmail,
+                status: 'active',
+                billingProvider: 'stripe',
+                tier: tierNameMeta,
+                memberSince: new Date()
+              });
+            } catch (hubspotError) {
+              console.error('[Stripe Webhook] HubSpot sync failed for activation link checkout:', hubspotError);
+            }
+          } else {
+            console.error(`[Stripe Webhook] Activation link checkout: user not found for userId=${userId} email=${memberEmail}`);
+          }
+        } catch (activationError: any) {
+          console.error(`[Stripe Webhook] Error processing activation link checkout:`, activationError.message);
+        }
+      }
+    }
+
     // Handle staff-initiated membership invites - auto-create user on checkout completion
     if (session.metadata?.source === 'staff_invite') {
       console.log(`[Stripe Webhook] Processing staff invite checkout: ${session.id}`);
@@ -2389,6 +2441,36 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
       last_name = userResult.rows[0].last_name;
       currentTier = userResult.rows[0].tier;
       currentStatus = userResult.rows[0].membership_status;
+
+      const statusMap: Record<string, string> = {
+        'active': 'active',
+        'trialing': 'trialing',
+        'past_due': 'past_due',
+        'incomplete': 'pending',
+        'incomplete_expired': 'pending',
+        'canceled': 'cancelled',
+        'unpaid': 'past_due',
+        'paused': 'frozen'
+      };
+      const mappedStatus = statusMap[subscription.status] || 'pending';
+      const shouldActivate = ['pending', 'inactive', 'non-member', null].includes(currentStatus) && 
+                              (subscription.status === 'active' || subscription.status === 'trialing');
+
+      await pool.query(
+        `UPDATE users SET 
+          stripe_subscription_id = $1,
+          stripe_current_period_end = COALESCE($2, stripe_current_period_end),
+          billing_provider = 'stripe',
+          membership_status = CASE 
+            WHEN membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member') THEN $3
+            ELSE membership_status 
+          END,
+          join_date = CASE WHEN join_date IS NULL AND $3 = 'active' THEN NOW() ELSE join_date END,
+          updated_at = NOW()
+        WHERE LOWER(email) = LOWER($4)`,
+        [subscription.id, subscriptionPeriodEnd, mappedStatus, email]
+      );
+      console.log(`[Stripe Webhook] Updated existing user ${email}: subscription=${subscription.id}, status=${mappedStatus} (stripe: ${subscription.status}), shouldActivate=${shouldActivate}`);
     }
 
     const memberName = `${first_name || ''} ${last_name || ''}`.trim() || email;
@@ -2418,9 +2500,9 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
     let activationTierSlug: string | null = null;
     let activationTierName: string | null = null;
     
-    // First check subscription metadata for tier info (used by dynamic pricing like corporate)
-    const metadataTierSlug = subscription.metadata?.tier_slug;
-    const metadataTierName = subscription.metadata?.tier_name;
+    // First check subscription metadata for tier info (supports both snake_case and camelCase keys)
+    const metadataTierSlug = subscription.metadata?.tier_slug || subscription.metadata?.tierSlug;
+    const metadataTierName = subscription.metadata?.tier_name || subscription.metadata?.tier;
     
     if (metadataTierSlug) {
       const tierResult = await pool.query(
