@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.44.0",
+    date: "2026-02-11",
+    title: "Conference Room Booking Fixes",
+    changes: [
+      "Fixed: Members can now book conference rooms even if they have a pending simulator request — these are separate systems",
+      "Fixed: Having a simulator booking on the same date no longer blocks conference room bookings (and vice versa)",
+      "Fixed: Conference room access is now correctly checked using the conference booking permission, not the simulator permission",
+      "Fixed: Confirmed conference room bookings now properly count toward your daily allowance to prevent double-booking",
+      "Fixed: Conference room access check on the booking page now uses the correct permission flag from your membership tier",
+    ],
+  },
+  {
     version: "7.43.1",
     date: "2026-02-11",
     title: "Wellness External URL Data Fix",

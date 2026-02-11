@@ -21,6 +21,7 @@ export interface TierLimits {
 
 export interface TierPermissions {
   canBookSimulators: boolean;
+  canBookConference: boolean;
   canBookWellness: boolean;
   advanceBookingDays: number;
   guestPassesPerMonth: number;
@@ -36,6 +37,7 @@ export interface TierPermissions {
 
 const DEFAULT_PERMISSIONS: TierPermissions = {
   canBookSimulators: false,
+  canBookConference: false,
   canBookWellness: true,
   advanceBookingDays: 7,
   guestPassesPerMonth: 0,
@@ -61,6 +63,7 @@ const pendingRequests = new Map<string, Promise<TierPermissions>>();
 function transformToPermissions(limits: TierLimits): TierPermissions {
   return {
     canBookSimulators: limits.can_book_simulators,
+    canBookConference: limits.can_book_conference,
     canBookWellness: limits.can_book_wellness,
     advanceBookingDays: limits.booking_window_days,
     guestPassesPerMonth: limits.guest_passes_per_month,
@@ -148,7 +151,7 @@ export function canAccessResource(permissions: TierPermissions, resourceType: st
   }
   
   if (resourceType === 'conference') {
-    return permissions.dailyConfRoomMinutes > 0;
+    return permissions.canBookConference;
   }
   
   return true;

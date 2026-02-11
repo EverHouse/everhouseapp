@@ -440,21 +440,33 @@ router.post('/api/booking-requests', async (req, res) => {
     try {
       await client.query('BEGIN');
       
+      // Look up resource type FIRST so pending check and linked email check can use it
+      if (resource_id) {
+        const resourceResult = await client.query(
+          `SELECT type FROM resources WHERE id = $1`,
+          [resource_id]
+        );
+        resourceType = resourceResult.rows[0]?.type || 'simulator';
+      }
+      
       if (!isStaffRequest || isViewAsMode) {
         await client.query(
           `SELECT pg_advisory_xact_lock(hashtext($1))`,
           [requestEmail]
         );
-        const pendingCheck = await client.query(
-          `SELECT COUNT(*)::int AS cnt FROM booking_requests
-           WHERE LOWER(user_email) = LOWER($1) AND status = 'pending'`,
-          [requestEmail]
-        );
-        if (pendingCheck.rows[0].cnt > 0) {
-          await client.query('ROLLBACK');
-          return res.status(409).json({
-            error: 'You already have a pending request. Please wait for it to be approved or denied before requesting another slot.'
-          });
+        // Skip pending check for conference rooms since they auto-confirm
+        if (resourceType !== 'conference_room') {
+          const pendingCheck = await client.query(
+            `SELECT COUNT(*)::int AS cnt FROM booking_requests
+             WHERE LOWER(user_email) = LOWER($1) AND status = 'pending'`,
+            [requestEmail]
+          );
+          if (pendingCheck.rows[0].cnt > 0) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({
+              error: 'You already have a pending request. Please wait for it to be approved or denied before requesting another slot.'
+            });
+          }
         }
       }
       
@@ -473,6 +485,9 @@ router.post('/api/booking-requests', async (req, res) => {
          AND br.status IN ('pending', 'approved', 'confirmed')
          AND LOWER(br.user_email) != LOWER($2)
          AND EXISTS (
+           SELECT 1 FROM resources r2 WHERE r2.id = br.resource_id AND r2.type = $3
+         )
+         AND EXISTS (
            SELECT 1 FROM users u 
            WHERE LOWER(u.email) = LOWER($2)
            AND (
@@ -482,7 +497,7 @@ router.post('/api/booking-requests', async (req, res) => {
            )
          )
          LIMIT 1`,
-        [request_date, user_email]
+        [request_date, user_email, resourceType]
       );
 
       if (linkedEmailCheck.rows.length > 0) {
@@ -492,14 +507,8 @@ router.post('/api/booking-requests', async (req, res) => {
         });
       }
       
-      // Get resource type to pass to limit checking
+      // Check for time slot overlap
       if (resource_id) {
-        const resourceResult = await client.query(
-          `SELECT type FROM resources WHERE id = $1`,
-          [resource_id]
-        );
-        resourceType = resourceResult.rows[0]?.type || 'simulator';
-        
         const overlapCheck = await client.query(
           `SELECT id FROM booking_requests 
            WHERE resource_id = $1 

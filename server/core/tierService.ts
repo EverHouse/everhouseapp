@@ -131,7 +131,7 @@ export async function getDailyBookedMinutes(email: string, date: string, resourc
       FROM booking_requests br
       WHERE LOWER(br.user_email) = LOWER($1)
         AND br.request_date = $2
-        AND br.status IN ('pending', 'approved', 'attended')`;
+        AND br.status IN ('pending', 'approved', 'attended', 'confirmed')`;
     
     const params: any[] = [email, date];
     
@@ -280,7 +280,11 @@ export async function checkDailyBookingLimit(
   
   const limits = await getTierLimits(tier);
   
-  if (!limits.can_book_simulators) {
+  if (resourceType === 'conference_room') {
+    if (!limits.can_book_conference) {
+      return { allowed: false, reason: 'Your membership tier does not include conference room booking' };
+    }
+  } else if (!limits.can_book_simulators) {
     return { allowed: false, reason: 'Your membership tier does not include simulator booking' };
   }
   
