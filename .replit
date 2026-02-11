@@ -67,7 +67,6 @@ ENABLE_TEST_LOGIN = "true"
 
 [userenv.production]
 NODE_ENV = "production"
-PORT = "5001"
 
 
 [deployment]
