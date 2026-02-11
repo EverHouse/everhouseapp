@@ -46,6 +46,7 @@ function CalendarFeeIndicator({
     snapshotPaid,
     dbOwed,
     hasUnpaidFeesFlag,
+    bookingStatus,
 }: {
     bookingId: number;
     bookingDisplayName: string;
@@ -57,7 +58,11 @@ function CalendarFeeIndicator({
     snapshotPaid: boolean;
     dbOwed: number;
     hasUnpaidFeesFlag: boolean;
+    bookingStatus: string;
 }) {
+    const isCheckedIn = bookingStatus === 'attended';
+    const skipFeeEstimate = snapshotPaid || isConference || isCheckedIn;
+
     const { data, isLoading, isError } = useQuery({
         queryKey: ['booking-fee-estimate', bookingId],
         queryFn: async () => {
@@ -67,7 +72,7 @@ function CalendarFeeIndicator({
         },
         staleTime: 30_000,
         retry: 1,
-        enabled: !snapshotPaid && !isConference,
+        enabled: !skipFeeEstimate,
     });
 
     const isPartialRoster = !isConference && declaredPlayerCount > 1 && filledPlayerCount < declaredPlayerCount;
@@ -89,7 +94,7 @@ function CalendarFeeIndicator({
         totalOwed = dbOwed;
     }
 
-    if (!snapshotPaid && !isConference && !isLoading && !isError && data) {
+    if (!skipFeeEstimate && !isLoading && !isError && data) {
         const serverFee = data.totalFee ?? 0;
         if (serverFee > 0) hasUnpaidFees = true;
         if (totalOwed <= 0) totalOwed = serverFee;
@@ -461,6 +466,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                         snapshotPaid={(booking as any)?.fee_snapshot_paid === true}
                                                         dbOwed={(booking as any)?.total_owed ?? 0}
                                                         hasUnpaidFeesFlag={(booking as any)?.has_unpaid_fees === true}
+                                                        bookingStatus={(booking as any)?.status || 'approved'}
                                                     />
                                                 </div>
                                             ) : pendingRequest && (
