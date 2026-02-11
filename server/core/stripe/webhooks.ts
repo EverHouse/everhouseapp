@@ -552,7 +552,8 @@ async function handleChargeRefunded(client: PoolClient, charge: any): Promise<De
           await notifyAllStaff(
             'Terminal Payment Refunded',
             `A Terminal payment for ${terminalPayment.user_email} has been fully refunded. Membership has been suspended.`,
-            { type: 'terminal_refund', userId: terminalPayment.user_id }
+            'terminal_refund',
+            { sendPush: true }
           );
           
           await logSystemAction({
@@ -645,7 +646,8 @@ async function handleChargeDisputeCreated(client: PoolClient, dispute: any): Pro
         await notifyAllStaff(
           'URGENT: Payment Dispute Received',
           `A payment dispute has been filed for ${terminalPayment.user_email}. Amount: $${(amount / 100).toFixed(2)}. Reason: ${reason || 'not specified'}. Membership has been suspended.`,
-          { type: 'terminal_dispute', userId: terminalPayment.user_id, disputeId: id }
+          'terminal_dispute',
+          { sendPush: true }
         );
         
         await logSystemAction({
@@ -723,7 +725,8 @@ async function handleChargeDisputeClosed(client: PoolClient, dispute: any): Prom
         await notifyAllStaff(
           disputeWon ? 'Dispute Won - Membership Reactivated' : 'Dispute Lost - Membership Remains Suspended',
           `Payment dispute for ${terminalPayment.user_email} has been closed. Status: ${status}. Amount: $${(amount / 100).toFixed(2)}.${disputeWon ? ' Membership has been reactivated.' : ' Membership remains suspended.'}`,
-          { type: 'terminal_dispute_closed', userId: terminalPayment.user_id, disputeId: id, disputeWon }
+          'terminal_dispute_closed',
+          { sendPush: true }
         );
         
         await logSystemAction({
@@ -1360,7 +1363,8 @@ async function handlePaymentIntentCanceled(client: PoolClient, paymentIntent: an
       await notifyAllStaff(
         'Terminal Payment Canceled',
         `A card reader payment was canceled or timed out. Email: ${email || 'unknown'}, Amount: $${(amount / 100).toFixed(2)}, Subscription: ${subscriptionId || 'N/A'}`,
-        { type: 'terminal_payment_canceled', paymentIntentId: id, email }
+        'terminal_payment_canceled',
+        { sendPush: true }
       );
       
       await logSystemAction({
@@ -3116,12 +3120,13 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: any):
           `subscription cancelled with ${orphanedEmails.length} group members deactivated: ${orphanedEmails.join(', ')}`
         );
 
-        await notifyAllStaff({
-          title: 'Orphan Billing Alert',
-          message: `Primary member ${memberName} (${email}) subscription was cancelled. ` +
+        await notifyAllStaff(
+          'Orphan Billing Alert',
+          `Primary member ${memberName} (${email}) subscription was cancelled. ` +
             `${orphanedEmails.length} group member(s) have been automatically deactivated: ${orphanedEmails.join(', ')}.`,
-          type: 'billing_alert',
-        });
+          'billing_alert',
+          { sendPush: true }
+        );
       }
 
       // Deactivate the billing group itself
