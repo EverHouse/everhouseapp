@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef } from 'react';
 
 let lockCount = 0;
 let savedScrollY = 0;
-let savedHtmlBg = '';
 const lockOwners = new Set<string>();
 
 function generateLockId(): string {
@@ -11,19 +10,10 @@ function generateLockId(): string {
 
 function applyScrollLock() {
   if (lockCount === 1) {
-    const isAlreadyLocked = document.body.style.position === 'fixed';
-    if (!isAlreadyLocked) {
-      savedScrollY = window.scrollY;
-    }
+    savedScrollY = window.scrollY;
     document.documentElement.classList.add('overflow-hidden');
     document.body.classList.add('overflow-hidden');
-    savedHtmlBg = document.documentElement.style.backgroundColor;
-    document.documentElement.style.backgroundColor = '#000';
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${savedScrollY}px`;
-    document.body.style.left = '0';
-    document.body.style.right = '0';
-    document.body.style.bottom = '0';
+    document.documentElement.style.overscrollBehavior = 'none';
     document.body.style.overscrollBehavior = 'none';
   }
 }
@@ -32,13 +22,8 @@ function removeScrollLock() {
   if (lockCount === 0 && lockOwners.size === 0) {
     const scrollY = savedScrollY;
     document.documentElement.classList.remove('overflow-hidden');
-    document.documentElement.style.backgroundColor = savedHtmlBg;
     document.body.classList.remove('overflow-hidden');
-    document.body.style.position = '';
-    document.body.style.top = '';
-    document.body.style.left = '';
-    document.body.style.right = '';
-    document.body.style.bottom = '';
+    document.documentElement.style.overscrollBehavior = '';
     document.body.style.overscrollBehavior = '';
     window.scrollTo(0, scrollY);
   }
@@ -46,15 +31,11 @@ function removeScrollLock() {
 
 export function acquireScrollLock(ownerId?: string): string {
   const id = ownerId || generateLockId();
-  
-  // Skip if body is already fixed (nested modal scenario)
-  const isAlreadyLocked = document.body.style.position === 'fixed';
-  
+
   if (!lockOwners.has(id)) {
     lockOwners.add(id);
     lockCount++;
-    // Only apply scroll lock if not already locked
-    if (!isAlreadyLocked) {
+    if (lockCount === 1) {
       applyScrollLock();
     }
   }
@@ -74,13 +55,8 @@ export function forceReleaseAllLocks(): void {
   lockCount = 0;
   const scrollY = savedScrollY;
   document.documentElement.classList.remove('overflow-hidden');
-  document.documentElement.style.backgroundColor = savedHtmlBg;
   document.body.classList.remove('overflow-hidden');
-  document.body.style.position = '';
-  document.body.style.top = '';
-  document.body.style.left = '';
-  document.body.style.right = '';
-  document.body.style.bottom = '';
+  document.documentElement.style.overscrollBehavior = '';
   document.body.style.overscrollBehavior = '';
   window.scrollTo(0, scrollY);
 }
@@ -163,14 +139,11 @@ if (typeof window !== 'undefined') {
     if (document.visibilityState === 'visible' && lockCount === 0 && lockOwners.size === 0) {
       document.documentElement.classList.remove('overflow-hidden');
       document.body.classList.remove('overflow-hidden');
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
-      document.body.style.bottom = '';
+      document.documentElement.style.overscrollBehavior = '';
+      document.body.style.overscrollBehavior = '';
     }
   });
-  
+
   window.addEventListener('beforeunload', () => {
     if (lockOwners.size > 0) {
       forceReleaseAllLocks();

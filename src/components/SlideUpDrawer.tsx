@@ -161,12 +161,12 @@ export function SlideUpDrawer({
   const drawerContent = (
     <div 
       className={`fixed inset-0 ${isDark ? 'dark' : ''}`}
-      style={{ overscrollBehavior: 'contain', touchAction: 'none', zIndex: drawerZIndex }}
+      style={{ overscrollBehavior: 'contain', touchAction: 'none', zIndex: drawerZIndex, height: '100dvh' }}
     >
       <div 
         className={`fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-200 ${isClosing ? 'opacity-0' : 'animate-backdrop-fade-in'}`}
         aria-hidden="true"
-        style={{ touchAction: 'none' }}
+        style={{ touchAction: 'none', height: '100dvh' }}
         onClick={dismissible ? handleClose : undefined}
       />
       

@@ -51,17 +51,6 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
     return () => setDrawerOpen(false);
   }, [isOpen, setDrawerOpen]);
   
-  // iOS PWA fix: temporarily set body background to match drawer when open
-  // This covers any gap in the safe area that iOS doesn't let fixed elements fill
-  useEffect(() => {
-    if (isOpen) {
-      const originalBg = document.body.style.backgroundColor;
-      document.body.style.backgroundColor = isDark ? '#1a1d15' : '#ffffff';
-      return () => {
-        document.body.style.backgroundColor = originalBg;
-      };
-    }
-  }, [isOpen, isDark]);
   
   const [activeTab, setActiveTab] = useState<TabType>(visitorMode ? 'billing' : 'overview');
   
@@ -632,9 +621,10 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
   };
 
   const drawerContent = (
-    <div className={`fixed inset-0 ${isDark ? 'dark' : ''}`} style={{ zIndex: 'var(--z-modal)' }}>
+    <div className={`fixed inset-0 ${isDark ? 'dark' : ''}`} style={{ zIndex: 'var(--z-modal)', height: '100dvh' }}>
       <div 
         className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300"
+        style={{ height: '100dvh' }}
         onClick={onClose}
       />
       
