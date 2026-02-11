@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
 import ReactDOM from 'react-dom';
+import { useQuery } from '@tanstack/react-query';
 import { formatTime12Hour, getTodayPacific } from '../../../../utils/dateUtils';
 import type { BookingRequest, Resource, CalendarClosure, AvailabilityBlock } from './simulatorTypes';
-import { estimateFeeByTier, formatDateShortAdmin, getClosureForSlot, getBlockForSlot } from './simulatorUtils';
+import { formatDateShortAdmin, getClosureForSlot, getBlockForSlot } from './simulatorUtils';
 
 export interface CalendarGridProps {
     resources: Resource[];
@@ -29,9 +30,100 @@ export interface CalendarGridProps {
     showToast: (msg: string, type: 'success' | 'error') => void;
     calendarColRef: React.RefObject<HTMLDivElement>;
     activeView: 'requests' | 'calendar';
-    guestFeeDollars: number;
-    overageRatePerBlockDollars: number;
-    tierMinutes: Record<string, number>;
+    guestFeeDollars?: number;
+    overageRatePerBlockDollars?: number;
+    tierMinutes?: Record<string, number>;
+}
+
+function CalendarFeeIndicator({
+    bookingId,
+    bookingDisplayName,
+    declaredPlayerCount,
+    filledPlayerCount,
+    isConference,
+    isUnmatched,
+    isInactiveMember,
+    snapshotPaid,
+    dbOwed,
+    hasUnpaidFeesFlag,
+}: {
+    bookingId: number;
+    bookingDisplayName: string;
+    declaredPlayerCount: number;
+    filledPlayerCount: number;
+    isConference: boolean;
+    isUnmatched: boolean;
+    isInactiveMember: boolean;
+    snapshotPaid: boolean;
+    dbOwed: number;
+    hasUnpaidFeesFlag: boolean;
+}) {
+    const { data, isLoading, isError } = useQuery({
+        queryKey: ['booking-fee-estimate', bookingId],
+        queryFn: async () => {
+            const res = await fetch(`/api/fee-estimate?bookingId=${bookingId}`, { credentials: 'include' });
+            if (!res.ok) throw new Error('Failed to fetch fee estimate');
+            return res.json() as Promise<{ totalFee: number; note: string; feeBreakdown: any; ownerTier: string }>;
+        },
+        staleTime: 30_000,
+        retry: 1,
+        enabled: !snapshotPaid && !isConference,
+    });
+
+    const isPartialRoster = !isConference && declaredPlayerCount > 1 && filledPlayerCount < declaredPlayerCount;
+    const textColor = isConference
+        ? 'text-purple-700 dark:text-purple-300'
+        : isUnmatched
+            ? 'text-amber-700 dark:text-amber-300'
+        : isInactiveMember
+            ? 'text-green-600/70 dark:text-green-400/70'
+        : isPartialRoster
+            ? 'text-blue-700 dark:text-blue-300'
+            : 'text-green-700 dark:text-green-300';
+
+    let hasUnpaidFees = false;
+    let totalOwed = 0;
+
+    if (hasUnpaidFeesFlag || dbOwed > 0) {
+        hasUnpaidFees = true;
+        totalOwed = dbOwed;
+    }
+
+    if (!snapshotPaid && !isConference && !isLoading && !isError && data) {
+        const serverFee = data.totalFee ?? 0;
+        if (serverFee > 0) hasUnpaidFees = true;
+        if (totalOwed <= 0) totalOwed = serverFee;
+    }
+
+    return (
+        <>
+            <span className={`hidden sm:flex items-center gap-1 text-[9px] sm:text-[10px] font-medium truncate ${textColor}`}>
+                <span className="truncate">{bookingDisplayName}</span>
+                {declaredPlayerCount > 1 && (
+                    <span className="text-[8px] opacity-70" title={`${filledPlayerCount}/${declaredPlayerCount} slots filled`}>
+                        {filledPlayerCount}/{declaredPlayerCount}
+                    </span>
+                )}
+            </span>
+
+            {declaredPlayerCount > 1 || hasUnpaidFees ? (
+                <span className={`sm:hidden text-[9px] font-bold ${hasUnpaidFees ? 'text-red-600 dark:text-red-400' : textColor}`} title={`${bookingDisplayName}${hasUnpaidFees ? ` - $${totalOwed.toFixed(2)} owed` : ''}`}>
+                    {filledPlayerCount}/{declaredPlayerCount}
+                </span>
+            ) : (
+                <span className={`sm:hidden w-3 h-3 rounded-full ${isConference ? 'bg-purple-500 dark:bg-purple-400' : isUnmatched ? 'bg-amber-500 dark:bg-amber-400' : 'bg-green-500 dark:bg-green-400'}`} title={bookingDisplayName}></span>
+            )}
+
+            {hasUnpaidFees && (
+                <span className="hidden sm:block absolute -top-1 -right-1 group">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 dark:bg-red-400 block cursor-help border border-white dark:border-gray-800"></span>
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs font-medium text-white bg-gray-800 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                        ${totalOwed.toFixed(2)} owed
+                    </span>
+                </span>
+            )}
+        </>
+    );
 }
 
 const CalendarGrid: React.FC<CalendarGridProps> = ({
@@ -358,59 +450,18 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                 </div>
                                             ) : booking ? (
                                                 <div className="px-0.5 sm:px-1 h-full flex items-center justify-center sm:justify-start relative">
-                                                    {(() => {
-                                                        const unfilledSlotsInner = (booking as any)?.unfilled_slots ?? 0;
-                                                        const declaredPlayersInner = (booking as any)?.declared_player_count ?? 1;
-                                                        const filledSlotsInner = Math.max(0, declaredPlayersInner - unfilledSlotsInner);
-                                                        const snapshotPaid = (booking as any)?.fee_snapshot_paid === true;
-                                                        const estimatedFromTier = snapshotPaid ? 0 : estimateFeeByTier((booking as any)?.tier, (booking as any)?.duration_minutes || 0, declaredPlayersInner, guestFeeDollars, overageRatePerBlockDollars, tierMinutes);
-                                                        const dbTotalOwed = (booking as any)?.total_owed ?? 0;
-                                                        const hasUnpaidFees = !snapshotPaid && (((booking as any)?.has_unpaid_fees === true) || 
-                                                            (dbTotalOwed > 0) || 
-                                                            (filledSlotsInner < declaredPlayersInner && estimatedFromTier > 0));
-                                                        const unfilledGuestFees = Math.max(0, declaredPlayersInner - filledSlotsInner) * guestFeeDollars;
-                                                        const totalOwed = dbTotalOwed > 0 ? dbTotalOwed + unfilledGuestFees : (filledSlotsInner < declaredPlayersInner ? estimatedFromTier : 0);
-                                                        const isPartialRoster = !isConference && declaredPlayersInner > 1 && filledSlotsInner < declaredPlayersInner;
-                                                        const textColor = isConference 
-                                                            ? 'text-purple-700 dark:text-purple-300' 
-                                                            : isUnmatched
-                                                                ? 'text-amber-700 dark:text-amber-300'
-                                                            : isInactiveMember 
-                                                                ? 'text-green-600/70 dark:text-green-400/70' 
-                                                            : isPartialRoster
-                                                                ? 'text-blue-700 dark:text-blue-300'
-                                                                : 'text-green-700 dark:text-green-300';
-                                                        
-                                                        return (
-                                                            <>
-                                                                <span className={`hidden sm:flex items-center gap-1 text-[9px] sm:text-[10px] font-medium truncate ${textColor}`}>
-                                                                    <span className="truncate">{bookingDisplayName}</span>
-                                                                    {declaredPlayersInner > 1 && (
-                                                                        <span className="text-[8px] opacity-70" title={`${filledSlotsInner}/${declaredPlayersInner} slots filled`}>
-                                                                            {filledSlotsInner}/{declaredPlayersInner}
-                                                                        </span>
-                                                                    )}
-                                                                </span>
-                                                                
-                                                                {declaredPlayersInner > 1 || hasUnpaidFees ? (
-                                                                    <span className={`sm:hidden text-[9px] font-bold ${hasUnpaidFees ? 'text-red-600 dark:text-red-400' : textColor}`} title={`${bookingDisplayName}${hasUnpaidFees ? ` - $${totalOwed.toFixed(2)} owed` : ''}`}>
-                                                                        {filledSlotsInner}/{declaredPlayersInner}
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className={`sm:hidden w-3 h-3 rounded-full ${isConference ? 'bg-purple-500 dark:bg-purple-400' : isUnmatched ? 'bg-amber-500 dark:bg-amber-400' : 'bg-green-500 dark:bg-green-400'}`} title={bookingDisplayName}></span>
-                                                                )}
-                                                                
-                                                                {hasUnpaidFees && (
-                                                                    <span className="hidden sm:block absolute -top-1 -right-1 group">
-                                                                        <span className="w-2.5 h-2.5 rounded-full bg-red-500 dark:bg-red-400 block cursor-help border border-white dark:border-gray-800"></span>
-                                                                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs font-medium text-white bg-gray-800 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
-                                                                            ${totalOwed.toFixed(2)} owed
-                                                                        </span>
-                                                                    </span>
-                                                                )}
-                                                            </>
-                                                        );
-                                                    })()}
+                                                    <CalendarFeeIndicator
+                                                        bookingId={booking.id}
+                                                        bookingDisplayName={bookingDisplayName}
+                                                        declaredPlayerCount={declaredPlayers}
+                                                        filledPlayerCount={filledSlots}
+                                                        isConference={isConference}
+                                                        isUnmatched={!!isUnmatched}
+                                                        isInactiveMember={!!isInactiveMember}
+                                                        snapshotPaid={(booking as any)?.fee_snapshot_paid === true}
+                                                        dbOwed={(booking as any)?.total_owed ?? 0}
+                                                        hasUnpaidFeesFlag={(booking as any)?.has_unpaid_fees === true}
+                                                    />
                                                 </div>
                                             ) : pendingRequest && (
                                                 <div className="px-0.5 sm:px-1 h-full flex items-center justify-center sm:justify-start">

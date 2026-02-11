@@ -23,6 +23,7 @@ export const changelog: ChangelogEntry[] = [
       "Fix: Member emails are now passed to the fee estimate so the system knows about all players in the booking, preventing phantom empty slot charges",
       "Improvement: Guest pass eligibility check is now more resilient — if a tier has monthly guest passes allocated, they'll work even if the feature flag wasn't explicitly set",
       "Improvement: Staff queue list now shows accurate fee amounts using the same calculation members see — previously it used a simplified estimate that didn't account for guest passes or member participants",
+      "Improvement: Calendar grid fee indicators (red dot with $X owed tooltip) now also use the same server-side calculation — all fee displays across the app are now unified",
     ],
   },
   {
