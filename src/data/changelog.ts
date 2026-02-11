@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.34.2",
+    date: "2026-02-11",
+    title: "Account Credit Consumption Fix",
+    changes: [
+      "CRITICAL FIX: When a member's account credit only partially covered a booking fee, the credit was never actually consumed — it stayed on the account and could be reused infinitely, giving unlimited discounts",
+      "Fix: The system now charges only the remaining amount (after credit) on the member's card, and properly consumes the credit from their Stripe balance after the payment succeeds",
+      "Improvement: Cleaner payment flow — members no longer see a full charge followed by a partial refund; they only see the net amount charged to their card",
+      "Safety: Credit is only consumed after the card payment succeeds, so if the card is declined, the credit stays on the account",
+    ],
+  },
+  {
     version: "7.34.1",
     date: "2026-02-10",
     title: "HubSpot Lifecycle Stage Fix",

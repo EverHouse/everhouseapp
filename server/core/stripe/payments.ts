@@ -375,13 +375,13 @@ export async function cancelPaymentIntent(
 /**
  * Create a payment for member self-service that applies customer balance.
  * 
- * Safe Flow (credit applied AFTER successful payment):
+ * Safe Flow (credit consumed AFTER successful payment):
  * 1. Check customer's available credit
  * 2. If full coverage: Consume credit immediately, payment complete
- * 3. If partial/no coverage: Create PaymentIntent for FULL amount, store pending credit in metadata
- * 4. On successful payment (webhook), refund the credit portion to the customer
+ * 3. If partial coverage: Create PaymentIntent for REMAINING amount (after credit), store credit amount in metadata
+ * 4. On successful payment (webhook), consume the credit via a balance transaction
  * 
- * This ensures no credit is lost if payment fails.
+ * This ensures no credit is lost if payment fails — credit is only consumed after the card charge succeeds.
  */
 export async function createBalanceAwarePayment(params: {
   stripeCustomerId: string;
@@ -453,7 +453,7 @@ export async function createBalanceAwarePayment(params: {
     }
 
     // Case 2: Need card payment
-    // Charge the FULL amount; if there's credit, we'll refund that portion after payment succeeds
+    // Charge only the remaining amount after credit; credit will be consumed via balance transaction in webhook
     const stripeMetadata: Record<string, string> = {
       ...metadata,
       userId,
@@ -465,9 +465,9 @@ export async function createBalanceAwarePayment(params: {
     if (bookingId) stripeMetadata.bookingId = bookingId.toString();
     if (sessionId) stripeMetadata.sessionId = sessionId.toString();
     
-    // Store pending credit to refund after payment succeeds
+    // Store credit to consume after payment succeeds (webhook will create balance transaction)
     if (balanceToApply > 0) {
-      stripeMetadata.pendingCreditRefund = balanceToApply.toString();
+      stripeMetadata.creditToConsume = balanceToApply.toString();
     }
 
     // Generate idempotency key to prevent duplicate charges
@@ -476,15 +476,15 @@ export async function createBalanceAwarePayment(params: {
       ? metadata.participantIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
       : [];
     const idempotencyKey = bookingId && sessionId
-      ? generatePaymentIdempotencyKey(bookingId, sessionId, participantIds, amountCents)
-      : `pi_${purpose}_${userId.replace(/[^a-zA-Z0-9-]/g, '')}_${amountCents}_${Date.now()}`;
+      ? generatePaymentIdempotencyKey(bookingId, sessionId, participantIds, remainingCents)
+      : `pi_${purpose}_${userId.replace(/[^a-zA-Z0-9-]/g, '')}_${remainingCents}_${Date.now()}`;
 
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: amountCents, // Charge FULL amount, credit applied as refund on success
+      amount: remainingCents,
       currency: 'usd',
       customer: stripeCustomerId,
       description: balanceToApply > 0 
-        ? `${description} ($${(balanceToApply / 100).toFixed(2)} credit will be applied)` 
+        ? `${description} ($${(balanceToApply / 100).toFixed(2)} account credit applied)` 
         : description,
       metadata: stripeMetadata,
       automatic_payment_methods: { enabled: true },
@@ -500,15 +500,15 @@ export async function createBalanceAwarePayment(params: {
       [email, paymentIntent.id, stripeCustomerId, amountCents, purpose, bookingId || null, sessionId || null, description, 'pending']
     );
 
-    console.log(`[Stripe] Member payment: total $${(amountCents / 100).toFixed(2)}, pending credit refund: $${(balanceToApply / 100).toFixed(2)}`);
+    console.log(`[Stripe] Member payment: total $${(amountCents / 100).toFixed(2)}, card charge: $${(remainingCents / 100).toFixed(2)}, credit to consume: $${(balanceToApply / 100).toFixed(2)}`);
 
     return {
       paidInFull: false,
       clientSecret: paymentIntent.client_secret || undefined,
       paymentIntentId: paymentIntent.id,
       totalCents: amountCents,
-      balanceApplied: balanceToApply, // This will be refunded after payment succeeds
-      remainingCents, // For UI display only - actual charge is full amount
+      balanceApplied: balanceToApply,
+      remainingCents,
     };
   } catch (error: any) {
     console.error(`[Stripe] Error creating balance-aware payment:`, error);

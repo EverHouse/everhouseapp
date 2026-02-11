@@ -1039,7 +1039,7 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: a
     }
   }
 
-  // Process pending credit refund if exists (from balance-aware payments)
+  // Process pending credit refund if exists (legacy path for backwards compatibility with in-flight payments)
   const pendingCreditRefund = metadata?.pendingCreditRefund ? parseInt(metadata.pendingCreditRefund, 10) : 0;
   if (pendingCreditRefund > 0 && customerId) {
     const localCreditAmount = pendingCreditRefund;
@@ -1071,6 +1071,41 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: a
           `INSERT INTO audit_log (action, resource_type, resource_id, details, created_at)
            VALUES ('credit_refund_failed', 'payment', $1, $2, NOW())`,
           [localPiId, JSON.stringify({ email: localEmail, amount: localCreditAmount, error: refundError.message })]
+        );
+      }
+    });
+  }
+
+  // Process credit consumption if exists (new path: card charged reduced amount, consume credit from balance)
+  const creditToConsume = metadata?.creditToConsume ? parseInt(metadata.creditToConsume, 10) : 0;
+  if (creditToConsume > 0 && customerId) {
+    const localCreditAmount = creditToConsume;
+    const localCustomerId = customerId;
+    const localPiId = id;
+    const localEmail = metadata?.email || '';
+    
+    deferredActions.push(async () => {
+      try {
+        const stripe = await getStripeClient();
+        
+        // Consume the credit by creating a positive balance transaction (reduces negative balance)
+        const balanceTx = await stripe.customers.createBalanceTransaction(
+          localCustomerId,
+          {
+            amount: localCreditAmount,
+            currency: 'usd',
+            description: `Account credit applied to payment ${localPiId}`,
+          }
+        );
+        
+        console.log(`[Stripe Webhook] Consumed account credit of $${(localCreditAmount / 100).toFixed(2)} for ${localEmail}, balance tx: ${balanceTx.id}`);
+      } catch (creditError: any) {
+        console.error(`[Stripe Webhook] Failed to consume account credit:`, creditError.message);
+        // Log for manual reconciliation
+        await pool.query(
+          `INSERT INTO audit_log (action, resource_type, resource_id, details, created_at)
+           VALUES ('credit_consume_failed', 'payment', $1, $2, NOW())`,
+          [localPiId, JSON.stringify({ email: localEmail, amount: localCreditAmount, error: creditError.message })]
         );
       }
     });
