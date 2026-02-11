@@ -1,7 +1,7 @@
 modules = ["nodejs-20", "python-3.11", "postgresql-16"]
 [nix]
 channel = "stable-25_05"
-packages = ["gifsicle", "imagemagick", "libwebp", "unzip"]
+packages = ["gifsicle", "imagemagick", "libwebp", "unzip", "yakut", "g-ls"]
 
 [agent]
 expertMode = true

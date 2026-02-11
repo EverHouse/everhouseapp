@@ -31,7 +31,7 @@ export const TRAINING_SEED_DATA = [
       { title: 'Updates (Header Icon)', content: 'The megaphone/campaign icon in the header takes you to the Updates page where you can view your activity notifications and manage member announcements.', pageIcon: 'campaign' },
       { title: 'Mobile Hamburger Menu', content: 'On mobile, tap the hamburger menu (three lines) in the top left to access all navigation items including: Dashboard, Bookings, Financials, Tours, Calendar, Facility, Updates, Directory, Training Guide, and Admin settings (Products & Pricing, Manage Team, Gallery, FAQs, Inquiries, Bug Reports, Changelog, Data Integrity).', pageIcon: 'menu' },
       { title: 'Profile Access', content: 'Tap your avatar in the top right to access your profile, where you can manage push notifications and set up a password for faster login.', pageIcon: 'person' },
-      { title: 'Sidebar Navigation', content: 'On larger screens (desktop/tablet), the sidebar provides quick access to all main sections plus Facility/Notices for managing closures and announcements.' },
+      { title: 'Sidebar Navigation', content: 'On larger screens (desktop), the sidebar provides quick access to all main sections plus Facility/Notices for managing closures and announcements.' },
       { title: 'Google Sign-In', content: 'Members can sign in with their Google account instead of waiting for an email code. If their Google email matches a known member email (including alternate emails), they are automatically connected to their existing account.', pageIcon: 'login' },
       { title: 'Linking Google Account', content: 'Members can link or unlink their Google account from Profile > Connected Accounts. This lets them use Google Sign-In for faster access in the future.', pageIcon: 'link' },
     ]
@@ -91,7 +91,7 @@ export const TRAINING_SEED_DATA = [
     guideId: 'booking-requests',
     icon: 'event_note',
     title: 'Managing Booking Requests',
-    description: 'Handle simulator and conference room bookings with Trackman integration',
+    description: 'Handle simulator booking requests with Trackman integration',
     sortOrder: 5,
     isAdminOnly: false,
     steps: [
@@ -105,6 +105,7 @@ export const TRAINING_SEED_DATA = [
       { title: 'Manual Booking', content: 'The floating action button (+) lets you create a manual booking for walk-ins or phone reservations. Enter the member, bay, date, time, and booking source.' },
       { title: 'Decline with Notes', content: 'If you need to decline a request, add staff notes explaining why. The member will be notified and can see the reason.' },
       { title: 'Guardian Consent for Minors', content: 'When a member under 18 makes a booking, the system requires guardian consent. Staff will see a consent form that captures guardian name, relationship, and phone number before the booking can proceed.' },
+      { title: 'One Pending Request at a Time', content: 'Members can only have one pending booking request at a time. They must wait for it to be approved or declined before submitting another. This prevents queue flooding and ensures staff can process requests in order.' },
     ]
   },
   {
@@ -145,11 +146,41 @@ export const TRAINING_SEED_DATA = [
     ]
   },
   {
+    guideId: 'conference-rooms',
+    icon: 'meeting_room',
+    title: 'Conference Room Bookings',
+    description: 'How conference room bookings work differently from simulators',
+    sortOrder: 8,
+    isAdminOnly: false,
+    steps: [
+      { title: 'Auto-Confirmed', content: 'Unlike simulator bookings which go through a "request and hold" approval process, conference room bookings are confirmed instantly. No staff approval is needed.', pageIcon: 'meeting_room' },
+      { title: 'Daily Allowance', content: 'Each membership tier includes a daily conference room allowance (in minutes). If a booking stays within the allowance, there is no charge.', pageIcon: 'schedule' },
+      { title: 'Overage Prepayment', content: 'If a booking exceeds the daily allowance, the member must pay for the overage minutes before the booking is confirmed. The payment screen appears automatically.', pageIcon: 'payment' },
+      { title: 'Member Booking Flow', content: 'Members book conference rooms from the "Book Golf" page by switching to the Conference tab. They pick the date, time, and duration. If overage applies, they pay upfront.', pageIcon: 'calendar_month' },
+      { title: 'No Trackman Linking', content: 'Conference room bookings do not link to Trackman. They are managed entirely within the app.', pageIcon: 'link_off' },
+    ]
+  },
+  {
+    guideId: 'waivers',
+    icon: 'assignment',
+    title: 'Waiver Management',
+    description: 'Track and enforce member liability waivers',
+    sortOrder: 9,
+    isAdminOnly: false,
+    steps: [
+      { title: 'What Are Waivers?', content: 'Every member must sign a liability waiver to use the facility. The system tracks whether each member has signed the current version of the waiver.', pageIcon: 'assignment' },
+      { title: 'When Members See Waivers', content: 'Members are prompted to sign the waiver when they log in if they haven\'t signed the latest version. A waiver modal appears that they must accept before continuing.', pageIcon: 'edit' },
+      { title: 'Waiver Versions', content: 'When the waiver text is updated, a new version is created. All members will need to re-sign the new version the next time they log in.', pageIcon: 'history' },
+      { title: 'Stale Waiver Review', content: 'The system automatically checks for members with unsigned or outdated waivers every 4 hours. Staff are notified when waivers need attention.', pageIcon: 'timer' },
+      { title: 'Waiver Status in Profile', content: 'You can see a member\'s waiver status in their profile drawer under the Overview tab. It shows whether their waiver is current, expired, or not yet signed.', pageIcon: 'verified' },
+    ]
+  },
+  {
     guideId: 'checkin-billing',
     icon: 'point_of_sale',
     title: 'Check-In & Billing',
     description: 'Check in bookings and handle payments',
-    sortOrder: 8,
+    sortOrder: 10,
     isAdminOnly: false,
     steps: [
       { title: 'Starting Check-In', content: 'When a member arrives for their booking, tap the check-in button on the booking card. This opens the billing screen.', pageIcon: 'point_of_sale' },
@@ -170,7 +201,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'contactless',
     title: 'Card Reader (Stripe Terminal)',
     description: 'Accept in-person card payments with a physical reader',
-    sortOrder: 9,
+    sortOrder: 11,
     isAdminOnly: false,
     steps: [
       { title: 'What is the Card Reader?', content: 'The card reader is a physical device (WisePOS E or S700) that lets staff accept tap, swipe, or chip payments in person. It connects to Stripe Terminal for secure processing.', pageIcon: 'contactless' },
@@ -186,7 +217,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'payments',
     title: 'Financials Page',
     description: 'Process payments, view subscriptions, and manage invoices',
-    sortOrder: 10,
+    sortOrder: 12,
     isAdminOnly: false,
     steps: [
       { title: 'Access Financials', content: 'Go to the Financials tab from the bottom navigation. This is your hub for all payment-related activities.', pageIcon: 'payments' },
@@ -194,11 +225,9 @@ export const TRAINING_SEED_DATA = [
       { title: 'POS: Record Purchase', content: 'Charge a member for merchandise, guest fees, or custom amounts. Search for the member, enter the amount and description, and select card or cash payment.' },
       { title: 'POS: Redeem Pass', content: 'Scan a QR code or manually enter a pass ID to redeem day passes. The system validates the pass and marks it as used.' },
       { title: 'POS: Register (New Customer)', content: 'Staff can process new walk-in customers at the register. Tap "Add Customer" to fill in their details, or tap "Scan ID" to auto-fill from a driver\'s license. Complete the purchase with card payment.', pageIcon: 'person_add' },
-      { title: 'Transactions: Recent Payments', content: 'The Transactions tab shows a live feed of all recent payments (member name, amount, type, and timestamp) plus a daily summary broken down by payment type: guest fees, overage fees, merchandise, membership payments, cash collected, check payments, and other.' },
-      { title: 'Transactions: Overdue Payments', content: 'Shows bookings from the last 30 days with unpaid balances. Tap any item to open the check-in billing modal and collect the outstanding amount.' },
-      { title: 'Transactions: Failed Payments', content: 'Payments that failed to process appear here. You can retry the charge or mark it as manually collected if the member paid another way.' },
-      { title: 'Transactions: Pending Authorizations', content: 'Card holds that are awaiting capture. These are pre-authorized amounts that haven\'t been finalized yet.' },
-      { title: 'Transactions: Refunds', content: 'Process full or partial refunds for payments made in the last 30 days. Select a payment, choose full or partial refund, enter amount (if partial), select a reason, and confirm.' },
+      { title: 'Transactions Overview', content: 'The Transactions tab has six sections: Summary (daily revenue breakdown by payment type), Pending Authorizations, Overdue Payments, Failed Payments, Refunds, and Recent Transactions. Use the section picker at the top to navigate between them.' },
+      { title: 'Overdue & Failed Payments', content: 'The Overdue section shows bookings from the last 30 days with unpaid balances — tap any item to collect. The Failed section shows payments that could not be processed, with options to retry the charge or mark as manually collected.' },
+      { title: 'Pending & Refunds', content: 'Pending Authorizations shows card holds awaiting capture. The Refunds section lets you process full or partial refunds for payments made in the last 30 days — select a payment, choose the refund amount, pick a reason, and confirm.' },
       { title: 'Dynamic Pricing', content: 'All prices (guest fees, overage rates, day pass prices) come directly from Stripe. If prices change in Stripe, they update automatically in the app. There is no need to update prices manually in the staff portal.', pageIcon: 'sync' },
       { title: 'Subscriptions Tab', content: 'View all active Stripe subscriptions. See member name, plan, amount, status, and next billing date. Filter by status: all, active, past_due, or canceled. You can also sync subscriptions from Stripe to update the local database.' },
       { title: 'Invoices Tab', content: 'View all Stripe invoices. Filter by status: all, paid, open, or uncollectible. You can also filter by date range. Download PDF receipts or open the Stripe-hosted invoice page.' },
@@ -211,11 +240,11 @@ export const TRAINING_SEED_DATA = [
     icon: 'confirmation_number',
     title: 'Day Pass Sales',
     description: 'Sell and redeem one-time access passes for non-members',
-    sortOrder: 11,
+    sortOrder: 13,
     isAdminOnly: false,
     steps: [
       { title: 'What Are Day Passes?', content: 'Day passes are one-time access passes for non-members. There are two types: Golf Sim day passes and Coworking day passes. They allow visitors to use the facility for a single day without a membership.', pageIcon: 'confirmation_number' },
-      { title: 'Selling a Day Pass (Staff)', content: 'From the New User drawer (via the floating action button), select "Visitor" mode. Choose the day pass product (Golf Sim or Coworking), fill in the visitor\'s info (or scan their ID to auto-fill), and complete the payment.', pageIcon: 'sell' },
+      { title: 'Selling a Day Pass (Staff)', content: 'From the New User drawer (via the floating action button), select "Visitor" mode. Choose the day pass product (Golf Sim or Coworking), fill in the visitor\'s info (or scan their ID to auto-fill), and complete the payment. You can also sell day passes directly from the POS Register under the Passes category tab.', pageIcon: 'sell' },
       { title: 'QR Code Delivery', content: 'After purchase, the visitor receives a QR code via email that can be redeemed at the front desk. The email includes the pass details and instructions for redemption.', pageIcon: 'qr_code' },
       { title: 'Redeeming at POS', content: 'Go to Financials > POS > Redeem Pass. Scan the visitor\'s QR code or enter the pass ID manually. The system validates the pass and marks it as redeemed.', pageIcon: 'redeem' },
       { title: 'Pricing', content: 'Day pass prices are managed in Stripe and update automatically in the app. If prices change in Stripe, the new prices are reflected everywhere without any manual updates needed.', pageIcon: 'attach_money' },
@@ -226,7 +255,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'account_balance',
     title: 'Billing Providers',
     description: 'Understand member billing sources and how to manage them',
-    sortOrder: 12,
+    sortOrder: 14,
     isAdminOnly: false,
     steps: [
       { title: 'What is a Billing Provider?', content: 'Each member has a billing provider that determines how their subscription and payments are managed. This is shown in the member\'s Billing tab.', pageIcon: 'account_balance' },
@@ -245,7 +274,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'family_restroom',
     title: 'Family & Corporate Groups',
     description: 'Manage group memberships with unified billing',
-    sortOrder: 13,
+    sortOrder: 15,
     isAdminOnly: false,
     steps: [
       { title: 'Two Group Types', content: 'There are two types of group memberships: Family groups (a primary member adds family members at a discounted rate) and Corporate groups (a company purchases multiple seats with volume pricing).', pageIcon: 'family_restroom' },
@@ -261,7 +290,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'directions_walk',
     title: 'Tours',
     description: 'View and manage scheduled facility tours',
-    sortOrder: 14,
+    sortOrder: 16,
     isAdminOnly: false,
     steps: [
       { title: 'Access Tours', content: 'Go to the Tours tab from the sidebar or hamburger menu to view all scheduled facility tours.', pageIcon: 'directions_walk' },
@@ -278,7 +307,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'notifications',
     title: 'Notices (Facility)',
     description: 'Schedule notices and facility closures',
-    sortOrder: 15,
+    sortOrder: 17,
     isAdminOnly: false,
     steps: [
       { title: 'Access Notices', content: 'Go to Facility from the sidebar or hamburger menu to manage facility notices and closures.', pageIcon: 'notifications' },
@@ -301,7 +330,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'calendar_month',
     title: 'Events & Wellness',
     description: 'Manage events and wellness classes',
-    sortOrder: 16,
+    sortOrder: 18,
     isAdminOnly: false,
     steps: [
       { title: 'Access the Calendar', content: 'Go to the Calendar tab to view and manage events and wellness classes.', pageIcon: 'calendar_month' },
@@ -320,7 +349,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'campaign',
     title: 'Updates & Announcements',
     description: 'Create announcements and view activity',
-    sortOrder: 17,
+    sortOrder: 19,
     isAdminOnly: false,
     steps: [
       { title: 'Access Updates', content: 'Click the megaphone/campaign icon in the header to go to the Updates page.', pageIcon: 'campaign' },
@@ -344,22 +373,25 @@ export const TRAINING_SEED_DATA = [
     icon: 'groups',
     title: 'Member Directory',
     description: 'Search and view member and visitor profiles',
-    sortOrder: 18,
+    sortOrder: 20,
     isAdminOnly: false,
     steps: [
       { title: 'Access Directory', content: 'Go to Directory from the bottom navigation, sidebar, or the hamburger menu on mobile.', pageIcon: 'groups' },
       { title: 'Four Directory Tabs', content: 'The directory has four tabs: Active (current paying members), Former (cancelled or expired memberships), Visitors (non-members), and Team (staff and admin accounts).' },
       { title: 'Active Members', content: 'The Active tab shows all current members with active subscriptions. These are your paying club members.' },
       { title: 'Former Members', content: 'The Former tab shows members who have cancelled or whose memberships have expired. Useful for win-back outreach.' },
-      { title: 'Visitors Tab', content: 'Visitors are non-members who have interacted with the club. Types include: ClassPass users, Sim Walk-Ins, Private Lesson attendees, Day Pass buyers, Guests, and Leads.' },
+      { title: 'Visitors Tab', content: 'Visitors are non-members who have interacted with the club. Filter by type: New, ClassPass, Sim Walk-In, Private Lesson, Day Pass, Guest, or Lead. You can also filter by source: MindBody, HubSpot, Stripe, or App.' },
       { title: 'Search', content: 'Use the search bar to find people by name, email, phone, or tier. Type "founding" to find founding members.' },
       { title: 'Filter by Tier', content: 'Use the tier filter buttons (All, Social, Core, Premium, Corporate, VIP, etc.) to narrow down the list.' },
-      { title: 'Member Profile Drawer', content: 'Tap a member to open their profile drawer with tabs for: Overview (contact info, tier, tags), History (bookings, events, wellness), Billing, and Staff Notes.' },
+      { title: 'Member Profile Drawer', content: 'Tap a member to open their profile drawer with tabs for: Overview (contact info, tier, tags), Billing (subscription, payments, group membership), Activity (bookings, events, visit history), Notes (staff notes and pinned notes), and Communications (email and SMS logs).' },
       { title: 'ID on File', content: 'In the member profile drawer, staff can view a stored ID image if one was scanned during registration. Options include viewing the ID full-size, re-scanning with a new ID, or removing the image from the record.', pageIcon: 'badge' },
       { title: 'Billing Tab', content: 'The Billing tab shows the member\'s billing provider and subscription details. For Stripe members, you can pause, apply discounts, change tier, or cancel the subscription.' },
-      { title: 'Booking History', content: 'In the History tab, view all member bookings and mark them as Attended or No Show directly from the profile.' },
+      { title: 'Activity Tab', content: 'In the Activity tab, view all member bookings, event RSVPs, wellness enrollments, and visit history. You can mark bookings as Attended or No Show directly from the profile.' },
       { title: 'View As Member (Admin Only)', content: 'Admins can tap "View As" to see the app from a member\'s perspective. A banner shows when viewing as another member. Exit by tapping the banner.' },
       { title: 'Privacy Controls', content: 'Members can access Privacy settings from their Profile. This includes options to opt out of data sharing (CCPA compliant) and request a data export.' },
+      { title: 'Communications Tab', content: 'The Communications tab shows a log of all emails and SMS messages sent to the member, including booking confirmations, payment receipts, and announcements. Useful for troubleshooting "I never got an email" issues.', pageIcon: 'chat' },
+      { title: 'Sort Members', content: 'Use the sort dropdown to organize the directory by: Name A-Z, Join Date, Last Visit, Lifetime Visits, or Tier.', pageIcon: 'sort' },
+      { title: 'Billing Filter', content: 'In addition to tier filters, use the billing filter to narrow results by billing type: Individual, Group, Stripe, MindBody, Family Add-on, or Comped.', pageIcon: 'filter_list' },
     ]
   },
   {
@@ -367,7 +399,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'mail',
     title: 'Inquiries',
     description: 'Manage form submissions (Admin only)',
-    sortOrder: 19,
+    sortOrder: 21,
     isAdminOnly: true,
     steps: [
       { title: 'Access Inquiries', content: 'Go to Inquiries from the Admin section of the sidebar or hamburger menu.', pageIcon: 'mail' },
@@ -383,7 +415,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'local_cafe',
     title: 'Cafe Menu',
     description: 'View cafe menu items synced from Stripe',
-    sortOrder: 20,
+    sortOrder: 22,
     isAdminOnly: false,
     steps: [
       { title: 'Cafe Menu Overview', content: 'Cafe menu items are managed through Stripe and synced to the app automatically. The menu is organized into categories like Breakfast, Lunch, Dessert, Kids, Shareables, and Sides.', pageIcon: 'local_cafe' },
@@ -397,7 +429,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'photo_library',
     title: 'Gallery',
     description: 'Manage venue photos (Admin only)',
-    sortOrder: 21,
+    sortOrder: 23,
     isAdminOnly: true,
     steps: [
       { title: 'Access Gallery', content: 'Go to Gallery from the Admin section of the sidebar or hamburger menu.', pageIcon: 'photo_library' },
@@ -412,7 +444,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'help_outline',
     title: 'FAQs',
     description: 'Edit frequently asked questions (Admin only)',
-    sortOrder: 22,
+    sortOrder: 24,
     isAdminOnly: true,
     steps: [
       { title: 'Access FAQs', content: 'Go to FAQs from the Admin section of the sidebar or hamburger menu.', pageIcon: 'help_outline' },
@@ -424,10 +456,10 @@ export const TRAINING_SEED_DATA = [
   },
   {
     guideId: 'team-access',
-    icon: 'shield_person',
+    icon: 'badge',
     title: 'Manage Team',
     description: 'Manage staff and admin accounts',
-    sortOrder: 23,
+    sortOrder: 25,
     isAdminOnly: true,
     steps: [
       { title: 'Access Manage Team', content: 'Go to Manage Team from the Admin section of the sidebar or hamburger menu. This is admin-only.', pageIcon: 'shield_person' },
@@ -439,10 +471,10 @@ export const TRAINING_SEED_DATA = [
   },
   {
     guideId: 'membership-tiers',
-    icon: 'loyalty',
+    icon: 'storefront',
     title: 'Membership Tiers',
     description: 'Configure tier settings and permissions',
-    sortOrder: 24,
+    sortOrder: 26,
     isAdminOnly: true,
     steps: [
       { title: 'Access Products & Pricing', content: 'Go to Products & Pricing from the Admin section of the sidebar or hamburger menu. This controls membership tier settings and Stripe integration.', pageIcon: 'loyalty' },
@@ -462,7 +494,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'badge',
     title: 'Team Directory',
     description: 'View staff and admin contact info',
-    sortOrder: 25,
+    sortOrder: 27,
     isAdminOnly: false,
     steps: [
       { title: 'Access Team Directory', content: 'Go to the Directory from the bottom navigation, then tap the Team tab to view staff and admin contacts.', pageIcon: 'badge' },
@@ -476,7 +508,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'upload_file',
     title: 'Trackman Import',
     description: 'Import historical booking data (Admin only)',
-    sortOrder: 26,
+    sortOrder: 28,
     isAdminOnly: true,
     steps: [
       { title: 'Access Trackman Import', content: 'Trackman Import is accessed from the Bookings tab. Look for the import/upload section when managing bookings. This is admin-only.', pageIcon: 'upload_file' },
@@ -492,7 +524,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'bug_report',
     title: 'Bug Reports',
     description: 'View and manage reported issues (Admin only)',
-    sortOrder: 27,
+    sortOrder: 29,
     isAdminOnly: true,
     steps: [
       { title: 'Access Bug Reports', content: 'Go to Bug Reports from the Admin section of the sidebar or hamburger menu.', pageIcon: 'bug_report' },
@@ -507,7 +539,7 @@ export const TRAINING_SEED_DATA = [
     icon: 'history',
     title: 'Changelog',
     description: 'View app updates and changes (Admin only)',
-    sortOrder: 28,
+    sortOrder: 30,
     isAdminOnly: true,
     steps: [
       { title: 'Access Changelog', content: 'Go to the Changelog from the sidebar/hamburger menu under Admin settings to view all app updates.', pageIcon: 'history' },
@@ -519,10 +551,10 @@ export const TRAINING_SEED_DATA = [
   },
   {
     guideId: 'data-integrity',
-    icon: 'verified',
+    icon: 'fact_check',
     title: 'Data Integrity',
     description: 'Monitor data consistency across Stripe, HubSpot, and the app',
-    sortOrder: 29,
+    sortOrder: 31,
     isAdminOnly: true,
     steps: [
       { title: 'What is Data Integrity?', content: 'The Data Integrity dashboard runs automated checks to make sure member data is consistent across the app, Stripe, and HubSpot. It catches things like mismatched tiers, missing Stripe customers, or stale subscription data.', pageIcon: 'verified' },

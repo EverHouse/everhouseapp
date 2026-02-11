@@ -13,6 +13,21 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.40.0",
+    date: "2026-02-11",
+    title: "Training Guide Audit & Update",
+    isMajor: true,
+    changes: [
+      "New: Added Conference Room Bookings training guide covering auto-confirmation, daily allowance, and overage prepayment",
+      "New: Added Waiver Management training guide covering waiver signing, versions, and stale waiver reviews",
+      "Fix: Updated Member Directory training to show correct profile drawer tabs (Overview, Billing, Activity, Notes, Communications)",
+      "Fix: Updated Financials training to reflect correct Transactions sub-sections (Summary, Pending, Overdue, Failed, Refunds, Recent)",
+      "Improved: Added training steps for directory sorting, billing filters, visitor source filters, and the pending booking limit rule",
+      "Fix: Corrected navigation icons for Products & Pricing, Manage Team, and Data Integrity to match the actual sidebar",
+      "Improved: Day pass training now mentions the POS Register as an alternative sales channel",
+    ],
+  },
+  {
     version: "7.39.7",
     date: "2026-02-11",
     title: "Booking Confirmation Reliability Fix",
