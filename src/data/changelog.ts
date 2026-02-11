@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.39.3",
+    date: "2026-02-11",
+    title: "PWA Safari Polish",
+    changes: [
+      "Fix: Safari PWA status bar now matches the green header instead of showing a light-colored bar",
+      "Fix: White gap under the footer on public pages is eliminated — the green footer now extends fully to the bottom of the screen on all devices",
+      "Fix: Member profile drawer now sizes correctly on PWA screens using dynamic viewport height",
+      "Fix: Restored safe-area padding on drawer sticky footers so buttons aren't hidden behind the home indicator",
+    ],
+  },
+  {
     version: "7.39.2",
     date: "2026-02-11",
     title: "Booking Confirmation Toast",

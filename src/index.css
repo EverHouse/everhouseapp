@@ -360,22 +360,6 @@ body::after {
 
 #root {
   background-color: inherit;
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--safari-toolbar-padding));
-}
-
-/* Footer safe-area extension - covers #root padding-bottom with footer background color */
-.footer-safe-area-extend {
-  position: relative;
-}
-.footer-safe-area-extend::after {
-  content: '';
-  display: block;
-  background-color: #293515;
-  height: calc(env(safe-area-inset-bottom, 0px) + var(--safari-toolbar-padding, 0px) + 20px);
-  margin-top: 0;
-  margin-left: calc(-1 * max(1rem, env(safe-area-inset-left, 0px)));
-  margin-right: calc(-1 * max(1rem, env(safe-area-inset-right, 0px)));
-  margin-bottom: calc(-1 * (env(safe-area-inset-bottom, 0px) + var(--safari-toolbar-padding, 0px) + 20px));
 }
 
 /* Native scrolling container for main content - restores iOS rubber-band physics */
