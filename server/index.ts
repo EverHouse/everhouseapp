@@ -239,6 +239,17 @@ async function initializeApp() {
     allowedHeaders: ['Content-Type', 'Authorization']
   };
 
+  app.disable('x-powered-by');
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    if (isProduction) {
+      res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    next();
+  });
 
   app.use(requestIdMiddleware);
   app.use(logRequest);
@@ -405,9 +416,88 @@ async function initializeApp() {
   registerRoutes(app);
 
   if (isProduction) {
+    const SEO_META: Record<string, { title: string; description: string }> = {
+      '/': {
+        title: 'Ever Members Club | Orange County\'s Premier Indoor Golf & Social Club',
+        description: 'A new kind of members club rooted in golf, built for community. Experience indoor golf simulators, coworking spaces, wellness programs, and curated events in Orange County.',
+      },
+      '/membership': {
+        title: 'Membership Plans | Ever Members Club',
+        description: 'Explore membership tiers at Ever Members Club. From Social to VIP, find the perfect plan with golf simulator access, coworking, wellness, and exclusive events.',
+      },
+      '/membership/apply': {
+        title: 'Apply for Membership | Ever Members Club',
+        description: 'Apply to join Ever Members Club. Start your membership journey with access to indoor golf simulators, coworking spaces, and a vibrant community in Orange County.',
+      },
+      '/private-hire': {
+        title: 'Private Events & Hire | Ever Members Club',
+        description: 'Host your next event at Ever Members Club. Private simulator bays, conference rooms, and event spaces available for corporate events, parties, and celebrations.',
+      },
+      '/whats-on': {
+        title: 'Events & What\'s On | Ever Members Club',
+        description: 'Discover upcoming events at Ever Members Club. Golf tournaments, social nights, wellness classes, and community gatherings in Orange County.',
+      },
+      '/menu': {
+        title: 'Café Menu | Ever Members Club',
+        description: 'Explore the Ever Members Club café menu. Farm-to-table breakfast, artisan lunch, craft beverages, and curated selections in a premium club setting.',
+      },
+      '/gallery': {
+        title: 'Gallery | Ever Members Club',
+        description: 'See inside Ever Members Club. Photos of our indoor golf simulators, lounge, café, coworking spaces, and member events in Orange County.',
+      },
+      '/contact': {
+        title: 'Contact Us | Ever Members Club',
+        description: 'Get in touch with Ever Members Club. Visit us in Orange County or reach out for membership inquiries, private events, and general questions.',
+      },
+      '/tours': {
+        title: 'Book a Tour | Ever Members Club',
+        description: 'Schedule a tour of Ever Members Club. See our indoor golf simulators, café, coworking spaces, and wellness facilities in person.',
+      },
+      '/day-pass': {
+        title: 'Day Pass | Ever Members Club',
+        description: 'Purchase a day pass to experience Ever Members Club. Enjoy golf simulators, café, and club amenities for the day without a membership.',
+      },
+      '/faq': {
+        title: 'FAQ | Ever Members Club',
+        description: 'Frequently asked questions about Ever Members Club. Learn about memberships, golf simulators, events, hours, and more.',
+      },
+      '/privacy': {
+        title: 'Privacy Policy | Ever Members Club',
+        description: 'Ever Members Club privacy policy. How we collect, use, and protect your personal information.',
+      },
+      '/terms': {
+        title: 'Terms of Service | Ever Members Club',
+        description: 'Ever Members Club terms of service. Membership agreement, usage policies, and club rules.',
+      },
+    };
+
     app.use((req, res, next) => {
       if (req.method === 'GET' && !req.path.startsWith('/api/') && req.path !== '/healthz' && req.path !== '/_health') {
-        return res.sendFile(path.join(__dirname, '../dist/index.html'));
+        if (!cachedIndexHtml) {
+          return res.sendFile(path.join(__dirname, '../dist/index.html'));
+        }
+
+        const routePath = req.path.replace(/\/+$/, '') || '/';
+        const meta = SEO_META[routePath];
+
+        if (meta) {
+          const ogUrl = `https://everclub.app${routePath === '/' ? '' : routePath}`;
+          let html = cachedIndexHtml;
+          html = html.replace(/<title>[^<]*<\/title>/, `<title>${meta.title}</title>`);
+          html = html.replace(/<meta name="description"[^>]*>/, `<meta name="description" content="${meta.description}" />`);
+          html = html.replace(/<meta property="og:title"[^>]*>/, `<meta property="og:title" content="${meta.title}" />`);
+          html = html.replace(/<meta property="og:description"[^>]*>/, `<meta property="og:description" content="${meta.description}" />`);
+          html = html.replace(/<meta property="og:url"[^>]*>/, `<meta property="og:url" content="${ogUrl}" />`);
+          html = html.replace(/<meta name="twitter:title"[^>]*>/, `<meta name="twitter:title" content="${meta.title}" />`);
+          html = html.replace(/<meta name="twitter:description"[^>]*>/, `<meta name="twitter:description" content="${meta.description}" />`);
+          res.setHeader('Content-Type', 'text/html');
+          res.setHeader('Cache-Control', 'no-cache');
+          return res.send(html);
+        }
+
+        res.setHeader('Content-Type', 'text/html');
+        res.setHeader('Cache-Control', 'no-cache');
+        return res.send(cachedIndexHtml);
       }
       next();
     });
