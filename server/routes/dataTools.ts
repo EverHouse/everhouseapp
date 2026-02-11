@@ -2319,7 +2319,7 @@ async function runVisitorArchiveInBackground(dryRun: boolean, staffEmail: string
         AND NOT EXISTS (SELECT 1 FROM walk_in_visits w WHERE LOWER(w.member_email) = LOWER(u.email))
         AND NOT EXISTS (SELECT 1 FROM event_rsvps er WHERE LOWER(er.user_email) = LOWER(u.email))
         AND NOT EXISTS (SELECT 1 FROM legacy_purchases lp WHERE LOWER(lp.member_email) = LOWER(u.email))
-        AND NOT EXISTS (SELECT 1 FROM day_pass_purchases dp WHERE LOWER(dp.email) = LOWER(u.email))
+        AND NOT EXISTS (SELECT 1 FROM day_pass_purchases dp WHERE LOWER(dp.purchaser_email) = LOWER(u.email))
     `);
 
     const candidates = candidatesResult.rows;
