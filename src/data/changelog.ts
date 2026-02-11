@@ -13,6 +13,14 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.39.2",
+    date: "2026-02-11",
+    title: "Booking Confirmation Toast",
+    changes: [
+      "Improvement: Members now see a clear toast notification confirming their booking request was sent — previously the only confirmation was a brief banner that could be easily missed",
+    ],
+  },
+  {
     version: "7.39.1",
     date: "2026-02-11",
     title: "Guest Pass & Fee Estimate Fixes",

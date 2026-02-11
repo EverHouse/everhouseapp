@@ -795,6 +795,7 @@ const BookGolf: React.FC = () => {
       
       haptic.success();
       playSound('bookingConfirmed');
+      showToast('Booking request sent! Staff will review shortly.', 'success', 4000);
       setShowConfirmation(true);
       setTimeout(() => {
         setShowConfirmation(false);
