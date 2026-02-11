@@ -49,6 +49,27 @@ interface SyncToolsPanelProps {
     deleted: number;
     errors: number;
   } | null;
+  handleArchiveStaleVisitors: (dryRun: boolean) => void;
+  isRunningVisitorArchive: boolean;
+  visitorArchiveResult: {
+    success: boolean;
+    message: string;
+    dryRun?: boolean;
+    totalScanned?: number;
+    eligibleCount?: number;
+    keptCount?: number;
+    archivedCount?: number;
+    sampleArchived?: Array<{ name: string; email: string }>;
+  } | null;
+  visitorArchiveProgress: {
+    phase: string;
+    totalVisitors: number;
+    checked: number;
+    eligibleCount: number;
+    keptCount: number;
+    archived: number;
+    errors: number;
+  } | null;
 }
 
 const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
@@ -74,6 +95,10 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
   isRunningStripeCustomerCleanup,
   stripeCleanupResult,
   stripeCleanupProgress,
+  handleArchiveStaleVisitors,
+  isRunningVisitorArchive,
+  visitorArchiveResult,
+  visitorArchiveProgress,
 }) => {
   return (
     <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
@@ -314,6 +339,86 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
                         {c.email || 'No email'} ({c.id})
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-gray-200 dark:border-white/10 pt-4 space-y-3">
+            <h4 className="text-sm font-medium text-primary dark:text-white flex items-center gap-2">
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">archive</span>
+              Archive Stale Visitors
+            </h4>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Archive non-member visitors who have zero visit activity, no MindBody transaction history, no day pass purchases, and no Stripe charges. Archived visitors are hidden from search results and directory.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => handleArchiveStaleVisitors(true)}
+                disabled={isRunningVisitorArchive}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isRunningVisitorArchive && <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                Scan & Preview
+              </button>
+              <button
+                onClick={() => handleArchiveStaleVisitors(false)}
+                disabled={isRunningVisitorArchive || !visitorArchiveResult?.dryRun}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isRunningVisitorArchive && <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                Archive Stale Visitors
+              </button>
+            </div>
+            {isRunningVisitorArchive && visitorArchiveProgress && (
+              <div className="mt-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="material-symbols-outlined animate-spin text-[16px] text-blue-600">progress_activity</span>
+                  <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                    {visitorArchiveProgress.phase === 'scanning' && 'Scanning visitors for activity...'}
+                    {visitorArchiveProgress.phase === 'checking_stripe' && `Checking Stripe transactions: ${visitorArchiveProgress.checked} / ${visitorArchiveProgress.totalVisitors}`}
+                    {visitorArchiveProgress.phase === 'archiving' && `Archiving: ${visitorArchiveProgress.archived} / ${visitorArchiveProgress.eligibleCount}`}
+                  </span>
+                </div>
+                {visitorArchiveProgress.totalVisitors > 0 && (
+                  <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ 
+                        width: `${visitorArchiveProgress.phase === 'checking_stripe' 
+                          ? Math.round((visitorArchiveProgress.checked / Math.max(1, visitorArchiveProgress.totalVisitors)) * 100)
+                          : visitorArchiveProgress.phase === 'archiving'
+                            ? Math.round((visitorArchiveProgress.archived / Math.max(1, visitorArchiveProgress.eligibleCount)) * 100)
+                            : visitorArchiveProgress.phase === 'scanning' ? 0 : 100}%` 
+                      }}
+                    />
+                  </div>
+                )}
+                <div className="mt-1 text-[10px] text-blue-600 dark:text-blue-400">
+                  {visitorArchiveProgress.eligibleCount > 0 && `Eligible: ${visitorArchiveProgress.eligibleCount} | `}
+                  {visitorArchiveProgress.keptCount > 0 && `Kept (has activity): ${visitorArchiveProgress.keptCount} | `}
+                  {visitorArchiveProgress.errors > 0 && `Errors: ${visitorArchiveProgress.errors}`}
+                </div>
+              </div>
+            )}
+            {visitorArchiveResult && (
+              <div className={`mt-2 p-3 rounded-lg ${visitorArchiveResult.success ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'}`}>
+                {visitorArchiveResult.dryRun && (
+                  <p className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400 mb-1">Preview Only - No Changes Made</p>
+                )}
+                <p className={`text-xs ${visitorArchiveResult.success ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>{visitorArchiveResult.message}</p>
+                {visitorArchiveResult.sampleArchived && visitorArchiveResult.sampleArchived.length > 0 && (
+                  <div className="mt-2 max-h-32 overflow-y-auto text-xs bg-white dark:bg-white/10 rounded p-2">
+                    <p className="text-[10px] font-medium text-gray-500 mb-1">Sample of {visitorArchiveResult.dryRun ? 'visitors to archive' : 'archived visitors'}:</p>
+                    {visitorArchiveResult.sampleArchived.map((v, i) => (
+                      <div key={i} className="py-0.5 text-gray-600 dark:text-gray-400">
+                        {v.name} ({v.email})
+                      </div>
+                    ))}
+                    {(visitorArchiveResult.eligibleCount || 0) > 20 && (
+                      <p className="text-[10px] text-gray-400 mt-1">...and {(visitorArchiveResult.eligibleCount || 0) - 20} more</p>
+                    )}
                   </div>
                 )}
               </div>

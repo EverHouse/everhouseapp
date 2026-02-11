@@ -71,6 +71,27 @@ interface IntegrityResultsPanelProps {
   isRunningVisitCountSync: boolean;
   visitCountResult: { success: boolean; message: string; mismatchCount?: number; updatedCount?: number; sampleMismatches?: any[]; dryRun?: boolean } | null;
   handleSyncVisitCounts: (dryRun: boolean) => void;
+  handleArchiveStaleVisitors: (dryRun: boolean) => void;
+  isRunningVisitorArchive: boolean;
+  visitorArchiveResult: {
+    success: boolean;
+    message: string;
+    dryRun?: boolean;
+    totalScanned?: number;
+    eligibleCount?: number;
+    keptCount?: number;
+    archivedCount?: number;
+    sampleArchived?: Array<{ name: string; email: string }>;
+  } | null;
+  visitorArchiveProgress: {
+    phase: string;
+    totalVisitors: number;
+    checked: number;
+    eligibleCount: number;
+    keptCount: number;
+    archived: number;
+    errors: number;
+  } | null;
 }
 
 const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
@@ -120,6 +141,10 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
   isRunningVisitCountSync,
   visitCountResult,
   handleSyncVisitCounts,
+  handleArchiveStaleVisitors,
+  isRunningVisitorArchive,
+  visitorArchiveResult,
+  visitorArchiveProgress,
 }) => {
   const getStatusColor = (status: 'pass' | 'warning' | 'fail') => {
     switch (status) {
@@ -426,6 +451,75 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                   )}
                 </div>
               )}
+              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-white/10">
+                <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px]">archive</span>
+                  Archive Stale Visitors
+                </p>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  <button
+                    onClick={() => handleArchiveStaleVisitors(true)}
+                    disabled={isRunningVisitorArchive}
+                    className="px-3 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                  >
+                    {isRunningVisitorArchive && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
+                    Scan & Preview
+                  </button>
+                  <button
+                    onClick={() => handleArchiveStaleVisitors(false)}
+                    disabled={isRunningVisitorArchive || !visitorArchiveResult?.dryRun}
+                    className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                  >
+                    Archive Now
+                  </button>
+                </div>
+                {isRunningVisitorArchive && visitorArchiveProgress && (
+                  <div className="p-2 rounded bg-blue-50 dark:bg-blue-900/20 mb-2">
+                    <div className="flex items-center gap-1 mb-1">
+                      <span className="material-symbols-outlined animate-spin text-[14px] text-blue-600">progress_activity</span>
+                      <span className="text-[11px] font-medium text-blue-700 dark:text-blue-300">
+                        {visitorArchiveProgress.phase === 'scanning' && 'Scanning...'}
+                        {visitorArchiveProgress.phase === 'checking_stripe' && `Stripe: ${visitorArchiveProgress.checked}/${visitorArchiveProgress.totalVisitors}`}
+                        {visitorArchiveProgress.phase === 'archiving' && `Archiving: ${visitorArchiveProgress.archived}/${visitorArchiveProgress.eligibleCount}`}
+                      </span>
+                    </div>
+                    {visitorArchiveProgress.totalVisitors > 0 && (
+                      <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-1.5">
+                        <div 
+                          className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                          style={{ 
+                            width: `${visitorArchiveProgress.phase === 'checking_stripe' 
+                              ? Math.round((visitorArchiveProgress.checked / Math.max(1, visitorArchiveProgress.totalVisitors)) * 100)
+                              : visitorArchiveProgress.phase === 'archiving'
+                                ? Math.round((visitorArchiveProgress.archived / Math.max(1, visitorArchiveProgress.eligibleCount)) * 100)
+                                : visitorArchiveProgress.phase === 'scanning' ? 0 : 100}%` 
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+                {visitorArchiveResult && (
+                  <div className={`p-2 rounded ${getResultStyle(visitorArchiveResult)}`}>
+                    {visitorArchiveResult.dryRun && (
+                      <p className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400 mb-1">Preview Only</p>
+                    )}
+                    <p className={`text-xs ${getTextStyle(visitorArchiveResult)}`}>{visitorArchiveResult.message}</p>
+                    {visitorArchiveResult.sampleArchived && visitorArchiveResult.sampleArchived.length > 0 && (
+                      <div className="mt-1 max-h-24 overflow-y-auto text-[11px] bg-white dark:bg-white/10 rounded p-1">
+                        {visitorArchiveResult.sampleArchived.map((v, i) => (
+                          <div key={i} className="py-0.5 text-gray-600 dark:text-gray-400">
+                            {v.name} ({v.email})
+                          </div>
+                        ))}
+                        {(visitorArchiveResult.eligibleCount || 0) > 20 && (
+                          <p className="text-[10px] text-gray-400">...and {(visitorArchiveResult.eligibleCount || 0) - 20} more</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         );

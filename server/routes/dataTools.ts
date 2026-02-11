@@ -31,6 +31,27 @@ interface StripeCleanupJob {
 
 let activeCleanupJob: StripeCleanupJob | null = null;
 
+interface VisitorArchiveJob {
+  id: string;
+  status: 'running' | 'completed' | 'failed';
+  dryRun: boolean;
+  startedAt: Date;
+  completedAt?: Date;
+  progress: {
+    phase: 'scanning' | 'checking_stripe' | 'archiving' | 'done';
+    totalVisitors: number;
+    checked: number;
+    eligibleCount: number;
+    keptCount: number;
+    archived: number;
+    errors: number;
+  };
+  result?: any;
+  error?: string;
+}
+
+let activeVisitorArchiveJob: VisitorArchiveJob | null = null;
+
 const router = Router();
 
 router.post('/api/data-tools/resync-member', isAdmin, async (req: Request, res: Response) => {
@@ -2237,5 +2258,190 @@ router.get('/api/data-tools/cleanup-stripe-customers/status', isAdmin, async (re
   }
   res.json({ hasJob: true, job: activeCleanupJob });
 });
+
+router.post('/api/data-tools/archive-stale-visitors', isAdmin, async (req: Request, res: Response) => {
+  try {
+    if (activeVisitorArchiveJob?.status === 'running') {
+      return res.status(409).json({ error: 'A visitor archive job is already running', jobId: activeVisitorArchiveJob.id });
+    }
+
+    const dryRun = req.body.dryRun !== false;
+    const staffEmail = getSessionUser(req)?.email || 'admin';
+
+    console.log(`[DataTools] Visitor archive initiated by ${staffEmail} (dryRun: ${dryRun})`);
+
+    const jobId = Date.now().toString(36);
+    activeVisitorArchiveJob = {
+      id: jobId,
+      status: 'running',
+      dryRun,
+      startedAt: new Date(),
+      progress: {
+        phase: 'scanning',
+        totalVisitors: 0,
+        checked: 0,
+        eligibleCount: 0,
+        keptCount: 0,
+        archived: 0,
+        errors: 0
+      }
+    };
+
+    runVisitorArchiveInBackground(dryRun, staffEmail, req);
+
+    res.json({ success: true, jobId, message: 'Archive job started' });
+  } catch (error: any) {
+    console.error('[DataTools] Visitor archive error:', error);
+    res.status(500).json({ error: 'Failed to start archive job', details: error.message });
+  }
+});
+
+router.get('/api/data-tools/archive-stale-visitors/status', isAdmin, async (req: Request, res: Response) => {
+  if (!activeVisitorArchiveJob) {
+    return res.json({ hasJob: false });
+  }
+  res.json({ hasJob: true, job: activeVisitorArchiveJob });
+});
+
+async function runVisitorArchiveInBackground(dryRun: boolean, staffEmail: string, req: Request) {
+  try {
+    activeVisitorArchiveJob!.progress.phase = 'scanning';
+    broadcastToStaff({ type: 'visitor_archive_progress', data: activeVisitorArchiveJob!.progress });
+
+    const candidatesResult = await db.execute(sql`
+      SELECT u.id, u.email, u.first_name, u.last_name, u.stripe_customer_id, u.membership_status
+      FROM users u
+      WHERE u.membership_status IN ('non-member', 'visitor')
+        AND u.archived_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM booking_requests br WHERE LOWER(br.user_email) = LOWER(u.email))
+        AND NOT EXISTS (SELECT 1 FROM booking_guests bg WHERE LOWER(bg.guest_email) = LOWER(u.email))
+        AND NOT EXISTS (SELECT 1 FROM booking_members bm WHERE LOWER(bm.user_email) = LOWER(u.email))
+        AND NOT EXISTS (SELECT 1 FROM walk_in_visits w WHERE LOWER(w.member_email) = LOWER(u.email))
+        AND NOT EXISTS (SELECT 1 FROM event_rsvps er WHERE LOWER(er.user_email) = LOWER(u.email))
+        AND NOT EXISTS (SELECT 1 FROM legacy_purchases lp WHERE LOWER(lp.member_email) = LOWER(u.email))
+        AND NOT EXISTS (SELECT 1 FROM day_pass_purchases dp WHERE LOWER(dp.email) = LOWER(u.email))
+    `);
+
+    const candidates = candidatesResult.rows;
+    activeVisitorArchiveJob!.progress.totalVisitors = candidates.length;
+    broadcastToStaff({ type: 'visitor_archive_progress', data: activeVisitorArchiveJob!.progress });
+
+    console.log(`[DataTools] Found ${candidates.length} visitor/non-member candidates with no local activity`);
+
+    activeVisitorArchiveJob!.progress.phase = 'checking_stripe';
+    broadcastToStaff({ type: 'visitor_archive_progress', data: activeVisitorArchiveJob!.progress });
+
+    const visitorsWithStripe = candidates.filter(c => c.stripe_customer_id);
+    const visitorsWithoutStripe = candidates.filter(c => !c.stripe_customer_id);
+
+    const eligible: typeof candidates = [...visitorsWithoutStripe];
+    let keptCount = 0;
+
+    if (visitorsWithStripe.length > 0) {
+      const Stripe = (await import('stripe')).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+
+      const BATCH_SIZE = 25;
+      for (let i = 0; i < visitorsWithStripe.length; i += BATCH_SIZE) {
+        const batch = visitorsWithStripe.slice(i, i + BATCH_SIZE);
+
+        await Promise.all(batch.map(async (visitor) => {
+          try {
+            const charges = await stripe.charges.list({ customer: visitor.stripe_customer_id, limit: 1 });
+            if (charges.data.length > 0) { keptCount++; return; }
+
+            const invoices = await stripe.invoices.list({ customer: visitor.stripe_customer_id, limit: 1 });
+            if (invoices.data.length > 0) { keptCount++; return; }
+
+            const paymentIntents = await stripe.paymentIntents.list({ customer: visitor.stripe_customer_id, limit: 1 });
+            if (paymentIntents.data.length > 0) { keptCount++; return; }
+
+            eligible.push(visitor);
+          } catch (err: any) {
+            console.error(`[DataTools] Error checking Stripe transactions for ${visitor.email}:`, err.message);
+            keptCount++;
+            activeVisitorArchiveJob!.progress.errors++;
+          }
+        }));
+
+        activeVisitorArchiveJob!.progress.checked = Math.min(i + BATCH_SIZE, visitorsWithStripe.length);
+        activeVisitorArchiveJob!.progress.keptCount = keptCount;
+        activeVisitorArchiveJob!.progress.eligibleCount = eligible.length;
+        broadcastToStaff({ type: 'visitor_archive_progress', data: activeVisitorArchiveJob!.progress });
+      }
+    }
+
+    activeVisitorArchiveJob!.progress.eligibleCount = eligible.length;
+    activeVisitorArchiveJob!.progress.keptCount = keptCount;
+    activeVisitorArchiveJob!.progress.checked = visitorsWithStripe.length;
+    broadcastToStaff({ type: 'visitor_archive_progress', data: activeVisitorArchiveJob!.progress });
+
+    console.log(`[DataTools] ${eligible.length} eligible for archive, ${keptCount} kept (has Stripe charges)`);
+
+    const sampleArchived = eligible.slice(0, 20).map(v => ({
+      name: [v.first_name, v.last_name].filter(Boolean).join(' ') || 'Unknown',
+      email: v.email
+    }));
+
+    let archivedCount = 0;
+
+    if (!dryRun && eligible.length > 0) {
+      activeVisitorArchiveJob!.progress.phase = 'archiving';
+      broadcastToStaff({ type: 'visitor_archive_progress', data: activeVisitorArchiveJob!.progress });
+
+      const ARCHIVE_BATCH_SIZE = 100;
+      for (let i = 0; i < eligible.length; i += ARCHIVE_BATCH_SIZE) {
+        const batch = eligible.slice(i, i + ARCHIVE_BATCH_SIZE);
+        const ids = batch.map(v => v.id);
+
+        try {
+          await db.execute(sql`UPDATE users SET archived_at = NOW(), archived_by = 'system-cleanup' WHERE id = ANY(${ids}::text[])`);
+          archivedCount += batch.length;
+        } catch (err: any) {
+          console.error(`[DataTools] Error archiving batch:`, err.message);
+          activeVisitorArchiveJob!.progress.errors++;
+        }
+
+        activeVisitorArchiveJob!.progress.archived = archivedCount;
+        broadcastToStaff({ type: 'visitor_archive_progress', data: activeVisitorArchiveJob!.progress });
+      }
+    }
+
+    const result = {
+      success: true,
+      message: dryRun
+        ? `Preview: Found ${eligible.length} stale visitors eligible for archiving (out of ${candidates.length} scanned). ${keptCount} kept (has Stripe charges).`
+        : `Archived ${archivedCount} stale visitors. ${keptCount} kept (has Stripe charges).`,
+      dryRun,
+      totalScanned: candidates.length,
+      eligibleCount: eligible.length,
+      keptCount,
+      archivedCount,
+      sampleArchived
+    };
+
+    logFromRequest(req, 'archive_stale_visitors' as any, 'users', null, undefined, {
+      action: dryRun ? 'preview' : 'execute',
+      totalScanned: candidates.length,
+      eligibleCount: eligible.length,
+      keptCount,
+      archivedCount,
+      staffEmail
+    });
+
+    activeVisitorArchiveJob!.status = 'completed';
+    activeVisitorArchiveJob!.completedAt = new Date();
+    activeVisitorArchiveJob!.result = result;
+    activeVisitorArchiveJob!.progress.phase = 'done';
+    broadcastToStaff({ type: 'visitor_archive_progress', data: activeVisitorArchiveJob!.progress, result });
+  } catch (error: any) {
+    console.error('[DataTools] Visitor archive error:', error);
+    activeVisitorArchiveJob!.status = 'failed';
+    activeVisitorArchiveJob!.completedAt = new Date();
+    activeVisitorArchiveJob!.error = error.message;
+    activeVisitorArchiveJob!.progress.phase = 'done';
+    broadcastToStaff({ type: 'visitor_archive_progress', data: activeVisitorArchiveJob!.progress, error: error.message });
+  }
+}
 
 export default router;

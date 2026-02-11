@@ -574,6 +574,27 @@ const DataIntegrityTab: React.FC = () => {
     }
   });
 
+  const [isRunningVisitorArchive, setIsRunningVisitorArchive] = useState(false);
+  const [visitorArchiveProgress, setVisitorArchiveProgress] = useState<{
+    phase: string;
+    totalVisitors: number;
+    checked: number;
+    eligibleCount: number;
+    keptCount: number;
+    archived: number;
+    errors: number;
+  } | null>(null);
+  const [visitorArchiveResult, setVisitorArchiveResult] = useState<{
+    success: boolean;
+    message: string;
+    dryRun?: boolean;
+    totalScanned?: number;
+    eligibleCount?: number;
+    keptCount?: number;
+    archivedCount?: number;
+    sampleArchived?: Array<{ name: string; email: string }>;
+  } | null>(null);
+
   const [isRunningStripeCleanup, setIsRunningStripeCleanup] = useState(false);
   const [stripeCleanupProgress, setStripeCleanupProgress] = useState<{
     phase: string;
@@ -659,6 +680,79 @@ const DataIntegrityTab: React.FC = () => {
     }, 5000);
     return () => clearInterval(interval);
   }, [isRunningStripeCleanup]);
+
+  useEffect(() => {
+    const handleProgress = (event: CustomEvent) => {
+      const { data, result, error } = event.detail || {};
+      if (data) {
+        setVisitorArchiveProgress(data);
+      }
+      if (data?.phase === 'done') {
+        setIsRunningVisitorArchive(false);
+        if (result) {
+          setVisitorArchiveResult({
+            success: result.success,
+            message: result.message,
+            dryRun: result.dryRun,
+            totalScanned: result.totalScanned,
+            eligibleCount: result.eligibleCount,
+            keptCount: result.keptCount,
+            archivedCount: result.archivedCount,
+            sampleArchived: result.sampleArchived,
+          });
+          if (!result.dryRun) showToast(result.message, 'success');
+        }
+        if (error) {
+          setVisitorArchiveResult({ success: false, message: error });
+          showToast(error, 'error');
+        }
+      }
+    };
+
+    window.addEventListener('visitor-archive-progress', handleProgress as EventListener);
+    return () => {
+      window.removeEventListener('visitor-archive-progress', handleProgress as EventListener);
+    };
+  }, [showToast]);
+
+  useEffect(() => {
+    if (!isRunningVisitorArchive) return;
+    const interval = setInterval(async () => {
+      try {
+        const statusData = await fetchWithCredentials<{ hasJob: boolean; job?: any }>('/api/data-tools/archive-stale-visitors/status');
+        if (statusData.hasJob && statusData.job) {
+          setVisitorArchiveProgress(statusData.job.progress);
+          if (statusData.job.status === 'completed') {
+            setIsRunningVisitorArchive(false);
+            setVisitorArchiveProgress(null);
+            const r = statusData.job.result;
+            if (r) {
+              setVisitorArchiveResult({
+                success: r.success,
+                message: r.message,
+                dryRun: r.dryRun,
+                totalScanned: r.totalScanned,
+                eligibleCount: r.eligibleCount,
+                keptCount: r.keptCount,
+                archivedCount: r.archivedCount,
+                sampleArchived: r.sampleArchived,
+              });
+            }
+          } else if (statusData.job.status === 'failed') {
+            setIsRunningVisitorArchive(false);
+            setVisitorArchiveProgress(null);
+            setVisitorArchiveResult({ success: false, message: statusData.job.error || 'Job failed' });
+          }
+        } else if (!statusData.hasJob) {
+          setIsRunningVisitorArchive(false);
+          setVisitorArchiveProgress(null);
+          setVisitorArchiveResult({ success: false, message: 'Job was lost (server may have restarted). Please try again.' });
+        }
+      } catch {
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [isRunningVisitorArchive]);
 
   const syncSubscriptionStatusMutation = useMutation({
     mutationFn: (dryRun: boolean) => 
@@ -1112,6 +1206,18 @@ const DataIntegrityTab: React.FC = () => {
   const handleSyncSubscriptionStatus = (dryRun: boolean = true) => {
     setSubscriptionStatusResult(null);
     syncSubscriptionStatusMutation.mutate(dryRun);
+  };
+
+  const handleArchiveStaleVisitors = async (dryRun: boolean = true) => {
+    setVisitorArchiveResult(null);
+    setVisitorArchiveProgress(null);
+    try {
+      await postWithCredentials('/api/data-tools/archive-stale-visitors', { dryRun });
+      setIsRunningVisitorArchive(true);
+    } catch (err: any) {
+      setVisitorArchiveResult({ success: false, message: err.message || 'Failed to start archive job' });
+      showToast(err.message || 'Failed to start archive job', 'error');
+    }
   };
 
   const handleCleanupStripeCustomers = async (dryRun: boolean = true) => {
@@ -1619,6 +1725,10 @@ const DataIntegrityTab: React.FC = () => {
         isRunningVisitCountSync={isRunningVisitCountSync}
         visitCountResult={visitCountResult}
         handleSyncVisitCounts={handleSyncVisitCounts}
+        handleArchiveStaleVisitors={handleArchiveStaleVisitors}
+        isRunningVisitorArchive={isRunningVisitorArchive}
+        visitorArchiveResult={visitorArchiveResult}
+        visitorArchiveProgress={visitorArchiveProgress}
       />
 
       <SyncToolsPanel
@@ -1644,6 +1754,10 @@ const DataIntegrityTab: React.FC = () => {
         isRunningStripeCustomerCleanup={isRunningStripeCustomerCleanup}
         stripeCleanupResult={stripeCleanupResult}
         stripeCleanupProgress={stripeCleanupProgress}
+        handleArchiveStaleVisitors={handleArchiveStaleVisitors}
+        isRunningVisitorArchive={isRunningVisitorArchive}
+        visitorArchiveResult={visitorArchiveResult}
+        visitorArchiveProgress={visitorArchiveProgress}
       />
 
       <CleanupToolsPanel
