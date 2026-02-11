@@ -90,6 +90,7 @@ export default defineConfig({
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(process.env.SUPABASE_URL),
     'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.SUPABASE_ANON_KEY),
     'import.meta.env.VITE_SCREENSHOT_TOKEN': JSON.stringify(process.env.SCREENSHOT_TOKEN || ''),
+    'import.meta.env.VITE_GOOGLE_CLIENT_ID': JSON.stringify(process.env.GOOGLE_CLIENT_ID || ''),
   },
   build: {
     target: 'esnext',
