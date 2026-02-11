@@ -1147,16 +1147,18 @@ router.post('/api/bookings/link-trackman-to-member', isStaffOrAdmin, async (req,
       let created = false;
       
       if (existingBooking) {
+        const staffNoteSuffix = ` [Linked to member via staff: ${ownerName} with ${totalPlayerCount} players]`;
+        const newStaffNotes = (existingBooking.staffNotes || '') + staffNoteSuffix;
         const [updated] = await tx.update(bookingRequests)
           .set({
             userEmail: ownerEmail.toLowerCase(),
             userName: ownerName,
-            userId: ownerId || null,
+            userId: ownerId ? String(ownerId) : null,
             isUnmatched: false,
             status: 'approved',
             declaredPlayerCount: totalPlayerCount,
             guestCount: guestCount,
-            staffNotes: sql`COALESCE(${bookingRequests.staffNotes}, '') || ' [Linked to member via staff: ' || ${ownerName} || ' with ' || ${totalPlayerCount.toString()} || ' players]'`,
+            staffNotes: newStaffNotes,
             updatedAt: new Date()
           })
           .where(eq(bookingRequests.id, existingBooking.id))
@@ -1211,7 +1213,7 @@ router.post('/api/bookings/link-trackman-to-member', isStaffOrAdmin, async (req,
           .values({
             userEmail: ownerEmail.toLowerCase(),
             userName: ownerName,
-            userId: ownerId || null,
+            userId: ownerId ? String(ownerId) : null,
             resourceId,
             requestDate,
             startTime,
@@ -1378,6 +1380,10 @@ router.get('/api/resources/overlapping-notices', isStaffOrAdmin, async (req, res
           OR (fc.start_time < $4 AND fc.end_time > $3)
         )`;
     
+    const params = isSameDayOnly
+      ? [queryDate, queryEndDate]
+      : [queryDate, queryEndDate, queryStartTime, queryEndTime];
+    
     const result = await pool.query(`
       SELECT 
         fc.id,
@@ -1404,7 +1410,7 @@ router.get('/api/resources/overlapping-notices', isStaffOrAdmin, async (req, res
         ${timeOverlapCondition}
       ORDER BY fc.start_date, fc.start_time
       LIMIT 20
-    `, [queryDate, queryEndDate, queryStartTime, queryEndTime]);
+    `, params);
     
     res.json(result.rows);
   } catch (error: any) {

@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.42.2",
+    date: "2026-02-11",
+    title: "Trackman Link & SQL Safety Fixes",
+    changes: [
+      "Fixed: Linking a Trackman booking to a member no longer fails due to a data type mismatch — user IDs are now properly stored as text",
+      "Fixed: Staff notes on linked bookings now build correctly instead of using a raw database expression that could fail",
+      "Fixed: Both 'update existing booking' and 'create new booking' paths in the Trackman link flow now handle user ID types consistently",
+    ],
+  },
+  {
     version: "7.42.1",
     date: "2026-02-11",
     title: "Private Event Linking & Blocks Pagination",
