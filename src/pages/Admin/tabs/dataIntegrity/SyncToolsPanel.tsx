@@ -40,6 +40,15 @@ interface SyncToolsPanelProps {
     deleted?: Array<{ id: string; email: string | null }>;
     deletedCount?: number;
   } | null;
+  stripeCleanupProgress: {
+    phase: string;
+    totalCustomers: number;
+    checked: number;
+    emptyFound: number;
+    skippedActiveCount: number;
+    deleted: number;
+    errors: number;
+  } | null;
 }
 
 const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
@@ -64,6 +73,7 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
   handleCleanupStripeCustomers,
   isRunningStripeCustomerCleanup,
   stripeCleanupResult,
+  stripeCleanupProgress,
 }) => {
   return (
     <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
@@ -242,6 +252,37 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
                 Delete Empty Customers
               </button>
             </div>
+            {isRunningStripeCustomerCleanup && stripeCleanupProgress && (
+              <div className="mt-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="material-symbols-outlined animate-spin text-[16px] text-blue-600">progress_activity</span>
+                  <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                    {stripeCleanupProgress.phase === 'fetching' && 'Fetching customers from Stripe...'}
+                    {stripeCleanupProgress.phase === 'checking' && `Checking customers: ${stripeCleanupProgress.checked} / ${stripeCleanupProgress.totalCustomers}`}
+                    {stripeCleanupProgress.phase === 'deleting' && `Deleting empty customers: ${stripeCleanupProgress.deleted} / ${stripeCleanupProgress.emptyFound}`}
+                  </span>
+                </div>
+                {stripeCleanupProgress.totalCustomers > 0 && (
+                  <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ 
+                        width: `${stripeCleanupProgress.phase === 'checking' 
+                          ? Math.round((stripeCleanupProgress.checked / Math.max(1, stripeCleanupProgress.totalCustomers)) * 100)
+                          : stripeCleanupProgress.phase === 'deleting'
+                            ? Math.round((stripeCleanupProgress.deleted / Math.max(1, stripeCleanupProgress.emptyFound)) * 100)
+                            : 0}%` 
+                      }}
+                    />
+                  </div>
+                )}
+                <div className="mt-1 text-[10px] text-blue-600 dark:text-blue-400">
+                  {stripeCleanupProgress.emptyFound > 0 && `Empty: ${stripeCleanupProgress.emptyFound} | `}
+                  {stripeCleanupProgress.skippedActiveCount > 0 && `Active (kept): ${stripeCleanupProgress.skippedActiveCount} | `}
+                  {stripeCleanupProgress.errors > 0 && `Errors: ${stripeCleanupProgress.errors}`}
+                </div>
+              </div>
+            )}
             {stripeCleanupResult && (
               <div className={`p-3 rounded-lg ${stripeCleanupResult.success ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
                 {stripeCleanupResult.dryRun && (

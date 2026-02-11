@@ -574,27 +574,91 @@ const DataIntegrityTab: React.FC = () => {
     }
   });
 
-  const cleanupStripeCustomersMutation = useMutation({
-    mutationFn: (dryRun: boolean) =>
-      postWithCredentials<any>('/api/data-tools/cleanup-stripe-customers', { dryRun }),
-    onSuccess: (data, dryRun) => {
-      setStripeCleanupResult({ 
-        success: data.success, 
-        message: data.message,
-        dryRun,
-        totalCustomers: data.totalCustomers,
-        emptyCount: data.emptyCount,
-        customers: data.customers,
-        deleted: data.deleted,
-        deletedCount: data.deletedCount,
-      });
-      if (!dryRun) showToast(data.message, 'success');
-    },
-    onError: (err: any) => {
-      setStripeCleanupResult({ success: false, message: err.message || 'Failed to cleanup Stripe customers' });
-      showToast(err.message || 'Failed to cleanup Stripe customers', 'error');
-    }
-  });
+  const [isRunningStripeCleanup, setIsRunningStripeCleanup] = useState(false);
+  const [stripeCleanupProgress, setStripeCleanupProgress] = useState<{
+    phase: string;
+    totalCustomers: number;
+    checked: number;
+    emptyFound: number;
+    skippedActiveCount: number;
+    deleted: number;
+    errors: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const handleProgress = (event: CustomEvent) => {
+      const { data, result, error } = event.detail || {};
+      if (data) {
+        setStripeCleanupProgress(data);
+      }
+      if (data?.phase === 'done') {
+        setIsRunningStripeCleanup(false);
+        if (result) {
+          setStripeCleanupResult({
+            success: result.success,
+            message: result.message,
+            dryRun: result.dryRun,
+            totalCustomers: result.totalCustomers,
+            emptyCount: result.emptyCount,
+            skippedActiveCount: result.skippedActiveCount,
+            customers: result.customers,
+            deleted: result.deleted,
+            deletedCount: result.deletedCount,
+          });
+          if (!result.dryRun) showToast(result.message, 'success');
+        }
+        if (error) {
+          setStripeCleanupResult({ success: false, message: error });
+          showToast(error, 'error');
+        }
+      }
+    };
+
+    window.addEventListener('stripe-cleanup-progress', handleProgress as EventListener);
+    return () => {
+      window.removeEventListener('stripe-cleanup-progress', handleProgress as EventListener);
+    };
+  }, [showToast]);
+
+  useEffect(() => {
+    if (!isRunningStripeCleanup) return;
+    const interval = setInterval(async () => {
+      try {
+        const statusData = await fetchWithCredentials<{ hasJob: boolean; job?: any }>('/api/data-tools/cleanup-stripe-customers/status');
+        if (statusData.hasJob && statusData.job) {
+          setStripeCleanupProgress(statusData.job.progress);
+          if (statusData.job.status === 'completed') {
+            setIsRunningStripeCleanup(false);
+            setStripeCleanupProgress(null);
+            const r = statusData.job.result;
+            if (r) {
+              setStripeCleanupResult({
+                success: r.success,
+                message: r.message,
+                dryRun: r.dryRun,
+                totalCustomers: r.totalCustomers,
+                emptyCount: r.emptyCount,
+                skippedActiveCount: r.skippedActiveCount,
+                customers: r.customers,
+                deleted: r.deleted,
+                deletedCount: r.deletedCount,
+              });
+            }
+          } else if (statusData.job.status === 'failed') {
+            setIsRunningStripeCleanup(false);
+            setStripeCleanupProgress(null);
+            setStripeCleanupResult({ success: false, message: statusData.job.error || 'Job failed' });
+          }
+        } else if (!statusData.hasJob) {
+          setIsRunningStripeCleanup(false);
+          setStripeCleanupProgress(null);
+          setStripeCleanupResult({ success: false, message: 'Job was lost (server may have restarted). Please try again.' });
+        }
+      } catch {
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [isRunningStripeCleanup]);
 
   const syncSubscriptionStatusMutation = useMutation({
     mutationFn: (dryRun: boolean) => 
@@ -1050,9 +1114,16 @@ const DataIntegrityTab: React.FC = () => {
     syncSubscriptionStatusMutation.mutate(dryRun);
   };
 
-  const handleCleanupStripeCustomers = (dryRun: boolean = true) => {
+  const handleCleanupStripeCustomers = async (dryRun: boolean = true) => {
     setStripeCleanupResult(null);
-    cleanupStripeCustomersMutation.mutate(dryRun);
+    setStripeCleanupProgress(null);
+    try {
+      await postWithCredentials('/api/data-tools/cleanup-stripe-customers', { dryRun });
+      setIsRunningStripeCleanup(true);
+    } catch (err: any) {
+      setStripeCleanupResult({ success: false, message: err.message || 'Failed to start cleanup job' });
+      showToast(err.message || 'Failed to start cleanup job', 'error');
+    }
   };
 
   const handleClearOrphanedStripeIds = (dryRun: boolean = true) => {
@@ -1134,7 +1205,7 @@ const DataIntegrityTab: React.FC = () => {
   const isRunningDuplicateDetection = detectDuplicatesMutation.isPending;
   const isLoadingPlaceholders = scanPlaceholdersMutation.isPending;
   const isDeletingPlaceholders = deletePlaceholdersMutation.isPending;
-  const isRunningStripeCustomerCleanup = cleanupStripeCustomersMutation.isPending;
+  const isRunningStripeCustomerCleanup = isRunningStripeCleanup;
 
   const toggleCheck = (checkName: string) => {
     setExpandedChecks(prev => {
@@ -1529,6 +1600,7 @@ const DataIntegrityTab: React.FC = () => {
         isRunningStripeCustomerCleanup={isRunningStripeCustomerCleanup}
         stripeCleanupResult={stripeCleanupResult}
         handleCleanupStripeCustomers={handleCleanupStripeCustomers}
+        stripeCleanupProgress={stripeCleanupProgress}
         isRunningGhostBookingFix={isRunningGhostBookingFix}
         ghostBookingResult={ghostBookingResult}
         handleFixGhostBookings={handleFixGhostBookings}
@@ -1571,6 +1643,7 @@ const DataIntegrityTab: React.FC = () => {
         handleCleanupStripeCustomers={handleCleanupStripeCustomers}
         isRunningStripeCustomerCleanup={isRunningStripeCustomerCleanup}
         stripeCleanupResult={stripeCleanupResult}
+        stripeCleanupProgress={stripeCleanupProgress}
       />
 
       <CleanupToolsPanel

@@ -132,6 +132,10 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
             window.dispatchEvent(new CustomEvent('data-integrity-update', { detail: message }));
           }
 
+          if (message.type === 'stripe_cleanup_progress') {
+            window.dispatchEvent(new CustomEvent('stripe-cleanup-progress', { detail: message }));
+          }
+
           // Handle billing updates (for Billing tab real-time updates)
           if (message.type === 'billing_update') {
             window.dispatchEvent(new CustomEvent('billing-update', { detail: message }));
