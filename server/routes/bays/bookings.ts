@@ -488,7 +488,6 @@ router.post('/api/booking-requests', async (req, res) => {
         
         if (overlapCheck.rows.length > 0) {
           await client.query('ROLLBACK');
-          client.release();
           return res.status(409).json({ error: 'This time slot is already booked' });
         }
       }
@@ -496,7 +495,6 @@ router.post('/api/booking-requests', async (req, res) => {
       const limitCheck = await checkDailyBookingLimit(user_email, request_date, duration_minutes, user_tier, resourceType);
       if (!limitCheck.allowed) {
         await client.query('ROLLBACK');
-        client.release();
         return res.status(403).json({ 
           error: limitCheck.reason,
           remainingMinutes: limitCheck.remainingMinutes
@@ -588,7 +586,6 @@ router.post('/api/booking-requests', async (req, res) => {
             // Overage fees apply - require prepayment
             if (!conference_prepayment_id) {
               await client.query('ROLLBACK');
-              client.release();
               return res.status(402).json({ 
                 error: 'Payment required for conference room overage fees',
                 overageMinutes,
@@ -606,7 +603,6 @@ router.post('/api/booking-requests', async (req, res) => {
             
             if (prepaymentCheck.rows.length === 0) {
               await client.query('ROLLBACK');
-              client.release();
               return res.status(400).json({ error: 'Prepayment not found' });
             }
             
@@ -614,14 +610,12 @@ router.post('/api/booking-requests', async (req, res) => {
             // Accept both 'succeeded' (credit payment) and 'completed' (card payment after confirm)
             if (prepayment.status !== 'succeeded' && prepayment.status !== 'completed') {
               await client.query('ROLLBACK');
-              client.release();
               return res.status(402).json({ error: 'Prepayment not completed. Please complete payment first.' });
             }
             
             // Verify prepayment amount matches expected fee
             if (prepayment.amount_cents < totalCents) {
               await client.query('ROLLBACK');
-              client.release();
               return res.status(402).json({ 
                 error: 'Prepayment amount insufficient for this booking duration',
                 prepaidCents: prepayment.amount_cents,
@@ -731,7 +725,7 @@ router.post('/api/booking-requests', async (req, res) => {
       await client.query('ROLLBACK');
       throw error;
     } finally {
-      client.release();
+      try { client.release(); } catch (_) {}
     }
     
     // Ensure session exists for auto-confirmed conference room bookings

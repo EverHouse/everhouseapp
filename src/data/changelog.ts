@@ -13,6 +13,14 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.39.7",
+    date: "2026-02-11",
+    title: "Booking Confirmation Reliability Fix",
+    changes: [
+      "Fix: Booking requests now reliably show the success confirmation — previously a database cleanup error could cause the booking to save correctly but show an error message to the member instead of the success toast",
+    ],
+  },
+  {
     version: "7.39.6",
     date: "2026-02-11",
     title: "Chronological Fee Ordering Fix",
