@@ -480,16 +480,10 @@ async function startServer() {
   }
   
   httpServer = http.createServer((req, res) => {
-    if (req.url === '/healthz' || req.url === '/_health') {
-      res.writeHead(200, { 'Content-Type': 'text/plain' });
-      res.end('OK');
-      return;
-    }
-    
-    if (req.url === '/') {
+    if (req.url === '/healthz' || req.url === '/_health' || req.url === '/') {
       const ua = req.headers['user-agent'] || '';
       const isBrowser = ua.includes('Mozilla') || ua.includes('Chrome') || ua.includes('Safari');
-      if (!isBrowser) {
+      if (req.url !== '/' || !isBrowser) {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('OK');
         return;
