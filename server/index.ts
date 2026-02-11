@@ -82,7 +82,8 @@ async function gracefulShutdown(signal: string) {
   }
 }
 
-const PORT = Number(process.env.PORT) || 3001;
+const isProduction = process.env.NODE_ENV === 'production';
+const PORT = Number(process.env.PORT) || (isProduction ? 5001 : 3001);
 
 httpServer = http.createServer((req, res) => {
   if (req.url === '/healthz' || req.url === '/_health') {
@@ -92,9 +93,14 @@ httpServer = http.createServer((req, res) => {
   }
 
   if (req.url === '/' && req.method === 'GET') {
-    if (process.env.NODE_ENV === 'production' && cachedIndexHtml) {
-      res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-cache' });
-      res.end(cachedIndexHtml);
+    if (isProduction) {
+      if (cachedIndexHtml) {
+        res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-cache' });
+        res.end(cachedIndexHtml);
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end('OK');
       return;
     }
     if (!expressApp) {

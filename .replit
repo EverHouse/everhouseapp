@@ -72,6 +72,7 @@ VAPID_PUBLIC_KEY = "BG-oXwIn5dHb93Y6SuyOpkHm7Qu2La9ge5pwQFAx98WRllqI6-zg-n3A5CUR
 SUPABASE_URL = "https://vramupyxmnzhgegltppg.supabase.co"
 ENABLE_CORPORATE_BILLING = "true"
 SUPABASE_DB_SCHEMA = "public"
+HUBSPOT_ACCESS_TOKEN = "pat-na2-0d49594e-a327-4d57-a5c0-c034bac559aa"
 
 [userenv.development]
 DEV_LOGIN_ENABLED = "true"
