@@ -6,6 +6,7 @@ import TierBadge from '../../../../components/TierBadge';
 import { SwipeableListItem } from '../../../../components/SwipeableListItem';
 import type { BookingRequest, Resource } from './simulatorTypes';
 import { formatDateShortAdmin, groupBookingsByDate } from './simulatorUtils';
+import GuideBookings from '../../../../components/guides/GuideBookings';
 
 function BookingFeeButton({ bookingId, dbOwed, hasUnpaidFees, setBookingSheet, fallback }: {
     bookingId: number;
@@ -123,6 +124,9 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                 Queue ({queueItems.length})
                             </h3>
                             <div className="flex items-center gap-2">
+                                <div className="hidden lg:block">
+                                    <GuideBookings />
+                                </div>
                                 <button
                                     onClick={() => navigateToTab('trackman')}
                                     className="hidden lg:flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary dark:text-white bg-primary/10 dark:bg-white/10 hover:bg-primary/20 dark:hover:bg-white/20 rounded-lg transition-colors shadow-sm"

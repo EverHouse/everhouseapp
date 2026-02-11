@@ -36,6 +36,7 @@ import { formatDateShortAdmin } from './simulator/simulatorUtils';
 import ManualBookingModal from './simulator/MemberSearchPopover';
 import CalendarGrid from './simulator/CalendarGrid';
 import BookingRequestsPanel from './simulator/BookingRequestsPanel';
+import GuideBookings from '../../../components/guides/GuideBookings';
 
 const SimulatorTab: React.FC = () => {
     const navigate = useNavigate();
@@ -1064,7 +1065,8 @@ const SimulatorTab: React.FC = () => {
                             )}
                         </button>
                     </div>
-                    <div className="flex items-center">
+                    <div className="flex items-center gap-2">
+                        <GuideBookings />
                         <button
                             onClick={() => navigateToTab('trackman')}
                             className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary dark:text-white bg-primary/10 dark:bg-white/10 hover:bg-primary/20 dark:hover:bg-white/20 rounded-lg transition-colors shadow-sm"
