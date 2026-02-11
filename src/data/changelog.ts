@@ -13,6 +13,21 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.41.0",
+    date: "2026-02-11",
+    title: "Facility Page Redesign — Liquid Glass",
+    isMajor: true,
+    changes: [
+      "New: Glass Segmented Control replaces bulky tab buttons — compact pill shape with a sliding white active indicator",
+      "New: Unified Glass Toolbar consolidates filters, color legend, and Google Calendar sync status into one sticky row",
+      "New: Glass Card layout for all notices — translucent cards with colored left border, hover lift effect, and shadow depth",
+      "New: Edit buttons now fade in on hover (desktop) to reduce visual clutter, always visible on mobile",
+      "New: Closure Reasons and Notice Types collapsed into compact pill badges instead of large grid sections",
+      "Improved: Needs Review drafts use the same Glass Card treatment with cyan left border",
+      "Improved: Past notices section uses glass styling with subtle opacity treatment",
+    ],
+  },
+  {
     version: "7.40.3",
     date: "2026-02-11",
     title: "Calendar Grid Interaction Redesign",

@@ -637,13 +637,20 @@ const BlocksTab: React.FC = () => {
     return (
         <PullToRefresh onRefresh={handlePullRefresh}>
         <AnimatedPage className="space-y-6">
-            <div className="flex gap-2 mb-4 animate-content-enter-delay-1">
+            <div className="inline-flex bg-black/5 dark:bg-white/10 backdrop-blur-sm rounded-full p-1 relative animate-content-enter-delay-1">
+                <div
+                    className="absolute top-1 bottom-1 bg-white dark:bg-white/20 shadow-md rounded-full transition-all duration-300"
+                    style={{
+                        width: 'calc(50% - 4px)',
+                        left: activeSubTab === 'notices' ? '4px' : 'calc(50% + 0px)',
+                    }}
+                />
                 <button
                     onClick={() => setActiveSubTab('notices')}
-                    className={`flex-1 py-2.5 px-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-1.5 ${
+                    className={`relative z-10 px-5 py-1.5 text-sm font-medium transition-colors duration-200 rounded-full flex items-center gap-1.5 ${
                         activeSubTab === 'notices'
-                            ? 'bg-amber-500 text-white shadow-md'
-                            : 'bg-white dark:bg-white/10 text-gray-600 dark:text-white/80 border border-gray-200 dark:border-white/25'
+                            ? 'text-primary dark:text-white'
+                            : 'text-gray-500 dark:text-white/60'
                     }`}
                 >
                     <span aria-hidden="true" className="material-symbols-outlined text-[18px]">notifications</span>
@@ -651,10 +658,10 @@ const BlocksTab: React.FC = () => {
                 </button>
                 <button
                     onClick={() => setActiveSubTab('blocks')}
-                    className={`flex-1 py-2.5 px-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-1.5 ${
+                    className={`relative z-10 px-5 py-1.5 text-sm font-medium transition-colors duration-200 rounded-full flex items-center gap-1.5 ${
                         activeSubTab === 'blocks'
-                            ? 'bg-orange-500 text-white shadow-md'
-                            : 'bg-white dark:bg-white/10 text-gray-600 dark:text-white/80 border border-gray-200 dark:border-white/25'
+                            ? 'text-primary dark:text-white'
+                            : 'text-gray-500 dark:text-white/60'
                     }`}
                 >
                     <span aria-hidden="true" className="material-symbols-outlined text-[18px]">event_busy</span>
@@ -667,15 +674,11 @@ const BlocksTab: React.FC = () => {
 
             {activeSubTab === 'notices' && (
             <>
-            <p className="text-sm text-primary/80 dark:text-white/80 mb-4">
-                Synced from Google Calendar: <span className="font-medium">Internal Calendar</span>
-            </p>
-
-            <div className="flex gap-2 items-center animate-slide-up-stagger overflow-x-auto" style={{ '--stagger-index': 0 } as React.CSSProperties}>
+            <div className="sticky top-0 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-white/10 -mx-4 px-4 py-2.5 flex items-center gap-3 flex-wrap animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
                 <select
                     value={closuresFilterResource}
                     onChange={(e) => setClosuresFilterResource(e.target.value)}
-                    className="px-2 py-2 rounded-xl bg-gray-100 dark:bg-white/10 border border-gray-300 dark:border-white/20 text-primary dark:text-white text-sm flex-shrink-0"
+                    className="px-2 py-1.5 rounded-lg bg-gray-100 dark:bg-white/10 border border-gray-300 dark:border-white/20 text-primary dark:text-white text-xs flex-shrink-0"
                 >
                     <option value="all">All</option>
                     <option value="entire_facility">Entire Facility</option>
@@ -693,53 +696,64 @@ const BlocksTab: React.FC = () => {
                     value={closuresFilterDate}
                     onChange={(e) => setClosuresFilterDate(e.target.value)}
                     placeholder="Filter date"
-                    className="px-2 py-2 rounded-xl bg-gray-100 dark:bg-white/10 border border-gray-300 dark:border-white/20 text-primary dark:text-white text-sm flex-shrink-0 w-[130px] [&::-webkit-datetime-edit-text]:text-gray-400 [&::-webkit-datetime-edit-month-field]:text-gray-400 [&::-webkit-datetime-edit-day-field]:text-gray-400 [&::-webkit-datetime-edit-year-field]:text-gray-400 [&:not(:valid)]:text-gray-400"
+                    className="px-2 py-1.5 rounded-lg bg-gray-100 dark:bg-white/10 border border-gray-300 dark:border-white/20 text-primary dark:text-white text-xs flex-shrink-0 w-[120px] [&::-webkit-datetime-edit-text]:text-gray-400 [&::-webkit-datetime-edit-month-field]:text-gray-400 [&::-webkit-datetime-edit-day-field]:text-gray-400 [&::-webkit-datetime-edit-year-field]:text-gray-400 [&:not(:valid)]:text-gray-400"
                 />
                 {closuresFilterDate && (
                     <button
                         onClick={() => setClosuresFilterDate('')}
-                        className="px-2 py-2 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-white/70 text-sm hover:bg-gray-200 dark:hover:bg-white/20 flex-shrink-0"
+                        className="px-2 py-1.5 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-white/70 text-xs hover:bg-gray-200 dark:hover:bg-white/20 flex-shrink-0"
                     >
                         Clear
                     </button>
                 )}
+
+                <div className="flex items-center gap-2 text-[10px] ml-auto flex-shrink-0">
+                    <div className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-red-500 inline-block"></span>
+                        <span className="text-gray-500 dark:text-white/60">Blocks</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
+                        <span className="text-gray-500 dark:text-white/60">Info</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-cyan-500 inline-block"></span>
+                        <span className="text-gray-500 dark:text-white/60">Draft</span>
+                    </div>
+                    <span className="text-gray-300 dark:text-white/20">|</span>
+                    <div className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
+                        <span className="text-gray-500 dark:text-white/60">Synced · Internal Calendar</span>
+                    </div>
+                </div>
             </div>
 
-            <div className="flex items-center gap-3 text-xs my-4">
-                <div className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-full bg-red-500"></span>
-                    <span className="text-gray-600 dark:text-white/70">Blocks bookings</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-full bg-amber-500"></span>
-                    <span className="text-gray-600 dark:text-white/70">Informational</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-full bg-cyan-500"></span>
-                    <span className="text-gray-600 dark:text-white/70">Draft</span>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <div className="rounded-2xl border border-gray-200 dark:border-white/20 overflow-hidden">
+            <div className="flex items-center gap-2 mb-4">
                 <button
                     onClick={() => setShowClosureReasonsSection(!showClosureReasonsSection)}
-                    className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white/60 dark:bg-white/10 backdrop-blur-sm border border-gray-200/50 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/15 transition-all"
                 >
-                    <div className="flex items-center gap-2">
-                        <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">settings</span>
-                        <span className="font-semibold text-primary dark:text-white">Closure Reasons</span>
-                        <span className="text-xs bg-gray-200 dark:bg-white/20 text-gray-600 dark:text-white/70 px-2 py-0.5 rounded-full">
-                            {closureReasons.filter(r => r.isActive).length}
-                        </span>
-                    </div>
-                    <span aria-hidden="true" className={`material-symbols-outlined text-gray-400 transition-transform ${showClosureReasonsSection ? 'rotate-180' : ''}`}>
-                        expand_more
+                    <span aria-hidden="true" className="material-symbols-outlined text-sm">settings</span>
+                    Closure Reasons
+                    <span className="bg-gray-200 dark:bg-white/20 text-gray-600 dark:text-white/70 px-1.5 py-0.5 rounded-full text-[10px]">
+                        {closureReasons.filter(r => r.isActive).length}
                     </span>
                 </button>
-                
-                {showClosureReasonsSection && (
-                    <div className="p-4 space-y-4 bg-white dark:bg-black/20">
+                <button
+                    onClick={() => setShowNoticeTypesSection(!showNoticeTypesSection)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white/60 dark:bg-white/10 backdrop-blur-sm border border-gray-200/50 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/15 transition-all"
+                >
+                    <span aria-hidden="true" className="material-symbols-outlined text-sm">category</span>
+                    Notice Types
+                    <span className="bg-gray-200 dark:bg-white/20 text-gray-600 dark:text-white/70 px-1.5 py-0.5 rounded-full text-[10px]">
+                        {noticeTypes.length}
+                    </span>
+                </button>
+            </div>
+
+            {showClosureReasonsSection && (
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-2xl p-4 mb-4">
+                    <div className="space-y-4">
                         <p className="text-xs text-gray-500 dark:text-white/60">
                             Manage the dropdown options shown when creating closures. Lower sort order appears first.
                         </p>
@@ -813,28 +827,12 @@ const BlocksTab: React.FC = () => {
                             </div>
                         )}
                     </div>
-                )}
-            </div>
+                </div>
+            )}
 
-            <div className="rounded-2xl border border-gray-200 dark:border-white/20 overflow-hidden">
-                <button
-                    onClick={() => setShowNoticeTypesSection(!showNoticeTypesSection)}
-                    className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
-                >
-                    <div className="flex items-center gap-2">
-                        <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">category</span>
-                        <span className="font-semibold text-primary dark:text-white">Notice Types</span>
-                        <span className="text-xs bg-gray-200 dark:bg-white/20 text-gray-600 dark:text-white/70 px-2 py-0.5 rounded-full">
-                            {noticeTypes.length}
-                        </span>
-                    </div>
-                    <span aria-hidden="true" className={`material-symbols-outlined text-gray-400 transition-transform ${showNoticeTypesSection ? 'rotate-180' : ''}`}>
-                        expand_more
-                    </span>
-                </button>
-                
-                {showNoticeTypesSection && (
-                    <div className="p-4 space-y-4 bg-white dark:bg-black/20">
+            {showNoticeTypesSection && (
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-2xl p-4 mb-4">
+                    <div className="space-y-4">
                         <p className="text-xs text-gray-500 dark:text-white/60">
                             Manage notice categories used when creating closures. Preset types cannot be edited or deleted.
                         </p>
@@ -898,9 +896,8 @@ const BlocksTab: React.FC = () => {
                             )}
                         </div>
                     </div>
-                )}
-            </div>
-            </div>
+                </div>
+            )}
 
             {needsReviewClosures.length > 0 && (
                 <div className="space-y-3 animate-slide-up-stagger" style={{ '--stagger-index': 1 } as React.CSSProperties}>
@@ -918,7 +915,7 @@ const BlocksTab: React.FC = () => {
                             return (
                                 <div 
                                     key={closure.id}
-                                    className="rounded-2xl overflow-hidden bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/30 animate-slide-up-stagger"
+                                    className="bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 border-l-4 border-l-cyan-500 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden group animate-slide-up-stagger"
                                     style={{ '--stagger-index': index } as React.CSSProperties}
                                 >
                                     <div className="p-4 flex items-start justify-between gap-3">
@@ -943,7 +940,7 @@ const BlocksTab: React.FC = () => {
                                         </div>
                                         <button
                                             onClick={(e) => handleEditClosure(closure, e)}
-                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-500 text-white text-sm font-medium hover:bg-cyan-600 active:scale-95 transition-all flex-shrink-0"
+                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-500 text-white text-sm font-medium hover:bg-cyan-600 active:scale-95 transition-all flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"
                                         >
                                             <span aria-hidden="true" className="material-symbols-outlined text-base">edit</span>
                                             Edit
@@ -972,20 +969,14 @@ const BlocksTab: React.FC = () => {
                         return (
                             <div 
                                 key={closure.id} 
-                                className={`rounded-2xl overflow-hidden transition-all animate-pop-in ${
+                                className={`bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden group animate-pop-in ${
                                     blocking 
-                                        ? 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30'
-                                        : 'bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30'
+                                        ? 'border-l-4 border-l-red-500'
+                                        : 'border-l-4 border-l-amber-500'
                                 }`}
                                 style={{ '--stagger-index': index } as React.CSSProperties}
                             >
-                                <div
-                                    className={`w-full p-4 text-left transition-colors ${
-                                        blocking 
-                                            ? 'hover:bg-red-100 dark:hover:bg-red-500/20'
-                                            : 'hover:bg-amber-100 dark:hover:bg-amber-500/20'
-                                    }`}
-                                >
+                                <div className="w-full p-4 text-left">
                                     <div className="flex items-start justify-between gap-3">
                                         <div 
                                             className="flex-1 min-w-0 cursor-pointer"
@@ -1040,7 +1031,7 @@ const BlocksTab: React.FC = () => {
                                                     </div>
                                                 )}
                                                 {blocking && closure.affectedAreas && (
-                                                    <div className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400`}>
+                                                    <div className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400">
                                                         <span aria-hidden="true" className="material-symbols-outlined text-[12px]">block</span>
                                                         <span>{formatAffectedAreas(closure.affectedAreas)}</span>
                                                     </div>
@@ -1050,11 +1041,7 @@ const BlocksTab: React.FC = () => {
                                         <div className="flex items-center gap-2 flex-shrink-0">
                                             <button
                                                 onClick={(e) => handleEditClosure(closure, e)}
-                                                className={`p-2 rounded-xl transition-all ${
-                                                    blocking 
-                                                        ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-500/30'
-                                                        : 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-500/30'
-                                                }`}
+                                                className="p-2 rounded-xl transition-all bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-white/60 hover:bg-gray-200 dark:hover:bg-white/20 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"
                                             >
                                                 <span aria-hidden="true" className="material-symbols-outlined text-lg">edit</span>
                                             </button>
@@ -1071,7 +1058,7 @@ const BlocksTab: React.FC = () => {
                                 </div>
                                 
                                 {isExpanded && (
-                                    <div className={`border-t ${blocking ? 'border-red-200 dark:border-red-500/30' : 'border-amber-200 dark:border-amber-500/30'}`}>
+                                    <div className="bg-gray-50/50 dark:bg-white/5 border-t border-gray-200/50 dark:border-white/10">
                                         <div className="p-4 space-y-3">
                                             {closure.memberNotice && (
                                                 <div>
@@ -1134,10 +1121,10 @@ const BlocksTab: React.FC = () => {
             )}
 
             {pastClosures.length > 0 && (
-                <div className="mt-6 rounded-2xl border border-gray-200 dark:border-white/20 overflow-hidden">
+                <div className="mt-6 bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-2xl overflow-hidden">
                     <button
                         onClick={() => setShowPastAccordion(!showPastAccordion)}
-                        className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                        className="w-full flex items-center justify-between p-4 hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors"
                     >
                         <div className="flex items-center gap-2">
                             <span aria-hidden="true" className="material-symbols-outlined text-gray-500 dark:text-white/60">history</span>
@@ -1152,7 +1139,7 @@ const BlocksTab: React.FC = () => {
                     </button>
                     
                     {showPastAccordion && (
-                        <div className="p-4 space-y-3 bg-gray-50/50 dark:bg-black/20">
+                        <div className="p-4 space-y-3 bg-gray-50/50 dark:bg-white/5 border-t border-gray-200/50 dark:border-white/10">
                             {pastClosures.map((closure, index) => {
                                 const blocking = isBlocking(closure.affectedAreas);
                                 const isExpanded = expandedNotices.has(closure.id);
@@ -1160,10 +1147,10 @@ const BlocksTab: React.FC = () => {
                                 return (
                                     <div 
                                         key={closure.id} 
-                                        className={`rounded-xl overflow-hidden transition-all opacity-70 hover:opacity-100 ${
+                                        className={`bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-xl overflow-hidden transition-all duration-200 opacity-70 hover:opacity-100 hover:shadow-sm group ${
                                             blocking 
-                                                ? 'bg-red-50 dark:bg-red-500/10 border border-red-200/60 dark:border-red-500/20'
-                                                : 'bg-amber-50 dark:bg-amber-500/10 border border-amber-200/60 dark:border-amber-500/20'
+                                                ? 'border-l-4 border-l-red-500'
+                                                : 'border-l-4 border-l-amber-500'
                                         }`}
                                     >
                                         <div className="p-3">
@@ -1206,7 +1193,7 @@ const BlocksTab: React.FC = () => {
                                                 <div className="flex items-center gap-1 flex-shrink-0">
                                                     <button
                                                         onClick={(e) => handleEditClosure(closure, e)}
-                                                        className="p-1.5 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-white/50 hover:bg-gray-200 dark:hover:bg-white/20 transition-all"
+                                                        className="p-1.5 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-white/50 hover:bg-gray-200 dark:hover:bg-white/20 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"
                                                     >
                                                         <span aria-hidden="true" className="material-symbols-outlined text-base">edit</span>
                                                     </button>
@@ -1223,7 +1210,7 @@ const BlocksTab: React.FC = () => {
                                         </div>
                                         
                                         {isExpanded && (
-                                            <div className={`border-t p-3 ${blocking ? 'border-red-200/40 dark:border-red-500/20' : 'border-amber-200/40 dark:border-amber-500/20'}`}>
+                                            <div className="bg-gray-50/50 dark:bg-white/5 border-t border-gray-200/50 dark:border-white/10 p-3">
                                                 <div className="flex gap-2">
                                                     <button
                                                         onClick={(e) => handleEditClosure(closure, e)}
