@@ -2586,4 +2586,116 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
   }
 });
 
+router.post('/api/stripe/staff/charge-subscription-invoice', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { subscriptionId, userId } = req.body;
+    const { staffEmail } = getStaffInfo(req);
+
+    if (!subscriptionId) {
+      return res.status(400).json({ error: 'Missing required field: subscriptionId' });
+    }
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing required field: userId' });
+    }
+
+    const userResult = await db.execute(sql`SELECT id, email, first_name, last_name, membership_status 
+       FROM users WHERE id = ${userId}`);
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userResult.rows[0];
+    const userEmail = user.email;
+
+    const stripe = await getStripeClient();
+
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+      expand: ['latest_invoice', 'customer']
+    });
+
+    const invoice = subscription.latest_invoice as any;
+    if (!invoice) {
+      return res.status(400).json({ error: 'No invoice found for this subscription' });
+    }
+
+    if (invoice.status !== 'open' && subscription.status !== 'incomplete') {
+      return res.status(400).json({ 
+        error: `Invoice is not payable. Invoice status: ${invoice.status}, Subscription status: ${subscription.status}` 
+      });
+    }
+
+    const customer = subscription.customer as any;
+    let paymentMethodId: string | null = null;
+
+    if (customer?.invoice_settings?.default_payment_method) {
+      paymentMethodId = typeof customer.invoice_settings.default_payment_method === 'string' 
+        ? customer.invoice_settings.default_payment_method 
+        : customer.invoice_settings.default_payment_method.id;
+    }
+
+    if (!paymentMethodId && typeof customer === 'object' && customer.id) {
+      const paymentMethods = await stripe.paymentMethods.list({
+        customer: customer.id,
+        type: 'card'
+      });
+      if (paymentMethods.data.length > 0) {
+        paymentMethodId = paymentMethods.data[0].id;
+      }
+    }
+
+    if (!paymentMethodId) {
+      return res.status(400).json({ 
+        error: 'No saved card on file. Use the terminal reader or ask the member to update their payment method.',
+        noSavedCard: true
+      });
+    }
+
+    const paidInvoice = await stripe.invoices.pay(invoice.id, {
+      payment_method: paymentMethodId
+    });
+
+    if (paidInvoice.status === 'paid') {
+      await db.execute(sql`UPDATE users SET membership_status = 'active', updated_at = NOW() WHERE id = ${userId}`);
+    }
+
+    logFromRequest(req, 'charge_subscription_invoice', 'payment', invoice.id, userEmail, {
+      subscriptionId,
+      invoiceId: invoice.id,
+      amountDue: invoice.amount_due,
+      paymentMethodId,
+      invoiceStatus: paidInvoice.status,
+      chargedBy: staffEmail
+    });
+
+    broadcastBillingUpdate({
+      action: 'subscription_payment_collected',
+      memberEmail: userEmail,
+      customerId: customer?.id
+    });
+
+    res.json({
+      success: true,
+      invoiceId: invoice.id,
+      invoiceStatus: paidInvoice.status,
+      amountPaid: paidInvoice.amount_paid
+    });
+  } catch (error: any) {
+    console.error('[Stripe] Error charging subscription invoice:', error);
+    
+    if (error.type === 'StripeCardError') {
+      return res.status(400).json({ 
+        error: `Card declined: ${error.message}`,
+        declineCode: error.decline_code
+      });
+    }
+    
+    await alertOnExternalServiceError('Stripe', error, 'charge subscription invoice');
+    res.status(500).json({ 
+      error: error.message || 'Failed to charge subscription invoice',
+      retryable: true
+    });
+  }
+});
+
 export default router;

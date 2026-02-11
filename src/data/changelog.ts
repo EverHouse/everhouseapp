@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.38.0",
+    date: "2026-02-11",
+    title: "Activation Controls & Charge Saved Card",
+    changes: [
+      "Feature: Staff can now send activation emails and copy activation links directly from a member's billing tab when their subscription is awaiting payment",
+      "Feature: Collect Payment modal now offers two options — Card Reader (terminal) or Charge Saved Card — so staff can charge a member's card on file without needing the physical reader",
+      "Improvement: Charge Saved Card shows the specific card that will be charged (brand, last 4 digits, expiry) before confirming",
+      "Improvement: All charge-card actions are logged in the staff activity feed for audit purposes",
+    ],
+  },
+  {
     version: "7.37.0",
     date: "2026-02-11",
     title: "Stripe Customer Cleanup & Lazy Customer Creation",

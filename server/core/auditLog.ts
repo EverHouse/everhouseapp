@@ -128,7 +128,8 @@ export type AuditAction =
   | 'large_charge_approved'
   | 'cancellation_requested'
   | 'complete_cancellation'
-  | 'replay_webhook';
+  | 'replay_webhook'
+  | 'charge_subscription_invoice';
 
 export type ActorType = 'staff' | 'member' | 'system';
 

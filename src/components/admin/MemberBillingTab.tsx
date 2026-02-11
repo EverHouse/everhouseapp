@@ -517,9 +517,13 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
   }>>([]);
   const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
 
+  const [isSendingActivation, setIsSendingActivation] = useState(false);
+
   const [showCollectPayment, setShowCollectPayment] = useState(false);
   const [collectPaymentAmount, setCollectPaymentAmount] = useState(0);
   const [collectPaymentError, setCollectPaymentError] = useState<string | null>(null);
+  const [collectPaymentMode, setCollectPaymentMode] = useState<'terminal' | 'charge_card'>('terminal');
+  const [isChargingCard, setIsChargingCard] = useState(false);
 
   const [outstandingData, setOutstandingData] = useState<{
     totalOutstandingCents: number;
@@ -819,6 +823,54 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
       setError(getNetworkErrorMessage());
     } finally {
       setIsOpeningBillingPortal(false);
+    }
+  };
+
+  const handleSendActivationEmail = async () => {
+    if (!memberEmail) return;
+    setIsSendingActivation(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/stripe/staff/send-reactivation-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ memberEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Failed to send activation email');
+      } else {
+        showSuccess('Activation email sent!');
+      }
+    } catch (err) {
+      setError(getNetworkErrorMessage());
+    } finally {
+      setIsSendingActivation(false);
+    }
+  };
+
+  const handleCopyActivationLink = async () => {
+    if (!memberEmail) return;
+    setError(null);
+    try {
+      const res = await fetch('/api/my/billing/portal', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: memberEmail }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.url) {
+          await navigator.clipboard.writeText(data.url);
+          showSuccess('Activation link copied to clipboard!');
+        }
+      } else {
+        setError(getApiErrorMessage(res, 'get activation link'));
+      }
+    } catch (err) {
+      setError(getNetworkErrorMessage());
     }
   };
 
@@ -1225,6 +1277,9 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
             setCollectPaymentError(null);
             setShowCollectPayment(true);
           } : undefined}
+          onSendActivationEmail={billingInfo.activeSubscription?.status === 'incomplete' ? handleSendActivationEmail : undefined}
+          isSendingActivation={isSendingActivation}
+          onCopyActivationLink={billingInfo.activeSubscription?.status === 'incomplete' ? handleCopyActivationLink : undefined}
         />
       )}
 
@@ -1678,7 +1733,11 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
       {showCollectPayment && billingInfo?.activeSubscription && (
         <ModalShell
           isOpen={showCollectPayment}
-          onClose={() => setShowCollectPayment(false)}
+          onClose={() => {
+            setShowCollectPayment(false);
+            setCollectPaymentMode('terminal');
+            setCollectPaymentError(null);
+          }}
           title="Collect Subscription Payment"
           size="md"
         >
@@ -1691,45 +1750,173 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
                 </span>
               </div>
             </div>
+
+            <div className={`flex rounded-lg overflow-hidden border ${isDark ? 'border-white/20' : 'border-gray-200'}`}>
+              <button
+                onClick={() => { setCollectPaymentMode('terminal'); setCollectPaymentError(null); }}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  collectPaymentMode === 'terminal'
+                    ? isDark
+                      ? 'bg-accent text-primary'
+                      : 'bg-primary text-white'
+                    : isDark
+                      ? 'bg-white/5 text-gray-400 hover:bg-white/10'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <span className="material-symbols-outlined text-lg">point_of_sale</span>
+                Card Reader
+              </button>
+              <button
+                onClick={() => { setCollectPaymentMode('charge_card'); setCollectPaymentError(null); }}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  collectPaymentMode === 'charge_card'
+                    ? isDark
+                      ? 'bg-accent text-primary'
+                      : 'bg-primary text-white'
+                    : isDark
+                      ? 'bg-white/5 text-gray-400 hover:bg-white/10'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <span className="material-symbols-outlined text-lg">credit_card</span>
+                Charge Saved Card
+              </button>
+            </div>
+
             {collectPaymentError && (
               <div className={`p-3 rounded-lg ${isDark ? 'bg-red-900/20 border border-red-700 text-red-400' : 'bg-red-50 border border-red-200 text-red-700'}`}>
                 <p className="text-sm">{collectPaymentError}</p>
               </div>
             )}
-            <TerminalPayment
-              amount={collectPaymentAmount}
-              subscriptionId={billingInfo.activeSubscription.id}
-              userId={memberId || null}
-              email={memberEmail}
-              description={`${billingInfo.activeSubscription.planName || 'Membership'} subscription payment`}
-              onSuccess={async (piId) => {
-                try {
-                  const confirmRes = await fetch('/api/stripe/terminal/confirm-subscription-payment', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                      paymentIntentId: piId,
-                      subscriptionId: billingInfo.activeSubscription!.id,
-                      userId: memberId || null,
-                      invoiceId: null
-                    })
-                  });
-                  if (!confirmRes.ok) {
-                    const data = await confirmRes.json();
-                    setCollectPaymentError(data.error || 'Failed to confirm payment');
-                    return;
+
+            {collectPaymentMode === 'terminal' && (
+              <TerminalPayment
+                amount={collectPaymentAmount}
+                subscriptionId={billingInfo.activeSubscription.id}
+                userId={memberId || null}
+                email={memberEmail}
+                description={`${billingInfo.activeSubscription.planName || 'Membership'} subscription payment`}
+                onSuccess={async (piId) => {
+                  try {
+                    const confirmRes = await fetch('/api/stripe/terminal/confirm-subscription-payment', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({
+                        paymentIntentId: piId,
+                        subscriptionId: billingInfo.activeSubscription!.id,
+                        userId: memberId || null,
+                        invoiceId: null
+                      })
+                    });
+                    if (!confirmRes.ok) {
+                      const data = await confirmRes.json();
+                      setCollectPaymentError(data.error || 'Failed to confirm payment');
+                      return;
+                    }
+                    showSuccess('Payment received! Membership activated.');
+                    setShowCollectPayment(false);
+                    setCollectPaymentMode('terminal');
+                    fetchBillingInfo();
+                  } catch (err: any) {
+                    setCollectPaymentError(err.message || 'Failed to confirm payment');
                   }
-                  showSuccess('Payment received! Membership activated.');
+                }}
+                onError={(msg) => setCollectPaymentError(msg)}
+                onCancel={() => {
                   setShowCollectPayment(false);
-                  fetchBillingInfo();
-                } catch (err: any) {
-                  setCollectPaymentError(err.message || 'Failed to confirm payment');
-                }
-              }}
-              onError={(msg) => setCollectPaymentError(msg)}
-              onCancel={() => setShowCollectPayment(false)}
-            />
+                  setCollectPaymentMode('terminal');
+                }}
+              />
+            )}
+
+            {collectPaymentMode === 'charge_card' && (
+              <div className="space-y-4">
+                <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  This will charge the member's saved card on file for the outstanding subscription invoice.
+                </p>
+
+                {billingInfo.paymentMethods && billingInfo.paymentMethods.length > 0 ? (
+                  <div className={`p-3 rounded-lg flex items-center gap-3 ${isDark ? 'bg-white/5 border border-white/10' : 'bg-gray-50 border border-gray-200'}`}>
+                    <span className={`material-symbols-outlined text-xl ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>credit_card</span>
+                    <div>
+                      <p className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        {(billingInfo.paymentMethods[0].brand || 'Card').charAt(0).toUpperCase() + (billingInfo.paymentMethods[0].brand || 'Card').slice(1)} •••• {billingInfo.paymentMethods[0].last4}
+                      </p>
+                      <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                        Expires {billingInfo.paymentMethods[0].expMonth}/{billingInfo.paymentMethods[0].expYear}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={`p-3 rounded-lg ${isDark ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-yellow-50 border border-yellow-200'}`}>
+                    <div className="flex items-center gap-2">
+                      <span className={`material-symbols-outlined ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`}>warning</span>
+                      <span className={`text-sm ${isDark ? 'text-yellow-300' : 'text-yellow-700'}`}>
+                        No saved card on file. Use the card reader or ask the member to update their payment method.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={() => {
+                      setShowCollectPayment(false);
+                      setCollectPaymentMode('terminal');
+                      setCollectPaymentError(null);
+                    }}
+                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      isDark ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setIsChargingCard(true);
+                      setCollectPaymentError(null);
+                      try {
+                        const res = await fetch('/api/stripe/staff/charge-subscription-invoice', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({
+                            subscriptionId: billingInfo.activeSubscription!.id,
+                            userId: memberId
+                          })
+                        });
+                        const data = await res.json();
+                        if (!res.ok) {
+                          setCollectPaymentError(data.error || 'Failed to charge card');
+                          return;
+                        }
+                        showSuccess('Payment received! Membership activated.');
+                        setShowCollectPayment(false);
+                        setCollectPaymentMode('terminal');
+                        fetchBillingInfo();
+                      } catch (err: any) {
+                        setCollectPaymentError(err.message || 'Failed to charge card');
+                      } finally {
+                        setIsChargingCard(false);
+                      }
+                    }}
+                    disabled={isChargingCard || !billingInfo.paymentMethods || billingInfo.paymentMethods.length === 0}
+                    className="flex-1 px-4 py-2.5 bg-primary dark:bg-accent text-white dark:text-primary rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  >
+                    {isChargingCard ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+                        Charging...
+                      </span>
+                    ) : (
+                      `Charge $${(collectPaymentAmount / 100).toFixed(2)}`
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </ModalShell>
       )}
