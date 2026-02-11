@@ -119,6 +119,10 @@ async function checkResourceEventOrder(
 
   if (lastPriority > currentPriority) {
     if (eventType === 'customer.subscription.created') {
+      if (lastEventType === 'customer.subscription.deleted') {
+        console.log(`[Stripe Webhook] Blocking stale subscription.created after subscription.deleted for resource ${resourceId} — preventing ghost reactivation`);
+        return false;
+      }
       console.log(`[Stripe Webhook] Out-of-order event: ${eventType} (priority ${currentPriority}) after ${lastEventType} (priority ${lastPriority}) for resource ${resourceId} — allowing through because subscription creation should never be skipped`);
       return true;
     }
@@ -2613,12 +2617,12 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: any):
                         const { syncMemberToHubSpot } = await import('../hubspot/stages');
                         await syncMemberToHubSpot({
                           email,
-                          status: status, // Use actual subscription status
+                          status: subscription.status,
                           billingProvider: 'stripe',
                           tier: tierName,
                           memberSince: new Date()
                         });
-                        console.log(`[Stripe Webhook] Synced ${email} to HubSpot: tier=${tierName}, status=${status}, billing=stripe, memberSince=now`);
+                        console.log(`[Stripe Webhook] Synced ${email} to HubSpot: tier=${tierName}, status=${subscription.status}, billing=stripe, memberSince=now`);
                       } catch (hubspotError) {
                         console.error('[Stripe Webhook] HubSpot sync failed for product name match:', hubspotError);
                       }

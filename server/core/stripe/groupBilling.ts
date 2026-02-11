@@ -1733,7 +1733,12 @@ export async function handlePrimarySubscriptionCancelled(subscriptionId: string)
       );
     }
 
-    console.log(`[GroupBilling] Successfully deactivated ${emailsToDeactivate.length} members for group ${groupId}`);
+    await pool.query(
+      `UPDATE billing_groups SET is_active = false, updated_at = NOW() WHERE id = $1 AND is_active = true`,
+      [groupId]
+    );
+
+    console.log(`[GroupBilling] Successfully deactivated group ${groupId} and ${emailsToDeactivate.length} members`);
 
   } catch (err) {
     console.error('[GroupBilling] Error handling primary subscription cancellation:', err);

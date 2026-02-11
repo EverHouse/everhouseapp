@@ -1815,7 +1815,12 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
                       setCollectPaymentError(data.error || 'Failed to confirm payment');
                       return;
                     }
-                    showSuccess('Payment received! Membership activated.');
+                    const confirmData = await confirmRes.json();
+                    if (confirmData.cardSaveWarning) {
+                      showSuccess(`Payment received! Membership activated. Note: ${confirmData.cardSaveWarning}`);
+                    } else {
+                      showSuccess('Payment received! Membership activated.');
+                    }
                     setShowCollectPayment(false);
                     setCollectPaymentMode('terminal');
                     fetchBillingInfo();

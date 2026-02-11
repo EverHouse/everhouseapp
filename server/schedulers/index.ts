@@ -20,6 +20,8 @@ import { startMemberSyncScheduler } from './memberSyncScheduler';
 import { startDuplicateCleanupScheduler } from './duplicateCleanupScheduler';
 import { startRelocationCleanupScheduler } from './relocationCleanupScheduler';
 import { startStuckCancellationScheduler } from './stuckCancellationScheduler';
+import { startPendingUserCleanupScheduler } from './pendingUserCleanupScheduler';
+import { startWebhookEventCleanupScheduler } from './webhookEventCleanupScheduler';
 import { startJobProcessor, stopJobProcessor } from '../core/jobQueue';
 
 export function initSchedulers(): void {
@@ -45,6 +47,8 @@ export function initSchedulers(): void {
   startGuestPassResetScheduler();
   startRelocationCleanupScheduler();
   startStuckCancellationScheduler();
+  startPendingUserCleanupScheduler();
+  startWebhookEventCleanupScheduler();
   startJobProcessor(5000);
 }
 

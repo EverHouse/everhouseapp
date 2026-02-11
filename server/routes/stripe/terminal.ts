@@ -457,13 +457,14 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
         });
       }
     } else {
-      console.warn(`[Terminal] No invoice PI found for subscription ${subscriptionId}, creating separate PI as fallback`);
+      console.warn(`[Terminal] No invoice PI found for subscription ${subscriptionId}, creating terminal PI linked to invoice`);
       paymentIntent = await stripe.paymentIntents.create({
         amount,
         currency: invoice.currency || 'usd',
+        customer: customerId,
         payment_method_types: ['card_present'],
         capture_method: 'automatic',
-        description: 'Subscription creation',
+        description: `Subscription activation - Invoice ${invoice.id}`,
         ...(email ? { receipt_email: email } : {}),
         metadata: {
           subscriptionId,
@@ -471,11 +472,14 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
           invoiceAmountDue: String(amount),
           userId: userId || '',
           email: email || '',
-          paymentType: 'subscription_terminal'
+          paymentType: 'subscription_terminal',
+          fallback: 'true',
+          requiresInvoiceReconciliation: 'true'
         }
       }, {
-        idempotencyKey: `terminal_sub_${subscriptionId}_${invoice.id}_${Date.now()}`
+        idempotencyKey: `terminal_sub_${subscriptionId}_${invoice.id}`
       });
+      console.log(`[Terminal] Created PI ${paymentIntent.id} for subscription ${subscriptionId} - will reconcile invoice after payment succeeds`);
     }
     
     const reader = await stripe.terminal.readers.processPaymentIntent(readerId, {
@@ -605,6 +609,15 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
     
     const customerId = subscription.customer as string;
     
+    if (piMetadata.requiresInvoiceReconciliation === 'true' && latestInvoice && latestInvoice.status !== 'paid') {
+      try {
+        await stripe.invoices.pay(actualInvoiceId, { paid_out_of_band: true });
+        console.log(`[Terminal] Reconciled invoice ${actualInvoiceId} as paid (out-of-band) after successful terminal payment ${paymentIntentId}`);
+      } catch (invoicePayErr: any) {
+        console.error(`[Terminal] Failed to reconcile invoice ${actualInvoiceId} after terminal payment:`, invoicePayErr.message);
+      }
+    }
+    
     const existingPaymentRecord = await db.select().from(terminalPayments)
       .where(eq(terminalPayments.stripePaymentIntentId, paymentIntentId));
     
@@ -628,6 +641,7 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
     }
     
     let cardSaved = false;
+    let cardSaveWarning: string | null = null;
     if (paymentIntent.payment_method) {
       try {
         const pm = await stripe.paymentMethods.retrieve(paymentIntent.payment_method as string);
@@ -641,7 +655,8 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
             reusablePaymentMethodId = generatedCard;
             console.log(`[Terminal] Found generated_card ${generatedCard} from card_present payment`);
           } else {
-            console.warn(`[Terminal] No generated_card found for card_present payment ${paymentIntentId}. Member will need to add a card manually for future billing.`);
+            cardSaveWarning = 'No reusable card was generated from this terminal payment. The member will need to add a payment method manually, or their next renewal will fail.';
+            console.warn(`[Terminal] ${cardSaveWarning} (PI: ${paymentIntentId})`);
           }
         } else {
           reusablePaymentMethodId = paymentIntent.payment_method as string;
@@ -672,8 +687,12 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
           console.log(`[Terminal] Saved payment method ${reusablePaymentMethodId} as default for customer ${customerId} and subscription ${subscriptionId}`);
         }
       } catch (attachError: any) {
-        console.error('[Terminal] Error saving payment method for future billing:', attachError.message);
+        cardSaveWarning = `Failed to save payment method for future billing: ${attachError.message}. The member may need to add a card manually.`;
+        console.error(`[Terminal] ${cardSaveWarning}`);
       }
+    } else {
+      cardSaveWarning = 'No payment method found on the PaymentIntent. The member will need to add a payment method manually for future billing.';
+      console.warn(`[Terminal] ${cardSaveWarning} (PI: ${paymentIntentId})`);
     }
     
     if (existingUser?.membershipStatus === 'active') {
@@ -684,7 +703,8 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
         subscriptionId,
         paymentIntentId,
         alreadyActivated: true,
-        cardSaved
+        cardSaved,
+        cardSaveWarning
       });
     }
     
@@ -725,7 +745,8 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
       membershipStatus: 'active',
       subscriptionId,
       paymentIntentId,
-      cardSaved
+      cardSaved,
+      cardSaveWarning
     });
   } catch (error: any) {
     console.error('[Terminal] Error confirming subscription payment:', error);

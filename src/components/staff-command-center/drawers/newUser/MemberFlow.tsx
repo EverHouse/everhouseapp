@@ -888,7 +888,12 @@ export function MemberFlow({
                         setStripeError(data.error || 'Failed to confirm payment');
                         return;
                       }
-                      showToast('Payment received! Membership activated.', 'success');
+                      const confirmData = await confirmRes.json();
+                      if (confirmData.cardSaveWarning) {
+                        showToast(`Payment received! Membership activated. Note: ${confirmData.cardSaveWarning}`, 'warning');
+                      } else {
+                        showToast('Payment received! Membership activated.', 'success');
+                      }
 
                       if (form.addGroupMembers && form.groupMembers.length > 0) {
                         try {

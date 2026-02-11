@@ -52,7 +52,7 @@ The application is built with a React 19 frontend (Vite, Tailwind CSS) and an Ex
 - **Waiver Management**: Tracks waiver versions and enforces signing.
 - **Unified Fee Service**: Centralized `computeFeeBreakdown()` in `server/core/billing/unifiedFeeService.ts` for all fee calculations.
 - **Dynamic Pricing**: Guest fee and overage rates pulled from Stripe product prices and updated via webhooks. Pricing config in `server/core/billing/pricingConfig.ts`.
-- **Webhook Safety**: Transactional dedup for Stripe webhooks, deferred action pattern, resource-based ordering.
+- **Webhook Safety**: Transactional dedup for Stripe webhooks, deferred action pattern, resource-based ordering, ghost reactivation blocking (subscription.created blocked if subscription.deleted already processed for same resource), subscription sync race condition guard (skips recently updated users within 5-minute window).
 - **Roster Protection**: Optimistic locking with `roster_version` and row-level locking.
 - **Billing Management**: Staff Payments Dashboard, unified payment history, member billing, self-service portal, tier change wizard with proration, dunning, card expiry checking, and refund processing.
 - **Day Pass System**: Non-member day pass purchases with visitor matching and QR code delivery.
@@ -64,7 +64,7 @@ The application is built with a React 19 frontend (Vite, Tailwind CSS) and an Ex
 - **Stripe Subscription → HubSpot Sync**: Automated sync of membership status and tier.
 - **Booking Prepayment**: Creates prepayment intents for expected fees, blocking check-in until paid, with auto-refunds on cancellation.
 - **Stripe Customer Metadata Sync**: User ID and tier synced to Stripe customer metadata.
-- **Scheduled Maintenance**: Daily tasks for session cleanup, webhook log cleanup, Stripe reconciliation, grace period checks, booking expiry, duplicate cleanup, guest pass resets, stuck cancellation checks, member sync, unresolved Trackman checks, communication log sync.
+- **Scheduled Maintenance**: Daily tasks for session cleanup, webhook log cleanup, Stripe reconciliation, grace period checks, booking expiry, duplicate cleanup, guest pass resets, stuck cancellation checks, member sync, unresolved Trackman checks, communication log sync, pending user cleanup (every 6 hours — cancels Stripe subscriptions and deletes stale pending users with expired checkout sessions), webhook event cleanup (every 24 hours — removes processed webhook events older than 7 days).
 - **Stripe Terminal Integration**: In-person card reader support for membership signup. Terminal card payments automatically save the card via Stripe's `generated_card` mechanism for future subscription renewals. The `confirm-subscription-payment` endpoint retrieves the reusable card from `latest_charge.payment_method_details.card_present.generated_card`, attaches it to the customer, and sets it as default on both customer and subscription.
 - **Stripe Product Catalog as Source of Truth**: Two-way sync between app and Stripe.
 - **Google Sheets Integration**: Announcement sync.

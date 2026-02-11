@@ -218,7 +218,7 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
           const stripeSubscriptionId = subscription.id;
 
           const existingUser = await pool.query(
-            'SELECT id, tier, stripe_customer_id, stripe_subscription_id, hubspot_id, first_name, last_name FROM users WHERE LOWER(email) = $1',
+            'SELECT id, tier, stripe_customer_id, stripe_subscription_id, hubspot_id, first_name, last_name, updated_at FROM users WHERE LOWER(email) = $1',
             [email]
           );
 
@@ -231,6 +231,12 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
               !user.hubspot_id;
 
             if (needsUpdate) {
+              if (user.updated_at && (Date.now() - new Date(user.updated_at).getTime()) < 5 * 60 * 1000) {
+                result.skipped++;
+                result.details.push({ email, action: 'skipped', reason: 'Recently updated (within 5 min), skipping to avoid webhook race' });
+                continue;
+              }
+
               let hubspotId = user.hubspot_id;
               if (!hubspotId) {
                 try {
@@ -257,7 +263,8 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
                      billing_provider = 'stripe',
                      hubspot_id = COALESCE($5, hubspot_id),
                      updated_at = NOW()
-                 WHERE id = $4`,
+                 WHERE id = $4
+                 AND (updated_at IS NULL OR updated_at < NOW() - INTERVAL '5 minutes')`,
                 [stripeCustomerId, stripeSubscriptionId, tier, user.id, hubspotId]
               );
               

@@ -900,6 +900,25 @@ router.delete('/api/stripe/subscriptions/cleanup-pending/:userId', isStaffOrAdmi
     if (user.stripe_customer_id) {
       try {
         const stripe = await getStripeClient();
+        
+        const subscriptions = await stripe.subscriptions.list({
+          customer: user.stripe_customer_id,
+          status: 'all',
+          limit: 10
+        });
+        
+        const activeStatuses = ['active', 'trialing', 'past_due', 'incomplete'];
+        for (const sub of subscriptions.data) {
+          if (activeStatuses.includes(sub.status)) {
+            try {
+              await stripe.subscriptions.cancel(sub.id);
+              console.log(`[Stripe] Cancelled active subscription ${sub.id} (status: ${sub.status}) during pending user cleanup`);
+            } catch (cancelErr: any) {
+              console.error(`[Stripe] Failed to cancel subscription ${sub.id} during cleanup:`, cancelErr.message);
+            }
+          }
+        }
+        
         await stripe.customers.del(user.stripe_customer_id);
         console.log(`[Stripe] Deleted Stripe customer ${user.stripe_customer_id} for pending user cleanup`);
       } catch (stripeErr: any) {
