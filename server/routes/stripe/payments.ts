@@ -486,59 +486,31 @@ router.post('/api/stripe/create-customer', isStaffOrAdmin, async (req: Request, 
 });
 
 router.post('/api/stripe/cleanup-stale-intents', isStaffOrAdmin, async (req: Request, res: Response) => {
-  const CLEANUP_BATCH_LIMIT = 25;
-  const PARALLEL_CHUNK_SIZE = 5;
-
   try {
-    const batchLimit = Math.min(
-      parseInt(req.body?.limit as string) || CLEANUP_BATCH_LIMIT,
-      100
-    );
-
     const staleIntents = await db.execute(sql`SELECT spi.stripe_payment_intent_id, spi.id as local_id, br.status as booking_status
        FROM stripe_payment_intents spi
        LEFT JOIN booking_requests br ON spi.booking_id = br.id
        WHERE spi.status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')
-       AND (br.status = 'cancelled' OR br.id IS NULL)
-       ORDER BY spi.created_at ASC
-       LIMIT ${batchLimit}`);
-
-    const totalStale = staleIntents.rows.length;
+       AND (br.status = 'cancelled' OR br.id IS NULL)`);
+    
     const results: { id: string; success: boolean; error?: string }[] = [];
-
-    for (let i = 0; i < staleIntents.rows.length; i += PARALLEL_CHUNK_SIZE) {
-      const chunk = staleIntents.rows.slice(i, i + PARALLEL_CHUNK_SIZE);
-      const chunkResults = await Promise.allSettled(
-        chunk.map(async (row) => {
-          await cancelPaymentIntent(row.stripe_payment_intent_id);
-          return row.stripe_payment_intent_id;
-        })
-      );
-
-      for (let j = 0; j < chunkResults.length; j++) {
-        const result = chunkResults[j];
-        const intentId = chunk[j].stripe_payment_intent_id;
-        if (result.status === 'fulfilled') {
-          results.push({ id: intentId, success: true });
-        } else {
-          const errMsg = result.reason?.message || 'Unknown error';
-          results.push({ id: intentId, success: false, error: errMsg });
-          console.error(`[Cleanup] Failed to cancel ${intentId}:`, errMsg);
-        }
+    
+    for (const row of staleIntents.rows) {
+      try {
+        await cancelPaymentIntent(row.stripe_payment_intent_id);
+        results.push({ id: row.stripe_payment_intent_id, success: true });
+        console.log(`[Cleanup] Cancelled stale payment intent ${row.stripe_payment_intent_id}`);
+      } catch (err: any) {
+        results.push({ id: row.stripe_payment_intent_id, success: false, error: err.message });
+        console.error(`[Cleanup] Failed to cancel ${row.stripe_payment_intent_id}:`, err.message);
       }
     }
-
-    const cancelledCount = results.filter(r => r.success).length;
-    const failedCount = results.filter(r => !r.success).length;
-    console.log(`[Cleanup] Processed ${totalStale} stale intents: ${cancelledCount} cancelled, ${failedCount} failed`);
-
+    
     res.json({ 
       success: true, 
-      processed: totalStale,
-      cancelled: cancelledCount,
-      failed: failedCount,
-      batchLimit,
-      hasMore: totalStale === batchLimit,
+      processed: results.length,
+      cancelled: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
       details: results 
     });
   } catch (error: any) {
