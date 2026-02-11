@@ -128,6 +128,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
   const [checkingCard, setCheckingCard] = useState(false);
   const [waiverReason, setWaiverReason] = useState('');
   const [showWaiverInput, setShowWaiverInput] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const isManageMode = mode === 'manage';
 
@@ -1189,6 +1190,29 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     }
   };
 
+  const handleDeleteBooking = async () => {
+    const deleteId = matchedBookingId || bookingId;
+    if (!deleteId) return;
+    if (!window.confirm('Are you sure you want to delete this booking? This cannot be undone.')) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/bookings/${deleteId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || data.message || 'Failed to delete booking');
+      }
+      onSuccess?.();
+      onClose();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete booking');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'golf_instructor':
@@ -1301,5 +1325,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     handleMarkAsEvent,
     executeMarkAsEvent,
     handleAssignToStaff,
+    deleting,
+    handleDeleteBooking,
   };
 }

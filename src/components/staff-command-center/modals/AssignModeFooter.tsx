@@ -22,6 +22,9 @@ interface AssignModeFooterProps {
   executeMarkAsEvent: (existingClosureId?: number) => Promise<void>;
   handleAssignToStaff: (staff: any) => Promise<void>;
   getRoleBadge: (role: string) => React.ReactNode;
+  onDeleteBooking?: () => Promise<void>;
+  deleting?: boolean;
+  matchedBookingId?: number | string;
 }
 
 export function AssignModeFooter({
@@ -46,6 +49,9 @@ export function AssignModeFooter({
   executeMarkAsEvent,
   handleAssignToStaff,
   getRoleBadge,
+  onDeleteBooking,
+  deleting,
+  matchedBookingId,
 }: AssignModeFooterProps) {
   return (
     <div className="p-4 space-y-2">
@@ -214,6 +220,26 @@ export function AssignModeFooter({
             </div>
           )}
         </div>
+      )}
+
+      {onDeleteBooking && (
+        <button
+          onClick={onDeleteBooking}
+          disabled={deleting}
+          className="w-full py-2.5 px-4 rounded-lg border border-red-400 text-red-600 dark:text-red-400 font-medium hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors flex items-center justify-center gap-2"
+        >
+          {deleting ? (
+            <>
+              <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+              Deleting...
+            </>
+          ) : (
+            <>
+              <span className="material-symbols-outlined text-sm">delete</span>
+              Delete Booking
+            </>
+          )}
+        </button>
       )}
 
       <p className="text-xs text-center text-primary/50 dark:text-white/50">
