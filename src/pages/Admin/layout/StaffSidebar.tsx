@@ -110,14 +110,14 @@ export const StaffSidebar: React.FC<StaffSidebarProps> = ({
         onMouseEnter={() => prefetchStaffRoute(tabToPath[item.id])}
         style={{ WebkitTapHighlightColor: 'transparent' }}
         className={`
-          relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200
+          relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-300 ease-out
           ${isActive 
             ? 'text-white font-semibold' 
-            : 'text-white/70 hover:bg-white/10 hover:text-white'
+            : 'text-white/60 hover:text-white hover:bg-white/[0.07] group/nav'
           }
         `}
       >
-        <span className={`material-symbols-outlined text-xl relative z-10 transition-colors duration-300 ${isActive ? 'filled text-[#CCB8E4]' : ''}`}>
+        <span className={`material-symbols-outlined text-xl relative z-10 transition-colors duration-300 ${isActive ? 'filled text-[#CCB8E4]' : 'group-hover/nav:text-white/90'}`}>
           {item.icon}
         </span>
         <span className="text-sm relative z-10">{item.label}</span>
@@ -127,7 +127,8 @@ export const StaffSidebar: React.FC<StaffSidebarProps> = ({
   };
 
   const sidebarContent = (
-    <aside className="hidden lg:flex flex-col w-64 h-screen fixed left-0 top-0 bg-[#293515] isolate" style={{ zIndex: 9999 }}>
+    <aside className="hidden lg:flex flex-col w-64 h-screen fixed left-0 top-0 bg-gradient-to-b from-[#293515] via-[#1f2a0f] to-[#1a220c] isolate" style={{ zIndex: 9999 }}>
+      <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")` }}></div>
       <button 
         onClick={() => { startNavigation(); navigate('/'); }}
         className="flex items-center gap-3 px-4 py-5 flex-shrink-0 hover:opacity-80 transition-opacity w-full text-left"
@@ -147,7 +148,7 @@ export const StaffSidebar: React.FC<StaffSidebarProps> = ({
       <nav ref={navContainerRef} className="relative flex-1 overflow-y-auto px-3 py-4">
         {indicatorStyle && (
           <div 
-            className="absolute left-3 right-3 rounded-xl bg-white/15 border border-white/25 shadow-[0_0_20px_rgba(255,255,255,0.08),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-md pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+            className="absolute left-3 right-3 rounded-xl bg-white/10 border border-white/20 shadow-[0_0_24px_rgba(204,184,228,0.1),0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_1px_rgba(255,255,255,0.2)] backdrop-blur-xl pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
             style={{ 
               top: indicatorStyle.top,
               height: indicatorStyle.height
@@ -162,7 +163,7 @@ export const StaffSidebar: React.FC<StaffSidebarProps> = ({
 
         {isAdmin && (
           <div className="mt-6 pt-4 border-t border-white/10">
-            <p className="px-3 mb-2 text-[10px] font-semibold text-white/40 uppercase tracking-wider">
+            <p className="px-3 mb-3 text-xs font-semibold text-white/40 uppercase tracking-widest">
               Admin
             </p>
             <div className="space-y-1">
