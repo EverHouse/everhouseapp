@@ -53,19 +53,27 @@ export async function subscribeToPush(userEmail: string): Promise<boolean> {
   try {
     const permission = await requestNotificationPermission();
     if (permission !== 'granted') {
+      console.warn('[Push] Permission not granted:', permission);
       return false;
     }
 
     const registration = await registerServiceWorker();
     if (!registration) {
+      console.warn('[Push] Service worker registration failed');
       return false;
     }
 
-    const response = await fetch(PUBLIC_VAPID_KEY_URL);
+    await navigator.serviceWorker.ready;
+
+    const response = await fetch(PUBLIC_VAPID_KEY_URL, { credentials: 'include' });
+    if (!response.ok) {
+      console.error('[Push] Failed to fetch VAPID key:', response.status);
+      return false;
+    }
     const { publicKey } = await response.json();
     
     if (!publicKey) {
-      console.error('No VAPID public key available');
+      console.error('[Push] No VAPID public key available from server');
       return false;
     }
 
@@ -77,15 +85,20 @@ export async function subscribeToPush(userEmail: string): Promise<boolean> {
     const result = await fetch(SUBSCRIBE_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({
         subscription: subscription.toJSON(),
         user_email: userEmail
       })
     });
 
+    if (!result.ok) {
+      console.error('[Push] Subscribe API failed:', result.status);
+    }
+
     return result.ok;
   } catch (error) {
-    console.error('Push subscription failed:', error);
+    console.error('[Push] Subscription failed:', error);
     return false;
   }
 }
