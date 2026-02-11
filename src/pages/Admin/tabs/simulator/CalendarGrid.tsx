@@ -426,18 +426,24 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                         ? 'bg-orange-100 dark:bg-orange-500/20 border border-orange-300 dark:border-orange-500/30'
                                                     : booking 
                                                         ? isConference
-                                                            ? 'bg-purple-100 dark:bg-purple-500/20 border border-purple-300 dark:border-purple-500/30 cursor-pointer hover:bg-purple-200 dark:hover:bg-purple-500/30'
+                                                            ? 'group relative hover:scale-105 hover:z-10 bg-purple-100 dark:bg-purple-500/20 border border-purple-300 dark:border-purple-500/30 cursor-pointer hover:bg-purple-200 dark:hover:bg-purple-500/30'
                                                             : isUnmatched
-                                                                ? 'bg-amber-100 dark:bg-amber-500/20 border-2 border-dashed border-amber-400 dark:border-amber-400/50 cursor-pointer hover:bg-amber-200 dark:hover:bg-amber-500/30'
+                                                                ? 'group relative hover:scale-105 hover:z-10 bg-amber-100 dark:bg-amber-500/20 border-2 border-dashed border-amber-400 dark:border-amber-400/50 cursor-pointer hover:bg-amber-200 dark:hover:bg-amber-500/30'
                                                             : isInactiveMember
-                                                                ? 'bg-green-100/50 dark:bg-green-500/10 border border-dashed border-orange-300 dark:border-orange-500/40 cursor-pointer hover:bg-green-200/50 dark:hover:bg-green-500/20'
+                                                                ? 'group relative hover:scale-105 hover:z-10 bg-green-100/50 dark:bg-green-500/10 border border-dashed border-orange-300 dark:border-orange-500/40 cursor-pointer hover:bg-green-200/50 dark:hover:bg-green-500/20'
                                                                 : hasPartialRoster
-                                                                    ? 'bg-blue-100 dark:bg-blue-600/20 border-2 border-dashed border-blue-400 dark:border-blue-400/50 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-600/30'
-                                                                    : 'bg-green-100 dark:bg-green-500/20 border border-green-300 dark:border-green-500/30 cursor-pointer hover:bg-green-200 dark:hover:bg-green-500/30' 
+                                                                    ? 'group relative hover:scale-105 hover:z-10 bg-blue-100 dark:bg-blue-600/20 border-2 border-dashed border-blue-400 dark:border-blue-400/50 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-600/30'
+                                                                    : 'group relative hover:scale-105 hover:z-10 bg-green-100 dark:bg-green-500/20 border border-green-300 dark:border-green-500/30 cursor-pointer hover:bg-green-200 dark:hover:bg-green-500/30' 
                                                         : pendingRequest
                                                                 ? 'bg-blue-50 dark:bg-blue-500/10 border-2 border-dashed border-blue-400 dark:border-blue-400/50 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-500/20'
                                                                 : 'bg-white dark:bg-white/5 border border-gray-200 dark:border-white/15 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10'
                                             } transition-all duration-150`}
+                                            style={isEmptyCell ? {
+                                                backgroundImage: isDark 
+                                                    ? 'radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)'
+                                                    : 'radial-gradient(circle, rgba(0,0,0,0.04) 1px, transparent 1px)',
+                                                backgroundSize: '8px 8px'
+                                            } : undefined}
                                         >
                                             {closure ? (
                                                 <div className="px-0.5 sm:px-1 h-full flex items-center justify-center">
@@ -454,6 +460,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                     <span className="sm:hidden text-[8px] font-bold text-orange-600 dark:text-orange-400">E</span>
                                                 </div>
                                             ) : booking ? (
+                                                <>
                                                 <div className="px-0.5 sm:px-1 h-full flex items-center justify-center sm:justify-start relative">
                                                     <CalendarFeeIndicator
                                                         bookingId={booking.id}
@@ -469,6 +476,23 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                         bookingStatus={(booking as any)?.status || 'approved'}
                                                     />
                                                 </div>
+                                                <div className="hidden sm:block opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-50">
+                                                    <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md rounded-lg shadow-xl border border-gray-200/50 dark:border-white/10 px-3 py-2 text-left min-w-[180px]">
+                                                        <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{bookingDisplayName}</p>
+                                                        <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{formatTime12Hour(booking.start_time)} – {formatTime12Hour(booking.end_time)}</p>
+                                                        {declaredPlayers > 1 && (
+                                                            <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{filledSlots}/{declaredPlayers} players</p>
+                                                        )}
+                                                        {((booking as any)?.total_owed ?? 0) > 0 && (
+                                                            <p className="text-[10px] text-red-600 dark:text-red-400 font-medium mt-0.5">${((booking as any)?.total_owed ?? 0).toFixed(2)} owed</p>
+                                                        )}
+                                                        {isUnmatched && <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 font-medium">Unmatched</p>}
+                                                        {isInactiveMember && <p className="text-[10px] text-orange-600 dark:text-orange-400 mt-0.5 font-medium">Inactive Member</p>}
+                                                        {(booking as any)?.status === 'attended' && <p className="text-[10px] text-green-600 dark:text-green-400 mt-0.5 font-medium">Checked In</p>}
+                                                        {isConference && <p className="text-[10px] text-purple-600 dark:text-purple-400 mt-0.5 font-medium">Conference Room</p>}
+                                                    </div>
+                                                </div>
+                                                </>
                                             ) : pendingRequest && (
                                                 <div className="px-0.5 sm:px-1 h-full flex items-center justify-center sm:justify-start">
                                                     <span className="hidden sm:block text-[9px] sm:text-[10px] font-medium truncate text-blue-600 dark:text-blue-400">

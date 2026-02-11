@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.40.3",
+    date: "2026-02-11",
+    title: "Calendar Grid Interaction Redesign",
+    changes: [
+      "New: Booked calendar slots now lift on hover with a smooth scale-up effect for better visual feedback",
+      "New: Hover tooltip on booked slots shows member name, time, player count, fees owed, and status at a glance",
+      "New: Empty calendar cells now display a subtle dot matrix texture instead of blank white space",
+      "Improved: Tooltip adapts to light and dark themes with frosted glass styling",
+    ],
+  },
+  {
     version: "7.40.2",
     date: "2026-02-11",
     title: "Toast Notification Redesign",
