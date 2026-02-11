@@ -73,6 +73,15 @@ router.get('/api/members/search', isAuthenticated, async (req, res) => {
     })
       .from(users)
       .where(whereConditions)
+      .orderBy(
+        sql`CASE 
+          WHEN ${users.membershipStatus} IN ('active', 'trialing', 'past_due') THEN 0
+          WHEN ${users.membershipStatus} IN ('expired', 'inactive') THEN 1
+          WHEN ${users.membershipStatus} IN ('visitor', 'non-member') THEN 2
+          ELSE 3
+        END`,
+        sql`COALESCE(${users.firstName}, ${users.email}) ASC`
+      )
       .limit(maxResults);
     
     const sessionUser = (req as any).session?.user;
