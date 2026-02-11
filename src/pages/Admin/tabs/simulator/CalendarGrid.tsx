@@ -97,7 +97,7 @@ function CalendarFeeIndicator({
     if (!skipFeeEstimate && !isLoading && !isError && data) {
         const serverFee = data.totalFee ?? 0;
         if (serverFee > 0) hasUnpaidFees = true;
-        if (totalOwed <= 0) totalOwed = serverFee;
+        totalOwed = Math.max(totalOwed, serverFee);
     }
 
     return (

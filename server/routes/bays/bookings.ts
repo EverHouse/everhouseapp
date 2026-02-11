@@ -1421,7 +1421,7 @@ async function calculateFeeEstimate(params: {
     // This handles: 1) member preview (no session), 2) staff checking booking without session
     const breakdown = await computeFeeBreakdown(
       sessionId 
-        ? { sessionId, declaredPlayerCount: playerCount, source: 'preview' as const, isConferenceRoom }
+        ? { sessionId, declaredPlayerCount: playerCount, source: 'preview' as const, isConferenceRoom, excludeSessionFromUsage: true }
         : {
             sessionDate: requestDate,
             sessionDuration: durationMinutes,
@@ -1429,7 +1429,8 @@ async function calculateFeeEstimate(params: {
             hostEmail: ownerEmail,
             participants,
             source: 'preview' as const,
-            isConferenceRoom
+            isConferenceRoom,
+            bookingId
           }
     );
     

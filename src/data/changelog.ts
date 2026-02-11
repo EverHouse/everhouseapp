@@ -13,6 +13,23 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.39.5",
+    date: "2026-02-11",
+    title: "Fee Display Accuracy Improvements",
+    changes: [
+      "Fix: Booking cards now show the correct total fee including empty slot guest fees — previously the card could show a lower amount than what the booking sheet displays when a booking has unfilled player slots",
+      "Fix: Fee estimate no longer double-counts the booking's own usage against the daily allowance, so members within their limits no longer see incorrect overage charges",
+    ],
+  },
+  {
+    version: "7.39.4",
+    date: "2026-02-11",
+    title: "Fee Estimate Double-Count Fix",
+    changes: [
+      "Fix: Booking cards no longer show incorrect fees due — the fee estimate was counting the booking's own usage against the member's daily allowance, making it look like every booking had overage when members were actually within their limits",
+    ],
+  },
+  {
     version: "7.39.3",
     date: "2026-02-11",
     title: "PWA Safari Polish",
