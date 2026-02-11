@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.46.0",
+    date: "2026-02-11",
+    title: "Stripe Terminal & Wellness Improvements",
+    changes: [
+      "Fixed: Wellness class enrollment button no longer causes accidental cancellations from rapid double-taps — added cooldown protection and deferred UI updates",
+      "Fixed: Terminal invoice payments now use the correct price format — resolves failed in-person invoice charges",
+      "Added: Terminal subscription payments now automatically save the card for future recurring billing",
+      "Added: Staff can now update a member's payment card on file via the card reader without charging them",
+      "Added: Card reader interactions now have a 2-minute timeout — if the reader doesn't respond, the action is automatically canceled to prevent stuck states",
+      "Fixed: Card save confirmation now properly verifies success before showing the 'saved' message — prevents false success reports",
+    ],
+  },
+  {
     version: "7.45.0",
     date: "2026-02-11",
     title: "HubSpot Deal Creation Disabled & Cleanup",
