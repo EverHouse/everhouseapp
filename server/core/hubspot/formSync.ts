@@ -75,6 +75,11 @@ async function fetchFormSubmissions(
       },
     });
 
+    if (response.status === 403) {
+      console.warn('[HubSpot FormSync] Access denied (403) - token may lack "forms" scope. Skipping form sync.');
+      return [];
+    }
+
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'unknown');
       throw new Error(`HubSpot API error ${response.status}: ${errorText}`);
@@ -108,125 +113,131 @@ export async function syncHubSpotFormSubmissions(): Promise<{
     errors: [] as string[],
   };
 
-  let accessToken: string;
   try {
-    accessToken = await getHubSpotAccessToken();
-  } catch (err: any) {
-    const msg = `Failed to get HubSpot access token: ${err.message}`;
-    console.error(`[HubSpot FormSync] ${msg}`);
-    result.errors.push(msg);
-    return result;
-  }
-
-  const sinceTimestamp = Date.now() - THIRTY_DAYS_MS;
-
-  const formIdToTypes = new Map<string, string[]>();
-  for (const [formType, formId] of Object.entries(HUBSPOT_FORMS)) {
-    if (!formId) continue;
-    const existing = formIdToTypes.get(formId) || [];
-    existing.push(formType);
-    formIdToTypes.set(formId, existing);
-  }
-
-  for (const [formId, formTypes] of formIdToTypes.entries()) {
-    const defaultFormType = formTypes[0];
-    console.log(`[HubSpot FormSync] Fetching submissions for form ${formId} (types: ${formTypes.join(', ')})`);
-
-    let submissions: HubSpotSubmission[];
+    let accessToken: string;
     try {
-      submissions = await fetchFormSubmissions(formId, accessToken, sinceTimestamp);
+      accessToken = await getHubSpotAccessToken();
     } catch (err: any) {
-      const msg = `Failed to fetch form ${formId}: ${err.message}`;
+      const msg = `Failed to get HubSpot access token: ${err.message}`;
       console.error(`[HubSpot FormSync] ${msg}`);
       result.errors.push(msg);
-      continue;
+      return result;
     }
 
-    result.totalFetched += submissions.length;
-    console.log(`[HubSpot FormSync] Found ${submissions.length} submissions for form ${formId}`);
+    const sinceTimestamp = Date.now() - THIRTY_DAYS_MS;
 
-    for (const submission of submissions) {
+    const formIdToTypes = new Map<string, string[]>();
+    for (const [formType, formId] of Object.entries(HUBSPOT_FORMS)) {
+      if (!formId) continue;
+      const existing = formIdToTypes.get(formId) || [];
+      existing.push(formType);
+      formIdToTypes.set(formId, existing);
+    }
+
+    for (const [formId, formTypes] of formIdToTypes.entries()) {
+      const defaultFormType = formTypes[0];
+      console.log(`[HubSpot FormSync] Fetching submissions for form ${formId} (types: ${formTypes.join(', ')})`);
+
+      let submissions: HubSpotSubmission[];
       try {
-        const existing = await db.select({ id: formSubmissions.id })
-          .from(formSubmissions)
-          .where(eq(formSubmissions.hubspotSubmissionId, submission.conversionId))
-          .limit(1);
-
-        if (existing.length > 0) {
-          result.skippedDuplicate++;
-          continue;
-        }
-
-        const formType = formTypes.length > 1
-          ? inferFormTypeFromPageUrl(submission.pageUrl, defaultFormType)
-          : defaultFormType;
-
-        const email = getFieldValue(submission.values, 'email') || '';
-        if (!email) {
-          continue;
-        }
-
-        const submittedAt = new Date(submission.submittedAt);
-        const windowStart = new Date(submission.submittedAt - 5 * 60 * 1000);
-        const windowEnd = new Date(submission.submittedAt + 5 * 60 * 1000);
-        const localMatch = await db.select({ id: formSubmissions.id })
-          .from(formSubmissions)
-          .where(and(
-            eq(formSubmissions.email, email),
-            eq(formSubmissions.formType, formType),
-            gte(formSubmissions.createdAt, windowStart),
-            lte(formSubmissions.createdAt, windowEnd),
-          ))
-          .limit(1);
-
-        if (localMatch.length > 0) {
-          await db.update(formSubmissions)
-            .set({ hubspotSubmissionId: submission.conversionId })
-            .where(eq(formSubmissions.id, localMatch[0].id));
-          result.skippedDuplicate++;
-          continue;
-        }
-
-        const firstName = getFieldValue(submission.values, 'firstname');
-        const lastName = getFieldValue(submission.values, 'lastname');
-        const phone = getFieldValue(submission.values, 'phone');
-        const message = getFieldValue(submission.values, 'message')
-          || getFieldValue(submission.values, 'comments')
-          || getFieldValue(submission.values, 'inquiry_details');
-
-        const metadataFields: Record<string, string> = {};
-        for (const v of submission.values) {
-          if (!['email', 'firstname', 'lastname', 'phone', 'message', 'comments', 'inquiry_details'].includes(v.name)) {
-            metadataFields[v.name] = v.value;
-          }
-        }
-        if (submission.pageUrl) {
-          metadataFields['pageUrl'] = submission.pageUrl;
-        }
-
-        await db.insert(formSubmissions).values({
-          formType,
-          firstName,
-          lastName,
-          email,
-          phone,
-          message,
-          metadata: Object.keys(metadataFields).length > 0 ? metadataFields : null,
-          status: 'new',
-          hubspotSubmissionId: submission.conversionId,
-          createdAt: new Date(submission.submittedAt),
-          updatedAt: new Date(submission.submittedAt),
-        });
-
-        result.newInserted++;
+        submissions = await fetchFormSubmissions(formId, accessToken, sinceTimestamp);
       } catch (err: any) {
-        const msg = `Failed to insert submission ${submission.conversionId}: ${err.message}`;
+        const msg = `Failed to fetch form ${formId}: ${err.message}`;
         console.error(`[HubSpot FormSync] ${msg}`);
         result.errors.push(msg);
+        continue;
+      }
+
+      result.totalFetched += submissions.length;
+      console.log(`[HubSpot FormSync] Found ${submissions.length} submissions for form ${formId}`);
+
+      for (const submission of submissions) {
+        try {
+          const existing = await db.select({ id: formSubmissions.id })
+            .from(formSubmissions)
+            .where(eq(formSubmissions.hubspotSubmissionId, submission.conversionId))
+            .limit(1);
+
+          if (existing.length > 0) {
+            result.skippedDuplicate++;
+            continue;
+          }
+
+          const formType = formTypes.length > 1
+            ? inferFormTypeFromPageUrl(submission.pageUrl, defaultFormType)
+            : defaultFormType;
+
+          const email = getFieldValue(submission.values, 'email') || '';
+          if (!email) {
+            continue;
+          }
+
+          const submittedAt = new Date(submission.submittedAt);
+          const windowStart = new Date(submission.submittedAt - 5 * 60 * 1000);
+          const windowEnd = new Date(submission.submittedAt + 5 * 60 * 1000);
+          const localMatch = await db.select({ id: formSubmissions.id })
+            .from(formSubmissions)
+            .where(and(
+              eq(formSubmissions.email, email),
+              eq(formSubmissions.formType, formType),
+              gte(formSubmissions.createdAt, windowStart),
+              lte(formSubmissions.createdAt, windowEnd),
+            ))
+            .limit(1);
+
+          if (localMatch.length > 0) {
+            await db.update(formSubmissions)
+              .set({ hubspotSubmissionId: submission.conversionId })
+              .where(eq(formSubmissions.id, localMatch[0].id));
+            result.skippedDuplicate++;
+            continue;
+          }
+
+          const firstName = getFieldValue(submission.values, 'firstname');
+          const lastName = getFieldValue(submission.values, 'lastname');
+          const phone = getFieldValue(submission.values, 'phone');
+          const message = getFieldValue(submission.values, 'message')
+            || getFieldValue(submission.values, 'comments')
+            || getFieldValue(submission.values, 'inquiry_details');
+
+          const metadataFields: Record<string, string> = {};
+          for (const v of submission.values) {
+            if (!['email', 'firstname', 'lastname', 'phone', 'message', 'comments', 'inquiry_details'].includes(v.name)) {
+              metadataFields[v.name] = v.value;
+            }
+          }
+          if (submission.pageUrl) {
+            metadataFields['pageUrl'] = submission.pageUrl;
+          }
+
+          await db.insert(formSubmissions).values({
+            formType,
+            firstName,
+            lastName,
+            email,
+            phone,
+            message,
+            metadata: Object.keys(metadataFields).length > 0 ? metadataFields : null,
+            status: 'new',
+            hubspotSubmissionId: submission.conversionId,
+            createdAt: new Date(submission.submittedAt),
+            updatedAt: new Date(submission.submittedAt),
+          });
+
+          result.newInserted++;
+        } catch (err: any) {
+          const msg = `Failed to insert submission ${submission.conversionId}: ${err.message}`;
+          console.error(`[HubSpot FormSync] ${msg}`);
+          result.errors.push(msg);
+        }
       }
     }
+
+    console.log(`[HubSpot FormSync] Sync complete: ${result.totalFetched} fetched, ${result.newInserted} inserted, ${result.skippedDuplicate} duplicates skipped, ${result.errors.length} errors`);
+  } catch (err: any) {
+    console.error(`[HubSpot FormSync] Unexpected error during sync: ${err.message}`);
+    result.errors.push(`Unexpected sync error: ${err.message}`);
   }
 
-  console.log(`[HubSpot FormSync] Sync complete: ${result.totalFetched} fetched, ${result.newInserted} inserted, ${result.skippedDuplicate} duplicates skipped, ${result.errors.length} errors`);
   return result;
 }

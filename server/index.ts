@@ -7,6 +7,7 @@ let isShuttingDown = false;
 let isReady = false;
 let httpServer: Server | null = null;
 let expressApp: any = null;
+let cachedIndexHtml: string | null = null;
 
 declare global {
   namespace Express {
@@ -90,14 +91,21 @@ httpServer = http.createServer((req, res) => {
     return;
   }
 
-  if (expressApp) {
-    expressApp(req, res);
-    return;
+  if (req.url === '/' && req.method === 'GET') {
+    if (process.env.NODE_ENV === 'production' && cachedIndexHtml) {
+      res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-cache' });
+      res.end(cachedIndexHtml);
+      return;
+    }
+    if (!expressApp) {
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end('OK');
+      return;
+    }
   }
 
-  if (req.url === '/') {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('OK');
+  if (expressApp) {
+    expressApp(req, res);
     return;
   }
 
@@ -406,6 +414,17 @@ async function initializeApp() {
 
   expressApp = app;
   console.log('[Startup] Express app fully initialized and accepting requests');
+
+  if (isProduction) {
+    try {
+      const indexPath = path.join(__dirname, '../dist/index.html');
+      const fs = await import('fs');
+      cachedIndexHtml = fs.readFileSync(indexPath, 'utf8');
+      console.log('[Startup] Cached index.html for fast serving');
+    } catch (err) {
+      console.error('[Startup] Failed to cache index.html:', err);
+    }
+  }
 
   try {
     initWebSocketServer(httpServer);
