@@ -359,12 +359,12 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
 
     const existingUser = resolved
       ? await pool.query(
-          `SELECT id, first_name, last_name, membership_status, created_at, archived_at 
+          `SELECT id, first_name, last_name, membership_status, created_at, archived_at, stripe_customer_id 
            FROM users WHERE id = $1`,
           [resolved.userId]
         )
       : await pool.query(
-          `SELECT id, first_name, last_name, membership_status, created_at, archived_at 
+          `SELECT id, first_name, last_name, membership_status, created_at, archived_at, stripe_customer_id 
            FROM users WHERE LOWER(email) = $1`,
           [email.toLowerCase()]
         );
@@ -380,17 +380,31 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
       if (existing.archived_at && ['non-member', 'visitor', null].includes(existing.membership_status)) {
         existingUserId = existing.id;
         console.log(`[Stripe] Unarchiving user ${email} for new membership creation`);
+      } else if (existing.membership_status === 'pending') {
+        existingUserId = existing.id;
+        console.log(`[Stripe] Reusing pending user ${email} (${existing.id}) for new membership creation`);
+        if (existing.stripe_customer_id) {
+          try {
+            const stripeClient = await getStripeClient();
+            const subs = await stripeClient.subscriptions.list({ customer: existing.stripe_customer_id, status: 'all', limit: 10 });
+            for (const sub of subs.data) {
+              if (['active', 'trialing', 'past_due', 'incomplete'].includes(sub.status)) {
+                await stripeClient.subscriptions.cancel(sub.id);
+                console.log(`[Stripe] Cancelled stale subscription ${sub.id} during pending user reuse`);
+              }
+            }
+            await stripeClient.customers.del(existing.stripe_customer_id);
+            console.log(`[Stripe] Deleted stale Stripe customer ${existing.stripe_customer_id} during pending user reuse`);
+          } catch (cleanupErr: any) {
+            console.error(`[Stripe] Failed to cleanup stale Stripe data for pending user:`, cleanupErr.message);
+          }
+          await pool.query('UPDATE users SET stripe_customer_id = NULL, stripe_subscription_id = NULL WHERE id = $1', [existing.id]);
+        }
       } else {
-        const isPending = existing.membership_status === 'pending';
         const name = [existing.first_name, existing.last_name].filter(Boolean).join(' ') || email;
         return res.status(400).json({ 
-          error: isPending 
-            ? `This email has an incomplete signup from ${new Date(existing.created_at).toLocaleDateString()}. Clean it up to proceed.`
-            : 'A member with this email already exists',
-          isPendingUser: isPending,
-          existingUserId: isPending ? existing.id : undefined,
-          existingUserName: name,
-          canCleanup: isPending
+          error: 'A member with this email already exists',
+          existingUserName: name
         });
       }
     }
