@@ -431,10 +431,51 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
       const usageResult = await pool.query(previewUsageQuery, queryParams);
       usageResult.rows.forEach(r => usageMap.set(r.identifier, parseInt(r.used) || 0));
     } else {
-      // Filter by resource type to separate simulator vs conference room usage
       const resourceTypeFilter = isConferenceRoom ? 'conference_room' : 'simulator';
-      const usageQuery = excludeId 
-        ? `WITH ledger_usage AS (
+      const hasTimeFilter = startTime !== undefined && excludeId !== undefined;
+      
+      let usageQuery: string;
+      let usageParams: any[];
+      
+      if (hasTimeFilter) {
+        usageParams = [allIdentifiers, sessionDate, excludeId, resourceTypeFilter, startTime];
+        usageQuery = `WITH ledger_usage AS (
+             SELECT LOWER(ul.member_id) as identifier, COALESCE(SUM(ul.minutes_charged), 0) as mins
+             FROM usage_ledger ul
+             JOIN booking_sessions bs ON ul.session_id = bs.id
+             JOIN resources r ON bs.resource_id = r.id
+             WHERE LOWER(ul.member_id) = ANY($1::text[])
+               AND bs.session_date = $2
+               AND ul.session_id != $3
+               AND r.type = $4
+               AND (bs.start_time < $5 OR (bs.start_time = $5 AND ul.session_id < $3))
+             GROUP BY LOWER(ul.member_id)
+           ),
+           ghost_usage AS (
+             SELECT LOWER(br.user_email) as identifier, 
+                    COALESCE(SUM(FLOOR(br.duration_minutes::float / GREATEST(1, COALESCE(br.declared_player_count, 1)))), 0) as mins
+             FROM booking_requests br
+             WHERE LOWER(br.user_email) = ANY($1::text[])
+               AND br.request_date = $2
+               AND br.status IN ('approved', 'confirmed', 'attended')
+               AND (
+                 br.session_id IS NULL
+                 OR (br.session_id != $3 AND NOT EXISTS (SELECT 1 FROM usage_ledger ul WHERE ul.session_id = br.session_id))
+               )
+               AND EXISTS (SELECT 1 FROM resources r WHERE r.id = br.resource_id AND r.type = $4)
+               AND (COALESCE(br.start_time, '00:00:00') < $5 OR (COALESCE(br.start_time, '00:00:00') = $5 AND br.session_id < $3))
+             GROUP BY LOWER(br.user_email)
+           )
+           SELECT identifier, COALESCE(SUM(mins), 0) as used
+           FROM (
+             SELECT * FROM ledger_usage
+             UNION ALL
+             SELECT * FROM ghost_usage
+           ) combined
+           GROUP BY identifier`;
+      } else if (excludeId) {
+        usageParams = [allIdentifiers, sessionDate, excludeId, resourceTypeFilter];
+        usageQuery = `WITH ledger_usage AS (
              SELECT LOWER(ul.member_id) as identifier, COALESCE(SUM(ul.minutes_charged), 0) as mins
              FROM usage_ledger ul
              JOIN booking_sessions bs ON ul.session_id = bs.id
@@ -465,8 +506,10 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
              UNION ALL
              SELECT * FROM ghost_usage
            ) combined
-           GROUP BY identifier`
-        : `WITH ledger_usage AS (
+           GROUP BY identifier`;
+      } else {
+        usageParams = [allIdentifiers, sessionDate, resourceTypeFilter];
+        usageQuery = `WITH ledger_usage AS (
              SELECT LOWER(ul.member_id) as identifier, COALESCE(SUM(ul.minutes_charged), 0) as mins
              FROM usage_ledger ul
              JOIN booking_sessions bs ON ul.session_id = bs.id
@@ -497,9 +540,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
              SELECT * FROM ghost_usage
            ) combined
            GROUP BY identifier`;
-      const usageParams = excludeId 
-        ? [allIdentifiers, sessionDate, excludeId, resourceTypeFilter]
-        : [allIdentifiers, sessionDate, resourceTypeFilter];
+      }
       const usageResult = await pool.query(usageQuery, usageParams);
       usageResult.rows.forEach(r => usageMap.set(r.identifier, parseInt(r.used) || 0));
     }
