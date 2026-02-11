@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.47.0",
+    date: "2026-02-11",
+    title: "Staff Terminal UI & Card Management",
+    changes: [
+      "Added: 'Update Card via Reader' button on the member billing tab — staff can now update a member's payment method directly from their profile using the card reader, no charge required",
+      "Added: When no card is on file, an 'Add Card via Reader' button appears so staff can add one right from the profile",
+      "Improved: Card reader waiting screen now shows a clear 'Waiting for Reader...' display with pulsing animation, helpful instructions, and a prominent Cancel button",
+      "Improved: Save-card mode shows a 'No charge — saving card only' notice so staff know no money is being taken",
+      "Added: Auto-cancel notice on the waiting screen reminds staff the action will timeout after 2 minutes",
+    ],
+  },
+  {
     version: "7.46.0",
     date: "2026-02-11",
     title: "Stripe Terminal & Wellness Improvements",
