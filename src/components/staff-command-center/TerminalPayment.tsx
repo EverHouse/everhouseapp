@@ -17,6 +17,7 @@ interface TerminalPaymentProps {
   email?: string;
   paymentMetadata?: Record<string, string>;
   cartItems?: Array<{ productId: string; name: string; priceCents: number; quantity: number }>;
+  mode?: 'payment' | 'save_card';
   onSuccess: (paymentIntentId: string) => void;
   onError: (message: string) => void;
   onCancel: () => void;
@@ -31,6 +32,7 @@ export function TerminalPayment({
   email,
   paymentMetadata,
   cartItems,
+  mode = 'payment',
   onSuccess, 
   onError,
   onCancel 
@@ -43,8 +45,48 @@ export function TerminalPayment({
   const [status, setStatus] = useState<'idle' | 'waiting' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState('');
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [setupIntentId, setSetupIntentId] = useState<string | null>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [creatingSimulated, setCreatingSimulated] = useState(false);
+
+  const isSaveCard = mode === 'save_card';
+
+  const clearTimeoutRef = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
+  const clearPollingRef = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  const startTimeout = useCallback(() => {
+    clearTimeoutRef();
+    timeoutRef.current = setTimeout(async () => {
+      clearPollingRef();
+      if (selectedReader) {
+        try {
+          await fetch('/api/stripe/terminal/cancel-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ readerId: selectedReader })
+          });
+        } catch (err) {
+          console.error('Error canceling on timeout:', err);
+        }
+      }
+      setStatus('error');
+      setStatusMessage('Reader timed out. No card was presented within 2 minutes.');
+      setProcessing(false);
+    }, 120000);
+  }, [clearTimeoutRef, clearPollingRef, selectedReader]);
 
   const fetchReaders = useCallback(async () => {
     try {
@@ -71,11 +113,10 @@ export function TerminalPayment({
   useEffect(() => {
     fetchReaders();
     return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-      }
+      clearPollingRef();
+      clearTimeoutRef();
     };
-  }, [fetchReaders]);
+  }, [fetchReaders, clearPollingRef, clearTimeoutRef]);
 
   const createSimulatedReader = async () => {
     try {
@@ -106,20 +147,16 @@ export function TerminalPayment({
       const data = await res.json();
       
       if (data.status === 'succeeded') {
-        if (pollingRef.current) {
-          clearInterval(pollingRef.current);
-          pollingRef.current = null;
-        }
+        clearPollingRef();
+        clearTimeoutRef();
         setStatus('success');
         setStatusMessage('Payment successful!');
         setTimeout(() => {
           onSuccess(piId);
         }, 1500);
       } else if (data.status === 'canceled' || data.status === 'requires_payment_method') {
-        if (pollingRef.current) {
-          clearInterval(pollingRef.current);
-          pollingRef.current = null;
-        }
+        clearPollingRef();
+        clearTimeoutRef();
         setStatus('error');
         setStatusMessage('Payment was declined or canceled');
         setProcessing(false);
@@ -127,7 +164,60 @@ export function TerminalPayment({
     } catch (err) {
       console.error('Error polling payment status:', err);
     }
-  }, [onSuccess]);
+  }, [onSuccess, clearPollingRef, clearTimeoutRef]);
+
+  const pollSetupStatus = useCallback(async (siId: string) => {
+    try {
+      const res = await fetch(`/api/stripe/terminal/setup-status/${siId}`, {
+        credentials: 'include'
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+
+      if (data.status === 'succeeded') {
+        clearPollingRef();
+        clearTimeoutRef();
+        try {
+          const confirmRes = await fetch('/api/stripe/terminal/confirm-save-card', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              setupIntentId: siId,
+              customerId: paymentMetadata?.customerId,
+              subscriptionId
+            })
+          });
+          const confirmData = await confirmRes.json();
+          if (!confirmRes.ok || !confirmData.cardSaved) {
+            setStatus('error');
+            setStatusMessage(confirmData.error || 'Card was read but could not be saved. Please try again.');
+            setProcessing(false);
+            return;
+          }
+        } catch (err: any) {
+          console.error('Error confirming save card:', err);
+          setStatus('error');
+          setStatusMessage('Card was read but could not be saved. Please try again.');
+          setProcessing(false);
+          return;
+        }
+        setStatus('success');
+        setStatusMessage('Card saved successfully!');
+        setTimeout(() => {
+          onSuccess(siId);
+        }, 1500);
+      } else if (data.status === 'canceled') {
+        clearPollingRef();
+        clearTimeoutRef();
+        setStatus('error');
+        setStatusMessage('Card save was canceled');
+        setProcessing(false);
+      }
+    } catch (err) {
+      console.error('Error polling setup status:', err);
+    }
+  }, [onSuccess, clearPollingRef, clearTimeoutRef, paymentMetadata?.customerId, subscriptionId]);
 
   const handleProcessPayment = async () => {
     if (!selectedReader) {
@@ -135,14 +225,31 @@ export function TerminalPayment({
       return;
     }
 
+    if (isSaveCard && !paymentMetadata?.customerId) {
+      onError('Customer ID is required to save a card');
+      return;
+    }
+
     setProcessing(true);
     setStatus('waiting');
-    setStatusMessage('Waiting for card on reader...');
+    setStatusMessage(isSaveCard ? 'Present card on reader to save...' : 'Waiting for card on reader...');
 
     try {
       let res: Response;
 
-      if (existingPaymentIntentId) {
+      if (isSaveCard) {
+        res = await fetch('/api/stripe/terminal/save-card', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            readerId: selectedReader,
+            customerId: paymentMetadata?.customerId,
+            email,
+            userId
+          })
+        });
+      } else if (existingPaymentIntentId) {
         res = await fetch('/api/stripe/terminal/process-existing-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -182,15 +289,24 @@ export function TerminalPayment({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Failed to process payment');
+        throw new Error(data.error || (isSaveCard ? 'Failed to save card' : 'Failed to process payment'));
       }
 
       const data = await res.json();
-      setPaymentIntentId(data.paymentIntentId);
 
-      pollingRef.current = setInterval(() => {
-        pollPaymentStatus(data.paymentIntentId);
-      }, 1500);
+      startTimeout();
+
+      if (isSaveCard) {
+        setSetupIntentId(data.setupIntentId);
+        pollingRef.current = setInterval(() => {
+          pollSetupStatus(data.setupIntentId);
+        }, 1500);
+      } else {
+        setPaymentIntentId(data.paymentIntentId);
+        pollingRef.current = setInterval(() => {
+          pollPaymentStatus(data.paymentIntentId);
+        }, 1500);
+      }
 
     } catch (err: any) {
       console.error('Error processing terminal payment:', err);
@@ -201,10 +317,8 @@ export function TerminalPayment({
   };
 
   const handleCancelPayment = async () => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
+    clearPollingRef();
+    clearTimeoutRef();
 
     if (selectedReader && processing) {
       try {
@@ -223,6 +337,7 @@ export function TerminalPayment({
     setStatus('idle');
     setStatusMessage('');
     setPaymentIntentId(null);
+    setSetupIntentId(null);
     onCancel();
   };
 
@@ -326,9 +441,11 @@ export function TerminalPayment({
 
           <div className={`p-4 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
             <div className="flex justify-between items-center">
-              <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>Amount to charge:</span>
+              <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>
+                {isSaveCard ? 'Action:' : 'Amount to charge:'}
+              </span>
               <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                ${(amount / 100).toFixed(2)}
+                {isSaveCard ? 'Save Card on File' : `$${(amount / 100).toFixed(2)}`}
               </span>
             </div>
           </div>
@@ -343,7 +460,7 @@ export function TerminalPayment({
             } disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <span className="material-symbols-outlined">contactless</span>
-            Collect Payment on Reader
+            {isSaveCard ? 'Save Card on Reader' : 'Collect Payment on Reader'}
           </button>
         </>
       )}
@@ -358,14 +475,16 @@ export function TerminalPayment({
             </div>
           </div>
           <h3 className={`text-lg font-medium mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-            Waiting for Card
+            {isSaveCard ? 'Waiting for Card' : 'Waiting for Card'}
           </h3>
           <p className={`text-sm mb-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
             {statusMessage}
           </p>
-          <p className={`text-sm mb-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-            Amount: <span className="font-semibold">${(amount / 100).toFixed(2)}</span>
-          </p>
+          {!isSaveCard && (
+            <p className={`text-sm mb-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              Amount: <span className="font-semibold">${(amount / 100).toFixed(2)}</span>
+            </p>
+          )}
           <button
             onClick={handleCancelPayment}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
@@ -387,7 +506,7 @@ export function TerminalPayment({
             </span>
           </div>
           <h3 className={`text-lg font-medium mb-2 ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
-            Payment Successful
+            {isSaveCard ? 'Card Saved' : 'Payment Successful'}
           </h3>
           <p className={`text-sm mb-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
             {statusMessage}
@@ -406,7 +525,7 @@ export function TerminalPayment({
             </span>
           </div>
           <h3 className={`text-lg font-medium mb-2 ${isDark ? 'text-red-400' : 'text-red-700'}`}>
-            Payment Failed
+            {isSaveCard ? 'Card Save Failed' : 'Payment Failed'}
           </h3>
           <p className={`text-sm mb-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
             {statusMessage}
@@ -416,6 +535,7 @@ export function TerminalPayment({
               setStatus('idle');
               setStatusMessage('');
               setPaymentIntentId(null);
+              setSetupIntentId(null);
             }}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               isDark 

@@ -439,6 +439,7 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
       try {
         paymentIntent = await stripe.paymentIntents.update(invoicePI.id, {
           payment_method_types: ['card_present'],
+          setup_future_usage: 'off_session',
           ...(email ? { receipt_email: email } : {}),
           metadata: {
             subscriptionId,
@@ -464,6 +465,7 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
         customer: customerId,
         payment_method_types: ['card_present'],
         capture_method: 'automatic',
+        setup_future_usage: 'off_session',
         description: `Subscription activation - Invoice ${invoice.id}`,
         ...(email ? { receipt_email: email } : {}),
         metadata: {
@@ -889,6 +891,181 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
   } catch (error: any) {
     console.error('[Terminal] Error processing existing payment:', error);
     res.status(500).json({ error: error.message || 'Failed to process existing payment on terminal' });
+  }
+});
+
+router.post('/api/stripe/terminal/save-card', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { readerId, customerId, email, userId } = req.body;
+
+    if (!readerId) {
+      return res.status(400).json({ error: 'Reader ID is required' });
+    }
+    if (!customerId) {
+      return res.status(400).json({ error: 'Customer ID is required' });
+    }
+
+    const stripe = await getStripeClient();
+
+    const setupIntent = await stripe.setupIntents.create({
+      customer: customerId,
+      payment_method_types: ['card_present'],
+      usage: 'off_session',
+      metadata: {
+        source: 'terminal',
+        email: email || '',
+        userId: userId || '',
+        paymentType: 'save_card'
+      }
+    });
+
+    const reader = await stripe.terminal.readers.processSetupIntent(readerId, {
+      setup_intent: setupIntent.id
+    });
+
+    if (reader.device_type?.startsWith('simulated')) {
+      try {
+        await stripe.testHelpers.terminal.readers.presentPaymentMethod(readerId);
+      } catch (simErr: any) {
+        console.error('[Terminal] Simulated card presentation error (non-blocking):', simErr.message);
+      }
+    }
+
+    await logFromRequest(req, {
+      action: 'terminal_save_card_initiated',
+      resourceType: 'setup_intent',
+      resourceId: setupIntent.id,
+      resourceName: email || customerId,
+      details: {
+        setupIntentId: setupIntent.id,
+        readerId,
+        customerId,
+        userId: userId || null
+      }
+    });
+
+    res.json({
+      success: true,
+      setupIntentId: setupIntent.id,
+      readerId: reader.id,
+      readerAction: reader.action
+    });
+  } catch (error: any) {
+    console.error('[Terminal] Error initiating save card:', error);
+    res.status(500).json({ error: error.message || 'Failed to initiate save card' });
+  }
+});
+
+router.get('/api/stripe/terminal/setup-status/:setupIntentId', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { setupIntentId } = req.params;
+    const stripe = await getStripeClient();
+
+    const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
+
+    res.json({
+      id: setupIntent.id,
+      status: setupIntent.status,
+      paymentMethod: setupIntent.payment_method
+    });
+  } catch (error: any) {
+    console.error('[Terminal] Error checking setup status:', error);
+    res.status(500).json({ error: error.message || 'Failed to check setup status' });
+  }
+});
+
+router.post('/api/stripe/terminal/confirm-save-card', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { setupIntentId, customerId, subscriptionId } = req.body;
+
+    if (!setupIntentId) {
+      return res.status(400).json({ error: 'SetupIntent ID is required' });
+    }
+    if (!customerId) {
+      return res.status(400).json({ error: 'Customer ID is required' });
+    }
+
+    const stripe = await getStripeClient();
+
+    const setupIntent = await stripe.setupIntents.retrieve(setupIntentId, {
+      expand: ['payment_method']
+    });
+
+    if (setupIntent.status !== 'succeeded') {
+      return res.status(400).json({
+        error: `SetupIntent is in "${setupIntent.status}" state, expected "succeeded"`,
+        status: setupIntent.status
+      });
+    }
+
+    if (!setupIntent.payment_method) {
+      return res.status(400).json({ error: 'No payment method found on SetupIntent' });
+    }
+
+    const pmId = typeof setupIntent.payment_method === 'string' 
+      ? setupIntent.payment_method 
+      : setupIntent.payment_method.id;
+
+    const pm = typeof setupIntent.payment_method === 'string'
+      ? await stripe.paymentMethods.retrieve(pmId)
+      : setupIntent.payment_method;
+
+    let reusablePaymentMethodId = pmId;
+
+    if (pm.type === 'card_present' && (pm as any).card_present?.generated_card) {
+      reusablePaymentMethodId = (pm as any).card_present.generated_card;
+      console.log(`[Terminal] Found generated_card ${reusablePaymentMethodId} from SetupIntent card_present`);
+    }
+
+    if (!reusablePaymentMethodId) {
+      return res.status(400).json({ error: 'Could not resolve a reusable payment method from the SetupIntent' });
+    }
+
+    let paymentMethodId = reusablePaymentMethodId;
+
+    try {
+      await stripe.paymentMethods.attach(paymentMethodId, {
+        customer: customerId
+      });
+    } catch (attachErr: any) {
+      if (!attachErr.message?.includes('already been attached')) {
+        return res.status(500).json({ error: `Failed to attach payment method: ${attachErr.message}` });
+      }
+    }
+
+    await stripe.customers.update(customerId, {
+      invoice_settings: {
+        default_payment_method: paymentMethodId
+      }
+    });
+
+    if (subscriptionId) {
+      await stripe.subscriptions.update(subscriptionId, {
+        default_payment_method: paymentMethodId
+      });
+    }
+
+    await logFromRequest(req, {
+      action: 'terminal_card_saved',
+      resourceType: 'payment_method',
+      resourceId: paymentMethodId,
+      resourceName: customerId,
+      details: {
+        setupIntentId,
+        customerId,
+        subscriptionId: subscriptionId || null,
+        paymentMethodId
+      }
+    });
+
+    res.json({
+      success: true,
+      cardSaved: true,
+      paymentMethodId
+    });
+  } catch (error: any) {
+    console.error('[Terminal] Error confirming save card:', error);
+    res.status(500).json({ error: error.message || 'Failed to confirm save card' });
   }
 });
 
