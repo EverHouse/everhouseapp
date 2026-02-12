@@ -968,6 +968,89 @@ router.get('/api/member/balance', async (req: Request, res: Response) => {
       });
     }
 
+    // On-the-fly fee computation for uncached sessions
+    const existingSessionIds = new Set(breakdown.map(b => b.sessionId));
+    try {
+      const uncachedResult = await pool.query(
+        `SELECT DISTINCT bs.id as session_id
+         FROM booking_participants bp
+         JOIN booking_sessions bs ON bs.id = bp.session_id
+         JOIN users pu ON pu.id = bp.user_id
+         WHERE LOWER(pu.email) = $1
+           AND bp.participant_type = 'owner'
+           AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
+           AND COALESCE(bp.cached_fee_cents, 0) = 0
+           AND bs.session_date >= CURRENT_DATE - INTERVAL '90 days'
+         LIMIT 20`,
+        [memberEmail]
+      );
+
+      const uncachedSessions = uncachedResult.rows
+        .map(r => r.session_id as number)
+        .filter(sid => !existingSessionIds.has(sid));
+
+      if (uncachedSessions.length > 0) {
+        console.log(`[Member Balance] Computing fees on-the-fly for ${uncachedSessions.length} sessions`);
+
+        const allCacheUpdates: Array<{ id: number; cents: number }> = [];
+
+        for (const sessionId of uncachedSessions) {
+          try {
+            const feeResult = await computeFeeBreakdown({ sessionId, source: 'balance' });
+
+            for (const p of feeResult.participants) {
+              if (p.totalCents > 0 && p.participantId) {
+                const sessionDataResult = await pool.query(
+                  `SELECT bs.session_date, r.name as resource_name, bp.participant_type, bp.display_name
+                   FROM booking_sessions bs
+                   LEFT JOIN resources r ON r.id = bs.resource_id
+                   LEFT JOIN booking_participants bp ON bp.id = $1
+                   WHERE bs.id = $2`,
+                  [p.participantId, sessionId]
+                );
+                const sData = sessionDataResult.rows[0];
+                const dateStr = sData?.session_date ? new Date(sData.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+
+                const isGuest = sData?.participant_type === 'guest';
+                breakdown.push({
+                  id: p.participantId,
+                  sessionId,
+                  type: isGuest ? 'guest' : 'overage',
+                  description: isGuest
+                    ? `Guest: ${sData?.display_name || 'Guest'} - ${dateStr}`
+                    : `${sData?.resource_name || 'Booking'} - ${dateStr}`,
+                  date: sData?.session_date,
+                  amountCents: p.totalCents
+                });
+
+                allCacheUpdates.push({ id: p.participantId, cents: p.totalCents });
+              }
+            }
+          } catch (sessionErr) {
+            console.error(`[Member Balance] Failed to compute fees for session ${sessionId}:`, sessionErr);
+          }
+        }
+
+        if (allCacheUpdates.length > 0) {
+          try {
+            const ids = allCacheUpdates.map(u => u.id);
+            const cents = allCacheUpdates.map(u => u.cents);
+            await pool.query(
+              `UPDATE booking_participants bp
+               SET cached_fee_cents = updates.cents
+               FROM (SELECT UNNEST($1::int[]) as id, UNNEST($2::int[]) as cents) as updates
+               WHERE bp.id = updates.id`,
+              [ids, cents]
+            );
+          } catch (cacheErr) {
+            console.error('[Member Balance] Failed to write-through cache:', cacheErr);
+          }
+        }
+      }
+    } catch (uncachedErr) {
+      console.error('[Member Balance] Error computing on-the-fly fees:', uncachedErr);
+    }
+
     const unfilledResult = await pool.query(
       `SELECT 
         bs.id as session_id,

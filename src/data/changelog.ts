@@ -13,6 +13,14 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.48.8",
+    date: "2026-02-12",
+    title: "Outstanding Balance Accuracy Fix",
+    changes: [
+      "Fixed: Outstanding fees now show accurately in member profile drawer by computing fees on-the-fly for sessions that hadn't been cached yet",
+    ],
+  },
+  {
     version: "7.48.7",
     date: "2026-02-12",
     title: "Archive Stale Visitors Fix",
