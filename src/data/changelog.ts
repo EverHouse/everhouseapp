@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.48.6",
+    date: "2026-02-12",
+    title: "Trackman Import Merged Account Fix",
+    changes: [
+      "Fixed: Trackman bookings were incorrectly linking to old merged accounts instead of the active member account, causing false fees and a 'Merged' badge on bookings",
+      "Fixed: Corrected 2 bookings for William Holder that were linked to his old merged account — fees zeroed and membership benefits now apply",
+      "Improved: Trackman import now automatically skips merged accounts when matching members, preventing this issue from happening again",
+    ],
+  },
+  {
     version: "7.48.5",
     date: "2026-02-12",
     title: "Outstanding Balance Relocated to Staff View",

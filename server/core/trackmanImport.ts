@@ -1291,7 +1291,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
       email: users.email,
       firstName: users.firstName,
       lastName: users.lastName
-    }).from(users).where(sql`email IS NOT NULL AND email != ''`);
+    }).from(users).where(sql`email IS NOT NULL AND email != '' AND COALESCE(membership_status, '') != 'merged'`);
     
     let addedFromDb = 0;
     for (const user of localUsers) {
@@ -1326,7 +1326,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
       trackmanEmail: users.trackmanEmail
     })
     .from(users)
-    .where(sql`trackman_email IS NOT NULL AND trackman_email != ''`);
+    .where(sql`trackman_email IS NOT NULL AND trackman_email != '' AND COALESCE(membership_status, '') != 'merged'`);
     
     for (const user of usersWithTrackmanEmail) {
       if (user.email && user.trackmanEmail) {
