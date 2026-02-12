@@ -1341,8 +1341,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       const memberResult = await pool.query(`
         SELECT u.id, u.email, u.name, mt.name as tier_name, mt.can_book_simulators
         FROM users u
-        LEFT JOIN members m ON m.user_id = u.id
-        LEFT JOIN member_tiers mt ON m.tier_id = mt.id
+        LEFT JOIN membership_tiers mt ON u.tier_id = mt.id
         WHERE LOWER(u.email) = LOWER($1)
       `, [memberEmail]);
 
