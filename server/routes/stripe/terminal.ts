@@ -333,7 +333,12 @@ router.get('/api/stripe/terminal/payment-status/:paymentIntentId', isStaffOrAdmi
       status: paymentIntent.status,
       amount: paymentIntent.amount,
       amountReceived: paymentIntent.amount_received,
-      currency: paymentIntent.currency
+      currency: paymentIntent.currency,
+      lastPaymentError: paymentIntent.last_payment_error ? {
+        message: paymentIntent.last_payment_error.message || 'Payment failed',
+        declineCode: paymentIntent.last_payment_error.decline_code || null,
+        code: paymentIntent.last_payment_error.code || null,
+      } : null
     });
   } catch (error: any) {
     console.error('[Terminal] Error checking payment status:', error);

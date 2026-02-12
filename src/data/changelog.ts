@@ -13,6 +13,14 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.48.1",
+    date: "2026-02-12",
+    title: "Terminal Payment Polling Fix",
+    changes: [
+      "Fixed: Card reader payments no longer show 'Payment Failed' while the terminal is still waiting for the customer to tap — the system now correctly waits for the card instead of treating the waiting state as an error",
+    ],
+  },
+  {
     version: "7.48.0",
     date: "2026-02-12",
     title: "Create Member Flow Reliability Fix",

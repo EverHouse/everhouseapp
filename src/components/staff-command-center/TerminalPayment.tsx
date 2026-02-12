@@ -154,11 +154,19 @@ export function TerminalPayment({
         setTimeout(() => {
           onSuccess(piId);
         }, 1500);
-      } else if (data.status === 'canceled' || data.status === 'requires_payment_method') {
+      } else if (data.status === 'canceled') {
         clearPollingRef();
         clearTimeoutRef();
         setStatus('error');
-        setStatusMessage('Payment was declined or canceled');
+        setStatusMessage('Payment was canceled');
+        setProcessing(false);
+      } else if (data.status === 'requires_payment_method' && data.lastPaymentError) {
+        clearPollingRef();
+        clearTimeoutRef();
+        setStatus('error');
+        setStatusMessage(data.lastPaymentError.declineCode
+          ? `Card declined: ${data.lastPaymentError.declineCode.replace(/_/g, ' ')}`
+          : (data.lastPaymentError.message || 'Payment was declined'));
         setProcessing(false);
       }
     } catch (err) {
