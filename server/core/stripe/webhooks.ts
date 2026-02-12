@@ -295,7 +295,7 @@ export async function processStripeWebhook(
 
     await executeDeferredActions(deferredActions);
 
-    cleanupOldProcessedEvents().catch(() => {});
+    cleanupOldProcessedEvents().catch(err => console.warn('[Stripe Webhook] Cleanup failed:', (err as Error).message));
   } catch (handlerError) {
     await client.query('ROLLBACK');
     console.error(`[Stripe Webhook] Handler failed for ${event.type} (${event.id}), rolled back:`, handlerError);
@@ -1867,7 +1867,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: any):
         console.log(`[Stripe Webhook] Successfully added $${amountDollars.toFixed(2)} to balance for ${memberEmail}. New balance: $${newBalanceDollars.toFixed(2)}`);
         
         // Get member name for notifications
-        const userResult = await pool.query(
+        const userResult = await client.query(
           'SELECT first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)',
           [memberEmail]
         );
@@ -1944,13 +1944,13 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: any):
           console.log(`[Stripe Webhook] Company synced to HubSpot: ${companyResult.hubspotCompanyId} (created: ${companyResult.created})`);
           
           // Update user with hubspot company ID
-          await pool.query(
+          await client.query(
             `UPDATE users SET hubspot_company_id = $1, company_name = $2, updated_at = NOW() WHERE email = $3`,
             [companyResult.hubspotCompanyId, companyName, userEmail.toLowerCase()]
           );
           
           // Update billing_group with hubspot company ID if it exists
-          await pool.query(
+          await client.query(
             `UPDATE billing_groups SET hubspot_company_id = $1, company_name = $2, updated_at = NOW() WHERE primary_email = $3`,
             [companyResult.hubspotCompanyId, companyName, userEmail.toLowerCase()]
           );
@@ -1977,7 +1977,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: any):
 
       if (userId && memberEmail) {
         try {
-          const updateResult = await pool.query(
+          const updateResult = await client.query(
             `UPDATE users SET 
               membership_status = 'active',
               stripe_customer_id = COALESCE(stripe_customer_id, $1),
@@ -2038,8 +2038,8 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: any):
       if (resolved) {
         // User exists via linked email (or direct match) - update their Stripe customer ID
         console.log(`[Stripe Webhook] User found via ${resolved.matchType} for ${email} -> ${resolved.primaryEmail}, updating Stripe customer ID`);
-        const preUpdateCheck = await pool.query('SELECT archived_at FROM users WHERE id = $1', [resolved.userId]);
-        await pool.query(
+        const preUpdateCheck = await client.query('SELECT archived_at FROM users WHERE id = $1', [resolved.userId]);
+        await client.query(
           `UPDATE users SET stripe_customer_id = $1, membership_status = 'active', billing_provider = 'stripe', archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = $2`,
           [customerId, resolved.userId]
         );
@@ -2057,7 +2057,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: any):
         }
       } else {
         // Check if user already exists by exact email match
-        const existingUser = await pool.query(
+        const existingUser = await client.query(
           'SELECT id, status FROM users WHERE LOWER(email) = LOWER($1)',
           [email]
         );
@@ -2065,8 +2065,8 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: any):
         if (existingUser.rows.length > 0) {
           // User exists - update their Stripe customer ID, status, and billing provider
           console.log(`[Stripe Webhook] User ${email} exists, updating Stripe customer ID and billing provider`);
-          const preUpdateCheckDirect = await pool.query('SELECT archived_at FROM users WHERE LOWER(email) = LOWER($1)', [email]);
-          await pool.query(
+          const preUpdateCheckDirect = await client.query('SELECT archived_at FROM users WHERE LOWER(email) = LOWER($1)', [email]);
+          await client.query(
             `UPDATE users SET stripe_customer_id = $1, membership_status = 'active', billing_provider = 'stripe', archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE LOWER(email) = LOWER($2)`,
             [customerId, email]
           );
@@ -2089,7 +2089,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: any):
         // Get tier slug from tier ID
         let tierSlug = null;
         if (tierId) {
-          const tierResult = await pool.query(
+          const tierResult = await client.query(
             'SELECT slug FROM membership_tiers WHERE id = $1',
             [tierId]
           );
@@ -2098,7 +2098,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: any):
           }
         }
         
-        await pool.query(
+        await client.query(
           `INSERT INTO users (email, first_name, last_name, tier, membership_status, stripe_customer_id, billing_provider, join_date, created_at, updated_at)
            VALUES ($1, $2, $3, $4, 'active', $5, 'stripe', NOW(), NOW(), NOW())
            ON CONFLICT (email) DO UPDATE SET 
@@ -2808,11 +2808,15 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
         metadata: i.metadata,
       }));
       
-      await handleSubscriptionItemsChanged(
-        subscription.id,
-        currentItems,
-        previousItems,
-      );
+      try {
+        await handleSubscriptionItemsChanged(
+          subscription.id,
+          currentItems,
+          previousItems,
+        );
+      } catch (itemsErr) {
+        console.error('[Stripe Webhook] handleSubscriptionItemsChanged failed (non-fatal):', (itemsErr as Error).message);
+      }
     }
 
     const userResult = await client.query(
@@ -2911,12 +2915,16 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
           });
         }
         
-        await notifyMember({
-          userEmail: email,
-          title: 'Membership Updated',
-          message: `Your membership has been changed to ${newTierName}.`,
-          type: 'system',
-        });
+        try {
+          await notifyMember({
+            userEmail: email,
+            title: 'Membership Updated',
+            message: `Your membership has been changed to ${newTierName}.`,
+            type: 'system',
+          });
+        } catch (notifyErr) {
+          console.error('[Stripe Webhook] Notification failed (non-fatal):', (notifyErr as Error).message);
+        }
       }
     }
 
@@ -2932,12 +2940,16 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
 
       const reactivationStatuses = ['past_due', 'unpaid', 'suspended'];
       if (previousAttributes?.status && reactivationStatuses.includes(previousAttributes.status)) {
-        await notifyAllStaff(
-          'Member Reactivated',
-          `${memberName} (${email}) membership has been reactivated (was ${previousAttributes.status}).`,
-          'member_status_change',
-          { sendPush: true, url: '/admin/members' }
-        );
+        try {
+          await notifyAllStaff(
+            'Member Reactivated',
+            `${memberName} (${email}) membership has been reactivated (was ${previousAttributes.status}).`,
+            'member_status_change',
+            { sendPush: true, url: '/admin/members' }
+          );
+        } catch (notifyErr) {
+          console.error('[Stripe Webhook] Notification failed (non-fatal):', (notifyErr as Error).message);
+        }
       }
       
       // Reactivate sub-members (family/corporate employees) if they were suspended/past_due
@@ -2995,20 +3007,27 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
         `UPDATE users SET membership_status = 'past_due', stripe_current_period_end = COALESCE($2, stripe_current_period_end), updated_at = NOW() WHERE id = $1`,
         [userId, subscriptionPeriodEnd]
       );
-      await notifyMember({
-        userEmail: email,
-        title: 'Membership Past Due',
-        message: 'Your membership payment is past due. Please update your payment method to avoid service interruption.',
-        type: 'membership_past_due',
-      }, { sendPush: true });
+      try {
+        await notifyMember({
+          userEmail: email,
+          title: 'Membership Past Due',
+          message: 'Your membership payment is past due. Please update your payment method to avoid service interruption.',
+          type: 'membership_past_due',
+        }, { sendPush: true });
+      } catch (notifyErr) {
+        console.error('[Stripe Webhook] Notification failed (non-fatal):', (notifyErr as Error).message);
+      }
 
-      // Notify staff about subscription going past due
-      await notifyAllStaff(
-        'Membership Past Due',
-        `${memberName} (${email}) subscription payment is past due.`,
-        'membership_past_due',
-        { sendPush: true, sendWebSocket: true }
-      );
+      try {
+        await notifyAllStaff(
+          'Membership Past Due',
+          `${memberName} (${email}) subscription payment is past due.`,
+          'membership_past_due',
+          { sendPush: true, sendWebSocket: true }
+        );
+      } catch (notifyErr) {
+        console.error('[Stripe Webhook] Notification failed (non-fatal):', (notifyErr as Error).message);
+      }
 
       console.log(`[Stripe Webhook] Past due notification sent to ${email}`);
       
@@ -3069,20 +3088,27 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: any, 
         `UPDATE users SET membership_status = 'suspended', stripe_current_period_end = COALESCE($2, stripe_current_period_end), updated_at = NOW() WHERE id = $1`,
         [userId, subscriptionPeriodEnd]
       );
-      await notifyMember({
-        userEmail: email,
-        title: 'Membership Unpaid',
-        message: 'Your membership is unpaid. Please update your payment method to restore access.',
-        type: 'membership_past_due',
-      }, { sendPush: true });
+      try {
+        await notifyMember({
+          userEmail: email,
+          title: 'Membership Unpaid',
+          message: 'Your membership is unpaid. Please update your payment method to restore access.',
+          type: 'membership_past_due',
+        }, { sendPush: true });
+      } catch (notifyErr) {
+        console.error('[Stripe Webhook] Notification failed (non-fatal):', (notifyErr as Error).message);
+      }
 
-      // Notify staff about subscription going unpaid/suspended
-      await notifyAllStaff(
-        'Membership Suspended - Unpaid',
-        `${memberName} (${email}) subscription is unpaid and has been suspended.`,
-        'membership_past_due',
-        { sendPush: true, sendWebSocket: true }
-      );
+      try {
+        await notifyAllStaff(
+          'Membership Suspended - Unpaid',
+          `${memberName} (${email}) subscription is unpaid and has been suspended.`,
+          'membership_past_due',
+          { sendPush: true, sendWebSocket: true }
+        );
+      } catch (notifyErr) {
+        console.error('[Stripe Webhook] Notification failed (non-fatal):', (notifyErr as Error).message);
+      }
 
       console.log(`[Stripe Webhook] Unpaid notification sent to ${email}`);
       
@@ -3207,19 +3233,27 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: any):
         console.error('[Stripe Webhook] HubSpot sync failed for status paused:', hubspotError);
       }
 
-      await notifyMember({
-        userEmail: email,
-        title: 'Trial Ended',
-        message: 'Your free trial has ended. Your account is still here - renew anytime to pick up where you left off!',
-        type: 'membership_paused',
-      });
+      try {
+        await notifyMember({
+          userEmail: email,
+          title: 'Trial Ended',
+          message: 'Your free trial has ended. Your account is still here - renew anytime to pick up where you left off!',
+          type: 'membership_paused',
+        });
+      } catch (notifyErr) {
+        console.error('[Stripe Webhook] Notification failed (non-fatal):', (notifyErr as Error).message);
+      }
 
-      await notifyAllStaff(
-        'Trial Expired',
-        `${memberName} (${email}) trial has ended. Membership paused (account preserved).`,
-        'trial_expired',
-        { sendPush: true, sendWebSocket: true }
-      );
+      try {
+        await notifyAllStaff(
+          'Trial Expired',
+          `${memberName} (${email}) trial has ended. Membership paused (account preserved).`,
+          'trial_expired',
+          { sendPush: true, sendWebSocket: true }
+        );
+      } catch (notifyErr) {
+        console.error('[Stripe Webhook] Notification failed (non-fatal):', (notifyErr as Error).message);
+      }
 
       broadcastBillingUpdate({
         action: 'subscription_paused',
@@ -3258,13 +3292,17 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: any):
           `subscription cancelled with ${orphanedEmails.length} group members deactivated: ${orphanedEmails.join(', ')}`
         );
 
-        await notifyAllStaff(
-          'Orphan Billing Alert',
-          `Primary member ${memberName} (${email}) subscription was cancelled. ` +
-            `${orphanedEmails.length} group member(s) have been automatically deactivated: ${orphanedEmails.join(', ')}.`,
-          'billing_alert',
-          { sendPush: true }
-        );
+        try {
+          await notifyAllStaff(
+            'Orphan Billing Alert',
+            `Primary member ${memberName} (${email}) subscription was cancelled. ` +
+              `${orphanedEmails.length} group member(s) have been automatically deactivated: ${orphanedEmails.join(', ')}.`,
+            'billing_alert',
+            { sendPush: true }
+          );
+        } catch (notifyErr) {
+          console.error('[Stripe Webhook] Notification failed (non-fatal):', (notifyErr as Error).message);
+        }
       }
 
       // Deactivate the billing group itself
@@ -3316,19 +3354,27 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: any):
       console.error('[Stripe Webhook] HubSpot cancellation handling failed:', cancellationError);
     }
 
-    await notifyMember({
-      userEmail: email,
-      title: 'Membership Cancelled',
-      message: 'Your membership has been cancelled. We hope to see you again soon.',
-      type: 'membership_cancelled',
-    });
+    try {
+      await notifyMember({
+        userEmail: email,
+        title: 'Membership Cancelled',
+        message: 'Your membership has been cancelled. We hope to see you again soon.',
+        type: 'membership_cancelled',
+      });
+    } catch (notifyErr) {
+      console.error('[Stripe Webhook] Notification failed (non-fatal):', (notifyErr as Error).message);
+    }
 
-    await notifyAllStaff(
-      'Membership Cancelled',
-      `${memberName} (${email}) has cancelled their membership.`,
-      'membership_cancelled',
-      { sendPush: true, sendWebSocket: true }
-    );
+    try {
+      await notifyAllStaff(
+        'Membership Cancelled',
+        `${memberName} (${email}) has cancelled their membership.`,
+        'membership_cancelled',
+        { sendPush: true, sendWebSocket: true }
+      );
+    } catch (notifyErr) {
+      console.error('[Stripe Webhook] Notification failed (non-fatal):', (notifyErr as Error).message);
+    }
 
     broadcastBillingUpdate({
       action: 'subscription_cancelled',

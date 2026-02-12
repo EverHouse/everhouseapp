@@ -882,7 +882,7 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
     try {
       const readerObj = await stripe.terminal.readers.retrieve(readerId);
       readerLabel = readerObj.label || readerId;
-    } catch {}
+    } catch (e) { /* reader label is cosmetic, ignore */ }
 
     const updateParams: any = {
       payment_method_types: ['card_present'],
