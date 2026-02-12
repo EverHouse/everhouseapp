@@ -840,6 +840,45 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                       </button>
                                     </>
                                   )}
+                                  {!issue.ignored && issue.table === 'trackman_unmatched_bookings' && (
+                                    <>
+                                      <button
+                                        onClick={() => setBookingSheet({
+                                          isOpen: true,
+                                          bookingId: issue.recordId as number,
+                                          bayName: issue.context?.bayNumber ? `Bay ${issue.context.bayNumber}` : undefined,
+                                          bookingDate: issue.context?.bookingDate,
+                                          timeSlot: issue.context?.startTime,
+                                          memberName: issue.context?.userName,
+                                          memberEmail: issue.context?.userEmail,
+                                          trackmanBookingId: issue.context?.trackmanBookingId,
+                                          importedName: issue.context?.importedName || issue.context?.userName,
+                                          notes: issue.context?.notes,
+                                          originalEmail: issue.context?.originalEmail
+                                        })}
+                                        className="p-1.5 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 rounded transition-colors"
+                                        title="Assign to a member"
+                                      >
+                                        <span className="material-symbols-outlined text-[16px]">person_add</span>
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          if (confirm('Dismiss this unmatched Trackman booking? It will be removed from the unresolved queue.')) {
+                                            fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/dismiss-trackman-unmatched', body: { recordId: issue.recordId } });
+                                          }
+                                        }}
+                                        disabled={fixIssueMutation.isPending}
+                                        className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
+                                        title="Dismiss this unmatched booking"
+                                      >
+                                        {fixIssueMutation.isPending ? (
+                                          <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                        ) : (
+                                          <span className="material-symbols-outlined text-[16px]">visibility_off</span>
+                                        )}
+                                      </button>
+                                    </>
+                                  )}
                                   {!issue.ignored && (issue.table === 'guest_passes' || issue.table === 'booking_fee_snapshots' || issue.table === 'booking_participants') && (
                                     <button
                                       onClick={() => {

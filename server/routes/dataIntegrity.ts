@@ -738,6 +738,24 @@ router.post('/api/data-integrity/fix/delete-fee-snapshot', isAdmin, async (req: 
   }
 });
 
+router.post('/api/data-integrity/fix/dismiss-trackman-unmatched', isAdmin, async (req: Request, res) => {
+  try {
+    const { recordId } = req.body;
+    if (!recordId) return res.status(400).json({ success: false, message: 'recordId is required' });
+    
+    const staffEmail = (req as any).session?.user?.email || 'admin';
+    
+    await db.execute(sql`UPDATE trackman_unmatched_bookings SET resolved_at = NOW(), resolved_by = ${staffEmail} WHERE id = ${recordId} AND resolved_at IS NULL`);
+    
+    logFromRequest(req, 'dismiss', 'trackman_unmatched', null, 'Trackman unmatched #' + recordId, { action: 'dismiss_from_integrity' });
+    
+    res.json({ success: true, message: 'Unmatched booking dismissed' });
+  } catch (error: unknown) {
+    console.error('[DataIntegrity] Dismiss trackman unmatched error:', getErrorMessage(error));
+    res.status(500).json({ success: false, message: getErrorMessage(error) });
+  }
+});
+
 router.post('/api/data-integrity/fix/delete-booking-participant', isAdmin, async (req: Request, res) => {
   try {
     const { recordId } = req.body;
