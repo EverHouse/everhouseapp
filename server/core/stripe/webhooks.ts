@@ -15,6 +15,7 @@ import { recordDayPassPurchaseFromWebhook } from '../../routes/dayPasses';
 import { handlePrimarySubscriptionCancelled } from './groupBilling';
 import { computeFeeBreakdown } from '../billing/unifiedFeeService';
 import { logPaymentFailure, logWebhookFailure } from '../monitoring';
+import { sendErrorAlert } from '../errorAlerts';
 import { logSystemAction } from '../auditLog';
 import { queueJobInTransaction } from '../jobQueue';
 import { pullTierFeaturesFromStripe, pullCafeItemsFromStripe } from './products';
@@ -1160,10 +1161,12 @@ const MAX_RETRY_ATTEMPTS = 3;
 async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: any): Promise<DeferredAction[]> {
   const { id, metadata, amount, last_payment_error, customer } = paymentIntent;
   const reason = last_payment_error?.message || 'Payment could not be processed';
+  const errorCode = last_payment_error?.code || 'unknown';
+  const declineCode = last_payment_error?.decline_code;
   
   const deferredActions: DeferredAction[] = [];
   
-  console.log(`[Stripe Webhook] Payment failed: ${id}, amount: $${(amount / 100).toFixed(2)}, reason: ${reason}`);
+  console.log(`[Stripe Webhook] Payment failed: ${id}, amount: $${(amount / 100).toFixed(2)}, reason: ${reason}, code: ${errorCode}${declineCode ? `, decline_code: ${declineCode}` : ''}`);
   
   logPaymentFailure({
     paymentIntentId: id,
@@ -1171,7 +1174,7 @@ async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: any)
     userEmail: metadata?.email,
     amountCents: amount,
     errorMessage: reason,
-    errorCode: last_payment_error?.code
+    errorCode
   });
 
   const existingResult = await client.query(
@@ -1198,7 +1201,6 @@ async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: any)
   
   console.log(`[Stripe Webhook] Updated payment ${id}: retry ${newRetryCount}/${MAX_RETRY_ATTEMPTS}, requires_card_update=${requiresCardUpdate}`);
 
-  // customer is already destructured from paymentIntent at function entry
   const customerId = typeof customer === 'string' ? customer : customer?.id;
   const customerEmail = typeof customer === 'object' ? customer?.email : metadata?.email;
   const customerName = typeof customer === 'object' ? customer?.name : metadata?.memberName;
@@ -1221,7 +1223,6 @@ async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: any)
     });
   });
 
-  // Audit log for failed payment
   const failedPaymentEmail = metadata?.email || customerEmail || 'unknown';
   deferredActions.push(async () => {
     await logSystemAction({
@@ -1233,9 +1234,36 @@ async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: any)
         source: 'stripe_webhook',
         amount_cents: amount,
         member_email: failedPaymentEmail,
-        failure_reason: reason
+        failure_reason: reason,
+        error_code: errorCode,
+        decline_code: declineCode || null,
+        retry_count: newRetryCount,
+        requires_card_update: requiresCardUpdate
       }
     });
+  });
+
+  deferredActions.push(async () => {
+    try {
+      await sendErrorAlert({
+        type: 'payment_failure',
+        title: requiresCardUpdate
+          ? `Payment failed ${newRetryCount}x — card update needed`
+          : `Payment failed (attempt ${newRetryCount})`,
+        message: `PaymentIntent ${id} for ${failedPaymentEmail}: $${(amount / 100).toFixed(2)} — ${reason}${declineCode ? ` (decline: ${declineCode})` : ''}`,
+        userEmail: failedPaymentEmail !== 'unknown' ? failedPaymentEmail : undefined,
+        details: {
+          paymentIntentId: id,
+          amount_cents: amount,
+          error_code: errorCode,
+          decline_code: declineCode || null,
+          retry_count: newRetryCount,
+          requires_card_update: requiresCardUpdate
+        }
+      });
+    } catch (alertErr) {
+      console.error('[Stripe Webhook] Error alert send failed (non-blocking):', alertErr);
+    }
   });
 
   const email = metadata?.email;
@@ -1248,10 +1276,13 @@ async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: any)
   const localAmount = amount;
   const localReason = reason;
   const localRequiresCardUpdate = requiresCardUpdate;
+  const localRetryCount = newRetryCount;
+  const localErrorCode = errorCode;
+  const localDeclineCode = declineCode;
 
   deferredActions.push(async () => {
     try {
-      const userResult = await pool.query('SELECT first_name, last_name FROM users WHERE email = $1', [email]);
+      const userResult = await pool.query('SELECT first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)', [email]);
       const memberName = userResult.rows[0] 
         ? `${userResult.rows[0].first_name || ''} ${userResult.rows[0].last_name || ''}`.trim() || email
         : email;
@@ -1273,11 +1304,11 @@ async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: any)
           : localReason
       });
 
-      console.log(`[Stripe Webhook] Payment failed notifications sent to ${email} (requires_card_update=${localRequiresCardUpdate})`);
+      console.log(`[Stripe Webhook] Payment failed notifications sent to ${email} (retry=${localRetryCount}, requires_card_update=${localRequiresCardUpdate})`);
 
       const staffMessage = localRequiresCardUpdate
-        ? `${memberName} (${email}) payment failed ${MAX_RETRY_ATTEMPTS}x - card update required`
-        : `Payment of $${(localAmount / 100).toFixed(2)} failed for ${memberName} (${email}). Reason: ${localReason}`;
+        ? `${memberName} (${email}) payment failed ${localRetryCount}x — card update required. Code: ${localErrorCode}${localDeclineCode ? ` / ${localDeclineCode}` : ''}`
+        : `Payment of $${(localAmount / 100).toFixed(2)} failed for ${memberName} (${email}). Attempt ${localRetryCount}/${MAX_RETRY_ATTEMPTS}. Reason: ${localReason}`;
       
       await notifyStaffPaymentFailed(email, memberName, localAmount / 100, staffMessage);
 
@@ -1518,15 +1549,18 @@ async function handleInvoicePaymentFailed(client: PoolClient, invoice: any): Pro
   const deferredActions: DeferredAction[] = [];
   const invoiceCustomerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
   const invoiceCustomerName = typeof invoice.customer === 'object' ? invoice.customer?.name : undefined;
+  const attemptCount = invoice.attempt_count || 1;
   
   logPaymentFailure({
     paymentIntentId: invoice.payment_intent,
     customerId: invoiceCustomerId,
     userEmail: invoice.customer_email,
     amountCents: invoice.amount_due,
-    errorMessage: `Invoice payment failed: ${invoice.id}`,
+    errorMessage: `Invoice payment failed: ${invoice.id} (attempt ${attemptCount})`,
     errorCode: 'invoice_payment_failed'
   });
+  
+  console.log(`[Stripe Webhook] Invoice payment failed: ${invoice.id}, attempt_count: ${attemptCount}, customer: ${invoice.customer_email || invoiceCustomerId}`);
   
   deferredActions.push(async () => {
     await upsertTransactionCache({
@@ -1563,12 +1597,33 @@ async function handleInvoicePaymentFailed(client: PoolClient, invoice: any): Pro
   }
 
   const userResult = await client.query(
-    'SELECT first_name, last_name FROM users WHERE email = $1',
+    'SELECT first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)',
     [email]
   );
   const memberName = userResult.rows[0]
     ? `${userResult.rows[0].first_name || ''} ${userResult.rows[0].last_name || ''}`.trim() || email
     : email;
+
+  try {
+    const stripe = await getStripeClient();
+    const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+    if (['canceled', 'incomplete_expired'].includes(subscription.status)) {
+      console.log(`[Stripe Webhook] Skipping grace period for ${email} — subscription ${invoice.subscription} is ${subscription.status}`);
+      return deferredActions;
+    }
+  } catch (stripeErr) {
+    console.warn(`[Stripe Webhook] Could not verify subscription ${invoice.subscription} status, continuing with grace period logic:`, stripeErr);
+  }
+
+  const userStatusCheck = await client.query(
+    'SELECT membership_status FROM users WHERE LOWER(email) = LOWER($1)',
+    [email]
+  );
+  const currentStatus = userStatusCheck.rows[0]?.membership_status;
+  if (currentStatus && ['cancelled', 'suspended'].includes(currentStatus)) {
+    console.log(`[Stripe Webhook] Skipping grace period for ${email} — user already ${currentStatus}`);
+    return deferredActions;
+  }
 
   await client.query(
     `UPDATE hubspot_deals 
@@ -1577,10 +1632,10 @@ async function handleInvoicePaymentFailed(client: PoolClient, invoice: any): Pro
          last_sync_error = $2,
          updated_at = NOW()
      WHERE LOWER(member_email) = LOWER($1)`,
-    [email, `Payment failed: ${reason}`]
+    [email, `Payment failed: ${reason} (attempt ${attemptCount})`]
   );
 
-  await client.query(
+  const gracePeriodResult = await client.query(
     `UPDATE users SET 
       grace_period_start = COALESCE(grace_period_start, NOW()),
       membership_status = CASE 
@@ -1591,28 +1646,38 @@ async function handleInvoicePaymentFailed(client: PoolClient, invoice: any): Pro
     WHERE LOWER(email) = LOWER($1) AND grace_period_start IS NULL`,
     [email]
   );
-  console.log(`[Stripe Webhook] Started grace period and set past_due status for ${email}`);
-  
-  // Sync payment failure status to HubSpot
-  try {
-    const { syncMemberToHubSpot } = await import('../hubspot/stages');
-    await syncMemberToHubSpot({ email, status: 'past_due', billingProvider: 'stripe' });
-    console.log(`[Stripe Webhook] Synced ${email} payment failure status to HubSpot`);
-  } catch (hubspotError) {
-    console.error('[Stripe Webhook] HubSpot sync failed for payment failure:', hubspotError);
+
+  if (gracePeriodResult.rowCount === 0) {
+    console.log(`[Stripe Webhook] Grace period already active for ${email}, skipping duplicate notifications (attempt ${attemptCount})`);
+    return deferredActions;
   }
+
+  console.log(`[Stripe Webhook] Started grace period and set past_due status for ${email} (attempt ${attemptCount})`);
 
   const localEmail = email;
   const localMemberName = memberName;
   const localAmountDue = amountDue;
   const localPlanName = planName;
   const localReason = reason;
+  const localAttemptCount = attemptCount;
 
   deferredActions.push(async () => {
+    try {
+      const { syncMemberToHubSpot } = await import('../hubspot/stages');
+      await syncMemberToHubSpot({ email: localEmail, status: 'past_due', billingProvider: 'stripe' });
+      console.log(`[Stripe Webhook] Synced ${localEmail} payment failure status to HubSpot`);
+    } catch (hubspotError) {
+      console.error('[Stripe Webhook] HubSpot sync failed for payment failure:', hubspotError);
+    }
+  });
+
+  deferredActions.push(async () => {
+    const urgencyPrefix = localAttemptCount >= 3 ? '🚨 URGENT: ' : localAttemptCount >= 2 ? '⚠️ ' : '';
+
     await notifyMember({
       userEmail: localEmail,
       title: 'Membership Payment Failed',
-      message: `We were unable to process your ${localPlanName} payment. Please update your payment method.`,
+      message: `We were unable to process your ${localPlanName} payment (attempt ${localAttemptCount}). Please update your payment method.`,
       type: 'membership_failed',
     }, { sendPush: true });
 
@@ -1624,8 +1689,8 @@ async function handleInvoicePaymentFailed(client: PoolClient, invoice: any): Pro
     });
 
     await notifyAllStaff(
-      'Membership Payment Failed',
-      `${localMemberName} (${localEmail}) membership payment of $${(localAmountDue / 100).toFixed(2)} failed: ${localReason}`,
+      `${urgencyPrefix}Membership Payment Failed`,
+      `${localMemberName} (${localEmail}) membership payment of $${(localAmountDue / 100).toFixed(2)} failed (attempt ${localAttemptCount}): ${localReason}`,
       'membership_failed',
       { sendPush: true }
     );
@@ -1638,7 +1703,28 @@ async function handleInvoicePaymentFailed(client: PoolClient, invoice: any): Pro
       planName: localPlanName
     });
 
-    console.log(`[Stripe Webhook] Membership payment failure processed for ${localEmail}, amount: $${(localAmountDue / 100).toFixed(2)}`);
+    console.log(`[Stripe Webhook] Membership payment failure processed for ${localEmail}, amount: $${(localAmountDue / 100).toFixed(2)}, attempt: ${localAttemptCount}`);
+  });
+
+  deferredActions.push(async () => {
+    try {
+      await sendErrorAlert({
+        type: 'payment_failure',
+        title: 'Membership Payment Failed',
+        message: `Invoice ${invoice.id} payment failed for ${localEmail} ($${(localAmountDue / 100).toFixed(2)}, attempt ${localAttemptCount}): ${localReason}`,
+        context: 'stripe',
+        details: {
+          invoiceId: invoice.id,
+          subscriptionId: invoice.subscription,
+          attemptCount: localAttemptCount,
+          amountCents: localAmountDue,
+          planName: localPlanName,
+        },
+        userEmail: localEmail,
+      });
+    } catch (alertErr) {
+      console.warn('[Stripe Webhook] Failed to send error alert for payment failure:', alertErr);
+    }
   });
 
   return deferredActions;

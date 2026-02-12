@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.48.3",
+    date: "2026-02-12",
+    title: "Payment Failure Webhook Hardening",
+    changes: [
+      "Improved: Payment failure handling is now more resilient — the system validates the subscription status before putting a member into a grace period, so stale or already-canceled subscriptions don't accidentally trigger grace periods",
+      "Fixed: HubSpot sync for failed payments now runs after the database save completes, preventing partial updates if something goes wrong mid-process",
+      "Added: Staff now see the Stripe attempt count and specific decline codes (e.g., 'insufficient_funds') in payment failure alerts, making it faster to diagnose issues",
+      "Added: Automatic error alerts are now sent for all payment failures, with escalating urgency for repeated failures",
+      "Fixed: If a member's grace period was already started, duplicate payment failure events no longer send duplicate notifications",
+      "Improved: Email matching for payment failures is now case-insensitive across all lookups, preventing missed notifications for members who signed up with mixed-case emails",
+    ],
+  },
+  {
     version: "7.48.2",
     date: "2026-02-12",
     title: "Terminal Cancel & Payment Polling Improvements",
