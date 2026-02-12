@@ -1334,6 +1334,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
               br.user_id as owner_user_id,
               br.notes, br.staff_notes, br.trackman_customer_notes,
               r.capacity as resource_capacity,
+              r.type as resource_type,
               EXTRACT(EPOCH FROM (bs.end_time - bs.start_time)) / 60 as session_duration_minutes
        FROM booking_requests br
        LEFT JOIN resources r ON br.resource_id = r.id
@@ -1486,7 +1487,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
             const dailyAllowance = tierLimits.daily_sim_minutes || 0;
             const isUnlimited = dailyAllowance >= 999 || tierLimits.unlimited_access;
             
-            const usageData = await getTotalDailyUsageMinutes(row.user_email, requestDate, bookingId);
+            const usageData = await getTotalDailyUsageMinutes(row.user_email, requestDate, bookingId, bookingData.resource_type);
             const usedToday = usageData.totalMinutes;
             
             let overageMinutes = 0;

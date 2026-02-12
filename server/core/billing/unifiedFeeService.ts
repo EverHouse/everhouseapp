@@ -260,14 +260,17 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
   
   // Pre-fetch participant identifiers (both UUID and email)
   const participantIdentifiers: Array<{ participantId: number | undefined; userId: string | null; email: string | null }> = [];
-  for (const p of participants) {
-    const email = await resolveToEmail(p.email || p.userId);
+  const resolvedEmails = await Promise.all(
+    participants.map(p => resolveToEmail(p.email || p.userId))
+  );
+  resolvedEmails.forEach((email, idx) => {
+    const p = participants[idx];
     participantIdentifiers.push({
       participantId: (p as any).participantId,
       userId: p.userId || null,
       email: email || null
     });
-  }
+  });
 
   // Collect all possible identifiers for usage lookup (both UUIDs and emails)
   const allIdentifiers: string[] = [];
@@ -557,6 +560,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
   let totalGuestCents = 0;
   let guestPassesUsed = 0;
   
+  let participantIdx = 0;
   for (const participant of participants) {
     const lineItem: FeeLineItem = {
       participantId: (participant as any).participantId,
@@ -577,6 +581,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
         lineItem.guestCents = 0;
         lineItem.totalCents = 0;
         lineItems.push(lineItem);
+        participantIdx++;
         continue;
       }
       
@@ -592,6 +597,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
           extra: { guestEmail, participantId: (participant as any).participantId }
         });
         lineItems.push(lineItem);
+        participantIdx++;
         continue;
       }
       
@@ -623,7 +629,8 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
     } else if (participant.participantType === 'owner') {
       lineItem.minutesAllocated = minutesPerParticipant;
       
-      const ownerEmail = await resolveToEmail(participant.email || participant.userId || hostEmail);
+      const pi = participantIdentifiers[participantIdx];
+      const ownerEmail = pi?.email || hostEmail;
 
       // "Staff is Free" rule: Staff/admin owners always have unlimited access
       if (isStaffRole(ownerEmail)) {
@@ -635,6 +642,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
           extra: { ownerEmail }
         });
         lineItems.push(lineItem);
+        participantIdx++;
         continue;
       }
       // Use batched tier data, fallback to individual query if not found
@@ -701,12 +709,14 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
         lineItem.overageCents = 0;
         lineItem.totalCents = 0;
         lineItems.push(lineItem);
+        participantIdx++;
         continue;
       }
       
       lineItem.minutesAllocated = minutesPerParticipant;
       
-      const memberEmail = await resolveToEmail(participant.email || participant.userId);
+      const pi = participantIdentifiers[participantIdx];
+      const memberEmail = pi?.email || '';
 
       // "Staff is Free" rule: Staff/admin members added to bookings pay $0
       if (memberEmail && isStaffRole(memberEmail)) {
@@ -718,6 +728,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
           extra: { memberEmail }
         });
         lineItems.push(lineItem);
+        participantIdx++;
         continue;
       }
       // Use batched tier data, fallback to individual query if not found
@@ -755,6 +766,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
     }
     
     lineItems.push(lineItem);
+    participantIdx++;
   }
   
   const actualGuestCount = participants.filter(p => p.participantType === 'guest').length;
@@ -853,15 +865,21 @@ export async function applyFeeBreakdownToParticipants(
   try {
     await client.query('BEGIN');
     
-    for (const participant of breakdown.participants) {
-      if (participant.participantId) {
-        await client.query(
-          `UPDATE booking_participants 
-           SET cached_fee_cents = $1
-           WHERE id = $2`,
-          [participant.totalCents, participant.participantId]
-        );
-      }
+    const idsToUpdate = breakdown.participants
+      .filter(p => p.participantId)
+      .map(p => p.participantId!);
+    const feesToUpdate = breakdown.participants
+      .filter(p => p.participantId)
+      .map(p => p.totalCents);
+
+    if (idsToUpdate.length > 0) {
+      await client.query(
+        `UPDATE booking_participants bp
+         SET cached_fee_cents = t.fee
+         FROM unnest($1::int[], $2::int[]) AS t(id, fee)
+         WHERE bp.id = t.id`,
+        [idsToUpdate, feesToUpdate]
+      );
     }
     
     await client.query('COMMIT');
@@ -917,13 +935,21 @@ export async function recalculateSessionFees(
   // Sync session fees to booking_requests for legacy compatibility
   // This ensures member Dashboard can show Pay Now button
   try {
+    const totalOverageMinutes = breakdown.participants.reduce((sum, p) => {
+      if (p.overageCents > 0 && p.minutesAllocated > 0) {
+        const usedAfter = (p.usedMinutesToday || 0) + p.minutesAllocated;
+        const dailyAllow = p.dailyAllowance || 0;
+        return sum + Math.max(0, usedAfter - dailyAllow);
+      }
+      return sum;
+    }, 0);
     await pool.query(`
       UPDATE booking_requests 
       SET overage_fee_cents = $1, 
           overage_minutes = $2,
           updated_at = NOW()
       WHERE session_id = $3
-    `, [breakdown.totals.totalCents || 0, breakdown.overageMinutes || 0, sessionId]);
+    `, [breakdown.totals.totalCents || 0, totalOverageMinutes, sessionId]);
   } catch (syncError) {
     logger.warn('[UnifiedFee] Failed to sync fees to booking_requests', { sessionId, error: syncError });
   }

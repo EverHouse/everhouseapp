@@ -172,15 +172,21 @@ router.post('/api/admin/seed-cafe', isAdmin, async (req, res) => {
       { category: 'Shareables', name: 'Tinned Fish Tray', price: 47, description: 'Premium selection of tinned fish', icon: 'set_meal', sort_order: 4 },
     ];
     
-    let inserted = 0;
-    for (const item of cafeItems) {
-      await pool.query(
-        `INSERT INTO cafe_items (category, name, price, description, icon, is_active, sort_order) 
-         VALUES ($1, $2, $3, $4, $5, true, $6)`,
-        [item.category, item.name, item.price, item.description, item.icon, item.sort_order]
-      );
-      inserted++;
-    }
+    const categories = cafeItems.map(i => i.category);
+    const names = cafeItems.map(i => i.name);
+    const prices = cafeItems.map(i => i.price);
+    const descriptions = cafeItems.map(i => i.description);
+    const icons = cafeItems.map(i => i.icon);
+    const sortOrders = cafeItems.map(i => i.sort_order);
+
+    const insertResult = await pool.query(
+      `INSERT INTO cafe_items (category, name, price, description, icon, is_active, sort_order)
+       SELECT category, name, price, description, icon, true, sort_order
+       FROM unnest($1::text[], $2::text[], $3::numeric[], $4::text[], $5::text[], $6::int[])
+       AS t(category, name, price, description, icon, sort_order)`,
+      [categories, names, prices, descriptions, icons, sortOrders]
+    );
+    const inserted = insertResult.rowCount || 0;
     
     res.json({ 
       success: true, 

@@ -102,6 +102,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
         br.start_time,
         br.end_time,
         br.member_notes,
+        br.declared_player_count,
         r.name as resource_name,
         br.overage_minutes,
         br.overage_fee_cents,
@@ -125,58 +126,48 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
     let sessionId = booking.session_id;
     if (!sessionId && booking.resource_id) {
       try {
-        // Get booking details for session creation
-        const bookingDetails = await pool.query(`
-          SELECT resource_id, request_date, start_time, end_time, declared_player_count, user_email, user_name
-          FROM booking_requests WHERE id = $1
-        `, [bookingId]);
+        const bookingDuration = Math.round(
+          (new Date(`2000-01-01T${booking.end_time}`).getTime() - 
+           new Date(`2000-01-01T${booking.start_time}`).getTime()) / 60000
+        );
         
-        if (bookingDetails.rows.length > 0) {
-          const bd = bookingDetails.rows[0];
-          
-          const bookingDuration = Math.round(
-            (new Date(`2000-01-01T${bd.end_time}`).getTime() - 
-             new Date(`2000-01-01T${bd.start_time}`).getTime()) / 60000
-          );
-          
-          const userResult = await pool.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1)`, [bd.user_email]);
-          const userId = userResult.rows[0]?.id || null;
+        const userResult = await pool.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1)`, [booking.owner_email]);
+        const userId = userResult.rows[0]?.id || null;
 
-          const sessionResult = await ensureSessionForBooking({
-            bookingId,
-            resourceId: bd.resource_id,
-            sessionDate: bd.request_date,
-            startTime: bd.start_time,
-            endTime: bd.end_time,
-            ownerEmail: bd.user_email || bd.owner_email || '',
-            ownerName: bd.user_name,
-            ownerUserId: userId?.toString() || undefined,
-            source: 'staff_manual',
-            createdBy: 'checkin_context'
-          });
-          sessionId = sessionResult.sessionId || null;
+        const sessionResult = await ensureSessionForBooking({
+          bookingId,
+          resourceId: booking.resource_id,
+          sessionDate: booking.booking_date,
+          startTime: booking.start_time,
+          endTime: booking.end_time,
+          ownerEmail: booking.owner_email || '',
+          ownerName: booking.owner_name,
+          ownerUserId: userId?.toString() || undefined,
+          source: 'staff_manual',
+          createdBy: 'checkin_context'
+        });
+        sessionId = sessionResult.sessionId || null;
+        
+        if (sessionId) {
+          const playerCount = booking.declared_player_count || 1;
+          const existingGuests = await pool.query(`
+            SELECT COUNT(*) as count FROM booking_participants 
+            WHERE session_id = $1 AND participant_type = 'guest'
+          `, [sessionId]);
+          const existingGuestCount = parseInt(existingGuests.rows[0]?.count || '0');
           
-          if (sessionId) {
-            // Ensure guest participants exist
-            const playerCount = bd.declared_player_count || 1;
-            const existingGuests = await pool.query(`
-              SELECT COUNT(*) as count FROM booking_participants 
-              WHERE session_id = $1 AND participant_type = 'guest'
-            `, [sessionId]);
-            const existingGuestCount = parseInt(existingGuests.rows[0]?.count || '0');
-            
-            if (existingGuestCount < playerCount - 1) {
-              for (let i = existingGuestCount + 1; i < playerCount; i++) {
-                await pool.query(`
-                  INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-                  VALUES ($1, NULL, 'guest', $2, 'pending', $3)
-                `, [sessionId, `Guest ${i + 1}`, bookingDuration]);
-              }
-            }
-            
-            // Calculate and cache fees
-            await recalculateSessionFees(sessionId);
+          const guestsToCreate = playerCount - 1 - existingGuestCount;
+          if (guestsToCreate > 0) {
+            const guestNumbers = Array.from({length: guestsToCreate}, (_, i) => existingGuestCount + i + 2);
+            const guestNames = guestNumbers.map(n => `Guest ${n}`);
+            await pool.query(`
+              INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+              SELECT $1, NULL, 'guest', name, 'pending', $2
+              FROM unnest($3::text[]) AS t(name)
+            `, [sessionId, bookingDuration, guestNames]);
           }
+          
+          await recalculateSessionFees(sessionId);
         }
       } catch (sessionError: any) {
         console.warn(`[Checkin Context] Failed to create session for booking ${bookingId}:`, sessionError.message);
@@ -622,27 +613,21 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
         [sessionId]
       );
 
-      for (const p of pendingParticipants.rows) {
+      const pendingIds = pendingParticipants.rows.map(p => p.id);
+      const previousStatuses = pendingParticipants.rows.map(p => p.payment_status);
+      if (pendingIds.length > 0) {
         await pool.query(
-          `UPDATE booking_participants SET payment_status = $1 WHERE id = $2`,
-          [newStatus, p.id]
+          `UPDATE booking_participants SET payment_status = $1 WHERE id = ANY($2::int[])`,
+          [newStatus, pendingIds]
         );
 
+        const auditAction = action === 'confirm_all' ? 'payment_confirmed' : 'payment_waived';
         await pool.query(`
           INSERT INTO booking_payment_audit 
             (booking_id, session_id, participant_id, action, staff_email, staff_name, reason, previous_status, new_status)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        `, [
-          bookingId,
-          sessionId,
-          p.id,
-          action === 'confirm_all' ? 'payment_confirmed' : 'payment_waived',
-          staffEmail,
-          staffName,
-          reason || null,
-          p.payment_status,
-          newStatus
-        ]);
+          SELECT $1, $2, pid, $3, $4, $5, $6, prev_status, $7
+          FROM unnest($8::int[], $9::text[]) AS t(pid, prev_status)
+        `, [bookingId, sessionId, auditAction, staffEmail, staffName, reason || null, newStatus, pendingIds, previousStatuses]);
       }
 
       if (action === 'confirm_all') {
@@ -686,7 +671,7 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
                 });
               }
             }
-            const totalCents = breakdown.totalCents;
+            const totalCents = breakdown.totals.totalCents;
 
             await pool.query(`
               INSERT INTO booking_fee_snapshots (booking_id, session_id, participant_fees, total_cents, status, created_at)
@@ -1001,17 +986,26 @@ router.post('/api/bookings/bulk-review-all-waivers', isStaffOrAdmin, async (req:
       RETURNING id, session_id
     `);
 
-    for (const row of result.rows) {
-      const bookingResult = await client.query(`
-        SELECT br.id FROM booking_requests br WHERE br.session_id = $1 LIMIT 1
-      `, [row.session_id]);
-      const bookingId = bookingResult.rows[0]?.id || null;
+    const sessionIds = result.rows.map(r => r.session_id);
+    const participantIds = result.rows.map(r => r.id);
+
+    if (sessionIds.length > 0) {
+      const bookingLookup = await client.query(
+        `SELECT br.session_id, br.id as booking_id 
+         FROM booking_requests br 
+         WHERE br.session_id = ANY($1::int[])`,
+        [sessionIds]
+      );
+      const sessionToBooking = new Map(bookingLookup.rows.map(r => [r.session_id, r.booking_id]));
+
+      const bookingIds = result.rows.map(r => sessionToBooking.get(r.session_id) || null);
 
       await client.query(`
         INSERT INTO booking_payment_audit 
           (booking_id, session_id, participant_id, action, staff_email, staff_name, reason, amount_affected)
-        VALUES ($1, $2, $3, 'payment_waived', $4, $5, 'Bulk reviewed by staff', 0)
-      `, [bookingId, row.session_id, row.id, sessionUser.email, sessionUser.name || null]);
+        SELECT bid, sid, pid, 'payment_waived', $1, $2, 'Bulk reviewed by staff', 0
+        FROM unnest($3::int[], $4::int[], $5::int[]) AS t(bid, sid, pid)
+      `, [sessionUser.email, sessionUser.name || null, bookingIds, sessionIds, participantIds]);
     }
 
     const updatedCount = result.rows.length;
@@ -1116,10 +1110,9 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
 
     if (participantType === 'guest') {
       const ownerTierResult = await pool.query(`
-        SELECT mt.name as tier_name, mt.guest_passes
+        SELECT mt.name as tier_name, mt.guest_passes_per_month as guest_passes
         FROM users u
-        JOIN members m ON m.user_id = u.id
-        JOIN member_tiers mt ON m.tier_id = mt.id
+        LEFT JOIN membership_tiers mt ON u.tier_id = mt.id
         WHERE LOWER(u.email) = LOWER($1)
       `, [booking.owner_email]);
 
@@ -1145,7 +1138,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
         const memberCheck = await pool.query(`
           SELECT id, COALESCE(name, email) as name, email 
           FROM users 
-          WHERE LOWER(email) = LOWER($1) AND is_deleted = false
+          WHERE LOWER(email) = LOWER($1) AND archived_at IS NULL
         `, [guestEmail]);
         if (memberCheck.rows.length > 0) {
           matchedMember = memberCheck.rows[0];
