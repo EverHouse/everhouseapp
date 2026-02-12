@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.48.0",
+    date: "2026-02-12",
+    title: "Create Member Flow Reliability Fix",
+    changes: [
+      "Fixed: 'Send Link' and 'Copy Link' buttons no longer error out on the first click — eliminated a race condition where the in-person payment setup would conflict with the link-sending process",
+      "Fixed: 'Copy Link' now reliably copies the checkout URL to your clipboard — the link is fully generated before the copy happens",
+      "Improved: Payment step now shows a clear choice between 'Collect Payment Now' (card/reader) and 'Send Payment Link' — prevents both flows from running at the same time",
+      "Added: Double-click protection on Send/Copy Link buttons — prevents accidental duplicate submissions",
+      "Improved: Better error messages — if a pending signup conflicts, you'll see a clear message instead of a generic error",
+    ],
+  },
+  {
     version: "7.47.1",
     date: "2026-02-11",
     title: "POS Terminal Invoice Payment Fix",
