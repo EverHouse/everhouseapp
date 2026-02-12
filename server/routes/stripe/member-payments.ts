@@ -1062,7 +1062,7 @@ router.get('/api/member/balance', async (req: Request, res: Response) => {
         (SELECT COUNT(*) FROM booking_participants bp2 
          WHERE bp2.session_id = bs.id 
            AND bp2.participant_type != 'owner'
-           AND bp2.payment_status != 'cancelled') as non_owner_count
+           AND bp2.payment_status IS NOT NULL) as non_owner_count
        FROM booking_participants bp
        JOIN booking_sessions bs ON bs.id = bp.session_id
        JOIN booking_requests br ON br.session_id = bs.id
