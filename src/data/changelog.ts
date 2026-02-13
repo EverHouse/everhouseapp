@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.54.2",
+    date: "2026-02-13",
+    title: "Unified Billing — Eliminate Duplicate Fee Logic",
+    changes: [
+      "Fixed: Booking detail panel now uses the same unified fee system as all other billing endpoints — eliminates ~120 lines of duplicate tier/overage/staff logic that could produce different results",
+      "Fixed: Fee line items now correctly match to the right member in both new and existing bookings, preventing wrong fee assignments",
+      "Fixed: All membership tiers (Social, Standard, Premium, VIP, Staff) now consistently go through the single source of truth for fee calculations",
+      "Improved: Guest fee handling in booking details now uses the unified system's guest pass tracking instead of separate inline logic"
+    ]
+  },
+  {
     version: "7.54.1",
     date: "2026-02-13",
     title: "Booking Fee Display Fix",
