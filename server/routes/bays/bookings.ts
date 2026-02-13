@@ -17,7 +17,7 @@ import { getCalendarNameForBayAsync, isStaffOrAdminCheck } from './helpers';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { getCalendarIdByName, deleteCalendarEvent } from '../../core/calendar/index';
 import { getGuestPassesRemaining } from '../guestPasses';
-import { computeFeeBreakdown, getEffectivePlayerCount } from '../../core/billing/unifiedFeeService';
+import { computeFeeBreakdown, getEffectivePlayerCount, applyFeeBreakdownToParticipants } from '../../core/billing/unifiedFeeService';
 import { PRICING } from '../../core/billing/pricingConfig';
 import { createGuestPassHold, releaseGuestPassHold } from '../../core/billing/guestPassHoldService';
 import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
@@ -1498,6 +1498,14 @@ async function calculateFeeEstimate(params: {
             bookingId
           }
     );
+
+    if (sessionId && bookingId) {
+      try {
+        await applyFeeBreakdownToParticipants(sessionId, breakdown);
+      } catch (syncErr) {
+        console.warn('[FeeEstimate] Non-blocking cache sync failed:', syncErr);
+      }
+    }
     
     console.log('[FeeEstimate] Unified breakdown result:', {
       overageCents: breakdown.totals.overageCents,

@@ -29,7 +29,7 @@ function BookingFeeButton({ bookingId, dbOwed, hasUnpaidFees, setBookingSheet, f
     if (isLoading || isError) return <>{fallback ?? null}</>;
 
     const serverFee = data?.totalFee ?? 0;
-    const displayAmount = Math.max(serverFee, dbOwed);
+    const displayAmount = data ? serverFee : dbOwed;
 
     if (displayAmount <= 0 && !hasUnpaidFees) return <>{fallback ?? null}</>;
 
