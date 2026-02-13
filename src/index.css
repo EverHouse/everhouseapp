@@ -307,7 +307,7 @@ html.dark, html.dark body {
 /* iOS Safari detection: -webkit-touch-callout is iOS-only */
 @supports (-webkit-touch-callout: none) {
   :root {
-    --safari-toolbar-padding: 50px;
+    --safari-toolbar-padding: 96px;
   }
 }
 
