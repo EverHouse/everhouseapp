@@ -75,18 +75,7 @@
         pointer-events: none;
         z-index: -1;
       }
-      #safari-tint-bottom {
-        position: fixed;
-        bottom: 3px;
-        left: 0;
-        width: 90%;
-        min-height: 15px;
-        background-color: #293515;
-        pointer-events: none;
-        z-index: -1;
-      }
-      html.dark #safari-tint-top,
-      html.dark #safari-tint-bottom {
+      html.dark #safari-tint-top {
         background-color: #293515;
       }
     </style>
@@ -114,7 +103,6 @@
   </head>
   <body>
     <div id="safari-tint-top"></div>
-    <div id="safari-tint-bottom"></div>
     <div id="app-splash"></div>
     <div id="root"></div>
     <div id="nav-overlay-root" style="position:fixed;inset:0;pointer-events:none;z-index:9999;"></div>
