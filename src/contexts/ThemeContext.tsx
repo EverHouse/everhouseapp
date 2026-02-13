@@ -64,10 +64,6 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       document.documentElement.classList.remove('dark');
     }
 
-    const themeColor = effectiveTheme === 'dark' ? '#1a2310' : '#293515';
-    document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
-      meta.setAttribute('content', themeColor);
-    });
   }, [effectiveTheme]);
 
   return (

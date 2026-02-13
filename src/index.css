@@ -263,7 +263,6 @@ body {
 
 #root {
   min-height: 100%;
-  background-color: inherit;
 }
 
 /* Modal scroll lock - override when modal is open */
@@ -277,7 +276,7 @@ html, body {
   width: 100%;
   max-width: 100vw;
   -webkit-tap-highlight-color: transparent;
-  background-color: #F2F2EC;
+  background-color: #293515;
   color: var(--brand-primary);
   font-family: 'Inter', sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -293,21 +292,8 @@ html, body {
 }
 
 html.dark, html.dark body {
-  background-color: #0f120a;
+  background-color: #1a2310;
   color: #F2F2EC;
-}
-
-/* Page-specific backgrounds for Safari translucent toolbar support */
-/* Public pages: light bone | Member/Staff: follows theme */
-html.page-public, html.page-public body,
-html.page-light, html.page-light body {
-  background-color: #F2F2EC !important;
-  color: var(--brand-primary) !important;
-}
-
-html.page-dark, html.page-dark body {
-  background-color: #0f120a !important;
-  color: #F2F2EC !important;
 }
 
 /* iOS Safari translucent toolbar support */
