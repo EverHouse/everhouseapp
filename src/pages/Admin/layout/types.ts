@@ -1,4 +1,4 @@
-export type TabType = 'home' | 'events' | 'announcements' | 'directory' | 'simulator' | 'team' | 'faqs' | 'inquiries' | 'gallery' | 'tiers' | 'blocks' | 'changelog' | 'training' | 'updates' | 'tours' | 'bugs' | 'trackman' | 'data-integrity' | 'settings' | 'financials';
+export type TabType = 'home' | 'events' | 'announcements' | 'directory' | 'simulator' | 'team' | 'faqs' | 'inquiries' | 'gallery' | 'tiers' | 'blocks' | 'changelog' | 'training' | 'updates' | 'tours' | 'bugs' | 'trackman' | 'data-integrity' | 'settings' | 'financials' | 'email-templates';
 
 export interface NavItemData {
   id: TabType;
@@ -35,7 +35,8 @@ export const tabToPath: Record<TabType, string> = {
   'settings': '/admin/settings',
   'changelog': '/admin/changelog',
   'tours': '/admin/tours',
-  'training': '/admin/training'
+  'training': '/admin/training',
+  'email-templates': '/admin/email-templates'
 };
 
 export const pathToTab: Record<string, TabType> = Object.entries(tabToPath).reduce(

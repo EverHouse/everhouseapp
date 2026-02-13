@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { db } from '../db';
 import { systemSettings } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
@@ -29,6 +30,7 @@ async function tryClaimReminderSlot(todayStr: string): Promise<boolean> {
     return result.length > 0;
   } catch (err) {
     console.error('[Daily Reminders] Database error:', err);
+    schedulerTracker.recordRun('Daily Reminder', false, String(err));
     return false;
   }
 }
@@ -47,13 +49,16 @@ async function checkAndSendReminders(): Promise<void> {
         try {
           const result = await sendDailyReminders();
           console.log(`[Daily Reminders] Completed: ${result.message}`);
+          schedulerTracker.recordRun('Daily Reminder', true);
         } catch (err) {
           console.error('[Daily Reminders] Send failed:', err);
+          schedulerTracker.recordRun('Daily Reminder', false, String(err));
         }
       }
     }
   } catch (err) {
     console.error('[Daily Reminders] Scheduler error:', err);
+    schedulerTracker.recordRun('Daily Reminder', false, String(err));
   }
 }
 

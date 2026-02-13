@@ -5,6 +5,7 @@ import { runAllIntegrityChecks, autoFixMissingTiers } from '../core/dataIntegrit
 import { sendIntegrityAlertEmail } from '../emails/integrityAlertEmail';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
 import { alertOnScheduledTaskFailure } from '../core/dataAlerts';
+import { schedulerTracker } from '../core/schedulerTracker';
 
 const INTEGRITY_CHECK_HOUR = 0;
 const INTEGRITY_SETTING_KEY = 'last_integrity_check_date';
@@ -85,10 +86,11 @@ async function checkAndRunIntegrityCheck(): Promise<void> {
           } else {
             console.log('[Integrity Check] No critical issues found, no alert needed');
           }
+          schedulerTracker.recordRun('Integrity Check', true);
         } catch (err) {
           console.error('[Integrity Check] Check failed:', err);
+          schedulerTracker.recordRun('Integrity Check', false, String(err));
           
-          // Notify staff about integrity check failure
           alertOnScheduledTaskFailure(
             'Daily Integrity Check',
             err instanceof Error ? err : new Error(String(err)),
@@ -101,8 +103,8 @@ async function checkAndRunIntegrityCheck(): Promise<void> {
     }
   } catch (err) {
     console.error('[Integrity Check] Scheduler error:', err);
+    schedulerTracker.recordRun('Integrity Check', false, String(err));
     
-    // Notify staff about scheduler error
     alertOnScheduledTaskFailure(
       'Daily Integrity Check',
       err instanceof Error ? err : new Error(String(err)),
@@ -119,8 +121,10 @@ async function runPeriodicAutoFix(): Promise<void> {
     if (result.fixedFromAlternateEmail > 0) {
       console.log(`[Auto-Fix] Fixed ${result.fixedFromAlternateEmail} members, ${result.remainingWithoutTier} still without tier`);
     }
+    schedulerTracker.recordRun('Auto-Fix Tiers', true);
   } catch (err) {
     console.error('[Auto-Fix] Periodic tier fix failed:', err);
+    schedulerTracker.recordRun('Auto-Fix Tiers', false, String(err));
   }
 }
 
@@ -181,8 +185,10 @@ async function cleanupAbandonedPendingUsers(): Promise<void> {
       const emails = pendingResult.rows.slice(0, deletedCount).map(r => r.email).join(', ');
       console.log(`[Auto-Cleanup] Deleted ${deletedCount} abandoned pending users with all related records: ${emails}`);
     }
+    schedulerTracker.recordRun('Abandoned Pending Cleanup', true);
   } catch (err) {
     console.error('[Auto-Cleanup] Failed to cleanup abandoned pending users:', err);
+    schedulerTracker.recordRun('Abandoned Pending Cleanup', false, String(err));
   }
 }
 

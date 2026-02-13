@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { db } from '../db';
 import { systemSettings } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
@@ -29,6 +30,7 @@ async function tryClaimUnresolvedTrackmanSlot(todayStr: string): Promise<boolean
     return result.length > 0;
   } catch (err) {
     console.error('[Unresolved Trackman Check] Database error:', err);
+    schedulerTracker.recordRun('Unresolved Trackman', false, String(err));
     return false;
   }
 }
@@ -78,11 +80,13 @@ async function checkUnresolvedTrackmanBookings(): Promise<void> {
           }
         } catch (err) {
           console.error('[Unresolved Trackman Check] Check failed:', err);
+          schedulerTracker.recordRun('Unresolved Trackman', false, String(err));
         }
       }
     }
   } catch (err) {
     console.error('[Unresolved Trackman Check] Scheduler error:', err);
+    schedulerTracker.recordRun('Unresolved Trackman', false, String(err));
   }
 }
 

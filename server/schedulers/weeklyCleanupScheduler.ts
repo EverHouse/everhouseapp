@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { getPacificDateParts } from '../utils/dateUtils';
 
 const CLEANUP_DAY = 0;
@@ -23,9 +24,11 @@ async function checkAndRunCleanup(): Promise<void> {
       await runSessionCleanup();
       
       console.log('[Cleanup] Weekly cleanup completed');
+      schedulerTracker.recordRun('Weekly Cleanup', true);
     }
   } catch (err) {
     console.error('[Cleanup] Scheduler error:', err);
+    schedulerTracker.recordRun('Weekly Cleanup', false, String(err));
   }
 }
 

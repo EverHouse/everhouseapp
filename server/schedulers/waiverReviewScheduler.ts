@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { notifyAllStaff } from '../core/notificationService';
@@ -65,6 +66,7 @@ export async function checkStaleWaivers(): Promise<{
     };
   } catch (error) {
     console.error('[Waiver Review] Error checking stale waivers:', error);
+    schedulerTracker.recordRun('Waiver Review', false, String(error));
     throw error;
   }
 }
@@ -82,6 +84,7 @@ async function scheduledCheck(): Promise<void> {
     await checkStaleWaivers();
   } catch (error) {
     console.error('[Waiver Review] Scheduled check failed:', error);
+    schedulerTracker.recordRun('Waiver Review', false, String(error));
     
     // Notify staff about waiver review scheduler failure
     alertOnScheduledTaskFailure(
@@ -90,6 +93,7 @@ async function scheduledCheck(): Promise<void> {
       { context: 'Scheduled check for stale waivers' }
     ).catch(alertErr => {
       console.error('[Waiver Review] Failed to send staff alert:', alertErr);
+      schedulerTracker.recordRun('Waiver Review', false, String(alertErr));
     });
   }
 }

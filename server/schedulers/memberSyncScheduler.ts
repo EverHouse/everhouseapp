@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { syncAllMembersFromHubSpot, getLastMemberSyncTime, setLastMemberSyncTime } from '../core/memberSync';
 import { getPacificDateParts } from '../utils/dateUtils';
 
@@ -25,9 +26,11 @@ async function runDailyMemberSync(): Promise<void> {
   try {
     const result = await syncAllMembersFromHubSpot();
     console.log(`[MemberSync] Daily sync complete - Synced: ${result.synced}, Errors: ${result.errors}`);
+    schedulerTracker.recordRun('Member Sync', true);
     await setLastMemberSyncTime(Date.now());
   } catch (err) {
     console.error('[MemberSync] Daily sync failed:', err);
+    schedulerTracker.recordRun('Member Sync', false, String(err));
   }
   
   const nextRun = getMillisecondsUntil3amPacific();

@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { processHubSpotQueue, getQueueStats, recoverStuckProcessingJobs } from '../core/hubspot';
 import { logger } from '../core/logger';
 import { alertOnScheduledTaskFailure } from '../core/dataAlerts';
@@ -29,13 +30,14 @@ async function processQueue(): Promise<void> {
       });
     }
     
-    // Log queue health periodically
     const queueStats = await getQueueStats();
     if (queueStats.pending > 0 || queueStats.failed > 0 || queueStats.dead > 0) {
       logger.info('[HubSpot Queue] Queue status', {
         extra: queueStats
       });
     }
+
+    schedulerTracker.recordRun('HubSpot Queue', true);
     
   } catch (error: unknown) {
     logger.error('[HubSpot Queue] Scheduler error', { error: getErrorMessage(error) });
@@ -44,6 +46,7 @@ async function processQueue(): Promise<void> {
     } catch (alertError) {
       // Ignore alert failures
     }
+    schedulerTracker.recordRun('HubSpot Queue', false, getErrorMessage(error));
   } finally {
     isProcessing = false;
   }

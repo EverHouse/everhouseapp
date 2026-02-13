@@ -140,6 +140,7 @@ const BugReportsAdmin = lazy(() => import('./pages/Admin/BugReportsAdmin'));
 const SettingsTab = lazy(() => import('./pages/Admin/tabs/SettingsTab'));
 const ChangelogTab = lazy(() => import('./pages/Admin/tabs/ChangelogTab'));
 const ToursTab = lazy(() => import('./pages/Admin/tabs/ToursTab'));
+const EmailTemplatesTab = lazy(() => import('./pages/Admin/tabs/EmailTemplatesTab'));
 
 import { prefetchRoute, prefetchAdjacentRoutes, prefetchOnIdle } from './lib/prefetch';
 
@@ -401,6 +402,7 @@ const AnimatedRoutes: React.FC = () => {
               <Route path="settings" element={<PageErrorBoundary pageName="Settings"><SettingsTab /></PageErrorBoundary>} />
               <Route path="changelog" element={<PageErrorBoundary pageName="Changelog"><ChangelogTab /></PageErrorBoundary>} />
               <Route path="tours" element={<PageErrorBoundary pageName="Tours"><ToursTab /></PageErrorBoundary>} />
+              <Route path="email-templates" element={<PageErrorBoundary pageName="EmailTemplates"><EmailTemplatesTab /></PageErrorBoundary>} />
               <Route path="training" element={null} />
             </Route>
             <Route path="/admin/data-integrity-legacy" element={

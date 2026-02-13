@@ -10,7 +10,7 @@ const CLUB_COLORS = {
   borderLight: '#e5e7eb'
 };
 
-function getWelcomeEmailHtml(firstName?: string): string {
+export function getWelcomeEmailHtml(firstName?: string): string {
   const greeting = firstName ? `Welcome, ${firstName}!` : 'Welcome to Ever Club!';
   
   return `

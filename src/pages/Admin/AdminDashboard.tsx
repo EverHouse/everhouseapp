@@ -96,6 +96,7 @@ const AdminDashboard: React.FC = () => {
       case 'data-integrity': return 'Data Integrity';
       case 'settings': return 'Settings';
       case 'financials': return 'Financials';
+      case 'email-templates': return 'Email Templates';
       default: return 'Dashboard';
     }
   };

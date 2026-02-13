@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { getPacificHour } from '../utils/dateUtils';
 
 export function startSessionCleanupScheduler(): void {
@@ -6,9 +7,11 @@ export function startSessionCleanupScheduler(): void {
       if (getPacificHour() === 2) {
         const { runSessionCleanup } = await import('../core/sessionCleanup');
         await runSessionCleanup();
+        schedulerTracker.recordRun('Session Cleanup', true);
       }
     } catch (err) {
       console.error('[Session Cleanup] Scheduler error:', err);
+      schedulerTracker.recordRun('Session Cleanup', false, String(err));
     }
   }, 60 * 60 * 1000);
   

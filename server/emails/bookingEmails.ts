@@ -18,7 +18,7 @@ interface BookingConfirmationData {
   durationMinutes?: number;
 }
 
-function getBookingConfirmationHtml(data: BookingConfirmationData): string {
+export function getBookingConfirmationHtml(data: BookingConfirmationData): string {
   const formattedDate = new Date(data.date + 'T12:00:00').toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -148,7 +148,7 @@ interface BookingRescheduleData {
   memberName: string;
 }
 
-function getBookingRescheduleHtml(data: BookingRescheduleData): string {
+export function getBookingRescheduleHtml(data: BookingRescheduleData): string {
   const formattedDate = new Date(data.date + 'T12:00:00').toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',

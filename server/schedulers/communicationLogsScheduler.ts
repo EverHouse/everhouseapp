@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { triggerCommunicationLogsSync } from '../core/memberSync';
 
 const COMM_LOGS_SYNC_INTERVAL_MS = 30 * 60 * 1000;

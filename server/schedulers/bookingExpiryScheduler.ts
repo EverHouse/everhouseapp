@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { pool } from '../core/db';
 import { getTodayPacific, getPacificHour, formatTimePacific, createPacificDate } from '../utils/dateUtils';
 import { notifyAllStaff } from '../core/notificationService';
@@ -51,6 +52,7 @@ async function expireStaleBookingRequests(): Promise<void> {
     }
 
     console.log(`[Booking Expiry] Auto-expired ${expiredCount} stale booking request(s)`);
+    schedulerTracker.recordRun('Booking Expiry', true);
 
     if (expiredCount >= 2) {
       const summary = expiredBookings.rows
@@ -70,6 +72,7 @@ async function expireStaleBookingRequests(): Promise<void> {
 
   } catch (error) {
     console.error('[Booking Expiry] Error expiring stale bookings:', error);
+    schedulerTracker.recordRun('Booking Expiry', false, String(error));
     logger.error({ error, context: 'booking_expiry_scheduler' }, 'Failed to expire stale booking requests');
   }
 }

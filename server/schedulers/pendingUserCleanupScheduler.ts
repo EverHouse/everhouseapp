@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { pool } from '../core/db';
 import { getStripeClient } from '../core/stripe/client';
 import { getErrorMessage } from '../utils/errorUtils';
@@ -17,10 +18,12 @@ async function cleanupPendingUsers(): Promise<void> {
 
     if (pendingUsers.rows.length === 0) {
       console.log('[Pending User Cleanup] No expired pending users found');
+      schedulerTracker.recordRun('Pending User Cleanup', true);
       return;
     }
 
     console.log(`[Pending User Cleanup] Found ${pendingUsers.rows.length} expired pending user(s) to clean up`);
+    schedulerTracker.recordRun('Pending User Cleanup', true);
 
     let deleted = 0;
     let stripeCleanedUp = 0;
@@ -48,10 +51,12 @@ async function cleanupPendingUsers(): Promise<void> {
 
             await stripe.customers.del(user.stripe_customer_id);
             console.log(`[Pending User Cleanup] Deleted Stripe customer ${user.stripe_customer_id} for ${user.email}`);
+            schedulerTracker.recordRun('Pending User Cleanup', true);
             stripeCleanedUp++;
           } catch (stripeErr: unknown) {
             stripeCleanupFailed = true;
             console.error(`[Pending User Cleanup] Stripe cleanup failed for ${user.email} — skipping user deletion to avoid orphaned billing:`, getErrorMessage(stripeErr));
+            schedulerTracker.recordRun('Pending User Cleanup', false, String(err));
           }
         }
 
@@ -63,15 +68,19 @@ async function cleanupPendingUsers(): Promise<void> {
         await pool.query('DELETE FROM users WHERE id = $1', [user.id]);
         deleted++;
         console.log(`[Pending User Cleanup] Deleted pending user ${user.email} (id: ${user.id})`);
+        schedulerTracker.recordRun('Pending User Cleanup', true);
       } catch (err: unknown) {
         errors++;
         console.error(`[Pending User Cleanup] Error cleaning up user ${user.email}:`, getErrorMessage(err));
+        schedulerTracker.recordRun('Pending User Cleanup', false, String(err));
       }
     }
 
     console.log(`[Pending User Cleanup] Summary: deleted=${deleted}, stripeCleanedUp=${stripeCleanedUp}, errors=${errors}`);
+    schedulerTracker.recordRun('Pending User Cleanup', true);
   } catch (error) {
     console.error('[Pending User Cleanup] Scheduler error:', error);
+    schedulerTracker.recordRun('Pending User Cleanup', false, String(error));
   }
 }
 
@@ -88,12 +97,14 @@ export function startPendingUserCleanupScheduler(): void {
   intervalId = setInterval(() => {
     cleanupPendingUsers().catch(err => {
       console.error('[Pending User Cleanup] Uncaught error:', err);
+      schedulerTracker.recordRun('Pending User Cleanup', false, String(err));
     });
   }, 6 * 60 * 60 * 1000);
 
   setTimeout(() => {
     cleanupPendingUsers().catch(err => {
       console.error('[Pending User Cleanup] Initial run error:', err);
+      schedulerTracker.recordRun('Pending User Cleanup', false, String(err));
     });
   }, 60 * 1000);
 }

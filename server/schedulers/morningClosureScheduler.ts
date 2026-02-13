@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { db } from '../db';
 import { systemSettings } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
@@ -29,6 +30,7 @@ async function tryClaimMorningSlot(todayStr: string): Promise<boolean> {
     return result.length > 0;
   } catch (err) {
     console.error('[Morning Closures] Database error:', err);
+    schedulerTracker.recordRun('Morning Closure', false, String(err));
     return false;
   }
 }
@@ -47,13 +49,16 @@ async function checkAndSendMorningNotifications(): Promise<void> {
         try {
           const result = await sendMorningClosureNotifications();
           console.log(`[Morning Closures] Completed: ${result.message}`);
+          schedulerTracker.recordRun('Morning Closure', true);
         } catch (err) {
           console.error('[Morning Closures] Send failed:', err);
+          schedulerTracker.recordRun('Morning Closure', false, String(err));
         }
       }
     }
   } catch (err) {
     console.error('[Morning Closures] Scheduler error:', err);
+    schedulerTracker.recordRun('Morning Closure', false, String(err));
   }
 }
 

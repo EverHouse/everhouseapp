@@ -53,7 +53,7 @@ function getEmailWrapper(content: string): string {
 `;
 }
 
-function getFirstVisitHtml(params: { firstName?: string }): string {
+export function getFirstVisitHtml(params: { firstName?: string }): string {
   const greeting = params.firstName ? `Welcome, ${params.firstName}!` : 'Welcome to Ever Club!';
 
   const content = `

@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { syncHubSpotFormSubmissions } from '../core/hubspot/formSync';
 import { getErrorMessage } from '../utils/errorUtils';
 
@@ -16,6 +17,7 @@ async function runSync(): Promise<void> {
     await syncHubSpotFormSubmissions();
   } catch (error: unknown) {
     console.error('[HubSpot FormSync] Scheduler error:', getErrorMessage(error));
+    schedulerTracker.recordRun('HubSpot Form Sync', false, getErrorMessage(error));
   } finally {
     isSyncing = false;
   }
@@ -27,6 +29,7 @@ export function startHubSpotFormSyncScheduler(): void {
   setTimeout(() => {
     runSync().catch(err => {
       console.error('[HubSpot FormSync] Initial run failed:', err);
+      schedulerTracker.recordRun('HubSpot Form Sync', false, String(err));
     });
   }, 60000);
 

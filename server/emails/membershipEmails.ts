@@ -78,7 +78,7 @@ interface MembershipRenewalParams {
   nextBillingDate: Date;
 }
 
-function getMembershipRenewalHtml(params: MembershipRenewalParams): string {
+export function getMembershipRenewalHtml(params: MembershipRenewalParams): string {
   const { memberName, amount, planName, nextBillingDate } = params;
   
   const content = `
@@ -161,7 +161,7 @@ interface MembershipFailedParams {
   reason: string;
 }
 
-function getMembershipFailedHtml(params: MembershipFailedParams): string {
+export function getMembershipFailedHtml(params: MembershipFailedParams): string {
   const { memberName, amount, planName, reason } = params;
   
   const content = `
@@ -239,7 +239,7 @@ interface CardExpiringParams {
   expiryYear: number;
 }
 
-function getCardExpiringHtml(params: CardExpiringParams): string {
+export function getCardExpiringHtml(params: CardExpiringParams): string {
   const { memberName, cardLast4, expiryMonth, expiryYear } = params;
   const expiryDisplay = `${String(expiryMonth).padStart(2, '0')}/${expiryYear}`;
   
@@ -395,7 +395,7 @@ interface GracePeriodReminderParams {
   reactivationLink: string;
 }
 
-function getGracePeriodReminderHtml(params: GracePeriodReminderParams): string {
+export function getGracePeriodReminderHtml(params: GracePeriodReminderParams): string {
   const { memberName, currentDay, totalDays, reactivationLink } = params;
   const isUrgent = currentDay >= totalDays;
   
@@ -526,7 +526,7 @@ interface MembershipActivationParams {
   expiresAt: Date;
 }
 
-function getMembershipActivationHtml(params: MembershipActivationParams): string {
+export function getMembershipActivationHtml(params: MembershipActivationParams): string {
   const { memberName, tierName, monthlyPrice, checkoutUrl, expiresAt } = params;
   
   const content = `

@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { db } from '../db';
 import { systemSettings } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
@@ -29,6 +30,7 @@ async function tryClaimReconciliationSlot(todayStr: string): Promise<boolean> {
     return result.length > 0;
   } catch (err) {
     console.error('[Stripe Reconciliation] Database error:', err);
+    schedulerTracker.recordRun('Stripe Reconciliation', false, String(err));
     return false;
   }
 }
@@ -43,15 +45,19 @@ async function checkAndRunReconciliation(): Promise<void> {
       
       if (claimed) {
         console.log('[Stripe Reconciliation] Starting scheduled reconciliation...');
+        schedulerTracker.recordRun('Stripe Reconciliation', true);
         
         try {
           const paymentResults = await reconcileDailyPayments();
           console.log('[Stripe Reconciliation] Payment reconciliation complete:', paymentResults);
+          schedulerTracker.recordRun('Stripe Reconciliation', true);
           
           const subscriptionResults = await reconcileSubscriptions();
           console.log('[Stripe Reconciliation] Subscription reconciliation complete:', subscriptionResults);
+          schedulerTracker.recordRun('Stripe Reconciliation', true);
         } catch (error) {
           console.error('[Stripe Reconciliation] Error running reconciliation:', error);
+          schedulerTracker.recordRun('Stripe Reconciliation', false, String(error));
           
           // Alert staff so financial discrepancies don't go unnoticed
           const { alertOnScheduledTaskFailure } = await import('../core/dataAlerts');
@@ -65,6 +71,7 @@ async function checkAndRunReconciliation(): Promise<void> {
     }
   } catch (error) {
     console.error('[Stripe Reconciliation] Scheduler error:', error);
+    schedulerTracker.recordRun('Stripe Reconciliation', false, String(error));
   }
 }
 
@@ -73,14 +80,17 @@ let intervalId: NodeJS.Timeout | null = null;
 export function startStripeReconciliationScheduler(): void {
   if (intervalId) {
     console.log('[Stripe Reconciliation] Scheduler already running');
+    schedulerTracker.recordRun('Stripe Reconciliation', true);
     return;
   }
 
   console.log(`[Startup] Stripe reconciliation scheduler enabled (runs at 5am Pacific)`);
+  schedulerTracker.recordRun('Stripe Reconciliation', true);
   
   intervalId = setInterval(() => {
     checkAndRunReconciliation().catch(err => {
       console.error('[Stripe Reconciliation] Uncaught error:', err);
+      schedulerTracker.recordRun('Stripe Reconciliation', false, String(err));
     });
   }, 60 * 60 * 1000);
 }
@@ -90,5 +100,6 @@ export function stopStripeReconciliationScheduler(): void {
     clearInterval(intervalId);
     intervalId = null;
     console.log('[Stripe Reconciliation] Scheduler stopped');
+    schedulerTracker.recordRun('Stripe Reconciliation', true);
   }
 }

@@ -62,7 +62,7 @@ function getEmailWrapper(content: string): string {
 `;
 }
 
-function getTrialWelcomeHtml(params: { firstName?: string; userId: number; trialEndDate: Date; couponCode?: string }): string {
+export function getTrialWelcomeHtml(params: { firstName?: string; userId: number; trialEndDate: Date; couponCode?: string }): string {
   const greeting = params.firstName ? `Welcome, ${params.firstName}!` : 'Welcome to Ever Club!';
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`MEMBER:${params.userId}`)}`;
   const coupon = params.couponCode || 'ASTORIA7';

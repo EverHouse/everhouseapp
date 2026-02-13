@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { pool } from '../core/db';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
@@ -34,6 +35,7 @@ async function expireUnacceptedInvites(): Promise<void> {
     }
     
     console.log(`[Invite Expiry] Processing ${expiredInvites.rows.length} expired invites`);
+    schedulerTracker.recordRun('Invite Expiry', true);
     
     for (const invite of expiredInvites.rows) {
       const client = await pool.connect();
@@ -99,8 +101,10 @@ async function expireUnacceptedInvites(): Promise<void> {
     }
     
     console.log(`[Invite Expiry] Completed processing ${expiredInvites.rows.length} expired invites`);
+    schedulerTracker.recordRun('Invite Expiry', true);
   } catch (err) {
     console.error('[Invite Expiry] Scheduler error:', err);
+    schedulerTracker.recordRun('Invite Expiry', false, String(err));
   }
 }
 

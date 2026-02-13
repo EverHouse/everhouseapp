@@ -23,6 +23,11 @@ import { formatTimeAgo, getTrendIcon, getTrendColor, downloadCSV } from './dataI
 import IntegrityResultsPanel from './dataIntegrity/IntegrityResultsPanel';
 import SyncToolsPanel from './dataIntegrity/SyncToolsPanel';
 import CleanupToolsPanel from './dataIntegrity/CleanupToolsPanel';
+import SchedulerMonitorPanel from './dataIntegrity/SchedulerMonitorPanel';
+import WebhookEventsPanel from './dataIntegrity/WebhookEventsPanel';
+import JobQueuePanel from './dataIntegrity/JobQueuePanel';
+import HubSpotQueuePanel from './dataIntegrity/HubSpotQueuePanel';
+import AlertHistoryPanel from './dataIntegrity/AlertHistoryPanel';
 import IgnoreModals from './dataIntegrity/IgnoreModals';
 
 const DataIntegrityTab: React.FC = () => {
@@ -46,6 +51,11 @@ const DataIntegrityTab: React.FC = () => {
   const [showIgnoredIssues, setShowIgnoredIssues] = useState(false);
 
   const [showDataTools, setShowDataTools] = useState(true);
+  const [showSchedulerMonitor, setShowSchedulerMonitor] = useState(false);
+  const [showWebhookEvents, setShowWebhookEvents] = useState(false);
+  const [showJobQueue, setShowJobQueue] = useState(false);
+  const [showHubSpotQueue, setShowHubSpotQueue] = useState(false);
+  const [showAlertHistory, setShowAlertHistory] = useState(false);
   const [resyncEmail, setResyncEmail] = useState('');
   const [resyncResult, setResyncResult] = useState<{ success: boolean; message: string } | null>(null);
 
@@ -1771,6 +1781,31 @@ const DataIntegrityTab: React.FC = () => {
         handleDeletePlaceholders={handleDeletePlaceholders}
         isDeletingPlaceholders={isDeletingPlaceholders}
         placeholderDeleteResult={placeholderDeleteResult}
+      />
+
+      <SchedulerMonitorPanel
+        isOpen={showSchedulerMonitor}
+        onToggle={() => setShowSchedulerMonitor(!showSchedulerMonitor)}
+      />
+
+      <WebhookEventsPanel
+        isOpen={showWebhookEvents}
+        onToggle={() => setShowWebhookEvents(!showWebhookEvents)}
+      />
+
+      <JobQueuePanel
+        isOpen={showJobQueue}
+        onToggle={() => setShowJobQueue(!showJobQueue)}
+      />
+
+      <HubSpotQueuePanel
+        isOpen={showHubSpotQueue}
+        onToggle={() => setShowHubSpotQueue(!showHubSpotQueue)}
+      />
+
+      <AlertHistoryPanel
+        isOpen={showAlertHistory}
+        onToggle={() => setShowAlertHistory(!showAlertHistory)}
       />
 
       <IgnoreModals

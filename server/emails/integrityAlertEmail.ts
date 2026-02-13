@@ -38,7 +38,7 @@ function formatIssueContext(context?: IntegrityIssue['context']): string {
   return parts.length > 0 ? `<br><span style="font-size: 12px; color: ${CLUB_COLORS.textMuted};">${parts.join(' • ')}</span>` : '';
 }
 
-function getIntegrityAlertEmailHtml(
+export function getIntegrityAlertEmailHtml(
   results: IntegrityCheckResult[],
   criticalIssues: IntegrityIssue[]
 ): string {

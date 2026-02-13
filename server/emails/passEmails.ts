@@ -78,7 +78,7 @@ interface PassDetails {
   purchaseDate: Date;
 }
 
-function getPassWithQrHtml(passDetails: PassDetails): string {
+export function getPassWithQrHtml(passDetails: PassDetails): string {
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`PASS:${passDetails.passId}`)}`;
   const formattedType = formatPassType(passDetails.type);
   
@@ -377,7 +377,7 @@ function getWorkspacePassContent(details: RedemptionDetails, formattedType: stri
   `;
 }
 
-function getRedemptionConfirmationHtml(details: RedemptionDetails): string {
+export function getRedemptionConfirmationHtml(details: RedemptionDetails): string {
   const formattedType = formatPassType(details.passType);
   const formattedTime = new Intl.DateTimeFormat('en-US', { 
     hour: 'numeric', 

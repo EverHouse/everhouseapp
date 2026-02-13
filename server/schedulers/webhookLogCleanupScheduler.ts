@@ -1,11 +1,14 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { getPacificHour } from '../utils/dateUtils';
 
 async function scheduleWebhookLogCleanup(): Promise<void> {
   try {
     const { cleanupOldWebhookLogs } = await import('../routes/trackmanWebhook');
     await cleanupOldWebhookLogs();
+    schedulerTracker.recordRun('Webhook Log Cleanup', true);
   } catch (err) {
     console.error('[Webhook Cleanup] Scheduler error:', err);
+    schedulerTracker.recordRun('Webhook Log Cleanup', false, String(err));
   }
 }
 

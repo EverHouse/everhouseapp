@@ -79,7 +79,7 @@ interface PaymentReceiptParams {
   transactionId?: string;
 }
 
-function getPaymentReceiptHtml(params: PaymentReceiptParams): string {
+export function getPaymentReceiptHtml(params: PaymentReceiptParams): string {
   const { memberName, amount, description, date, transactionId } = params;
   
   const content = `
@@ -161,7 +161,7 @@ interface PaymentFailedParams {
   updateCardUrl?: string;
 }
 
-function getPaymentFailedHtml(params: PaymentFailedParams): string {
+export function getPaymentFailedHtml(params: PaymentFailedParams): string {
   const { memberName, amount, reason, updateCardUrl } = params;
   const ctaUrl = updateCardUrl || 'https://everclub.app/profile';
   
@@ -239,7 +239,7 @@ interface OutstandingBalanceParams {
   dueDate?: string;
 }
 
-function getOutstandingBalanceHtml(params: OutstandingBalanceParams): string {
+export function getOutstandingBalanceHtml(params: OutstandingBalanceParams): string {
   const { memberName, amount, description, dueDate } = params;
   
   const content = `
@@ -324,7 +324,7 @@ interface FeeWaivedParams {
   bookingDescription?: string;
 }
 
-function getFeeWaivedHtml(params: FeeWaivedParams): string {
+export function getFeeWaivedHtml(params: FeeWaivedParams): string {
   const { memberName, originalAmount, reason, bookingDescription } = params;
   
   const content = `
@@ -515,7 +515,7 @@ export interface PurchaseReceiptParams {
   date: Date;
 }
 
-function getPurchaseReceiptHtml(params: PurchaseReceiptParams): string {
+export function getPurchaseReceiptHtml(params: PurchaseReceiptParams): string {
   const { memberName, items, totalAmount, paymentMethod, paymentIntentId, date } = params;
 
   const lineItemsHtml = items.map(item => `

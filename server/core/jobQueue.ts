@@ -1,6 +1,7 @@
 import { db } from '../db';
 import { getErrorMessage } from '../utils/errorUtils';
 import { sql } from 'drizzle-orm';
+import { schedulerTracker } from './schedulerTracker';
 import type { PoolClient } from 'pg';
 import { broadcastBillingUpdate, broadcastDayPassUpdate, sendNotificationToUser } from './websocket';
 import { notifyPaymentSuccess, notifyPaymentFailed, notifyStaffPaymentFailed, notifyMember, notifyAllStaff } from './notificationService';
@@ -278,8 +279,10 @@ export function startJobProcessor(intervalMs: number = 5000): void {
   processingInterval = setInterval(async () => {
     try {
       await processJobs();
+      schedulerTracker.recordRun('Job Queue Processor', true);
     } catch (error) {
       console.error('[JobQueue] Processing error:', error);
+      schedulerTracker.recordRun('Job Queue Processor', false, String(error));
     }
   }, intervalMs);
 }

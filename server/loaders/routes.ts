@@ -54,6 +54,8 @@ import conferencePrepaymentRouter from '../routes/conference/prepayment';
 import pricingRouter from '../routes/pricing';
 import authGoogleRouter from '../routes/auth-google';
 import idScannerRouter from '../routes/idScanner';
+import emailTemplatesRouter from '../routes/emailTemplates';
+import monitoringRouter from '../routes/monitoring';
 import { registerObjectStorageRoutes } from '../replit_integrations/object_storage';
 
 export function registerRoutes(app: Express): void {
@@ -111,5 +113,7 @@ export function registerRoutes(app: Express): void {
   app.use(conferencePrepaymentRouter);
   app.use(pricingRouter);
   app.use(idScannerRouter);
+  app.use(emailTemplatesRouter);
+  app.use(monitoringRouter);
   registerObjectStorageRoutes(app);
 }

@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { pool } from '../core/db';
 import { getPacificHour, getTodayPacific, CLUB_TIMEZONE } from '../utils/dateUtils';
 import { sendGracePeriodReminderEmail } from '../emails/membershipEmails';
@@ -116,8 +117,10 @@ async function processGracePeriodMembers(): Promise<void> {
               const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
               await syncMemberToHubSpot({ email, status: 'terminated' });
               console.log(`[Grace Period] Synced ${email} status=terminated to HubSpot`);
+              schedulerTracker.recordRun('Grace Period', true);
             } catch (hubspotError) {
               console.error('[Grace Period] HubSpot sync failed:', hubspotError);
+              schedulerTracker.recordRun('Grace Period', false, String(hubspotError));
             }
             
             await notifyAllStaff(
@@ -130,12 +133,15 @@ async function processGracePeriodMembers(): Promise<void> {
         }
       } catch (error) {
         console.error(`[Grace Period] Error processing member ${email}:`, error);
+        schedulerTracker.recordRun('Grace Period', false, String(error));
       }
     }
     
     console.log('[Grace Period] Daily check complete');
+    schedulerTracker.recordRun('Grace Period', true);
   } catch (error) {
     console.error('[Grace Period] Scheduler error:', error);
+    schedulerTracker.recordRun('Grace Period', false, String(error));
   }
 }
 
@@ -152,6 +158,7 @@ export function startGracePeriodScheduler(): void {
   intervalId = setInterval(() => {
     processGracePeriodMembers().catch(err => {
       console.error('[Grace Period] Uncaught error:', err);
+      schedulerTracker.recordRun('Grace Period', false, String(err));
     });
   }, 60 * 60 * 1000);
 }

@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { pool } from '../core/db';
 
 async function cleanupOldWebhookEvents(): Promise<void> {
@@ -7,8 +8,10 @@ async function cleanupOldWebhookEvents(): Promise<void> {
     );
 
     console.log(`[Webhook Event Cleanup] Deleted ${result.rowCount} old webhook deduplication record(s)`);
+    schedulerTracker.recordRun('Webhook Event Cleanup', true);
   } catch (error) {
     console.error('[Webhook Event Cleanup] Scheduler error:', error);
+    schedulerTracker.recordRun('Webhook Event Cleanup', false, String(error));
   }
 }
 
@@ -25,12 +28,14 @@ export function startWebhookEventCleanupScheduler(): void {
   intervalId = setInterval(() => {
     cleanupOldWebhookEvents().catch(err => {
       console.error('[Webhook Event Cleanup] Uncaught error:', err);
+      schedulerTracker.recordRun('Webhook Event Cleanup', false, String(err));
     });
   }, 24 * 60 * 60 * 1000);
 
   setTimeout(() => {
     cleanupOldWebhookEvents().catch(err => {
       console.error('[Webhook Event Cleanup] Initial run error:', err);
+      schedulerTracker.recordRun('Webhook Event Cleanup', false, String(err));
     });
   }, 5 * 60 * 1000);
 }

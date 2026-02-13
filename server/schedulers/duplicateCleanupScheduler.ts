@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { pool } from '../core/db';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
 
@@ -73,10 +74,12 @@ async function checkAndRunCleanup(): Promise<void> {
       const result = await cleanupDuplicateTrackmanBookings();
       if (result.deletedCount > 0) {
         console.log(`[Duplicate Cleanup] Completed: removed ${result.deletedCount} duplicates`);
+        schedulerTracker.recordRun('Duplicate Cleanup', true);
       }
     }
   } catch (error) {
     console.error('[Duplicate Cleanup] Scheduler error:', error);
+    schedulerTracker.recordRun('Duplicate Cleanup', false, String(error));
   }
 }
 
@@ -89,11 +92,13 @@ export function startDuplicateCleanupScheduler(): void {
       const result = await cleanupDuplicateTrackmanBookings();
       if (result.deletedCount > 0) {
         console.log(`[Duplicate Cleanup] Startup cleanup removed ${result.deletedCount} duplicates`);
+        schedulerTracker.recordRun('Duplicate Cleanup', true);
       } else {
         console.log('[Duplicate Cleanup] No duplicates found');
       }
     } catch (error) {
       console.error('[Duplicate Cleanup] Startup cleanup error:', error);
+      schedulerTracker.recordRun('Duplicate Cleanup', false, String(error));
     }
   }, 10000);
   

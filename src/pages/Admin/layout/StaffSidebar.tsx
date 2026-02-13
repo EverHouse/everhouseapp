@@ -36,6 +36,7 @@ const ADMIN_ITEMS: NavItem[] = [
   { id: 'faqs', icon: 'help_outline', label: 'FAQs' },
   { id: 'inquiries', icon: 'mail', label: 'Inquiries' },
   { id: 'bugs', icon: 'bug_report', label: 'Bug Reports' },
+  { id: 'email-templates', icon: 'forward_to_inbox', label: 'Email Templates' },
   { id: 'changelog', icon: 'history', label: 'Changelog' },
   { id: 'data-integrity', icon: 'fact_check', label: 'Data Integrity' },
 ];

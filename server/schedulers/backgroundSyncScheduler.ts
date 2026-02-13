@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { syncGoogleCalendarEvents, syncWellnessCalendarEvents, syncInternalCalendarToClosures, syncConferenceRoomCalendarToBookings } from '../core/calendar/index';
 import { syncToursFromCalendar } from '../routes/tours';
 
@@ -18,6 +19,7 @@ const runBackgroundSync = async () => {
     console.log(`[Auto-sync] Events: ${eventsMsg}, Wellness: ${wellnessMsg}, Tours: ${toursMsg}, Closures: ${closuresMsg}, ConfRoom: ${confRoomMsg}`);
   } catch (err) {
     console.error('[Auto-sync] Calendar sync failed:', err);
+    schedulerTracker.recordRun('Background Sync', false, String(err));
   } finally {
     setTimeout(runBackgroundSync, SYNC_INTERVAL_MS);
   }

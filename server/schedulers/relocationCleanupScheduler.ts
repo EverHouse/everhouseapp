@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { clearStaleRelocations } from '../routes/bays/reschedule';
 
 export function startRelocationCleanupScheduler(): void {
@@ -6,6 +7,7 @@ export function startRelocationCleanupScheduler(): void {
       await clearStaleRelocations();
     } catch (err) {
       console.error('[Relocation Cleanup] Scheduler error:', err);
+      schedulerTracker.recordRun('Relocation Cleanup', false, String(err));
     }
   }, 5 * 60 * 1000);
 

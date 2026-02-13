@@ -1,3 +1,4 @@
+import { schedulerTracker } from '../core/schedulerTracker';
 import { pool } from '../core/db';
 import { notifyAllStaff } from '../core/notificationService';
 import { logger } from '../core/logger';
@@ -78,6 +79,7 @@ async function checkStuckCancellations(): Promise<void> {
 
   } catch (error) {
     console.error('[Stuck Cancellations] Scheduler error:', error);
+    schedulerTracker.recordRun('Stuck Cancellation', false, String(error));
     logger.error({ error, context: 'stuck_cancellation_scheduler' }, 'Failed to check stuck cancellation bookings');
   }
 }
@@ -95,6 +97,7 @@ export function startStuckCancellationScheduler(): void {
   intervalId = setInterval(() => {
     checkStuckCancellations().catch(err => {
       console.error('[Stuck Cancellations] Uncaught error:', err);
+      schedulerTracker.recordRun('Stuck Cancellation', false, String(err));
     });
   }, 2 * 60 * 60 * 1000);
 
@@ -102,6 +105,7 @@ export function startStuckCancellationScheduler(): void {
   setTimeout(() => {
     checkStuckCancellations().catch(err => {
       console.error('[Stuck Cancellations] Initial run error:', err);
+      schedulerTracker.recordRun('Stuck Cancellation', false, String(err));
     });
   }, 60 * 1000);
 }
