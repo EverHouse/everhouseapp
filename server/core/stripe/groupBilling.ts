@@ -1735,6 +1735,17 @@ export async function handlePrimarySubscriptionCancelled(subscriptionId: string)
          WHERE LOWER(email) = ANY($1::text[])`,
         [emailsToDeactivate]
       );
+      
+      // Sync cancelled sub-members to HubSpot
+      try {
+        const { syncMemberToHubSpot } = await import('../hubspot/stages');
+        for (const subEmail of emailsToDeactivate) {
+          await syncMemberToHubSpot({ email: subEmail, status: 'cancelled', billingProvider: 'family_addon' });
+        }
+        console.log(`[GroupBilling] Synced ${emailsToDeactivate.length} cancelled sub-members to HubSpot`);
+      } catch (hubspotErr) {
+        console.error('[GroupBilling] HubSpot sync failed for cancelled sub-members:', hubspotErr);
+      }
     }
 
     await pool.query(

@@ -2991,6 +2991,20 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
                 type: 'system',
               }, { sendPush: true });
             }
+            
+            // Defer HubSpot sync for reactivated sub-members (runs after transaction commits)
+            const reactivatedEmails = subMembersResult.rows.map((r: { email: string }) => r.email);
+            deferredActions.push(async () => {
+              try {
+                const { syncMemberToHubSpot } = await import('../hubspot/stages');
+                for (const subEmail of reactivatedEmails) {
+                  await syncMemberToHubSpot({ email: subEmail, status: 'active', billingProvider: 'family_addon' });
+                }
+                console.log(`[Stripe Webhook] Synced ${reactivatedEmails.length} reactivated sub-members to HubSpot`);
+              } catch (hubspotErr) {
+                console.error('[Stripe Webhook] HubSpot sync failed for reactivated sub-members:', hubspotErr);
+              }
+            });
           }
         }
       } catch (groupErr) {
@@ -3070,6 +3084,20 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
                 type: 'membership_past_due',
               }, { sendPush: true });
             }
+            
+            // Defer HubSpot sync for past_due sub-members (runs after transaction commits)
+            const pastDueEmails = subMembersResult.rows.map((r: { email: string }) => r.email);
+            deferredActions.push(async () => {
+              try {
+                const { syncMemberToHubSpot } = await import('../hubspot/stages');
+                for (const subEmail of pastDueEmails) {
+                  await syncMemberToHubSpot({ email: subEmail, status: 'past_due', billingProvider: 'family_addon' });
+                }
+                console.log(`[Stripe Webhook] Synced ${pastDueEmails.length} past_due sub-members to HubSpot`);
+              } catch (hubspotErr) {
+                console.error('[Stripe Webhook] HubSpot sync failed for past_due sub-members:', hubspotErr);
+              }
+            });
           }
         }
       } catch (groupErr) {
@@ -3151,6 +3179,20 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
                 type: 'membership_past_due',
               }, { sendPush: true });
             }
+            
+            // Defer HubSpot sync for suspended sub-members (runs after transaction commits)
+            const suspendedEmails = subMembersResult.rows.map((r: { email: string }) => r.email);
+            deferredActions.push(async () => {
+              try {
+                const { syncMemberToHubSpot } = await import('../hubspot/stages');
+                for (const subEmail of suspendedEmails) {
+                  await syncMemberToHubSpot({ email: subEmail, status: 'suspended', billingProvider: 'family_addon' });
+                }
+                console.log(`[Stripe Webhook] Synced ${suspendedEmails.length} suspended sub-members to HubSpot`);
+              } catch (hubspotErr) {
+                console.error('[Stripe Webhook] HubSpot sync failed for suspended sub-members:', hubspotErr);
+              }
+            });
           }
         }
       } catch (groupErr) {
