@@ -4,6 +4,7 @@ import { Footer } from '../../components/Footer';
 import VirtualTour from '../../components/VirtualTour';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useParallax } from '../../hooks/useParallax';
+import SEO from '../../components/SEO';
 
 const PrivateHire: React.FC = () => {
   const { setPageReady } = usePageReady();
@@ -15,6 +16,7 @@ const PrivateHire: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#0f120a]">
+       <SEO title="Private Events & Venue Hire in Orange County | Ever Members Club" description="Host private events, corporate gatherings & celebrations at Ever Members Club in Tustin. Trackman golf simulator bays, conference rooms & elegant event spaces in Orange County." url="/private-hire" />
        <div 
          className="fixed top-0 left-0 right-0 bg-primary"
          style={{ height: 'env(safe-area-inset-top, 0px)', zIndex: 'var(--z-header)' }}

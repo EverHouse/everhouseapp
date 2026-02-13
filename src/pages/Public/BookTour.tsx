@@ -161,9 +161,9 @@ const BookTour: React.FC = () => {
   return (
     <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#0f120a]">
       <SEO
-        title="Book a Tour | Ever Club"
-        description="Book a private 30-minute tour of Ever Club. Experience Trackman simulators, premium workspaces, and a curated social club in Orange County."
-        url="/tour"
+        title="Book a Private Tour | Ever Members Club — Indoor Golf & Social Club, OC"
+        description="Schedule a free 30-minute tour of Ever Members Club in Tustin. See Trackman simulators, premium coworking, café & wellness facilities at Orange County's top private club."
+        url="/tours"
       />
       <div
         className="fixed top-0 left-0 right-0 bg-primary"

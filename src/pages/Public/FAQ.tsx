@@ -5,6 +5,7 @@ import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
 import EmptyState from '../../components/EmptyState';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { AnimatedPage } from '../../components/motion';
+import SEO from '../../components/SEO';
 
 interface FaqItem {
   id: number;
@@ -68,6 +69,7 @@ const FAQ: React.FC = () => {
 
   return (
     <AnimatedPage>
+    <SEO title="FAQ — Frequently Asked Questions | Ever Members Club, Orange County" description="Got questions about Ever Members Club? Find answers about memberships, Trackman golf simulators, events, hours, day passes & more at our Tustin, OC location." url="/faq" />
     <div 
       className="flex flex-col min-h-screen bg-bone dark:bg-[#0f120a] overflow-x-hidden"
       style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}

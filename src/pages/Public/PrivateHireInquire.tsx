@@ -5,6 +5,7 @@ import { triggerHaptic } from '../../utils/haptics';
 import { formatPhoneNumber } from '../../utils/phoneFormat';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
+import SEO from '../../components/SEO';
 
 const getHubspotCookie = (): string | null => {
   const cookies = document.cookie.split(';');
@@ -174,6 +175,7 @@ const PrivateHireInquire: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#0f120a]">
+      <SEO title="Private Event Inquiry | Ever Members Club — Orange County Venue" description="Submit an inquiry for private events at Ever Members Club in Tustin, OC. Golf simulator parties, corporate events, celebrations & more." url="/private-hire/inquire" />
       <div 
         className="fixed top-0 left-0 right-0 bg-primary"
         style={{ height: 'env(safe-area-inset-top, 0px)', zIndex: 'var(--z-header)' }}

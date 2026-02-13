@@ -5,6 +5,7 @@ import Input from '../../components/Input';
 import EmptyState from '../../components/EmptyState';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useNavigationLoading } from '../../contexts/NavigationLoadingContext';
+import SEO from '../../components/SEO';
 
 interface DayPassTier {
   id: number;
@@ -123,6 +124,7 @@ const BuyDayPass: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-bone dark:bg-[#0f120a] overflow-x-hidden">
+      <SEO title="Day Pass — Golf Simulator & Coworking | Ever Members Club, Orange County" description="No membership needed. Purchase a day pass for Trackman golf simulators or premium coworking at Ever Members Club in Tustin, Orange County." url="/day-pass" />
       <div className="px-6 pt-4 md:pt-2 pb-6 text-center animate-pop-in">
         <h1 className="text-3xl font-bold tracking-tight text-primary dark:text-white mb-3">Day Passes</h1>
         <p className="text-primary/70 dark:text-white/70 text-sm leading-relaxed max-w-xs mx-auto">

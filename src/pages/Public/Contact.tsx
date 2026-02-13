@@ -6,6 +6,7 @@ import { usePageReady } from '../../contexts/PageReadyContext';
 import { useNavigationLoading } from '../../contexts/NavigationLoadingContext';
 import { AnimatedPage } from '../../components/motion';
 import { getApiErrorMessage, getNetworkErrorMessage } from '../../utils/errorHandling';
+import SEO from '../../components/SEO';
 
 const Contact: React.FC = () => {
   const navigate = useNavigate();
@@ -66,6 +67,7 @@ const Contact: React.FC = () => {
 
   return (
     <AnimatedPage>
+    <SEO title="Contact Us | Ever Members Club — Tustin, Orange County" description="Get in touch with Ever Members Club at 2620 Park Ave, Tustin, CA 92782. Membership inquiries, private events, tours & general questions. Call (714) 390-7500." url="/contact" />
     <div className="flex flex-col min-h-screen bg-bone dark:bg-[#0f120a] overflow-x-hidden">
       <div className="px-6 pt-4 md:pt-2 pb-6 text-center animate-content-enter">
         <h1 className="text-3xl font-bold tracking-tight text-primary dark:text-white mb-3">Get in Touch</h1>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 interface SEOProps {
   title: string;
@@ -6,6 +6,7 @@ interface SEOProps {
   url: string;
   image?: string;
   type?: 'website' | 'article';
+  keywords?: string;
 }
 
 const BASE_URL = 'https://everclub.app';
@@ -16,28 +17,18 @@ export const SEO: React.FC<SEOProps> = ({
   description,
   url,
   image = DEFAULT_IMAGE,
-  type = 'website'
+  type = 'website',
+  keywords,
 }) => {
   const fullUrl = url.startsWith('http') ? url : `${BASE_URL}${url}`;
   const fullImage = image.startsWith('http') ? image : `${BASE_URL}${image}`;
   const fullTitle = title.includes('Ever') ? title : `${title} | Ever Members Club`;
 
-  return (
-    <>
-      <title>{fullTitle}</title>
-      <meta name="description" content={description} />
-      <meta property="og:title" content={fullTitle} />
-      <meta property="og:description" content={description} />
-      <meta property="og:url" content={fullUrl} />
-      <meta property="og:image" content={fullImage} />
-      <meta property="og:type" content={type} />
-      <meta property="og:site_name" content="Ever Members Club" />
-      <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:title" content={fullTitle} />
-      <meta name="twitter:description" content={description} />
-      <meta name="twitter:image" content={fullImage} />
-    </>
-  );
+  useEffect(() => {
+    document.title = fullTitle;
+  }, [fullTitle]);
+
+  return null;
 };
 
 export default SEO;

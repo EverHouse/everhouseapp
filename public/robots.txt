@@ -4,6 +4,7 @@ Allow: /membership
 Allow: /membership/apply
 Allow: /whats-on
 Allow: /private-hire
+Allow: /private-hire/inquire
 Allow: /menu
 Allow: /gallery
 Allow: /contact

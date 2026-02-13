@@ -420,48 +420,48 @@ async function initializeApp() {
   if (isProduction) {
     const SEO_META: Record<string, { title: string; description: string }> = {
       '/': {
-        title: 'Ever Members Club | Orange County\'s Premier Indoor Golf & Social Club',
-        description: 'A new kind of members club rooted in golf, built for community. Experience indoor golf simulators, coworking spaces, wellness programs, and curated events in Orange County.',
+        title: 'Ever Members Club | Indoor Golf & Social Club in Tustin, Orange County',
+        description: 'Orange County\'s premier private indoor golf & social club. Trackman golf simulators, premium coworking, café, wellness & curated events. Visit us in Tustin — book a private tour today.',
       },
       '/membership': {
-        title: 'Membership Plans | Ever Members Club',
-        description: 'Explore membership tiers at Ever Members Club. From Social to VIP, find the perfect plan with golf simulator access, coworking, wellness, and exclusive events.',
+        title: 'Membership Plans & Pricing | Ever Members Club — Tustin, OC',
+        description: 'Explore membership tiers at Ever Members Club in Orange County. Social, Core, Premium & Corporate plans with Trackman simulator access, coworking, wellness programs & exclusive member events.',
       },
       '/membership/apply': {
-        title: 'Apply for Membership | Ever Members Club',
-        description: 'Apply to join Ever Members Club. Start your membership journey with access to indoor golf simulators, coworking spaces, and a vibrant community in Orange County.',
+        title: 'Apply for Membership | Ever Members Club — Orange County Indoor Golf Club',
+        description: 'Join Orange County\'s premier indoor golf & social club. Apply for membership at Ever Members Club in Tustin — Trackman simulators, premium workspace, wellness & a curated community.',
       },
       '/private-hire': {
-        title: 'Private Events & Hire | Ever Members Club',
-        description: 'Host your next event at Ever Members Club. Private simulator bays, conference rooms, and event spaces available for corporate events, parties, and celebrations.',
+        title: 'Private Events & Venue Hire in Orange County | Ever Members Club',
+        description: 'Host private events, corporate gatherings & celebrations at Ever Members Club in Tustin. Trackman golf simulator bays, conference rooms & elegant event spaces in Orange County.',
       },
       '/whats-on': {
-        title: 'Events & What\'s On | Ever Members Club',
-        description: 'Discover upcoming events at Ever Members Club. Golf tournaments, social nights, wellness classes, and community gatherings in Orange County.',
+        title: 'Events & Happenings in Orange County | Ever Members Club',
+        description: 'Discover golf tournaments, social nights, wellness classes & curated events at Ever Members Club in Tustin, Orange County. See what\'s on and RSVP.',
       },
       '/menu': {
-        title: 'Café Menu | Ever Members Club',
-        description: 'Explore the Ever Members Club café menu. Farm-to-table breakfast, artisan lunch, craft beverages, and curated selections in a premium club setting.',
+        title: 'Café Menu | Ever Members Club — Tustin, Orange County',
+        description: 'Explore the Ever Members Club café menu. Farm-to-table breakfast, artisan lunch, craft coffee & curated beverages inside Orange County\'s premier indoor golf & social club.',
       },
       '/gallery': {
-        title: 'Gallery | Ever Members Club',
-        description: 'See inside Ever Members Club. Photos of our indoor golf simulators, lounge, café, coworking spaces, and member events in Orange County.',
+        title: 'Gallery & Photos | Ever Members Club — Indoor Golf Club in Orange County',
+        description: 'See inside Ever Members Club in Tustin. Photos of Trackman golf simulators, lounge, café, coworking spaces & member events at Orange County\'s private social club.',
       },
       '/contact': {
-        title: 'Contact Us | Ever Members Club',
-        description: 'Get in touch with Ever Members Club. Visit us in Orange County or reach out for membership inquiries, private events, and general questions.',
+        title: 'Contact Us | Ever Members Club — Tustin, Orange County',
+        description: 'Get in touch with Ever Members Club at 2620 Park Ave, Tustin, CA 92782. Membership inquiries, private events, tours & general questions. Call (714) 390-7500.',
       },
       '/tours': {
-        title: 'Book a Tour | Ever Members Club',
-        description: 'Schedule a tour of Ever Members Club. See our indoor golf simulators, café, coworking spaces, and wellness facilities in person.',
+        title: 'Book a Private Tour | Ever Members Club — Indoor Golf & Social Club, OC',
+        description: 'Schedule a free 30-minute tour of Ever Members Club in Tustin. See Trackman simulators, premium coworking, café & wellness facilities at Orange County\'s top private club.',
       },
       '/day-pass': {
-        title: 'Day Pass | Ever Members Club',
-        description: 'Purchase a day pass to experience Ever Members Club. Enjoy golf simulators, café, and club amenities for the day without a membership.',
+        title: 'Day Pass — Golf Simulator & Coworking | Ever Members Club, Orange County',
+        description: 'No membership needed. Purchase a day pass for Trackman golf simulators or premium coworking at Ever Members Club in Tustin, Orange County. Walk in & experience the club.',
       },
       '/faq': {
-        title: 'FAQ | Ever Members Club',
-        description: 'Frequently asked questions about Ever Members Club. Learn about memberships, golf simulators, events, hours, and more.',
+        title: 'FAQ — Frequently Asked Questions | Ever Members Club, Orange County',
+        description: 'Got questions about Ever Members Club? Find answers about memberships, Trackman golf simulators, events, hours, day passes & more at our Tustin, OC location.',
       },
       '/privacy': {
         title: 'Privacy Policy | Ever Members Club',
@@ -471,7 +471,243 @@ async function initializeApp() {
         title: 'Terms of Service | Ever Members Club',
         description: 'Ever Members Club terms of service. Membership agreement, usage policies, and club rules.',
       },
+      '/private-hire/inquire': {
+        title: 'Private Event Inquiry | Ever Members Club — Orange County Venue',
+        description: 'Submit an inquiry for private events at Ever Members Club in Tustin, OC. Golf simulator parties, corporate events, celebrations & more at Orange County\'s premier venue.',
+      },
     };
+
+    const BASE_JSON_LD = {
+      "@type": ["SportsActivityLocation", "LocalBusiness"],
+      "name": "Ever Members Club",
+      "alternateName": "Ever Club",
+      "description": "Orange County's premier private indoor golf & social club featuring Trackman simulators, premium coworking, wellness programs, and curated events.",
+      "url": "https://everclub.app",
+      "telephone": "+17143907500",
+      "email": "info@joinever.club",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "2620 Park Ave",
+        "addressLocality": "Tustin",
+        "addressRegion": "CA",
+        "postalCode": "92782",
+        "addressCountry": "US"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": 33.7458,
+        "longitude": -117.8262
+      },
+      "areaServed": {
+        "@type": "GeoCircle",
+        "geoMidpoint": {
+          "@type": "GeoCoordinates",
+          "latitude": 33.7458,
+          "longitude": -117.8262
+        },
+        "geoRadius": "30 mi"
+      },
+      "priceRange": "$$$",
+      "openingHoursSpecification": [
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+          "opens": "07:00",
+          "closes": "22:00"
+        },
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": ["Saturday", "Sunday"],
+          "opens": "08:00",
+          "closes": "22:00"
+        }
+      ],
+      "sameAs": ["https://www.instagram.com/everhouse.app/"],
+      "image": "https://everclub.app/images/hero-lounge-optimized.webp",
+      "amenityFeature": [
+        {"@type": "LocationFeatureSpecification", "name": "Trackman Golf Simulators", "value": true},
+        {"@type": "LocationFeatureSpecification", "name": "Premium Coworking Space", "value": true},
+        {"@type": "LocationFeatureSpecification", "name": "Café & Bar", "value": true},
+        {"@type": "LocationFeatureSpecification", "name": "Private Event Space", "value": true},
+        {"@type": "LocationFeatureSpecification", "name": "Wellness Programs", "value": true}
+      ],
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Membership Plans",
+        "itemListElement": [
+          {"@type": "Offer", "name": "Social Membership", "description": "Access to social events and café"},
+          {"@type": "Offer", "name": "Core Membership", "description": "Golf simulator access, coworking, and events"},
+          {"@type": "Offer", "name": "Premium Membership", "description": "Full access including priority booking and wellness"},
+          {"@type": "Offer", "name": "Day Pass", "description": "Single-day access to golf simulators or coworking"}
+        ]
+      }
+    };
+
+    const FAQ_JSON_LD = {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is Ever Members Club?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Ever Members Club is Orange County's premier private indoor golf and social club, located in Tustin, CA. We combine Trackman golf simulators, premium coworking spaces, a café, wellness programs, and curated social events under one roof."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Where is Ever Members Club located?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "We're located at 2620 Park Ave, Tustin, CA 92782, in the heart of Orange County."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What golf simulators do you use?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "We use Trackman golf simulators, the industry-leading technology used by PGA Tour professionals for practice, play, and entertainment."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do I need a membership to visit?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "You can experience the club with a Day Pass for golf simulators or coworking, or book a private tour to see the full facility before joining."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What membership options are available?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "We offer Social, Core, Premium, and Corporate membership tiers, each with different levels of access to golf simulators, coworking, events, and wellness programs."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I host a private event at Ever Club?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes! We offer private event spaces including golf simulator bays and conference rooms for corporate events, celebrations, and social gatherings."
+          }
+        }
+      ]
+    };
+
+    const TOURS_JSON_LD = {
+      "@type": "TouristAttraction",
+      "name": "Ever Members Club",
+      "description": "Schedule a free 30-minute tour of Orange County's premier indoor golf & social club featuring Trackman simulators, premium coworking, café & wellness facilities.",
+      "url": "https://everclub.app/tours",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "2620 Park Ave",
+        "addressLocality": "Tustin",
+        "addressRegion": "CA",
+        "postalCode": "92782",
+        "addressCountry": "US"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": 33.7458,
+        "longitude": -117.8262
+      },
+      "touristType": ["Golf Enthusiasts", "Professionals", "Social Groups"]
+    };
+
+    const EVENT_VENUE_JSON_LD = {
+      "@type": "EventVenue",
+      "name": "Ever Members Club — Private Event Venue",
+      "description": "Host private events, corporate gatherings & celebrations at Ever Members Club in Tustin. Trackman golf simulator bays, conference rooms & elegant event spaces in Orange County.",
+      "url": "https://everclub.app/private-hire",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "2620 Park Ave",
+        "addressLocality": "Tustin",
+        "addressRegion": "CA",
+        "postalCode": "92782",
+        "addressCountry": "US"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": 33.7458,
+        "longitude": -117.8262
+      },
+      "maximumAttendeeCapacity": 100
+    };
+
+    const GEO_META_TAGS = `<meta name="geo.region" content="US-CA" />\n<meta name="geo.placename" content="Tustin, California" />\n<meta name="geo.position" content="33.7458;-117.8262" />\n<meta name="ICBM" content="33.7458, -117.8262" />`;
+
+    function getBreadcrumbs(routePath: string): object {
+      const items: { name: string; item: string }[] = [
+        { name: "Home", item: "https://everclub.app" }
+      ];
+
+      const breadcrumbMap: Record<string, { name: string; item: string }[]> = {
+        '/membership': [{ name: "Membership", item: "https://everclub.app/membership" }],
+        '/membership/apply': [
+          { name: "Membership", item: "https://everclub.app/membership" },
+          { name: "Apply", item: "https://everclub.app/membership/apply" }
+        ],
+        '/tours': [{ name: "Book a Tour", item: "https://everclub.app/tours" }],
+        '/private-hire': [{ name: "Private Events", item: "https://everclub.app/private-hire" }],
+        '/private-hire/inquire': [
+          { name: "Private Events", item: "https://everclub.app/private-hire" },
+          { name: "Inquire", item: "https://everclub.app/private-hire/inquire" }
+        ],
+        '/whats-on': [{ name: "Events", item: "https://everclub.app/whats-on" }],
+        '/menu': [{ name: "Café Menu", item: "https://everclub.app/menu" }],
+        '/gallery': [{ name: "Gallery", item: "https://everclub.app/gallery" }],
+        '/contact': [{ name: "Contact", item: "https://everclub.app/contact" }],
+        '/day-pass': [{ name: "Day Pass", item: "https://everclub.app/day-pass" }],
+        '/faq': [{ name: "FAQ", item: "https://everclub.app/faq" }],
+      };
+
+      const additionalItems = breadcrumbMap[routePath] || [];
+      const allItems = [...items, ...additionalItems];
+
+      return {
+        "@type": "BreadcrumbList",
+        "itemListElement": allItems.map((item, index) => ({
+          "@type": "ListItem",
+          "position": index + 1,
+          "name": item.name,
+          "item": item.item
+        }))
+      };
+    }
+
+    function getJsonLdScripts(routePath: string): string {
+      const graphItems: object[] = [
+        {
+          "@type": "WebSite",
+          "@id": "https://everclub.app/#website",
+          "url": "https://everclub.app",
+          "name": "Ever Members Club",
+          "publisher": { "@id": "https://everclub.app/#organization" }
+        },
+        { ...BASE_JSON_LD, "@id": "https://everclub.app/#organization" }
+      ];
+
+      if (routePath === '/faq') {
+        graphItems.push(FAQ_JSON_LD);
+      }
+      if (routePath === '/tours') {
+        graphItems.push(TOURS_JSON_LD);
+      }
+      if (routePath === '/private-hire') {
+        graphItems.push(EVENT_VENUE_JSON_LD);
+      }
+
+      if (routePath !== '/') {
+        graphItems.push(getBreadcrumbs(routePath));
+      }
+
+      return `<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@graph": graphItems })}</script>`;
+    }
 
     app.use((req, res, next) => {
       if (req.method === 'GET' && !req.path.startsWith('/api/') && req.path !== '/healthz' && req.path !== '/_health') {
@@ -492,14 +728,18 @@ async function initializeApp() {
           html = html.replace(/<meta property="og:url"[^>]*>/, `<meta property="og:url" content="${ogUrl}" />`);
           html = html.replace(/<meta name="twitter:title"[^>]*>/, `<meta name="twitter:title" content="${meta.title}" />`);
           html = html.replace(/<meta name="twitter:description"[^>]*>/, `<meta name="twitter:description" content="${meta.description}" />`);
+          html = html.replace('</head>', `<link rel="canonical" href="${ogUrl}" />\n${GEO_META_TAGS}\n${getJsonLdScripts(routePath)}\n</head>`);
           res.setHeader('Content-Type', 'text/html');
           res.setHeader('Cache-Control', 'no-cache');
           return res.send(html);
         }
 
+        let html = cachedIndexHtml;
+        const fallbackUrl = `https://everclub.app${routePath === '/' ? '' : routePath}`;
+        html = html.replace('</head>', `<link rel="canonical" href="${fallbackUrl}" />\n${GEO_META_TAGS}\n${getJsonLdScripts(routePath)}\n</head>`);
         res.setHeader('Content-Type', 'text/html');
         res.setHeader('Cache-Control', 'no-cache');
-        return res.send(cachedIndexHtml);
+        return res.send(html);
       }
       next();
     });

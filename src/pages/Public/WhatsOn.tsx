@@ -146,8 +146,8 @@ const WhatsOn: React.FC = () => {
   return (
     <AnimatedPage>
       <SEO
-        title="What's On | Ever Club"
-        description="Discover upcoming events, wellness classes, and curated experiences at Ever Club. Join us for culture, conversation, and community in Tustin, Orange County."
+        title="Events & Happenings in Orange County | Ever Members Club"
+        description="Discover golf tournaments, social nights, wellness classes & curated events at Ever Members Club in Tustin, Orange County. See what's on and RSVP."
         url="/whats-on"
         image="/images/events-crowd-optimized.webp"
       />
