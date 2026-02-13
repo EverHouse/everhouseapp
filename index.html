@@ -66,23 +66,17 @@
         background-color: #1a2310;
       }
       #safari-tint-top {
-        display: none;
+        position: fixed;
+        top: 4px;
+        left: 0;
+        width: 90%;
+        min-height: 15px;
+        background-color: #293515;
+        pointer-events: none;
+        z-index: -1;
       }
-      @media (max-width: 767px) and (hover: none) and (pointer: coarse) {
-        #safari-tint-top {
-          display: block;
-          position: fixed;
-          top: 4px;
-          left: 0;
-          width: 90%;
-          min-height: 15px;
-          background-color: #293515;
-          pointer-events: none;
-          z-index: -1;
-        }
-        html.dark #safari-tint-top {
-          background-color: #293515;
-        }
+      html.dark #safari-tint-top {
+        background-color: #141c09;
       }
     </style>
     <!-- Start of HubSpot Embed Code (deferred loader) -->
