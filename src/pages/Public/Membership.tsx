@@ -309,7 +309,7 @@ const MembershipOverview: React.FC = () => {
            </button>
         </div>
         <Link 
-            to="/checkout"
+            to={selectedPass === 'workspace' ? '/checkout?type=day-pass-coworking' : '/checkout?type=day-pass-golf-sim'}
             className="w-full mt-4 py-3 text-sm font-semibold text-primary dark:text-white border-t border-primary/5 dark:border-white/10 hover:bg-primary/5 dark:hover:bg-white/5 transition-colors rounded-b-xl tracking-wide uppercase block text-center"
         >
            Experience the Club
