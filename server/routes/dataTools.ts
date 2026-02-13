@@ -12,6 +12,7 @@ import { getSessionUser } from '../types/session';
 import { broadcastToStaff } from '../core/websocket';
 import { getErrorMessage, getErrorCode, getErrorStatusCode } from '../utils/errorUtils';
 import { bulkPushToHubSpot } from '../core/dataIntegrity';
+import { normalizeTierName } from '@shared/constants/tiers';
 
 interface StripeCleanupJob {
   id: string;
@@ -157,7 +158,8 @@ router.post('/api/data-tools/resync-member', isAdmin, async (req: Request, res: 
     if (props.firstname) updateData.firstName = props.firstname;
     if (props.lastname) updateData.lastName = props.lastname;
     if (props.phone) updateData.phone = props.phone;
-    if (props.membership_tier) updateData.tier = props.membership_tier;
+    const normalizedTier = props.membership_tier ? normalizeTierName(props.membership_tier) : null;
+    if (normalizedTier) updateData.tier = normalizedTier;
     if (props.membership_status) updateData.membershipStatus = props.membership_status;
     
     await db.execute(sql`UPDATE users SET 
@@ -165,7 +167,7 @@ router.post('/api/data-tools/resync-member', isAdmin, async (req: Request, res: 
         first_name = COALESCE(${props.firstname || null}, first_name),
         last_name = COALESCE(${props.lastname || null}, last_name),
         phone = COALESCE(${props.phone || null}, phone),
-        tier = COALESCE(${props.membership_tier || null}, tier),
+        tier = COALESCE(${normalizedTier}, tier),
         membership_status = COALESCE(${props.membership_status || null}, membership_status),
         updated_at = NOW()
       WHERE id = ${user.id}`);
