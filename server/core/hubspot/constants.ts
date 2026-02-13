@@ -70,7 +70,7 @@ export const DB_BILLING_PROVIDER_TO_HUBSPOT: Record<string, string> = {
   'manual': 'manual',
   'comped': 'Comped',
   'none': 'None',
-  'family_addon': 'Family Addon',
+  'family_addon': 'stripe',
 };
 
 // Map app tier slugs to HubSpot membership_tier dropdown options

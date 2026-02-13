@@ -110,8 +110,14 @@ export interface SyncMemberToHubSpotInput {
   status?: string;
   billingProvider?: string;
   tier?: string;
-  memberSince?: Date | string; // Date when membership started (synced on new subscriptions)
-  createIfMissing?: boolean; // If true (default), creates HubSpot contact if not found
+  memberSince?: Date | string;
+  createIfMissing?: boolean;
+  stripeCustomerId?: string;
+  stripeCreatedDate?: Date | string;
+  stripeDelinquent?: boolean;
+  stripeDiscountId?: string;
+  stripePricingInterval?: string;
+  billingGroupRole?: string;
 }
 
 export interface SyncMemberToHubSpotResult {
@@ -122,6 +128,8 @@ export interface SyncMemberToHubSpotResult {
     billingProvider?: boolean;
     tier?: boolean;
     memberSince?: boolean;
+    stripeFields?: boolean;
+    billingGroupRole?: boolean;
   };
   error?: string;
 }
@@ -129,7 +137,7 @@ export interface SyncMemberToHubSpotResult {
 export async function syncMemberToHubSpot(
   input: SyncMemberToHubSpotInput
 ): Promise<SyncMemberToHubSpotResult> {
-  const { email, status, billingProvider, tier, memberSince, createIfMissing = true } = input;
+  const { email, status, billingProvider, tier, memberSince, createIfMissing = true, stripeCustomerId, stripeCreatedDate, stripeDelinquent, stripeDiscountId, stripePricingInterval, billingGroupRole } = input;
   
   if (isPlaceholderEmail(email)) {
     console.log(`[HubSpot Sync] Skipping sync for placeholder email: ${email}`);
@@ -148,7 +156,7 @@ export async function syncMemberToHubSpot(
             value: email.toLowerCase()
           }]
         }],
-        properties: ['email', 'membership_status', 'billing_provider', 'membership_tier'],
+        properties: ['email', 'membership_status', 'billing_provider', 'membership_tier', 'billing_group_role'],
         limit: 1
       })
     );
@@ -225,11 +233,36 @@ export async function syncMemberToHubSpot(
     }
     
     if (memberSince) {
-      // HubSpot date properties expect midnight UTC timestamp in milliseconds
       const date = memberSince instanceof Date ? memberSince : new Date(memberSince);
       const midnightUtc = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
       properties.membership_start_date = midnightUtc.getTime().toString();
       updated.memberSince = true;
+    }
+
+    if (input.stripeCustomerId) {
+      properties.stripe_customer_id = input.stripeCustomerId;
+    }
+    if (input.stripeCreatedDate) {
+      const date = input.stripeCreatedDate instanceof Date ? input.stripeCreatedDate : new Date(input.stripeCreatedDate);
+      const midnightUtc = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+      properties.stripe_created_date = midnightUtc.getTime().toString();
+    }
+    if (input.stripeDelinquent !== undefined) {
+      properties.stripe_delinquent = input.stripeDelinquent ? 'true' : 'false';
+    }
+    if (input.stripeDiscountId) {
+      properties.stripe_discount_id = input.stripeDiscountId;
+    }
+    if (input.stripePricingInterval) {
+      properties.stripe_pricing_interval_of_last_active_subscription = input.stripePricingInterval;
+    }
+    if (Object.keys(properties).some(k => k.startsWith('stripe_'))) {
+      updated.stripeFields = true;
+    }
+
+    if (input.billingGroupRole) {
+      properties.billing_group_role = input.billingGroupRole;
+      updated.billingGroupRole = true;
     }
     
     if (Object.keys(properties).length === 0) {
