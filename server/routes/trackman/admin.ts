@@ -5,7 +5,7 @@ import { db } from '../../db';
 import { sql } from 'drizzle-orm';
 import { sendPushNotification } from '../push';
 import { getGuestPassesRemaining } from '../guestPasses';
-import { getMemberTierByEmail, getTierLimits, getDailyBookedMinutes, getTotalDailyUsageMinutes } from '../../core/tierService';
+import { getMemberTierByEmail, getTierLimits } from '../../core/tierService';
 import { computeFeeBreakdown, applyFeeBreakdownToParticipants, recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { logFromRequest } from '../../core/auditLog';
 import { getStripeClient } from '../../core/stripe/client';
@@ -1452,11 +1452,125 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     const staffEmailsResult = await db.execute(sql`SELECT LOWER(email) as email FROM staff_users WHERE is_active = true`);
     const staffEmailSet = new Set(staffEmailsResult.rows.map(r => r.email));
     
-    const membersWithFees = await Promise.all(membersResult.rows.map(async (row) => {
+    const participantsArray: Array<{
+      userId?: string;
+      email?: string;
+      displayName: string;
+      participantType: 'owner' | 'member' | 'guest';
+    }> = [];
+    for (const row of membersResult.rows) {
+      if (row.user_email) {
+        participantsArray.push({
+          userId: row.user_email,
+          email: row.user_email,
+          displayName: row.first_name && row.last_name
+            ? `${row.first_name} ${row.last_name}`
+            : row.user_email,
+          participantType: row.is_primary ? 'owner' : 'member'
+        });
+      }
+    }
+    for (const row of guestsResult.rows) {
+      participantsArray.push({
+        email: row.guest_email || undefined,
+        displayName: row.guest_name || 'Guest',
+        participantType: 'guest'
+      });
+    }
+    if (participantsArray.length === 0 && ownerEmail) {
+      participantsArray.push({
+        userId: ownerEmail,
+        email: ownerEmail,
+        displayName: ownerName || ownerEmail,
+        participantType: 'owner'
+      });
+    }
+
+    const feeBreakdownResult = await computeFeeBreakdown(
+      sessionId
+        ? { sessionId, bookingId, declaredPlayerCount: expectedPlayerCount, source: 'preview', isConferenceRoom: bookingData.resource_type === 'conference_room', excludeSessionFromUsage: true }
+        : {
+            sessionDate: requestDate,
+            startTime: bookingData.start_time,
+            sessionDuration: durationMinutes,
+            declaredPlayerCount: expectedPlayerCount,
+            hostEmail: ownerEmail || '',
+            participants: participantsArray,
+            source: 'preview',
+            isConferenceRoom: bookingData.resource_type === 'conference_room',
+            bookingId
+          }
+    );
+
+    const ownerLineItems = feeBreakdownResult.participants.filter(li => li.participantType === 'owner');
+    const memberLineItems = feeBreakdownResult.participants.filter(li => li.participantType === 'member');
+    const guestLineItems = feeBreakdownResult.participants.filter(li => li.participantType === 'guest');
+
+    const lineItemEmailMap = new Map<string, typeof feeBreakdownResult.participants[0]>();
+    if (sessionId) {
+      const userIds = feeBreakdownResult.participants
+        .filter(li => li.userId && li.participantType !== 'guest')
+        .map(li => li.userId!);
+      if (userIds.length > 0) {
+        const emailLookup = await pool.query(
+          `SELECT id, LOWER(email) as email FROM users WHERE id = ANY($1::text[])`,
+          [userIds]
+        );
+        for (const r of emailLookup.rows) {
+          const li = feeBreakdownResult.participants.find(p => p.userId === r.id);
+          if (li) lineItemEmailMap.set(r.email, li);
+        }
+      }
+    } else {
+      for (const li of feeBreakdownResult.participants) {
+        if (li.userId) lineItemEmailMap.set(li.userId.toLowerCase(), li);
+      }
+    }
+
+    function findLineItemForMember(row: any): typeof feeBreakdownResult.participants[0] | undefined {
+      const email = (row.user_email || '').toLowerCase();
+      if (!email) return undefined;
+      const mapped = lineItemEmailMap.get(email);
+      if (mapped) return mapped;
+      if (row.is_primary && ownerLineItems.length > 0) return ownerLineItems[0];
+      return undefined;
+    }
+
+    function generateFeeNote(lineItem: typeof feeBreakdownResult.participants[0], membershipStatus: string | null, isPrimary: boolean): string {
+      const fee = lineItem.totalCents / 100;
+      const hasActiveMembership = membershipStatus && ['active', 'trialing', 'past_due'].includes(membershipStatus);
+
+      if (lineItem.isStaff) return 'Staff — included';
+
+      if (!hasActiveMembership) {
+        const statusLabel = membershipStatus || 'non-member';
+        return isPrimary
+          ? `${statusLabel} — $${fee} (no membership benefits)`
+          : `${statusLabel} — $${fee} charged to host`;
+      }
+
+      const dailyAllowance = lineItem.dailyAllowance || 0;
+      const isUnlimited = dailyAllowance >= 999;
+      const isSocialTier = lineItem.tierName?.toLowerCase() === 'social';
+
+      if (isUnlimited) return 'Included in membership';
+      if (isSocialTier) return fee > 0 ? `Social tier - $${fee} (${lineItem.minutesAllocated} min)` : 'Included';
+      if (lineItem.tierName) {
+        if (dailyAllowance > 0) return fee > 0 ? `${lineItem.tierName} - $${fee} (overage)` : 'Included in membership';
+        return `Pay-as-you-go - $${fee}`;
+      }
+      return `No tier assigned — $${fee}`;
+    }
+
+    const membersWithFees = membersResult.rows.map((row) => {
+      const membershipStatus = row.membership_status || null;
+      const hasActiveMembership = membershipStatus && ['active', 'trialing', 'past_due'].includes(membershipStatus);
+      const isStaffUser = row.user_email ? staffEmailSet.has(row.user_email.toLowerCase()) : false;
+
       let tier: string | null = null;
       let fee = 0;
       let feeNote = '';
-      let feeBreakdown: {
+      let feeBreakdownObj: {
         perPersonMins: number;
         dailyAllowance: number;
         usedToday: number;
@@ -1465,95 +1579,37 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
         isUnlimited: boolean;
         isSocialTier: boolean;
       } | null = null;
-      
-      const membershipStatus = row.membership_status || null;
-      const hasActiveMembership = membershipStatus && ['active', 'trialing', 'past_due'].includes(membershipStatus);
-      
+
       if (row.user_email) {
-        const isStaffMember = staffEmailSet.has(row.user_email.toLowerCase());
-        if (isStaffMember) {
-          tier = 'Staff';
-          fee = 0;
-          feeNote = 'Staff — included';
-          feeBreakdown = {
-            perPersonMins, dailyAllowance: 999, usedToday: 0,
-            overageMinutes: 0, fee: 0, isUnlimited: true, isSocialTier: false
+        const lineItem = findLineItemForMember(row);
+        if (lineItem) {
+          fee = lineItem.totalCents / 100;
+          tier = lineItem.isStaff ? 'Staff' : (lineItem.tierName || null);
+          feeNote = generateFeeNote(lineItem, membershipStatus, row.is_primary);
+          const dailyAllowance = lineItem.dailyAllowance || 0;
+          const overageMinutes = lineItem.overageCents > 0
+            ? Math.ceil((lineItem.overageCents / 100) / PRICING.OVERAGE_RATE_DOLLARS) * PRICING.OVERAGE_BLOCK_MINUTES
+            : 0;
+          feeBreakdownObj = {
+            perPersonMins: lineItem.minutesAllocated,
+            dailyAllowance,
+            usedToday: lineItem.usedMinutesToday || 0,
+            overageMinutes,
+            fee,
+            isUnlimited: lineItem.isStaff ? true : dailyAllowance >= 999,
+            isSocialTier: lineItem.tierName?.toLowerCase() === 'social'
           };
-        } else if (hasActiveMembership) {
-          tier = row.user_tier || await getMemberTierByEmail(row.user_email);
-          
-          if (tier) {
-            const tierLimits = await getTierLimits(tier);
-            const isSocialTier = tier.toLowerCase() === 'social';
-            const dailyAllowance = tierLimits.daily_sim_minutes || 0;
-            const isUnlimited = dailyAllowance >= 999 || tierLimits.unlimited_access;
-            
-            const usageData = await getTotalDailyUsageMinutes(row.user_email, requestDate, bookingId, bookingData.resource_type);
-            const usedToday = usageData.totalMinutes;
-            
-            let overageMinutes = 0;
-            
-            if (isUnlimited) {
-              fee = 0;
-              feeNote = 'Included in membership';
-              overageMinutes = 0;
-            } else if (isSocialTier) {
-              overageMinutes = perPersonMins;
-              const overageBlocks = Math.ceil(perPersonMins / 30);
-              fee = overageBlocks * PRICING.OVERAGE_RATE_DOLLARS;
-              feeNote = fee > 0 ? `Social tier - $${fee} (${perPersonMins} min)` : 'Included';
-            } else if (dailyAllowance > 0) {
-              overageMinutes = Math.max(0, (usedToday + perPersonMins) - dailyAllowance);
-              const overageBlocks = Math.ceil(overageMinutes / 30);
-              fee = overageBlocks * PRICING.OVERAGE_RATE_DOLLARS;
-              feeNote = fee > 0 ? `${tier} - $${fee} (overage)` : 'Included in membership';
-            } else {
-              overageMinutes = perPersonMins;
-              const overageBlocks = Math.ceil(perPersonMins / 30);
-              fee = overageBlocks * PRICING.OVERAGE_RATE_DOLLARS;
-              feeNote = `Pay-as-you-go - $${fee}`;
-            }
-            
-            feeBreakdown = {
-              perPersonMins,
-              dailyAllowance,
-              usedToday,
-              overageMinutes,
-              fee,
-              isUnlimited,
-              isSocialTier
-            };
-          } else {
-            const overageMinutes = perPersonMins;
-            const overageBlocks = Math.ceil(overageMinutes / 30);
-            fee = overageBlocks * PRICING.OVERAGE_RATE_DOLLARS;
-            feeNote = `No tier assigned — $${fee}`;
-            feeBreakdown = {
-              perPersonMins, dailyAllowance: 0, usedToday: 0,
-              overageMinutes, fee, isUnlimited: false, isSocialTier: false
-            };
-          }
         } else {
-          const statusLabel = membershipStatus || 'non-member';
-          const overageMinutes = perPersonMins;
-          const overageBlocks = Math.ceil(overageMinutes / 30);
-          fee = overageBlocks * PRICING.OVERAGE_RATE_DOLLARS;
-          feeNote = row.is_primary
-            ? `${statusLabel} — $${fee} (no membership benefits)`
-            : `${statusLabel} — $${fee} charged to host`;
-          feeBreakdown = {
-            perPersonMins, dailyAllowance: 0, usedToday: 0,
-            overageMinutes, fee, isUnlimited: false, isSocialTier: false
-          };
+          fee = PRICING.GUEST_FEE_DOLLARS;
+          feeNote = `Pending assignment - $${PRICING.GUEST_FEE_DOLLARS}`;
         }
       } else {
         fee = PRICING.GUEST_FEE_DOLLARS;
         feeNote = `Pending assignment - $${PRICING.GUEST_FEE_DOLLARS}`;
       }
-      
-      const isStaffUser = row.user_email ? staffEmailSet.has(row.user_email.toLowerCase()) : false;
+
       const isInactiveMember = !hasActiveMembership && !!row.user_email && !row.is_primary && !isStaffUser;
-      
+
       return {
         id: row.id,
         bookingId: row.booking_id,
@@ -1562,39 +1618,42 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
         isPrimary: row.is_primary,
         linkedAt: row.linked_at,
         linkedBy: row.linked_by,
-        memberName: row.first_name && row.last_name 
+        memberName: row.first_name && row.last_name
           ? `${row.first_name} ${row.last_name}`
           : row.user_email || 'Empty Slot',
         tier,
         fee,
         feeNote,
-        feeBreakdown,
+        feeBreakdown: feeBreakdownObj,
         membershipStatus,
         isInactiveMember: !!isInactiveMember,
         isStaff: isStaffUser,
         guestInfo: null as any
       };
-    }));
-    
-    let guestPassesAvailable = ownerGuestPassesRemaining;
-    let guestPassesUsedThisBooking = 0;
-    let guestPassesRemainingAfterBooking = ownerGuestPassesRemaining;
-    const guestsWithFees = guestsResult.rows.map(row => {
+    });
+
+    let guestPassesUsedThisBooking = feeBreakdownResult.totals.guestPassesUsed;
+    let guestPassesRemainingAfterBooking = ownerGuestPassesRemaining - guestPassesUsedThisBooking;
+    const guestsWithFees = guestsResult.rows.map((row, idx) => {
+      const lineItem = guestLineItems[idx];
       let fee: number;
       let feeNote: string;
       let usedGuestPass = false;
-      
-      if (guestPassesAvailable > 0) {
-        fee = 0;
-        feeNote = 'Guest Pass Used';
-        guestPassesAvailable--;
-        guestPassesUsedThisBooking++;
-        usedGuestPass = true;
+
+      if (lineItem) {
+        if (lineItem.guestPassUsed) {
+          fee = 0;
+          feeNote = 'Guest Pass Used';
+          usedGuestPass = true;
+        } else {
+          fee = lineItem.guestCents / 100;
+          feeNote = fee > 0 ? `No passes - $${fee} due` : 'No charge';
+        }
       } else {
         fee = PRICING.GUEST_FEE_DOLLARS;
         feeNote = `No passes - $${PRICING.GUEST_FEE_DOLLARS} due`;
       }
-      
+
       return {
         id: row.id,
         bookingId: row.booking_id,
