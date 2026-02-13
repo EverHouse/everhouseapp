@@ -16,13 +16,13 @@ export const Footer: React.FC<FooterProps> = ({ hideCta = false }) => (
      <div className="space-y-6 text-sm font-medium mb-10 flex flex-col items-center">
         <div className="relative flex flex-col items-center">
             <span className="material-symbols-outlined text-lg absolute -left-8 top-0.5 text-[#E7E7DC]/70">location_on</span>
-            <p className="text-[#E7E7DC]">2620 Park Ave, Tustin, CA 92782</p>
-            <p className="text-[#E7E7DC]/70 text-xs"></p>
+            <p className="text-[#E7E7DC]">15771 Red Hill Ave, Ste 500</p>
+            <p className="text-[#E7E7DC]/70 text-xs">Tustin, CA 92780</p>
         </div>
 
         <div className="relative flex items-center">
             <span className="material-symbols-outlined text-lg absolute -left-8 text-[#E7E7DC]/70">call</span>
-            <a href="tel:7143907500" className="hover:underline">(714) 390-7500</a>
+            <a href="tel:9495455855" className="hover:underline">(949) 545-5855</a>
         </div>
 
         <div className="relative flex flex-col items-center text-xs">

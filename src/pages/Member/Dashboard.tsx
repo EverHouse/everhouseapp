@@ -1127,7 +1127,7 @@ const Dashboard: React.FC = () => {
                         onClick: () => downloadICalFile({
                           title: `${item.title} - Ever Club`,
                           description: `Your ${item.resourceType === 'conference_room' ? 'conference room' : 'golf simulator'} booking at Ever Club`,
-                          location: 'Ever Club, 2620 Park Ave, Tustin, CA 92782',
+                          location: 'Ever Club, 15771 Red Hill Ave, Ste 500, Tustin, CA 92780',
                           startDate: item.rawDate,
                           startTime: startTime24,
                           endTime: endTime24

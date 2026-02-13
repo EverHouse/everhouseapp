@@ -449,7 +449,7 @@ async function initializeApp() {
       },
       '/contact': {
         title: 'Contact Us | Ever Members Club — Tustin, Orange County',
-        description: 'Get in touch with Ever Members Club at 2620 Park Ave, Tustin, CA 92782. Membership inquiries, private events, tours & general questions. Call (714) 390-7500.',
+        description: 'Get in touch with Ever Members Club at 15771 Red Hill Ave, Ste 500, Tustin, CA 92780. Membership inquiries, private events, tours & general questions. Call (949) 545-5855.',
       },
       '/tours': {
         title: 'Book a Private Tour | Ever Members Club — Indoor Golf & Social Club, OC',
@@ -483,27 +483,27 @@ async function initializeApp() {
       "alternateName": ["Ever Club", "Even House"],
       "description": "Orange County's premier private indoor golf & social club featuring Trackman simulators, premium coworking, wellness programs, and curated events.",
       "url": "https://everclub.app",
-      "telephone": "+17143907500",
+      "telephone": "+19495455855",
       "email": "info@joinever.club",
       "address": {
         "@type": "PostalAddress",
-        "streetAddress": "2620 Park Ave",
+        "streetAddress": "15771 Red Hill Ave, Ste 500",
         "addressLocality": "Tustin",
         "addressRegion": "CA",
-        "postalCode": "92782",
+        "postalCode": "92780",
         "addressCountry": "US"
       },
       "geo": {
         "@type": "GeoCoordinates",
-        "latitude": 33.7458,
-        "longitude": -117.8262
+        "latitude": 33.709,
+        "longitude": -117.8272
       },
       "areaServed": {
         "@type": "GeoCircle",
         "geoMidpoint": {
           "@type": "GeoCoordinates",
-          "latitude": 33.7458,
-          "longitude": -117.8262
+          "latitude": 33.709,
+          "longitude": -117.8272
         },
         "geoRadius": "30 mi"
       },
@@ -559,7 +559,7 @@ async function initializeApp() {
           "name": "Where is Ever Members Club located?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "We're located at 2620 Park Ave, Tustin, CA 92782, in the heart of Orange County."
+            "text": "We're located at 15771 Red Hill Ave, Ste 500, Tustin, CA 92780, in the heart of Orange County."
           }
         },
         {
@@ -604,16 +604,16 @@ async function initializeApp() {
       "url": "https://everclub.app/tours",
       "address": {
         "@type": "PostalAddress",
-        "streetAddress": "2620 Park Ave",
+        "streetAddress": "15771 Red Hill Ave, Ste 500",
         "addressLocality": "Tustin",
         "addressRegion": "CA",
-        "postalCode": "92782",
+        "postalCode": "92780",
         "addressCountry": "US"
       },
       "geo": {
         "@type": "GeoCoordinates",
-        "latitude": 33.7458,
-        "longitude": -117.8262
+        "latitude": 33.709,
+        "longitude": -117.8272
       },
       "touristType": ["Golf Enthusiasts", "Professionals", "Social Groups"]
     };
@@ -625,21 +625,21 @@ async function initializeApp() {
       "url": "https://everclub.app/private-hire",
       "address": {
         "@type": "PostalAddress",
-        "streetAddress": "2620 Park Ave",
+        "streetAddress": "15771 Red Hill Ave, Ste 500",
         "addressLocality": "Tustin",
         "addressRegion": "CA",
-        "postalCode": "92782",
+        "postalCode": "92780",
         "addressCountry": "US"
       },
       "geo": {
         "@type": "GeoCoordinates",
-        "latitude": 33.7458,
-        "longitude": -117.8262
+        "latitude": 33.709,
+        "longitude": -117.8272
       },
       "maximumAttendeeCapacity": 100
     };
 
-    const GEO_META_TAGS = `<meta name="geo.region" content="US-CA" />\n<meta name="geo.placename" content="Tustin, California" />\n<meta name="geo.position" content="33.7458;-117.8262" />\n<meta name="ICBM" content="33.7458, -117.8262" />`;
+    const GEO_META_TAGS = `<meta name="geo.region" content="US-CA" />\n<meta name="geo.placename" content="Tustin, California" />\n<meta name="geo.position" content="33.709;-117.8272" />\n<meta name="ICBM" content="33.709, -117.8272" />`;
 
     function getBreadcrumbs(routePath: string): object {
       const items: { name: string; item: string }[] = [
@@ -695,7 +695,7 @@ async function initializeApp() {
           ],
           "contactPoint": {
             "@type": "ContactPoint",
-            "telephone": "+17143907500",
+            "telephone": "+19495455855",
             "contactType": "customer service",
             "email": "info@joinever.club"
           }
