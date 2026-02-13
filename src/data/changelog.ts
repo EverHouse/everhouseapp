@@ -13,6 +13,22 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.53.0",
+    date: "2026-02-13",
+    title: "Admin Monitoring Dashboard — See Everything Running Under the Hood",
+    isMajor: true,
+    changes: [
+      "New: Email Templates page — preview all 18 email templates with sample data right from the admin sidebar, so you can see exactly what members receive",
+      "New: Scheduled Tasks Monitor — see the health of all 25+ background jobs at a glance with green/yellow/red status lights, last run time, and run counts",
+      "New: Webhook Event Viewer — browse incoming webhook events with type and status filtering, and click to expand full event details",
+      "New: Job Queue Monitor — see pending, processing, completed, and failed background jobs with error details for failed ones",
+      "New: HubSpot Sync Queue Status — monitor HubSpot sync queue depth, failed items, and average processing time",
+      "New: System Alert History — timeline of all system alerts and notifications with severity colors and date range filtering",
+      "Fixed: 10 scheduler error handlers that would crash instead of logging errors correctly",
+      "Fixed: Security hardening on monitoring queries to prevent injection attacks",
+    ],
+  },
+  {
     version: "7.52.0",
     date: "2026-02-12",
     title: "Data Tools: Full Audit & Optimization",
