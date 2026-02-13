@@ -2005,7 +2005,8 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
                 status: 'active',
                 billingProvider: 'stripe',
                 tier: tierNameMeta,
-                memberSince: new Date()
+                memberSince: new Date(),
+                billingGroupRole: 'Primary',
               });
             } catch (hubspotError) {
               console.error('[Stripe Webhook] HubSpot sync failed for activation link checkout:', hubspotError);
@@ -2053,7 +2054,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
         // Sync to HubSpot for existing user update
         try {
           const { syncMemberToHubSpot } = await import('../hubspot/stages');
-          await syncMemberToHubSpot({ email: resolved.primaryEmail, status: 'active', billingProvider: 'stripe', memberSince: new Date() });
+          await syncMemberToHubSpot({ email: resolved.primaryEmail, status: 'active', billingProvider: 'stripe', memberSince: new Date(), billingGroupRole: 'Primary' });
           console.log(`[Stripe Webhook] Synced existing user ${resolved.primaryEmail} to HubSpot`);
         } catch (hubspotError) {
           console.error('[Stripe Webhook] HubSpot sync failed for existing user:', hubspotError);
@@ -2080,7 +2081,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
           // Sync to HubSpot for existing user update
           try {
             const { syncMemberToHubSpot } = await import('../hubspot/stages');
-            await syncMemberToHubSpot({ email, status: 'active', billingProvider: 'stripe', memberSince: new Date() });
+            await syncMemberToHubSpot({ email, status: 'active', billingProvider: 'stripe', memberSince: new Date(), billingGroupRole: 'Primary' });
             console.log(`[Stripe Webhook] Synced existing user ${email} to HubSpot`);
           } catch (hubspotError) {
             console.error('[Stripe Webhook] HubSpot sync failed for existing user:', hubspotError);
@@ -2136,7 +2137,8 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
           status: 'active',
           billingProvider: 'stripe',
           tier: tierName || undefined,
-          memberSince: new Date()
+          memberSince: new Date(),
+          billingGroupRole: 'Primary',
         });
         console.log(`[Stripe Webhook] Synced ${email} to HubSpot: status=active, tier=${tierName}, billing=stripe, memberSince=now`);
       } catch (hubspotError) {
@@ -2715,7 +2717,8 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
                           status: subscription.status,
                           billingProvider: 'stripe',
                           tier: tierName,
-                          memberSince: new Date()
+                          memberSince: new Date(),
+                          billingGroupRole: 'Primary',
                         });
                         console.log(`[Stripe Webhook] Synced ${email} to HubSpot: tier=${tierName}, status=${subscription.status}, billing=stripe, memberSince=now`);
                       } catch (hubspotError) {
@@ -3020,7 +3023,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
       // Sync status change to HubSpot
       try {
         const { syncMemberToHubSpot } = await import('../hubspot/stages');
-        await syncMemberToHubSpot({ email, status: 'active', billingProvider: 'stripe' });
+        await syncMemberToHubSpot({ email, status: 'active', billingProvider: 'stripe', billingGroupRole: 'Primary' });
         console.log(`[Stripe Webhook] Synced ${email} status=active to HubSpot`);
       } catch (hubspotError) {
         console.error('[Stripe Webhook] HubSpot sync failed for status active:', hubspotError);
@@ -3113,7 +3116,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
       // Sync past_due status to HubSpot
       try {
         const { syncMemberToHubSpot } = await import('../hubspot/stages');
-        await syncMemberToHubSpot({ email, status: 'past_due', billingProvider: 'stripe' });
+        await syncMemberToHubSpot({ email, status: 'past_due', billingProvider: 'stripe', billingGroupRole: 'Primary' });
         console.log(`[Stripe Webhook] Synced ${email} status=past_due to HubSpot`);
       } catch (hubspotError) {
         console.error('[Stripe Webhook] HubSpot sync failed for status past_due:', hubspotError);

@@ -781,8 +781,14 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
     
     if (updatedUser) {
       try {
-        const { syncMemberToHubSpot } = await import('../../core/hubspot');
-        await syncMemberToHubSpot(updatedUser);
+        const { syncMemberToHubSpot } = await import('../../core/hubspot/stages');
+        await syncMemberToHubSpot({
+          email: updatedUser.email,
+          status: updatedUser.membershipStatus || 'active',
+          tier: updatedUser.tier || undefined,
+          billingProvider: updatedUser.billingProvider || undefined,
+          billingGroupRole: 'Primary',
+        });
       } catch (hubspotError) {
         console.error('[Terminal] HubSpot sync error (non-blocking):', hubspotError);
       }
