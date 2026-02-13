@@ -33,6 +33,9 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: EventsTab dark mode coverage expanded",
       "Fixed: Reduced-motion preference now properly handles all animated elements — no more invisible content",
       "Fixed: Theme transition speed improved from 0.4s to 0.3s for snappier feel",
+      "Fixed: Splash screen background changed from green to cream/bone — prevents Safari mobile toolbar from tinting green",
+      "Fixed: PWA install splash screen background updated to match light theme",
+      "Fixed: Dark mode splash screen uses proper dark olive background",
     ],
   },
   {

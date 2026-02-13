@@ -52,13 +52,16 @@
       #app-splash {
         position: fixed;
         inset: 0;
-        background-color: #293515;
+        background-color: #F2F2EC;
         z-index: 99999;
         display: flex;
         align-items: center;
         justify-content: center;
         transition: opacity 0.5s ease-out;
         pointer-events: none;
+      }
+      html.dark #app-splash {
+        background-color: #0f120a;
       }
     </style>
     <!-- Start of HubSpot Embed Code (deferred loader) -->
