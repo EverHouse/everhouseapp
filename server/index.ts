@@ -421,7 +421,7 @@ async function initializeApp() {
     const SEO_META: Record<string, { title: string; description: string }> = {
       '/': {
         title: 'Ever Members Club | Indoor Golf & Social Club in Tustin, Orange County',
-        description: 'Orange County\'s premier private indoor golf & social club. Trackman golf simulators, premium coworking, café, wellness & curated events. Visit us in Tustin — book a private tour today.',
+        description: 'Orange County\'s premier private indoor golf & social club, formerly Even House. Trackman golf simulators, premium coworking, café, wellness & curated events. Visit us in Tustin — book a private tour today.',
       },
       '/membership': {
         title: 'Membership Plans & Pricing | Ever Members Club — Tustin, OC',
@@ -682,6 +682,24 @@ async function initializeApp() {
 
     function getJsonLdScripts(routePath: string): string {
       const graphItems: object[] = [
+        {
+          "@type": "Organization",
+          "@id": "https://everclub.app/#organization",
+          "name": "Ever Members Club",
+          "alternateName": ["Ever Club", "Even House"],
+          "url": "https://everclub.app",
+          "logo": "https://everclub.app/images/everclub-logo-dark.webp",
+          "sameAs": [
+            "https://www.instagram.com/everhouse.app/",
+            "https://evenhouse.club"
+          ],
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "telephone": "+17143907500",
+            "contactType": "customer service",
+            "email": "info@joinever.club"
+          }
+        },
         {
           "@type": "WebSite",
           "@id": "https://everclub.app/#website",

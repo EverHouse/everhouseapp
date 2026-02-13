@@ -83,8 +83,9 @@ const Contact: React.FC = () => {
       </div>
 
       <section className="px-4 mb-8 space-y-3 animate-content-enter-delay-1">
-           <ContactCard icon="location_on" title="VISIT US" value="15771 Red Hill Ave, Ste 500" />
-           <ContactCard icon="call" title="CALL US" value="(949) 545-5855" href="tel:9495455855" />
+           <ContactCard icon="location_on" title="VISIT US" value="2620 Park Ave, Tustin, CA 92782" />
+           <p className="text-xs text-primary/40 dark:text-white/30 mt-1">Formerly Even House (evenhouse.club)</p>
+           <ContactCard icon="call" title="CALL US" value="(714) 390-7500" href="tel:7143907500" />
            <ContactCard icon="mail" title="EMAIL US" value="info@joinever.club" href="mailto:info@joinever.club" />
            <div 
              className="group flex items-center justify-between bg-zinc-700/50 p-4 rounded-2xl border border-black/5 dark:border-white/10 shadow-sm dark:shadow-black/20 opacity-60 cursor-default"
@@ -228,7 +229,7 @@ const Contact: React.FC = () => {
       <section className="px-4 mb-12">
         <div className="w-full h-64 rounded-[2rem] overflow-hidden relative border border-black/5 dark:border-white/10">
             <iframe
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3318.7!2d-117.8272!3d33.709!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x80dcdfe2e5f3b3f5%3A0x0!2s15771%20Red%20Hill%20Ave%20%23500%2C%20Tustin%2C%20CA%2092780!5e0!3m2!1sen!2sus!4v1702850000000!5m2!1sen!2sus"
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3318.5!2d-117.8282!3d33.7458!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2s2620%20Park%20Ave%2C%20Tustin%2C%20CA%2092782!5e0!3m2!1sen!2sus!4v1702850000000!5m2!1sen!2sus"
               className="w-full h-full border-0"
               title="Ever Club Location"
               loading="lazy"

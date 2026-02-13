@@ -40,9 +40,9 @@ const PrivateHire: React.FC = () => {
          >
            <img 
              src="/images/venue-wide-optimized.webp" 
-             alt="Ever Club Event Space" 
+             alt="Private event venue with Trackman golf simulators at Ever Members Club in Orange County" 
              className="absolute inset-0 w-full h-[120%] object-cover object-[center_35%] will-change-transform animate-hero-bg"
-             loading="eager"
+             loading="lazy"
              style={{ 
                transform: `translateY(${parallaxOffset}px) scale(1.05)`,
                opacity: parallaxOpacity

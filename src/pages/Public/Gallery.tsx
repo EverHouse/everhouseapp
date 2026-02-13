@@ -215,7 +215,7 @@ const GalleryItem: React.FC<GalleryItemProps> = React.memo(({ img, index, onItem
       <img 
         src={img} 
         className={`w-full h-auto object-cover transform group-hover:scale-105 transition-all duration-700 ease-out ${loaded ? 'opacity-100' : 'opacity-0 absolute top-0 left-0'}`}
-        alt="Gallery"
+        alt="Inside Ever Members Club — indoor golf and social club gallery in Tustin, OC"
         loading="lazy"
         decoding="async"
         onLoad={() => setLoaded(true)}
@@ -311,6 +311,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ images, currentIndex, onClose
         <img
           src={images[currentIndex]}
           alt="Gallery full view"
+          loading="lazy"
           className="max-w-full max-h-[80vh] object-contain rounded-2xl"
         />
       </div>

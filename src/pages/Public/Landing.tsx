@@ -82,7 +82,7 @@ const Landing: React.FC = () => {
     <AnimatedPage>
       <SEO
         title="Ever Members Club | Indoor Golf & Social Club in Tustin, Orange County"
-        description="Orange County's premier private indoor golf & social club. Trackman golf simulators, premium coworking, café, wellness & curated events. Visit us in Tustin — book a private tour today."
+        description="Orange County's premier private indoor golf & social club, formerly Even House. Trackman golf simulators, premium coworking, café, wellness & curated events. Visit us in Tustin — book a private tour today."
         url="/"
         image="/images/hero-lounge-optimized.webp"
       />
@@ -110,7 +110,7 @@ const Landing: React.FC = () => {
         >
           <img 
             src="/images/hero-lounge-optimized.webp" 
-            alt="Ever Club Lounge" 
+            alt="Ever Members Club indoor lounge and social space in Tustin, Orange County" 
             className="absolute inset-0 w-full h-[120%] object-cover object-[center_35%] will-change-transform animate-hero-bg"
             loading="eager"
             fetchPriority="high"
@@ -132,7 +132,7 @@ const Landing: React.FC = () => {
             Your Office. <br/> Your Course. <br/> Your Club.
           </h1>
           <p className="text-sm sm:text-base text-white/80 mb-8 sm:mb-10 max-w-sm tracking-wide animate-hero-tagline">
-            Orange County's private club for professionals who work, play, and connect — all under one roof.
+            Formerly Even House — Orange County's private club for professionals who work, play, and connect — all under one roof.
           </p>
           <div className="flex flex-col gap-3 w-full max-w-xs animate-hero-cta">
              <Link to="/tour" className="w-full py-4 rounded-2xl bg-white text-primary font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-white/90 transition-all text-center">

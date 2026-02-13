@@ -150,7 +150,7 @@ const PublicCafe: React.FC = () => {
                       <div className="flex gap-4 flex-1 items-center">
                         <div className="w-14 h-14 flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden relative bg-[#EAEBE6] dark:bg-white/5 text-primary/40 dark:text-white/40">
                           {item.image ? (
-                            <img src={item.image} alt={item.name} className="w-full h-full object-cover absolute inset-0 opacity-80" />
+                            <img src={item.image} alt={item.name} loading="lazy" className="w-full h-full object-cover absolute inset-0 opacity-80" />
                           ) : (
                             <span className="material-symbols-outlined text-2xl">{item.icon || 'restaurant'}</span>
                           )}
