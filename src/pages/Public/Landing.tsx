@@ -202,7 +202,7 @@ const Landing: React.FC = () => {
           title="Trackman Golf Simulators"
           description="Four state-of-the-art Trackman 4 bays for year-round play. Practice your swing, play world-class courses, or compete with friends — rain or shine. No tee time needed."
           ctaLabel="Get a Day Pass"
-          ctaLink="/checkout"
+          ctaLink="/checkout?type=day-pass-golf-sim"
           reversed={true}
         />
 

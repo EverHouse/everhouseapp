@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
 import Input from '../../components/Input';
 import EmptyState from '../../components/EmptyState';
@@ -18,6 +18,8 @@ interface DayPassTier {
 
 const BuyDayPass: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const filterType = searchParams.get('type');
   const { startNavigation } = useNavigationLoading();
   const { setPageReady } = usePageReady();
   const [tiers, setTiers] = useState<DayPassTier[]>([]);
@@ -51,7 +53,10 @@ const BuyDayPass: React.FC = () => {
           stripePriceId: tier.stripe_price_id,
         }));
       
-      setTiers(dayPasses);
+      const filtered = filterType 
+        ? dayPasses.filter((t: DayPassTier) => t.slug === filterType || t.slug.includes(filterType)) 
+        : dayPasses;
+      setTiers(filtered.length > 0 ? filtered : dayPasses);
       setPageReady(true);
     } catch (err) {
       setError('Unable to load day passes. Please try again.');
