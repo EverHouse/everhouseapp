@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Footer } from '../../components/Footer';
 import { MenuItemSkeleton, SkeletonList } from '../../components/skeletons';
@@ -180,6 +180,20 @@ const PublicCafe: React.FC = () => {
           ))
         )}
       </div>
+
+      <section className="px-6 py-10 text-center">
+        <p className="text-primary/60 dark:text-white/60 text-sm mb-2">Our cafe is available to members and day pass holders.</p>
+        <div className="flex items-center justify-center gap-4">
+          <Link to="/tour" className="text-sm font-semibold text-primary dark:text-white hover:opacity-80 transition-opacity flex items-center gap-1">
+            Book a Tour
+            <span className="material-symbols-outlined text-lg">arrow_forward</span>
+          </Link>
+          <Link to="/checkout" className="text-sm font-semibold text-primary dark:text-white hover:opacity-80 transition-opacity flex items-center gap-1">
+            Get a Day Pass
+            <span className="material-symbols-outlined text-lg">arrow_forward</span>
+          </Link>
+        </div>
+      </section>
 
       <Footer />
     </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
 import { BookingCardSkeleton, SkeletonList } from '../../components/skeletons';
 import BackToTop from '../../components/BackToTop';
@@ -336,6 +336,13 @@ const WhatsOn: React.FC = () => {
             Explore Membership
           </button>
         </div>
+      </section>
+
+      <section className="px-6 py-10 text-center">
+        <p className="text-primary/60 dark:text-white/60 text-sm mb-4">Want to attend? Membership gives you access to all events and classes.</p>
+        <Link to="/tour" className="inline-block px-8 py-4 bg-primary text-white rounded-2xl font-bold text-sm tracking-widest uppercase hover:bg-primary/90 transition-all duration-300 active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)]">
+          Book a Tour
+        </Link>
       </section>
 
       <Footer />

@@ -58,15 +58,18 @@ const PrivateHire: React.FC = () => {
            <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] mb-4 text-white text-shadow-sm font-serif animate-hero-headline">
              Curated spaces for <br/> unforgettable moments.
            </h1>
-           <p className="text-sm sm:text-base text-white/80 mb-8 sm:mb-10 max-w-md tracking-wide leading-relaxed animate-hero-tagline">
+           <p className="text-sm sm:text-base text-white/80 mb-4 sm:mb-5 max-w-md tracking-wide leading-relaxed animate-hero-tagline">
              From intimate dinners to grand receptions, discover the perfect setting for your next event at our Tustin location. Our team handles every detail so you can focus on your guests.
+           </p>
+           <p className="text-xs text-white/50 uppercase tracking-[0.2em] mb-8 sm:mb-10 animate-hero-tagline font-light">
+             Private events for 10 to 600+ guests
            </p>
            <div className="flex flex-col gap-3 w-full max-w-xs animate-hero-cta">
              <Link 
                to="/private-hire/inquire"
                className="w-full py-4 rounded-2xl bg-white/30 backdrop-blur-xl text-white font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-white/40 transition-all text-center border border-white/40"
              >
-               Submit Inquiry
+               Plan Your Event
              </Link>
            </div>
          </div>

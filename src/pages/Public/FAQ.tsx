@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
 import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
 import EmptyState from '../../components/EmptyState';
@@ -13,6 +14,7 @@ interface FaqItem {
 }
 
 const FALLBACK_FAQS: FaqItem[] = [
+  { id: 0, question: "Is Ever Club just a simulator room?", answer: "Not at all. Golf is the centerpiece, but the club is the product. Ever Club is a private social and professional space — the Trackman simulators are one part of a much larger experience that includes a premium workspace, a chef-driven cafe, curated events, and a community of like-minded professionals. Think of it as your office, your course, and your club — all under one roof.", category: "General" },
   { id: 1, question: "What is included in the membership?", answer: "Membership includes access to our lounge areas, coworking spaces, and the onsite cafe. Core and Premium memberships also include monthly hours for our TrackMan golf simulators and conference room bookings.", category: "Membership" },
   { id: 2, question: "Can I bring guests?", answer: "Yes, members are welcome to bring guests. Social and Core members have a daily guest limit, while Premium members enjoy enhanced guest privileges. Guests must be accompanied by a member at all times.", category: "Membership" },
   { id: 3, question: "How do I book a simulator?", answer: "Members can book simulator bays directly through the Ever Club app or member portal. Reservations can be made up to 14 days in advance depending on your membership tier.", category: "Booking" },

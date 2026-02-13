@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
 import EmptyState from '../../components/EmptyState';
 import { usePageReady } from '../../contexts/PageReadyContext';
@@ -145,6 +146,13 @@ const Gallery: React.FC = () => {
             </>
           )}
         </div>
+
+        <section className="px-6 py-10 text-center bg-bone dark:bg-[#0f120a]">
+          <p className="text-primary/60 dark:text-white/60 text-sm mb-4">Like what you see?</p>
+          <Link to="/tour" className="inline-block px-8 py-4 bg-primary text-white rounded-2xl font-bold text-sm tracking-widest uppercase hover:bg-primary/90 transition-all duration-300 active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)]">
+            Book Your Private Tour
+          </Link>
+        </section>
 
         <Footer />
       </div>

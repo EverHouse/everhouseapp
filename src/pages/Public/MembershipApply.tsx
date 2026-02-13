@@ -55,6 +55,7 @@ const MembershipApply: React.FC = () => {
     if (!formData.firstname.trim()) errors.firstname = 'First name is required';
     if (!formData.lastname.trim()) errors.lastname = 'Last name is required';
     if (!formData.email.trim()) errors.email = 'Email is required';
+    if (!formData.phone.trim()) errors.phone = 'Phone number is required';
     return errors;
   };
 
@@ -164,7 +165,7 @@ const MembershipApply: React.FC = () => {
               Apply for Membership
             </h1>
             <p className="text-primary/60 dark:text-white/60 text-sm md:text-base">
-              Join the Ever Members Club community and discover a new way to connect, play, and unwind.
+              Tell us a little about yourself. We'll reach out within 24 hours to schedule your private tour.
             </p>
           </div>
 
@@ -174,8 +175,11 @@ const MembershipApply: React.FC = () => {
                 <span className="material-symbols-outlined text-4xl text-green-600 dark:text-green-400">check_circle</span>
               </div>
               <h2 className="text-2xl font-bold text-primary dark:text-white mb-3">Thank You!</h2>
-              <p className="text-primary/70 dark:text-white/70 mb-8 max-w-sm mx-auto">
-                We've received your membership application and will be in touch soon to discuss next steps.
+              <p className="text-primary/70 dark:text-white/70 mb-4 max-w-sm mx-auto">
+                We've received your membership application. Our team will reach out within 24 hours to schedule your private tour.
+              </p>
+              <p className="text-primary/50 dark:text-white/50 text-sm mb-8 max-w-sm mx-auto">
+                In the meantime, <Link to="/membership" className="underline hover:text-primary dark:hover:text-white transition-colors">explore our membership tiers</Link>.
               </p>
               <Link 
                 to="/membership"
@@ -273,7 +277,7 @@ const MembershipApply: React.FC = () => {
 
                     <div>
                       <label htmlFor="apply-phone" className="block text-sm font-semibold text-primary dark:text-white mb-2">
-                        Phone Number <span className="text-primary/40 dark:text-white/40 text-xs font-normal">(optional)</span>
+                        Phone Number <span className="text-red-500 dark:text-red-400">*</span>
                       </label>
                       <input
                         id="apply-phone"
@@ -398,6 +402,7 @@ const MembershipApply: React.FC = () => {
                         )}
                       </button>
                     </div>
+                    <p className="text-xs text-primary/40 dark:text-white/40 text-center mt-3 font-light">Your information is kept private and never shared.</p>
                   </div>
                 )}
               </form>

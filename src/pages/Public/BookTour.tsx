@@ -97,6 +97,7 @@ const BookTour: React.FC = () => {
     if (!formData.lastName.trim()) errors.lastName = 'Last name is required';
     if (!formData.email.trim()) errors.email = 'Email is required';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = 'Please enter a valid email';
+    if (!formData.phone.trim()) errors.phone = 'Phone number is required';
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -160,7 +161,7 @@ const BookTour: React.FC = () => {
     <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#0f120a]">
       <SEO
         title="Book a Tour | Ever Club"
-        description="Schedule a private tour of Ever Club — Orange County's premier indoor golf and social club."
+        description="Book a private 30-minute tour of Ever Club. Experience Trackman simulators, premium workspaces, and a curated social club in Orange County."
         url="/tour"
       />
       <div
@@ -183,11 +184,28 @@ const BookTour: React.FC = () => {
         <div className="max-w-xl mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-3xl md:text-4xl font-serif font-light text-primary dark:text-white mb-3">
-              Book a Tour
+              Book Your Private Tour
             </h1>
             <p className="text-primary/60 dark:text-white/60 text-sm md:text-base">
-              See our golf simulators, lounge, and wellness spaces in person. Pick a time that works for you.
+              Experience the club firsthand. Meet the team, explore the space, and see if Ever Club is the right fit for you.
             </p>
+            <p className="text-primary/40 dark:text-white/40 text-xs font-medium mt-2">
+              Join 200+ members who started with a tour.
+            </p>
+            <div className="flex items-center justify-center gap-6 text-primary/50 dark:text-white/50 text-xs mt-4 mb-2">
+              <span className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm">schedule</span>
+                30 minutes
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm">person</span>
+                Private & guided
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm">check_circle</span>
+                No commitment
+              </span>
+            </div>
           </div>
 
           {step === 3 && bookingResult ? (
@@ -215,6 +233,19 @@ const BookTour: React.FC = () => {
                   <span className="material-symbols-outlined text-primary/60 dark:text-white/60">location_on</span>
                   <span className="text-primary dark:text-white font-medium">3625 W MacArthur Blvd, Santa Ana, CA 92704</span>
                 </div>
+              </div>
+
+              <div className="border-t border-primary/10 dark:border-white/10 pt-6 mt-2">
+                <p className="text-sm text-primary/60 dark:text-white/60 mb-4">
+                  Ready to learn more about membership?
+                </p>
+                <Link
+                  to="/membership"
+                  className="text-sm font-semibold text-primary dark:text-white hover:opacity-80 transition-opacity flex items-center justify-center gap-1"
+                >
+                  Explore Membership
+                  <span className="material-symbols-outlined text-lg">arrow_forward</span>
+                </Link>
               </div>
 
               <Link
@@ -313,15 +344,26 @@ const BookTour: React.FC = () => {
                   </div>
 
                   <div>
-                    <label htmlFor="tour-phone" className="block text-sm font-semibold text-primary dark:text-white mb-2">Phone</label>
+                    <label htmlFor="tour-phone" className="block text-sm font-semibold text-primary dark:text-white mb-2">
+                      Phone <span className="text-red-500 dark:text-red-400">*</span>
+                    </label>
                     <input
                       id="tour-phone"
                       type="tel"
                       value={formData.phone}
-                      onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                      onChange={(e) => {
+                        setFormData(prev => ({ ...prev, phone: e.target.value }));
+                        if (fieldErrors.phone) setFieldErrors(prev => ({ ...prev, phone: '' }));
+                      }}
                       placeholder="(949) 555-0100"
                       className={getInputClass('phone')}
                     />
+                    {fieldErrors.phone && (
+                      <p className="text-sm text-red-500 dark:text-red-400 mt-1 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-sm">error</span>
+                        {fieldErrors.phone}
+                      </p>
+                    )}
                   </div>
 
                   <button

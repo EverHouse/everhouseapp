@@ -126,9 +126,9 @@ const MembershipOverview: React.FC = () => {
     <div className="px-4 pt-4 pb-0 flex flex-col gap-8 bg-bone dark:bg-[#0f120a] min-h-screen overflow-x-hidden">
       <div className="text-center px-2 animate-content-enter">
         <p className="text-primary/40 dark:text-white/40 text-[10px] font-bold uppercase tracking-[0.3em] mb-2">Est. 2025</p>
-        <h1 className="text-3xl font-medium tracking-tight text-primary dark:text-white mb-3">Membership Overview</h1>
+        <h1 className="text-3xl font-medium tracking-tight text-primary dark:text-white mb-3">Your Office. Your Course. Your Club.</h1>
         <p className="text-primary/70 dark:text-white/70 text-base font-light leading-relaxed max-w-[320px] mx-auto">
-          A space for connection and growth. Select the membership that fits your lifestyle.
+          Select the membership that fits how you work, play, and connect.
         </p>
       </div>
 
@@ -136,6 +136,12 @@ const MembershipOverview: React.FC = () => {
         Compare full feature table
         <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
       </Link>
+
+      <div className="text-center py-4 animate-content-enter-delay-1">
+        <p className="text-sm text-primary/70 dark:text-white/70 font-light">
+          Join <span className="font-semibold text-primary dark:text-white">200+ professionals</span> who chose Ever Club over country clubs, home simulators, and co-working spaces.
+        </p>
+      </div>
 
       <div className="flex flex-col gap-5 animate-content-enter-delay-2">
         {tiers.map((tier) => {
@@ -200,6 +206,15 @@ const MembershipOverview: React.FC = () => {
           }
         })}
       </div>
+
+      <div className="text-center py-6 px-4 animate-content-enter-delay-3">
+        <p className="text-xs text-primary/50 dark:text-white/50 uppercase tracking-[0.15em] font-medium mb-1">
+          For perspective
+        </p>
+        <p className="text-sm text-primary/70 dark:text-white/70 font-light max-w-md mx-auto leading-relaxed">
+          Traditional country club initiation fees start at $20,000+. A home simulator build-out runs $15,000–$25,000. Ever Club gives you Trackman technology, a premium workspace, and a curated community — starting at a fraction of the cost.
+        </p>
+      </div>
       
       <div className="bg-white/40 dark:bg-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/60 dark:border-white/10 shadow-sm dark:shadow-black/20 animate-content-enter-delay-3">
         <div className="text-center mb-8">
@@ -253,8 +268,11 @@ const MembershipOverview: React.FC = () => {
             onClick={() => navigate('/membership/apply')}
             className="px-8 py-4 rounded-2xl bg-primary text-white font-bold text-sm tracking-widest uppercase hover:bg-primary/90 transition-all duration-300 active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)]"
           >
-            Start Your Membership
+            Apply Now — Limited Membership
           </button>
+          <p className="text-xs text-primary/40 dark:text-white/40 mt-3 font-light">
+            We cap membership to ensure availability. Once a tier fills, the waitlist opens.
+          </p>
         </div>
       </div>
 
@@ -294,7 +312,7 @@ const MembershipOverview: React.FC = () => {
             to="/checkout"
             className="w-full mt-4 py-3 text-sm font-semibold text-primary dark:text-white border-t border-primary/5 dark:border-white/10 hover:bg-primary/5 dark:hover:bg-white/5 transition-colors rounded-b-xl tracking-wide uppercase block text-center"
         >
-           Buy a Day Pass
+           Experience the Club
         </Link>
       </div>
 

@@ -79,7 +79,6 @@ const PrivateHireInquire: React.FC = () => {
     if (!formData.lastname.trim()) errors.lastname = 'Last name is required';
     if (!formData.email.trim()) errors.email = 'Email is required';
     if (!formData.phone.trim()) errors.phone = 'Phone number is required';
-    if (!formData.consent) errors.consent = 'You must agree to receive communications';
     return errors;
   };
 
@@ -108,6 +107,13 @@ const PrivateHireInquire: React.FC = () => {
     setLoading(true);
     setError('');
     triggerHaptic('medium');
+
+    if (!formData.consent) {
+      setFieldErrors({ consent: 'You must agree to receive communications' });
+      setError('Please agree to receive communications before submitting.');
+      setLoading(false);
+      return;
+    }
 
     try {
       const servicesText = formData.services
@@ -328,38 +334,6 @@ const PrivateHireInquire: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="pt-4 border-t border-primary/10 dark:border-white/10">
-                      <p className="text-xs text-primary/60 dark:text-white/60 mb-4 leading-relaxed">
-                        Ever Club is committed to protecting and respecting your privacy. We use your information to administer your account and to provide the products, services, and updates you request from us. We also contact you with information about membership, events, promotions, operational updates, and other content that may be relevant to you. If you consent to receiving communications from us, please indicate your preferences below.
-                      </p>
-                      <label className={`flex items-start gap-3 cursor-pointer group p-3 rounded-xl transition-colors ${fieldErrors.consent ? 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20' : 'hover:bg-primary/5 dark:hover:bg-white/5'}`}>
-                        <input
-                          type="checkbox"
-                          checked={formData.consent}
-                          onChange={(e) => {
-                            handleChange('consent', e.target.checked);
-                            if (fieldErrors.consent) setFieldErrors(prev => ({ ...prev, consent: '' }));
-                          }}
-                          className="mt-0.5 w-5 h-5 rounded border-primary/30 text-primary focus:ring-primary"
-                        />
-                        <span className="text-sm text-primary dark:text-white leading-relaxed">
-                          I agree to receive communications from Ever Club regarding membership, account updates, events, and promotions. <span className="text-red-500 dark:text-red-400">*</span>
-                        </span>
-                      </label>
-                      {fieldErrors.consent && (
-                        <p className="text-sm text-red-500 dark:text-red-400 mt-2 flex items-center gap-1 pl-1">
-                          <span className="material-symbols-outlined text-sm">error</span>
-                          {fieldErrors.consent}
-                        </p>
-                      )}
-                      <p className="text-xs text-primary/60 dark:text-white/60 mt-4 leading-relaxed">
-                        You can unsubscribe from Ever Club communications at any time. For more information about how to unsubscribe, our privacy practices, and how we protect and respect your personal information, please review our Privacy Policy.
-                      </p>
-                      <p className="text-xs text-primary/60 dark:text-white/60 mt-3 leading-relaxed">
-                        By submitting this form, you authorize Ever Club to store and process your personal information to provide the content, services, and membership evaluation you have requested.
-                      </p>
-                    </div>
-
                     {error && (
                       <div className="p-4 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 flex items-start gap-2">
                         <span className="material-symbols-outlined text-red-600 dark:text-red-400 text-lg mt-0.5">error</span>
@@ -475,6 +449,38 @@ const PrivateHireInquire: React.FC = () => {
                       </div>
                     </div>
 
+                    <div className="pt-4 border-t border-primary/10 dark:border-white/10">
+                      <p className="text-xs text-primary/60 dark:text-white/60 mb-4 leading-relaxed">
+                        Ever Club is committed to protecting and respecting your privacy. We use your information to administer your account and to provide the products, services, and updates you request from us. We also contact you with information about membership, events, promotions, operational updates, and other content that may be relevant to you. If you consent to receiving communications from us, please indicate your preferences below.
+                      </p>
+                      <label className={`flex items-start gap-3 cursor-pointer group p-3 rounded-xl transition-colors ${fieldErrors.consent ? 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20' : 'hover:bg-primary/5 dark:hover:bg-white/5'}`}>
+                        <input
+                          type="checkbox"
+                          checked={formData.consent}
+                          onChange={(e) => {
+                            handleChange('consent', e.target.checked);
+                            if (fieldErrors.consent) setFieldErrors(prev => ({ ...prev, consent: '' }));
+                          }}
+                          className="mt-0.5 w-5 h-5 rounded border-primary/30 text-primary focus:ring-primary"
+                        />
+                        <span className="text-sm text-primary dark:text-white leading-relaxed">
+                          I agree to receive communications from Ever Club regarding membership, account updates, events, and promotions. <span className="text-red-500 dark:text-red-400">*</span>
+                        </span>
+                      </label>
+                      {fieldErrors.consent && (
+                        <p className="text-sm text-red-500 dark:text-red-400 mt-2 flex items-center gap-1 pl-1">
+                          <span className="material-symbols-outlined text-sm">error</span>
+                          {fieldErrors.consent}
+                        </p>
+                      )}
+                      <p className="text-xs text-primary/60 dark:text-white/60 mt-4 leading-relaxed">
+                        You can unsubscribe from Ever Club communications at any time. For more information about how to unsubscribe, our privacy practices, and how we protect and respect your personal information, please review our Privacy Policy.
+                      </p>
+                      <p className="text-xs text-primary/60 dark:text-white/60 mt-3 leading-relaxed">
+                        By submitting this form, you authorize Ever Club to store and process your personal information to provide the content, services, and membership evaluation you have requested.
+                      </p>
+                    </div>
+
                     {error && (
                       <div className="p-4 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 flex items-start gap-2">
                         <span className="material-symbols-outlined text-red-600 dark:text-red-400 text-lg mt-0.5">error</span>
@@ -501,10 +507,12 @@ const PrivateHireInquire: React.FC = () => {
                             Submitting...
                           </>
                         ) : (
-                          'Submit'
+                          'Plan Your Event'
                         )}
                       </button>
                     </div>
+                    <p className="text-xs text-primary/40 dark:text-white/40 text-center mt-3 font-light">Our events team will respond within 24 hours.</p>
+                    <p className="text-xs text-primary/40 dark:text-white/40 text-center mt-1 font-light">Your information is kept private and never shared.</p>
                   </div>
                 )}
               </form>

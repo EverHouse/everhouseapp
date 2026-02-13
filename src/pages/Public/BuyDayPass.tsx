@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
 import Input from '../../components/Input';
 import EmptyState from '../../components/EmptyState';
@@ -123,6 +123,20 @@ const BuyDayPass: React.FC = () => {
         <p className="text-primary/70 dark:text-white/70 text-sm leading-relaxed max-w-xs mx-auto">
           Experience Ever Club as a guest. No membership required.
         </p>
+        <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs text-primary/60 dark:text-white/60 mt-3">
+          <span className="flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-sm">wifi</span>
+            High-speed wifi
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-sm">local_cafe</span>
+            Cafe access
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-sm">weekend</span>
+            Lounge access
+          </span>
+        </div>
       </div>
 
       <section className="px-4 mb-6">
@@ -267,6 +281,14 @@ const BuyDayPass: React.FC = () => {
         </div>
       </section>
       
+      <section className="px-6 py-10 text-center">
+        <p className="text-primary/60 dark:text-white/60 text-sm mb-2">Loved your visit?</p>
+        <p className="text-primary/80 dark:text-white/80 text-sm font-medium mb-4">Membership gives you unlimited access, priority booking, and a community of professionals.</p>
+        <Link to="/tour" className="inline-block px-8 py-4 bg-primary text-white rounded-2xl font-bold text-sm tracking-widest uppercase hover:bg-primary/90 transition-all duration-300 active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)]">
+          Book a Tour
+        </Link>
+      </section>
+
       <Footer />
     </div>
   );

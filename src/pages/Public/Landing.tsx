@@ -82,19 +82,17 @@ const Landing: React.FC = () => {
     <AnimatedPage>
       <SEO
         title="Ever Members Club | Orange County's Premier Indoor Golf & Social Club"
-        description="A new kind of members club rooted in golf, built for community. Experience indoor golf simulators, coworking spaces, wellness programs, and curated events in Tustin, Orange County."
+        description="Orange County's private club for professionals who work, play, and connect — all under one roof. Book a private tour and experience Trackman simulators, premium workspaces, and a curated social club."
         url="/"
         image="/images/hero-lounge-optimized.webp"
       />
     <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#0f120a]">
-      {/* Fixed brand green status bar fill for iOS PWA */}
       <div 
         className="fixed top-0 left-0 right-0 bg-primary"
         style={{ height: 'env(safe-area-inset-top, 0px)', zIndex: 'var(--z-header)' }}
         aria-hidden="true"
       />
       
-      {/* Hero Section - extends behind status bar */}
       <div 
         ref={heroRef as React.RefObject<HTMLDivElement>}
         className="relative flex flex-col justify-end p-6 pb-[max(4rem,env(safe-area-inset-bottom))] overflow-visible"
@@ -103,7 +101,6 @@ const Landing: React.FC = () => {
           minHeight: '700px'
         }}
       >
-        {/* Background container that extends into safe area */}
         <div 
           className="absolute inset-0 overflow-hidden rounded-b-[2.5rem]"
           style={{
@@ -130,30 +127,76 @@ const Landing: React.FC = () => {
           />
         </div>
         
-        {/* Hero content */}
         <div className="relative z-10 flex flex-col items-center text-center">
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] mb-4 text-white text-shadow-sm font-serif animate-hero-headline">
-            A new kind of <br/> members club — <br/> rooted in golf, built <br/> for community.
+            Your Office. <br/> Your Course. <br/> Your Club.
           </h1>
           <p className="text-sm sm:text-base text-white/80 mb-8 sm:mb-10 max-w-sm tracking-wide animate-hero-tagline">
-            Orange County's private indoor golf & social club.<br className="hidden sm:inline" /> Golf. Work. Connect.
+            Orange County's private club for professionals who work, play, and connect — all under one roof.
           </p>
           <div className="flex flex-col gap-3 w-full max-w-xs animate-hero-cta">
-             <Link to="/membership" className="w-full py-4 rounded-2xl bg-white/30 backdrop-blur-xl text-white font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-white/40 transition-all text-center border border-white/40">
-                Explore Membership Plans
+             <Link to="/tour" className="w-full py-4 rounded-2xl bg-white text-primary font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-white/90 transition-all text-center">
+                Book Your Private Tour
              </Link>
-             <Link to="/tour" className="w-full py-3 text-white font-medium text-sm hover:opacity-80 transition-opacity flex items-center justify-center gap-2 group">
-                Book a Tour
+             <Link to="/membership" className="w-full py-3 text-white font-medium text-sm hover:opacity-80 transition-opacity flex items-center justify-center gap-2 group">
+                Explore Membership
                 <span className="material-symbols-outlined text-lg group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
              </Link>
           </div>
+          <p className="mt-4 text-[10px] sm:text-xs text-white/60 uppercase tracking-[0.2em] font-medium animate-hero-cta">
+            Limited membership. Book a tour to secure your spot.
+          </p>
         </div>
       </div>
 
-      {/* Content wrapper with cream background */}
       <div className="bg-bone dark:bg-[#0f120a]">
-      {/* Features Section - "Why Ever Club" (Moved to First Position) */}
-      <section className="px-6 py-12 animate-content-enter-delay-1">
+
+      <div className="px-6 pt-6 pb-12 bg-bone dark:bg-[#0f120a] animate-content-enter-delay-1">
+        <p className="text-center text-xs font-bold uppercase tracking-[0.2em] text-primary/50 dark:text-white/50 mb-8">As Featured In</p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-5xl mx-auto">
+          <a 
+            href="https://www.forbes.com/sites/mikedojc/2025/09/09/even-house-turns-indoor-golf-into-a-community-social-hub/" 
+            target="_blank" 
+            rel="noreferrer"
+            className="backdrop-blur-xl bg-white/40 dark:bg-white/5 p-6 rounded-[1.5rem] border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.01] transition-all duration-300 flex flex-col"
+          >
+            <p className="text-xl font-bold text-primary/80 dark:text-white/80 tracking-tight mb-4" style={{ fontFamily: 'Georgia, serif' }}>Forbes</p>
+            <blockquote className="text-sm text-primary/80 dark:text-white/80 leading-relaxed flex-1">
+              "Ever Club has fashioned a tribe-finding concept... creating a 'third place' around an indoor golf experience while layering in a farm-to-table café and flex space for co-working."
+            </blockquote>
+            <p className="text-xs text-primary/50 dark:text-white/50 font-medium mt-4">September 2025</p>
+          </a>
+
+          <a 
+            href="https://hypebeast.com/2025/2/even-house-membership-golf-club-for-the-next-generation" 
+            target="_blank" 
+            rel="noreferrer"
+            className="backdrop-blur-xl bg-white/40 dark:bg-white/5 p-6 rounded-[1.5rem] border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.01] transition-all duration-300 flex flex-col"
+          >
+            <p className="text-lg font-black text-primary/80 dark:text-white/80 uppercase tracking-tighter mb-4">Hypebeast</p>
+            <blockquote className="text-sm text-primary/80 dark:text-white/80 leading-relaxed flex-1">
+              "A laid-back yet high-end culture where people can connect and unwind... creating a place where people can come to recharge."
+            </blockquote>
+            <p className="text-xs text-primary/50 dark:text-white/50 font-medium mt-4">February 2025</p>
+          </a>
+
+          <a 
+            href="https://www.foxla.com/video/fmc-t05loqz15hed9sfa" 
+            target="_blank" 
+            rel="noreferrer"
+            className="backdrop-blur-xl bg-white/40 dark:bg-white/5 p-6 rounded-[1.5rem] border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.01] transition-all duration-300 flex flex-col"
+          >
+            <p className="text-lg font-black text-primary/80 dark:text-white/80 uppercase tracking-wide mb-4">Fox 11</p>
+            <blockquote className="text-sm text-primary/80 dark:text-white/80 leading-relaxed flex-1">
+              "It's all about having another place where you feel like you belong... the third space. We are missing out on third spaces."
+            </blockquote>
+            <p className="text-xs text-primary/50 dark:text-white/50 font-medium mt-4">December 2025</p>
+          </a>
+        </div>
+      </div>
+
+      <section className="px-6 py-12 animate-content-enter-delay-2">
         <h2 className="text-3xl font-bold text-primary dark:text-white mb-8 font-sans">Why Ever Members Club</h2>
         <div className="grid grid-cols-2 gap-4">
           <FeatureCard 
@@ -183,7 +226,6 @@ const Landing: React.FC = () => {
         </div>
       </section>
 
-      {/* Editorial Sections */}
       <div>
         <EditorialSection
           image="/images/private-dining-optimized.webp"
@@ -213,57 +255,6 @@ const Landing: React.FC = () => {
         />
       </div>
 
-      {/* Press & Media Section */}
-      <div className="px-6 pt-6 pb-12 bg-bone dark:bg-[#0f120a] animate-content-enter-delay-2">
-        <p className="text-center text-xs font-bold uppercase tracking-[0.2em] text-primary/50 dark:text-white/50 mb-8">As Featured In</p>
-        
-        {/* Quote Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-5xl mx-auto">
-          {/* Forbes Quote */}
-          <a 
-            href="https://www.forbes.com/sites/mikedojc/2025/09/09/even-house-turns-indoor-golf-into-a-community-social-hub/" 
-            target="_blank" 
-            rel="noreferrer"
-            className="backdrop-blur-xl bg-white/40 dark:bg-white/5 p-6 rounded-[1.5rem] border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.01] transition-all duration-300 flex flex-col"
-          >
-            <p className="text-xl font-bold text-primary/80 dark:text-white/80 tracking-tight mb-4" style={{ fontFamily: 'Georgia, serif' }}>Forbes</p>
-            <blockquote className="text-sm text-primary/80 dark:text-white/80 leading-relaxed flex-1">
-              "Ever Club has fashioned a tribe-finding concept... creating a 'third place' around an indoor golf experience while layering in a farm-to-table café and flex space for co-working."
-            </blockquote>
-            <p className="text-xs text-primary/50 dark:text-white/50 font-medium mt-4">September 2025</p>
-          </a>
-
-          {/* Hypebeast Quote */}
-          <a 
-            href="https://hypebeast.com/2025/2/even-house-membership-golf-club-for-the-next-generation" 
-            target="_blank" 
-            rel="noreferrer"
-            className="backdrop-blur-xl bg-white/40 dark:bg-white/5 p-6 rounded-[1.5rem] border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.01] transition-all duration-300 flex flex-col"
-          >
-            <p className="text-lg font-black text-primary/80 dark:text-white/80 uppercase tracking-tighter mb-4">Hypebeast</p>
-            <blockquote className="text-sm text-primary/80 dark:text-white/80 leading-relaxed flex-1">
-              "A laid-back yet high-end culture where people can connect and unwind... creating a place where people can come to recharge."
-            </blockquote>
-            <p className="text-xs text-primary/50 dark:text-white/50 font-medium mt-4">February 2025</p>
-          </a>
-
-          {/* Fox 11 Good Day LA Quote */}
-          <a 
-            href="https://www.foxla.com/video/fmc-t05loqz15hed9sfa" 
-            target="_blank" 
-            rel="noreferrer"
-            className="backdrop-blur-xl bg-white/40 dark:bg-white/5 p-6 rounded-[1.5rem] border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.01] transition-all duration-300 flex flex-col"
-          >
-            <p className="text-lg font-black text-primary/80 dark:text-white/80 uppercase tracking-wide mb-4">Fox 11</p>
-            <blockquote className="text-sm text-primary/80 dark:text-white/80 leading-relaxed flex-1">
-              "It's all about having another place where you feel like you belong... the third space. We are missing out on third spaces."
-            </blockquote>
-            <p className="text-xs text-primary/50 dark:text-white/50 font-medium mt-4">December 2025</p>
-          </a>
-        </div>
-      </div>
-
-      {/* Membership Preview Section */}
       <section className="px-6 pb-12 bg-bone dark:bg-[#0f120a] animate-content-enter-delay-3">
          <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-primary dark:text-white mb-2">Membership Tiers</h2>
@@ -271,7 +262,6 @@ const Landing: React.FC = () => {
          </div>
          
          <div className="flex flex-col gap-4">
-            {/* Social Tier */}
             {socialTier && (
             <div className="backdrop-blur-xl bg-white/50 dark:bg-white/5 p-6 rounded-[2rem] border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms]">
                 <div className="flex justify-between items-center mb-2">
@@ -288,7 +278,6 @@ const Landing: React.FC = () => {
             </div>
             )}
 
-            {/* Core Tier - Featured/Popular */}
             {coreTier && (
             <div className="backdrop-blur-xl bg-primary/90 p-6 rounded-[2rem] border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.2),0_0_20px_rgba(41,53,21,0.3),inset_0_1px_1px_rgba(255,255,255,0.1)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms] relative overflow-hidden">
                 <div className="flex justify-between items-start mb-2 relative z-10">
@@ -308,7 +297,6 @@ const Landing: React.FC = () => {
             </div>
             )}
 
-            {/* Corporate Tier */}
             {corporateTier && (
             <div className="backdrop-blur-xl bg-white/50 dark:bg-white/5 p-6 rounded-[2rem] border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms]">
                 <div className="flex justify-between items-center mb-2">
@@ -332,7 +320,6 @@ const Landing: React.FC = () => {
          </div>
       </section>
 
-      {/* Social Proof Stats Section */}
       <section className="px-6 py-10 bg-bone dark:bg-[#0f120a] animate-content-enter-delay-4">
         <h3 className="text-center text-2xl font-bold text-primary dark:text-white mb-6">Join 200+ Members</h3>
         <div className="flex justify-center items-center gap-0 overflow-x-auto">
@@ -358,7 +345,6 @@ const Landing: React.FC = () => {
         </div>
       </section>
 
-      {/* Testimonial Section */}
       <section className="px-6 py-12 bg-bone dark:bg-[#0f120a] animate-content-enter-delay-5">
         <div className="max-w-2xl mx-auto text-center">
           <span className="text-6xl text-primary/20 dark:text-white/20 font-serif leading-none block mb-2">"</span>
@@ -369,7 +355,6 @@ const Landing: React.FC = () => {
         </div>
       </section>
 
-      {/* Private Events Inquiry Section */}
       <div className="px-4 pb-12 animate-content-enter-delay-6">
          <div className="relative rounded-[2rem] overflow-hidden h-[400px] group backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.1)] hover:scale-[1.01] transition-all duration-[400ms]">
             <div className="absolute inset-0 bg-[url('/images/gallery/gallery-l1050555.webp')] bg-cover bg-center opacity-70 transition-transform duration-700 group-hover:scale-105"></div>
@@ -383,6 +368,17 @@ const Landing: React.FC = () => {
             </div>
          </div>
       </div>
+
+      <section className="px-6 py-16 bg-primary dark:bg-[#1a1f12]">
+        <div className="max-w-md mx-auto text-center">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 font-serif">See it for yourself.</h2>
+          <p className="text-sm sm:text-base text-white/70 mb-8">Book a private tour and experience Ever Club firsthand.</p>
+          <Link to="/tour" className="inline-block px-10 py-4 rounded-2xl bg-white text-primary font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-white/90 transition-all">
+            Book Your Private Tour
+          </Link>
+        </div>
+      </section>
+
       </div>
 
       <Footer hideCta />
