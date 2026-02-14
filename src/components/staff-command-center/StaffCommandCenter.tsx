@@ -13,6 +13,7 @@ import { StaffCommandCenterSkeleton } from '../skeletons';
 import { AnimatedPage } from '../motion';
 import { useStaffWebSocketContext } from '../../contexts/StaffWebSocketContext';
 import { useBookingActions } from '../../hooks/useBookingActions';
+import { playSound } from '../../utils/sounds';
 
 import { useCommandCenterData } from './hooks/useCommandCenterData';
 import { formatLastSynced, formatTodayDate } from './helpers';
@@ -140,11 +141,14 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
             membershipStatus: result.membershipStatus
           });
         } else if (result.alreadyCheckedIn) {
+          playSound('tap');
           showToast('This member was already checked in just now', 'info');
         } else {
+          playSound('checkinWarning');
           showToast(result.error || 'Check-in failed', 'error');
         }
       } catch (err) {
+        playSound('checkinWarning');
         showToast('Failed to process check-in', 'error');
       }
       return;
@@ -158,12 +162,15 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
           handleCheckIn(booking);
           showToast(`Checking in ${booking.user_name}...`, 'info');
         } else {
+          playSound('checkinWarning');
           showToast('Booking not found for today.', 'error');
         }
       } else {
+        playSound('checkinWarning');
         showToast('Invalid QR code format.', 'error');
       }
     } catch (error) {
+      playSound('checkinWarning');
       showToast('Invalid QR code.', 'error');
     }
   };
