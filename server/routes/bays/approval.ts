@@ -8,6 +8,7 @@ import { sendPushNotification, sendPushNotificationToStaff } from '../push';
 import { formatNotificationDateTime, formatDateDisplayWithDay, formatTime12Hour } from '../../utils/dateUtils';
 import { logAndRespond } from '../../core/logger';
 import { logFromRequest } from '../../core/auditLog';
+import { notifyAllStaff } from '../../core/notificationService';
 import { checkClosureConflict, checkAvailabilityBlockConflict } from '../../core/bookingValidation';
 import { bookingEvents } from '../../core/bookingEvents';
 import { sendNotificationToUser, broadcastAvailabilityUpdate, broadcastMemberStatsUpdated, broadcastBillingUpdate } from '../../core/websocket';
@@ -1009,15 +1010,6 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
           const memberMessage = `Your ${statusLabel} for ${friendlyDateTime} has been cancelled.`;
           
           await tx.insert(notifications).values({
-            userEmail: 'staff@evenhouse.club',
-            title: 'Booking Cancelled by Member',
-            message: staffMessage,
-            type: 'booking_cancelled',
-            relatedId: bookingId,
-            relatedType: 'booking_request'
-          });
-          
-          await tx.insert(notifications).values({
             userEmail: memberEmail,
             title: 'Booking Cancelled',
             message: memberMessage,
@@ -1050,27 +1042,6 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
             eq(notifications.type, 'booking')
           ));
         
-        if (existing.trackmanBookingId) {
-          let bayName = 'Bay';
-          if (existing.resourceId) {
-            const [resource] = await tx.select({ name: resources.name }).from(resources).where(eq(resources.id, existing.resourceId));
-            if (resource?.name) {
-              bayName = resource.name;
-            }
-          }
-          
-          const trackmanReminderMessage = `Reminder: ${memberName}'s booking on ${friendlyDateTime} (${bayName}) was cancelled - please also cancel in Trackman`;
-          
-          await tx.insert(notifications).values({
-            userEmail: 'staff@evenhouse.club',
-            title: 'Trackman Cancellation Required',
-            message: trackmanReminderMessage,
-            type: 'booking_cancelled',
-            relatedId: bookingId,
-            relatedType: 'booking_request'
-          });
-        }
-        
         return { updated: updatedRow, bookingData: existing, pushInfo, overageRefundResult, isConferenceRoom, isPendingCancel: false, alreadyPending: false };
       });
       
@@ -1082,20 +1053,16 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
         const { memberName, bookingDate, bookingTime, bayName } = pushInfo;
         
         const staffMessage = `Booking cancellation pending for ${memberName} on ${bookingDate} at ${bookingTime} (${bayName}). Please cancel in Trackman to complete.`;
-        await db.insert(notifications).values({
-          userEmail: 'staff@evenhouse.club',
-          title: 'Cancel in Trackman Required',
-          message: staffMessage,
-          type: 'cancellation_pending',
-          relatedId: bookingId,
-          relatedType: 'booking_request'
-        });
-        
-        sendPushNotificationToStaff({
-          title: 'Cancel in Trackman Required',
-          body: staffMessage,
-          url: '/admin/bookings'
-        }).catch(err => console.error('Staff push notification failed:', err));
+        notifyAllStaff(
+          'Cancel in Trackman Required',
+          staffMessage,
+          'booking_cancelled',
+          {
+            relatedId: bookingId,
+            relatedType: 'booking_request',
+            url: '/admin/bookings'
+          }
+        ).catch(err => console.error('Staff cancellation notification failed:', err));
         
         await db.insert(notifications).values({
           userEmail: bookingData.userEmail || '',
@@ -1141,11 +1108,16 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
       
       if (pushInfo) {
         if (pushInfo.type === 'both') {
-          sendPushNotificationToStaff({
-            title: 'Booking Cancelled',
-            body: pushInfo.staffMessage || pushInfo.message,
-            url: '/admin/bookings'
-          }).catch(err => console.error('Staff push notification failed:', err));
+          notifyAllStaff(
+            'Booking Cancelled by Member',
+            pushInfo.staffMessage || pushInfo.message,
+            'booking_cancelled',
+            {
+              relatedId: bookingId,
+              relatedType: 'booking_request',
+              url: '/admin/bookings'
+            }
+          ).catch(err => console.error('Staff cancellation notification failed:', err));
           if (pushInfo.email) {
             sendPushNotification(pushInfo.email, {
               title: 'Booking Cancelled',
@@ -1154,11 +1126,16 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
             }).catch(err => console.error('Member push notification failed:', err));
           }
         } else if (pushInfo.type === 'staff') {
-          sendPushNotificationToStaff({
-            title: 'Booking Cancelled',
-            body: pushInfo.message,
-            url: '/admin/bookings'
-          }).catch(err => console.error('Staff push notification failed:', err));
+          notifyAllStaff(
+            'Booking Cancelled by Staff',
+            pushInfo.message,
+            'booking_cancelled',
+            {
+              relatedId: bookingId,
+              relatedType: 'booking_request',
+              url: '/admin/bookings'
+            }
+          ).catch(err => console.error('Staff cancellation notification failed:', err));
         } else if (pushInfo.email) {
           sendPushNotification(pushInfo.email, {
             title: 'Booking Cancelled',

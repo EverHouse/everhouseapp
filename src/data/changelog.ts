@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.61.0",
+    date: "2026-02-15",
+    title: "Staff Notification Delivery Fix",
+    changes: [
+      "Fixed: All cancellation notifications now reach every staff member individually instead of going to a single shared address — no more missed alerts",
+      "Fixed: Staff-initiated cancellations, Trackman cancellation reminders, and stuck cancellation alerts all deliver to each staff member's notification feed, push, and real-time channel",
+      "Fixed: Cancellation requests from the member booking page now use the same improved delivery as the command center",
+      "Improved: Stuck cancellation scheduler checks all staff notifications instead of a single address when detecting recently alerted bookings"
+    ]
+  },
+  {
     version: "7.60.0",
     date: "2026-02-15",
     title: "Cancellation Request Visibility for Staff",

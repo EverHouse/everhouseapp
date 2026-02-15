@@ -32,11 +32,9 @@ async function checkStuckCancellations(): Promise<void> {
 
     console.log(`[Stuck Cancellations] Found ${stuckBookings.rows.length} stuck cancellation(s)`);
 
-    // Check which bookings already had a recent stuck cancellation alert
     const recentlyAlerted = await pool.query(
-      `SELECT related_id FROM notifications 
-       WHERE user_email = 'staff@evenhouse.club'
-       AND type = 'cancellation_stuck'
+      `SELECT DISTINCT related_id FROM notifications 
+       WHERE type = 'cancellation_stuck'
        AND related_type = 'booking_request'
        AND created_at > NOW() - INTERVAL '4 hours'
        AND related_id = ANY($1::int[])`,
