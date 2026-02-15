@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.60.0",
+    date: "2026-02-15",
+    title: "Cancellation Request Visibility for Staff",
+    changes: [
+      "New: Cancellation requests now appear directly in the Pending Requests queue in the Staff Command Center — no more missed cancellations",
+      "New: Cancellation requests show a red 'Cancellation' badge with Trackman info so staff can immediately see what needs to be cancelled",
+      "New: 'Complete Cancellation' button lets staff mark a cancellation as done directly from the command center after handling it in Trackman",
+      "Improved: Cancellation alerts in the notification feed now have a prominent red border so they stand out from routine notifications",
+      "Improved: Staff Command Center live-updates when a member submits or completes a cancellation — no manual refresh needed"
+    ]
+  },
+  {
     version: "7.59.0",
     date: "2026-02-13",
     title: "Public Pages CRO Optimization",
