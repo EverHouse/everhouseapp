@@ -73,6 +73,7 @@ NODE_ENV = "production"
 deploymentTarget = "autoscale"
 run = ["npm", "run", "start"]
 build = ["npm", "run", "build"]
+publicDir = "dist/public"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-a74e2fa8-3e0a-44cd-bca4-3046e4e3b9c2"
