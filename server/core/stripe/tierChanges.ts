@@ -55,7 +55,7 @@ export async function previewTierChange(
       // Calculate proration from invoice line items
       let prorationAmount = 0;
       for (const line of previewInvoice.lines.data) {
-        if (line.proration) {
+        if ((line as any).proration) {
           prorationAmount += line.amount;
         }
       }
@@ -88,7 +88,7 @@ export async function previewTierChange(
           newAmountCents: newPrice.unit_amount || 0,
           prorationAmountCents: 0,
           nextInvoiceAmountCents: newPrice.unit_amount || 0,
-          effectiveDate: new Date(sub.current_period_end * 1000),
+          effectiveDate: new Date((sub as any).current_period_end * 1000),
           isImmediate: false,
         }
       };

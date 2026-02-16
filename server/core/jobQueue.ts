@@ -55,7 +55,7 @@ export async function queueJob(
      VALUES (${jobType}, ${JSON.stringify(payload)}, ${priority}, ${maxRetries}, ${scheduledFor}, ${webhookEventId})
      RETURNING id`);
   
-  return result.rows[0].id;
+  return (result.rows[0] as any).id;
 }
 
 export async function queueJobInTransaction(
@@ -90,7 +90,7 @@ export async function queueJobs(
      VALUES ${sql.join(valuesSql, sql`, `)}
      RETURNING id`);
   
-  return result.rows.map(r => r.id);
+  return result.rows.map((r: any) => r.id);
 }
 
 async function claimJobs(): Promise<Array<{ id: number; jobType: string; payload: any; retryCount: number; maxRetries: number }>> {
@@ -110,7 +110,7 @@ async function claimJobs(): Promise<Array<{ id: number; jobType: string; payload
      )
      RETURNING id, job_type, payload, retry_count, max_retries`);
   
-  return result.rows.map(r => ({
+  return result.rows.map((r: any) => ({
     id: r.id,
     jobType: r.job_type,
     payload: r.payload,
@@ -139,19 +139,19 @@ async function executeJob(job: { id: number; jobType: string; payload: any; retr
   try {
     switch (jobType) {
       case 'send_payment_receipt':
-        await sendPaymentReceiptEmail(payload.to, payload.memberName, payload.amount, payload.date, payload.description, payload.paymentMethod);
+        await sendPaymentReceiptEmail(payload.to, { memberName: payload.memberName, amount: payload.amount, date: payload.date, description: payload.description, transactionId: payload.paymentMethod });
         break;
       case 'send_payment_failed_email':
-        await sendPaymentFailedEmail(payload.to, payload.memberName, payload.amount, payload.reason, payload.retryDate);
+        await sendPaymentFailedEmail(payload.to, { memberName: payload.memberName, amount: payload.amount, reason: payload.reason, updateCardUrl: payload.retryDate });
         break;
       case 'send_membership_renewal_email':
-        await sendMembershipRenewalEmail(payload.to, payload.memberName, payload.tier, payload.nextBillingDate, payload.amount);
+        await sendMembershipRenewalEmail(payload.to, { memberName: payload.memberName, planName: payload.tier, nextBillingDate: payload.nextBillingDate, amount: payload.amount });
         break;
       case 'send_membership_failed_email':
-        await sendMembershipFailedEmail(payload.to, payload.memberName, payload.tier, payload.reason, payload.updatePaymentUrl);
+        await sendMembershipFailedEmail(payload.to, { memberName: payload.memberName, planName: payload.tier, reason: payload.reason, amount: payload.amount || 0 });
         break;
       case 'send_pass_with_qr_email':
-        await sendPassWithQrEmail(payload.to, payload.passPurchase, payload.qrCodeDataUrl);
+        await sendPassWithQrEmail(payload.to, payload.passPurchase);
         break;
       case 'notify_payment_success':
         await notifyPaymentSuccess(payload.userEmail, payload.amount, payload.description);
@@ -192,7 +192,7 @@ async function executeJob(job: { id: number; jobType: string; payload: any; retr
         await queuePaymentSyncToHubSpot(payload);
         break;
       case 'sync_company_to_hubspot':
-        await syncCompanyToHubSpot(payload.companyName, payload.metadata);
+        await syncCompanyToHubSpot(payload);
         break;
       case 'sync_day_pass_to_hubspot':
         await queueDayPassSyncToHubSpot(payload);
@@ -317,7 +317,8 @@ export async function getJobQueueStats(): Promise<{
   const result = await db.execute(sql`SELECT status, COUNT(*)::int as count FROM job_queue GROUP BY status`);
   
   const stats = { pending: 0, processing: 0, completed: 0, failed: 0 };
-  for (const row of result.rows) {
+  for (const _row of result.rows) {
+    const row = _row as any;
     if (row.status === 'pending') stats.pending = row.count;
     else if (row.status === 'processing') stats.processing = row.count;
     else if (row.status === 'completed') stats.completed = row.count;

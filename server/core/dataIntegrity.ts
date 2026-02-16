@@ -102,6 +102,15 @@ export interface IssueContext {
   notes?: string;
   originalEmail?: string;
   status?: string;
+  errorType?: string;
+  email?: string;
+  memberEmails?: string | string[];
+  lastUpdate?: string;
+  memberStatus?: string;
+  mindbodyClientId?: string;
+  billingProvider?: string;
+  stripeSubscriptionId?: string;
+  stripeCustomerIds?: string[];
 }
 
 export interface IntegrityIssue {
@@ -1278,9 +1287,9 @@ async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
           hubspot.crm.contacts.batchApi.read({
             inputs: hsBatch.map((m: any) => ({ id: m.hubspot_id })),
             properties: ['membership_tier']
-          })
+          } as any)
         );
-        for (const contact of (readResult.results || [])) {
+        for (const contact of ((readResult as any).results || [])) {
           hubspotTierMap.set(contact.id, (contact.properties?.membership_tier || '').toLowerCase().trim());
         }
       } catch (batchErr: unknown) {
@@ -1562,7 +1571,7 @@ async function checkDuplicateStripeCustomers(): Promise<IntegrityCheckResult> {
 
   return {
     checkName: 'Duplicate Stripe Customers',
-    status: issues.length === 0 ? 'pass' : issues.some(i => i.severity === 'warning') ? 'warning' : 'info',
+    status: issues.length === 0 ? 'pass' : issues.some(i => i.severity === 'warning') ? 'warning' : 'info' as any,
     issueCount: issues.length,
     issues,
     lastRun: new Date()
@@ -2437,9 +2446,9 @@ export async function bulkPushToHubSpot(dryRun: boolean = true): Promise<{
         properties: ['firstname', 'lastname', 'email', 'membership_tier']
       };
       const readResult = await retryableHubSpotRequest(() =>
-        hubspot.crm.contacts.batchApi.read(readInput)
+        hubspot.crm.contacts.batchApi.read(readInput as any)
       );
-      for (const contact of (readResult.results || [])) {
+      for (const contact of ((readResult as any).results || [])) {
         hsContactMap[contact.id] = contact.properties || {};
       }
     } catch (error: unknown) {

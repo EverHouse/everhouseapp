@@ -45,6 +45,7 @@ interface LogContext {
   dbErrorDetail?: string;
   dbErrorTable?: string;
   dbErrorConstraint?: string;
+  [key: string]: any;
 }
 
 function formatTimestamp(): string {

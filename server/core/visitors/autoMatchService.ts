@@ -390,21 +390,21 @@ async function createBookingSessionForAutoMatch(
     
     if (memberTier) {
       await recordUsage(sessionId, {
-        memberId: userId,
+        memberId: String(userId),
         minutesCharged: booking.durationMinutes,
         overageFee: 0,
         guestFee: 0,
         tierAtBooking: memberTier
-      }, 'trackman');
+      }, 'trackman' as any);
       console.log(`[AutoMatch] Created session ${sessionId} for member ${email} (${memberTier})`);
     } else {
       await recordUsage(sessionId, {
-        memberId: userId,
+        memberId: String(userId),
         minutesCharged: booking.durationMinutes,
         overageFee: 0,
         guestFee: 0,
         tierAtBooking: undefined
-      }, 'trackman');
+      }, 'trackman' as any);
       console.log(`[AutoMatch] Created session ${sessionId} for visitor ${email}`);
     }
     
@@ -440,7 +440,7 @@ export async function autoMatchSingleBooking(
     const parsed = parseBookingNotes(notes);
     
     // Helper to create session for future bookings
-    const maybeCreateSession = async (userId: number, email: string, displayName: string): Promise<number | null> => {
+    const maybeCreateSession = async (userId: any, email: string, displayName: string): Promise<number | null> => {
       if (!isFuture || !bookingDetails) return null;
       return createBookingSessionForAutoMatch(bookingDetails, userId, email, displayName);
     };
@@ -454,7 +454,7 @@ export async function autoMatchSingleBooking(
           user.email, 
           `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email
         );
-        await resolveBookingWithUser(bookingId, user.id, user.email, staffEmail, sessionId);
+        await resolveBookingWithUser(bookingId, user.id as any, user.email, staffEmail, sessionId);
         result.matched = true;
         result.matchType = 'purchase';
         result.visitorEmail = user.email;
@@ -477,7 +477,7 @@ export async function autoMatchSingleBooking(
           lastName: purchaseMatch.lastName || undefined,
           mindbodyClientId: purchaseMatch.mindbodyClientId || undefined
         });
-        userId = visitor.id;
+        userId = visitor.id as any;
       }
       
       // For future bookings, create session first so we can link purchase correctly
@@ -532,8 +532,8 @@ export async function autoMatchSingleBooking(
         if (user) {
           const visitorType: VisitorType = isClassPass ? 'classpass' : 'golfnow';
           const visitorLabel = isClassPass ? 'ClassPass Visitor' : 'GolfNow Visitor';
-          const sessionId = await maybeCreateSession(user.id, visitorEmail, userName || visitorLabel);
-          await resolveBookingWithUser(bookingId, user.id, visitorEmail, staffEmail, sessionId);
+          const sessionId = await maybeCreateSession(user.id as any, visitorEmail, userName || visitorLabel);
+          await resolveBookingWithUser(bookingId, user.id as any, visitorEmail, staffEmail, sessionId);
           result.matched = true;
           result.matchType = isClassPass ? 'classpass_visitor' : 'golfnow_fallback';
           result.visitorEmail = visitorEmail;
@@ -943,12 +943,12 @@ async function autoMatchBookingRequests(
           
           if (sessionId) {
             await recordUsage(sessionId, {
-              memberId: visitor.id,
+              memberId: visitor.id?.toString(),
               minutesCharged: row.duration_minutes || 60,
               overageFee: 0,
               guestFee: 0,
               tierAtBooking: undefined
-            }, 'trackman');
+            }, 'trackman' as any);
           }
         } catch (sessionError) {
           console.log(`[AutoMatch] Could not create session for booking ${row.id}:`, sessionError);

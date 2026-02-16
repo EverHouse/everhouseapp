@@ -152,7 +152,7 @@ export async function syncMemberToHubSpot(
         filterGroups: [{
           filters: [{
             propertyName: 'email',
-            operator: 'EQ',
+            operator: 'EQ' as any,
             value: email.toLowerCase()
           }]
         }],
@@ -172,8 +172,8 @@ export async function syncMemberToHubSpot(
       // Create the contact if it doesn't exist
       console.log(`[HubSpot Sync] Contact not found for ${email}, creating...`);
       const { findOrCreateHubSpotContact } = await import('./members');
-      const result = await findOrCreateHubSpotContact(email);
-      if (!result.success || !result.contactId) {
+      const result = await findOrCreateHubSpotContact(email, '', '');
+      if (!result.contactId) {
         console.error(`[HubSpot Sync] Failed to create contact for ${email}`);
         return { success: false, error: 'Failed to create contact', updated: {} };
       }

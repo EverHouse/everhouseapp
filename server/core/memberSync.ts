@@ -148,7 +148,7 @@ export async function initMemberSyncSettings(): Promise<void> {
   try {
     const result = await db.execute(sql`SELECT value FROM app_settings WHERE key = 'last_member_sync_time'`);
     if (result.rows.length > 0 && result.rows[0].value) {
-      lastSyncTime = parseInt(result.rows[0].value, 10);
+      lastSyncTime = parseInt(result.rows[0].value as string, 10);
       console.log(`[MemberSync] Loaded last sync time: ${new Date(lastSyncTime).toISOString()}`);
     }
   } catch (err) {
@@ -1365,7 +1365,7 @@ export async function syncCommunicationLogsFromHubSpot(): Promise<{ synced: numb
               let memberEmail: string | null = null;
               
               try {
-                const associations = await hubspot.crm.objects.calls.associationsApi.getAll(
+                const associations = await (hubspot.crm.objects.calls as any).associationsApi.getAll(
                   callId,
                   'contacts'
                 );

@@ -13,7 +13,7 @@ export interface RetryOptions {
 }
 
 function isRetryableError(error: unknown): boolean {
-  const errObj = error as Record<string, unknown>;
+  const errObj = error as any;
   const statusCode = errObj?.response?.status || errObj?.response?.statusCode || errObj?.status || errObj?.code;
   const errorMsg = error instanceof Error ? error.message : String(error);
   
@@ -43,7 +43,7 @@ function isRetryableError(error: unknown): boolean {
 }
 
 function isNonRetryableClientError(error: unknown): boolean {
-  const errObj = error as Record<string, unknown>;
+  const errObj = error as any;
   const statusCode = errObj?.response?.status || errObj?.response?.statusCode || errObj?.status || errObj?.code;
   
   if (typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500 && statusCode !== 429) {

@@ -218,7 +218,7 @@ export async function createInvoiceWithLineItems(params: CreatePOSInvoiceParams)
       });
     }
 
-    const finalizedInvoice = await stripe.invoices.finalizeInvoice(invoice.id);
+    const finalizedInvoice = await stripe.invoices.finalizeInvoice(invoice.id) as any;
 
     if (forTerminal) {
       const invoicePiId = typeof finalizedInvoice.payment_intent === 'string'
@@ -258,9 +258,9 @@ export async function createInvoiceWithLineItems(params: CreatePOSInvoiceParams)
       };
     }
 
-    const paymentIntentId = typeof finalizedInvoice.payment_intent === 'string'
-      ? finalizedInvoice.payment_intent
-      : finalizedInvoice.payment_intent?.id;
+    const paymentIntentId = typeof (finalizedInvoice as any).payment_intent === 'string'
+      ? (finalizedInvoice as any).payment_intent
+      : (finalizedInvoice as any).payment_intent?.id;
 
     if (!paymentIntentId) {
       throw new Error('Invoice finalization did not create a PaymentIntent');

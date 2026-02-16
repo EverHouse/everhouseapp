@@ -44,6 +44,10 @@ export interface FeeBreakdown {
     sessionDate: string;
     source: 'preview' | 'approval' | 'checkin' | 'stripe' | 'roster_update';
   };
+  totalSessionFee?: number;
+  participantsUpdated?: boolean;
+  billingResult?: any;
+  ledgerUpdated?: boolean;
 }
 
 export interface FeeComputeParams {

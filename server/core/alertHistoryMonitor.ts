@@ -40,7 +40,7 @@ export async function getAlertHistory(params: AlertQueryParams): Promise<AlertEn
     LIMIT ${limit}
   `);
 
-  const alerts: AlertEntry[] = result.rows.map(r => ({
+  const alerts: AlertEntry[] = result.rows.map((r: any) => ({
     id: r.id,
     title: r.title,
     message: r.message,

@@ -49,7 +49,7 @@ async function cancelPendingPaymentIntentsForBooking(bookingId: number): Promise
     );
     for (const row of pendingIntents.rows) {
       try {
-        await cancelPaymentIntent(row.stripe_payment_intent_id);
+        await cancelPaymentIntent(row.stripe_payment_intent_id as string);
         process.stderr.write(`[Trackman Import] Cancelled payment intent ${row.stripe_payment_intent_id}\n`);
       } catch (cancelErr: unknown) {
         process.stderr.write(`[Trackman Import] Failed to cancel payment intent ${row.stripe_payment_intent_id}: ${getErrorMessage(cancelErr)}\n`);
@@ -325,8 +325,8 @@ async function loadEmailMapping(): Promise<Map<string, string>> {
     let linkedCount = 0;
     for (const row of linkedEmailsResult.rows) {
       if (row.primary_email && row.linked_email) {
-        const normalizedLinked = row.linked_email.toLowerCase().trim();
-        const normalizedPrimary = row.primary_email.toLowerCase().trim();
+        const normalizedLinked = (row.linked_email as string).toLowerCase().trim();
+        const normalizedPrimary = (row.primary_email as string).toLowerCase().trim();
         if (!mapping.has(normalizedLinked)) {
           mapping.set(normalizedLinked, normalizedPrimary);
           linkedCount++;
@@ -824,7 +824,7 @@ async function createTrackmanSessionAndParticipants(input: SessionCreationInput)
     try {
     // Gather all participants with resolved user IDs
     const participantInputs: ParticipantInput[] = [];
-    const memberData: { userId: string; tier: string }[] = [];
+    const memberData: { userId: string; tier: string; email?: string }[] = [];
     
     // Resolve owner's user ID and tier
     const ownerUserId = await getUserIdByEmail(input.ownerEmail);
@@ -1472,7 +1472,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 noticeType: 'private_event',
                 isActive: true,
                 createdBy: 'trackman_import'
-              }).returning();
+              } as any).returning();
               
               // Create Availability Block (time slot)
               await db.insert(availabilityBlocks).values({
@@ -1482,7 +1482,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 startTime: startTime,
                 endTime: endTime || startTime,
                 reason: `Lesson - ${row.userName}`
-              });
+              } as any);
               
               process.stderr.write(`[Trackman Import] Converted staff lesson to block: ${row.userEmail} -> "${row.userName}" on ${bookingDate}\n`);
             } catch (blockErr: unknown) {
@@ -3830,6 +3830,7 @@ export async function rescanUnmatchedBookings(performedBy: string = 'system'): P
     return { 
       scanned: unmatchedBookings.length, 
       matched: 0, 
+      lessonsConverted: 0,
       resolved: [], 
       errors: ['HubSpot unavailable - cannot fetch members for matching'] 
     };
@@ -3901,7 +3902,7 @@ export async function rescanUnmatchedBookings(performedBy: string = 'system'): P
         // This is a lesson booking - convert to availability block
         const resourceId = parseInt(booking.bayNumber || '') || null;
         const bookingDate = booking.bookingDate ? 
-          (booking.bookingDate instanceof Date ? booking.bookingDate.toISOString().split('T')[0] : booking.bookingDate) : null;
+          ((booking.bookingDate as any) instanceof Date ? (booking.bookingDate as any).toISOString().split('T')[0] : booking.bookingDate) : null;
         const startTime = booking.startTime?.toString() || null;
         const endTime = booking.endTime?.toString() || startTime;
         
@@ -4340,8 +4341,8 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
       continue;
     }
 
-    const bookingDate = item.bookingDate instanceof Date 
-      ? item.bookingDate.toISOString().split('T')[0]
+    const bookingDate = (item.bookingDate as any) instanceof Date 
+      ? (item.bookingDate as any).toISOString().split('T')[0]
       : item.bookingDate;
 
     if (!dryRun) {

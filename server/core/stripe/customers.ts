@@ -148,12 +148,13 @@ export async function getOrCreateStripeCustomer(
       const lastName = userResult.rows[0]?.last_name;
       
       // Update metadata and name if missing
-      const needsUpdate = !existingCustomer.deleted && (
-        !existingCustomer.metadata?.userId ||
-        !existingCustomer.name ||
-        (userTier && existingCustomer.metadata?.tier !== userTier) ||
-        (firstName && !existingCustomer.metadata?.firstName) ||
-        (lastName && !existingCustomer.metadata?.lastName)
+      const cust = existingCustomer as any;
+      const needsUpdate = !cust.deleted && (
+        !cust.metadata?.userId ||
+        !cust.name ||
+        (userTier && cust.metadata?.tier !== userTier) ||
+        (firstName && !cust.metadata?.firstName) ||
+        (lastName && !cust.metadata?.lastName)
       );
       
       if (needsUpdate) {
@@ -168,7 +169,7 @@ export async function getOrCreateStripeCustomer(
         
         await stripeForValidation.customers.update(existingCustomerId, {
           metadata: updateMetadata,
-          ...(resolvedName && !existingCustomer.name ? { name: resolvedName } : {}),
+          ...(resolvedName && !(existingCustomer as any).name ? { name: resolvedName } : {}),
         });
         console.log(`[Stripe] Updated metadata for existing customer ${existingCustomerId}`);
       }
@@ -300,7 +301,7 @@ export async function getOrCreateStripeCustomer(
     stripe = await getStripeClient();
   } catch (error: unknown) {
     console.error('[Stripe] Failed to get Stripe client:', error);
-    await alertOnExternalServiceError('Stripe', error, 'initialize Stripe client');
+    await alertOnExternalServiceError('Stripe', error as Error, 'initialize Stripe client');
     throw error;
   }
   
@@ -339,7 +340,7 @@ export async function getOrCreateStripeCustomer(
       
       if (isRateLimitOrNetwork) {
         console.error(`[Stripe] Critical error searching for customer ${searchEmail}, aborting to prevent duplicates:`, error);
-        await alertOnExternalServiceError('Stripe', error, `search for customer by email ${searchEmail}`);
+        await alertOnExternalServiceError('Stripe', error as Error, `search for customer by email ${searchEmail}`);
         throw new Error(`Stripe unavailable while searching for existing customers - cannot safely create new customer: ${getErrorMessage(error)}`);
       }
       
@@ -391,7 +392,7 @@ export async function getOrCreateStripeCustomer(
     }
   } catch (error: unknown) {
     console.error('[Stripe] Failed to create/update customer:', error);
-    await alertOnExternalServiceError('Stripe', error, 'create or update customer');
+    await alertOnExternalServiceError('Stripe', error as Error, 'create or update customer');
     throw error;
   }
 
@@ -477,7 +478,7 @@ export async function syncCustomerMetadataToStripe(
     return { success: true };
   } catch (error: unknown) {
     console.error('[Stripe] Failed to sync customer metadata:', error);
-    await alertOnExternalServiceError('Stripe', error, 'sync customer metadata');
+    await alertOnExternalServiceError('Stripe', error as Error, 'sync customer metadata');
     return { success: false, error: getErrorMessage(error) };
   }
 }

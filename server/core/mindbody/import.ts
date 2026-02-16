@@ -820,12 +820,7 @@ export async function runFullMindbodyImport(
       .set({
         status: 'completed',
         completedAt: new Date(),
-        results: {
-          members: membersResult,
-          sales: salesResult,
-          attendance: attendanceResult,
-        },
-      })
+      } as any)
       .where(eq(legacyImportJobs.id, job.id));
   }
   

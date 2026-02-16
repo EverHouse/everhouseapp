@@ -292,7 +292,8 @@ export async function refundGuestPassForParticipant(
         `SELECT stripe_price_id FROM membership_tiers WHERE LOWER(name) = 'guest pass' AND stripe_price_id IS NOT NULL`
       );
       if (priceResult.rows[0]?.stripe_price_id) {
-        const stripe = (await import('../stripe/client')).default;
+        const { getStripeClient } = await import('../stripe/client');
+        const stripe = await getStripeClient();
         const price = await stripe.prices.retrieve(priceResult.rows[0].stripe_price_id);
         if (price.unit_amount) {
           guestFeeCents = price.unit_amount;

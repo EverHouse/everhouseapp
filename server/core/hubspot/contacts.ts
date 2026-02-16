@@ -123,7 +123,7 @@ export async function syncDayPassPurchaseToHubSpot(
           filterGroups: [{
             filters: [{
               propertyName: 'email',
-              operator: 'EQ',
+              operator: 'EQ' as any,
               value: normalizedEmail
             }]
           }],
@@ -200,7 +200,7 @@ export async function syncDayPassPurchaseToHubSpot(
             filterGroups: [{
               filters: [{
                 propertyName: 'email',
-                operator: 'EQ',
+                operator: 'EQ' as any,
                 value: normalizedEmail
               }]
             }],

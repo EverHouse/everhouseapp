@@ -1426,8 +1426,7 @@ export async function reconcileGroupBillingWithStripe(): Promise<ReconciliationR
                 await db.update(groupMembers)
                   .set({
                     stripeSubscriptionItemId: stripeItem.id,
-                    updatedAt: new Date(),
-                  })
+                  } as any)
                   .where(eq(groupMembers.id, member.id));
                 
                 result.itemsRelinked++;
@@ -1443,7 +1442,7 @@ export async function reconcileGroupBillingWithStripe(): Promise<ReconciliationR
                   .set({
                     isActive: false,
                     removedAt: new Date(),
-                  })
+                  } as any)
                   .where(eq(groupMembers.id, member.id));
                 
                 await pool.query(
@@ -1467,8 +1466,7 @@ export async function reconcileGroupBillingWithStripe(): Promise<ReconciliationR
               await db.update(groupMembers)
                 .set({
                   stripeSubscriptionItemId: stripeItem.id,
-                  updatedAt: new Date(),
-                })
+                } as any)
                 .where(eq(groupMembers.id, member.id));
               
               result.itemsRelinked++;
@@ -1504,8 +1502,7 @@ export async function reconcileGroupBillingWithStripe(): Promise<ReconciliationR
                   isActive: true,
                   stripeSubscriptionItemId: item.id,
                   removedAt: null,
-                  updatedAt: new Date(),
-                })
+                } as any)
                 .where(eq(groupMembers.id, inactiveMember[0].id));
               
               await pool.query(
@@ -1638,8 +1635,7 @@ export async function handleSubscriptionItemsChanged(
             await db.update(groupMembers)
               .set({
                 stripeSubscriptionItemId: existingItemForEmail.id,
-                updatedAt: new Date(),
-              })
+              } as any)
               .where(eq(groupMembers.id, member[0].id));
             console.log(`[GroupBilling] Updated member ${memberEmail} subscription item ID from ${item.id} to ${existingItemForEmail.id}`);
           }

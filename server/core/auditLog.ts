@@ -133,7 +133,26 @@ export type AuditAction =
   | 'stripe_member_sync'
   | 'billing_provider_changed'
   | 'terminal_payment_initiated'
-  | 'terminal_payment_canceled';
+  | 'terminal_payment_canceled'
+  | 'terminal_payment_refunded'
+  | 'terminal_payment_disputed'
+  | 'terminal_dispute_closed'
+  | 'booking_dev_confirm'
+  | 'unlink_hubspot_contact'
+  | 'merge_hubspot_duplicates'
+  | 'delete_orphan_guest_pass'
+  | 'delete_orphan_fee_snapshot'
+  | 'dismiss'
+  | 'delete_orphan_booking_participant'
+  | 'cleanup_mindbody_ids'
+  | 'sync_members_to_hubspot'
+  | 'sync_subscription_status'
+  | 'clear_orphaned_stripe_ids'
+  | 'link_stripe_hubspot'
+  | 'sync_visit_counts'
+  | 'detect_duplicates'
+  | 'sync_payment_status'
+  | 'fix_trackman_ghost_bookings';
 
 export type ActorType = 'staff' | 'member' | 'system';
 
@@ -161,7 +180,15 @@ export type ResourceType =
   | 'invoices'
   | 'payments'
   | 'balance'
-  | 'payment_method';
+  | 'payment_method'
+  | 'users'
+  | 'stripe'
+  | 'billing_groups'
+  | 'legacy_purchase'
+  | 'bulk_waiver'
+  | 'terminal_reader'
+  | 'setup_intent'
+  | 'trackman_booking';
 
 interface AuditLogParams {
   staffEmail: string;

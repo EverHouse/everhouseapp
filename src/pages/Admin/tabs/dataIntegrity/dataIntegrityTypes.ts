@@ -50,6 +50,12 @@ export interface IssueContext {
   hubspotContactId?: string;
   userId?: number;
   duplicateUsers?: Array<{ userId: number; email: string; status: string; tier: string }>;
+  errorType?: string;
+  email?: string;
+  memberEmails?: string;
+  lastUpdate?: string;
+  memberStatus?: string;
+  stripeCustomerId?: string;
 }
 
 export interface IgnoreInfo {
@@ -84,7 +90,7 @@ export interface IgnoredIssueEntry {
 
 export interface IntegrityCheckResult {
   checkName: string;
-  status: 'pass' | 'warning' | 'fail';
+  status: 'pass' | 'warning' | 'fail' | 'info';
   issueCount: number;
   issues: IntegrityIssue[];
   lastRun: Date;

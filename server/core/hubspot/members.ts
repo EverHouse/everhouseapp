@@ -35,14 +35,14 @@ export async function getContactDeals(hubspotContactId: string): Promise<any[]> 
   try {
     const hubspot = await getHubSpotClient();
     const response = await retryableHubSpotRequest(() =>
-      hubspot.crm.contacts.associationsApi.getAll(hubspotContactId, 'deals')
+      (hubspot.crm.contacts as any).associationsApi.getAll(hubspotContactId, 'deals')
     );
     
-    if (!response.results || response.results.length === 0) {
+    if (!(response as any).results || (response as any).results.length === 0) {
       return [];
     }
     
-    const dealIds = response.results.map((r: any) => r.id);
+    const dealIds = (response as any).results.map((r: any) => r.id);
     const deals = await Promise.all(
       dealIds.map((id: string) =>
         retryableHubSpotRequest(() =>
@@ -85,7 +85,7 @@ export async function findOrCreateHubSpotContact(
         filterGroups: [{
           filters: [{
             propertyName: 'email',
-            operator: 'EQ',
+            operator: 'EQ' as any,
             value: email.toLowerCase()
           }]
         }],
@@ -197,7 +197,7 @@ export async function createMembershipDeal(
       dealId,
       'contacts',
       contactId,
-      [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 3 }]
+      [{ associationCategory: 'HUBSPOT_DEFINED' as any, associationTypeId: 3 }]
     )
   );
   
@@ -272,7 +272,7 @@ export async function createDealForLegacyMember(
           isPrimary: true,
           lastKnownMindbodyStatus: normalizedStatus,
           billingProvider: 'mindbody'
-        });
+        } as any);
       }
       
       return { 
@@ -320,7 +320,7 @@ export async function createDealForLegacyMember(
       isPrimary: true,
       lastKnownMindbodyStatus: normalizedStatus,
       billingProvider: 'mindbody'
-    });
+    } as any);
     
     await pool.query(
       'UPDATE users SET hubspot_id = $1, updated_at = NOW() WHERE LOWER(email) = $2 AND (hubspot_id IS NULL OR hubspot_id = \'\')',
@@ -708,7 +708,7 @@ export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMe
       },
       newValue: `Created member with ${tier} membership`,
       performedBy: createdBy,
-      performedByName
+      performedByName: createdByName
     });
     
     if (!isProduction) {

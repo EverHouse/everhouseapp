@@ -22,8 +22,8 @@ function stripHtmlTags(html: string): string {
     .trim();
 }
 
-export function parseClosureMetadata(description: string): { affectedAreas?: string; notifyMembers?: boolean; notes?: string } {
-  const result: { affectedAreas?: string; notifyMembers?: boolean; notes?: string } = {};
+export function parseClosureMetadata(description: string): { affectedAreas?: string; notifyMembers?: boolean; notes?: string; visibility?: string } {
+  const result: { affectedAreas?: string; notifyMembers?: boolean; notes?: string; visibility?: string } = {};
   
   if (!description) return result;
   

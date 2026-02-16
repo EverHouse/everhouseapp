@@ -54,19 +54,19 @@ export async function syncStripeCustomersForMindBodyMembers(): Promise<CustomerS
     
     for (const member of members) {
       try {
-        const fullName = [member.first_name, member.last_name].filter(Boolean).join(' ') || undefined;
-        await stripe.customers.update(member.stripe_customer_id, {
+        const fullName = [member.first_name as string, member.last_name as string].filter(Boolean).join(' ') || undefined;
+        await stripe.customers.update(member.stripe_customer_id as string, {
           metadata: {
-            tier: member.tier || '',
+            tier: (member.tier as string) || '',
             billing_provider: 'mindbody',
             ...(fullName ? { name: fullName } : {}),
           },
         });
         result.updated++;
         result.details.push({
-          email: member.email,
+          email: member.email as string,
           action: 'updated',
-          customerId: member.stripe_customer_id,
+          customerId: member.stripe_customer_id as string,
         });
         
       } catch (error: unknown) {
@@ -74,16 +74,16 @@ export async function syncStripeCustomersForMindBodyMembers(): Promise<CustomerS
           await db.execute(sql`UPDATE users SET stripe_customer_id = NULL WHERE id = ${member.id}`);
           result.cleared++;
           result.details.push({
-            email: member.email,
+            email: member.email as string,
             action: 'cleared',
-            customerId: member.stripe_customer_id,
+            customerId: member.stripe_customer_id as string,
             reason: 'Customer no longer exists in Stripe',
           });
         } else {
           console.error(`[Stripe Customer Sync] Error updating ${member.email}:`, getErrorMessage(error));
           result.errors.push(`${member.email}: ${getErrorMessage(error)}`);
           result.details.push({
-            email: member.email,
+            email: member.email as string,
             action: 'error',
             reason: getErrorMessage(error),
           });
@@ -123,8 +123,8 @@ export async function getCustomerSyncStatus(): Promise<{
   `);
   
   return {
-    needsSync: parseInt(result.rows[0].needs_sync) || 0,
-    alreadySynced: parseInt(result.rows[0].already_synced) || 0,
-    total: parseInt(result.rows[0].total) || 0,
+    needsSync: parseInt(result.rows[0].needs_sync as string) || 0,
+    alreadySynced: parseInt(result.rows[0].already_synced as string) || 0,
+    total: parseInt(result.rows[0].total as string) || 0,
   };
 }

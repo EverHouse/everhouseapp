@@ -1,9 +1,15 @@
-import { db } from './db';
+import { db } from '../db';
 import { users } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
 import { handleTierChange, queueTierSync } from './hubspot';
 import { notifyMember } from './notificationService';
-import { getTierRank } from '../../routes/members/helpers';
+
+function getTierRank(tier: string): number {
+  const ranks: Record<string, number> = {
+    'social': 1, 'core': 2, 'premium': 3, 'vip': 4, 'corporate': 5
+  };
+  return ranks[tier.toLowerCase()] || 0;
+}
 
 interface MemberTierUpdatePayload {
   email: string;

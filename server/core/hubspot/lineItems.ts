@@ -55,7 +55,7 @@ export async function addLineItemToDeal(
         lineItemId,
         'deals',
         hubspotDealId,
-        [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 20 }]
+        [{ associationCategory: 'HUBSPOT_DEFINED' as any, associationTypeId: 20 }]
       )
     );
     
@@ -95,7 +95,7 @@ export async function addLineItemToDeal(
         },
         newValue: `${productInfo.productName} x${quantity} @ $${discountedPrice}`,
         performedBy: createdBy,
-        performedByName
+        performedByName: createdByName
       });
     }
     

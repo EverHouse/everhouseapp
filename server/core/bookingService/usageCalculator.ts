@@ -660,6 +660,7 @@ export function formatOverageFeeFromDollars(dollars: number): string {
 }
 
 export const OVERAGE_RATE_PER_30_MIN = PRICING.OVERAGE_RATE_DOLLARS;
+export const OVERAGE_RATE_PER_HOUR = PRICING.OVERAGE_RATE_DOLLARS * 2;
 export const FLAT_GUEST_FEE = PRICING.GUEST_FEE_DOLLARS;
 
 export interface RecalculationResult {

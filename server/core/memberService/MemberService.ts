@@ -465,7 +465,7 @@ class MemberServiceClass {
       ? row.tags
       : (typeof row.tags === 'string' ? JSON.parse(row.tags) : []);
     
-    let tierConfig: MembershipTier | null = null;
+    let tierConfig: any = null;
     if (includeTierConfig && row.tier_config_id) {
       tierConfig = {
         id: row.tier_config_id,

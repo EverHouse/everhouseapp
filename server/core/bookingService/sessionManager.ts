@@ -1,6 +1,7 @@
 import { db } from '../../db';
 import { getErrorCode, getErrorMessage } from '../../utils/errorUtils';
 import { pool } from '../db';
+import type { PoolClient } from 'pg';
 import { 
   bookingSessions, 
   bookingParticipants, 
@@ -21,7 +22,7 @@ import { getMemberTierByEmail } from '../tierService';
 // Transaction context type - allows functions to participate in an outer transaction
 export type TransactionContext = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-export type BookingSource = 'member_request' | 'staff_manual' | 'trackman_import';
+export type BookingSource = 'member_request' | 'staff_manual' | 'trackman_import' | 'trackman_webhook' | 'trackman';
 export type ParticipantType = 'owner' | 'member' | 'guest';
 export type PaymentMethod = 'guest_pass' | 'credit_card' | 'unpaid' | 'waived';
 
@@ -68,7 +69,7 @@ export async function createSession(
       startTime: request.startTime,
       endTime: request.endTime,
       trackmanBookingId: request.trackmanBookingId,
-      source,
+      source: source as any,
       createdBy: request.createdBy
     };
     
@@ -329,7 +330,7 @@ export async function recordUsage(
           input.memberId 
             ? eq(usageLedger.memberId, input.memberId) 
             : isNull(usageLedger.memberId),
-          eq(usageLedger.source, source)
+          eq(usageLedger.source, source as any)
         )
       )
       .limit(1);
@@ -364,7 +365,7 @@ export async function recordUsage(
       guestFee: input.guestFee?.toString() ?? '0.00',
       tierAtBooking,
       paymentMethod: input.paymentMethod ?? 'unpaid',
-      source
+      source: source as any
     };
     
     await dbCtx.insert(usageLedger).values(usageData);

@@ -35,11 +35,12 @@ export async function getHubSpotQueueMonitorData(): Promise<HubSpotQueueMonitorD
     FROM hubspot_sync_queue
   `);
 
+  const row = statsResult.rows[0] as any;
   const stats: HubSpotQueueStats = {
-    pending: statsResult.rows[0]?.pending || 0,
-    failed: statsResult.rows[0]?.failed || 0,
-    completed_24h: statsResult.rows[0]?.completed_24h || 0,
-    processing: statsResult.rows[0]?.processing || 0,
+    pending: row?.pending || 0,
+    failed: row?.failed || 0,
+    completed_24h: row?.completed_24h || 0,
+    processing: row?.processing || 0,
   };
 
   const failedResult = await db.execute(sql`
@@ -50,7 +51,7 @@ export async function getHubSpotQueueMonitorData(): Promise<HubSpotQueueMonitorD
     LIMIT 20
   `);
 
-  const recentFailed: FailedQueueItem[] = failedResult.rows.map(r => ({
+  const recentFailed: FailedQueueItem[] = failedResult.rows.map((r: any) => ({
     id: r.id,
     operation: r.operation,
     lastError: r.last_error,
@@ -65,12 +66,12 @@ export async function getHubSpotQueueMonitorData(): Promise<HubSpotQueueMonitorD
     FROM hubspot_sync_queue
     WHERE status = 'completed' AND completed_at > NOW() - INTERVAL '24 hours'
   `);
-  const avgProcessingTime = avgResult.rows[0]?.avg_ms || 0;
+  const avgProcessingTime = (avgResult.rows[0] as any)?.avg_ms || 0;
 
   const lagResult = await db.execute(sql`
     SELECT MIN(created_at) as oldest_pending FROM hubspot_sync_queue WHERE status = 'pending'
   `);
-  const oldestPending = lagResult.rows[0]?.oldest_pending;
+  const oldestPending = (lagResult.rows[0] as any)?.oldest_pending;
   let queueLag = 'No pending items';
   if (oldestPending) {
     const lagMs = Date.now() - new Date(oldestPending).getTime();

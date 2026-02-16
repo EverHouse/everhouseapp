@@ -35,7 +35,7 @@ export async function enqueueHubSpotSync(
         logger.info('[HubSpot Queue] Duplicate job skipped', { 
           extra: { idempotencyKey, existingId: existing.rows[0].id }
         });
-        return existing.rows[0].id;
+        return (existing.rows[0] as any).id;
       }
     }
     
@@ -44,13 +44,13 @@ export async function enqueueHubSpotSync(
        RETURNING id`);
     
     logger.info('[HubSpot Queue] Job enqueued', { 
-      extra: { jobId: result.rows[0].id, operation, idempotencyKey }
+      extra: { jobId: (result.rows[0] as any).id, operation, idempotencyKey }
     });
     
-    return result.rows[0].id;
+    return (result.rows[0] as any).id;
   } catch (error: unknown) {
     logger.error('[HubSpot Queue] Failed to enqueue job', { 
-      error,
+      error: error as Error,
       extra: { operation, idempotencyKey }
     });
     return null;
@@ -95,7 +95,8 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
     extra: { count: result.rows.length }
   });
   
-  for (const job of result.rows) {
+  for (const _job of result.rows) {
+    const job = _job as any;
     stats.processed++;
     
     try {
@@ -127,7 +128,7 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
            WHERE id = ${job.id}`);
         
         logger.error('[HubSpot Queue] Job dead (unrecoverable error - skipping retries)', { 
-          error,
+          error: error as Error,
           extra: { jobId: job.id, operation: job.operation }
         });
         
@@ -178,7 +179,7 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
            WHERE id = ${job.id}`);
         
         logger.error('[HubSpot Queue] Job dead (max retries exceeded)', { 
-          error,
+          error: error as Error,
           extra: { jobId: job.id, operation: job.operation }
         });
         
@@ -224,7 +225,8 @@ async function executeHubSpotOperation(operation: string, payload: any): Promise
     case 'update_contact':
       await stages.updateContactMembershipStatus(
         payload.email,
-        payload.status
+        payload.status,
+        payload.performedBy || 'system'
       );
       break;
       
@@ -307,11 +309,12 @@ export async function getQueueStats(): Promise<{
     FROM hubspot_sync_queue
   `);
   
+  const statsRow = result.rows[0] as any;
   return {
-    pending: parseInt(result.rows[0].pending) || 0,
-    processing: parseInt(result.rows[0].processing) || 0,
-    failed: parseInt(result.rows[0].failed) || 0,
-    dead: parseInt(result.rows[0].dead) || 0,
-    completedToday: parseInt(result.rows[0].completed_today) || 0
+    pending: parseInt(statsRow.pending) || 0,
+    processing: parseInt(statsRow.processing) || 0,
+    failed: parseInt(statsRow.failed) || 0,
+    dead: parseInt(statsRow.dead) || 0,
+    completedToday: parseInt(statsRow.completed_today) || 0
   };
 }

@@ -50,7 +50,7 @@ export async function getWebhookEvents(params: WebhookQueryParams): Promise<{ ev
   const countResult = await db.execute(sql`
     SELECT COUNT(*)::int as total FROM trackman_webhook_events ${whereClause}
   `);
-  const total = countResult.rows[0]?.total || 0;
+  const total = (countResult.rows[0] as any)?.total || 0;
 
   const result = await db.execute(sql`
     SELECT id, event_type, trackman_booking_id, trackman_user_id, processed_at, processing_error, matched_booking_id, matched_user_id, created_at, retry_count, last_retry_at
@@ -59,7 +59,7 @@ export async function getWebhookEvents(params: WebhookQueryParams): Promise<{ ev
     LIMIT ${limit} OFFSET ${offset}
   `);
 
-  const events: WebhookEvent[] = result.rows.map(row => ({
+  const events: WebhookEvent[] = result.rows.map((row: any) => ({
     id: row.id,
     eventType: row.event_type,
     trackmanBookingId: row.trackman_booking_id,
@@ -79,5 +79,5 @@ export async function getWebhookEvents(params: WebhookQueryParams): Promise<{ ev
 
 export async function getWebhookEventTypes(): Promise<string[]> {
   const result = await db.execute(sql`SELECT DISTINCT event_type FROM trackman_webhook_events ORDER BY event_type`);
-  return result.rows.map(r => r.event_type);
+  return result.rows.map((r: any) => r.event_type);
 }

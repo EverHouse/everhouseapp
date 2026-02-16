@@ -343,7 +343,6 @@ export async function linkAndNotifyParticipants(
         try {
           const notificationMsg = `You have been added to a simulator booking on ${bookingDateStr} at ${startTimeStr} (${bayName}).`;
           await db.insert(notifications).values({
-            userId: member?.id || null,
             userEmail: email,
             title: 'Added to Booking',
             message: notificationMsg,

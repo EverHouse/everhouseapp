@@ -179,16 +179,17 @@ export function renderTemplatePreview(templateId: string): string | null {
     case 'integrity-alert':
       return getIntegrityAlertEmailHtml(
         [
-          { checkName: 'Orphaned Bookings', status: 'warning', issueCount: 3, duration: 1200 },
-          { checkName: 'Duplicate Members', status: 'error', issueCount: 1, duration: 800 },
-          { checkName: 'Stripe Sync', status: 'pass', issueCount: 0, duration: 500 },
-        ],
+          { checkName: 'Orphaned Bookings', status: 'warning', issueCount: 3, issues: [], lastRun: new Date(), durationMs: 1200 },
+          { checkName: 'Duplicate Members', status: 'fail', issueCount: 1, issues: [], lastRun: new Date(), durationMs: 800 },
+          { checkName: 'Stripe Sync', status: 'pass', issueCount: 0, issues: [], lastRun: new Date(), durationMs: 500 },
+        ] as any[],
         [
           {
-            id: 'issue-1',
-            checkName: 'Duplicate Members',
-            severity: 'error',
-            message: 'Duplicate email found: alex@example.com',
+            category: 'data_quality' as const,
+            severity: 'error' as const,
+            table: 'users',
+            recordId: 1,
+            description: 'Duplicate email found: alex@example.com',
             context: { memberName: 'Alex Johnson', memberEmail: 'alex@example.com' },
           },
         ]
