@@ -73,7 +73,7 @@ async function expireStaleBookingRequests(): Promise<void> {
   } catch (error) {
     console.error('[Booking Expiry] Error expiring stale bookings:', error);
     schedulerTracker.recordRun('Booking Expiry', false, String(error));
-    logger.error({ error, context: 'booking_expiry_scheduler' }, 'Failed to expire stale booking requests');
+    logger.error('Failed to expire stale booking requests', { error: error as Error, extra: { context: 'booking_expiry_scheduler' } });
   }
 }
 

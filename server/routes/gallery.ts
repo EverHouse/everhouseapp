@@ -69,7 +69,7 @@ router.put('/api/admin/gallery/:id', isStaffOrAdmin, async (req, res) => {
         sortOrder: sortOrder !== undefined ? sortOrder : undefined,
         isActive: isActive !== undefined ? isActive : undefined
       })
-      .where(eq(galleryImages.id, parseInt(id)))
+      .where(eq(galleryImages.id, parseInt(id as string)))
       .returning();
     
     if (!updated) {
@@ -88,7 +88,7 @@ router.delete('/api/admin/gallery/:id', isStaffOrAdmin, async (req, res) => {
     
     const [updated] = await db.update(galleryImages)
       .set({ isActive: false })
-      .where(eq(galleryImages.id, parseInt(id)))
+      .where(eq(galleryImages.id, parseInt(id as string)))
       .returning();
     
     if (!updated) {

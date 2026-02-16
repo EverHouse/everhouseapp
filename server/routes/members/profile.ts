@@ -300,7 +300,7 @@ router.put('/api/members/:email/sms-preferences', isAuthenticated, async (req, r
 router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
   try {
     const { email } = req.params;
-    const normalizedEmail = decodeURIComponent(email).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
     
     const bookingHistory = await db.select({
       id: bookingRequests.id,
@@ -563,7 +563,7 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
 router.get('/api/members/:email/guests', isStaffOrAdmin, async (req, res) => {
   try {
     const { email } = req.params;
-    const normalizedEmail = decodeURIComponent(email).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
     
     const guestHistory = await db.select({
       id: bookingGuests.id,
@@ -608,16 +608,16 @@ router.put('/api/members/:id/role', isAdmin, async (req, res) => {
     
     const result = await db.update(users)
       .set(updateData)
-      .where(eq(users.id, id))
+      .where(eq(users.id, id as string))
       .returning();
     
     if (result.length === 0) {
       const insertResult = await db.insert(users)
         .values({
-          id,
+          id: id as string,
           role: role || 'member',
           tags: tags || []
-        })
+        } as any)
         .onConflictDoUpdate({
           target: users.id,
           set: {
@@ -640,7 +640,7 @@ router.put('/api/members/:id/role', isAdmin, async (req, res) => {
 router.get('/api/members/:email/cascade-preview', isStaffOrAdmin, async (req, res) => {
   try {
     const { email } = req.params;
-    const normalizedEmail = decodeURIComponent(email).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
     
     const userResult = await db.select({ id: users.id })
       .from(users)

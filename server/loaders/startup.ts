@@ -94,7 +94,7 @@ export async function runStartupTasks(): Promise<void> {
     const databaseUrl = process.env.DATABASE_URL;
     if (databaseUrl) {
       console.log('[Stripe] Initializing Stripe schema...');
-      await runMigrations({ databaseUrl, schema: 'stripe' });
+      await runMigrations({ databaseUrl, schema: 'stripe' } as any);
       console.log('[Stripe] Schema ready');
 
       const stripeSync = await getStripeSync();
@@ -160,7 +160,7 @@ export async function runStartupTasks(): Promise<void> {
       
       import('../core/stripe/customerSync.js')
         .then(({ syncStripeCustomersForMindBodyMembers }) => syncStripeCustomersForMindBodyMembers())
-        .then((result) => {
+        .then((result: any) => {
           if (result.created > 0 || result.linked > 0) {
             console.log(`[Stripe] Customer sync: created=${result.created}, linked=${result.linked}`);
           }

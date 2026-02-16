@@ -46,7 +46,7 @@ export interface Closure {
   startTime: string | null;
   endTime: string | null;
   affectedAreas: string;
-  noticeType?: string | null;
+  noticeType: string | null;
 }
 
 export interface Announcement {

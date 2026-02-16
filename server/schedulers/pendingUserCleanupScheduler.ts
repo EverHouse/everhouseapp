@@ -56,7 +56,7 @@ async function cleanupPendingUsers(): Promise<void> {
           } catch (stripeErr: unknown) {
             stripeCleanupFailed = true;
             console.error(`[Pending User Cleanup] Stripe cleanup failed for ${user.email} — skipping user deletion to avoid orphaned billing:`, getErrorMessage(stripeErr));
-            schedulerTracker.recordRun('Pending User Cleanup', false, String(err));
+            schedulerTracker.recordRun('Pending User Cleanup', false, String(stripeErr));
           }
         }
 

@@ -59,7 +59,7 @@ router.get('/api/staff/conference-room/available-slots', isStaffOrAdmin, async (
         });
       }
     } catch (calError) {
-      logger.error('Failed to fetch Google Calendar busy times', { error: calError });
+      logger.error('Failed to fetch Google Calendar busy times', { error: calError as Error });
     }
 
     const allBusySlots = [
@@ -99,8 +99,8 @@ router.get('/api/staff/conference-room/available-slots', isStaffOrAdmin, async (
 
     const isSlotAvailable = (slotStart: number, slotEnd: number): boolean => {
       for (const busy of allBusySlots) {
-        const busyStart = parseTime(busy.start_time);
-        const busyEnd = parseTime(busy.end_time);
+        const busyStart = parseTime(busy.start_time as string);
+        const busyEnd = parseTime(busy.end_time as string);
         if (slotStart < busyEnd && slotEnd > busyStart) {
           return false;
         }
@@ -308,7 +308,7 @@ router.post('/api/staff/conference-room/booking', isStaffOrAdmin, async (req: Re
       });
 
       broadcastAvailabilityUpdate({
-        resourceId,
+        resourceId: resourceId as number,
         resourceType: 'conference_room',
         date,
         action: 'booked'

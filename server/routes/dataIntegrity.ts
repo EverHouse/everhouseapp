@@ -242,7 +242,7 @@ router.delete('/api/data-integrity/ignore/:issueKey', isAdmin, async (req: Reque
       return res.status(400).json({ error: 'issueKey is required' });
     }
     
-    const result = await removeIgnoreRule(issueKey);
+    const result = await removeIgnoreRule(issueKey as string);
     
     if (!result.removed) {
       return res.status(404).json({ error: 'Ignore rule not found' });
@@ -361,11 +361,11 @@ router.get('/api/data-integrity/placeholder-accounts', isAdmin, async (req, res)
       
       for (const row of localResult.rows) {
         localDatabaseUsers.push({
-          id: row.id,
-          email: row.email,
-          name: [row.first_name, row.last_name].filter(Boolean).join(' ') || row.email,
-          status: row.membership_status,
-          createdAt: row.created_at?.toISOString() || '',
+          id: row.id as string,
+          email: row.email as string,
+          name: [row.first_name as string, row.last_name as string].filter(Boolean).join(' ') || row.email as string,
+          status: row.membership_status as string,
+          createdAt: (row.created_at as Date)?.toISOString() || '',
         });
       }
     } catch (dbError: unknown) {
@@ -387,7 +387,7 @@ router.get('/api/data-integrity/placeholder-accounts', isAdmin, async (req, res)
           stripeCustomers.push({
             id: customer.id,
             email: customer.email,
-            name: customer.name,
+            name: customer.name ?? null,
             created: customer.created,
           });
         }
@@ -429,7 +429,7 @@ router.get('/api/data-integrity/placeholder-accounts', isAdmin, async (req, res)
       console.warn('[DataIntegrity] HubSpot scan failed:', getErrorMessage(hubspotError));
     }
     
-    logFromRequest(req, 'placeholder_scan' as any, 'system', null, undefined, {
+    logFromRequest(req, 'placeholder_scan' as any, 'system', undefined, undefined, {
       action: 'scan',
       stripeCount: stripeCustomers.length,
       hubspotCount: hubspotContacts.length,
@@ -731,7 +731,7 @@ router.post('/api/data-integrity/fix/delete-guest-pass', isAdmin, async (req: Re
     
     await db.execute(sql`DELETE FROM guest_passes WHERE id = ${recordId}`);
     
-    logFromRequest(req, 'delete_orphan_guest_pass', 'guest_passes', recordId, undefined, { deletedId: recordId });
+    logFromRequest(req, 'delete_orphan_guest_pass' as any, 'guest_passes' as any, recordId, undefined, { deletedId: recordId });
     
     res.json({ success: true, message: `Deleted orphaned guest pass ${recordId}` });
   } catch (error: unknown) {
@@ -747,7 +747,7 @@ router.post('/api/data-integrity/fix/delete-fee-snapshot', isAdmin, async (req: 
     
     await db.execute(sql`DELETE FROM booking_fee_snapshots WHERE id = ${recordId}`);
     
-    logFromRequest(req, 'delete_orphan_fee_snapshot', 'booking_fee_snapshots', recordId, undefined, { deletedId: recordId });
+    logFromRequest(req, 'delete_orphan_fee_snapshot' as any, 'booking_fee_snapshots' as any, recordId, undefined, { deletedId: recordId });
     
     res.json({ success: true, message: `Deleted orphaned fee snapshot ${recordId}` });
   } catch (error: unknown) {
@@ -765,7 +765,7 @@ router.post('/api/data-integrity/fix/dismiss-trackman-unmatched', isAdmin, async
     
     await db.execute(sql`UPDATE trackman_unmatched_bookings SET resolved_at = NOW(), resolved_by = ${staffEmail} WHERE id = ${recordId} AND resolved_at IS NULL`);
     
-    logFromRequest(req, 'dismiss', 'trackman_unmatched', null, 'Trackman unmatched #' + recordId, { action: 'dismiss_from_integrity' });
+    logFromRequest(req, 'dismiss' as any, 'trackman_unmatched' as any, undefined, 'Trackman unmatched #' + recordId, { action: 'dismiss_from_integrity' });
     
     res.json({ success: true, message: 'Unmatched booking dismissed' });
   } catch (error: unknown) {
@@ -781,7 +781,7 @@ router.post('/api/data-integrity/fix/delete-booking-participant', isAdmin, async
     
     await db.execute(sql`DELETE FROM booking_participants WHERE id = ${recordId}`);
     
-    logFromRequest(req, 'delete_orphan_booking_participant', 'booking_participants', recordId, undefined, { deletedId: recordId });
+    logFromRequest(req, 'delete_orphan_booking_participant' as any, 'booking_participants' as any, recordId, undefined, { deletedId: recordId });
     
     res.json({ success: true, message: `Deleted orphaned booking participant ${recordId}` });
   } catch (error: unknown) {

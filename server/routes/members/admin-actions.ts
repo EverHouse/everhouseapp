@@ -31,7 +31,7 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: `Invalid tier. Must be one of: ${TIER_NAMES.join(', ')} or empty to clear` });
     }
     
-    const normalizedEmail = decodeURIComponent(email).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
     
     const userResult = await db.select({
       id: users.id,
@@ -82,7 +82,7 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
       ? `${sessionUser.firstName} ${sessionUser.lastName || ''}`.trim() 
       : sessionUser?.email?.split('@')[0] || 'Staff';
 
-    let hubspotResult = { success: true, oldLineItemRemoved: false, newLineItemAdded: false };
+    let hubspotResult: any = { success: true, oldLineItemRemoved: false, newLineItemAdded: false };
 
     if (normalizedTier) {
       hubspotResult = await handleTierChange(
@@ -162,7 +162,7 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
       action: 'change_tier',
       resourceType: 'member',
       resourceId: member.id.toString(),
-      resourceName: `${member.firstName || ''} ${member.lastName || ''}`.trim() || member.email,
+      resourceName: `${member.firstName || ''} ${member.lastName || ''}`.trim() || member.email || undefined,
       details: {
         memberEmail: normalizedEmail,
         previousTier: oldTierDisplay || 'None',
@@ -228,7 +228,7 @@ router.post('/api/members/:id/suspend', isStaffOrAdmin, async (req, res) => {
       membershipStatus: users.membershipStatus
     })
       .from(users)
-      .where(eq(users.id, id));
+      .where(eq(users.id, id as string));
     
     if (userResult.length === 0) {
       return res.status(404).json({ error: 'Member not found' });
@@ -307,7 +307,7 @@ router.post('/api/members/:id/suspend', isStaffOrAdmin, async (req, res) => {
 router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
   try {
     const { email } = req.params;
-    const normalizedEmail = decodeURIComponent(email).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
     const sessionUser = getSessionUser(req);
     const archivedBy = sessionUser?.email || 'unknown';
     
@@ -415,7 +415,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
   try {
     const { email } = req.params;
     const { deleteFromHubSpot, deleteFromStripe } = req.query;
-    const normalizedEmail = decodeURIComponent(email).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
     const sessionUser = getSessionUser(req);
     
     const userResult = await db.select({ 
@@ -625,7 +625,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
     if (stripeCustomerId) {
       try {
         const { getStripe } = await import('../../core/stripe');
-        const stripe = getStripe();
+        const stripe = await getStripe();
         let hasMore = true;
         let startingAfter: string | undefined;
         while (hasMore) {
@@ -653,7 +653,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
     if (deleteFromStripe === 'true' && stripeCustomerId) {
       try {
         const { getStripe } = await import('../../core/stripe');
-        const stripe = getStripe();
+        const stripe = await getStripe();
         await stripe.customers.del(stripeCustomerId);
         stripeDeleted = true;
         deletionLog.push('stripe_customer');
@@ -705,7 +705,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
       message: `Member ${memberName || normalizedEmail} permanently deleted`
     });
   } catch (error: unknown) {
-    console.error('Member permanent delete error:', error?.message || error);
+    console.error('Member permanent delete error:', (error as Error)?.message || error);
     res.status(500).json({ error: 'Failed to permanently delete member' });
   }
 });
@@ -713,7 +713,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
 router.post('/api/members/:email/anonymize', isStaffOrAdmin, async (req, res) => {
   try {
     const { email } = req.params;
-    const normalizedEmail = decodeURIComponent(email).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
     const sessionUser = getSessionUser(req);
     const anonymizedBy = sessionUser?.email || 'unknown';
     
@@ -1239,7 +1239,7 @@ router.post('/api/admin/tier-change/commit', isStaffOrAdmin, async (req, res) =>
 router.get('/api/members/:userId/duplicates', isStaffOrAdmin, async (req, res) => {
   try {
     const { userId } = req.params;
-    const duplicates = await findPotentialDuplicates(userId);
+    const duplicates = await findPotentialDuplicates(userId as string);
     res.json({ duplicates });
   } catch (error: unknown) {
     console.error('[Duplicates] Error finding duplicates:', error);
@@ -1274,7 +1274,7 @@ router.post('/api/members/merge/execute', isAdmin, async (req, res) => {
     
     const result = await executeMerge(primaryUserId, secondaryUserId, sessionUser?.email || 'admin');
     
-    logFromRequest(req, 'merge_users', 'user', primaryUserId, undefined, {
+    logFromRequest(req, 'merge_users' as any, 'user', primaryUserId, undefined, {
       secondary_user_id: secondaryUserId,
       records_merged: result.recordsMerged,
       merged_lifetime_visits: result.mergedLifetimeVisits

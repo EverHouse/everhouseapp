@@ -97,7 +97,7 @@ router.post('/api/staff/passes/:id/redeem', isStaffOrAdmin, async (req: Request,
       })
       .where(
         and(
-          eq(dayPassPurchases.id, id),
+          eq(dayPassPurchases.id, id as string),
           eq(dayPassPurchases.status, 'active'),
           gt(dayPassPurchases.remainingUses, 0)
         )
@@ -120,7 +120,7 @@ router.post('/api/staff/passes/:id/redeem', isStaffOrAdmin, async (req: Request,
           productType: dayPassPurchases.productType
         })
         .from(dayPassPurchases)
-        .where(eq(dayPassPurchases.id, id))
+        .where(eq(dayPassPurchases.id, id as string))
         .limit(1);
 
       if (!pass) {
@@ -138,14 +138,14 @@ router.post('/api/staff/passes/:id/redeem', isStaffOrAdmin, async (req: Request,
           location: passRedemptionLogs.location,
         })
         .from(passRedemptionLogs)
-        .where(eq(passRedemptionLogs.purchaseId, id))
+        .where(eq(passRedemptionLogs.purchaseId, id as string))
         .orderBy(desc(passRedemptionLogs.redeemedAt))
         .limit(10);
 
       // Check if already redeemed today
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const redeemedToday = logs.find(log => new Date(log.redeemedAt) >= today);
+      const redeemedToday = logs.find(log => new Date(log.redeemedAt as Date) >= today);
       
       if (pass.status !== 'active') {
         return res.status(400).json({ 
@@ -197,7 +197,7 @@ router.post('/api/staff/passes/:id/redeem', isStaffOrAdmin, async (req: Request,
     const { remainingUses, status } = updateResult[0];
 
     await db.insert(passRedemptionLogs).values({
-      purchaseId: id,
+      purchaseId: id as string,
       redeemedBy: staffEmail,
       location: location || 'front_desk',
     });
@@ -211,7 +211,7 @@ router.post('/api/staff/passes/:id/redeem', isStaffOrAdmin, async (req: Request,
         quantity: dayPassPurchases.quantity,
       })
       .from(dayPassPurchases)
-      .where(eq(dayPassPurchases.id, id))
+      .where(eq(dayPassPurchases.id, id as string))
       .limit(1);
 
     const guestName = [passDetails?.purchaserFirstName, passDetails?.purchaserLastName]
@@ -231,7 +231,7 @@ router.post('/api/staff/passes/:id/redeem', isStaffOrAdmin, async (req: Request,
 
     broadcastDayPassUpdate({
       action: 'day_pass_redeemed',
-      passId: id,
+      passId: id as string,
       purchaserEmail: passDetails?.purchaserEmail,
       purchaserName: guestName,
       productType: passDetails?.productType,
@@ -270,7 +270,7 @@ router.get('/api/staff/passes/:passId/history', isStaffOrAdmin, async (req: Requ
         location: passRedemptionLogs.location,
       })
       .from(passRedemptionLogs)
-      .where(eq(passRedemptionLogs.purchaseId, passId))
+      .where(eq(passRedemptionLogs.purchaseId, passId as string))
       .orderBy(desc(passRedemptionLogs.redeemedAt))
       .limit(5);
 
@@ -303,7 +303,7 @@ router.post('/api/staff/passes/:passId/refund', isStaffOrAdmin, async (req: Requ
         stripePaymentIntentId: dayPassPurchases.stripePaymentIntentId,
       })
       .from(dayPassPurchases)
-      .where(eq(dayPassPurchases.id, passId))
+      .where(eq(dayPassPurchases.id, passId as string))
       .limit(1);
 
     if (!pass) {
@@ -342,7 +342,7 @@ router.post('/api/staff/passes/:passId/refund', isStaffOrAdmin, async (req: Requ
         status: 'refunded',
         updatedAt: new Date(),
       })
-      .where(eq(dayPassPurchases.id, passId));
+      .where(eq(dayPassPurchases.id, passId as string));
 
     const guestName = [pass.purchaserFirstName, pass.purchaserLastName]
       .filter(Boolean)
@@ -352,7 +352,7 @@ router.post('/api/staff/passes/:passId/refund', isStaffOrAdmin, async (req: Requ
 
     broadcastDayPassUpdate({
       action: 'day_pass_refunded',
-      passId: passId,
+      passId: passId as string,
       purchaserEmail: pass.purchaserEmail,
       purchaserName: guestName,
       productType: pass.productType,

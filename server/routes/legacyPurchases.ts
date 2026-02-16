@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db";
 import { pool } from "../core/db";
-import { legacyPurchases, users, legacyImportJobs, hubspotDeals, hubspotProductMappings, hubspotLineItems } from "@shared/schema";
+import { legacyPurchases, users, legacyImportJobs, hubspotDeals, hubspotProductMappings, hubspotLineItems } from "../../shared/schema";
 import { eq, desc, and, sql, gte, lte } from "drizzle-orm";
 import { isStaffOrAdmin, isAdmin } from "../core/middleware";
 import { importMembersFromCSV, importSalesFromCSV, importAttendanceFromCSV, importFirstVisitReport, importSalesFromContent, parseFirstVisitReport } from "../core/mindbody/import";
@@ -51,7 +51,7 @@ router.get("/api/legacy-purchases/member/:email", isStaffOrAdmin, async (req: Re
     
     const purchases = await db.select()
       .from(legacyPurchases)
-      .where(eq(legacyPurchases.memberEmail, email.toLowerCase()))
+      .where(eq(legacyPurchases.memberEmail, (email as string).toLowerCase()))
       .orderBy(desc(legacyPurchases.saleDate));
     
     // Convert cents to dollars for display
@@ -109,7 +109,7 @@ router.get("/api/legacy-purchases/my-purchases", async (req: Request, res: Respo
       saleDate: p.saleDate,
       isComp: p.isComp,
       quantity: p.quantity || 1,
-      staffName: p.staffName || null,
+      staffName: (p as any).staffName || null,
     }));
     
     console.log(`[LegacyPurchases] my-purchases for ${targetEmail}: found ${formattedPurchases.length} purchases`);
@@ -379,7 +379,7 @@ async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurcha
 router.get("/api/members/:email/unified-purchases", isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
     const { email } = req.params;
-    const purchases = await getUnifiedPurchasesForEmail(email);
+    const purchases = await getUnifiedPurchasesForEmail(email as string);
     
     console.log(`[UnifiedPurchases] staff view for ${email}: found ${purchases.length} purchases`);
     res.json(purchases);
@@ -432,7 +432,7 @@ router.get("/api/legacy-purchases/member/:email/stats", isStaffOrAdmin, async (r
       guestSimFees: sql<number>`COUNT(*) FILTER (WHERE item_category = 'guest_sim_fee')`,
     })
       .from(legacyPurchases)
-      .where(eq(legacyPurchases.memberEmail, email.toLowerCase()));
+      .where(eq(legacyPurchases.memberEmail, (email as string).toLowerCase()));
     
     res.json({
       totalPurchases: stats[0]?.totalPurchases || 0,
@@ -567,7 +567,7 @@ router.post("/api/legacy-purchases/admin/upload-csv",
       
       // Log the action
       await logFromRequest(req, {
-        actionType: 'mindbody_csv_import',
+        action: 'mindbody_csv_import',
         resourceType: 'legacy_purchase',
         resourceName: batchId,
         details: {
@@ -575,7 +575,7 @@ router.post("/api/legacy-purchases/admin/upload-csv",
           salesFile: files.salesFile?.[0]?.originalname,
           results,
         },
-      });
+      } as any);
       
       // Update job status using the job ID
       await db.update(legacyImportJobs)
@@ -583,7 +583,7 @@ router.post("/api/legacy-purchases/admin/upload-csv",
           status: 'completed',
           completedAt: new Date(),
           results: results,
-        })
+        } as any)
         .where(eq(legacyImportJobs.id, job.id));
       
       res.json({
@@ -774,7 +774,7 @@ async function createLegacyLineItem(
       hubspot.crm.lineItems.basicApi.create({ properties })
     );
     
-    const lineItemId = lineItemResponse.id;
+    const lineItemId = (lineItemResponse as any).id;
     
     await retryableHubSpotRequest(() =>
       hubspot.crm.associations.v4.basicApi.create(
@@ -1015,7 +1015,7 @@ router.post("/api/legacy-purchases/admin/sync-hubspot/:email", isAdmin, async (r
       hubspotId: users.hubspotId,
     })
       .from(users)
-      .where(eq(users.email, email.toLowerCase()))
+      .where(eq(users.email, (email as string).toLowerCase()))
       .limit(1);
     
     if (!member[0]?.hubspotId) {
@@ -1029,7 +1029,7 @@ router.post("/api/legacy-purchases/admin/sync-hubspot/:email", isAdmin, async (r
       lastPurchaseDate: sql<string>`MAX(sale_date)`,
     })
       .from(legacyPurchases)
-      .where(eq(legacyPurchases.memberEmail, email.toLowerCase()));
+      .where(eq(legacyPurchases.memberEmail, (email as string).toLowerCase()));
     
     const properties: Record<string, string> = {
       eh_total_purchases: String(stats[0]?.totalPurchases || 0),

@@ -132,6 +132,7 @@ const SubscriptionsSubTab: React.FC = () => {
   const { data: subscriptionsData, isLoading, error: queryError, refetch } = useSubscriptions(statusFilter);
   const subscriptions = subscriptionsData?.subscriptions || [];
   const hasMore = subscriptionsData?.hasMore || false;
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   
   const error = localError || (queryError instanceof Error ? queryError.message : null);
 
@@ -515,6 +516,7 @@ const InvoicesSubTab: React.FC = () => {
   const { data: invoicesData, isLoading, error: queryError, refetch } = useInvoices(statusFilter, appliedStartDate, appliedEndDate);
   const invoices = invoicesData?.invoices || [];
   const hasMore = invoicesData?.hasMore || false;
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const error = queryError instanceof Error ? queryError.message : null;
 

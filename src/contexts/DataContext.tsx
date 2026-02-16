@@ -799,7 +799,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   // Listen for member stats updates (visit counts, guest passes) - refresh current user if it's their data
   // Use a ref to avoid dependency on refreshUser which changes every render
   // Read from actualUserRef inside the function to avoid dependency on actualUser
-  const refreshUserRef = useRef<() => Promise<void>>();
+  const refreshUserRef = useRef<() => Promise<void>>(undefined);
   useEffect(() => {
     refreshUserRef.current = async () => {
       // Read from ref instead of closing over actualUser

@@ -124,7 +124,7 @@ const SimulatorTab: React.FC = () => {
         return [...fromRequests, ...fromPending];
     }, [bookingRequestsData, pendingBookingsData]);
     
-    const approvedBookings: BookingRequest[] = approvedBookingsData;
+    const approvedBookings: BookingRequest[] = approvedBookingsData as any;
     
     const { memberStatusMap, memberNameMap } = useMemo(() => {
         const statusMap: Record<string, string> = {};
@@ -1102,7 +1102,7 @@ const SimulatorTab: React.FC = () => {
                         isBookingUnmatched={isBookingUnmatched}
                         handleRefresh={handleRefresh}
                         showToast={showToast}
-                        confirm={confirm}
+                        confirm={confirm as any}
                         guestFeeDollars={guestFeeDollars}
                         overageRatePerBlockDollars={overageRatePerBlockDollars}
                         tierMinutes={tierMinutes}

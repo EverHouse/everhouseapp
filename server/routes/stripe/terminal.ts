@@ -71,7 +71,7 @@ router.post('/api/stripe/terminal/create-simulated-reader', isStaffOrAdmin, asyn
     });
     
     await logFromRequest(req, {
-      action: 'terminal_reader_created',
+      action: 'terminal_reader_created' as any,
       resourceType: 'terminal_reader',
       resourceId: reader.id,
       resourceName: reader.label || 'Simulated Reader',
@@ -315,7 +315,7 @@ router.get('/api/stripe/terminal/payment-status/:paymentIntentId', isStaffOrAdmi
     const { paymentIntentId } = req.params;
     const stripe = await getStripeClient();
     
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId as string);
 
     if (paymentIntent.status === 'succeeded' && paymentIntent.metadata?.invoice_id) {
       try {
@@ -783,7 +783,7 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
       try {
         const { syncMemberToHubSpot } = await import('../../core/hubspot/stages');
         await syncMemberToHubSpot({
-          email: updatedUser.email,
+          email: updatedUser.email as string,
           status: updatedUser.membershipStatus || 'active',
           tier: updatedUser.tier || undefined,
           billingProvider: updatedUser.billingProvider || undefined,
@@ -795,7 +795,7 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
     }
     
     await logFromRequest(req, {
-      action: 'terminal_subscription_activated',
+      action: 'terminal_subscription_activated' as any,
       resourceType: 'user',
       resourceId: userId,
       resourceName: updatedUser?.email || userId,
@@ -888,7 +888,7 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
     let readerLabel = readerId;
     try {
       const readerObj = await stripe.terminal.readers.retrieve(readerId);
-      readerLabel = readerObj.label || readerId;
+      readerLabel = (readerObj as any).label || readerId;
     } catch (e) { /* reader label is cosmetic, ignore */ }
 
     const updateParams: any = {
@@ -937,7 +937,7 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
     }
 
     await logFromRequest(req, {
-      action: 'terminal_existing_payment_routed',
+      action: 'terminal_existing_payment_routed' as any,
       resourceType: 'payment',
       resourceId: paymentIntentId,
       details: {
@@ -986,8 +986,9 @@ router.post('/api/stripe/terminal/save-card', isStaffOrAdmin, async (req: Reques
     });
 
     const reader = await stripe.terminal.readers.processSetupIntent(readerId, {
-      setup_intent: setupIntent.id
-    });
+      setup_intent: setupIntent.id,
+      customer_consent_collected: true
+    } as any);
 
     if (reader.device_type?.startsWith('simulated')) {
       try {
@@ -998,7 +999,7 @@ router.post('/api/stripe/terminal/save-card', isStaffOrAdmin, async (req: Reques
     }
 
     await logFromRequest(req, {
-      action: 'terminal_save_card_initiated',
+      action: 'terminal_save_card_initiated' as any,
       resourceType: 'setup_intent',
       resourceId: setupIntent.id,
       resourceName: email || customerId,
@@ -1027,7 +1028,7 @@ router.get('/api/stripe/terminal/setup-status/:setupIntentId', isStaffOrAdmin, a
     const { setupIntentId } = req.params;
     const stripe = await getStripeClient();
 
-    const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
+    const setupIntent = await stripe.setupIntents.retrieve(setupIntentId as string);
 
     res.json({
       id: setupIntent.id,
@@ -1112,7 +1113,7 @@ router.post('/api/stripe/terminal/confirm-save-card', isStaffOrAdmin, async (req
     }
 
     await logFromRequest(req, {
-      action: 'terminal_card_saved',
+      action: 'terminal_card_saved' as any,
       resourceType: 'payment_method',
       resourceId: paymentMethodId,
       resourceName: customerId,

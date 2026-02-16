@@ -54,17 +54,17 @@ router.get('/api/settings', isAuthenticated, async (req, res) => {
 
 router.get('/api/settings/:key', isAuthenticated, async (req, res) => {
   try {
-    const { key } = req.params;
+    const key = req.params.key as string;
     
-    const [setting] = await db.select().from(appSettings).where(eq(appSettings.key, key));
+    const [setting] = await db.select().from(appSettings).where(eq(appSettings.key, key as string));
     
     if (setting) {
       res.json(setting);
-    } else if (DEFAULT_SETTINGS[key]) {
+    } else if ((DEFAULT_SETTINGS as any)[key]) {
       res.json({
         key,
-        value: DEFAULT_SETTINGS[key].value,
-        category: DEFAULT_SETTINGS[key].category,
+        value: (DEFAULT_SETTINGS as any)[key].value,
+        category: (DEFAULT_SETTINGS as any)[key].category,
         updatedAt: new Date()
       });
     } else {
@@ -77,7 +77,7 @@ router.get('/api/settings/:key', isAuthenticated, async (req, res) => {
 
 router.put('/api/admin/settings/:key', isAdmin, async (req, res) => {
   try {
-    const { key } = req.params;
+    const key = req.params.key as string;
     const { value } = req.body;
     const userEmail = getSessionUser(req)?.email;
     
@@ -85,9 +85,9 @@ router.put('/api/admin/settings/:key', isAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Value is required' });
     }
     
-    const category = DEFAULT_SETTINGS[key]?.category || 'general';
+    const category = (DEFAULT_SETTINGS as any)[key]?.category || 'general';
     
-    const [existing] = await db.select().from(appSettings).where(eq(appSettings.key, key));
+    const [existing] = await db.select().from(appSettings).where(eq(appSettings.key, key as string));
     
     if (existing) {
       const [updated] = await db
@@ -96,8 +96,8 @@ router.put('/api/admin/settings/:key', isAdmin, async (req, res) => {
           value: String(value),
           updatedAt: new Date(),
           updatedBy: userEmail
-        })
-        .where(eq(appSettings.key, key))
+        } as any)
+        .where(eq(appSettings.key, key as string))
         .returning();
       
       res.json(updated);
@@ -105,11 +105,11 @@ router.put('/api/admin/settings/:key', isAdmin, async (req, res) => {
       const [created] = await db
         .insert(appSettings)
         .values({
-          key,
+          key: key as string,
           value: String(value),
           category,
           updatedBy: userEmail
-        })
+        } as any)
         .returning();
       
       res.json(created);

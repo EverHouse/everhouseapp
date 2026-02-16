@@ -163,7 +163,7 @@ router.get('/api/bookings/:bookingId/participants', async (req: Request, res: Re
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const bookingId = parseInt(req.params.bookingId);
+    const bookingId = parseInt(req.params.bookingId as string);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
@@ -281,7 +281,7 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const bookingId = parseInt(req.params.bookingId);
+    const bookingId = parseInt(req.params.bookingId as string);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
@@ -726,7 +726,7 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
       // Invalidate cached fees for all participants (roster changed)
       await invalidateCachedFees(participantIds, 'participant_added');
       
-      const recalcResult = await recalculateSessionFees(sessionId);
+      const recalcResult = await recalculateSessionFees(sessionId, 'roster_update');
       logger.info('[roster] Session fees recalculated after adding participant', {
         extra: {
           sessionId,
@@ -847,8 +847,8 @@ router.delete('/api/bookings/:bookingId/participants/:participantId', async (req
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const bookingId = parseInt(req.params.bookingId);
-    const participantId = parseInt(req.params.participantId);
+    const bookingId = parseInt(req.params.bookingId as string);
+    const participantId = parseInt(req.params.participantId as string);
     const rosterVersion = req.body?.rosterVersion;
     
     if (isNaN(bookingId) || isNaN(participantId)) {
@@ -1008,7 +1008,7 @@ router.delete('/api/bookings/:bookingId/participants/:participantId', async (req
       // Invalidate cached fees for all remaining participants (roster changed)
       await invalidateCachedFees(participantIds, 'participant_removed');
       
-      const recalcResult = await recalculateSessionFees(booking.session_id);
+      const recalcResult = await recalculateSessionFees(booking.session_id, 'roster_update');
       logger.info('[roster] Session fees recalculated after removing participant', {
         extra: {
           sessionId: booking.session_id,
@@ -1066,7 +1066,7 @@ router.post('/api/bookings/:bookingId/participants/preview-fees', async (req: Re
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const bookingId = parseInt(req.params.bookingId);
+    const bookingId = parseInt(req.params.bookingId as string);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
@@ -1371,7 +1371,7 @@ router.post('/api/bookings/:id/invite/accept', async (req: Request, res: Respons
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const bookingId = parseInt(req.params.id);
+    const bookingId = parseInt(req.params.id as string);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
@@ -1506,7 +1506,7 @@ router.post('/api/bookings/:id/invite/decline', async (req: Request, res: Respon
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const bookingId = parseInt(req.params.id);
+    const bookingId = parseInt(req.params.id as string);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
@@ -1605,7 +1605,7 @@ router.post('/api/bookings/:bookingId/guest-fee-checkout', async (req: Request, 
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const bookingId = parseInt(req.params.bookingId);
+    const bookingId = parseInt(req.params.bookingId as string);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
@@ -1826,7 +1826,7 @@ router.post('/api/bookings/:bookingId/confirm-guest-payment', async (req: Reques
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const bookingId = parseInt(req.params.bookingId);
+    const bookingId = parseInt(req.params.bookingId as string);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
@@ -1867,7 +1867,7 @@ router.post('/api/bookings/:bookingId/confirm-guest-payment', async (req: Reques
       return res.status(403).json({ error: 'Participant does not belong to this booking' });
     }
 
-    const stripe = getStripeClient();
+    const stripe = await getStripeClient();
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
     if (paymentIntent.status !== 'succeeded') {
@@ -1944,7 +1944,7 @@ router.post('/api/bookings/:bookingId/cancel-guest-payment', async (req: Request
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const bookingId = parseInt(req.params.bookingId);
+    const bookingId = parseInt(req.params.bookingId as string);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
@@ -1993,7 +1993,7 @@ router.post('/api/bookings/:bookingId/cancel-guest-payment', async (req: Request
 
     if (paymentIntentId) {
       try {
-        const stripe = getStripeClient();
+        const stripe = await getStripeClient();
         await stripe.paymentIntents.cancel(paymentIntentId);
       } catch (stripeErr: unknown) {
         logger.warn('[roster] Failed to cancel Stripe payment intent', {
@@ -2018,7 +2018,7 @@ router.post('/api/bookings/:bookingId/cancel-guest-payment', async (req: Request
 
 router.patch('/api/admin/booking/:bookingId/player-count', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const bookingId = parseInt(req.params.bookingId, 10);
+    const bookingId = parseInt(req.params.bookingId as string, 10);
     const { playerCount } = req.body;
     const sessionUser = getSessionUser(req);
     const staffEmail = sessionUser?.email?.toLowerCase() || 'unknown';
@@ -2086,7 +2086,7 @@ router.patch('/api/admin/booking/:bookingId/player-count', isStaffOrAdmin, async
     }
 
     if (booking.session_id) {
-      await recalculateSessionFees(booking.session_id, 'staff_action');
+      await recalculateSessionFees(booking.session_id, 'staff_action' as any);
     }
 
     const { logFromRequest } = await import('../core/auditLog');

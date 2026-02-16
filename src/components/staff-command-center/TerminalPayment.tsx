@@ -37,7 +37,8 @@ export function TerminalPayment({
   onError,
   onCancel 
 }: TerminalPaymentProps) {
-  const { isDark } = useTheme();
+  const { effectiveTheme } = useTheme();
+  const isDark = effectiveTheme === 'dark';
   const [readers, setReaders] = useState<TerminalReader[]>([]);
   const [selectedReader, setSelectedReader] = useState<string>('');
   const [loading, setLoading] = useState(true);

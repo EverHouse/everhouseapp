@@ -85,7 +85,7 @@ router.post('/api/member/conference/prepay/estimate', async (req: Request, res: 
 
     res.json(response);
   } catch (error: unknown) {
-    logger.error('[ConferencePrepay] Error calculating estimate', { error });
+    logger.error('[ConferencePrepay] Error calculating estimate', { error: error as Error });
     res.status(500).json({ error: 'Failed to calculate prepayment estimate' });
   }
 });
@@ -392,7 +392,7 @@ router.post('/api/member/conference/prepay/create-intent', async (req: Request, 
       paymentRequired: true
     });
   } catch (error: unknown) {
-    logger.error('[ConferencePrepay] Error creating payment intent', { error });
+    logger.error('[ConferencePrepay] Error creating payment intent', { error: error as Error });
     res.status(500).json({ error: 'Failed to create prepayment' });
   }
 });
@@ -404,7 +404,7 @@ router.post('/api/member/conference/prepay/:id/confirm', async (req: Request, re
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const prepaymentId = parseInt(req.params.id);
+    const prepaymentId = parseInt(req.params.id as string);
     if (isNaN(prepaymentId)) {
       return res.status(400).json({ error: 'Invalid prepayment ID' });
     }
@@ -476,7 +476,7 @@ router.post('/api/member/conference/prepay/:id/confirm', async (req: Request, re
 
     res.json({ success: true });
   } catch (error: unknown) {
-    logger.error('[ConferencePrepay] Error confirming payment', { error });
+    logger.error('[ConferencePrepay] Error confirming payment', { error: error as Error });
     res.status(500).json({ error: 'Failed to confirm payment' });
   }
 });
@@ -488,7 +488,7 @@ router.get('/api/member/conference/prepay/:id', async (req: Request, res: Respon
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const prepaymentId = parseInt(req.params.id);
+    const prepaymentId = parseInt(req.params.id as string);
     if (isNaN(prepaymentId)) {
       return res.status(400).json({ error: 'Invalid prepayment ID' });
     }
@@ -522,7 +522,7 @@ router.get('/api/member/conference/prepay/:id', async (req: Request, res: Respon
       completedAt: prepayment.completed_at
     });
   } catch (error: unknown) {
-    logger.error('[ConferencePrepay] Error fetching prepayment', { error });
+    logger.error('[ConferencePrepay] Error fetching prepayment', { error: error as Error });
     res.status(500).json({ error: 'Failed to fetch prepayment' });
   }
 });

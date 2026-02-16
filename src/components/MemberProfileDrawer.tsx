@@ -831,8 +831,8 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                           credentials: 'include',
                           body: JSON.stringify({ 
                             email: member.email,
-                            firstName: member.firstName || member.name?.split(' ')[0] || '',
-                            lastName: member.lastName || member.name?.split(' ').slice(1).join(' ') || '',
+                            firstName: (member as any).firstName || member.name?.split(' ')[0] || '',
+                            lastName: (member as any).lastName || member.name?.split(' ').slice(1).join(' ') || '',
                             tierId: selectedTierId
                           })
                         });
@@ -929,7 +929,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
               </div>
               
               <p className={`mb-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                This will permanently delete <strong>{member.firstName} {member.lastName}</strong> ({member.email}) and all their data from the app.
+                This will permanently delete <strong>{(member as any).firstName} {(member as any).lastName}</strong> ({member.email}) and all their data from the app.
               </p>
               
               <div className="space-y-3 mb-6">
@@ -995,7 +995,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
               <div className="flex items-center gap-3 mb-4">
                 <span className="material-symbols-outlined text-3xl text-indigo-500">merge</span>
                 <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  Merge {member.name || member.firstName}
+                  Merge {member.name || (member as any).firstName}
                 </h3>
               </div>
               
@@ -1030,7 +1030,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                         credentials: 'include',
                         body: JSON.stringify({
                           primaryUserId: selected.id,
-                          secondaryUserId: member.id || member.userId
+                          secondaryUserId: member.id || (member as any).userId
                         })
                       });
                       if (res.ok) {
@@ -1258,7 +1258,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                         credentials: 'include',
                         body: JSON.stringify({
                           primaryUserId: selectedMergeTarget.id,
-                          secondaryUserId: member.id || member.userId
+                          secondaryUserId: member.id || (member as any).userId
                         })
                       });
                       if (res.ok) {

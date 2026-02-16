@@ -144,7 +144,7 @@ export interface MemberFlowProps {
   form: MemberFormData;
   setForm: React.Dispatch<React.SetStateAction<MemberFormData>>;
   tiers: MembershipTier[];
-  discounts: { id: string; code: string; percentOff: number }[];
+  discounts: { id: string; code: string; percentOff: number; stripeCouponId?: string }[];
   existingBillingGroups: ExistingBillingGroup[];
   isDark: boolean;
   isLoading: boolean;
@@ -155,7 +155,7 @@ export interface MemberFlowProps {
   onSuccess: (user: { id: string; email: string; name: string }) => void;
   createdUser: { id: string; email: string; name: string } | null;
   onClose: () => void;
-  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
   scannedIdImage: { base64: string; mimeType: string } | null;
   onShowIdScanner: () => void;
 }
@@ -174,7 +174,7 @@ export interface VisitorFlowProps {
   createdUser: { id: string; email: string; name: string } | null;
   onClose: () => void;
   onBookNow: () => void;
-  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
   scannedIdImage: { base64: string; mimeType: string } | null;
   onShowIdScanner: () => void;
 }

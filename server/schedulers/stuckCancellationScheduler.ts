@@ -78,7 +78,7 @@ async function checkStuckCancellations(): Promise<void> {
   } catch (error) {
     console.error('[Stuck Cancellations] Scheduler error:', error);
     schedulerTracker.recordRun('Stuck Cancellation', false, String(error));
-    logger.error({ error, context: 'stuck_cancellation_scheduler' }, 'Failed to check stuck cancellation bookings');
+    logger.error('Failed to check stuck cancellation bookings', { error: error as Error, extra: { context: 'stuck_cancellation_scheduler' } });
   }
 }
 

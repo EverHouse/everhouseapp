@@ -382,7 +382,7 @@ export function NewUserDrawer({
           }}
           createdUser={createdUser}
           onClose={handleClose}
-          onBookNow={onBookNow}
+          onBookNow={onBookNow as any}
           showToast={showToast}
           scannedIdImage={scannedIdImage}
           onShowIdScanner={() => setShowIdScanner(true)}

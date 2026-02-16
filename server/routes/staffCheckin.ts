@@ -86,7 +86,7 @@ interface CheckinContext {
 
 router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const bookingId = parseInt(req.params.id);
+    const bookingId = parseInt(req.params.id as string);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
@@ -168,7 +168,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
             `, [sessionId, bookingDuration, guestNames]);
           }
           
-          await recalculateSessionFees(sessionId);
+          await recalculateSessionFees(sessionId, 'checkin');
         }
       } catch (sessionError: unknown) {
         console.warn(`[Checkin Context] Failed to create session for booking ${bookingId}:`, getErrorMessage(sessionError));
@@ -233,7 +233,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
           
           console.log(`[Checkin Context Sync] Cleaned up ${orphanedIds.length} orphaned participants for booking ${bookingId}:`, orphanedNames);
           // Recalculate fees after cleanup
-          await recalculateSessionFees(sessionId, 'sync_cleanup');
+          await recalculateSessionFees(sessionId, 'sync_cleanup' as any);
         }
       } catch (syncError: unknown) {
         console.warn(`[Checkin Context Sync] Non-blocking sync cleanup failed for booking ${bookingId}:`, getErrorMessage(syncError));
@@ -391,7 +391,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
 
 router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const bookingId = parseInt(req.params.id);
+    const bookingId = parseInt(req.params.id as string);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
@@ -432,7 +432,7 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
     // This handles the case where we no longer write on GET requests
     if (sessionId) {
       try {
-        await recalculateSessionFees(sessionId, 'staff_action');
+        await recalculateSessionFees(sessionId, 'staff_action' as any);
       } catch (calcError) {
         console.error('[StaffCheckin] Failed to recalculate fees before payment action:', calcError);
         // Continue with existing values - non-blocking error
@@ -816,27 +816,27 @@ router.get('/api/bookings/overdue-payments', isStaffOrAdmin, async (req: Request
       ORDER BY booking_date DESC
     `);
 
-    const overduePayments: OverduePayment[] = result.rows.map(row => {
+    const overduePayments: OverduePayment[] = result.rows.map((row: any) => {
       const bookingDate = row.booking_date instanceof Date 
         ? row.booking_date.toISOString().split('T')[0]
         : String(row.booking_date || '').split('T')[0];
-      const declaredPlayers = parseInt(row.declared_player_count) || 1;
-      const filledPlayers = parseInt(row.filled_participant_count) || 0;
+      const declaredPlayers = parseInt(String(row.declared_player_count)) || 1;
+      const filledPlayers = parseInt(String(row.filled_participant_count)) || 0;
       const unfilledGuests = Math.max(0, declaredPlayers - filledPlayers);
       const guestFeePerSlot = PRICING.GUEST_FEE_DOLLARS;
       const unfilledGuestFees = unfilledGuests * guestFeePerSlot;
-      const dbOutstanding = parseFloat(row.total_outstanding) || 0;
+      const dbOutstanding = parseFloat(String(row.total_outstanding)) || 0;
       return {
-        bookingId: row.booking_id,
-        sessionId: row.session_id,
-        ownerEmail: row.owner_email,
-        ownerName: row.owner_name || row.owner_email,
+        bookingId: row.booking_id as number,
+        sessionId: row.session_id as number,
+        ownerEmail: row.owner_email as string,
+        ownerName: (row.owner_name || row.owner_email) as string,
         bookingDate,
-        startTime: row.start_time,
-        endTime: row.end_time,
-        resourceName: row.resource_name || 'Unknown',
+        startTime: row.start_time as string,
+        endTime: row.end_time as string,
+        resourceName: (row.resource_name || 'Unknown') as string,
         totalOutstanding: dbOutstanding + unfilledGuestFees,
-        unreviewedWaivers: parseInt(row.unreviewed_waivers) || 0
+        unreviewedWaivers: parseInt(String(row.unreviewed_waivers)) || 0
       };
     });
 
@@ -849,7 +849,7 @@ router.get('/api/bookings/overdue-payments', isStaffOrAdmin, async (req: Request
 router.post('/api/booking-participants/:id/mark-waiver-reviewed', isStaffOrAdmin, async (req: Request, res: Response) => {
   const client = await pool.connect();
   try {
-    const participantId = parseInt(req.params.id);
+    const participantId = parseInt(req.params.id as string);
     if (isNaN(participantId)) {
       return res.status(400).json({ error: 'Invalid participant ID' });
     }
@@ -907,7 +907,7 @@ router.post('/api/booking-participants/:id/mark-waiver-reviewed', isStaffOrAdmin
 router.post('/api/bookings/:bookingId/mark-all-waivers-reviewed', isStaffOrAdmin, async (req: Request, res: Response) => {
   const client = await pool.connect();
   try {
-    const bookingId = parseInt(req.params.bookingId);
+    const bookingId = parseInt(req.params.bookingId as string);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
@@ -1053,7 +1053,7 @@ router.get('/api/bookings/stale-waivers', isStaffOrAdmin, async (req: Request, r
 
 router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const bookingId = parseInt(req.params.id);
+    const bookingId = parseInt(req.params.id as string);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
@@ -1180,7 +1180,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
         ]);
 
         try {
-          await recalculateSessionFees(sessionId, 'staff_add_member');
+          await recalculateSessionFees(sessionId, 'staff_add_member' as any);
           
           // Create prepayment intent for any new fees (e.g., overage)
           try {
@@ -1270,7 +1270,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
 
       // Recalculate fees to update all participant fees
       try {
-        await recalculateSessionFees(sessionId, 'staff_add_guest');
+        await recalculateSessionFees(sessionId, 'staff_add_guest' as any);
         
         // Create prepayment intent for the new fees
         try {
@@ -1421,7 +1421,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
 
       // Recalculate fees to update all participant fees
       try {
-        await recalculateSessionFees(sessionId, 'staff_add_member');
+        await recalculateSessionFees(sessionId, 'staff_add_member' as any);
       } catch (feeErr) {
         console.warn(`[Staff Add Member] Failed to recalculate fees for session ${sessionId}:`, feeErr);
       }

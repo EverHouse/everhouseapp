@@ -4,6 +4,7 @@ import { db } from '../../db';
 import { users, staffUsers } from '../../../shared/schema';
 import { isProduction } from '../../core/db';
 import { isStaffOrAdmin, isAuthenticated } from '../../core/middleware';
+import { getSessionUser } from '../../types/session';
 import { redactEmail } from './helpers';
 
 const router = Router();
@@ -383,7 +384,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
       // Consider all active statuses, including trialing and past_due (still has access)
       // Also consider active if they have a Stripe subscription
       const activeStatuses = ['active', 'trialing', 'past_due'];
-      const isActive = activeStatuses.includes(status.toLowerCase()) || !status || !!member.stripeSubscriptionId;
+      const isActive = activeStatuses.includes(status.toLowerCase()) || !status || !!(member as any).stripeSubscriptionId;
       
       return {
         id: member.id,

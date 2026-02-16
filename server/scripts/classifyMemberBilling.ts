@@ -141,7 +141,7 @@ export async function bulkClassifyMindbodyMembers(): Promise<{ updated: number; 
         sql`${users.billingProvider} IS NULL OR ${users.billingProvider} = ''`
       ));
     
-    updated = result.count || 0;
+    updated = (result as any).count || 0;
     console.log(`[BillingClassify] Updated ${updated} members with Mindbody IDs to mindbody provider`);
     
     return { updated, errors };

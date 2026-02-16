@@ -78,7 +78,7 @@ router.get('/api/admin/bug-reports/:id', isStaffOrAdmin, async (req, res) => {
     const { id } = req.params;
     
     const [report] = await db.select().from(bugReports)
-      .where(eq(bugReports.id, parseInt(id)));
+      .where(eq(bugReports.id, parseInt(id as string)));
     
     if (!report) {
       return res.status(404).json({ error: 'Bug report not found' });
@@ -104,7 +104,7 @@ router.put('/api/admin/bug-reports/:id', isStaffOrAdmin, async (req, res) => {
     if (status !== undefined) {
       updateData.status = status;
       if (status === 'resolved') {
-        updateData.resolvedBy = user.email;
+        updateData.resolvedBy = user?.email;
         updateData.resolvedAt = new Date();
       }
     }
@@ -116,14 +116,14 @@ router.put('/api/admin/bug-reports/:id', isStaffOrAdmin, async (req, res) => {
     // Notify the member when their bug report is resolved
     if (status === 'resolved') {
       // Need to fetch the original report to get the user email
-      const [original] = await db.select().from(bugReports).where(eq(bugReports.id, parseInt(id)));
+      const [original] = await db.select().from(bugReports).where(eq(bugReports.id, parseInt(id as string)));
       if (original?.userEmail) {
         await notifyMember({
           userEmail: original.userEmail,
           title: 'Bug Report Resolved',
           message: 'Your bug report has been resolved. Thank you for helping us improve!',
           type: 'system',
-          relatedId: parseInt(id),
+          relatedId: parseInt(id as string),
           relatedType: 'bug_report',
           url: '/member/profile'
         });
@@ -132,7 +132,7 @@ router.put('/api/admin/bug-reports/:id', isStaffOrAdmin, async (req, res) => {
     
     const [updated] = await db.update(bugReports)
       .set(updateData)
-      .where(eq(bugReports.id, parseInt(id)))
+      .where(eq(bugReports.id, parseInt(id as string)))
       .returning();
     
     if (!updated) {
@@ -151,7 +151,7 @@ router.delete('/api/admin/bug-reports/:id', isStaffOrAdmin, async (req, res) => 
     const { id } = req.params;
     
     const [deleted] = await db.delete(bugReports)
-      .where(eq(bugReports.id, parseInt(id)))
+      .where(eq(bugReports.id, parseInt(id as string)))
       .returning();
     
     if (!deleted) {

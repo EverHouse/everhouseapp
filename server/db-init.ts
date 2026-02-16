@@ -379,7 +379,7 @@ export async function ensureDatabaseConstraints() {
 export async function seedTierFeatures(): Promise<void> {
   try {
     const existing = await db.execute(sql`SELECT COUNT(*) FROM tier_features`);
-    if (parseInt(existing.rows[0].count) > 0) {
+    if (parseInt(existing.rows[0].count as string) > 0) {
       console.log('[DB Init] Tier features already seeded, skipping');
       return;
     }

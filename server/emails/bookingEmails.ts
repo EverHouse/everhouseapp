@@ -272,15 +272,15 @@ export async function sendBookingRescheduleEmail(
   data: BookingRescheduleData
 ): Promise<boolean> {
   try {
-    const resend = getResendClient();
-    if (!resend) {
+    const resendResult = await getResendClient();
+    if (!resendResult) {
       logger.warn('[BookingEmails] Resend client not configured, skipping reschedule email');
       return false;
     }
 
     const html = getBookingRescheduleHtml(data);
 
-    await resend.emails.send({
+    await resendResult.client.emails.send({
       from: 'Ever Club <noreply@everclub.app>',
       to: email,
       subject: `Booking Rescheduled: ${data.bayName} on ${data.date}`,
@@ -300,15 +300,15 @@ export async function sendBookingConfirmationEmail(
   data: BookingConfirmationData
 ): Promise<boolean> {
   try {
-    const resend = getResendClient();
-    if (!resend) {
+    const resendResult = await getResendClient();
+    if (!resendResult) {
       logger.warn('[BookingEmails] Resend client not configured, skipping email');
       return false;
     }
     
     const html = getBookingConfirmationHtml(data);
     
-    await resend.emails.send({
+    await resendResult.client.emails.send({
       from: 'Ever Club <noreply@everclub.app>',
       to: email,
       subject: `Booking Confirmed: ${data.bayName} on ${data.date}`,

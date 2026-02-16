@@ -527,12 +527,12 @@ const DirectoryTab: React.FC = () => {
         }
     }, [fetchFormerMembers]);
 
-    const visitorToMemberProfile = useCallback((visitor: Visitor): MemberProfile => ({
+    const visitorToMemberProfile = useCallback((visitor: Visitor) => ({
         email: visitor.email || '',
         name: [visitor.firstName, visitor.lastName].filter(Boolean).join(' ') || 'Unknown',
         tier: null,
         rawTier: null,
-        role: visitor.role || 'visitor',
+        role: (visitor.role || 'visitor') as any,
         joinDate: visitor.createdAt || null,
         phone: visitor.phone || '',
         mindbodyId: null,
@@ -556,12 +556,12 @@ const DirectoryTab: React.FC = () => {
         setVisitorDetailsOpen(true);
     }, []);
 
-    const teamMemberToMemberProfile = useCallback((member: TeamMember): MemberProfile => ({
+    const teamMemberToMemberProfile = useCallback((member: TeamMember) => ({
         email: member.email || '',
         name: [member.first_name, member.last_name].filter(Boolean).join(' ') || 'Unknown',
         tier: member.tier || null,
         rawTier: member.tier || null,
-        role: member.role || 'staff',
+        role: (member.role || 'staff') as any,
         joinDate: null,
         phone: member.phone || '',
         mindbodyId: null,
@@ -582,7 +582,7 @@ const DirectoryTab: React.FC = () => {
 
     const openTeamMemberDetails = useCallback((member: TeamMember) => {
         const profile = teamMemberToMemberProfile(member);
-        setSelectedMember(profile);
+        setSelectedMember(profile as any);
         setIsViewingDetails(true);
     }, [teamMemberToMemberProfile]);
 
@@ -1509,7 +1509,7 @@ const DirectoryTab: React.FC = () => {
                                         </div>
                                         <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-gray-50 dark:border-white/20">
                                             <div className="flex items-center gap-1.5 flex-wrap">
-                                                {member.tier && <TierBadge tier={member.tier} size="sm" membershipStatus={member.membershipStatus} />}
+                                                {member.tier && <TierBadge tier={member.tier} size="sm" membershipStatus={member.membership_status} />}
                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                                     member.is_active 
                                                         ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' 
@@ -1827,7 +1827,7 @@ const DirectoryTab: React.FC = () => {
 
             <MemberProfileDrawer
                 isOpen={visitorDetailsOpen && !!selectedVisitor}
-                member={selectedVisitor ? visitorToMemberProfile(selectedVisitor) : null}
+                member={selectedVisitor ? visitorToMemberProfile(selectedVisitor) as any : null}
                 isAdmin={isAdmin}
                 onClose={() => { setVisitorDetailsOpen(false); setSelectedVisitor(null); }}
                 onViewAs={() => {}}

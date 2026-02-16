@@ -69,15 +69,15 @@ async function expireUnacceptedInvites(): Promise<void> {
         await client.query('COMMIT');
         
         if (invite.owner_email) {
-          const dateDisplay = invite.session_date ? formatDateDisplayWithDay(invite.session_date) : 'your booking';
-          const timeDisplay = invite.start_time ? ` at ${formatTime12Hour(invite.start_time)}` : '';
+          const dateDisplay = invite.session_date ? formatDateDisplayWithDay(invite.session_date as string) : 'your booking';
+          const timeDisplay = invite.start_time ? ` at ${formatTime12Hour(invite.start_time as string)}` : '';
           
           await notifyMember({
-            userEmail: invite.owner_email.toLowerCase(),
+            userEmail: (invite.owner_email as string).toLowerCase(),
             type: 'booking',
             title: 'Invite expired',
             message: `${invite.display_name}'s invite to your booking on ${dateDisplay}${timeDisplay} has expired as they did not respond in time.`,
-            relatedId: invite.booking_id
+            relatedId: invite.booking_id as number
           });
         }
         

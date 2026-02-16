@@ -146,7 +146,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
   visitorArchiveResult,
   visitorArchiveProgress,
 }) => {
-  const getStatusColor = (status: 'pass' | 'warning' | 'fail') => {
+  const getStatusColor = (status: 'pass' | 'warning' | 'fail' | 'info') => {
     switch (status) {
       case 'pass': return 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400';
       case 'warning': return 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400';

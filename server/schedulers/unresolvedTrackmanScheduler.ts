@@ -58,7 +58,7 @@ async function checkUnresolvedTrackmanBookings(): Promise<void> {
           const unresolved = result.rows;
           
           if (unresolved.length > 0) {
-            const oldestDate = new Date(unresolved[0].created_at).toLocaleDateString('en-US', {
+            const oldestDate = new Date(unresolved[0].created_at as string).toLocaleDateString('en-US', {
               timeZone: 'America/Los_Angeles',
               month: 'short',
               day: 'numeric',

@@ -39,7 +39,7 @@ const EmailTemplatesTab: React.FC = () => {
   const fetchTemplates = async () => {
     try {
       setLoading(true);
-      const data = await fetchWithCredentials('/api/admin/email-templates');
+      const data = await fetchWithCredentials('/api/admin/email-templates') as any;
       setTemplates(data.templates);
       if (data.templates.length > 0) {
         selectTemplate(data.templates[0]);
@@ -56,7 +56,7 @@ const EmailTemplatesTab: React.FC = () => {
     setPreviewLoading(true);
     setPreviewHtml(null);
     try {
-      const data = await fetchWithCredentials(`/api/admin/email-templates/${template.id}/preview`);
+      const data = await fetchWithCredentials(`/api/admin/email-templates/${template.id}/preview`) as any;
       setPreviewHtml(data.html);
     } catch (err) {
       setPreviewHtml('<html><body><p style="padding:40px;color:#666;text-align:center;">Failed to load template preview.</p></body></html>');

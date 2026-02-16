@@ -3,7 +3,7 @@ import { getPacificHour } from '../utils/dateUtils';
 
 async function scheduleWebhookLogCleanup(): Promise<void> {
   try {
-    const { cleanupOldWebhookLogs } = await import('../routes/trackmanWebhook');
+    const { cleanupOldWebhookLogs } = await import('../routes/trackman/index');
     await cleanupOldWebhookLogs();
     schedulerTracker.recordRun('Webhook Log Cleanup', true);
   } catch (err) {

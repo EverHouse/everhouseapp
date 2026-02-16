@@ -46,6 +46,9 @@ export function MemberFlow({
   const linkSubmittingRef = useRef(false);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'terminal'>('card');
   const [paymentPath, setPaymentPath] = useState<'choose' | 'card_or_terminal' | 'link'>('choose');
+  const [subMemberScannedIds, setSubMemberScannedIds] = useState<Record<number, { base64: string; mimeType: string }>>({});
+  const [scanningSubMemberIndex, setScanningSubMemberIndex] = useState<number | null>(null);
+  const [showIdScanner, setShowIdScanner] = useState(false);
 
   const getInputClass = (fieldName: string) => `w-full px-3 py-2.5 rounded-lg border ${
     fieldErrors[fieldName]

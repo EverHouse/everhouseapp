@@ -12,7 +12,7 @@ const router = Router();
 router.get('/api/staff-users/by-email/:email', isStaffOrAdmin, async (req, res) => {
   try {
     const { email } = req.params;
-    const normalizedEmail = normalizeEmail(decodeURIComponent(email));
+    const normalizedEmail = normalizeEmail(decodeURIComponent(email as string));
     
     const result = await db.select({
       id: staffUsers.id,
@@ -132,7 +132,7 @@ router.put('/api/staff-users/:id', isAdmin, async (req, res) => {
     
     const result = await db.update(staffUsers)
       .set(updateData)
-      .where(eq(staffUsers.id, parseInt(id)))
+      .where(eq(staffUsers.id, parseInt(id as string)))
       .returning();
     
     if (result.length === 0) {
@@ -163,7 +163,7 @@ router.delete('/api/staff-users/:id', isAdmin, async (req, res) => {
     const { id } = req.params;
     
     const result = await db.delete(staffUsers)
-      .where(eq(staffUsers.id, parseInt(id)))
+      .where(eq(staffUsers.id, parseInt(id as string)))
       .returning();
     
     if (result.length === 0) {
@@ -270,7 +270,7 @@ router.put('/api/admin-users/:id', isAdmin, async (req, res) => {
     
     const result = await db.update(staffUsers)
       .set(updateData)
-      .where(and(eq(staffUsers.id, parseInt(id)), eq(staffUsers.role, 'admin')))
+      .where(and(eq(staffUsers.id, parseInt(id as string)), eq(staffUsers.role, 'admin')))
       .returning();
     
     if (result.length === 0) {
@@ -308,7 +308,7 @@ router.delete('/api/admin-users/:id', isAdmin, async (req, res) => {
     }
     
     const result = await db.delete(staffUsers)
-      .where(and(eq(staffUsers.id, parseInt(id)), eq(staffUsers.role, 'admin')))
+      .where(and(eq(staffUsers.id, parseInt(id as string)), eq(staffUsers.role, 'admin')))
       .returning();
     
     if (result.length === 0) {

@@ -87,8 +87,8 @@ describe('Training Guide Content Validation', () => {
           expect(typeof step.pageIcon).toBe('string');
         }
 
-        if (step.imageUrl !== undefined) {
-          expect(typeof step.imageUrl).toBe('string');
+        if ((step as any).imageUrl !== undefined) {
+          expect(typeof (step as any).imageUrl).toBe('string');
         }
       });
     });

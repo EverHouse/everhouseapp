@@ -446,7 +446,7 @@ const BlocksTab: React.FC = () => {
         setIsClosureModalOpen(true);
     };
 
-    const handlePullRefresh = () => {
+    const handlePullRefresh = async () => {
         syncClosuresMutation.mutate();
     };
 

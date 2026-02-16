@@ -79,7 +79,7 @@ router.put('/api/admin/faqs/:id', isStaffOrAdmin, async (req, res) => {
         ...(isActive !== undefined && { isActive }),
         updatedAt: new Date(),
       })
-      .where(eq(faqs.id, parseInt(id)))
+      .where(eq(faqs.id, parseInt(id as string)))
       .returning();
     
     if (!updated) {
@@ -98,7 +98,7 @@ router.delete('/api/admin/faqs/:id', isStaffOrAdmin, async (req, res) => {
     const { id } = req.params;
     
     const [deleted] = await db.delete(faqs)
-      .where(eq(faqs.id, parseInt(id)))
+      .where(eq(faqs.id, parseInt(id as string)))
       .returning();
     
     if (!deleted) {

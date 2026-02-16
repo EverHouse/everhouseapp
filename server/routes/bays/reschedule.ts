@@ -17,7 +17,7 @@ const router = Router();
 
 router.post('/api/admin/booking/:id/reschedule/start', isStaffOrAdmin, async (req, res) => {
   try {
-    const bookingId = parseInt(req.params.id, 10);
+    const bookingId = parseInt(req.params.id as string, 10);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
@@ -45,8 +45,8 @@ router.post('/api/admin/booking/:id/reschedule/start', isStaffOrAdmin, async (re
     const pacificDateStr = now.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
     const pacificTimeStr = now.toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour12: false, hour: '2-digit', minute: '2-digit' });
 
-    const bookingDate = booking.request_date;
-    const bookingStartTime = booking.start_time;
+    const bookingDate = booking.request_date as string;
+    const bookingStartTime = booking.start_time as string;
 
     if (bookingDate < pacificDateStr || (bookingDate === pacificDateStr && bookingStartTime < pacificTimeStr)) {
       return res.status(400).json({ error: 'Cannot reschedule a booking that has already started or is in the past' });
@@ -82,7 +82,7 @@ router.post('/api/admin/booking/:id/reschedule/start', isStaffOrAdmin, async (re
 
 router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (req, res) => {
   try {
-    const bookingId = parseInt(req.params.id, 10);
+    const bookingId = parseInt(req.params.id as string, 10);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
@@ -204,7 +204,7 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
 
     if (updated.session_id) {
       try {
-        await recalculateSessionFees(updated.session_id, 'reschedule');
+        await recalculateSessionFees(updated.session_id, 'reschedule' as any);
         logger.info('[Reschedule] Recalculated session fees after reschedule', {
           extra: { bookingId, sessionId: updated.session_id }
         });
@@ -224,7 +224,7 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
           const stripe = await getStripeClient();
           for (const intent of staleIntents.rows) {
             try {
-              await stripe.paymentIntents.cancel(intent.stripe_payment_intent_id);
+              await stripe.paymentIntents.cancel(intent.stripe_payment_intent_id as string);
               await db.execute(sql`UPDATE stripe_payment_intents SET status = 'canceled', updated_at = NOW() WHERE id = ${intent.id}`);
               logger.info('[Reschedule] Canceled stale prepayment intent after reschedule', {
                 extra: { bookingId, sessionId: updated.session_id, paymentIntentId: intent.stripe_payment_intent_id }
@@ -244,7 +244,7 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
     }
 
     const newBayResult = await db.execute(sql`SELECT name FROM resources WHERE id = ${resource_id}`);
-    const newBayName = newBayResult.rows[0]?.name || 'Unknown';
+    const newBayName = (newBayResult.rows[0] as any)?.name || 'Unknown';
 
     logFromRequest(req, {
       action: 'booking_rescheduled',
@@ -263,12 +263,12 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
 
     try {
       broadcastAvailabilityUpdate({
-        resourceId: originalResourceId,
+        resourceId: Number(originalResourceId),
         resourceType: 'simulator',
-        date: originalDate,
+        date: originalDate as string,
         action: 'updated'
       });
-      if (resource_id !== originalResourceId || request_date !== originalDate) {
+      if (resource_id !== (originalResourceId as any) || request_date !== (originalDate as any)) {
         broadcastAvailabilityUpdate({
           resourceId: resource_id,
           resourceType: 'simulator',
@@ -289,18 +289,18 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
          VALUES (${booking.user_email}, ${'Booking Rescheduled'}, ${notifMessage}, ${'booking_rescheduled'}, ${bookingId}, ${'booking'})`
       ).catch(() => {});
 
-      sendPushNotification(booking.user_email, {
+      sendPushNotification(booking.user_email as string, {
         title: 'Booking Rescheduled',
         body: notifMessage,
         url: '/sims'
       }).catch(() => {});
 
-      sendBookingRescheduleEmail(booking.user_email, {
+      sendBookingRescheduleEmail(booking.user_email as string, {
         date: request_date,
         startTime: start_time,
         endTime: end_time,
         bayName: newBayName,
-        memberName: booking.user_name || 'Member',
+        memberName: (booking.user_name as string) || 'Member',
       }).catch(() => {});
     }
 
@@ -316,7 +316,7 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
 
 router.post('/api/admin/booking/:id/reschedule/cancel', isStaffOrAdmin, async (req, res) => {
   try {
-    const bookingId = parseInt(req.params.id, 10);
+    const bookingId = parseInt(req.params.id as string, 10);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }

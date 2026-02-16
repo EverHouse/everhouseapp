@@ -776,7 +776,7 @@ router.put('/api/admin/training-sections/:id', isAdmin, async (req, res) => {
         ...(sortOrder !== undefined && { sortOrder }),
         updatedAt: new Date(),
       })
-      .where(eq(trainingSections.id, parseInt(id)))
+      .where(eq(trainingSections.id, parseInt(id as string)))
       .returning();
     
     if (!updated) {
@@ -795,7 +795,7 @@ router.delete('/api/admin/training-sections/:id', isAdmin, async (req, res) => {
     const { id } = req.params;
     
     const [deleted] = await db.delete(trainingSections)
-      .where(eq(trainingSections.id, parseInt(id)))
+      .where(eq(trainingSections.id, parseInt(id as string)))
       .returning();
     
     if (!deleted) {

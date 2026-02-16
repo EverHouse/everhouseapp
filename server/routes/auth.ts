@@ -188,8 +188,8 @@ async function createSupabaseToken(user: { id: string, email: string, role: stri
       return null;
     }
     
-    if (linkData?.properties?.access_token) {
-      return linkData.properties.access_token;
+    if ((linkData?.properties as any)?.access_token) {
+      return (linkData.properties as any).access_token;
     }
     
     const hashedToken = linkData?.properties?.hashed_token;
@@ -767,16 +767,16 @@ router.post('/api/auth/request-otp', async (req, res) => {
       
       return res.json({ success: true, message: 'Login code sent to your email' });
     } catch (emailError: unknown) {
-      console.error('[OTP Email] Error sending email:', emailError?.message || emailError);
+      console.error('[OTP Email] Error sending email:', (emailError as Error)?.message || emailError);
       return res.status(500).json({ error: 'Failed to send login code. Please try again.' });
     }
   } catch (error: unknown) {
-    if (!isProduction) console.error('OTP request error:', error?.message || error);
+    if (!isProduction) console.error('OTP request error:', (error as Error)?.message || error);
     
-    if (error?.message?.includes('HubSpot') || error?.message?.includes('hubspot')) {
+    if ((error as Error)?.message?.includes('HubSpot') || (error as Error)?.message?.includes('hubspot')) {
       return res.status(500).json({ error: 'Unable to verify membership. Please try again later.' });
     }
-    if (error?.message?.includes('Resend') || error?.message?.includes('email')) {
+    if ((error as Error)?.message?.includes('Resend') || (error as Error)?.message?.includes('email')) {
       return res.status(500).json({ error: 'Unable to send email. Please try again later.' });
     }
     
@@ -977,7 +977,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
           'trialing': 'Trialing',
           'past_due': 'Past Due'
         };
-        const memberStatusStr = (hasDbUser ? dbUser[0].membershipStatus : contact?.properties.membership_status || '').toLowerCase();
+        const memberStatusStr = (hasDbUser ? dbUser[0].membershipStatus : contact?.properties.membership_status || '' as string | null)?.toLowerCase() || '';
         
         member = {
           id: hasDbUser ? dbUser[0].id : (contact?.id || crypto.randomUUID()),
@@ -1330,16 +1330,16 @@ router.post('/api/auth/dev-login', async (req, res) => {
       id: user.id,
       firstName: user.firstName || '',
       lastName: user.lastName || '',
-      email: user.email,
+      email: user.email || devEmail,
       phone: user.phone || '',
-      tier: user.tier || null,
+      tier: user.tier || undefined,
       role: user.role || 'member',
       expires_at: Date.now() + sessionTtl
     };
     
-    req.session.user = member;
+    req.session.user = member as any;
 
-    const supabaseToken = await createSupabaseToken(member);
+    const supabaseToken = await createSupabaseToken({ ...member, email: member.email as string });
     
     req.session.save((err) => {
       if (err) {

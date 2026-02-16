@@ -204,7 +204,7 @@ router.get('/api/booking-requests', async (req, res) => {
     
     let inviteStatusMap = new Map<string, string>();
     if (requestingUserEmail && !isStaffRequest) {
-      const sessionIds = result.filter(b => b.session_id).map(b => b.session_id as string);
+      const sessionIds = result.filter(b => b.session_id).map(b => String(b.session_id));
       if (sessionIds.length > 0) {
         const inviteStatuses = await db.select({
           sessionId: bookingParticipants.sessionId,
@@ -219,7 +219,7 @@ router.get('/api/booking-requests', async (req, res) => {
         
         for (const row of inviteStatuses) {
           if (row.sessionId) {
-            inviteStatusMap.set(row.sessionId, row.inviteStatus || '');
+            inviteStatusMap.set(String(row.sessionId), row.inviteStatus || '');
           }
         }
       }
@@ -325,7 +325,7 @@ router.get('/api/booking-requests', async (req, res) => {
       const primaryBookerName = isLinkedMember ? (booking.user_name || booking.user_email) : null;
       
       const inviteStatus = (isLinkedMember && booking.session_id) 
-        ? (inviteStatusMap.get(booking.session_id) || null)
+        ? (inviteStatusMap.get(String(booking.session_id)) || null)
         : null;
       
       const members = memberDetailsMap.get(booking.id) || [];
@@ -579,7 +579,7 @@ router.post('/api/booking-requests', async (req, res) => {
               email: users.email, 
               firstName: users.firstName,
               lastName: users.lastName,
-              name: users.name
+              name: (users as any).name
             }).from(users)
               .where(eq(users.id, participant.userId))
               .limit(1);
@@ -587,7 +587,7 @@ router.post('/api/booking-requests', async (req, res) => {
               participant.email = existingUser.email?.toLowerCase() || '';
               // Also set name if not already set
               if (!participant.name) {
-                participant.name = existingUser.name || 
+                participant.name = (existingUser as any).name || 
                   `${existingUser.firstName || ''} ${existingUser.lastName || ''}`.trim() || 
                   existingUser.email;
               }
@@ -604,7 +604,7 @@ router.post('/api/booking-requests', async (req, res) => {
           const statusCheck = await db.select({ 
             membershipStatus: users.membershipStatus,
             email: users.email,
-            name: users.name
+            name: (users as any).name
           }).from(users)
             .where(eq(users.id, participant.userId))
             .limit(1);
@@ -796,7 +796,7 @@ router.post('/api/booking-requests', async (req, res) => {
     
     // Ensure session exists for auto-confirmed conference room bookings
     // ensureSessionForBooking handles retries and writes staff_notes on failure internally
-    if (isConferenceRoom && row.resourceId) {
+    if (resourceType === 'conference_room' && row.resourceId) {
       await ensureSessionForBooking({
         bookingId: row.id,
         resourceId: row.resourceId,

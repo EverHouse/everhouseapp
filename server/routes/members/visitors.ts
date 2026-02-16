@@ -349,7 +349,7 @@ router.get('/api/visitors/:id/purchases', isStaffOrAdmin, async (req, res) => {
       membershipStatus: users.membershipStatus
     })
       .from(users)
-      .where(eq(users.id, id));
+      .where(eq(users.id, id as string));
     
     if (visitorResult.length === 0) {
       return res.status(404).json({ error: 'Visitor not found' });
@@ -494,7 +494,7 @@ router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
         
         const staffEmail = (req as any).session?.user?.email || 'admin';
         await logFromRequest(req, {
-          action: 'visitor_linked',
+          action: 'visitor_linked' as any,
           resourceType: 'user',
           resourceId: user.id,
           resourceName: `${user.first_name || ''} ${user.last_name || ''}`.trim() || normalizedEmail,
@@ -546,7 +546,7 @@ router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
     
     const staffEmail = (req as any).session?.user?.email || 'admin';
     await logFromRequest(req, {
-      action: 'visitor_created',
+      action: 'visitor_created' as any,
       resourceType: 'user',
       resourceId: userId,
       resourceName: `${firstName || ''} ${lastName || ''}`.trim() || normalizedEmail,
@@ -734,7 +734,7 @@ router.post('/api/visitors/backfill-types', isAdmin, async (req, res) => {
     
     const staffEmail = (req as any).session?.user?.email || 'admin';
     await logFromRequest(req, {
-      action: 'data_migration',
+      action: 'data_migration' as any,
       resourceType: 'system',
       resourceId: 'visitor_types_backfill',
       resourceName: 'Visitor Types Backfill',
@@ -777,7 +777,7 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
       hubspotId: users.hubspotId
     })
       .from(users)
-      .where(eq(users.id, id));
+      .where(eq(users.id, id as string));
     
     if (userResult.length === 0) {
       return res.status(404).json({ error: 'Visitor not found' });
@@ -911,7 +911,7 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
     if (deleteFromStripe === 'true' && visitor.stripeCustomerId) {
       try {
         const { getStripe } = await import('../../core/stripe');
-        const stripe = getStripe();
+        const stripe = await getStripe();
         let hasMore = true;
         let startingAfter: string | undefined;
         while (hasMore) {
@@ -929,7 +929,7 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
             startingAfter = subscriptions.data[subscriptions.data.length - 1].id;
           }
         }
-        await stripe.customers.del(visitor.stripeCustomerId);
+        await (stripe as any).customers.del(visitor.stripeCustomerId);
         stripeDeleted = true;
         deletionLog.push('stripe_customer');
       } catch (stripeError: unknown) {
@@ -954,10 +954,10 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
     deletionLog.push('users');
     
     await logFromRequest(req, {
-      action: 'delete_visitor',
+      action: 'delete_visitor' as any,
       resourceType: 'user',
-      resourceId: id,
-      resourceName: visitorName,
+      resourceId: id as string,
+      resourceName: visitorName || undefined,
       details: {
         email: visitor.email,
         deletedRecords: deletionLog,

@@ -20,7 +20,7 @@ const AnimatedCounter: React.FC<AnimatedCounterProps> = ({
   const [displayValue, setDisplayValue] = useState(value);
   const [isAnimating, setIsAnimating] = useState(false);
   const previousValue = useRef(value);
-  const animationFrame = useRef<number>();
+  const animationFrame = useRef<number>(undefined);
 
   useEffect(() => {
     if (value === previousValue.current) return;

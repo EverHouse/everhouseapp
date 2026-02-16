@@ -14,7 +14,7 @@ const router = Router();
 router.get('/api/members/:email/communications', isStaffOrAdmin, async (req, res) => {
   try {
     const { email } = req.params;
-    const normalizedEmail = decodeURIComponent(email).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
     
     const logs = await db.select()
       .from(communicationLogs)
@@ -38,7 +38,7 @@ router.post('/api/members/:email/communications', isStaffOrAdmin, async (req, re
       return res.status(400).json({ error: 'Communication type is required' });
     }
     
-    const normalizedEmail = decodeURIComponent(email).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
     
     const result = await db.insert(communicationLogs)
       .values({
@@ -66,11 +66,11 @@ router.post('/api/members/:email/communications', isStaffOrAdmin, async (req, re
 router.delete('/api/members/:email/communications/:logId', isStaffOrAdmin, async (req, res) => {
   try {
     const { email, logId } = req.params;
-    const normalizedEmail = decodeURIComponent(email).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
     
     const result = await db.delete(communicationLogs)
       .where(and(
-        eq(communicationLogs.id, parseInt(logId)),
+        eq(communicationLogs.id, parseInt(logId as string)),
         sql`LOWER(${communicationLogs.memberEmail}) = ${normalizedEmail}`
       ))
       .returning();
@@ -367,8 +367,8 @@ router.post('/api/members/me/data-export-request', isAuthenticated, async (req, 
         const adminEmails = adminStaff.map(s => s.email);
         
         await withResendRetry(() => resendClient.emails.send({
-          from: fromEmail,
-          to: adminEmails,
+          from: fromEmail as string,
+          to: adminEmails as string[],
           subject: `[Action Required] CCPA Data Export Request from ${memberName}`,
           html: `
             <h2>Data Export Request</h2>

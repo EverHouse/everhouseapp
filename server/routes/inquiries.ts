@@ -39,7 +39,7 @@ router.get('/api/admin/inquiries/:id', isStaffOrAdmin, async (req, res) => {
     const { id } = req.params;
     
     const [inquiry] = await db.select().from(formSubmissions)
-      .where(eq(formSubmissions.id, parseInt(id)));
+      .where(eq(formSubmissions.id, parseInt(id as string)));
     
     if (!inquiry) {
       return res.status(404).json({ error: 'Inquiry not found' });
@@ -63,7 +63,7 @@ router.put('/api/admin/inquiries/:id', isStaffOrAdmin, async (req, res) => {
         ...(notes !== undefined && { notes }),
         updatedAt: new Date(),
       })
-      .where(eq(formSubmissions.id, parseInt(id)))
+      .where(eq(formSubmissions.id, parseInt(id as string)))
       .returning();
     
     if (!updated) {
@@ -85,7 +85,7 @@ router.delete('/api/admin/inquiries/:id', isStaffOrAdmin, async (req, res) => {
     if (archive === 'true') {
       const [archived] = await db.update(formSubmissions)
         .set({ status: 'archived', updatedAt: new Date() })
-        .where(eq(formSubmissions.id, parseInt(id)))
+        .where(eq(formSubmissions.id, parseInt(id as string)))
         .returning();
       
       if (!archived) {
@@ -96,7 +96,7 @@ router.delete('/api/admin/inquiries/:id', isStaffOrAdmin, async (req, res) => {
     }
     
     const [deleted] = await db.delete(formSubmissions)
-      .where(eq(formSubmissions.id, parseInt(id)))
+      .where(eq(formSubmissions.id, parseInt(id as string)))
       .returning();
     
     if (!deleted) {

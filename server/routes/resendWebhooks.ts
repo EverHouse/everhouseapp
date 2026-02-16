@@ -223,7 +223,7 @@ router.post('/api/webhooks/resend', async (req: Request, res: Response) => {
     res.status(200).json({ received: true });
   } catch (error: unknown) {
     logger.error('Failed to process Resend webhook', {
-      error,
+      error: error as Error,
       extra: { eventType: event.type }
     });
     res.status(500).json({ error: 'Internal server error' });

@@ -123,7 +123,7 @@ class MockWebhookProcessor {
 
 describe('Webhook Idempotency', () => {
   let processor: MockWebhookProcessor;
-  let deferredActions: Array<() => Promise<void>>;
+  let deferredActions: Array<() => Promise<any>>;
 
   beforeEach(() => {
     processor = new MockWebhookProcessor();

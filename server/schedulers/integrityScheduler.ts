@@ -130,7 +130,7 @@ async function runPeriodicAutoFix(): Promise<void> {
 
 async function cleanupAbandonedPendingUsers(): Promise<void> {
   try {
-    const { pool } = await import('../db');
+    const { pool } = await import('../core/db');
     
     if (!pool) {
       console.log('[Auto-Cleanup] Database pool not ready, skipping cleanup');

@@ -14,7 +14,7 @@ const DEFAULT_PERMISSIONS: TierPermissions = {
   hasSimulatorGuestPasses: false,
   hasDiscountedMerch: false,
   unlimitedAccess: false,
-};
+} as TierPermissions;
 
 export function useTierPermissions(tierName: string | undefined): {
   permissions: TierPermissions;

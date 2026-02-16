@@ -333,7 +333,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
     
     const newActivity: RecentActivity = {
       id: `deny-${apiId}-${Date.now()}`,
-      type: 'booking_declined',
+      type: 'booking_declined' as any,
       timestamp: new Date().toISOString(),
       primary_text: request.user_name || 'Member',
       secondary_text: request.bay_name || 'Bay',
@@ -436,7 +436,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
     
     const newActivity: RecentActivity = {
       id: `checkin-${id}-${Date.now()}`,
-      type: 'booking_checked_in',
+      type: 'booking_checked_in' as any,
       timestamp: new Date().toISOString(),
       primary_text: booking.user_name || 'Member',
       secondary_text: booking.bay_name || 'Bay',

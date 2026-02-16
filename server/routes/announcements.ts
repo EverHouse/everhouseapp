@@ -270,7 +270,7 @@ router.put('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
     }
     
     if (showAsBanner) {
-      await db.execute(sql`UPDATE announcements SET show_as_banner = false WHERE show_as_banner = true AND id != ${parseInt(id)}`);
+      await db.execute(sql`UPDATE announcements SET show_as_banner = false WHERE show_as_banner = true AND id != ${parseInt(id as string)}`);
     }
     
     const results = await db.execute(sql`
@@ -282,7 +282,7 @@ router.put('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
           link_type = ${linkType || null},
           link_target = ${linkTarget || null},
           show_as_banner = ${showAsBanner || false}
-      WHERE id = ${parseInt(id)}
+      WHERE id = ${parseInt(id as string)}
       RETURNING *
     `);
     
@@ -354,7 +354,7 @@ router.delete('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
     const { id } = req.params;
     
     const [deleted] = await db.delete(announcements)
-      .where(eq(announcements.id, parseInt(id)))
+      .where(eq(announcements.id, parseInt(id as string)))
       .returning();
     
     if (!deleted) {
@@ -371,7 +371,7 @@ router.delete('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
     
     getLinkedSheetId().then(sheetId => {
       if (sheetId) {
-        deleteFromSheet(sheetId, id).catch(err => {
+        deleteFromSheet(sheetId, id as string).catch(err => {
           console.error('Failed to delete announcement from Google Sheet:', getErrorMessage(err));
         });
       }

@@ -191,7 +191,7 @@ router.delete('/api/notifications/:id', isAuthenticated, async (req, res) => {
       return res.status(404).json(createErrorResponse(req, 'Notification not found or access denied', 'NOT_FOUND'));
     }
     
-    res.json({ success: true, deletedId: parseInt(id) });
+    res.json({ success: true, deletedId: parseInt(id as string) });
   } catch (error: unknown) {
     logAndRespond(req, res, 500, 'Failed to delete notification', error, 'NOTIFICATION_DELETE_ERROR');
   }

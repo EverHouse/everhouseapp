@@ -30,7 +30,7 @@ const ProductsSubTab: React.FC<ProductsSubTabProps> = ({ activeSubTab }) => {
   const [discountRules, setDiscountRules] = useState<DiscountRule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editValues, setEditValues] = useState<Partial<ProductMapping | DiscountRule>>({});
+  const [editValues, setEditValues] = useState<Record<string, any>>({});
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {

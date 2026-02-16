@@ -158,7 +158,7 @@ router.get('/api/admin/member/:userId/id-image', isStaffOrAdmin, async (req, res
   try {
     const { userId } = req.params;
 
-    const result = await db.select({ idImageUrl: users.idImageUrl }).from(users).where(eq(users.id, userId)).limit(1);
+    const result = await db.select({ idImageUrl: users.idImageUrl }).from(users).where(eq(users.id, userId as string)).limit(1);
 
     if (result.length === 0) {
       return res.status(404).json({ error: 'User not found' });
@@ -175,9 +175,9 @@ router.delete('/api/admin/member/:userId/id-image', isStaffOrAdmin, async (req, 
   try {
     const { userId } = req.params;
 
-    await db.update(users).set({ idImageUrl: null }).where(eq(users.id, userId));
+    await db.update(users).set({ idImageUrl: null }).where(eq(users.id, userId as string));
 
-    logFromRequest(req, 'delete_id_image', 'member', userId);
+    logFromRequest(req, 'delete_id_image', 'member', userId as string);
 
     res.json({ success: true });
   } catch (error: unknown) {

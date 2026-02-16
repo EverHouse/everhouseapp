@@ -130,7 +130,7 @@ router.get('/api/admin/command-center', isStaffOrAdmin, async (req, res) => {
         WHERE status IN ('succeeded', 'paid')
         AND created_at >= to_timestamp(${startOfDayUnix}) AND created_at < to_timestamp(${endOfDayUnix})
       `);
-      financials.todayRevenueCents = parseInt(todayRevenue.rows[0]?.total_cents || '0');
+      financials.todayRevenueCents = parseInt(String(todayRevenue.rows[0]?.total_cents || '0'));
     } catch { /* table may not have expected structure */ }
     
     res.json({
@@ -233,7 +233,7 @@ router.get('/api/admin/financials/summary', isStaffOrAdmin, async (req, res) => 
         AND created_at >= to_timestamp(${startOfDay})
         AND created_at < to_timestamp(${endOfDay})
       `);
-      results.todayRevenueCents = parseInt(todayRevenue.rows[0]?.total_cents || '0');
+      results.todayRevenueCents = parseInt(String(todayRevenue.rows[0]?.total_cents || '0'));
     } catch { /* table may not exist */ }
     
     // Overdue payments from booking sessions
@@ -247,7 +247,7 @@ router.get('/api/admin/financials/summary', isStaffOrAdmin, async (req, res) => 
         AND bs.fee_status = 'finalized'
         AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
       `);
-      results.overduePaymentsCount = parseInt(overdueCount.rows[0]?.count || '0');
+      results.overduePaymentsCount = parseInt(String(overdueCount.rows[0]?.count || '0'));
     } catch { /* table may not exist */ }
     
     // Failed payments - only query if table exists
@@ -257,7 +257,7 @@ router.get('/api/admin/financials/summary', isStaffOrAdmin, async (req, res) => 
         FROM stripe_payment_intents
         WHERE status = 'requires_payment_method' OR status = 'requires_confirmation'
       `);
-      results.failedPaymentsCount = parseInt(failedPayments.rows[0]?.count || '0');
+      results.failedPaymentsCount = parseInt(String(failedPayments.rows[0]?.count || '0'));
     } catch { /* table may not exist */ }
     
     // Pending authorizations - count uncaptured payment intents
@@ -267,7 +267,7 @@ router.get('/api/admin/financials/summary', isStaffOrAdmin, async (req, res) => 
         FROM stripe_payment_intents
         WHERE status = 'requires_capture'
       `);
-      results.pendingAuthorizationsCount = parseInt(pendingAuths.rows[0]?.count || '0');
+      results.pendingAuthorizationsCount = parseInt(String(pendingAuths.rows[0]?.count || '0'));
     } catch { /* table may not exist */ }
     
     res.json({

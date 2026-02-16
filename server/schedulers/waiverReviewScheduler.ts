@@ -42,7 +42,7 @@ export async function checkStaleWaivers(): Promise<{
         AND bp.created_at < NOW() - INTERVAL '12 hours'
     `);
 
-    const staleWaivers: StaleWaiver[] = result.rows;
+    const staleWaivers: StaleWaiver[] = result.rows as unknown as StaleWaiver[];
 
     console.log(`[Waiver Review] Found ${staleWaivers.length} stale waiver(s) pending review`);
 

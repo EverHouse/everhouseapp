@@ -351,7 +351,7 @@ router.put('/api/notice-types/:id', isStaffOrAdmin, async (req, res) => {
     const [existing] = await db
       .select()
       .from(noticeTypes)
-      .where(eq(noticeTypes.id, parseInt(id)));
+      .where(eq(noticeTypes.id, parseInt(id as string)));
     
     if (!existing) {
       return res.status(404).json({ error: 'Notice type not found' });
@@ -372,7 +372,7 @@ router.put('/api/notice-types/:id', isStaffOrAdmin, async (req, res) => {
     const [result] = await db
       .update(noticeTypes)
       .set(updateData)
-      .where(eq(noticeTypes.id, parseInt(id)))
+      .where(eq(noticeTypes.id, parseInt(id as string)))
       .returning();
     
     res.json(result);
@@ -392,7 +392,7 @@ router.delete('/api/notice-types/:id', isStaffOrAdmin, async (req, res) => {
     const [existing] = await db
       .select()
       .from(noticeTypes)
-      .where(eq(noticeTypes.id, parseInt(id)));
+      .where(eq(noticeTypes.id, parseInt(id as string)));
     
     if (!existing) {
       return res.status(404).json({ error: 'Notice type not found' });
@@ -404,7 +404,7 @@ router.delete('/api/notice-types/:id', isStaffOrAdmin, async (req, res) => {
     
     await db
       .delete(noticeTypes)
-      .where(eq(noticeTypes.id, parseInt(id)));
+      .where(eq(noticeTypes.id, parseInt(id as string)));
     
     res.json({ success: true, message: 'Notice type deleted' });
   } catch (error: unknown) {
@@ -480,7 +480,7 @@ router.put('/api/closure-reasons/:id', isStaffOrAdmin, async (req, res) => {
     const [result] = await db
       .update(closureReasons)
       .set(updateData)
-      .where(eq(closureReasons.id, parseInt(id)))
+      .where(eq(closureReasons.id, parseInt(id as string)))
       .returning();
     
     if (!result) {
@@ -504,7 +504,7 @@ router.delete('/api/closure-reasons/:id', isStaffOrAdmin, async (req, res) => {
     const [result] = await db
       .update(closureReasons)
       .set({ isActive: false })
-      .where(eq(closureReasons.id, parseInt(id)))
+      .where(eq(closureReasons.id, parseInt(id as string)))
       .returning();
     
     if (!result) {
@@ -551,7 +551,7 @@ router.get('/api/closures/needs-review', isStaffOrAdmin, async (req, res) => {
       if (!closure.affectedAreas || closure.affectedAreas === 'none') {
         missingFields.push('Affected areas');
       }
-      if (!closure.visibility || closure.visibility.trim() === '') {
+      if (!(closure as any).visibility || (closure as any).visibility.trim() === '') {
         missingFields.push('Visibility');
       }
       return {
@@ -745,7 +745,7 @@ router.post('/api/closures', isStaffOrAdmin, async (req, res) => {
 router.delete('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const closureId = parseInt(id);
+    const closureId = parseInt(id as string);
     
     const [closure] = await db
       .select()
@@ -816,7 +816,7 @@ router.delete('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
 router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const closureId = parseInt(id);
+    const closureId = parseInt(id as string);
     const { 
       title, 
       reason,
@@ -1064,7 +1064,7 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
             relatedType: 'closure'
           }));
           
-          await db.insert(notifications).values(notificationValues);
+          await db.insert(notifications).values(notificationValues as any);
           console.log(`[Closures] Sent same-day publish notification to ${allMembers.length} members for closure #${closureId}`);
         }
       } catch (notifyError) {
@@ -1176,7 +1176,7 @@ router.post('/api/closures/sync', isStaffOrAdmin, async (req, res) => {
       created: result.created,
       updated: result.updated,
       deleted: result.deleted,
-      errors: result.errors
+      errors: result.error
     });
     
     res.json({

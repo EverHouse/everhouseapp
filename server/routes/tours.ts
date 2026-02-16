@@ -90,7 +90,7 @@ router.post('/api/tours/:id/checkin', isStaffOrAdmin, async (req, res) => {
         checkedInBy: staffEmail,
         updatedAt: new Date(),
       })
-      .where(eq(tours.id, parseInt(id)))
+      .where(eq(tours.id, parseInt(id as string)))
       .returning();
     
     if (!updated) {
@@ -132,7 +132,7 @@ router.patch('/api/tours/:id/status', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
     }
     
-    const [existingTour] = await db.select().from(tours).where(eq(tours.id, parseInt(id)));
+    const [existingTour] = await db.select().from(tours).where(eq(tours.id, parseInt(id as string)));
     const previousStatus = existingTour?.status || 'unknown';
     
     const updateData: any = {
@@ -150,7 +150,7 @@ router.patch('/api/tours/:id/status', isStaffOrAdmin, async (req, res) => {
     
     const [updated] = await db.update(tours)
       .set(updateData)
-      .where(eq(tours.id, parseInt(id)))
+      .where(eq(tours.id, parseInt(id as string)))
       .returning();
     
     if (!updated) {
@@ -615,7 +615,7 @@ export async function syncToursFromCalendar(): Promise<{ synced: number; created
     let pageToken: string | undefined = undefined;
     
     do {
-      const response = await calendar.events.list({
+      const response: any = await calendar.events.list({
         calendarId,
         timeMin: oneYearAgo.toISOString(),
         maxResults: 250,
@@ -774,9 +774,8 @@ export async function syncToursFromCalendar(): Promise<{ synced: number; created
           await notifyAllStaff(
             'New Tour Scheduled',
             `${guestName} scheduled a tour for ${formattedDate}`,
-            'tour_scheduled',
-            undefined,
-            'tour'
+            'tour_scheduled' as any,
+            { relatedType: 'tour' }
           );
         }
       }
@@ -829,9 +828,8 @@ export async function sendTodayTourReminders(): Promise<number> {
       await notifyAllStaff(
         `${todayTours.length} Tour${todayTours.length > 1 ? 's' : ''} Today`,
         `Today's tours: ${tourList}`,
-        'tour_reminder',
-        undefined,
-        'tour'
+        'tour_reminder' as any,
+        { relatedType: 'tour' }
       );
     }
     
@@ -1028,9 +1026,8 @@ export async function syncToursFromHubSpot(): Promise<{ synced: number; created:
             await notifyAllStaff(
               'New Tour Scheduled',
               `${guestName || 'Guest'} scheduled a tour for ${formattedDate}`,
-              'tour_scheduled',
-              undefined,
-              'tour'
+              'tour_scheduled' as any,
+              { relatedType: 'tour' }
             );
           }
         }
