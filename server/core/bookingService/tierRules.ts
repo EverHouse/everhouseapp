@@ -15,6 +15,7 @@ import {
   TierLimits 
 } from '../tierService';
 import { logger } from '../logger';
+import { getTodayPacific, getPacificDateParts } from '../../utils/dateUtils';
 
 export interface TierValidationResult {
   allowed: boolean;
@@ -105,7 +106,7 @@ export async function getRemainingMinutes(
       return 0;
     }
     
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetDate = date || getTodayPacific();
     // Pass resource type to filter usage appropriately
     const bookedMinutes = await getDailyBookedMinutes(memberEmail, targetDate, resourceType || 'simulator');
     
@@ -173,11 +174,10 @@ export async function getGuestPassesRemaining(memberEmail: string): Promise<numb
     
     const limits = await getTierLimits(tier);
     
-    const currentMonth = new Date();
-    const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
-      .toISOString().split('T')[0];
-    const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0)
-      .toISOString().split('T')[0];
+    const { year, month } = getPacificDateParts();
+    const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const monthEnd = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
     
     const result = await pool.query(
       `SELECT COUNT(*) as guest_count

@@ -1,5 +1,6 @@
 import { notifyAllStaff } from './notificationService';
 import { isProduction } from './db';
+import { getTodayPacific } from '../utils/dateUtils';
 
 export type DataAlertType = 
   | 'import_failure'
@@ -306,5 +307,5 @@ export async function alertOnTrackmanImportIssues(result: TrackmanImportResult):
 }
 
 function getTodayKey(): string {
-  return new Date().toISOString().split('T')[0];
+  return getTodayPacific();
 }

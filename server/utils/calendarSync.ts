@@ -1,3 +1,5 @@
+import { getTodayPacific } from './dateUtils';
+
 const APP_METADATA_PREFIX = 'ehApp';
 
 export interface WellnessMetadata {
@@ -92,5 +94,5 @@ export function parseGoogleDateTime(dateTime: string | undefined, date: string |
   if (date) {
     return { date, time: '09:00' };
   }
-  return { date: new Date().toISOString().split('T')[0], time: '09:00' };
+  return { date: getTodayPacific(), time: '09:00' };
 }

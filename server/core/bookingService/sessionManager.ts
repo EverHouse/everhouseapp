@@ -18,6 +18,7 @@ import {
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import { logger } from '../logger';
 import { getMemberTierByEmail } from '../tierService';
+import { getTodayPacific } from '../../utils/dateUtils';
 
 // Transaction context type - allows functions to participate in an outer transaction
 export type TransactionContext = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -227,7 +228,7 @@ export async function ensureSessionForBooking(params: {
 
         const existingNotes = existing[0]?.staffNotes || '';
         const shortError = errorMsg.length > 80 ? errorMsg.substring(0, 80) + '...' : errorMsg;
-        const failureNote = `[SESSION_CREATION_FAILED] Auto session failed (${new Date().toISOString().split('T')[0]}). Please create a session manually.`;
+        const failureNote = `[SESSION_CREATION_FAILED] Auto session failed (${getTodayPacific()}). Please create a session manually.`;
         const updatedNotes = existingNotes ? `${existingNotes}\n${failureNote}` : failureNote;
 
         await db
@@ -457,7 +458,7 @@ export async function createOrFindGuest(
       if (existing[0]) {
         await db
           .update(guests)
-          .set({ lastVisitDate: new Date().toISOString().split('T')[0] })
+          .set({ lastVisitDate: getTodayPacific() })
           .where(eq(guests.id, existing[0].id));
         
         return existing[0].id;
@@ -471,7 +472,7 @@ export async function createOrFindGuest(
         email: email?.toLowerCase(),
         phone,
         createdByMemberId,
-        lastVisitDate: new Date().toISOString().split('T')[0]
+        lastVisitDate: getTodayPacific()
       })
       .returning();
     
