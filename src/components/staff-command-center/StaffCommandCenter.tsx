@@ -859,7 +859,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
                     setFabOpen(false); 
                     setQrScannerOpen(true);
                   }}
-                  className="flex items-center gap-2 pl-3 pr-1.5 py-1.5 rounded-full bg-white/90 dark:bg-surface-dark/90 backdrop-blur-xl shadow-lg border border-gray-200 dark:border-white/20 transition-all duration-200 hover:scale-105 active:scale-95 animate-fab-item-5"
+                  className="flex items-center gap-2 pl-3 pr-1.5 py-1.5 rounded-full bg-white/90 dark:bg-surface-dark/90 backdrop-blur-xl shadow-lg border border-gray-200 dark:border-white/20 transition-all duration-200 hover:scale-105 active:scale-95 animate-fab-item-6"
                   role="menuitem"
                 >
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap">QR Scanner</span>
@@ -871,14 +871,30 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
                 <button
                   onClick={() => { 
                     setFabOpen(false); 
-                    setManualBookingModalOpen(true);
+                    navigate('/admin/calendar?subtab=events');
+                    setTimeout(() => window.dispatchEvent(new CustomEvent('openEventCreate')), 300);
+                  }}
+                  className="flex items-center gap-2 pl-3 pr-1.5 py-1.5 rounded-full bg-white/90 dark:bg-surface-dark/90 backdrop-blur-xl shadow-lg border border-gray-200 dark:border-white/20 transition-all duration-200 hover:scale-105 active:scale-95 animate-fab-item-5"
+                  role="menuitem"
+                >
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap">New Event</span>
+                  <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-xl text-white">celebration</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { 
+                    setFabOpen(false); 
+                    navigate('/admin/calendar?subtab=wellness');
+                    setTimeout(() => window.dispatchEvent(new CustomEvent('openWellnessCreate')), 300);
                   }}
                   className="flex items-center gap-2 pl-3 pr-1.5 py-1.5 rounded-full bg-white/90 dark:bg-surface-dark/90 backdrop-blur-xl shadow-lg border border-gray-200 dark:border-white/20 transition-all duration-200 hover:scale-105 active:scale-95 animate-fab-item-4"
                   role="menuitem"
                 >
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap">Manual Booking</span>
-                  <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-xl text-white">edit_calendar</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap">New Wellness</span>
+                  <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-xl text-white">spa</span>
                   </div>
                 </button>
 

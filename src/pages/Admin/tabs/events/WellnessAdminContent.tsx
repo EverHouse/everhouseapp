@@ -89,9 +89,9 @@ export const WellnessAdminContent: React.FC = () => {
             const recurringCount = savedItem.recurringUpdated || 0;
             const successMsg = editId 
                 ? (recurringCount > 0 
-                    ? `Class updated + ${recurringCount} future instances updated` 
-                    : 'Class updated successfully')
-                : 'Class created successfully';
+                    ? `Wellness updated + ${recurringCount} future instances updated` 
+                    : 'Wellness updated successfully')
+                : 'Wellness created successfully';
             setSuccess(successMsg);
             showToast(successMsg, 'success');
             setTimeout(() => setSuccess(null), 3000);
@@ -105,7 +105,7 @@ export const WellnessAdminContent: React.FC = () => {
         mutationFn: (classId: number) => 
             deleteWithCredentials(`/api/wellness-classes/${classId}`),
         onSuccess: () => {
-            setSuccess('Class deleted');
+            setSuccess('Wellness deleted');
             setTimeout(() => setSuccess(null), 3000);
             queryClient.invalidateQueries({ queryKey: ['wellness-classes'] });
         },
@@ -573,7 +573,7 @@ export const WellnessAdminContent: React.FC = () => {
             <SlideUpDrawer 
                 isOpen={isEditing} 
                 onClose={() => { setIsEditing(false); setError(null); }} 
-                title={editId ? 'Edit Class' : 'Add Class'}
+                title={editId ? 'Edit Wellness' : 'Add Wellness'}
                 maxHeight="large"
                 stickyFooter={
                     <div className="flex gap-3 p-4">
@@ -589,7 +589,7 @@ export const WellnessAdminContent: React.FC = () => {
                             className="flex-1 py-3 rounded-xl bg-brand-green text-white font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                             {(isUploading || saveClassMutation.isPending) && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
-                            {isUploading || saveClassMutation.isPending ? 'Saving...' : editId ? 'Save Changes' : 'Add Class'}
+                            {isUploading || saveClassMutation.isPending ? 'Saving...' : editId ? 'Save Changes' : 'Add Wellness'}
                         </button>
                     </div>
                 }

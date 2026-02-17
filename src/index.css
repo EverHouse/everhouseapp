@@ -1675,6 +1675,7 @@ html.dark .border-accessible {
 .animate-fab-item-3 { opacity: 0; animation: fabItemEnter 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s forwards; }
 .animate-fab-item-4 { opacity: 0; animation: fabItemEnter 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) 0.14s forwards; }
 .animate-fab-item-5 { opacity: 0; animation: fabItemEnter 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) 0.18s forwards; }
+.animate-fab-item-6 { opacity: 0; animation: fabItemEnter 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) 0.22s forwards; }
 
 /* Skeleton crossfade - fades out skeleton while content fades in */
 @keyframes skeletonFadeOut {
