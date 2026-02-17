@@ -1235,8 +1235,9 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       setReassignSearchOpen(false);
 
       await fetchRosterData();
-    } catch (error: any) {
-      showToast(error.message || 'Failed to reassign owner', 'error');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to reassign owner';
+      showToast(message, 'error');
     } finally {
       setIsReassigningOwner(false);
     }

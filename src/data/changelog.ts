@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.65.2",
+    date: "2026-02-17",
+    title: "Booking Owner Reassignment",
+    changes: [
+      "New: Staff can now reassign booking ownership directly from the booking detail modal — tap the swap icon next to the owner's name, search for a member, and the booking transfers instantly",
+      "Improved: Reassigning an owner now updates the display name, recalculates fees based on the new owner's tier, and logs the change to the staff activity feed",
+    ]
+  },
+  {
     version: "7.65.1",
     date: "2026-02-17",
     title: "Trackman Booking ID Verification",
