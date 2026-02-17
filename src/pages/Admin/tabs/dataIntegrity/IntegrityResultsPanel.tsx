@@ -805,9 +805,16 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                   </span>
                 </button>
                 
-                {isExpanded && result.issues.length > 0 && (
+                {isExpanded && (
                   <div className="px-4 pb-4 space-y-3">
                     {renderCheckFixTools(result.checkName)}
+
+                    {result.issues.length === 0 && (
+                      <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
+                        <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                        No issues found for this check.
+                      </div>
+                    )}
                     
                     {result.issues.filter(i => !i.ignored).length > 3 && (
                       <div className="flex justify-end">
@@ -821,7 +828,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                       </div>
                     )}
                     
-                    {Object.entries(groupByCategory(result.issues)).map(([category, categoryIssues]) => (
+                    {result.issues.length > 0 && Object.entries(groupByCategory(result.issues)).map(([category, categoryIssues]) => (
                       <div key={category} className="space-y-2">
                         <p className="text-xs font-medium text-primary/60 dark:text-white/60 uppercase tracking-wide">
                           {getCategoryLabel(category)} ({categoryIssues.length})
