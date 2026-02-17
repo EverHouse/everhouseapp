@@ -1,5 +1,5 @@
 import { schedulerTracker } from '../core/schedulerTracker';
-import { pool } from '../core/db';
+import { queryWithRetry } from '../core/db';
 import { getTodayPacific, getPacificHour, formatTimePacific, createPacificDate } from '../utils/dateUtils';
 import { notifyAllStaff } from '../core/notificationService';
 import { logger } from '../core/logger';
@@ -21,7 +21,7 @@ async function expireStaleBookingRequests(): Promise<void> {
     
     console.log(`[Booking Expiry] Running stale booking check at ${todayStr} ${currentTimePacific}`);
 
-    const expiredBookings = await pool.query<ExpiredBookingResult>(
+    const expiredBookings = await queryWithRetry<ExpiredBookingResult>(
       `UPDATE booking_requests 
        SET status = 'expired',
            staff_notes = COALESCE(staff_notes || E'\n', '') || '[Auto-expired: booking time passed without confirmation]',
@@ -114,7 +114,7 @@ export async function runManualBookingExpiry(): Promise<{ expiredCount: number }
   const todayStr = getTodayPacific();
   const currentTimePacific = formatTimePacific(new Date());
   
-  const result = await pool.query(
+  const result = await queryWithRetry(
     `UPDATE booking_requests 
      SET status = 'expired',
          staff_notes = COALESCE(staff_notes || E'\n', '') || '[Auto-expired: booking time passed without confirmation]',

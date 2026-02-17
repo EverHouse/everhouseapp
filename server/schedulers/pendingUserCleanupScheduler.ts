@@ -1,11 +1,11 @@
 import { schedulerTracker } from '../core/schedulerTracker';
-import { pool } from '../core/db';
+import { queryWithRetry } from '../core/db';
 import { getStripeClient } from '../core/stripe/client';
 import { getErrorMessage } from '../utils/errorUtils';
 
 async function cleanupPendingUsers(): Promise<void> {
   try {
-    const pendingUsers = await pool.query(
+    const pendingUsers = await queryWithRetry(
       `SELECT id, email, stripe_customer_id, created_at
        FROM users
        WHERE membership_status = 'pending'
@@ -65,7 +65,7 @@ async function cleanupPendingUsers(): Promise<void> {
           continue;
         }
 
-        await pool.query('DELETE FROM users WHERE id = $1', [user.id]);
+        await queryWithRetry('DELETE FROM users WHERE id = $1', [user.id]);
         deleted++;
         console.log(`[Pending User Cleanup] Deleted pending user ${user.email} (id: ${user.id})`);
         schedulerTracker.recordRun('Pending User Cleanup', true);

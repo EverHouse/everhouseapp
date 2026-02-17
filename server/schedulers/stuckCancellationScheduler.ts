@@ -1,5 +1,5 @@
 import { schedulerTracker } from '../core/schedulerTracker';
-import { pool } from '../core/db';
+import { queryWithRetry } from '../core/db';
 import { notifyAllStaff } from '../core/notificationService';
 import { logger } from '../core/logger';
 
@@ -15,7 +15,7 @@ interface StuckCancellationResult {
 
 async function checkStuckCancellations(): Promise<void> {
   try {
-    const stuckBookings = await pool.query<StuckCancellationResult>(
+    const stuckBookings = await queryWithRetry<StuckCancellationResult>(
       `SELECT br.id, br.user_email, br.user_name, br.request_date, br.start_time, 
               br.cancellation_pending_at, r.name as resource_name
        FROM booking_requests br
@@ -32,7 +32,7 @@ async function checkStuckCancellations(): Promise<void> {
 
     console.log(`[Stuck Cancellations] Found ${stuckBookings.rows.length} stuck cancellation(s)`);
 
-    const recentlyAlerted = await pool.query(
+    const recentlyAlerted = await queryWithRetry(
       `SELECT DISTINCT related_id FROM notifications 
        WHERE type = 'cancellation_stuck'
        AND related_type = 'booking_request'

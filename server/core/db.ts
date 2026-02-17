@@ -33,6 +33,8 @@ const RETRYABLE_ERRORS = [
   'Connection terminated unexpectedly',
   'timeout expired',
   'sorry, too many clients already',
+  'Connection terminated due to connection timeout',
+  'connection terminated due to connection timeout',
 ];
 
 function isRetryableError(error: unknown): boolean {
