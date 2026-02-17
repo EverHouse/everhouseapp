@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.66.0",
+    date: "2026-02-17",
+    title: "Training Guide Audit & Update",
+    changes: [
+      "Updated: Bookings Guide now accurately describes the Queue + Calendar layout, unmatched Trackman cards, Scheduled section with date filters, and the Booking Sheet workflow",
+      "Updated: Managing Players & Guests guide now covers owner reassignment, creating new visitors from the roster, and player count adjustment",
+      "Updated: Check-In & Billing guide now explains the Financial Summary section, inline payment method options (Card Reader, Card on File, Online Card, Waive), and fee badges",
+      "Updated: Tours guide now documents native tour scheduling at /tour, 2-step booking flow, Google Calendar integration, and confirmation emails",
+      "New: Application Pipeline training guide — covers the full membership application workflow from submission through checkout invitation",
+      "New: Email Templates training guide — explains how to preview all automated email templates by category",
+      "Updated: Getting Started guide now lists all current navigation items including Applications and Email Templates",
+    ]
+  },
+  {
     version: "7.65.3",
     date: "2026-02-17",
     title: "Guest Participant Sync Fix",
