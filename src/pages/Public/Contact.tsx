@@ -68,7 +68,7 @@ const Contact: React.FC = () => {
   return (
     <AnimatedPage>
     <SEO title="Contact Us | Ever Club — Tustin, OC" description="Contact Ever Club at 15771 Red Hill Ave, Ste 500, Tustin, CA 92780. Membership inquiries, private events, tours & questions. (949) 545-5855." url="/contact" />
-    <div className="flex flex-col min-h-screen bg-bone dark:bg-[#0f120a] overflow-x-hidden">
+    <div className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] overflow-x-hidden">
       <div className="px-6 pt-4 md:pt-2 pb-6 text-center animate-content-enter">
         <h1 className="text-3xl font-bold tracking-tight text-primary dark:text-white mb-3">Get in Touch</h1>
         <p className="text-primary/70 dark:text-white/70 text-sm leading-relaxed max-w-xs mx-auto">

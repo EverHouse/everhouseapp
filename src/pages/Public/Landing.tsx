@@ -86,7 +86,7 @@ const Landing: React.FC = () => {
         url="/"
         image="/images/hero-lounge-optimized.webp"
       />
-    <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#0f120a]">
+    <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#141414]">
       <div 
         className="fixed top-0 left-0 right-0 bg-primary"
         style={{ height: 'env(safe-area-inset-top, 0px)', zIndex: 'var(--z-header)' }}
@@ -149,9 +149,9 @@ const Landing: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-bone dark:bg-[#0f120a]">
+      <div className="bg-bone dark:bg-[#141414]">
 
-      <div className="px-6 pt-6 pb-12 bg-bone dark:bg-[#0f120a] animate-content-enter-delay-1">
+      <div className="px-6 pt-6 pb-12 bg-bone dark:bg-[#141414] animate-content-enter-delay-1">
         <p className="text-center text-xs font-bold uppercase tracking-[0.2em] text-primary/50 dark:text-white/50 mb-8">As Featured In</p>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-5xl mx-auto">
@@ -234,7 +234,7 @@ const Landing: React.FC = () => {
         />
       </div>
 
-      <section className="px-6 pb-12 bg-bone dark:bg-[#0f120a] animate-content-enter-delay-3">
+      <section className="px-6 pb-12 bg-bone dark:bg-[#141414] animate-content-enter-delay-3">
          <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-primary dark:text-white mb-2">Membership Tiers</h2>
             <p className="text-primary/70 dark:text-white/70 text-sm">Select the plan that fits your lifestyle.</p>
@@ -299,7 +299,7 @@ const Landing: React.FC = () => {
          </div>
       </section>
 
-      <section className="px-6 py-10 bg-bone dark:bg-[#0f120a] animate-content-enter-delay-4">
+      <section className="px-6 py-10 bg-bone dark:bg-[#141414] animate-content-enter-delay-4">
         <h3 className="text-center text-2xl font-bold text-primary dark:text-white mb-6">Join 200+ Members</h3>
         <div className="flex justify-center items-center gap-0 overflow-x-auto">
           <div className="flex-1 min-w-0 text-center px-3">
@@ -324,7 +324,7 @@ const Landing: React.FC = () => {
         </div>
       </section>
 
-      <section className="px-6 py-12 bg-bone dark:bg-[#0f120a] animate-content-enter-delay-5">
+      <section className="px-6 py-12 bg-bone dark:bg-[#141414] animate-content-enter-delay-5">
         <div className="max-w-2xl mx-auto text-center">
           <span className="text-6xl text-primary/20 dark:text-white/20 font-serif leading-none block mb-2">"</span>
           <blockquote className="text-lg sm:text-xl italic text-primary/90 dark:text-white/90 mb-4 leading-relaxed -mt-8">
@@ -348,7 +348,7 @@ const Landing: React.FC = () => {
          </div>
       </div>
 
-      <section className="px-6 py-16 bg-bone dark:bg-[#0f120a]">
+      <section className="px-6 py-16 bg-bone dark:bg-[#141414]">
         <div className="max-w-md mx-auto text-center">
           <h2 className="text-2xl sm:text-3xl font-bold text-primary dark:text-white mb-3 font-serif">See it for yourself.</h2>
           <p className="text-sm sm:text-base text-primary/60 dark:text-white/60 mb-8">Book a private tour and experience Ever Club firsthand.</p>

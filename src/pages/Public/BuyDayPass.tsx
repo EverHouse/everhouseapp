@@ -114,7 +114,7 @@ const BuyDayPass: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex flex-col min-h-screen bg-bone dark:bg-[#0f120a]">
+      <div className="flex flex-col min-h-screen bg-bone dark:bg-[#141414]">
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin w-8 h-8 border-2 border-primary dark:border-white border-t-transparent rounded-full" />
         </div>
@@ -123,7 +123,7 @@ const BuyDayPass: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-bone dark:bg-[#0f120a] overflow-x-hidden">
+    <div className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] overflow-x-hidden">
       <SEO title="Day Pass — Golf Simulator & Coworking | Ever Club" description="No membership needed. Buy a day pass for Trackman golf simulators or coworking at Ever Club in Tustin, OC. Walk in & experience the club." url="/day-pass" />
       <div className="px-6 pt-4 md:pt-2 pb-6 text-center animate-pop-in">
         <h1 className="text-3xl font-bold tracking-tight text-primary dark:text-white mb-3">Day Passes</h1>

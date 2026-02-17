@@ -4,7 +4,7 @@ import SEO from '../../components/SEO';
 
 const TermsOfService: React.FC = () => {
   return (
-    <div className="min-h-screen bg-bone dark:bg-[#0f120a] text-primary dark:text-bone pt-24 pb-12">
+    <div className="min-h-screen bg-bone dark:bg-[#141414] text-primary dark:text-bone pt-24 pb-12">
       <SEO title="Terms of Service | Ever Club" description="Ever Club terms of service and conditions for membership at our indoor golf & social club in Tustin, Orange County." url="/terms" />
       <div className="max-w-4xl mx-auto px-6">
         <h1 className="text-4xl md:text-5xl font-display mb-8">Membership Terms & Conditions</h1>

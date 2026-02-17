@@ -228,7 +228,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       const canRetry = this.state.retryCount < 3;
 
       return (
-        <div className="flex items-center justify-center h-screen bg-[#0f120a] text-white p-6">
+        <div className="flex items-center justify-center h-screen bg-[#141414] text-white p-6">
           <div className="glass-card rounded-2xl p-8 max-w-md text-center">
             <span className="material-symbols-outlined text-6xl text-red-400 mb-4">
               {isNetworkError ? 'wifi_off' : 'error'}
@@ -771,7 +771,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
             <main 
                 id="main-content"
-                className={`relative h-auto overflow-visible dark:bg-[#0f120a] ${showHeader && !isFullBleedHeroPage ? 'pt-[max(88px,calc(env(safe-area-inset-top)+72px))]' : ''}`}
+                className={`relative h-auto overflow-visible dark:bg-[#141414] ${showHeader && !isFullBleedHeroPage ? 'pt-[max(88px,calc(env(safe-area-inset-top)+72px))]' : ''}`}
             >
                 {children}
                 {isMemberRoute && !isAdminRoute && !isProfilePage && <BottomSentinel />}

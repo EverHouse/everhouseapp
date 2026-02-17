@@ -152,10 +152,10 @@ const WhatsOn: React.FC = () => {
         image="/images/events-crowd-optimized.webp"
       />
     <div 
-      className="flex flex-col min-h-screen bg-[#EAEBE6] dark:bg-[#0f120a] overflow-x-hidden"
+      className="flex flex-col min-h-screen bg-[#EAEBE6] dark:bg-[#141414] overflow-x-hidden"
       style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}
     >
-      <section className="px-6 pt-4 md:pt-2 pb-6 bg-[#EAEBE6] dark:bg-[#0f120a] animate-content-enter">
+      <section className="px-6 pt-4 md:pt-2 pb-6 bg-[#EAEBE6] dark:bg-[#141414] animate-content-enter">
         <h1 className="text-5xl font-light text-primary dark:text-white mb-4 tracking-tight">What's On</h1>
         <p className="text-primary/70 dark:text-white/70 text-base leading-relaxed max-w-[90%]">
            Curated experiences at Ever Club. Join us for culture, conversation, and community in Tustin.

@@ -326,11 +326,11 @@ const Login: React.FC = () => {
 
   if (otpSent) {
     return (
-      <div className="flex flex-col min-h-screen bg-bone dark:bg-[#0f120a] overflow-x-hidden">
+      <div className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] overflow-x-hidden">
         <div className="flex-1 flex flex-col justify-center px-6 py-12">
           <div className="w-full max-w-sm mx-auto space-y-8">
             <div className="text-center">
-              <div className="w-16 h-16 bg-primary text-bone dark:text-[#0f120a] rounded-full flex items-center justify-center mx-auto text-2xl mb-6 shadow-xl dark:shadow-black/20">
+              <div className="w-16 h-16 bg-primary text-bone dark:text-[#141414] rounded-full flex items-center justify-center mx-auto text-2xl mb-6 shadow-xl dark:shadow-black/20">
                 <span className="material-symbols-outlined text-3xl">dialpad</span>
               </div>
               <h2 className="text-3xl font-bold tracking-tight text-primary dark:text-white">
@@ -409,7 +409,7 @@ const Login: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-bone dark:bg-[#0f120a] overflow-x-hidden">
+    <div className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] overflow-x-hidden">
       <div className="flex-1 flex flex-col justify-center px-6 py-12">
         <div className="w-full max-w-sm mx-auto space-y-8">
             

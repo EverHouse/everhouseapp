@@ -23,7 +23,7 @@ export const BRAND = {
     accent: '#CCB8E4',
     background: {
       light: '#F2F2EC',
-      dark: '#0f120a',
+      dark: '#141414',
     },
   },
 };

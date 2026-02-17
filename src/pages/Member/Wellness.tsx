@@ -497,7 +497,7 @@ const MedSpaView: React.FC<{isDark?: boolean}> = ({ isDark = true }) => (
       </p>
     </div>
 
-    <div className={`sticky top-0 z-10 py-3 -mx-6 px-6 mb-6 ${isDark ? 'bg-[#0f120a]/95 backdrop-blur-sm' : 'bg-bone/95 backdrop-blur-sm'}`}>
+    <div className={`sticky top-0 z-10 py-3 -mx-6 px-6 mb-6 ${isDark ? 'bg-[#141414]/95 backdrop-blur-sm' : 'bg-bone/95 backdrop-blur-sm'}`}>
        <a 
          href="https://www.amarieaesthetics.co" 
          target="_blank" 

@@ -102,7 +102,7 @@ const MembershipOverview: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="px-4 pt-4 pb-0 flex flex-col gap-8 bg-bone dark:bg-[#0f120a] min-h-screen overflow-x-hidden">
+      <div className="px-4 pt-4 pb-0 flex flex-col gap-8 bg-bone dark:bg-[#141414] min-h-screen overflow-x-hidden">
         <div className="text-center px-2 animate-pulse">
           <div className="h-8 bg-primary/10 dark:bg-white/10 rounded-lg w-48 mx-auto mb-3"></div>
           <div className="h-4 bg-primary/10 dark:bg-white/10 rounded w-64 mx-auto"></div>
@@ -124,7 +124,7 @@ const MembershipOverview: React.FC = () => {
         url="/membership"
         image="/images/hero-lounge-optimized.webp"
       />
-    <div className="px-4 pt-4 pb-0 flex flex-col gap-8 bg-bone dark:bg-[#0f120a] min-h-screen overflow-x-hidden">
+    <div className="px-4 pt-4 pb-0 flex flex-col gap-8 bg-bone dark:bg-[#141414] min-h-screen overflow-x-hidden">
       <div className="text-center px-2 animate-content-enter">
         <p className="text-primary/40 dark:text-white/40 text-[10px] font-bold uppercase tracking-[0.3em] mb-2">Est. 2025</p>
         <h1 className="text-3xl font-medium tracking-tight text-primary dark:text-white mb-3">Your Office. Your Course. Your Club.</h1>
@@ -372,7 +372,7 @@ const Corporate: React.FC = () => {
 
     return (
       <AnimatedPage>
-      <div className="px-6 pt-6 pb-12 flex flex-col gap-6 bg-bone dark:bg-[#0f120a] min-h-screen">
+      <div className="px-6 pt-6 pb-12 flex flex-col gap-6 bg-bone dark:bg-[#141414] min-h-screen">
         <div className="flex flex-col gap-2 mb-2 pt-4 animate-content-enter">
             <div className="flex items-center gap-2">
                 <span className="px-4 py-1 bg-white/50 dark:bg-white/5 backdrop-blur text-primary dark:text-white text-[10px] font-bold rounded-full uppercase tracking-wider border border-primary/5 dark:border-white/10 shadow-sm dark:shadow-black/20">
@@ -565,7 +565,7 @@ const CompareFeatures: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex flex-col gap-6 pt-6 px-4 pb-12 bg-bone dark:bg-[#0f120a] min-h-screen">
+      <div className="flex flex-col gap-6 pt-6 px-4 pb-12 bg-bone dark:bg-[#141414] min-h-screen">
         <div className="text-center px-2 pt-4 animate-pulse">
           <div className="h-8 bg-primary/10 dark:bg-white/10 rounded-lg w-48 mx-auto mb-3"></div>
           <div className="h-4 bg-primary/10 dark:bg-white/10 rounded w-64 mx-auto"></div>
@@ -577,7 +577,7 @@ const CompareFeatures: React.FC = () => {
 
   return (
     <AnimatedPage>
-    <div className="flex flex-col gap-6 pt-6 px-4 pb-12 bg-bone dark:bg-[#0f120a] min-h-screen">
+    <div className="flex flex-col gap-6 pt-6 px-4 pb-12 bg-bone dark:bg-[#141414] min-h-screen">
        <div className="text-center px-2 pt-4 animate-content-enter">
         <h2 className="text-3xl font-medium tracking-tight text-primary dark:text-white mb-3">Compare Features</h2>
         <p className="text-primary/70 dark:text-white/70 text-base font-light leading-relaxed max-w-[320px] mx-auto">

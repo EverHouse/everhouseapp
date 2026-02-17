@@ -885,7 +885,7 @@ export default function Checkout() {
   const isCorporate = tier === 'corporate';
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#f5f7f0] to-[#eef1e6] dark:from-[#0f120a] dark:to-[#1a1d12]">
+    <div className="min-h-screen bg-gradient-to-b from-[#f5f7f0] to-[#eef1e6] dark:from-[#141414] dark:to-[#1c1c1c]">
       <header className="sticky top-0 z-50 bg-transparent">
         <div className="max-w-4xl mx-auto px-6 py-4">
           <a href="/#/" className="inline-flex items-center gap-2 text-primary/60 dark:text-white/60 hover:text-primary dark:hover:text-white transition-colors text-sm">

@@ -285,7 +285,7 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
 
     return (
       <div 
-        className={`flex flex-col bg-white/40 dark:bg-white/[0.03] backdrop-blur-xl border border-white/60 dark:border-white/[0.08] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark ${pendingRequests.length > 0 ? `border-l-4 ${hasCancellations ? 'border-l-red-500' : 'border-l-amber-500'}` : ''}`}
+        className={`flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark ${pendingRequests.length > 0 ? `border-l-4 ${hasCancellations ? 'border-l-red-500' : 'border-l-amber-500'}` : ''}`}
         role="region"
         aria-label={pendingRequests.length > 0 ? `Booking Requests - ${pendingRequests.length} pending, action required` : 'Booking Requests'}
       >
@@ -433,7 +433,7 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
     
     return (
       <div 
-        className="flex flex-col bg-white/40 dark:bg-white/[0.03] backdrop-blur-xl border border-white/60 dark:border-white/[0.08] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark"
+        className="flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark"
         role="region"
         aria-label={hasUnmatchedBookings ? "Today's Bookings - some need member assignment" : "Today's Bookings"}
       >

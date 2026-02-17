@@ -101,7 +101,7 @@ class ErrorBoundary extends Component<Props, State> {
       const hitReloadLimit = this.state.reloadAttempts >= MAX_GLOBAL_RELOADS;
 
       return (
-        <div className="flex items-center justify-center min-h-screen bg-[#0f120a] text-white p-6">
+        <div className="flex items-center justify-center min-h-screen bg-[#141414] text-white p-6">
           <div className="text-center max-w-sm">
             <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-red-500/20 flex items-center justify-center">
               <span className="material-symbols-outlined text-3xl text-red-400">error</span>

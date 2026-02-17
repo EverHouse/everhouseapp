@@ -21,7 +21,7 @@ const EditorialSection: React.FC<EditorialSectionProps> = ({
   className = '',
 }) => {
   return (
-    <section className={`bg-bone dark:bg-[#0f120a] py-16 px-6 md:py-24 md:px-12 lg:px-20 ${className}`}>
+    <section className={`bg-bone dark:bg-[#141414] py-16 px-6 md:py-24 md:px-12 lg:px-20 ${className}`}>
       <div className={`max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 lg:gap-16 items-center ${reversed ? 'md:flex-row-reverse' : ''}`}>
         {/* Image */}
         <div className={`${reversed ? 'md:order-2' : 'md:order-1'}`}>

@@ -15,7 +15,7 @@ const PrivateHire: React.FC = () => {
   }, [setPageReady]);
 
   return (
-    <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#0f120a]">
+    <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#141414]">
        <SEO title="Private Events & Venue Hire | Ever Club, Tustin" description="Host private events, corporate gatherings & celebrations at Ever Club in Tustin. Trackman simulator bays, conference rooms & event spaces in OC." url="/private-hire" />
        <div 
          className="fixed top-0 left-0 right-0 bg-primary"
@@ -78,9 +78,9 @@ const PrivateHire: React.FC = () => {
          </div>
        </div>
 
-       <div className="bg-bone dark:bg-[#0f120a]">
+       <div className="bg-bone dark:bg-[#141414]">
 
-       <section className="py-20 px-4 md:px-6 bg-bone dark:bg-[#0f120a]">
+       <section className="py-20 px-4 md:px-6 bg-bone dark:bg-[#141414]">
          <div className="max-w-7xl mx-auto">
            <div className="text-center mb-12 px-2">
              <h2 className="text-3xl md:text-4xl font-light text-primary dark:text-white mb-4 font-serif">
@@ -94,7 +94,7 @@ const PrivateHire: React.FC = () => {
          </div>
        </section>
 
-       <section className="py-20 px-4 md:px-6 bg-bone dark:bg-[#0f120a]">
+       <section className="py-20 px-4 md:px-6 bg-bone dark:bg-[#141414]">
          <div className="max-w-7xl mx-auto">
            <div className="text-center mb-12 px-2">
              <h2 className="text-3xl md:text-4xl font-light text-primary dark:text-white mb-4 font-serif">

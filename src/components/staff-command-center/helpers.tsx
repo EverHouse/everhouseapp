@@ -34,7 +34,7 @@ export const GlassListRow: React.FC<{
   <div 
     onClick={onClick}
     style={style}
-    className={`flex items-center gap-3 p-3 rounded-xl bg-white/30 dark:bg-white/[0.04] backdrop-blur-lg border border-white/50 dark:border-white/[0.06] hover:bg-white/50 dark:hover:bg-white/[0.08] hover:shadow-liquid dark:hover:shadow-liquid-dark transition-colors cursor-pointer ${className}`}
+    className={`flex items-center gap-3 p-3 rounded-xl bg-white/30 dark:bg-white/[0.08] backdrop-blur-lg border border-white/50 dark:border-white/[0.1] hover:bg-white/50 dark:hover:bg-white/[0.12] hover:shadow-liquid dark:hover:shadow-liquid-dark transition-colors cursor-pointer ${className}`}
   >
     {children}
   </div>

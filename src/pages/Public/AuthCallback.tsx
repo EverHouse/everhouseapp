@@ -56,7 +56,7 @@ const AuthCallback: React.FC = () => {
 
   if (error) {
     return (
-      <div className="flex flex-col min-h-screen bg-bone dark:bg-[#0f120a] items-center justify-center">
+      <div className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] items-center justify-center">
         <div className="bg-white dark:bg-[#1a1d15] p-8 rounded-2xl shadow-sm dark:shadow-none border border-black/5 dark:border-white/10 max-w-sm w-full mx-4">
           <div className="text-center">
             <span className="material-symbols-outlined text-red-500 text-4xl mb-4">error</span>
@@ -75,7 +75,7 @@ const AuthCallback: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-bone dark:bg-[#0f120a] items-center justify-center">
+    <div className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] items-center justify-center">
       <div className="bg-white dark:bg-[#1a1d15] p-8 rounded-2xl shadow-sm dark:shadow-none border border-black/5 dark:border-white/10 max-w-sm w-full mx-4">
         <div className="text-center">
           <WalkingGolferSpinner size="md" className="mx-auto mb-4" />
