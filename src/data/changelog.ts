@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.63.1",
+    date: "2026-02-17",
+    title: "Billing State Consistency Improvements",
+    changes: [
+      "New: Payment intents in 'processing' or 'requires action' states are now tracked in real-time — admin dashboards now accurately reflect payments waiting for 3D Secure authentication",
+      "Fixed: When a payment fails, the associated fee snapshot is now immediately marked as failed — previously required the reconciliation scheduler to catch the inconsistency",
+    ]
+  },
+  {
     version: "7.63.0",
     date: "2026-02-17",
     title: "Billing System Hardening",

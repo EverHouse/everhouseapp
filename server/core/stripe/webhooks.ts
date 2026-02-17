@@ -244,7 +244,9 @@ export async function processStripeWebhook(
 
     console.log(`[Stripe Webhook] Processing event: ${event.id} (${event.type})`);
 
-    if (event.type === 'payment_intent.succeeded') {
+    if (event.type === 'payment_intent.processing' || event.type === 'payment_intent.requires_action') {
+      deferredActions = await handlePaymentIntentStatusUpdate(client, event.data.object);
+    } else if (event.type === 'payment_intent.succeeded') {
       deferredActions = await handlePaymentIntentSucceeded(client, event.data.object);
     } else if (event.type === 'payment_intent.payment_failed') {
       deferredActions = await handlePaymentIntentFailed(client, event.data.object);
@@ -349,7 +351,9 @@ export async function replayStripeEvent(
 
     console.log(`[Stripe Webhook Replay] Processing event: ${event.id} (${event.type})`);
 
-    if (event.type === 'payment_intent.succeeded') {
+    if (event.type === 'payment_intent.processing' || event.type === 'payment_intent.requires_action') {
+      deferredActions = await handlePaymentIntentStatusUpdate(client, event.data.object);
+    } else if (event.type === 'payment_intent.succeeded') {
       deferredActions = await handlePaymentIntentSucceeded(client, event.data.object);
     } else if (event.type === 'payment_intent.payment_failed') {
       deferredActions = await handlePaymentIntentFailed(client, event.data.object);
@@ -1232,6 +1236,42 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: S
   return deferredActions;
 }
 
+async function handlePaymentIntentStatusUpdate(client: PoolClient, paymentIntent: Stripe.PaymentIntent): Promise<DeferredAction[]> {
+  const { id, status, amount, currency, customer, metadata, created } = paymentIntent;
+  const deferredActions: DeferredAction[] = [];
+
+  console.log(`[Stripe Webhook] Payment intent status update: ${id} → ${status}`);
+
+  await client.query(
+    `UPDATE stripe_payment_intents SET status = $2, updated_at = NOW() WHERE stripe_payment_intent_id = $1`,
+    [id, status]
+  );
+
+  const customerId = typeof customer === 'string' ? customer : customer?.id;
+  const customerEmail = typeof customer === 'object' ? (customer as any)?.email : metadata?.email;
+  const customerName = typeof customer === 'object' ? (customer as any)?.name : metadata?.memberName;
+
+  deferredActions.push(async () => {
+    await upsertTransactionCache({
+      stripeId: id,
+      objectType: 'payment_intent',
+      amountCents: amount,
+      currency: currency || 'usd',
+      status,
+      createdAt: new Date(created * 1000),
+      customerId,
+      customerEmail,
+      customerName,
+      description: metadata?.description || `Payment ${status}`,
+      metadata,
+      source: 'webhook',
+      paymentIntentId: id,
+    });
+  });
+
+  return deferredActions;
+}
+
 const MAX_RETRY_ATTEMPTS = 3;
 
 async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: Stripe.PaymentIntent): Promise<DeferredAction[]> {
@@ -1273,6 +1313,11 @@ async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: Stri
          requires_card_update = $4
      WHERE stripe_payment_intent_id = $1`,
     [id, newRetryCount, reason, requiresCardUpdate]
+  );
+
+  await client.query(
+    `UPDATE booking_fee_snapshots SET status = 'failed' WHERE stripe_payment_intent_id = $1 AND status = 'pending'`,
+    [id]
   );
   
   console.log(`[Stripe Webhook] Updated payment ${id}: retry ${newRetryCount}/${MAX_RETRY_ATTEMPTS}, requires_card_update=${requiresCardUpdate}`);
