@@ -791,4 +791,113 @@ router.post('/api/data-integrity/fix/delete-booking-participant', isAdmin, async
   }
 });
 
+router.post('/api/data-integrity/fix/fix-orphaned-participants', isAdmin, async (req: Request, res) => {
+  try {
+    const { dryRun = true } = req.body;
+    
+    const invalidParticipants = await db.execute(sql`
+      SELECT bp.id, bp.user_id, bp.display_name, bp.participant_type, bp.session_id
+      FROM booking_participants bp
+      LEFT JOIN users u ON bp.user_id = u.id
+      WHERE bp.user_id IS NOT NULL AND bp.user_id != '' AND u.id IS NULL
+    `);
+    
+    const rows = invalidParticipants.rows as any[];
+    
+    if (rows.length === 0) {
+      return res.json({ success: true, message: 'No orphaned participants found', relinked: 0, converted: 0, total: 0, dryRun });
+    }
+    
+    const relinked: Array<{ id: number; displayName: string; oldUserId: string; newUserId: string; email: string }> = [];
+    const toConvert: Array<{ id: number; displayName: string; userId: string }> = [];
+    
+    for (const row of rows) {
+      const emailMatch = await db.execute(sql`
+        SELECT id, email FROM users WHERE LOWER(email) = LOWER(${row.user_id}) LIMIT 1
+      `);
+      
+      if (emailMatch.rows.length > 0) {
+        const matchedUser = emailMatch.rows[0] as any;
+        relinked.push({
+          id: row.id,
+          displayName: row.display_name,
+          oldUserId: row.user_id,
+          newUserId: matchedUser.id,
+          email: matchedUser.email
+        });
+      } else {
+        toConvert.push({
+          id: row.id,
+          displayName: row.display_name,
+          userId: row.user_id
+        });
+      }
+    }
+    
+    if (!dryRun) {
+      for (const item of relinked) {
+        await db.execute(sql`
+          UPDATE booking_participants 
+          SET user_id = ${item.newUserId}
+          WHERE id = ${item.id}
+        `);
+      }
+      
+      for (const item of toConvert) {
+        await db.execute(sql`
+          UPDATE booking_participants 
+          SET user_id = NULL, participant_type = 'guest'
+          WHERE id = ${item.id}
+        `);
+      }
+      
+      logFromRequest(req, 'fix_orphaned_participants' as any, 'booking_participants' as any, undefined, undefined, {
+        relinkedCount: relinked.length,
+        convertedCount: toConvert.length,
+        totalFixed: rows.length,
+        relinkedIds: relinked.map(r => r.id),
+        convertedIds: toConvert.map(c => c.id)
+      });
+      
+      logger.info('[DataIntegrity] Fixed orphaned participants', { extra: { relinked: relinked.length, converted: toConvert.length, total: rows.length } });
+    }
+    
+    res.json({
+      success: true,
+      message: dryRun
+        ? `Found ${rows.length} orphaned participants: ${relinked.length} can be re-linked to existing members, ${toConvert.length} will be converted to guests`
+        : `Fixed ${rows.length} orphaned participants: ${relinked.length} re-linked, ${toConvert.length} converted to guests`,
+      relinked: relinked.length,
+      converted: toConvert.length,
+      total: rows.length,
+      dryRun,
+      relinkedDetails: relinked.slice(0, 20),
+      convertedDetails: toConvert.slice(0, 20)
+    });
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Fix orphaned participants error', { extra: { error: getErrorMessage(error) } });
+    res.status(500).json({ success: false, message: getErrorMessage(error) });
+  }
+});
+
+router.post('/api/data-integrity/fix/convert-participant-to-guest', isAdmin, async (req: Request, res) => {
+  try {
+    const { recordId } = req.body;
+    if (!recordId) return res.status(400).json({ success: false, message: 'recordId is required' });
+    
+    await db.execute(sql`
+      UPDATE booking_participants 
+      SET user_id = NULL, participant_type = 'guest'
+      WHERE id = ${recordId}
+    `);
+    
+    logFromRequest(req, 'convert_participant_to_guest' as any, 'booking_participants' as any, recordId, undefined, { convertedId: recordId });
+    
+    res.json({ success: true, message: `Converted participant ${recordId} to guest` });
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Convert participant to guest error', { extra: { error: getErrorMessage(error) } });
+    res.status(500).json({ success: false, message: getErrorMessage(error) });
+  }
+});
+
 export default router;

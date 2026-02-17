@@ -92,6 +92,9 @@ interface IntegrityResultsPanelProps {
     archived: number;
     errors: number;
   } | null;
+  isRunningOrphanedParticipantFix: boolean;
+  orphanedParticipantResult: { success: boolean; message: string; relinked?: number; converted?: number; total?: number; dryRun?: boolean; relinkedDetails?: any[]; convertedDetails?: any[] } | null;
+  handleFixOrphanedParticipants: (dryRun: boolean) => void;
 }
 
 const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
@@ -145,6 +148,9 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
   isRunningVisitorArchive,
   visitorArchiveResult,
   visitorArchiveProgress,
+  isRunningOrphanedParticipantFix,
+  orphanedParticipantResult,
+  handleFixOrphanedParticipants,
 }) => {
   const getStatusColor = (status: 'pass' | 'warning' | 'fail' | 'info') => {
     switch (status) {
@@ -636,6 +642,59 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
           </div>
         );
 
+      case 'Participant User Relationships':
+        return (
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mb-4">
+            <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+              <strong>Quick Fix:</strong> Re-link participants to existing members by email, or convert unmatched ones to guests
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => handleFixOrphanedParticipants(true)}
+                disabled={isRunningOrphanedParticipantFix}
+                className="px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+              >
+                {isRunningOrphanedParticipantFix && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
+                <span className="material-symbols-outlined text-[14px]">visibility</span>
+                Preview
+              </button>
+              <button
+                onClick={() => handleFixOrphanedParticipants(false)}
+                disabled={isRunningOrphanedParticipantFix}
+                className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+              >
+                {isRunningOrphanedParticipantFix && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
+                <span className="material-symbols-outlined text-[14px]">build</span>
+                Fix All
+              </button>
+            </div>
+            {orphanedParticipantResult && (
+              <div className={`mt-2 p-2 rounded ${!orphanedParticipantResult.success ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700' : orphanedParticipantResult.dryRun ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700' : 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700'}`}>
+                {orphanedParticipantResult.dryRun && (
+                  <p className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400 mb-1">Preview Only - No Changes Made</p>
+                )}
+                <p className={`text-xs ${!orphanedParticipantResult.success ? 'text-red-700 dark:text-red-400' : orphanedParticipantResult.dryRun ? 'text-blue-700 dark:text-blue-400' : 'text-green-700 dark:text-green-400'}`}>{orphanedParticipantResult.message}</p>
+                {orphanedParticipantResult.relinkedDetails && orphanedParticipantResult.relinkedDetails.length > 0 && (
+                  <div className="mt-1">
+                    <p className="text-[10px] font-bold text-green-600 dark:text-green-400">Re-linked to members ({orphanedParticipantResult.relinked}):</p>
+                    {orphanedParticipantResult.relinkedDetails.map((d: any, i: number) => (
+                      <p key={i} className="text-[10px] text-gray-600 dark:text-gray-400">{d.displayName} → {d.email}</p>
+                    ))}
+                  </div>
+                )}
+                {orphanedParticipantResult.convertedDetails && orphanedParticipantResult.convertedDetails.length > 0 && (
+                  <div className="mt-1">
+                    <p className="text-[10px] font-bold text-orange-600 dark:text-orange-400">Converted to guests ({orphanedParticipantResult.converted}):</p>
+                    {orphanedParticipantResult.convertedDetails.map((d: any, i: number) => (
+                      <p key={i} className="text-[10px] text-gray-600 dark:text-gray-400">{d.displayName} (was: {d.userId})</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+
       default:
         return null;
     }
@@ -883,6 +942,24 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                         )}
                                       </button>
                                     </>
+                                  )}
+                                  {!issue.ignored && issue.table === 'booking_participants' && issue.category === 'missing_relationship' && (
+                                    <button
+                                      onClick={() => {
+                                        if (confirm(`Convert "${issue.context?.memberName || 'this participant'}" to a guest? Their booking record will be kept.`)) {
+                                          fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/convert-participant-to-guest', body: { recordId: issue.recordId } });
+                                        }
+                                      }}
+                                      disabled={fixIssueMutation.isPending}
+                                      className="p-1.5 text-orange-600 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900/30 rounded transition-colors disabled:opacity-50"
+                                      title="Convert to guest (keeps booking record)"
+                                    >
+                                      {fixIssueMutation.isPending ? (
+                                        <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                      ) : (
+                                        <span className="material-symbols-outlined text-[16px]">person_off</span>
+                                      )}
+                                    </button>
                                   )}
                                   {!issue.ignored && (issue.table === 'guest_passes' || issue.table === 'booking_fee_snapshots' || issue.table === 'booking_participants') && (
                                     <button

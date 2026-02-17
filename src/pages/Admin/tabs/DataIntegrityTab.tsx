@@ -118,6 +118,7 @@ const DataIntegrityTab: React.FC = () => {
   const [paymentStatusResult, setPaymentStatusResult] = useState<{ success: boolean; message: string; totalChecked?: number; updatedCount?: number; updates?: any[]; dryRun?: boolean } | null>(null);
   const [visitCountResult, setVisitCountResult] = useState<{ success: boolean; message: string; mismatchCount?: number; updatedCount?: number; sampleMismatches?: any[]; dryRun?: boolean } | null>(null);
   const [ghostBookingResult, setGhostBookingResult] = useState<{ success: boolean; message: string; ghostBookings?: number; fixed?: number; dryRun?: boolean } | null>(null);
+  const [orphanedParticipantResult, setOrphanedParticipantResult] = useState<{ success: boolean; message: string; relinked?: number; converted?: number; total?: number; dryRun?: boolean; relinkedDetails?: any[]; convertedDetails?: any[] } | null>(null);
   const [duplicateDetectionResult, setDuplicateDetectionResult] = useState<{ success: boolean; message: string; appDuplicates?: any[]; hubspotDuplicates?: any[] } | null>(null);
   const [expandedDuplicates, setExpandedDuplicates] = useState<{ app: boolean; hubspot: boolean }>({ app: false, hubspot: false });
   const [dealStageRemediationResult, setDealStageRemediationResult] = useState<{ success: boolean; message: string; total?: number; fixed?: number; dryRun?: boolean } | null>(null);
@@ -909,6 +910,31 @@ const DataIntegrityTab: React.FC = () => {
     },
   });
 
+  const fixOrphanedParticipantsMutation = useMutation({
+    mutationFn: (dryRun: boolean) =>
+      postWithCredentials<{ message?: string; relinked?: number; converted?: number; total?: number; dryRun?: boolean; relinkedDetails?: any[]; convertedDetails?: any[] }>('/api/data-integrity/fix/fix-orphaned-participants', { dryRun }),
+    onSuccess: (data, dryRun) => {
+      setOrphanedParticipantResult({
+        success: true,
+        message: data.message || `${dryRun ? 'Found' : 'Fixed'} ${data.total || 0} orphaned participants`,
+        relinked: data.relinked,
+        converted: data.converted,
+        total: data.total,
+        dryRun,
+        relinkedDetails: data.relinkedDetails,
+        convertedDetails: data.convertedDetails
+      });
+      showToast(data.message || `${dryRun ? 'Preview complete' : 'Fix applied'}`, dryRun ? 'info' : 'success');
+      if (!dryRun && (data.total || 0) > 0) {
+        runIntegrityMutation.mutate();
+      }
+    },
+    onError: (err: Error) => {
+      setOrphanedParticipantResult({ success: false, message: (err instanceof Error ? err.message : String(err)) || 'Failed' });
+      showToast((err instanceof Error ? err.message : String(err)) || 'Failed to fix', 'error');
+    },
+  });
+
   const remediateDealStagesMutation = useMutation({
     mutationFn: (dryRun: boolean) => 
       postWithCredentials<{ message?: string; total?: number; fixed?: number }>('/api/hubspot/remediate-deal-stages', { dryRun }),
@@ -1271,6 +1297,11 @@ const DataIntegrityTab: React.FC = () => {
     }
   };
 
+  const handleFixOrphanedParticipants = (dryRun: boolean = true) => {
+    setOrphanedParticipantResult(null);
+    fixOrphanedParticipantsMutation.mutate(dryRun);
+  };
+
   const handleRemediateDealStages = (dryRun: boolean = true) => {
     setDealStageRemediationResult(null);
     remediateDealStagesMutation.mutate(dryRun);
@@ -1317,6 +1348,7 @@ const DataIntegrityTab: React.FC = () => {
   const isRunningPaymentStatusSync = syncPaymentStatusMutation.isPending;
   const isRunningVisitCountSync = syncVisitCountsMutation.isPending;
   const isRunningGhostBookingFix = previewGhostBookingsMutation.isPending || fixGhostBookingsMutation.isPending;
+  const isRunningOrphanedParticipantFix = fixOrphanedParticipantsMutation.isPending;
   const isRunningDealStageRemediation = remediateDealStagesMutation.isPending;
   const isRunningDuplicateDetection = detectDuplicatesMutation.isPending;
   const isLoadingPlaceholders = scanPlaceholdersMutation.isPending;
@@ -1739,6 +1771,9 @@ const DataIntegrityTab: React.FC = () => {
         isRunningVisitorArchive={isRunningVisitorArchive}
         visitorArchiveResult={visitorArchiveResult}
         visitorArchiveProgress={visitorArchiveProgress}
+        isRunningOrphanedParticipantFix={isRunningOrphanedParticipantFix}
+        orphanedParticipantResult={orphanedParticipantResult}
+        handleFixOrphanedParticipants={handleFixOrphanedParticipants}
       />
 
       <SyncToolsPanel
