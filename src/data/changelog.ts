@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.65.3",
+    date: "2026-02-17",
+    title: "Guest Participant Sync Fix",
+    changes: [
+      "Fixed: Adding a guest to a booking now correctly creates the participant record in the session — resolves $25 fee showing on calendar while booking details showed $0",
+      "Fixed: Guest count on booking records now updates when guests are added through the roster",
+      "Fixed: Fee recalculation now runs automatically after adding a guest, ensuring guest passes are properly applied",
+      "Improved: Staff activity log now captures when guests are added to bookings",
+    ]
+  },
+  {
     version: "7.65.2",
     date: "2026-02-17",
     title: "Booking Owner Reassignment",

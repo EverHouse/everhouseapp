@@ -2078,7 +2078,23 @@ router.post('/api/admin/booking/:id/guests', isStaffOrAdmin, async (req, res) =>
       await db.execute(sql`DELETE FROM booking_members WHERE id = ${slotId} AND booking_id = ${bookingId}`);
     }
     
-    const ownerEmail = (bookingResult.rows[0] as any).user_email;
+    const booking = bookingResult.rows[0] as any;
+    const ownerEmail = booking.user_email;
+    const sessionId = booking.session_id ? parseInt(booking.session_id) : null;
+
+    if (sessionId) {
+      const durationMinutes = booking.duration_minutes || 60;
+      const declaredPlayerCount = booking.declared_player_count || 1;
+      const slotDuration = Math.floor(durationMinutes / Math.max(declaredPlayerCount, 1));
+      await db.execute(sql`INSERT INTO booking_participants (session_id, participant_type, display_name, payment_status, slot_duration)
+         VALUES (${sessionId}, 'guest', ${guestName.trim()}, 'pending', ${slotDuration})`);
+      logger.info('[AddGuest] Created booking_participant for guest in session', { extra: { bookingId, sessionId, guestName: guestName.trim() } });
+
+      await recalculateSessionFees(sessionId, 'roster_update');
+    }
+
+    await db.execute(sql`UPDATE booking_requests SET guest_count = COALESCE(guest_count, 0) + 1, updated_at = NOW() WHERE id = ${bookingId}`);
+
     let guestPassesRemaining = 0;
     if (ownerEmail) {
       const passesResult = await db.execute(sql`SELECT passes_total - passes_used as remaining FROM guest_passes WHERE LOWER(member_email) = LOWER(${ownerEmail})`);
@@ -2086,6 +2102,14 @@ router.post('/api/admin/booking/:id/guests', isStaffOrAdmin, async (req, res) =>
         guestPassesRemaining = (passesResult.rows[0] as any).remaining || 0;
       }
     }
+
+    await logFromRequest(req, {
+      action: 'update' as any,
+      resourceType: 'booking',
+      resourceId: String(bookingId),
+      resourceName: `Guest added: ${guestName.trim()}`,
+      details: { guestName: guestName.trim(), guestEmail: guestEmail?.trim() || null, sessionId }
+    });
     
     res.json({
       success: true,
