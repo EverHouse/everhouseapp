@@ -48,7 +48,7 @@ router.get('/api/announcements', async (req, res) => {
       ) as typeof query;
     }
     
-    const results = await query.orderBy(asc(BANNER_FIRST), desc(announcements.createdAt));
+    const results = await query.orderBy(asc(BANNER_FIRST), desc(announcements.createdAt)).limit(100);
     
     const formatted = results.map(a => ({
       id: a.id.toString(),

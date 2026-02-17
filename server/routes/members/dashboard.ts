@@ -106,7 +106,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
             .where(and(...conditions))
             .orderBy(asc(bookingRequests.requestDate), asc(bookingRequests.startTime))
         );
-      } catch (error) {
+      } catch (error: unknown) {
         logger.warn('[dashboard-data] Failed to fetch bookings', { extra: { error } });
         return [];
       }
@@ -152,7 +152,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
         .innerJoin(events, eq(eventRsvps.eventId, events.id))
         .where(and(...conditions))
         .orderBy(events.eventDate, events.startTime);
-      } catch (error) {
+      } catch (error: unknown) {
         logger.warn('[dashboard-data] Failed to fetch RSVPs', { extra: { error } });
         return [];
       }
@@ -184,7 +184,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
         .innerJoin(wellnessClasses, eq(wellnessEnrollments.classId, wellnessClasses.id))
         .where(and(...conditions))
         .orderBy(wellnessClasses.date, wellnessClasses.time);
-      } catch (error) {
+      } catch (error: unknown) {
         logger.warn('[dashboard-data] Failed to fetch wellness enrollments', { extra: { error } });
         return [];
       }
@@ -228,7 +228,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
         .leftJoin(resources, eq(bookingRequests.resourceId, resources.id))
         .where(and(...conditions))
         .orderBy(desc(bookingRequests.createdAt));
-      } catch (error) {
+      } catch (error: unknown) {
         logger.warn('[dashboard-data] Failed to fetch booking requests', { extra: { error } });
         return [];
       }
@@ -252,7 +252,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
           notes: booking.description,
           calendar_event_id: booking.id
         }));
-      } catch (error) {
+      } catch (error: unknown) {
         logger.warn('[dashboard-data] Failed to fetch conference room bookings', { extra: { error } });
         return [];
       }
@@ -288,7 +288,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
         `;
         const result = await pool.query(query, [todayPacific]);
         return result.rows;
-      } catch (error) {
+      } catch (error: unknown) {
         logger.warn('[dashboard-data] Failed to fetch wellness classes', { extra: { error } });
         return [];
       }
@@ -320,7 +320,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
         .from(events)
         .where(and(...conditions))
         .orderBy(asc(events.eventDate), asc(events.startTime));
-      } catch (error) {
+      } catch (error: unknown) {
         logger.warn('[dashboard-data] Failed to fetch events', { extra: { error } });
         return [];
       }
@@ -373,7 +373,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
           passes_total: data.passesTotal,
           passes_remaining: Math.max(0, data.passesTotal - data.passesUsed)
         };
-      } catch (error) {
+      } catch (error: unknown) {
         logger.warn('[dashboard-data] Failed to fetch guest passes', { extra: { error } });
         return null;
       }
@@ -411,7 +411,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
           linkType: a.linkType || undefined,
           linkTarget: a.linkTarget || undefined,
         };
-      } catch (error) {
+      } catch (error: unknown) {
         logger.warn('[dashboard-data] Failed to fetch banner announcement', { extra: { error } });
         return null;
       }

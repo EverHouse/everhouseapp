@@ -1466,9 +1466,7 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
       }
       
       if (updatedUser?.lifetime_visits) {
-        broadcastMemberStatsUpdated(booking.userEmail, {
-          lifetimeVisits: updatedUser.lifetime_visits
-        });
+        try { broadcastMemberStatsUpdated(booking.userEmail, { lifetimeVisits: updatedUser.lifetime_visits }); } catch (err: unknown) { console.error('[Broadcast] Stats update error:', err); }
       }
       
       // Send check-in confirmation notification to member
@@ -1963,20 +1961,34 @@ router.put('/api/booking-requests/:id/complete-cancellation', isStaffOrAdmin, as
       console.error('[Complete Cancellation] Failed to release guest pass holds:', err);
     }
     
-    // 6. NOW mark as cancelled with any error details in staff notes
+    // 6. NOW mark as cancelled with any error details in staff notes + notify member (in transaction)
     const errorNote = errors.length > 0 
       ? `\n[Cancellation completed with ${errors.length} error(s): ${errors.join('; ')}]`
       : '';
     
-    await db.update(bookingRequests)
-      .set({
-        status: 'cancelled',
-        staffNotes: sql`COALESCE(staff_notes, '') || ${'\n[Cancellation completed manually by ' + staffEmail + ']' + errorNote}`,
-        updatedAt: new Date()
-      })
-      .where(eq(bookingRequests.id, bookingId));
+    const bookingDate = existing.requestDate;
+    const bookingTime = existing.startTime?.substring(0, 5) || '';
     
-    // 7. Broadcast availability, notify member, audit log (after status update)
+    await db.transaction(async (tx) => {
+      await tx.update(bookingRequests)
+        .set({
+          status: 'cancelled',
+          staffNotes: sql`COALESCE(staff_notes, '') || ${'\n[Cancellation completed manually by ' + staffEmail + ']' + errorNote}`,
+          updatedAt: new Date()
+        })
+        .where(eq(bookingRequests.id, bookingId));
+      
+      await tx.insert(notifications).values({
+        userEmail: existing.userEmail || '',
+        title: 'Booking Cancelled',
+        message: `Your booking on ${bookingDate} at ${bookingTime} has been cancelled and any charges have been refunded.`,
+        type: 'booking_cancelled',
+        relatedId: bookingId,
+        relatedType: 'booking_request'
+      });
+    });
+    
+    // 7. Broadcast availability, audit log (after status update)
     broadcastAvailabilityUpdate({
       resourceId: existing.resourceId || undefined,
       resourceType: 'simulator',
@@ -1985,17 +1997,6 @@ router.put('/api/booking-requests/:id/complete-cancellation', isStaffOrAdmin, as
     });
     
     const memberName = existing.userName || existing.userEmail || 'Member';
-    const bookingDate = existing.requestDate;
-    const bookingTime = existing.startTime?.substring(0, 5) || '';
-    
-    await db.insert(notifications).values({
-      userEmail: existing.userEmail || '',
-      title: 'Booking Cancelled',
-      message: `Your booking on ${bookingDate} at ${bookingTime} has been cancelled and any charges have been refunded.`,
-      type: 'booking_cancelled',
-      relatedId: bookingId,
-      relatedType: 'booking_request'
-    });
     
     logFromRequest(req, 'complete_cancellation' as any, 'booking', req.params.id as string, staffEmail, {
       member_email: existing.userEmail,

@@ -47,7 +47,7 @@ export async function sendPushNotificationToAllMembers(payload: { title: string;
     
     await Promise.all(notifications);
     console.log(`[Push] Sent notification to ${subscriptions.length} members`);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Failed to send push notification to members:', error);
   }
 }
@@ -117,7 +117,7 @@ async function getAffectedBayIds(affectedAreas: string): Promise<number[]> {
       }
       if (idSet.size > 0) return Array.from(idSet);
     }
-  } catch (parseError) {
+  } catch (parseError: unknown) {
     console.warn('[getAffectedBayIds] Failed to parse JSON affectedAreas:', affectedAreas, parseError);
   }
   
@@ -287,7 +287,7 @@ async function createClosureCalendarEvents(
       
       return response.data.id || null;
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error creating closure calendar event:', error);
     return null;
   }
@@ -299,7 +299,7 @@ async function deleteClosureCalendarEvents(calendarId: string, eventIds: string)
   for (const eventId of ids) {
     try {
       await deleteCalendarEvent(eventId.trim(), calendarId);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(`Failed to delete calendar event ${eventId}:`, error);
     }
   }
@@ -528,7 +528,8 @@ router.get('/api/closures', async (req, res) => {
       .select()
       .from(facilityClosures)
       .where(eq(facilityClosures.isActive, true))
-      .orderBy(facilityClosures.startDate, facilityClosures.startTime);
+      .orderBy(facilityClosures.startDate, facilityClosures.startTime)
+      .limit(200);
     res.json(results);
   } catch (error: unknown) {
     if (!isProduction) console.error('Closures fetch error:', error);
@@ -704,7 +705,7 @@ router.post('/api/closures', isStaffOrAdmin, async (req, res) => {
           await db.insert(notifications).values(notificationValues);
           console.log(`[Closures] Created in-app notifications for ${membersWithEmails.length} members`);
         }
-      } catch (notifError) {
+      } catch (notifError: unknown) {
         console.error('[Closures] Failed to create in-app notifications:', notifError);
       }
       
@@ -714,7 +715,7 @@ router.post('/api/closures', isStaffOrAdmin, async (req, res) => {
           body: notificationBody,
           url: '/announcements'
         });
-      } catch (pushError) {
+      } catch (pushError: unknown) {
         console.error('[Closures] Failed to send push notifications:', pushError);
       }
     }
@@ -777,7 +778,7 @@ router.delete('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
           console.log(`[Closures] Cleaned up legacy Conference Room event(s) for closure #${closureId}`);
         }
       }
-    } catch (calError) {
+    } catch (calError: unknown) {
       console.error('[Closures] Failed to delete calendar event:', calError);
     }
     
@@ -788,7 +789,7 @@ router.delete('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
         .delete(announcements)
         .where(eq(announcements.closureId, closureId));
       console.log(`[Closures] Deleted announcement(s) for closure #${closureId}`);
-    } catch (announcementError) {
+    } catch (announcementError: unknown) {
       console.error('[Closures] Failed to delete announcement:', announcementError);
     }
     
@@ -891,7 +892,7 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
             eq(notifications.relatedId, closureId)
           ));
         console.log(`[Closures] Cleared old notifications for closure #${closureId} (start date changed to ${start_date})`);
-      } catch (err) {
+      } catch (err: unknown) {
         console.error('[Closures] Failed to clear old notifications:', err);
       }
     }
@@ -979,7 +980,7 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
           
           console.log(`[Closures] Updated Internal Calendar event for closure #${closureId}`);
         }
-      } catch (calError) {
+      } catch (calError: unknown) {
         console.error('[Closures] Failed to update calendar events:', calError);
       }
     }
@@ -1021,7 +1022,7 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
         .where(eq(announcements.closureId, closureId));
       
       console.log(`[Closures] Updated announcement for closure #${closureId}`);
-    } catch (announcementError) {
+    } catch (announcementError: unknown) {
       console.error('[Closures] Failed to update announcement:', announcementError);
     }
     
@@ -1071,7 +1072,7 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
           await db.insert(notifications).values(notificationValues as any);
           console.log(`[Closures] Sent same-day publish notification to ${allMembers.length} members for closure #${closureId}`);
         }
-      } catch (notifyError) {
+      } catch (notifyError: unknown) {
         console.error('[Closures] Failed to send publish notifications:', notifyError);
       }
     } else if (wasPublished && hasAffectedResources && !startsToday) {

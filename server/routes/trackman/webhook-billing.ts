@@ -46,7 +46,7 @@ export async function updateBaySlotCache(
          updated_at = NOW()`,
       [resourceId, slotDate, startTime, endTime, status, trackmanBookingId, customerEmail, customerName, playerCount || 1]
     );
-  } catch (e) {
+  } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to update bay slot cache', { error: e as Error });
   }
 }
@@ -90,7 +90,7 @@ export async function createBookingForMember(
             logger.info('[Trackman Webhook] Recalculated fees after duration change', {
               extra: { sessionId: existingBooking.rows[0].session_id }
             });
-          } catch (recalcErr) {
+          } catch (recalcErr: unknown) {
             logger.warn('[Trackman Webhook] Failed to recalculate fees', { 
               extra: { sessionId: existingBooking.rows[0].session_id } 
             });
@@ -205,7 +205,7 @@ export async function createBookingForMember(
               [startTime, endTime, sessionCheck.rows[0].session_id]
             );
             await recalculateSessionFees(sessionCheck.rows[0].session_id, 'trackman_webhook' as any);
-          } catch (recalcErr) {
+          } catch (recalcErr: unknown) {
             logger.warn('[Trackman Webhook] Failed to recalculate fees', { extra: { bookingId: pendingBookingId, error: recalcErr } });
           }
         }
@@ -270,12 +270,12 @@ export async function createBookingForMember(
                   );
                   logger.info('[Trackman Webhook] Prepayment fully covered by credit', { extra: { sessionId: newSessionId, bookingId: pendingBookingId } });
                 }
-              } catch (prepayError) {
+              } catch (prepayError: unknown) {
                 logger.warn('[Trackman Webhook] Failed to create prepayment intent', { extra: { sessionId: newSessionId, error: prepayError } });
               }
             }
           }
-        } catch (sessionErr) {
+        } catch (sessionErr: unknown) {
           logger.error('[Trackman Webhook] Failed to ensure session for linked booking', { extra: { bookingId: pendingBookingId, trackmanBookingId, error: sessionErr } });
         }
       }
@@ -309,7 +309,7 @@ export async function createBookingForMember(
           if (totalFees > 0) {
             feeInfo = ` Estimated fees: $${(totalFees / 100).toFixed(2)}.`;
           }
-        } catch (e) {
+        } catch (e: unknown) {
           console.error('[Trackman Webhook] Failed to fetch fee info for notification:', e);
         }
       }
@@ -501,18 +501,18 @@ export async function createBookingForMember(
               logger.info('[Trackman Webhook] Created guest participants and cached fees', {
                 extra: { sessionId, playerCount, slotDuration }
               });
-            } catch (participantErr) {
+            } catch (participantErr: unknown) {
               logger.warn('[Trackman Webhook] Failed to create guest participants (non-blocking)', { 
                 extra: { sessionId, error: participantErr } 
               });
             }
-          } catch (billingErr) {
+          } catch (billingErr: unknown) {
             logger.warn('[Trackman Webhook] Failed to calculate billing (session created)', { 
               extra: { bookingId, sessionId, error: billingErr } 
             });
           }
         }
-      } catch (sessionErr) {
+      } catch (sessionErr: unknown) {
         logger.error('[Trackman Webhook] Failed to ensure session for booking', { extra: { bookingId, trackmanBookingId, error: sessionErr } });
       }
       
@@ -566,7 +566,7 @@ export async function createBookingForMember(
     }
     
     return { success: false };
-  } catch (e) {
+  } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to create booking for member', { error: e as Error });
     return { success: false };
   }
@@ -682,7 +682,7 @@ export async function linkByExternalBookingId(
         logger.info('[Trackman Webhook] Recalculated fees after externalBookingId link', {
           extra: { bookingId, sessionId: booking.session_id, originalDuration, newDuration: durationMinutes }
         });
-      } catch (recalcErr) {
+      } catch (recalcErr: unknown) {
         logger.warn('[Trackman Webhook] Failed to recalculate fees for externalBookingId link', { 
           extra: { bookingId, error: recalcErr } 
         });
@@ -726,13 +726,13 @@ export async function linkByExternalBookingId(
                 totalCents: breakdown.totals.totalCents 
               }
             });
-          } catch (feeError) {
+          } catch (feeError: unknown) {
             logger.warn('[Trackman Webhook] Failed to calculate fees for new session', {
               extra: { sessionId: createdSessionId, error: feeError }
             });
           }
         }
-      } catch (sessionError) {
+      } catch (sessionError: unknown) {
         logger.warn('[Trackman Webhook] Failed to create session for externalBookingId link', {
           extra: { bookingId, error: sessionError }
         });
@@ -751,7 +751,7 @@ export async function linkByExternalBookingId(
     });
     
     return { matched: true, bookingId, memberEmail, memberName };
-  } catch (e) {
+  } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to link by externalBookingId', { error: e as Error });
     return { matched: false };
   }
@@ -853,12 +853,12 @@ export async function tryMatchByBayDateTime(
         source: 'trackman_webhook',
         createdBy: 'trackman_auto_match'
       });
-    } catch (sessionErr) {
+    } catch (sessionErr: unknown) {
       logger.warn('[Trackman Webhook] Failed to ensure session for bay/date/time match', { extra: { bookingId, error: sessionErr } });
     }
 
     return { matched: true, bookingId, memberEmail, memberName };
-  } catch (e) {
+  } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to match by bay/date/time', { error: e as Error });
     return { matched: false };
   }
@@ -898,7 +898,7 @@ export async function refundGuestPassesForCancelledBooking(bookingId: number, me
     }
     
     return refundedCount;
-  } catch (e) {
+  } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to refund guest passes for cancelled booking', { error: e as Error });
     return 0;
   }

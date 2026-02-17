@@ -68,7 +68,7 @@ async function isStaffOrAdminCheck(email: string): Promise<boolean> {
       [email]
     );
     return result.rows.length > 0;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[isStaffOrAdminCheck] DB error, defaulting to false:', (error as Error).message);
     return false;
   }
@@ -646,7 +646,7 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
         logger.info('[roster] Invite notification sent', {
           extra: { bookingId, invitedMember: memberInfo.email }
         });
-      } catch (notifError) {
+      } catch (notifError: unknown) {
         logger.warn('[roster] Failed to send invite notification (non-blocking)', {
           error: notifError as Error,
           extra: { bookingId, memberEmail: memberInfo.email }
@@ -791,14 +791,14 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
               });
             }
           }
-        } catch (prepayError) {
+        } catch (prepayError: unknown) {
           logger.warn('[roster] Failed to create prepayment intent (non-blocking)', {
             error: prepayError as Error,
             extra: { sessionId, bookingId }
           });
         }
       }
-    } catch (recalcError) {
+    } catch (recalcError: unknown) {
       logger.warn('[roster] Failed to recalculate session fees (non-blocking)', {
         error: recalcError as Error,
         extra: { sessionId, bookingId }
@@ -821,7 +821,7 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
       ...(type === 'guest' && { guestPassesRemaining }),
       newRosterVersion
     });
-    } catch (txError) {
+    } catch (txError: unknown) {
       await client.query('ROLLBACK');
       throw txError;
     } finally {
@@ -1018,7 +1018,7 @@ router.delete('/api/bookings/:bookingId/participants/:participantId', async (req
           ledgerUpdated: recalcResult.ledgerUpdated
         }
       });
-    } catch (recalcError) {
+    } catch (recalcError: unknown) {
       logger.warn('[roster] Failed to recalculate session fees (non-blocking)', {
         error: recalcError as Error,
         extra: { sessionId: booking.session_id, bookingId }
@@ -1040,7 +1040,7 @@ router.delete('/api/bookings/:bookingId/participants/:participantId', async (req
       ...(participant.participantType === 'guest' && guestPassesRemaining !== undefined && { guestPassesRemaining }),
       newRosterVersion
     });
-    } catch (txError) {
+    } catch (txError: unknown) {
       await client.query('ROLLBACK');
       throw txError;
     } finally {
@@ -1200,7 +1200,7 @@ router.post('/api/bookings/:bookingId/participants/preview-fees', async (req: Re
               isConferenceRoom
             }
       );
-    } catch (feeError) {
+    } catch (feeError: unknown) {
       logger.warn('[roster] Failed to compute unified fee breakdown, using fallback', {
         error: feeError as Error,
         extra: { bookingId, sessionId: booking.session_id }

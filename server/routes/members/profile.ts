@@ -326,7 +326,8 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
         sql`LOWER(${bookingRequests.userEmail}) = ${normalizedEmail}`,
         sql`${bookingRequests.id} IN (SELECT booking_id FROM booking_members WHERE LOWER(user_email) = ${normalizedEmail})`
       ))
-      .orderBy(desc(bookingRequests.requestDate), desc(bookingRequests.startTime));
+      .orderBy(desc(bookingRequests.requestDate), desc(bookingRequests.startTime))
+      .limit(100);
     
     // Batch fetch all counts in a single query instead of N+1 queries per booking
     const bookingIds = bookingHistory.map(b => b.id);
@@ -431,7 +432,8 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       .from(eventRsvps)
       .leftJoin(events, eq(eventRsvps.eventId, events.id))
       .where(sql`LOWER(${eventRsvps.userEmail}) = ${normalizedEmail}`)
-      .orderBy(desc(events.eventDate), desc(eventRsvps.createdAt));
+      .orderBy(desc(events.eventDate), desc(eventRsvps.createdAt))
+      .limit(100);
     
     const wellnessHistory = await db.select({
       id: wellnessEnrollments.id,
@@ -447,7 +449,8 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       .from(wellnessEnrollments)
       .leftJoin(wellnessClasses, eq(wellnessEnrollments.classId, wellnessClasses.id))
       .where(sql`LOWER(${wellnessEnrollments.userEmail}) = ${normalizedEmail}`)
-      .orderBy(desc(wellnessClasses.date), desc(wellnessEnrollments.createdAt));
+      .orderBy(desc(wellnessClasses.date), desc(wellnessEnrollments.createdAt))
+      .limit(100);
     
     const guestPassRaw = await db.select()
       .from(guestPasses)
@@ -463,7 +466,8 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
     const guestCheckInsHistory = await db.select()
       .from(guestCheckIns)
       .where(sql`LOWER(${guestCheckIns.memberEmail}) = ${normalizedEmail}`)
-      .orderBy(desc(guestCheckIns.checkInDate), desc(guestCheckIns.createdAt));
+      .orderBy(desc(guestCheckIns.checkInDate), desc(guestCheckIns.createdAt))
+      .limit(100);
     
     const visitHistory = await db.select({
       id: bookingRequests.id,
@@ -491,7 +495,8 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
           )
         )
       ))
-      .orderBy(desc(bookingRequests.requestDate));
+      .orderBy(desc(bookingRequests.requestDate))
+      .limit(100);
     
     const guestAppearances = await db.select({
       id: bookingRequests.id,

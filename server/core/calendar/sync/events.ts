@@ -275,12 +275,13 @@ export async function syncGoogleCalendarEvents(): Promise<{ synced: number; crea
       )
     );
     
+    const idsToDelete = existingEvents
+      .filter(dbEvent => cancelledEventIds.has(dbEvent.googleCalendarId!) || !fetchedEventIds.has(dbEvent.googleCalendarId!))
+      .map(dbEvent => dbEvent.id);
     let deleted = 0;
-    for (const dbEvent of existingEvents) {
-      if (cancelledEventIds.has(dbEvent.googleCalendarId!) || !fetchedEventIds.has(dbEvent.googleCalendarId!)) {
-        await db.delete(events).where(eq(events.id, dbEvent.id));
-        deleted++;
-      }
+    if (idsToDelete.length > 0) {
+      await pool.query('DELETE FROM events WHERE id = ANY($1)', [idsToDelete]);
+      deleted = idsToDelete.length;
     }
     
     return { synced: calendarEvents.length, created, updated, deleted, pushedToCalendar };

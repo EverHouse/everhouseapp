@@ -266,6 +266,10 @@ export async function processStripeWebhook(
       deferredActions = await handleSubscriptionCreated(client, event.data.object);
     } else if (event.type === 'customer.subscription.updated') {
       deferredActions = await handleSubscriptionUpdated(client, event.data.object, event.data.previous_attributes);
+    } else if (event.type === 'customer.subscription.paused') {
+      deferredActions = await handleSubscriptionPaused(client, event.data.object);
+    } else if (event.type === 'customer.subscription.resumed') {
+      deferredActions = await handleSubscriptionResumed(client, event.data.object);
     } else if (event.type === 'customer.subscription.deleted') {
       deferredActions = await handleSubscriptionDeleted(client, event.data.object);
     } else if (event.type === 'charge.dispute.created') {
@@ -365,6 +369,10 @@ export async function replayStripeEvent(
       deferredActions = await handleSubscriptionCreated(client, event.data.object);
     } else if (event.type === 'customer.subscription.updated') {
       deferredActions = await handleSubscriptionUpdated(client, event.data.object, event.data.previous_attributes);
+    } else if (event.type === 'customer.subscription.paused') {
+      deferredActions = await handleSubscriptionPaused(client, event.data.object);
+    } else if (event.type === 'customer.subscription.resumed') {
+      deferredActions = await handleSubscriptionResumed(client, event.data.object);
     } else if (event.type === 'customer.subscription.deleted') {
       deferredActions = await handleSubscriptionDeleted(client, event.data.object);
     } else if (event.type === 'charge.dispute.created') {
@@ -3223,6 +3231,177 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
     console.log(`[Stripe Webhook] Subscription status changed to '${status}' for ${memberName} (${email})`);
   } catch (error) {
     console.error('[Stripe Webhook] Error handling subscription updated:', error);
+    throw error;
+  }
+  return deferredActions;
+}
+
+async function handleSubscriptionPaused(client: PoolClient, subscription: Stripe.Subscription): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+  try {
+    const customerId = subscription.customer;
+
+    const userResult = await client.query(
+      'SELECT id, email, first_name, last_name FROM users WHERE stripe_customer_id = $1',
+      [customerId]
+    );
+
+    if (userResult.rows.length === 0) {
+      console.warn(`[Stripe Webhook] No user found for Stripe customer ${customerId} (subscription.paused)`);
+      return deferredActions;
+    }
+
+    const { id: userId, email, first_name, last_name } = userResult.rows[0];
+    const memberName = `${first_name || ''} ${last_name || ''}`.trim() || email;
+
+    await client.query(
+      `UPDATE users SET membership_status = 'frozen', updated_at = NOW() WHERE id = $1`,
+      [userId]
+    );
+    console.log(`[Stripe Webhook] Subscription paused: ${email} membership_status set to frozen`);
+
+    try {
+      const { syncMemberToHubSpot } = await import('../hubspot/stages');
+      await syncMemberToHubSpot({ email, status: 'frozen', billingProvider: 'stripe', billingGroupRole: 'Primary' });
+      console.log(`[Stripe Webhook] Synced ${email} status=frozen to HubSpot`);
+    } catch (hubspotError: unknown) {
+      console.error('[Stripe Webhook] HubSpot sync failed for status frozen:', getErrorMessage(hubspotError));
+    }
+
+    try {
+      await notifyMember({
+        userEmail: email,
+        title: 'Membership Paused',
+        message: 'Your membership has been paused. You can resume anytime to restore full access.',
+        type: 'system',
+      });
+    } catch (notifyErr: unknown) {
+      console.error('[Stripe Webhook] Notification failed (non-fatal):', getErrorMessage(notifyErr));
+    }
+
+    try {
+      await notifyAllStaff(
+        'Membership Paused',
+        `${memberName} (${email}) membership has been paused (frozen).`,
+        'member_status_change',
+        { sendPush: true, sendWebSocket: true }
+      );
+    } catch (notifyErr: unknown) {
+      console.error('[Stripe Webhook] Notification failed (non-fatal):', getErrorMessage(notifyErr));
+    }
+
+    broadcastBillingUpdate({
+      action: 'subscription_updated',
+      memberEmail: email,
+      memberName,
+      status: 'frozen'
+    });
+
+    deferredActions.push(async () => {
+      await logSystemAction({
+        action: 'subscription_paused',
+        resourceType: 'subscription',
+        resourceId: subscription.id,
+        resourceName: `${memberName} (${email})`,
+        details: {
+          source: 'stripe_webhook',
+          member_email: email,
+          stripe_subscription_id: subscription.id,
+          new_status: 'frozen'
+        }
+      });
+    });
+
+    console.log(`[Stripe Webhook] Subscription paused processed for ${memberName} (${email})`);
+  } catch (error: unknown) {
+    console.error('[Stripe Webhook] Error handling subscription paused:', getErrorMessage(error));
+    throw error;
+  }
+  return deferredActions;
+}
+
+async function handleSubscriptionResumed(client: PoolClient, subscription: Stripe.Subscription): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+  try {
+    const customerId = subscription.customer;
+    const subscriptionPeriodEnd = (subscription as any).current_period_end
+      ? new Date((subscription as any).current_period_end * 1000)
+      : null;
+
+    const userResult = await client.query(
+      'SELECT id, email, first_name, last_name FROM users WHERE stripe_customer_id = $1',
+      [customerId]
+    );
+
+    if (userResult.rows.length === 0) {
+      console.warn(`[Stripe Webhook] No user found for Stripe customer ${customerId} (subscription.resumed)`);
+      return deferredActions;
+    }
+
+    const { id: userId, email, first_name, last_name } = userResult.rows[0];
+    const memberName = `${first_name || ''} ${last_name || ''}`.trim() || email;
+
+    await client.query(
+      `UPDATE users SET membership_status = 'active', stripe_current_period_end = COALESCE($2, stripe_current_period_end), updated_at = NOW() WHERE id = $1`,
+      [userId, subscriptionPeriodEnd]
+    );
+    console.log(`[Stripe Webhook] Subscription resumed: ${email} membership_status set to active`);
+
+    try {
+      const { syncMemberToHubSpot } = await import('../hubspot/stages');
+      await syncMemberToHubSpot({ email, status: 'active', billingProvider: 'stripe', billingGroupRole: 'Primary' });
+      console.log(`[Stripe Webhook] Synced ${email} status=active to HubSpot`);
+    } catch (hubspotError: unknown) {
+      console.error('[Stripe Webhook] HubSpot sync failed for status active:', getErrorMessage(hubspotError));
+    }
+
+    try {
+      await notifyMember({
+        userEmail: email,
+        title: 'Membership Resumed',
+        message: 'Your membership has been resumed. Welcome back!',
+        type: 'membership_renewed',
+      });
+    } catch (notifyErr: unknown) {
+      console.error('[Stripe Webhook] Notification failed (non-fatal):', getErrorMessage(notifyErr));
+    }
+
+    try {
+      await notifyAllStaff(
+        'Membership Resumed',
+        `${memberName} (${email}) membership has been resumed.`,
+        'member_status_change',
+        { sendPush: true, sendWebSocket: true }
+      );
+    } catch (notifyErr: unknown) {
+      console.error('[Stripe Webhook] Notification failed (non-fatal):', getErrorMessage(notifyErr));
+    }
+
+    broadcastBillingUpdate({
+      action: 'subscription_updated',
+      memberEmail: email,
+      memberName,
+      status: 'active'
+    });
+
+    deferredActions.push(async () => {
+      await logSystemAction({
+        action: 'subscription_resumed',
+        resourceType: 'subscription',
+        resourceId: subscription.id,
+        resourceName: `${memberName} (${email})`,
+        details: {
+          source: 'stripe_webhook',
+          member_email: email,
+          stripe_subscription_id: subscription.id,
+          new_status: 'active'
+        }
+      });
+    });
+
+    console.log(`[Stripe Webhook] Subscription resumed processed for ${memberName} (${email})`);
+  } catch (error: unknown) {
+    console.error('[Stripe Webhook] Error handling subscription resumed:', getErrorMessage(error));
     throw error;
   }
   return deferredActions;

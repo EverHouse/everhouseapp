@@ -74,7 +74,7 @@ router.post('/api/admin/booking/:id/reschedule/start', isStaffOrAdmin, async (re
         session_id: booking.session_id,
       }
     });
-  } catch (err) {
+  } catch (err: unknown) {
     logger.error('[Reschedule] Failed to start reschedule', { error: err as Error });
     return res.status(500).json({ error: 'Failed to start reschedule' });
   }
@@ -194,7 +194,7 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
       }
 
       await client.query('COMMIT');
-    } catch (txErr) {
+    } catch (txErr: unknown) {
       await client.query('ROLLBACK');
       logger.error('[Reschedule] Transaction failed, rolled back', { error: txErr as Error });
       return res.status(500).json({ error: 'Failed to confirm reschedule' });
@@ -208,7 +208,7 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
         logger.info('[Reschedule] Recalculated session fees after reschedule', {
           extra: { bookingId, sessionId: updated.session_id }
         });
-      } catch (feeErr) {
+      } catch (feeErr: unknown) {
         logger.warn('[Reschedule] Fee recalculation failed (non-blocking)', {
           extra: { bookingId, sessionId: updated.session_id, error: (feeErr as Error).message }
         });
@@ -229,14 +229,14 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
               logger.info('[Reschedule] Canceled stale prepayment intent after reschedule', {
                 extra: { bookingId, sessionId: updated.session_id, paymentIntentId: intent.stripe_payment_intent_id }
               });
-            } catch (cancelErr) {
+            } catch (cancelErr: unknown) {
               logger.warn('[Reschedule] Failed to cancel prepayment intent (non-blocking)', {
                 extra: { bookingId, paymentIntentId: intent.stripe_payment_intent_id, error: (cancelErr as Error).message }
               });
             }
           }
         }
-      } catch (intentErr) {
+      } catch (intentErr: unknown) {
         logger.warn('[Reschedule] Failed to query stale prepayment intents (non-blocking)', {
           extra: { bookingId, sessionId: updated.session_id, error: (intentErr as Error).message }
         });
@@ -301,14 +301,14 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
         endTime: end_time,
         bayName: newBayName,
         memberName: (booking.user_name as string) || 'Member',
-      }).catch(() => {});
+      }).catch((err: unknown) => console.error('[Email] Reschedule email error:', err));
     }
 
     return res.json({
       success: true,
       booking: updated
     });
-  } catch (err) {
+  } catch (err: unknown) {
     logger.error('[Reschedule] Failed to confirm reschedule', { error: err as Error });
     return res.status(500).json({ error: 'Failed to confirm reschedule' });
   }
@@ -324,7 +324,7 @@ router.post('/api/admin/booking/:id/reschedule/cancel', isStaffOrAdmin, async (r
     await db.execute(sql`UPDATE booking_requests SET is_relocating = false, relocating_started_at = NULL, updated_at = NOW() WHERE id = ${bookingId}`);
 
     return res.json({ success: true });
-  } catch (err) {
+  } catch (err: unknown) {
     logger.error('[Reschedule] Failed to cancel reschedule', { error: err as Error });
     return res.status(500).json({ error: 'Failed to cancel reschedule' });
   }
@@ -342,7 +342,7 @@ export async function clearStaleRelocations(): Promise<number> {
       logger.info(`[Reschedule] Auto-cleared ${count} stale relocating booking(s)`);
     }
     return count;
-  } catch (err) {
+  } catch (err: unknown) {
     logger.error('[Reschedule] Failed to clear stale relocations', { error: err as Error });
     return 0;
   }

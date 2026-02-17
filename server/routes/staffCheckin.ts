@@ -33,7 +33,7 @@ async function getMemberDisplayName(email: string): Promise<string> {
     if (result.length > 0 && (result[0].firstName || result[0].lastName)) {
       return [result[0].firstName, result[0].lastName].filter(Boolean).join(' ');
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[StaffCheckin] Error looking up member name:', error);
   }
   return email.split('@')[0];
@@ -433,7 +433,7 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
     if (sessionId) {
       try {
         await recalculateSessionFees(sessionId, 'staff_action' as any);
-      } catch (calcError) {
+      } catch (calcError: unknown) {
         console.error('[StaffCheckin] Failed to recalculate fees before payment action:', calcError);
         // Continue with existing values - non-blocking error
       }
@@ -519,7 +519,7 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
         });
         
         if (consumeResult.passesRemaining !== undefined) {
-          broadcastMemberStatsUpdated(booking.owner_email, { guestPasses: consumeResult.passesRemaining });
+          try { broadcastMemberStatsUpdated(booking.owner_email, { guestPasses: consumeResult.passesRemaining }); } catch (err: unknown) { console.error('[Broadcast] Stats update error:', err); }
         }
         
         return res.json({ 
@@ -588,7 +588,7 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
             
             console.log(`[StaffCheckin] Sent waiver notification to ${recipientEmail}`);
           }
-        } catch (notifyErr) {
+        } catch (notifyErr: unknown) {
           console.error('[StaffCheckin] Failed to send waiver notification:', notifyErr);
         }
       }
@@ -683,7 +683,7 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
           } else {
             console.log(`[StaffCheckin] Fee snapshot already exists for session ${sessionId}, skipping`);
           }
-        } catch (snapshotErr) {
+        } catch (snapshotErr: unknown) {
           console.error('[StaffCheckin] Failed to create fee snapshot:', snapshotErr);
         }
 
@@ -724,7 +724,7 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
           });
           
           console.log(`[StaffCheckin] Sent bulk waiver notification to ${booking.owner_email} for ${pendingParticipants.rows.length} participants`);
-        } catch (notifyErr) {
+        } catch (notifyErr: unknown) {
           console.error('[StaffCheckin] Failed to send bulk waiver notification:', notifyErr);
         }
       }
@@ -1223,10 +1223,10 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
                 logger.info('[Staff Add Member] Created prepayment intent', { extra: { sessionId, amountDollars: (totalCents/100).toFixed(2) } });
               }
             }
-          } catch (prepayErr) {
+          } catch (prepayErr: unknown) {
             logger.warn('[Staff Add Member] Failed to create prepayment intent', { extra: { sessionId, error: String(prepayErr) } });
           }
-        } catch (feeErr) {
+        } catch (feeErr: unknown) {
           logger.warn('[Staff Add Guest->Member] Failed to recalculate fees', { extra: { sessionId, error: String(feeErr) } });
         }
 
@@ -1313,10 +1313,10 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
               logger.info('[Staff Add Guest] Created prepayment intent', { extra: { sessionId, amountDollars: (totalCents/100).toFixed(2) } });
             }
           }
-        } catch (prepayErr) {
+        } catch (prepayErr: unknown) {
           logger.warn('[Staff Add Guest] Failed to create prepayment intent', { extra: { sessionId, error: String(prepayErr) } });
         }
-      } catch (feeErr) {
+      } catch (feeErr: unknown) {
         logger.warn('[Staff Add Guest] Failed to recalculate fees', { extra: { sessionId, error: String(feeErr) } });
       }
 
@@ -1422,7 +1422,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       // Recalculate fees to update all participant fees
       try {
         await recalculateSessionFees(sessionId, 'staff_add_member' as any);
-      } catch (feeErr) {
+      } catch (feeErr: unknown) {
         console.warn(`[Staff Add Member] Failed to recalculate fees for session ${sessionId}:`, feeErr);
       }
 
@@ -1503,7 +1503,7 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
         .catch(err => console.error('[QR Checkin] Failed to sync visit count to HubSpot:', err));
     }
 
-    broadcastMemberStatsUpdated(member.email, { lifetimeVisits: newVisitCount });
+    try { broadcastMemberStatsUpdated(member.email, { lifetimeVisits: newVisitCount }); } catch (err: unknown) { console.error('[Broadcast] Stats update error:', err); }
 
     notifyMember({
       userEmail: member.email,

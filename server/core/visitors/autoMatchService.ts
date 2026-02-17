@@ -269,7 +269,7 @@ export async function matchBookingToPurchase(
       saleDate: row.sale_date,
       source: row.source as 'legacy' | 'day_pass'
     };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[AutoMatch] Error matching booking to purchase:', error);
     return null;
   }
@@ -410,7 +410,7 @@ async function createBookingSessionForAutoMatch(
     
     await client.query('COMMIT');
     return sessionId;
-  } catch (error) {
+  } catch (error: unknown) {
     await client.query('ROLLBACK');
     console.error('[AutoMatch] Error creating booking session:', error);
     return null;
@@ -546,7 +546,7 @@ export async function autoMatchSingleBooking(
 
     result.reason = 'No matching purchase found and no fallback applicable';
     return result;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[AutoMatch] Error auto-matching booking:', error);
     result.reason = error instanceof Error ? error.message : 'Unknown error';
     return result;
@@ -581,7 +581,7 @@ async function resolveBookingWithUser(
     ]);
 
     await client.query('COMMIT');
-  } catch (error) {
+  } catch (error: unknown) {
     await client.query('ROLLBACK');
     throw error;
   } finally {
@@ -950,7 +950,7 @@ async function autoMatchBookingRequests(
               tierAtBooking: undefined
             }, 'trackman' as any);
           }
-        } catch (sessionError) {
+        } catch (sessionError: unknown) {
           console.log(`[AutoMatch] Could not create session for booking ${row.id}:`, sessionError);
         }
       }
@@ -986,7 +986,7 @@ async function autoMatchBookingRequests(
       });
       matched++;
       console.log(`[AutoMatch] Matched booking_request #${row.id} -> ${visitor.email} (existing real visitor)`);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(`[AutoMatch] Error matching booking_request #${row.id}:`, error);
       results.push({
         bookingId: row.id,
@@ -1018,7 +1018,7 @@ export async function autoMatchAllUnmatchedBookings(
     console.log(`[AutoMatch] Complete: ${totalMatched} matched, ${totalFailed} failed (legacy: ${legacyResults.matched}/${legacyResults.failed}, requests: ${requestsResults.matched}/${requestsResults.failed})`);
     
     return { matched: totalMatched, failed: totalFailed, results: allResults };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[AutoMatch] Error in batch auto-match:', error);
     throw error;
   }

@@ -137,7 +137,7 @@ async function insertNotificationToDatabase(payload: NotificationPayload): Promi
     }).returning({ id: notifications.id });
     
     return result;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error(`[Notification] Database insert failed for ${payload.userEmail}`, {
       userEmail: payload.userEmail,
       error: getErrorMessage(error),
@@ -178,7 +178,7 @@ async function deliverViaWebSocket(payload: NotificationPayload): Promise<Delive
       success,
       details: { connectionsSent: result.sentCount }
     };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error(`[Notification] WebSocket delivery failed for ${payload.userEmail}`, {
       userEmail: payload.userEmail,
       error: getErrorMessage(error),
@@ -284,7 +284,7 @@ async function deliverViaPush(userEmail: string, payload: { title: string; body:
       success: !allFailed,
       details: { successCount, failCount, totalSubscriptions: subscriptions.length }
     };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error(`[Notification] Push delivery failed for ${userEmail}`, {
       userEmail,
       error: getErrorMessage(error),
@@ -323,7 +323,7 @@ async function deliverViaEmail(to: string, subject: string, html: string): Promi
       success: true,
       details: { to, subject }
     };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error(`[Notification] Email delivery failed for ${to}`, {
       userEmail: to,
       error: getErrorMessage(error),
@@ -488,7 +488,7 @@ export async function notifyAllStaff(
           success: true,
           details: { connectionsSent: sent }
         });
-      } catch (error) {
+      } catch (error: unknown) {
         deliveryResults.push({
           channel: 'websocket',
           success: false,
@@ -517,7 +517,7 @@ export async function notifyAllStaff(
     });
     
     return { staffCount: staffEmails.length, deliveryResults };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error(`[Notification] Staff notification failed`, {
       error: getErrorMessage(error),
       cause: error instanceof Error && error.cause ? String(error.cause) : undefined,
@@ -618,7 +618,7 @@ async function deliverPushToStaff(payload: { title: string; body: string; url?: 
       success: successCount > 0 || staffSubscriptions.length === 0,
       details: { successCount, failCount, totalSubscriptions: staffSubscriptions.length }
     };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error(`[Notification] Staff push delivery failed`, {
       error: getErrorMessage(error),
       extra: { event: 'notification.staff_push_failed' }

@@ -121,7 +121,7 @@ router.get('/api/guest-passes/:email', isAuthenticated, async (req, res) => {
           ).length;
         }
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('[GuestPasses] Error counting pending guests:', err);
     }
     
@@ -199,7 +199,7 @@ router.post('/api/guest-passes/:email/use', isAuthenticated, async (req, res) =>
       url: '/member/profile'
     }).catch(err => console.error('Push notification failed:', err));
     
-    broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining });
+    try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining }); } catch (err: unknown) { console.error('[Broadcast] Stats update error:', err); }
     
     res.json({
       passes_used: data.passesUsed,
@@ -240,7 +240,7 @@ router.put('/api/guest-passes/:email', isStaffOrAdmin, async (req, res) => {
     const data = result[0];
     const passesRemaining = data.passesTotal - data.passesUsed;
     
-    broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: passesRemaining });
+    try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: passesRemaining }); } catch (err: unknown) { console.error('[Broadcast] Stats update error:', err); }
     
     res.json({
       passes_used: data.passesUsed,
@@ -265,45 +265,57 @@ export async function useGuestPass(
     // Normalize email for consistent matching
     const normalizedEmail = memberEmail.toLowerCase();
     
-    const result = await db.update(guestPasses)
-      .set({ passesUsed: sql`${guestPasses.passesUsed} + 1` })
-      .where(and(
-        sql`LOWER(${guestPasses.memberEmail}) = ${normalizedEmail}`,
-        lt(guestPasses.passesUsed, guestPasses.passesTotal)
-      ))
-      .returning();
-    
-    if (result.length === 0) {
-      return { success: false, error: 'No guest passes remaining' };
-    }
-    
-    const data = result[0];
-    const remaining = data.passesTotal - data.passesUsed;
-    
-    if (sendNotification) {
-      const message = guestName 
-        ? `Guest pass used for ${guestName}. You have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`
-        : `Guest pass used. You have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`;
+    const { data, remaining, notificationMessage } = await db.transaction(async (tx) => {
+      const result = await tx.update(guestPasses)
+        .set({ passesUsed: sql`${guestPasses.passesUsed} + 1` })
+        .where(and(
+          sql`LOWER(${guestPasses.memberEmail}) = ${normalizedEmail}`,
+          lt(guestPasses.passesUsed, guestPasses.passesTotal)
+        ))
+        .returning();
       
-      await db.insert(notifications).values({
-        userEmail: normalizedEmail,
-        title: 'Guest Pass Used',
-        message: message,
-        type: 'guest_pass',
-        relatedType: 'guest_pass'
-      });
+      if (result.length === 0) {
+        throw new Error('No guest passes remaining');
+      }
       
+      const data = result[0];
+      const remaining = data.passesTotal - data.passesUsed;
+      
+      let notificationMessage: string | null = null;
+      if (sendNotification) {
+        const message = guestName 
+          ? `Guest pass used for ${guestName}. You have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`
+          : `Guest pass used. You have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`;
+        notificationMessage = message;
+        
+        await tx.insert(notifications).values({
+          userEmail: normalizedEmail,
+          title: 'Guest Pass Used',
+          message: message,
+          type: 'guest_pass',
+          relatedType: 'guest_pass'
+        });
+      }
+      
+      return { data, remaining, notificationMessage };
+    });
+    
+    if (notificationMessage) {
       sendPushNotification(normalizedEmail, {
         title: 'Guest Pass Used',
-        body: message,
+        body: notificationMessage,
         url: '/member/profile'
       }).catch(err => console.error('Push notification failed:', err));
     }
     
-    broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining });
+    try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining }); } catch (err: unknown) { console.error('[Broadcast] Stats update error:', err); }
     
     return { success: true, remaining };
-  } catch (error) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Failed to use guest pass';
+    if (msg === 'No guest passes remaining') {
+      return { success: false, error: msg };
+    }
     console.error('[useGuestPass] Error:', error);
     return { success: false, error: 'Failed to use guest pass' };
   }
@@ -318,50 +330,60 @@ export async function refundGuestPass(
     // Normalize email for consistent matching
     const normalizedEmail = memberEmail.toLowerCase();
     
-    const result = await db.update(guestPasses)
-      .set({ passesUsed: sql`GREATEST(0, ${guestPasses.passesUsed} - 1)` })
-      .where(sql`LOWER(${guestPasses.memberEmail}) = ${normalizedEmail}`)
-      .returning();
-    
-    if (result.length === 0) {
-      return { success: false, error: 'Member guest pass record not found' };
-    }
-    
-    const data = result[0];
-    const remaining = data.passesTotal - data.passesUsed;
-    
-    if (sendNotification) {
-      const message = guestName 
-        ? `Guest pass refunded for ${guestName}. You now have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`
-        : `Guest pass refunded. You now have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`;
+    const { data, remaining, notificationMessage } = await db.transaction(async (tx) => {
+      const result = await tx.update(guestPasses)
+        .set({ passesUsed: sql`GREATEST(0, ${guestPasses.passesUsed} - 1)` })
+        .where(sql`LOWER(${guestPasses.memberEmail}) = ${normalizedEmail}`)
+        .returning();
       
-      await db.insert(notifications).values({
-        userEmail: normalizedEmail,
-        title: 'Guest Pass Refunded',
-        message: message,
-        type: 'guest_pass',
-        relatedType: 'guest_pass'
-      });
+      if (result.length === 0) {
+        throw new Error('Member guest pass record not found');
+      }
       
-      // Send push notification
+      const data = result[0];
+      const remaining = data.passesTotal - data.passesUsed;
+      
+      let notificationMessage: string | null = null;
+      if (sendNotification) {
+        const message = guestName 
+          ? `Guest pass refunded for ${guestName}. You now have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`
+          : `Guest pass refunded. You now have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`;
+        notificationMessage = message;
+        
+        await tx.insert(notifications).values({
+          userEmail: normalizedEmail,
+          title: 'Guest Pass Refunded',
+          message: message,
+          type: 'guest_pass',
+          relatedType: 'guest_pass'
+        });
+      }
+      
+      return { data, remaining, notificationMessage };
+    });
+    
+    if (notificationMessage) {
       sendPushNotification(normalizedEmail, {
         title: 'Guest Pass Refunded',
-        body: message,
+        body: notificationMessage,
         url: '/member/profile'
       }).catch(err => console.error('Push notification failed:', err));
       
-      // Send WebSocket notification
       sendNotificationToUser(normalizedEmail, {
         type: 'guest_pass',
         title: 'Guest Pass Refunded',
-        message: message
+        message: notificationMessage
       });
     }
     
-    broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining });
+    try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining }); } catch (err: unknown) { console.error('[Broadcast] Stats update error:', err); }
     
     return { success: true, remaining };
-  } catch (error) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Failed to refund guest pass';
+    if (msg === 'Member guest pass record not found') {
+      return { success: false, error: msg };
+    }
     console.error('[refundGuestPass] Error:', error);
     return { success: false, error: 'Failed to refund guest pass' };
   }
@@ -382,7 +404,7 @@ export async function getGuestPassesRemaining(memberEmail: string, tier?: string
     }
     
     return Math.max(0, result[0].passesTotal - result[0].passesUsed);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[getGuestPassesRemaining] Error:', error);
     return 0;
   }
@@ -408,7 +430,7 @@ export async function ensureGuestPassRecord(memberEmail: string, tier?: string):
           passesTotal
         });
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[ensureGuestPassRecord] Error:', error);
   }
 }

@@ -66,7 +66,7 @@ router.get("/api/legacy-purchases/member/:email", isStaffOrAdmin, async (req: Re
     }));
     
     res.json(formattedPurchases);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[LegacyPurchases] Error fetching purchases:", error);
     res.status(500).json({ error: "Failed to fetch purchases" });
   }
@@ -114,7 +114,7 @@ router.get("/api/legacy-purchases/my-purchases", async (req: Request, res: Respo
     
     console.log(`[LegacyPurchases] my-purchases for ${targetEmail}: found ${formattedPurchases.length} purchases`);
     res.json(formattedPurchases);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[LegacyPurchases] Error fetching my purchases:", error);
     res.status(500).json({ error: "Failed to fetch purchases" });
   }
@@ -353,7 +353,7 @@ async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurcha
           status: 'paid',
           source: 'Stripe',
         }));
-    } catch (balanceError) {
+    } catch (balanceError: unknown) {
       console.error('[UnifiedPurchases] Error fetching balance transactions:', balanceError);
     }
   }
@@ -383,7 +383,7 @@ router.get("/api/members/:email/unified-purchases", isStaffOrAdmin, async (req: 
     
     console.log(`[UnifiedPurchases] staff view for ${email}: found ${purchases.length} purchases`);
     res.json(purchases);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[UnifiedPurchases] Error fetching unified purchases:", error);
     res.status(500).json({ error: "Failed to fetch unified purchases" });
   }
@@ -414,7 +414,7 @@ router.get("/api/my-unified-purchases", async (req: Request, res: Response) => {
     
     console.log(`[UnifiedPurchases] my-unified-purchases for ${targetEmail}: found ${purchases.length} purchases`);
     res.json(purchases);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[UnifiedPurchases] Error fetching my unified purchases:", error);
     res.status(500).json({ error: "Failed to fetch unified purchases" });
   }
@@ -440,7 +440,7 @@ router.get("/api/legacy-purchases/member/:email/stats", isStaffOrAdmin, async (r
       guestPasses: stats[0]?.guestPasses || 0,
       guestSimFees: stats[0]?.guestSimFees || 0,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[LegacyPurchases] Error fetching stats:", error);
     res.status(500).json({ error: "Failed to fetch stats" });
   }
@@ -472,7 +472,7 @@ router.post("/api/legacy-purchases/admin/import", isAdmin, async (req: Request, 
       success: true,
       results,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[LegacyPurchases] Import error:", error);
     res.status(500).json({ 
       error: "Import failed",
@@ -490,7 +490,7 @@ router.get("/api/legacy-purchases/admin/import-jobs", isAdmin, async (req: Reque
       .limit(20);
     
     res.json(jobs);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[LegacyPurchases] Error fetching import jobs:", error);
     res.status(500).json({ error: "Failed to fetch import jobs" });
   }
@@ -591,7 +591,7 @@ router.post("/api/legacy-purchases/admin/upload-csv",
         message: 'CSV import completed successfully',
         results,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("[CSVUpload] Import error:", error);
       res.status(500).json({ 
         error: "CSV import failed",
@@ -611,7 +611,7 @@ router.get("/api/legacy-purchases/admin/unmatched", isAdmin, async (req: Request
       .limit(100);
     
     res.json(unmatched);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[LegacyPurchases] Error fetching unmatched:", error);
     res.status(500).json({ error: "Failed to fetch unmatched purchases" });
   }
@@ -671,7 +671,7 @@ router.post("/api/legacy-purchases/admin/link-guest-fees", isAdmin, async (req: 
       processed: guestPurchases.length,
       linked,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[LegacyPurchases] Error linking guest fees:", error);
     res.status(500).json({ error: "Failed to link guest fees" });
   }
@@ -995,7 +995,7 @@ router.post("/api/legacy-purchases/admin/sync-hubspot", isAdmin, async (req: Req
       ...results,
       errorDetails: results.errorDetails.length > 0 ? results.errorDetails : undefined,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[LegacyPurchases] HubSpot sync error:", error);
     res.status(500).json({ 
       error: "HubSpot sync failed",
@@ -1048,7 +1048,7 @@ router.post("/api/legacy-purchases/admin/sync-hubspot/:email", isAdmin, async (r
       email,
       properties,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[LegacyPurchases] HubSpot sync error:", error);
     res.status(500).json({ 
       error: "HubSpot sync failed",

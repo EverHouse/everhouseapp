@@ -40,7 +40,7 @@ export async function createCalendarEvent(booking: any, bayName: string): Promis
     );
     
     return response.data.id || null;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error creating calendar event:', error);
     return null;
   }
@@ -84,7 +84,7 @@ export async function createCalendarEventOnCalendar(
     );
     
     return response.data.id || null;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error creating calendar event:', error);
     return null;
   }
@@ -101,7 +101,7 @@ export async function deleteCalendarEvent(eventId: string, calendarId: string = 
       'deleteCalendarEvent'
     );
     return true;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error deleting calendar event:', error);
     return false;
   }
@@ -145,7 +145,7 @@ export async function updateCalendarEvent(
     );
     
     return true;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error updating calendar event:', error);
     return false;
   }

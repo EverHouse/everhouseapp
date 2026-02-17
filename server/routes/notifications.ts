@@ -20,7 +20,7 @@ async function isStaffUser(email: string): Promise<boolean> {
       [email]
     );
     return result.rows.length > 0;
-  } catch (error) {
+  } catch (error: unknown) {
     return false;
   }
 }

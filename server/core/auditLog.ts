@@ -237,7 +237,7 @@ export async function logAdminAction(params: AuditLogParams): Promise<void> {
     };
     
     await db.insert(adminAuditLog).values(entry);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[AuditLog] Failed to log admin action:', error);
   }
 }
@@ -269,7 +269,7 @@ export async function logSystemAction(params: SystemActionParams): Promise<void>
     };
     
     await db.insert(adminAuditLog).values(entry);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[AuditLog] Failed to log system action:', error);
   }
 }
@@ -304,7 +304,7 @@ export async function logMemberAction(params: MemberActionParams): Promise<void>
     };
     
     await db.insert(adminAuditLog).values(entry);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[AuditLog] Failed to log member action:', error);
   }
 }
@@ -414,7 +414,7 @@ export async function getAuditLogs(params: {
       .offset(offset);
     
     return { logs, total: logs.length };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[AuditLog] Failed to fetch audit logs:', error);
     return { logs: [], total: 0 };
   }
@@ -431,7 +431,7 @@ export async function cleanupOldAuditLogs(daysToKeep: number = 365): Promise<num
     
     console.log(`[AuditLog] Cleaned up ${deleted.length} old audit log entries`);
     return deleted.length;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[AuditLog] Failed to cleanup old audit logs:', error);
     return 0;
   }

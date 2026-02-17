@@ -43,7 +43,7 @@ router.get('/api/account/my-data', isAuthenticated, async (req: any, res: Respon
     res.setHeader('Content-Disposition', `attachment; filename="my-data-${new Date().toISOString().split('T')[0]}.json"`);
     
     return res.json(exportData);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[DataExport] Error exporting member data:', error);
     return res.status(500).json({ error: 'Failed to export data' });
   }
@@ -74,7 +74,7 @@ router.get('/api/account/my-data/preview', isAuthenticated, async (req: any, res
       summary: preview,
       message: 'Use GET /api/account/my-data to download your complete data export'
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[DataExport] Error previewing member data:', error);
     return res.status(500).json({ error: 'Failed to preview data' });
   }
@@ -91,7 +91,7 @@ router.get('/api/account/export-history', isAuthenticated, async (req: any, res:
       .limit(10);
     
     return res.json({ exports: history });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[DataExport] Error fetching export history:', error);
     return res.status(500).json({ error: 'Failed to fetch export history' });
   }

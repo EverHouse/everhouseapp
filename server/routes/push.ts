@@ -64,7 +64,7 @@ export async function sendPushNotification(userEmail: string, payload: { title: 
     
     await Promise.all(notifications);
     return { sent: true };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Failed to send push notification:', error);
     return { sent: false, reason: 'Error sending push' };
   }
@@ -112,7 +112,7 @@ export async function sendPushNotificationToStaff(payload: { title: string; body
     
     await Promise.all(notifications);
     return { sent: true, count: staffSubscriptions.length };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Failed to send push notification to staff:', error);
     return { sent: false, count: 0, reason: 'Error sending push' };
   }
@@ -182,7 +182,7 @@ export async function sendPushNotificationToAllMembers(payload: { title: string;
     console.log(`[Push to Members] Sent ${results.sent} in-app notifications, ${memberSubscriptions.length - results.pushFailed} push notifications. Failures: ${results.pushFailed}`);
     
     return results.sent;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Failed to send push notification to members:', error);
     return 0;
   }

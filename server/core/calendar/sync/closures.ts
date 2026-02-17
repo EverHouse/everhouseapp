@@ -200,16 +200,23 @@ async function createAvailabilityBlocks(
     console.log(`[Calendar Sync] Skipping non-existent resource IDs: ${skippedIds.join(', ')}`);
   }
   
+  const valueRows: any[] = [];
+  const params: any[] = [];
+  let paramIdx = 1;
   for (const resId of filteredIds) {
     for (const date of dates) {
-      await pool.query(
-        `INSERT INTO availability_blocks (resource_id, block_date, start_time, end_time, block_type, notes, created_by, closure_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         ON CONFLICT DO NOTHING`,
-        [resId, date, blockStartTime, blockEndTime, 'blocked', notes, 'system', closureId]
-      );
+      valueRows.push(`($${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++})`);
+      params.push(resId, date, blockStartTime, blockEndTime, 'blocked', notes, 'system', closureId);
       blocksCreated++;
     }
+  }
+  if (valueRows.length > 0) {
+    await pool.query(
+      `INSERT INTO availability_blocks (resource_id, block_date, start_time, end_time, block_type, notes, created_by, closure_id)
+       VALUES ${valueRows.join(', ')}
+       ON CONFLICT DO NOTHING`,
+      params
+    );
   }
   return blocksCreated;
 }

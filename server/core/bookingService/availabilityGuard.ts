@@ -301,7 +301,7 @@ export async function isResourceAvailableForDate(
 ): Promise<boolean> {
   try {
     const closures = await pool.query(
-      `SELECT id FROM facility_closures
+      `SELECT id, affected_areas FROM facility_closures
        WHERE is_active = true
          AND start_date <= $1
          AND end_date >= $1
@@ -311,13 +311,8 @@ export async function isResourceAvailableForDate(
     );
     
     for (const closure of closures.rows) {
-      const fullClosure = await pool.query(
-        `SELECT affected_areas FROM facility_closures WHERE id = $1`,
-        [closure.id]
-      );
-      
-      if (fullClosure.rows[0]) {
-        const affectedIds = await parseAffectedAreas(fullClosure.rows[0].affected_areas);
+      if (closure.affected_areas) {
+        const affectedIds = await parseAffectedAreas(closure.affected_areas);
         if (affectedIds.includes(resourceId)) {
           return false;
         }

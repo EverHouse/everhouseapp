@@ -180,14 +180,22 @@ export async function getBillingGroupByPrimaryEmail(primaryEmail: string): Promi
     ? `${primaryUserResult.rows[0].first_name || ''} ${primaryUserResult.rows[0].last_name || ''}`.trim()
     : primaryEmail;
   
+  const memberEmails = members.map(m => m.memberEmail.toLowerCase());
+  const allMemberUsers = memberEmails.length > 0
+    ? await pool.query(
+        'SELECT email, first_name, last_name FROM users WHERE LOWER(email) = ANY($1)',
+        [memberEmails]
+      )
+    : { rows: [] };
+  const memberUserMap = new Map(
+    allMemberUsers.rows.map((r: any) => [r.email.toLowerCase(), r])
+  );
+
   const memberInfos: GroupMemberInfo[] = [];
   for (const member of members) {
-    const memberUserResult = await pool.query(
-      'SELECT first_name, last_name FROM users WHERE LOWER(email) = $1',
-      [member.memberEmail.toLowerCase()]
-    );
-    const memberName = memberUserResult.rows[0]
-      ? `${memberUserResult.rows[0].first_name || ''} ${memberUserResult.rows[0].last_name || ''}`.trim()
+    const userRow = memberUserMap.get(member.memberEmail.toLowerCase());
+    const memberName = userRow
+      ? `${userRow.first_name || ''} ${userRow.last_name || ''}`.trim()
       : member.memberEmail;
     
     memberInfos.push({

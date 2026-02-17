@@ -294,7 +294,7 @@ async function handleCancellationCascade(
         logger.info('[cancellation-cascade] Notified member participant', {
           extra: { bookingId, memberEmail: member.email, participantId: member.participantId }
         });
-      } catch (notifyError) {
+      } catch (notifyError: unknown) {
         const errorMsg = `Failed to notify participant ${member.email}: ${(notifyError as Error).message}`;
         result.errors.push(errorMsg);
         logger.warn('[cancellation-cascade] ' + errorMsg, { error: notifyError as Error });
@@ -327,7 +327,7 @@ async function handleCancellationCascade(
         } else {
           result.errors.push(`Failed to refund guest pass for ${guest.displayName}: ${refundResult.error}`);
         }
-      } catch (refundError) {
+      } catch (refundError: unknown) {
         const errorMsg = `Failed to refund guest pass for ${guest.displayName}: ${(refundError as Error).message}`;
         result.errors.push(errorMsg);
         logger.warn('[cancellation-cascade] ' + errorMsg, { error: refundError as Error });
@@ -344,7 +344,7 @@ async function handleCancellationCascade(
           relatedId: bookingId,
           relatedType: 'booking_request'
         });
-      } catch (notifyError) {
+      } catch (notifyError: unknown) {
         logger.warn('[cancellation-cascade] Failed to notify owner about guest pass refund', { error: notifyError as Error });
       }
     }
@@ -357,7 +357,7 @@ async function handleCancellationCascade(
       }
     });
 
-  } catch (error) {
+  } catch (error: unknown) {
     await client.query('ROLLBACK');
     const errorMsg = `Cascade error: ${(error as Error).message}`;
     result.errors.push(errorMsg);
@@ -509,7 +509,7 @@ router.get('/api/bookings', async (req, res) => {
               [sessionEmail]
             );
             isStaff = result.rows.length > 0;
-          } catch (e) {
+          } catch (e: unknown) {
             logger.warn('[resources] Staff check query failed:', e);
           }
         }
@@ -709,7 +709,7 @@ router.put('/api/bookings/:id/approve', isStaffOrAdmin, async (req, res) => {
             source: 'member_request',
             createdBy: 'resource_confirmation'
           });
-        } catch (sessionErr) {
+        } catch (sessionErr: unknown) {
           console.error('[Resource Confirmation] Failed to ensure session:', sessionErr);
         }
       }
@@ -780,7 +780,7 @@ router.put('/api/bookings/:id/decline', isStaffOrAdmin, async (req, res) => {
            WHERE resource_id = $1 AND slot_date = $2 AND start_time = $3`,
           [result.resourceId, result.requestDate, result.startTime]
         );
-      } catch (err) {
+      } catch (err: unknown) {
         logger.warn('[Staff Decline] Failed to clean up trackman_bay_slots', { 
           bookingId, 
           resourceId: result.resourceId,
@@ -1286,7 +1286,7 @@ router.post('/api/bookings/link-trackman-to-member', isStaffOrAdmin, async (req,
         logger.info('[link-trackman-to-member] Recalculated fees after member assignment', {
           extra: { bookingId: result.booking.id, sessionId: result.sessionId, newOwner: ownerEmail }
         });
-      } catch (recalcErr) {
+      } catch (recalcErr: unknown) {
         logger.warn('[link-trackman-to-member] Failed to recalculate fees after assignment', {
           extra: { bookingId: result.booking.id, sessionId: result.sessionId, error: recalcErr }
         });
@@ -1326,7 +1326,7 @@ router.post('/api/bookings/link-trackman-to-member', isStaffOrAdmin, async (req,
             });
           }
         }
-      } catch (linkErr) {
+      } catch (linkErr: unknown) {
         logger.warn('[link-trackman-to-member] Failed to link email', { extra: { error: linkErr } });
       }
     }
@@ -1838,7 +1838,7 @@ router.put('/api/bookings/:id/assign-with-players', isStaffOrAdmin, async (req, 
         logger.info('[assign-with-players] Recalculated fees after member assignment', {
           extra: { bookingId, sessionId: result.sessionId, newOwner: owner.email }
         });
-      } catch (recalcErr) {
+      } catch (recalcErr: unknown) {
         logger.warn('[assign-with-players] Failed to recalculate fees after assignment', {
           extra: { bookingId, sessionId: result.sessionId, error: recalcErr }
         });
@@ -1884,7 +1884,7 @@ router.put('/api/bookings/:id/assign-with-players', isStaffOrAdmin, async (req, 
             });
           }
         }
-      } catch (prepayErr) {
+      } catch (prepayErr: unknown) {
         logger.warn('[assign-with-players] Failed to create prepayment intent', {
           extra: { bookingId, sessionId: result.sessionId, error: prepayErr }
         });
@@ -1937,7 +1937,7 @@ router.put('/api/bookings/:id/assign-with-players', isStaffOrAdmin, async (req, 
           message: `Your simulator booking for ${dateStr} at ${timeStr} has been confirmed.${feeMessage}`,
           data: { bookingId, feeCents: totalCents },
         });
-      } catch (notifyErr) {
+      } catch (notifyErr: unknown) {
         logger.warn('[assign-with-players] Failed to notify member', {
           extra: { bookingId, error: notifyErr }
         });
@@ -1967,7 +1967,7 @@ router.put('/api/bookings/:id/assign-with-players', isStaffOrAdmin, async (req, 
             });
           }
         }
-      } catch (linkErr) {
+      } catch (linkErr: unknown) {
         logger.warn('[assign-with-players] Failed to link email', { extra: { error: linkErr } });
       }
     }
@@ -2100,7 +2100,7 @@ router.post('/api/bookings', bookingRateLimiter, async (req, res) => {
               [sessionEmail]
             );
             isStaff = result.rows.length > 0;
-          } catch (e) {
+          } catch (e: unknown) {
             logger.warn('[resources] Staff check query failed:', e);
           }
         }
@@ -2127,7 +2127,7 @@ router.post('/api/bookings', bookingRateLimiter, async (req, res) => {
       if (user?.tags) {
         userTags = typeof user.tags === 'string' ? JSON.parse(user.tags) : (Array.isArray(user.tags) ? user.tags : []);
       }
-    } catch (parseError) {
+    } catch (parseError: unknown) {
       console.warn('[POST /api/bookings] Failed to parse user tags for', user_email, parseError);
       userTags = [];
     }
@@ -2374,7 +2374,7 @@ router.delete('/api/bookings/:id', isStaffOrAdmin, async (req, res) => {
             sessionId: booking.sessionId
           }
         });
-      } catch (txErr) {
+      } catch (txErr: unknown) {
         await client.query('ROLLBACK');
         throw txErr;
       } finally {
@@ -2430,7 +2430,7 @@ router.delete('/api/bookings/:id', isStaffOrAdmin, async (req, res) => {
             await deleteCalendarEvent(booking.calendarEventId, calendarId);
           }
         }
-      } catch (calError) {
+      } catch (calError: unknown) {
         console.error('Failed to delete calendar event (non-blocking):', calError);
       }
     }
@@ -2586,7 +2586,7 @@ router.put('/api/bookings/:id/member-cancel', async (req, res) => {
            WHERE resource_id = $1 AND slot_date = $2 AND start_time = $3`,
           [existing.resourceId, existing.requestDate, existing.startTime]
         );
-      } catch (err) {
+      } catch (err: unknown) {
         logger.warn('[Member Cancel] Failed to clean up trackman_bay_slots', { 
           bookingId, 
           resourceId: existing.resourceId,
@@ -2636,7 +2636,7 @@ router.put('/api/bookings/:id/member-cancel', async (req, res) => {
           relatedType: 'booking_request'
         }
       );
-    } catch (staffNotifyErr) {
+    } catch (staffNotifyErr: unknown) {
       console.error('Staff notification failed:', staffNotifyErr);
     }
     
@@ -2652,7 +2652,7 @@ router.put('/api/bookings/:id/member-cancel', async (req, res) => {
             await deleteCalendarEvent(existing.calendarEventId, calendarId);
           }
         }
-      } catch (calError) {
+      } catch (calError: unknown) {
         console.error('Failed to delete calendar event (non-blocking):', calError);
       }
     }
@@ -2912,7 +2912,7 @@ router.post('/api/staff/bookings/manual', isStaffOrAdmin, async (req, res) => {
             end_time
           );
         }
-      } catch (calErr) {
+      } catch (calErr: unknown) {
         logger.error('Calendar event creation error', { error: calErr as Error, requestId: req.requestId });
       }
     }
@@ -2971,7 +2971,7 @@ router.post('/api/staff/bookings/manual', isStaffOrAdmin, async (req, res) => {
             });
           }
         }
-      } catch (cancelIntentsErr) {
+      } catch (cancelIntentsErr: unknown) {
         logger.warn('[Reschedule] Failed to cancel pending payment intents', { error: cancelIntentsErr as Error });
       }
       
@@ -2988,7 +2988,7 @@ router.post('/api/staff/bookings/manual', isStaffOrAdmin, async (req, res) => {
               await deleteCalendarEvent(oldBookingRequest.calendarEventId, oldCalendarId);
             }
           }
-        } catch (calErr) {
+        } catch (calErr: unknown) {
           logger.warn('Failed to delete old calendar event during reschedule', { error: calErr as Error, requestId: req.requestId });
         }
       }
@@ -3040,7 +3040,7 @@ router.post('/api/staff/bookings/manual', isStaffOrAdmin, async (req, res) => {
         message: notifMessage,
         data: { bookingId: newBooking.id, eventType: 'booking_approved' }
       }, { action: 'manual_booking', bookingId: newBooking.id, resourceType: resource.type, triggerSource: 'resources.ts' });
-    } catch (notifErr) {
+    } catch (notifErr: unknown) {
       logger.error('Failed to send manual booking notification', { error: notifErr as Error, requestId: req.requestId });
     }
 

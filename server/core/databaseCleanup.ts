@@ -102,7 +102,7 @@ export async function cleanupTestData(): Promise<CleanupResult> {
     });
     
     return result;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Cleanup] Test data cleanup failed', {
       error: error instanceof Error ? error.message : String(error),
       extra: { event: 'cleanup.test_data_failed' }
@@ -137,7 +137,7 @@ export async function cleanupOldBookings(daysOld: number = 90): Promise<number> 
     });
     
     return oldBookings.length;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Cleanup] Old bookings cleanup failed', {
       error: error instanceof Error ? error.message : String(error),
       extra: { event: 'cleanup.old_bookings_failed' }
@@ -170,7 +170,7 @@ export async function cleanupOldNotifications(daysOld: number = 90): Promise<num
     });
     
     return oldNotifications.length;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Cleanup] Old notifications cleanup failed', {
       error: error instanceof Error ? error.message : String(error),
       extra: { event: 'cleanup.old_notifications_failed' }
@@ -203,7 +203,7 @@ export async function cleanupOldUnreadNotifications(daysOld: number = 60): Promi
     });
     
     return oldNotifications.length;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Cleanup] Old unread notifications cleanup failed', {
       error: error instanceof Error ? error.message : String(error),
       extra: { event: 'cleanup.old_unread_notifications_failed' }
@@ -228,7 +228,7 @@ export async function cleanupOldAvailabilityBlocks(daysOld: number = 30): Promis
     }
     
     return count;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Cleanup] Old availability blocks cleanup failed', {
       error: error instanceof Error ? error.message : String(error),
       extra: { event: 'cleanup.old_availability_blocks_failed' }
@@ -242,7 +242,7 @@ export async function cleanupOldJobs(daysToKeep: number = 7): Promise<number> {
     const { cleanupOldJobs: cleanupJobs } = await import('../core/jobQueue');
     const count = await cleanupJobs(daysToKeep);
     return count;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Cleanup] Old jobs cleanup failed', {
       error: error instanceof Error ? error.message : String(error),
       extra: { event: 'cleanup.old_jobs_failed' }
@@ -267,7 +267,7 @@ export async function runScheduledCleanup(): Promise<void> {
     logger.info('[Cleanup] Scheduled cleanup completed', {
       extra: { event: 'cleanup.scheduled_complete' }
     });
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Cleanup] Scheduled cleanup failed', {
       error: error instanceof Error ? error.message : String(error),
       extra: { event: 'cleanup.scheduled_failed' }

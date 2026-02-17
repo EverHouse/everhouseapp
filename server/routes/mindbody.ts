@@ -61,7 +61,7 @@ router.get("/api/admin/mindbody/unmatched", isStaffOrAdmin, async (req: Request,
       limit,
       offset,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[Mindbody] Error fetching unmatched:", error);
     res.status(500).json({ error: "Failed to fetch unmatched records" });
   }
@@ -146,7 +146,7 @@ router.post("/api/admin/mindbody/link", isStaffOrAdmin, async (req: Request, res
       memberEmail: normalizedEmail,
       memberName: `${targetMember.firstName || ''} ${targetMember.lastName || ''}`.trim(),
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[Mindbody] Error linking member:", error);
     res.status(500).json({ error: "Failed to link member" });
   }
@@ -171,7 +171,7 @@ router.get("/api/admin/mindbody/link-history", isStaffOrAdmin, async (req: Reque
       .limit(limit);
 
     res.json(history);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[Mindbody] Error fetching link history:", error);
     res.status(500).json({ error: "Failed to fetch link history" });
   }

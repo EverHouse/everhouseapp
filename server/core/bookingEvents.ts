@@ -97,7 +97,7 @@ export async function cleanupNotificationsForBooking(
       return result.length;
     }
     return 0;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[BookingEvents] Failed to cleanup notifications:', error);
     return 0;
   }
@@ -119,7 +119,7 @@ export async function validateBookingStatus(
     
     const isValid = allowedStatuses.includes(booking.status);
     return { valid: isValid, currentStatus: booking.status, booking };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[BookingEvents] Failed to validate booking status:', error);
     return { valid: false };
   }
@@ -162,7 +162,7 @@ export async function publish(
           relatedId: data.bookingId,
           relatedType: 'booking'
         });
-      } catch (err) {
+      } catch (err: unknown) {
         console.error('[BookingEvents] Failed to create member notification:', err);
       }
 
@@ -203,18 +203,20 @@ export async function publish(
 
       if (staffNotification) {
         const staffEmails = await getStaffEmails();
-        for (const email of staffEmails) {
+        if (staffEmails.length > 0) {
           try {
-            await db.insert(notifications).values({
-              userEmail: email,
-              title: staffNotification.title,
-              message: staffNotification.message,
-              type: 'booking',
-              relatedId: data.bookingId,
-              relatedType: 'booking_request'
-            });
-          } catch (err) {
-            console.error(`[BookingEvents] Failed to create staff notification for ${email}:`, err);
+            await db.insert(notifications).values(
+              staffEmails.map(email => ({
+                userEmail: email,
+                title: staffNotification.title,
+                message: staffNotification.message,
+                type: 'booking',
+                relatedId: data.bookingId,
+                relatedType: 'booking_request'
+              }))
+            );
+          } catch (err: unknown) {
+            console.error('[BookingEvents] Failed to create staff notifications:', err);
           }
         }
 
@@ -227,7 +229,7 @@ export async function publish(
     }
 
     console.log(`[BookingEvents] Successfully published ${eventType}`);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`[BookingEvents] Failed to publish ${eventType}:`, error);
   }
 }
@@ -238,7 +240,7 @@ async function getStaffEmails(): Promise<string[]> {
       .from(staffUsers)
       .where(eq(staffUsers.isActive, true));
     return staff.map(s => s.email.toLowerCase());
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[BookingEvents] Failed to get staff emails:', error);
     return [];
   }
@@ -359,7 +361,7 @@ export async function linkAndNotifyParticipants(
           });
           
           result.notified++;
-        } catch (notifErr) {
+        } catch (notifErr: unknown) {
           console.error(`[BookingEvents] Failed to notify participant ${email}:`, notifErr);
         }
       } else if (participant.type === 'guest') {
@@ -379,7 +381,7 @@ export async function linkAndNotifyParticipants(
     
     console.log(`[BookingEvents] Linked ${result.linkedMembers} members and ${result.linkedGuests} guests to booking ${bookingId}, notified ${result.notified}`);
     return result;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`[BookingEvents] Failed to link participants for booking ${bookingId}:`, error);
     return result;
   }

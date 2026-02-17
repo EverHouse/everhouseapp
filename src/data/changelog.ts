@@ -29,10 +29,17 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: Staff check-in booking descriptions now show Pacific-timezone dates",
       "Fixed: Member join dates calculated from Stripe/HubSpot now use Pacific timezone",
       "Fixed: WebSocket origin validation tightened — previously a permissive substring check could match unintended domains",
+      "Fixed: Background notifications and broadcasts now properly handle errors instead of silently failing",
+      "Fixed: Guest pass use and refund operations are now wrapped in database transactions — partial failures can no longer leave data in an inconsistent state",
+      "Fixed: Booking cancellation database writes are now transactional — prevents partially-cancelled bookings if something goes wrong mid-process",
+      "Fixed: Events, RSVPs, announcements, closures, tours, wellness reviews, and member history endpoints now have result limits to prevent performance issues with large datasets",
+      "Fixed: All error handling across the entire backend now uses proper TypeScript type safety (150+ catch blocks updated)",
+      "New: Stripe subscription pause and resume events are now handled — if a membership is paused via Stripe, the member's status updates to frozen and staff are notified; resuming restores active status",
       "New: Staff and admin user creation, modification, and deletion now logged in the Staff Activity feed",
       "New: Application settings changes (individual and bulk) now logged in the Staff Activity feed",
       "New: Stripe coupon creation, updates, and deletion now logged in the Staff Activity feed",
-      "New: Member role changes now logged in the Staff Activity feed for full accountability"
+      "New: Member role changes now logged in the Staff Activity feed for full accountability",
+      "Improved: Database queries optimized — batch operations replace individual queries in group billing, booking notifications, calendar sync, and availability checks for faster performance"
     ]
   },
   {

@@ -311,9 +311,9 @@ router.get('/api/events', async (req, res) => {
     
     let result;
     if (conditions.length > 0) {
-      result = await query.where(and(...conditions)).orderBy(events.eventDate, events.startTime);
+      result = await query.where(and(...conditions)).orderBy(events.eventDate, events.startTime).limit(200);
     } else {
-      result = await query.orderBy(events.eventDate, events.startTime);
+      result = await query.orderBy(events.eventDate, events.startTime).limit(200);
     }
     
     // Filter out today's events that have already ended (using end_time or start_time)
@@ -898,7 +898,8 @@ router.get('/api/rsvps', async (req, res) => {
     .from(eventRsvps)
     .innerJoin(events, eq(eventRsvps.eventId, events.id))
     .where(and(...conditions))
-    .orderBy(events.eventDate, events.startTime);
+    .orderBy(events.eventDate, events.startTime)
+    .limit(500);
     
     res.json(result);
   } catch (error: unknown) {

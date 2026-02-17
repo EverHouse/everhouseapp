@@ -72,7 +72,7 @@ export async function getTierLimits(tierName: string): Promise<TierLimits> {
     tierCache.set(cacheKey, { data, expiry: Date.now() + CACHE_TTL_MS });
     
     return data;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[getTierLimits] Error fetching tier limits:', error);
     return DEFAULT_TIER_LIMITS;
   }
@@ -115,7 +115,7 @@ export async function getMemberTierByEmail(email: string, options?: { allowInact
     }
     
     return user.tier_name || user.tier || null;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[getMemberTierByEmail] Error:', error);
     return null;
   }
@@ -148,7 +148,7 @@ export async function getDailyBookedMinutes(email: string, date: string, resourc
     const result = await pool.query(query, params);
     
     return parseInt(result.rows[0].total_minutes) || 0;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[getDailyBookedMinutes] Error:', error);
     return 0;
   }
@@ -226,7 +226,7 @@ export async function getDailyParticipantMinutes(email: string, date: string, ex
     const participantsMinutes = parseFloat(participantsResult.rows[0].total_minutes) || 0;
 
     return Math.max(membersMinutes, participantsMinutes);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[getDailyParticipantMinutes] Error:', error);
     return 0;
   }
@@ -287,7 +287,7 @@ export async function getTotalDailyUsageMinutes(
       participantMinutes,
       totalMinutes: ownerMinutes + participantMinutes
     };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[getTotalDailyUsageMinutes] Error:', error);
     return { ownerMinutes: 0, participantMinutes: 0, totalMinutes: 0 };
   }

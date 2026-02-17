@@ -54,7 +54,7 @@ router.get('/api/tours', isStaffOrAdmin, async (req, res) => {
         .orderBy(desc(tours.tourDate), asc(tours.startTime));
     }
     
-    const result = await query;
+    const result = await query.limit(200);
     res.json(result);
   } catch (error: unknown) {
     if (!isProduction) console.error('Tours fetch error:', error);
@@ -572,7 +572,7 @@ async function fetchHubSpotTourMeetings(): Promise<HubSpotMeetingDetails[]> {
         guestName = `${firstName} ${lastName}`.trim() || null;
         guestEmail = contact.properties.email || null;
         guestPhone = contact.properties.phone || null;
-      } catch (e) {
+      } catch (e: unknown) {
         if (!isProduction) console.warn(`[HubSpot] Failed to fetch contact ${contactId}:`, e);
       }
     }
@@ -834,7 +834,7 @@ export async function sendTodayTourReminders(): Promise<number> {
     }
     
     return todayTours.length;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error sending tour reminders:', error);
     return 0;
   }
@@ -931,7 +931,7 @@ export async function syncToursFromHubSpot(): Promise<{ synced: number; created:
           guestName = `${firstName} ${lastName}`.trim() || null;
           guestEmail = contact.properties.email || null;
           guestPhone = contact.properties.phone || null;
-        } catch (e) {
+        } catch (e: unknown) {
           if (!isProduction) console.warn(`[HubSpot Sync] Failed to fetch contact ${contactId}:`, e);
         }
       }

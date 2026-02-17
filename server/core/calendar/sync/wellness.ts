@@ -300,12 +300,13 @@ export async function syncWellnessCalendarEvents(): Promise<{ synced: number; cr
       'SELECT id, google_calendar_id FROM wellness_classes WHERE google_calendar_id IS NOT NULL AND is_active = true'
     );
     
+    const idsToDeactivate = existingClasses.rows
+      .filter((dbClass: any) => cancelledEventIds.has(dbClass.google_calendar_id) || !fetchedEventIds.has(dbClass.google_calendar_id))
+      .map((dbClass: any) => dbClass.id);
     let deleted = 0;
-    for (const dbClass of existingClasses.rows) {
-      if (cancelledEventIds.has(dbClass.google_calendar_id) || !fetchedEventIds.has(dbClass.google_calendar_id)) {
-        await pool.query('UPDATE wellness_classes SET is_active = false WHERE id = $1', [dbClass.id]);
-        deleted++;
-      }
+    if (idsToDeactivate.length > 0) {
+      await pool.query('UPDATE wellness_classes SET is_active = false WHERE id = ANY($1)', [idsToDeactivate]);
+      deleted = idsToDeactivate.length;
     }
     
     return { synced: events.length, created, updated, deleted, pushedToCalendar };

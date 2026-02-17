@@ -60,7 +60,7 @@ async function getStaffUserByEmail(email: string): Promise<StaffUserData | null>
       };
     }
     return null;
-  } catch (error) {
+  } catch (error: unknown) {
     if (!isProduction) console.error('Error fetching staff user:', error);
     return null;
   }
@@ -142,7 +142,7 @@ async function upsertUserWithTier(data: UpsertUserData): Promise<void> {
     }
     
     if (!isProduction) console.log(`[Auth] Updated user ${normalizedEmailValue} with role ${data.role}, tier ${normalizedTier || 'none'}`);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[Auth] Error upserting user tier:', error);
   }
 }
@@ -261,7 +261,7 @@ const checkOtpRequestLimit = async (email: string, ip: string): Promise<{ allowe
       return { allowed: false, retryAfter: Math.max(0, retryAfter) };
     }
     return { allowed: true };
-  } catch (error) {
+  } catch (error: unknown) {
     // Fail-closed: deny requests when rate limiting is unavailable to prevent abuse
     console.error('[RateLimit] Database error, denying request for safety:', error);
     return { allowed: false, retryAfter: 60 };
@@ -297,7 +297,7 @@ const checkMagicLinkRequestLimit = async (email: string, ip: string): Promise<{ 
       return { allowed: false, retryAfter: Math.max(0, retryAfter) };
     }
     return { allowed: true };
-  } catch (error) {
+  } catch (error: unknown) {
     // Fail-closed: deny requests when rate limiting is unavailable to prevent abuse
     console.error('[RateLimit] Database error, denying request for safety:', error);
     return { allowed: false, retryAfter: 60 };
@@ -329,7 +329,7 @@ const checkOtpVerifyAttempts = async (email: string): Promise<{ allowed: boolean
     }
     
     return { allowed: true };
-  } catch (error) {
+  } catch (error: unknown) {
     // Fail-closed: deny requests when rate limiting is unavailable to prevent abuse
     console.error('[RateLimit] Database error, denying request for safety:', error);
     return { allowed: false, retryAfter: 60 };
@@ -356,7 +356,7 @@ const recordOtpVerifyFailure = async (email: string): Promise<void> => {
        RETURNING count`,
       [key, resetAt, OTP_VERIFY_MAX_ATTEMPTS, lockedUntil]
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[RateLimit] Database error recording failure:', error);
   }
 };
@@ -365,7 +365,7 @@ const clearOtpVerifyAttempts = async (email: string): Promise<void> => {
   const key = `otp_verify:${email}`;
   try {
     await pool.query(`DELETE FROM rate_limits WHERE key = $1`, [key]);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[RateLimit] Database error clearing attempts:', error);
   }
 };
@@ -435,7 +435,7 @@ router.post('/api/auth/verify-member', async (req, res) => {
               const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
               await syncMemberToHubSpot({ email: normalizedEmail, status: subscription.status, billingProvider: 'stripe' });
               console.log(`[Auth] Synced auto-fixed status to HubSpot for ${normalizedEmail}`);
-            } catch (hubspotError) {
+            } catch (hubspotError: unknown) {
               console.error('[Auth] HubSpot sync failed for auto-fix:', hubspotError);
             }
           } else {
@@ -621,7 +621,7 @@ router.post('/api/auth/request-otp', async (req, res) => {
               const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
               await syncMemberToHubSpot({ email: normalizedEmail, status: subscription.status, billingProvider: 'stripe' });
               console.log(`[Auth] Synced auto-fixed status to HubSpot for ${normalizedEmail}`);
-            } catch (hubspotError) {
+            } catch (hubspotError: unknown) {
               console.error('[Auth] HubSpot sync failed for auto-fix:', hubspotError);
             }
             // Continue with login - subscription is valid
@@ -1031,7 +1031,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
               .where(sql`LOWER(${users.email}) = LOWER(${member.email})`);
           }
         }
-      } catch (e) {
+      } catch (e: unknown) {
         console.error('[Welcome Email] Error checking/sending:', e);
       }
     })();
@@ -1201,7 +1201,7 @@ router.post('/api/auth/password-login', async (req, res) => {
           membershipStartDate: contact.properties.membership_start_date || '',
         };
       }
-    } catch (hubspotError) {
+    } catch (hubspotError: unknown) {
       if (!isProduction) console.error('HubSpot lookup failed:', hubspotError);
     }
     

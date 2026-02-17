@@ -50,7 +50,7 @@ export function validateTrackmanWebhookSignature(req: Request): boolean {
     }
     
     return isValid || !isProduction;
-  } catch (e) {
+  } catch (e: unknown) {
     logger.error('[Trackman Webhook] Signature validation error', { error: e as Error });
     return !isProduction;
   }
@@ -113,7 +113,7 @@ export async function logWebhookEvent(
       [eventType, JSON.stringify(redactedPayload), trackmanBookingId, trackmanUserId, matchedBookingId, matchedUserId, error]
     );
     return result.rows[0]?.id;
-  } catch (e) {
+  } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to log webhook event', { error: e as Error });
     return 0;
   }
@@ -151,7 +151,7 @@ export async function resolveLinkedEmail(email: string): Promise<string> {
     }
     
     return email;
-  } catch (e) {
+  } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to resolve linked email', { error: e as Error });
     return email;
   }
@@ -182,7 +182,7 @@ export async function findMemberByEmail(email: string): Promise<{
     }
     
     return null;
-  } catch (e) {
+  } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to find member by email', { error: e as Error });
     return null;
   }

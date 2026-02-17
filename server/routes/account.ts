@@ -66,7 +66,7 @@ router.post('/api/account/delete-request', isAuthenticated, async (req: any, res
           <p>Best regards,<br>The Ever Club Team</p>
         `
       });
-    } catch (emailError) {
+    } catch (emailError: unknown) {
       console.warn('[Account] Failed to send deletion confirmation email (non-blocking):', emailError);
     }
 
@@ -76,7 +76,7 @@ router.post('/api/account/delete-request', isAuthenticated, async (req: any, res
       success: true,
       message: 'Your deletion request has been submitted. Our team will process it within 7 business days.'
     });
-  } catch (error) {
+  } catch (error: unknown) {
     return logAndRespond(req, res, 500, 'Failed to submit deletion request', error);
   }
 });

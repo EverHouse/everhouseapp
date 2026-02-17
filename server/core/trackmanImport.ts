@@ -33,7 +33,7 @@ export async function getGolfInstructorEmails(): Promise<string[]> {
     return instructors
       .map(i => i.email?.toLowerCase())
       .filter((email): email is string => !!email);
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('[Trackman] Error fetching golf instructor emails:', err);
     // Fallback to empty array - caller should handle gracefully
     return [];
@@ -55,7 +55,7 @@ async function cancelPendingPaymentIntentsForBooking(bookingId: number): Promise
         process.stderr.write(`[Trackman Import] Failed to cancel payment intent ${row.stripe_payment_intent_id}: ${getErrorMessage(cancelErr)}\n`);
       }
     }
-  } catch (e) {
+  } catch (e: unknown) {
     // Non-blocking
   }
 }
@@ -248,7 +248,7 @@ async function isConvertedToPrivateEventBlock(
       .limit(1);
     
     return matchingBlocks.length > 0;
-  } catch (err) {
+  } catch (err: unknown) {
     // Non-blocking - if check fails, allow booking creation
     process.stderr.write(`[Trackman Import] Error checking for private event block: ${getErrorMessage(err)}\n`);
     return false;
@@ -754,7 +754,7 @@ async function findMembersByName(name: string): Promise<{
       match: 'ambiguous', 
       members: result.rows.map(r => ({ id: r.id, email: r.email, name: r.name?.trim() || r.email }))
     };
-  } catch (error) {
+  } catch (error: unknown) {
     process.stderr.write(`[Trackman Import] Error searching members by name "${name}": ${error}\n`);
     return { match: 'none', members: [] };
   }
@@ -813,7 +813,7 @@ async function autoLinkEmailToOwner(aliasEmail: string, ownerEmail: string, reas
       return true;
     }
     return false;
-  } catch (error) {
+  } catch (error: unknown) {
     process.stderr.write(`[Trackman Import] Failed to auto-link ${aliasEmail} to ${ownerEmail}: ${error}\n`);
     return false;
   }
@@ -2180,7 +2180,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                   notes: sql`COALESCE(notes, '') || ' [Auto-resolved: merged with placeholder]'`
                 })
                 .where(eq(trackmanUnmatchedBookings.id, existingUnmatched[0].id));
-            } catch (e) { /* non-blocking */ }
+            } catch (e: unknown) { /* non-blocking */ }
           }
           
           updatedRows++;
@@ -2339,7 +2339,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                         notes: sql`COALESCE(notes, '') || ' [Auto-resolved: linked to app booking]'`
                       })
                       .where(eq(trackmanUnmatchedBookings.id, existingUnmatched[0].id));
-                  } catch (e) { /* non-blocking */ }
+                  } catch (e: unknown) { /* non-blocking */ }
                 }
                 
                 linkedRows++;
@@ -2384,7 +2384,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                         notes: sql`COALESCE(notes, '') || ' [Auto-resolved: booking already exists]'`
                       })
                       .where(eq(trackmanUnmatchedBookings.id, existingUnmatched[0].id));
-                  } catch (e) { /* non-blocking */ }
+                  } catch (e: unknown) { /* non-blocking */ }
                 }
                 
                 matchedRows++;
@@ -2536,7 +2536,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                       notes: sql`COALESCE(notes, '') || ' [Auto-resolved: linked to app booking]'`
                     })
                     .where(eq(trackmanUnmatchedBookings.id, existingUnmatched[0].id));
-                } catch (e) { /* non-blocking */ }
+                } catch (e: unknown) { /* non-blocking */ }
               }
               
               linkedRows++;
@@ -2677,7 +2677,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                     notes: sql`COALESCE(notes, '') || ' [Auto-resolved: ghost booking updated with member info]'`
                   })
                   .where(eq(trackmanUnmatchedBookings.id, existingUnmatched[0].id));
-              } catch (e) { /* non-blocking */ }
+              } catch (e: unknown) { /* non-blocking */ }
             }
 
             updatedRows++;
@@ -2992,7 +2992,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 })
                 .where(eq(trackmanUnmatchedBookings.id, existingUnmatched[0].id));
               process.stderr.write(`[Trackman Import] Auto-resolved legacy entry for booking ${row.bookingId} -> ${matchedEmail}\n`);
-            } catch (e) { /* non-blocking */ }
+            } catch (e: unknown) { /* non-blocking */ }
           }
 
           matchedRows++;
@@ -3614,7 +3614,7 @@ export async function resolveUnmatchedBooking(
           isPast
         });
         process.stderr.write(`[Trackman Resolve] Created Session & Ledger for Booking #${insertResult.bookingId}\n`);
-      } catch (sessionErr) {
+      } catch (sessionErr: unknown) {
         process.stderr.write(`[Trackman Resolve] Warning: Session creation failed for Booking #${insertResult.bookingId}: ${sessionErr}\n`);
       }
     } else {
@@ -3728,7 +3728,7 @@ export async function resolveUnmatchedBooking(
               isPast: otherIsPast
             });
             process.stderr.write(`[Trackman Resolve] Created Session & Ledger for auto-resolved Booking #${otherResult.bookingId}\n`);
-          } catch (sessionErr) {
+          } catch (sessionErr: unknown) {
             process.stderr.write(`[Trackman Resolve] Warning: Session creation failed for auto-resolved Booking #${otherResult.bookingId}: ${sessionErr}\n`);
           }
         } else {

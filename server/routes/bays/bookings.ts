@@ -566,7 +566,7 @@ router.post('/api/booking-requests', async (req, res) => {
             if (existingUser) {
               participant.userId = existingUser.id;
             }
-          } catch (err) {
+          } catch (err: unknown) {
             console.error(`[Booking] Failed to lookup user for email ${participant.email}:`, err);
           }
         }
@@ -593,7 +593,7 @@ router.post('/api/booking-requests', async (req, res) => {
               }
               console.log(`[Booking] Resolved email for directory-selected participant: ${participant.email}`);
             }
-          } catch (err) {
+          } catch (err: unknown) {
             console.error(`[Booking] Failed to lookup email for userId ${participant.userId}:`, err);
           }
         }
@@ -787,7 +787,7 @@ router.post('/api/booking-requests', async (req, res) => {
         createdAt: dbRow.created_at,
         updatedAt: dbRow.updated_at
       };
-    } catch (error) {
+    } catch (error: unknown) {
       await client.query('ROLLBACK');
       throw error;
     } finally {
@@ -817,7 +817,7 @@ router.post('/api/booking-requests', async (req, res) => {
         if (resource?.name) {
           resourceName = resource.name;
         }
-      } catch (e) {
+      } catch (e: unknown) {
         console.error('[Bookings] Failed to fetch resource name:', e);
       }
     }
@@ -906,7 +906,7 @@ router.post('/api/booking-requests', async (req, res) => {
         date: row.requestDate,
         action: 'booked'
       });
-    } catch (postCommitError) {
+    } catch (postCommitError: unknown) {
       console.error('[BookingRequest] Post-commit operations failed:', postCommitError);
     }
   } catch (error: unknown) {
@@ -1167,7 +1167,7 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
          WHERE br.id = $1`,
         [bookingId]
       );
-    } catch (sessionErr) {
+    } catch (sessionErr: unknown) {
       console.error('[Member Cancel] Failed to fetch session (non-blocking):', sessionErr);
     }
     
@@ -1192,7 +1192,7 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
         await db.update(bookingRequests)
           .set({ overagePaymentIntentId: null, overageFeeCents: 0, overageMinutes: 0 })
           .where(eq(bookingRequests.id, bookingId));
-      } catch (paymentErr) {
+      } catch (paymentErr: unknown) {
         console.error('[Member Cancel] Failed to handle overage payment (non-blocking):', paymentErr);
       }
     }
@@ -1215,7 +1215,7 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
           }
         }
       }
-    } catch (cancelIntentsErr) {
+    } catch (cancelIntentsErr: unknown) {
       console.error('[Member Cancel] Failed to cancel pending payment intents (non-blocking):', cancelIntentsErr);
     }
     
@@ -1260,7 +1260,7 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
             }
           }
         }
-      } catch (participantRefundErr) {
+      } catch (participantRefundErr: unknown) {
         console.error('[Member Cancel] Failed to process participant refunds (non-blocking):', participantRefundErr);
       }
     } else {
@@ -1279,7 +1279,7 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
         );
         console.log(`[Member Cancel] Cleared pending fees for session ${sessionResult.rows[0].session_id}`);
       }
-    } catch (feeCleanupErr) {
+    } catch (feeCleanupErr: unknown) {
       console.error('[Member Cancel] Failed to clear pending fees (non-blocking):', feeCleanupErr);
     }
     
@@ -1332,7 +1332,7 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
               await deleteCalendarEvent(existing.calendarEventId, calendarId);
             }
           }
-        } catch (calError) {
+        } catch (calError: unknown) {
           console.error('Failed to delete calendar event (non-blocking):', calError);
         }
       }
@@ -1496,7 +1496,7 @@ async function calculateFeeEstimate(params: {
     if (sessionId && bookingId) {
       try {
         await applyFeeBreakdownToParticipants(sessionId, breakdown);
-      } catch (syncErr) {
+      } catch (syncErr: unknown) {
         console.warn('[FeeEstimate] Non-blocking cache sync failed:', syncErr);
       }
     }
@@ -1560,7 +1560,7 @@ async function calculateFeeEstimate(params: {
             : 'Within daily allowance',
       unifiedBreakdown: breakdown
     };
-  } catch (error) {
+  } catch (error: unknown) {
     // Do NOT use fallback - this could show incorrect prices
     console.error('[FeeEstimate] Unified service error:', error);
     throw new Error('Unable to calculate fee estimate. Please try again.');

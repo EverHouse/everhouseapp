@@ -89,7 +89,7 @@ function parseSessionId(cookieHeader: string | undefined, sessionSecret: string)
     }
     
     return signedCookie;
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('[WebSocket] Error parsing session cookie:', err);
     return null;
   }
@@ -123,7 +123,7 @@ async function verifySessionFromDatabase(sessionId: string): Promise<SessionData
     
     const sessionData = result.rows[0].sess as SessionData;
     return sessionData;
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('[WebSocket] Error verifying session:', err);
     return null;
   }
@@ -210,7 +210,7 @@ export function closeWebSocketServer(): void {
       connections.forEach(conn => {
         try {
           conn.ws.close(1001, 'Server shutting down');
-        } catch (err) {
+        } catch (err: unknown) {
           // Ignore close errors during shutdown
         }
       });
@@ -371,7 +371,7 @@ export function initWebSocketServer(server: Server) {
               message: 'Not authenticated'
             }));
           }
-        } catch (e) {
+        } catch (e: unknown) {
           console.error('[WebSocket] Error parsing message from unauthenticated client:', e);
         }
         return;
@@ -412,7 +412,7 @@ export function initWebSocketServer(server: Server) {
         if (message.type === 'ping') {
           ws.send(JSON.stringify({ type: 'pong' }));
         }
-      } catch (e) {
+      } catch (e: unknown) {
         console.error('[WebSocket] Error parsing message:', e);
       }
     });
@@ -519,7 +519,7 @@ export function sendNotificationToUser(
       try {
         conn.ws.send(payload);
         sent++;
-      } catch (error) {
+      } catch (error: unknown) {
         logger.warn(`[WebSocket] Error sending to ${email}`, {
           userEmail: email,
           error: (error as Error).message,
@@ -578,7 +578,7 @@ export function broadcastToAllMembers(notification: {
         try {
           conn.ws.send(payload);
           sent++;
-        } catch (err) {
+        } catch (err: unknown) {
           logger.warn(`[WebSocket] Error in broadcastToAllMembers send`, { error: getErrorMessage(err) });
         }
       }
@@ -612,7 +612,7 @@ export function broadcastToStaff(notification: {
         try {
           conn.ws.send(payload);
           sent++;
-        } catch (err) {
+        } catch (err: unknown) {
           logger.warn(`[WebSocket] Error in broadcastToStaff send`, { error: getErrorMessage(err) });
         }
       }
@@ -644,7 +644,7 @@ export function broadcastBookingEvent(event: BookingEvent) {
           try {
             conn.ws.send(payload);
             sent++;
-          } catch (err) {
+          } catch (err: unknown) {
             logger.warn(`[WebSocket] Error in broadcastBookingEvent send`, { error: getErrorMessage(err) });
           }
         }
@@ -674,7 +674,7 @@ export function broadcastAnnouncementUpdate(action: 'created' | 'updated' | 'del
         try {
           conn.ws.send(payload);
           sent++;
-        } catch (err) {
+        } catch (err: unknown) {
           logger.warn(`[WebSocket] Error in broadcastAnnouncementUpdate send`, { error: getErrorMessage(err) });
         }
       }
@@ -703,7 +703,7 @@ export function broadcastAvailabilityUpdate(data: {
         try {
           conn.ws.send(payload);
           sent++;
-        } catch (err) {
+        } catch (err: unknown) {
           logger.warn(`[WebSocket] Error in broadcastAvailabilityUpdate send`, { error: getErrorMessage(err) });
         }
       }
@@ -734,7 +734,7 @@ export function broadcastWaitlistUpdate(data: {
         try {
           conn.ws.send(payload);
           sent++;
-        } catch (err) {
+        } catch (err: unknown) {
           logger.warn(`[WebSocket] Error in broadcastWaitlistUpdate send`, { error: getErrorMessage(err) });
         }
       }
@@ -760,7 +760,7 @@ export function broadcastDirectoryUpdate(action: 'synced' | 'updated' | 'created
         try {
           conn.ws.send(payload);
           sent++;
-        } catch (err) {
+        } catch (err: unknown) {
           logger.warn(`[WebSocket] Error in broadcastDirectoryUpdate send`, { error: getErrorMessage(err) });
         }
       }
@@ -786,7 +786,7 @@ export function broadcastCafeMenuUpdate(action: 'created' | 'updated' | 'deleted
         try {
           conn.ws.send(payload);
           sent++;
-        } catch (err) {
+        } catch (err: unknown) {
           logger.warn(`[WebSocket] Error in broadcastCafeMenuUpdate send`, { error: getErrorMessage(err) });
         }
       }
@@ -813,7 +813,7 @@ export function broadcastClosureUpdate(action: 'created' | 'updated' | 'deleted'
         try {
           conn.ws.send(payload);
           sent++;
-        } catch (err) {
+        } catch (err: unknown) {
           logger.warn(`[WebSocket] Error in broadcastClosureUpdate send`, { error: getErrorMessage(err) });
         }
       }
@@ -839,7 +839,7 @@ export function broadcastMemberDataUpdated(changedEmails: string[] = []) {
         try {
           conn.ws.send(payload);
           sent++;
-        } catch (err) {
+        } catch (err: unknown) {
           logger.warn(`[WebSocket] Error in broadcastMemberDataUpdated send`, { error: getErrorMessage(err) });
         }
       }
@@ -867,7 +867,7 @@ export function broadcastMemberStatsUpdated(memberEmail: string, data: { guestPa
       try {
         conn.ws.send(payload);
         sent++;
-      } catch (err) {
+      } catch (err: unknown) {
         logger.warn(`[WebSocket] Error in broadcastMemberStatsUpdated send`, { error: getErrorMessage(err) });
       }
     }
@@ -880,7 +880,7 @@ export function broadcastMemberStatsUpdated(memberEmail: string, data: { guestPa
         try {
           conn.ws.send(payload);
           sent++;
-        } catch (err) {
+        } catch (err: unknown) {
           logger.warn(`[WebSocket] Error in broadcastMemberStatsUpdated send`, { error: getErrorMessage(err) });
         }
       }
@@ -915,7 +915,7 @@ export function broadcastTierUpdate(data: {
       try {
         conn.ws.send(payload);
         sent++;
-      } catch (err) {
+      } catch (err: unknown) {
         logger.warn(`[WebSocket] Error in broadcastTierUpdate send`, { error: getErrorMessage(err) });
       }
     }
@@ -928,7 +928,7 @@ export function broadcastTierUpdate(data: {
         try {
           conn.ws.send(payload);
           sent++;
-        } catch (err) {
+        } catch (err: unknown) {
           logger.warn(`[WebSocket] Error in broadcastTierUpdate send`, { error: getErrorMessage(err) });
         }
       }
@@ -955,7 +955,7 @@ export function broadcastDataIntegrityUpdate(action: 'check_complete' | 'issue_r
         try {
           conn.ws.send(payload);
           sent++;
-        } catch (err) {
+        } catch (err: unknown) {
           logger.warn(`[WebSocket] Error in broadcastDataIntegrityUpdate send`, { error: getErrorMessage(err) });
         }
       }
@@ -998,7 +998,7 @@ export function broadcastBillingUpdate(data: {
         try {
           conn.ws.send(payload);
           sent++;
-        } catch (err) {
+        } catch (err: unknown) {
           logger.warn(`[WebSocket] Error in broadcastBillingUpdate send`, { error: getErrorMessage(err) });
         }
       }
@@ -1012,7 +1012,7 @@ export function broadcastBillingUpdate(data: {
         try {
           conn.ws.send(payload);
           sent++;
-        } catch (err) {
+        } catch (err: unknown) {
           logger.warn(`[WebSocket] Error in broadcastBillingUpdate send`, { error: getErrorMessage(err) });
         }
       }
@@ -1047,7 +1047,7 @@ export function broadcastDayPassUpdate(data: {
         try {
           conn.ws.send(payload);
           sent++;
-        } catch (err) {
+        } catch (err: unknown) {
           logger.warn(`[WebSocket] Error in broadcastDayPassUpdate send`, { error: getErrorMessage(err) });
         }
       }

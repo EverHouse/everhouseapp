@@ -128,7 +128,7 @@ export async function tryAutoApproveBooking(
     });
     
     return { matched: true, bookingId, resourceId, sessionId: createdSessionId };
-  } catch (e) {
+  } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to auto-approve booking', { error: e as Error });
     return { matched: false };
   }
@@ -200,7 +200,7 @@ export async function cancelBookingByTrackmanId(
         logger.info('[Trackman Webhook] Cleared pending fees for cancelled booking', {
           extra: { bookingId, sessionId: booking.session_id }
         });
-      } catch (feeErr) {
+      } catch (feeErr: unknown) {
         logger.warn('[Trackman Webhook] Failed to clear fees for cancelled booking', {
           extra: { bookingId, sessionId: booking.session_id, error: (feeErr as Error).message }
         });
@@ -227,7 +227,7 @@ export async function cancelBookingByTrackmanId(
           });
         }
       }
-    } catch (cancelIntentsErr) {
+    } catch (cancelIntentsErr: unknown) {
       logger.warn('[Trackman Webhook] Failed to cancel pending payment intents', { error: cancelIntentsErr as Error });
     }
     
@@ -339,7 +339,7 @@ export async function cancelBookingByTrackmanId(
             }
           }
         }
-      } catch (refundParticipantsErr) {
+      } catch (refundParticipantsErr: unknown) {
         logger.error('[Trackman Webhook] Failed to process participant refunds', { error: refundParticipantsErr as Error });
       }
     }
@@ -374,7 +374,7 @@ export async function cancelBookingByTrackmanId(
       logger.info('[Trackman Webhook] Sent staff notifications for cancelled booking', {
         extra: { bookingId, memberEmail, refundedPasses }
       });
-    } catch (notifyErr) {
+    } catch (notifyErr: unknown) {
       logger.warn('[Trackman Webhook] Failed to send staff notifications for cancelled booking', {
         extra: { bookingId, error: (notifyErr as Error).message }
       });
@@ -399,7 +399,7 @@ export async function cancelBookingByTrackmanId(
           bay_name: bayName
         }
       });
-    } catch (auditErr) {
+    } catch (auditErr: unknown) {
       logger.warn('[Trackman Webhook] Failed to log audit entry for cancelled booking', {
         extra: { bookingId, error: (auditErr as Error).message }
       });
@@ -431,7 +431,7 @@ export async function cancelBookingByTrackmanId(
         logger.info('[Trackman Webhook] Sent cancellation confirmation to member', {
           extra: { bookingId, memberEmail, wasPendingCancellation: true }
         });
-      } catch (memberNotifyErr) {
+      } catch (memberNotifyErr: unknown) {
         logger.warn('[Trackman Webhook] Failed to send member cancellation confirmation', {
           extra: { bookingId, memberEmail, error: (memberNotifyErr as Error).message }
         });
@@ -446,7 +446,7 @@ export async function cancelBookingByTrackmanId(
         date: bookingDate,
         action: 'cancelled'
       });
-    } catch (broadcastErr) {
+    } catch (broadcastErr: unknown) {
       logger.warn('[Trackman Webhook] Failed to broadcast availability update', {
         extra: { bookingId, error: (broadcastErr as Error).message }
       });
@@ -457,7 +457,7 @@ export async function cancelBookingByTrackmanId(
     });
     
     return { cancelled: true, bookingId, refundedPasses, wasPendingCancellation };
-  } catch (e) {
+  } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to cancel booking', { error: e as Error });
     return { cancelled: false };
   }
@@ -509,7 +509,7 @@ export async function saveToUnmatchedBookings(
     });
     
     return { success: true, id: result.rows[0]?.id };
-  } catch (e) {
+  } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to save unmatched booking', { error: e as Error });
     return { success: false };
   }
@@ -634,7 +634,7 @@ export async function createUnmatchedBookingRequest(
     }
     
     return { created: false };
-  } catch (e) {
+  } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to create unmatched booking_request', { error: e as Error });
     return { created: false };
   }
@@ -703,7 +703,7 @@ async function tryLinkCancelledBooking(
     const refundedPasses = await refundGuestPassesForCancelledBooking(bookingId, memberEmail);
     
     return { matched: true, bookingId, refundedPasses };
-  } catch (e) {
+  } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to link cancelled booking', { error: e as Error });
     return { matched: false };
   }
@@ -752,7 +752,7 @@ async function notifyStaffCancelledBookingLinked(
     logger.info('[Trackman Webhook] Notified staff about cancelled booking link', { 
       extra: { memberName, memberEmail, date: slotDate, bookingId, refundedPasses } 
     });
-  } catch (e) {
+  } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to notify staff about cancelled booking', { error: e as Error });
   }
 }
@@ -800,7 +800,7 @@ async function notifyMemberBookingConfirmed(
         } 
       });
     }
-  } catch (e) {
+  } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to notify member', { error: e as Error });
   }
 }
@@ -899,7 +899,7 @@ async function notifyStaffBookingCreated(
     logger.info('[Trackman Webhook] Notified staff', { 
       extra: { action, memberName, memberEmail, date: slotDate } 
     });
-  } catch (e) {
+  } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to notify staff', { error: e as Error });
   }
 }

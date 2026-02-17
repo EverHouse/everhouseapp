@@ -9,7 +9,7 @@ router.get('/api/admin/email-templates', isStaffOrAdmin, async (_req, res) => {
   try {
     const templates = getAllTemplates();
     res.json({ templates });
-  } catch (error) {
+  } catch (error: unknown) {
     res.status(500).json({ error: 'Failed to fetch email templates' });
   }
 });
@@ -26,7 +26,7 @@ router.get('/api/admin/email-templates/:templateId/preview', isStaffOrAdmin, asy
     logFromRequest(req, 'view' as any, 'system' as any, templateId as string, `Email template preview: ${templateId}`);
 
     res.json({ html });
-  } catch (error) {
+  } catch (error: unknown) {
     res.status(500).json({ error: 'Failed to render template preview' });
   }
 });

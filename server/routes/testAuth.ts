@@ -168,7 +168,7 @@ router.post('/test-login', async (req: Request, res: Response) => {
         });
       });
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[TestAuth] Error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -234,7 +234,7 @@ router.post('/test-cleanup', async (req: Request, res: Response) => {
         bookings: bookingsDeleted
       }
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[TestCleanup] Error:', error);
     res.status(500).json({ error: 'Cleanup failed' });
   }

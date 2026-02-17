@@ -82,7 +82,7 @@ async function detectAndNotifyStatusChange(
         
         console.log(`[MemberSync] Started grace period for Mindbody member ${email} - status changed to ${newStatus}`);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(`[MemberSync] Failed to start grace period for ${email}:`, err);
     }
   }
@@ -152,7 +152,7 @@ export async function initMemberSyncSettings(): Promise<void> {
       lastSyncTime = parseInt(result.rows[0].value as string, 10);
       console.log(`[MemberSync] Loaded last sync time: ${new Date(lastSyncTime).toISOString()}`);
     }
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('[MemberSync] Failed to load last sync time:', err);
   }
 }
@@ -167,7 +167,7 @@ export async function setLastMemberSyncTime(time: number): Promise<void> {
     await db.execute(sql`INSERT INTO app_settings (key, value, category, updated_at) 
        VALUES ('last_member_sync_time', ${time.toString()}, 'sync', NOW())
        ON CONFLICT (key) DO UPDATE SET value = ${time.toString()}, updated_at = NOW()`);
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('[MemberSync] Failed to persist last sync time:', err);
   }
 }
@@ -324,7 +324,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
               if (!isNaN(createDate.getTime())) {
                 joinDate = formatDatePacific(createDate);
               }
-            } catch (e) {
+            } catch (e: unknown) {
               // If parsing fails, joinDate remains null
             }
           }
@@ -470,7 +470,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
               }
               hubspotIdCollisions++;
             }
-          } catch (dupError) {
+          } catch (dupError: unknown) {
             console.error(`[MemberSync] Error checking for HubSpot ID collisions:`, dupError);
           }
           
@@ -593,7 +593,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
                 mergedContactEmails.set(result.id, email);
               }
             }
-          } catch (err) {
+          } catch (err: unknown) {
             if (!isProduction) console.error(`[MemberSync] Error fetching merged contacts:`, err);
           }
           
@@ -618,7 +618,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
                   })
                   .onConflictDoNothing();
                 linkedEmailsAdded++;
-              } catch (err) {
+              } catch (err: unknown) {
                 // Ignore duplicate key errors
               }
             }
@@ -659,7 +659,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
               const status = (contact.properties.membership_status || 'non-member').toLowerCase();
               try {
                 await syncDealStageFromMindbodyStatus(email, status, 'system', 'Mindbody Sync');
-              } catch (err) {
+              } catch (err: unknown) {
                 if (!isProduction) console.error(`[MemberSync] Failed to sync deal stage for ${email}:`, err);
               }
             })
@@ -686,7 +686,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
     await alertOnHubSpotSyncComplete(synced, errors, allContacts.length);
     
     return { synced, errors };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[MemberSync] Fatal error:', error);
     await alertOnSyncFailure(
       'hubspot',
@@ -876,7 +876,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
               if (!isNaN(createDate.getTime())) {
                 joinDate = formatDatePacific(createDate);
               }
-            } catch (e) {
+            } catch (e: unknown) {
               console.error('[MemberSync] Failed to parse createdate:', e);
             }
           }
@@ -1016,7 +1016,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
               }
               hubspotIdCollisions++;
             }
-          } catch (dupError) {
+          } catch (dupError: unknown) {
             console.error(`[MemberSync] Error checking for HubSpot ID collisions:`, dupError);
           }
           
@@ -1127,7 +1127,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
                 mergedContactEmails.set(result.id, email);
               }
             }
-          } catch (err) {
+          } catch (err: unknown) {
             if (!isProduction) console.error(`[MemberSync] Error fetching merged contacts:`, err);
           }
           
@@ -1150,7 +1150,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
                   })
                   .onConflictDoNothing();
                 linkedEmailsAdded++;
-              } catch (err) {
+              } catch (err: unknown) {
                 console.error('[MemberSync] Failed to add linked email from HubSpot merge:', err);
               }
             }
@@ -1187,7 +1187,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
               const status = (contact.properties.membership_status || 'non-member').toLowerCase();
               try {
                 await syncDealStageFromMindbodyStatus(email, status, 'system', 'Mindbody Sync');
-              } catch (err) {
+              } catch (err: unknown) {
                 if (!isProduction) console.error(`[MemberSync] Failed to sync deal stage for ${email}:`, err);
               }
             })
@@ -1210,7 +1210,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
     await alertOnHubSpotSyncComplete(synced, errors, allContacts.length);
     
     return { synced, errors };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[MemberSync] Fatal error in focused sync:', error);
     await alertOnSyncFailure(
       'hubspot',
@@ -1234,7 +1234,7 @@ export async function updateHubSpotContactVisitCount(hubspotId: string, visitCou
     });
     if (!isProduction) console.log(`[MemberSync] Updated HubSpot contact ${hubspotId} visit count to ${visitCount}`);
     return true;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`[MemberSync] Failed to update HubSpot visit count for ${hubspotId}:`, error);
     return false;
   }
@@ -1438,7 +1438,7 @@ export async function syncCommunicationLogsFromHubSpot(): Promise<{ synced: numb
               });
               
               synced++;
-            } catch (err) {
+            } catch (err: unknown) {
               errors++;
               if (!isProduction) console.error('[CommLogs] Error processing call:', err);
             }
@@ -1565,13 +1565,13 @@ export async function syncCommunicationLogsFromHubSpot(): Promise<{ synced: numb
           });
           
           synced++;
-        } catch (err) {
+        } catch (err: unknown) {
           errors++;
           if (!isProduction) console.error('[CommLogs] Error processing SMS:', err);
         }
       }
       
-    } catch (err) {
+    } catch (err: unknown) {
       // SMS sync is optional, don't fail the whole sync
       if (!isProduction) console.log('[CommLogs] SMS sync skipped:', err);
     }
@@ -1579,7 +1579,7 @@ export async function syncCommunicationLogsFromHubSpot(): Promise<{ synced: numb
     if (!isProduction) console.log(`[CommLogs] Complete - Synced: ${synced}, Errors: ${errors}`);
     
     return { synced, errors };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[CommLogs] Fatal error:', error);
     return { synced: 0, errors: 1 };
   } finally {
@@ -1616,7 +1616,7 @@ export async function updateHubSpotContactPreferences(
     await hubspot.crm.contacts.basicApi.update(hubspotId, { properties });
     if (!isProduction) console.log(`[MemberSync] Updated HubSpot contact ${hubspotId} preferences:`, properties);
     return true;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`[MemberSync] Failed to update HubSpot preferences for ${hubspotId}:`, error);
     return false;
   }
