@@ -923,7 +923,11 @@ export async function addCorporateMember(params: {
           
           if (corporateItem) {
             originalQuantity = corporateItem.quantity || 0;
-            originalPricePerSeat = corporateItem.price?.unit_amount || 35000;
+            originalPricePerSeat = corporateItem.price?.unit_amount ?? 0;
+            if (!originalPricePerSeat) {
+              console.error(`[GroupBilling] Corporate seat price is missing from Stripe subscription item ${corporateItem.id} — cannot adjust`);
+              throw new Error('Corporate seat price not found on Stripe subscription item');
+            }
             originalProductId = corporateItem.price?.product as string;
             corporateItemId = corporateItem.id;
             
@@ -1111,7 +1115,11 @@ export async function removeCorporateMember(params: {
         );
         
         if (corporateItem) {
-          const oldPricePerSeat = corporateItem.price?.unit_amount || 35000;
+          const oldPricePerSeat = corporateItem.price?.unit_amount ?? 0;
+          if (!oldPricePerSeat) {
+            console.error(`[GroupBilling] Corporate seat price is missing from Stripe subscription item ${corporateItem.id} — cannot adjust`);
+            throw new Error('Corporate seat price not found on Stripe subscription item');
+          }
           
           if (oldPricePerSeat !== newPricePerSeat) {
             console.log(`[GroupBilling] Price tier change on removal: ${oldPricePerSeat} -> ${newPricePerSeat} cents/seat for ${newMemberCount} members`);

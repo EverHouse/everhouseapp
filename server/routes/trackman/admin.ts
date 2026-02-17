@@ -576,8 +576,14 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
           
           if (dayPassResult.rows.length > 0) {
             const dayPass = dayPassResult.rows[0] as any;
-            const amountCents = dayPass.price_cents || 5000;
-            
+            const amountCents = dayPass.price_cents;
+            if (!amountCents || amountCents <= 0) {
+              console.error(`[Trackman Resolve] Day pass price_cents is missing or zero for slug 'day-pass-golf-sim' — cannot bill`);
+              billingMessage = ' Day pass billing skipped: price not configured in membership_tiers.';
+              await db.execute(sql`INSERT INTO day_pass_purchases 
+                 (user_id, product_type, quantity, amount_cents, booking_date, status, trackman_booking_id, created_at)
+                 VALUES (${member.id}, ${'day-pass-golf-sim'}, 1, 0, ${bookingDateStr}, ${'pending_price'}, ${booking.trackman_booking_id}, NOW())`);
+            } else {
             const customerId = member.stripe_customer_id;
             if (!customerId) {
               console.log(`[Trackman Resolve] Skipping day pass billing for visitor ${member.email} - no Stripe customer`);
@@ -666,6 +672,7 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
             
             updateVisitorTypeByUserId(member.id, 'day_pass', 'day_pass_purchase', new Date(bookingDateStr))
               .catch(err => console.error('[VisitorType] Failed to update day_pass type:', err));
+            }
             }
           }
         } else {

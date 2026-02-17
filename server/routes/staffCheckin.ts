@@ -632,8 +632,10 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
       }
 
       if (action === 'confirm_all') {
+        const snapshotClient = await pool.connect();
         try {
-          const existingSnapshot = await pool.query(
+          await snapshotClient.query('BEGIN');
+          const existingSnapshot = await snapshotClient.query(
             `SELECT id FROM booking_fee_snapshots WHERE session_id = $1 AND status = 'completed' LIMIT 1`,
             [sessionId]
           );
@@ -674,17 +676,28 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
             }
             const totalCents = breakdown.totals.totalCents;
 
-            await pool.query(`
+            const insertResult = await snapshotClient.query(`
               INSERT INTO booking_fee_snapshots (booking_id, session_id, participant_fees, total_cents, status, created_at)
               VALUES ($1, $2, $3, $4, 'completed', NOW())
+              ON CONFLICT (session_id) WHERE status = 'completed' DO NOTHING
+              RETURNING id
             `, [bookingId, sessionId, JSON.stringify(participantFees), totalCents]);
-
-            console.log(`[StaffCheckin] Created fee snapshot for booking ${bookingId}, session ${sessionId}, total ${totalCents} cents`);
+            if (insertResult.rowCount === 0) {
+              await snapshotClient.query('ROLLBACK');
+              console.log(`[StaffCheckin] Fee snapshot race: another check-in already created snapshot for session ${sessionId}`);
+            } else {
+              await snapshotClient.query('COMMIT');
+              console.log(`[StaffCheckin] Created fee snapshot for booking ${bookingId}, session ${sessionId}, total ${totalCents} cents`);
+            }
           } else {
+            await snapshotClient.query('ROLLBACK');
             console.log(`[StaffCheckin] Fee snapshot already exists for session ${sessionId}, skipping`);
           }
         } catch (snapshotErr: unknown) {
+          await snapshotClient.query('ROLLBACK').catch(() => {});
           console.error('[StaffCheckin] Failed to create fee snapshot:', snapshotErr);
+        } finally {
+          snapshotClient.release();
         }
 
         await notifyMember({

@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.63.5",
+    date: "2026-02-17",
+    title: "Billing Security Audit — Final Hardening",
+    changes: [
+      "Fixed: Day pass billing no longer silently falls back to a hardcoded $50 price — now stops and logs an error if the price isn't properly configured",
+      "Fixed: Corporate group billing no longer falls back to a hardcoded $350/seat price — now fails safely with a clear error if the Stripe subscription data is missing",
+      "Fixed: Check-in fee snapshot recording now runs inside a database transaction — prevents duplicate or partial records if two staff members check in simultaneously",
+    ]
+  },
+  {
     version: "7.63.4",
     date: "2026-02-17",
     title: "Complete Billing Idempotency Coverage",
