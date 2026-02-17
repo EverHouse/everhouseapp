@@ -1364,70 +1364,66 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
               const exclusionCheck = await db.execute(sql`SELECT 1 FROM sync_exclusions WHERE email = ${email}`);
               if (exclusionCheck.rows.length > 0) {
                 logger.info('[HubSpot Webhook] Skipping excluded/deleted email', { extra: { email, propertyName, propertyValue } });
-              } else if (propertyName === 'membership_status') {
-                const newStatus = (propertyValue || 'non-member').toLowerCase();
-                
-                // Don't allow HubSpot to downgrade status to 'non-member' if user has active Stripe subscription
-                // Stripe is the source of truth for billing status
-                if (newStatus === 'non-member') {
-                  const stripeCheck = await db.execute(sql`SELECT stripe_subscription_id FROM users WHERE LOWER(email) = ${email}`);
-                  if (stripeCheck.rows.length > 0 && stripeCheck.rows[0].stripe_subscription_id) {
+              } else {
+                const userCheck = await db.execute(sql`SELECT role, billing_provider, stripe_subscription_id, membership_status, first_name, last_name, tier FROM users WHERE LOWER(email) = ${email}`);
+                const existingUser = userCheck.rows[0];
+                const isStripeProtected = existingUser?.billing_provider === 'stripe';
+                const isVisitorProtected = existingUser?.role === 'visitor';
+
+                if (isVisitorProtected) {
+                  logger.info('[HubSpot Webhook] VISITOR PROTECTED: Skipping update for visitor', { extra: { email, propertyName, propertyValue } });
+                } else if (propertyName === 'membership_status') {
+                  const newStatus = (propertyValue || 'non-member').toLowerCase();
+
+                  if (isStripeProtected) {
+                    logger.info('[HubSpot Webhook] STRIPE WINS: Skipping status change for Stripe-billed member', { extra: { email, newStatus } });
+                  } else if (newStatus === 'non-member' && existingUser?.stripe_subscription_id) {
                     logger.info('[HubSpot Webhook] Skipping status change to \'non-member\' for - has active Stripe subscription', { extra: { email } });
                   } else {
-                    const prevStatusResult = await db.execute(sql`SELECT membership_status, first_name, last_name FROM users WHERE LOWER(email) = ${email}`);
-                    const prevStatus = prevStatusResult.rows[0]?.membership_status;
-
+                    const prevStatus = existingUser?.membership_status;
                     await db.execute(sql`UPDATE users SET membership_status = ${newStatus}, updated_at = NOW() WHERE LOWER(email) = ${email}`);
                     logger.info('[HubSpot Webhook] Updated DB membership_status for to', { extra: { email, newStatus } });
 
-                    if (prevStatus && prevStatus !== 'non-member' && prevStatus !== 'visitor') {
-                      const row = prevStatusResult.rows[0];
-                      const name = `${row.first_name || ''} ${row.last_name || ''}`.trim() || email;
+                    const activeStatuses = ['active', 'trialing'];
+                    const inactiveStatuses = ['expired', 'terminated', 'cancelled', 'canceled', 'inactive', 'churned', 'declined', 'suspended', 'frozen', 'non-member'];
+                    const hubspotMemberName = existingUser
+                      ? `${existingUser.first_name || ''} ${existingUser.last_name || ''}`.trim() || email
+                      : email;
+                    const memberTier = existingUser?.tier || 'Unknown';
+
+                    if (prevStatus && prevStatus !== 'non-member' && newStatus === 'non-member') {
                       await notifyAllStaff(
                         'Member Status Changed',
-                        `${name} (${email}) status changed to non-member via MindBody (was ${prevStatus}).`,
+                        `${hubspotMemberName} (${email}) status changed to non-member via MindBody (was ${prevStatus}).`,
+                        'member_status_change',
+                        { sendPush: true, url: '/admin/members' }
+                      );
+                    } else if (activeStatuses.includes(newStatus) && !activeStatuses.includes(prevStatus || '')) {
+                      await notifyAllStaff(
+                        '🎉 New Member Activated',
+                        `${hubspotMemberName} (${email}) is now active via MindBody (${memberTier} tier).`,
+                        'new_member',
+                        { sendPush: true, url: '/admin/members' }
+                      );
+                    } else if (inactiveStatuses.includes(newStatus) && !inactiveStatuses.includes(prevStatus || '')) {
+                      await notifyAllStaff(
+                        'Member Status Changed',
+                        `${hubspotMemberName} (${email}) status changed to ${newStatus} via MindBody.`,
                         'member_status_change',
                         { sendPush: true, url: '/admin/members' }
                       );
                     }
                   }
-                } else {
-                  await db.execute(sql`UPDATE users SET membership_status = ${newStatus}, updated_at = NOW() WHERE LOWER(email) = ${email}`);
-                  logger.info('[HubSpot Webhook] Updated DB membership_status for to', { extra: { email, newStatus } });
-
-                  // Notify staff of membership status changes from HubSpot/MindBody
-                  const activeStatuses = ['active', 'trialing'];
-                  const inactiveStatuses = ['expired', 'terminated', 'cancelled', 'canceled', 'inactive', 'churned', 'declined', 'suspended', 'frozen', 'non-member'];
-                  
-                  // Get member name for notification
-                  const memberResult = await db.execute(sql`SELECT first_name, last_name, tier FROM users WHERE LOWER(email) = ${email}`);
-                  const memberRow = memberResult.rows[0];
-                  const hubspotMemberName = memberRow 
-                    ? `${memberRow.first_name || ''} ${memberRow.last_name || ''}`.trim() || email 
-                    : email;
-                  const memberTier = memberRow?.tier || 'Unknown';
-                  
-                  if (activeStatuses.includes(newStatus)) {
-                    await notifyAllStaff(
-                      '🎉 New Member Activated',
-                      `${hubspotMemberName} (${email}) is now active via MindBody (${memberTier} tier).`,
-                      'new_member',
-                      { sendPush: true, url: '/admin/members' }
-                    );
-                  } else if (inactiveStatuses.includes(newStatus)) {
-                    await notifyAllStaff(
-                      'Member Status Changed',
-                      `${hubspotMemberName} (${email}) status changed to ${newStatus} via MindBody.`,
-                      'member_status_change',
-                      { sendPush: true, url: '/admin/members' }
-                    );
+                } else if (propertyName === 'membership_tier') {
+                  if (isStripeProtected) {
+                    logger.info('[HubSpot Webhook] STRIPE WINS: Skipping tier change for Stripe-billed member', { extra: { email, propertyValue } });
+                  } else {
+                    const normalizedTier = normalizeTierName(propertyValue || '');
+                    if (normalizedTier) {
+                      await db.execute(sql`UPDATE users SET tier = ${normalizedTier}, updated_at = NOW() WHERE LOWER(email) = ${email}`);
+                      logger.info('[HubSpot Webhook] Updated DB tier for to', { extra: { email, normalizedTier } });
+                    }
                   }
-                }
-              } else if (propertyName === 'membership_tier') {
-                const normalizedTier = normalizeTierName(propertyValue || '');
-                if (normalizedTier) {
-                  await db.execute(sql`UPDATE users SET tier = ${normalizedTier}, updated_at = NOW() WHERE LOWER(email) = ${email}`);
-                  logger.info('[HubSpot Webhook] Updated DB tier for to', { extra: { email, normalizedTier } });
                 }
               }
             }
