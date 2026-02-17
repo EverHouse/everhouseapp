@@ -2899,11 +2899,26 @@ export async function autoFixMissingTiers(): Promise<{
   fixedBillingProvider: number;
   fixedFromAlternateEmail: number;
   remainingWithoutTier: number;
+  normalizedStatusCase: number;
+  syncedStaffRoles: number;
 }> {
   let fixedBillingProvider = 0;
   let fixedFromAlternateEmail = 0;
+  let normalizedStatusCase = 0;
+  let syncedStaffRoles = 0;
   
   try {
+    const caseNormResult = await db.execute(sql`
+      UPDATE users SET membership_status = LOWER(membership_status), updated_at = NOW()
+      WHERE membership_status != LOWER(membership_status)
+      RETURNING id, email, membership_status
+    `);
+    normalizedStatusCase = caseNormResult.rows.length;
+    if (normalizedStatusCase > 0) {
+      const details = (caseNormResult.rows as any[]).map(r => `${r.email} -> ${r.membership_status}`).join(', ');
+      console.log(`[AutoFix] Normalized membership_status case for ${normalizedStatusCase} members: ${details}`);
+    }
+
     const billingProviderResult = await db.execute(sql`
       UPDATE users SET billing_provider = 'mindbody', updated_at = NOW()
       WHERE membership_status = 'active'
@@ -2973,7 +2988,7 @@ export async function autoFixMissingTiers(): Promise<{
     
     if (remainingWithoutTier > 0) {
       const emailsResult = await db.execute(sql`
-        SELECT email, first_name, last_name, stripe_customer_id
+        SELECT email, first_name, last_name, stripe_customer_id, mindbody_client_id
         FROM users 
         WHERE role = 'member' 
           AND membership_status = 'active' 
@@ -2983,13 +2998,31 @@ export async function autoFixMissingTiers(): Promise<{
         ORDER BY created_at DESC
         LIMIT 20
       `);
-      const emails = (emailsResult.rows as any[]).map(r => `${r.first_name || ''} ${r.last_name || ''} <${r.email}>`).join(', ');
-      console.log(`[AutoFix] ${remainingWithoutTier} members still without tier: ${emails}`);
+      const emails = (emailsResult.rows as any[]).map(r => `${r.first_name || ''} ${r.last_name || ''} <${r.email}>${r.mindbody_client_id ? ` (MindBody: ${r.mindbody_client_id})` : ''}`).join(', ');
+      console.log(`[AutoFix] ${remainingWithoutTier} active members still without tier (cannot auto-determine): ${emails}`);
+    }
+
+    const staffSyncResult = await db.execute(sql`
+      UPDATE users u
+      SET role = su.role,
+          tier = 'VIP',
+          membership_status = 'active',
+          updated_at = NOW()
+      FROM staff_users su
+      WHERE LOWER(u.email) = LOWER(su.email)
+        AND su.is_active = true
+        AND u.role NOT IN ('admin', 'staff', 'golf_instructor')
+      RETURNING u.id, u.email, su.role as new_role
+    `);
+    syncedStaffRoles = staffSyncResult.rows.length;
+    if (syncedStaffRoles > 0) {
+      const details = (staffSyncResult.rows as any[]).map(r => `${r.email} -> role=${r.new_role}, tier=VIP, status=active`).join(', ');
+      console.log(`[AutoFix] Synced staff role for ${syncedStaffRoles} users: ${details}`);
     }
     
-    return { fixedBillingProvider, fixedFromAlternateEmail, remainingWithoutTier };
+    return { fixedBillingProvider, fixedFromAlternateEmail, remainingWithoutTier, normalizedStatusCase, syncedStaffRoles };
   } catch (error: unknown) {
-    console.error('[AutoFix] Error fixing missing tiers:', getErrorMessage(error));
-    return { fixedBillingProvider: 0, fixedFromAlternateEmail: 0, remainingWithoutTier: -1 };
+    console.error('[AutoFix] Error in periodic auto-fixes:', getErrorMessage(error));
+    return { fixedBillingProvider: 0, fixedFromAlternateEmail: 0, remainingWithoutTier: -1, normalizedStatusCase: 0, syncedStaffRoles: 0 };
   }
 }

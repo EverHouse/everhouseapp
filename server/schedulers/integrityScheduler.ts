@@ -118,11 +118,17 @@ async function checkAndRunIntegrityCheck(): Promise<void> {
 async function runPeriodicAutoFix(): Promise<void> {
   try {
     const result = await autoFixMissingTiers();
+    if (result.normalizedStatusCase > 0) {
+      console.log(`[Auto-Fix] Normalized membership_status case for ${result.normalizedStatusCase} members`);
+    }
     if (result.fixedBillingProvider > 0) {
       console.log(`[Auto-Fix] Set billing_provider='mindbody' for ${result.fixedBillingProvider} members with MindBody IDs`);
     }
     if (result.fixedFromAlternateEmail > 0) {
       console.log(`[Auto-Fix] Fixed ${result.fixedFromAlternateEmail} members, ${result.remainingWithoutTier} still without tier`);
+    }
+    if (result.syncedStaffRoles > 0) {
+      console.log(`[Auto-Fix] Synced staff roles for ${result.syncedStaffRoles} users`);
     }
     schedulerTracker.recordRun('Auto-Fix Tiers', true);
   } catch (err) {
