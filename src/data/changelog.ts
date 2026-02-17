@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.63.3",
+    date: "2026-02-17",
+    title: "Refund Safety & Complete Billing Hardening",
+    changes: [
+      "Fixed: All Stripe refund calls now include idempotency keys — prevents duplicate refunds from double-clicks or network retries across all cancellation and refund flows",
+      "Fixed: Staff refund processing now wraps all database updates (payment status, participant records, usage ledger reversals, audit log) in a single transaction — partial failures no longer leave inconsistent data",
+      "Fixed: Refund ledger reversal failures now properly roll back the entire refund record instead of silently continuing with partial data",
+    ]
+  },
+  {
     version: "7.63.2",
     date: "2026-02-17",
     title: "Billing Idempotency & Transaction Safety",

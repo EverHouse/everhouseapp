@@ -2161,81 +2161,98 @@ router.post('/api/payments/refund', isStaffOrAdmin, async (req: Request, res: Re
       refundParams.amount = amountCents;
     }
 
-    const refund = await stripe.refunds.create(refundParams);
+    const refund = await stripe.refunds.create(refundParams, {
+      idempotencyKey: `refund_${paymentIntentId}_${amountCents || 'full'}_${staffEmail}`
+    });
 
     const refundedAmount = refund.amount;
     const isPartialRefund = refundedAmount < payment.amountCents;
     const newStatus = isPartialRefund ? 'partially_refunded' : 'refunded';
 
-    await updatePaymentStatus(paymentIntentId, newStatus);
+    const txClient = await pool.connect();
+    try {
+      await txClient.query('BEGIN');
 
-    if (payment.sessionId) {
-      try {
-        await db.execute(sql`UPDATE booking_participants 
+      await txClient.query(
+        `UPDATE stripe_payment_intents SET status = $1, updated_at = NOW() WHERE stripe_payment_intent_id = $2`,
+        [newStatus, paymentIntentId]
+      );
+
+      if (payment.sessionId) {
+        await txClient.query(
+          `UPDATE booking_participants 
            SET payment_status = 'refunded', updated_at = NOW() 
-           WHERE session_id = ${payment.sessionId} AND stripe_payment_intent_id = ${paymentIntentId}`);
-        
-        let ledgerEntries = await db.execute(sql`SELECT id, member_id, overage_fee, guest_fee, minutes_charged, stripe_payment_intent_id
+           WHERE session_id = $1 AND stripe_payment_intent_id = $2`,
+          [payment.sessionId, paymentIntentId]
+        );
+
+        let ledgerResult = await txClient.query(
+          `SELECT id, member_id, overage_fee, guest_fee, minutes_charged, stripe_payment_intent_id
            FROM usage_ledger 
-           WHERE session_id = ${payment.sessionId} 
-             AND stripe_payment_intent_id = ${paymentIntentId}
+           WHERE session_id = $1 
+             AND stripe_payment_intent_id = $2
              AND (COALESCE(overage_fee, 0) > 0 OR COALESCE(guest_fee, 0) > 0)
-           ORDER BY created_at ASC`);
-        
-        if (ledgerEntries.rows.length === 0) {
+           ORDER BY created_at ASC`,
+          [payment.sessionId, paymentIntentId]
+        );
+
+        if (ledgerResult.rows.length === 0) {
           console.warn(`[Payments] [OPS_REVIEW_REQUIRED] No ledger entries found with payment_intent_id ${paymentIntentId}, falling back to session-wide entries for session ${payment.sessionId}.`);
-          ledgerEntries = await db.execute(sql`SELECT id, member_id, overage_fee, guest_fee, minutes_charged, stripe_payment_intent_id
+          ledgerResult = await txClient.query(
+            `SELECT id, member_id, overage_fee, guest_fee, minutes_charged, stripe_payment_intent_id
              FROM usage_ledger 
-             WHERE session_id = ${payment.sessionId} 
+             WHERE session_id = $1 
                AND (COALESCE(overage_fee, 0) > 0 OR COALESCE(guest_fee, 0) > 0)
-             ORDER BY created_at ASC`);
+             ORDER BY created_at ASC`,
+            [payment.sessionId]
+          );
         }
-        
-        if (ledgerEntries.rows.length > 0) {
-          const totalLedgerFeeCents = ledgerEntries.rows.reduce((sum: any, entry: any) => {
+
+        if (ledgerResult.rows.length > 0) {
+          const totalLedgerFeeCents = ledgerResult.rows.reduce((sum: any, entry: any) => {
             return sum + Math.round((parseFloat(entry.overage_fee) || 0) * 100) + Math.round((parseFloat(entry.guest_fee) || 0) * 100);
           }, 0);
-          
+
           const refundCents = refundedAmount;
           const refundProportion = totalLedgerFeeCents > 0 
             ? Math.min(1, refundCents / totalLedgerFeeCents)
             : 1;
-          
+
           let totalReversedOverageCents = 0;
           let totalReversedGuestCents = 0;
           const targetReversalCents = refundCents;
-          
+
           const reversalAmounts: Array<{
             memberId: string;
             reversedOverageCents: number;
             reversedGuestCents: number;
           }> = [];
-          
-          for (const entry of ledgerEntries.rows as any[]) {
+
+          for (const entry of ledgerResult.rows as any[]) {
             const originalOverageCents = Math.round((parseFloat(entry.overage_fee) || 0) * 100);
             const originalGuestCents = Math.round((parseFloat(entry.guest_fee) || 0) * 100);
-            
+
             let reversedOverageCents = isPartialRefund 
               ? Math.round(originalOverageCents * refundProportion)
               : originalOverageCents;
             let reversedGuestCents = isPartialRefund 
               ? Math.round(originalGuestCents * refundProportion)
               : originalGuestCents;
-            
+
             reversalAmounts.push({
               memberId: entry.member_id,
               reversedOverageCents,
               reversedGuestCents
             });
-            
+
             totalReversedOverageCents += reversedOverageCents;
             totalReversedGuestCents += reversedGuestCents;
           }
-          
+
           if (isPartialRefund && reversalAmounts.length > 0) {
             const actualReversalCents = totalReversedOverageCents + totalReversedGuestCents;
             const remainderCents = targetReversalCents - actualReversalCents;
-            
+
             if (remainderCents !== 0) {
               if (reversalAmounts[0].reversedOverageCents > 0 || reversalAmounts[0].reversedGuestCents === 0) {
                 reversalAmounts[0].reversedOverageCents += remainderCents;
@@ -2245,49 +2262,60 @@ router.post('/api/payments/refund', isStaffOrAdmin, async (req: Request, res: Re
               console.log(`[Payments] Applied rounding remainder of $${(remainderCents / 100).toFixed(2)} to first reversal entry`);
             }
           }
-          
+
           let reversalCount = 0;
-          for (let i = 0; i < ledgerEntries.rows.length; i++) {
-            const entry = ledgerEntries.rows[i];
+          for (let i = 0; i < ledgerResult.rows.length; i++) {
             const amounts = reversalAmounts[i];
-            
+
             if (amounts.reversedOverageCents !== 0 || amounts.reversedGuestCents !== 0) {
-              await db.execute(sql`INSERT INTO usage_ledger 
+              await txClient.query(
+                `INSERT INTO usage_ledger 
                  (session_id, member_id, minutes_charged, overage_fee, guest_fee, payment_method, source, stripe_payment_intent_id)
-                 VALUES (${payment.sessionId}, ${amounts.memberId}, 0, ${(-amounts.reversedOverageCents / 100).toFixed(2)}, ${(-amounts.reversedGuestCents / 100).toFixed(2)}, 'waived', 'staff_manual', ${paymentIntentId})`);
+                 VALUES ($1, $2, 0, $3, $4, 'waived', 'staff_manual', $5)`,
+                [payment.sessionId, amounts.memberId, (-amounts.reversedOverageCents / 100).toFixed(2), (-amounts.reversedGuestCents / 100).toFixed(2), paymentIntentId]
+              );
               reversalCount++;
             }
           }
-          
+
           const reversalType = isPartialRefund 
             ? `partial (${(refundProportion * 100).toFixed(1)}%)`
             : 'full';
           console.log(`[Payments] Created ${reversalCount} ${reversalType} ledger reversal(s) for session ${payment.sessionId}, refund: $${(refundCents / 100).toFixed(2)}, linked to payment ${paymentIntentId}`);
         }
-        
-        console.log(`[Payments] Updated ledger and participants for session ${payment.sessionId}`);
-      } catch (ledgerError) {
-        console.error('[Payments] Failed to update ledger/participants for refund:', ledgerError);
-      }
-    }
 
-    await db.insert(billingAuditLog).values({
-      memberEmail: payment.memberEmail || 'unknown',
-      hubspotDealId: null,
-      actionType: 'payment_refunded',
-      actionDetails: {
-        paymentIntentId,
-        refundId: refund.id,
-        refundAmount: refundedAmount,
-        reason: reason || 'No reason provided',
-        originalAmount: payment.amountCents,
-        isPartialRefund,
-        sessionId: payment.sessionId
-      },
-      newValue: `Refunded $${(refundedAmount / 100).toFixed(2)} of $${(payment.amountCents / 100).toFixed(2)}`,
-      performedBy: staffEmail,
-      performedByName: staffName
-    });
+        console.log(`[Payments] Updated ledger and participants for session ${payment.sessionId}`);
+      }
+
+      await txClient.query(
+        `INSERT INTO billing_audit_log (member_email, hubspot_deal_id, action_type, action_details, new_value, performed_by, performed_by_name, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+        [
+          payment.memberEmail || 'unknown',
+          null,
+          'payment_refunded',
+          JSON.stringify({
+            paymentIntentId,
+            refundId: refund.id,
+            refundAmount: refundedAmount,
+            reason: reason || 'No reason provided',
+            originalAmount: payment.amountCents,
+            isPartialRefund,
+            sessionId: payment.sessionId
+          }),
+          `Refunded $${(refundedAmount / 100).toFixed(2)} of $${(payment.amountCents / 100).toFixed(2)}`,
+          staffEmail,
+          staffName
+        ]
+      );
+
+      await txClient.query('COMMIT');
+    } catch (txError) {
+      await txClient.query('ROLLBACK');
+      throw txError;
+    } finally {
+      txClient.release();
+    }
 
     console.log(`[Payments] Refund ${refund.id} created for ${paymentIntentId}: $${(refundedAmount / 100).toFixed(2)}`);
 

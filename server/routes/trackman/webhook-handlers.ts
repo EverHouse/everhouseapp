@@ -295,6 +295,8 @@ export async function cancelBookingByTrackmanId(
                     bookingId: bookingId.toString(),
                     participantId: participant.id.toString()
                   }
+                }, {
+                  idempotencyKey: `refund_trackman_cancel_${booking.id}_${pi.id}`
                 });
                 
                 // Mark participant as refunded

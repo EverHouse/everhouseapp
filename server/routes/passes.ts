@@ -331,6 +331,8 @@ router.post('/api/staff/passes/:passId/refund', isStaffOrAdmin, async (req: Requ
       const refund = await stripe.refunds.create({
         payment_intent: pass.stripePaymentIntentId,
         reason: 'requested_by_customer'
+      }, {
+        idempotencyKey: `refund_guest_pass_${passId}_${pass.stripePaymentIntentId}`
       });
       console.log(`[Passes] Stripe refund created for pass ${passId}: ${refund.id}`);
     } catch (stripeError: unknown) {

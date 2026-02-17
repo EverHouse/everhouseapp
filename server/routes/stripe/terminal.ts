@@ -609,7 +609,9 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
       try {
         const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
         if (pi.status === 'succeeded') {
-          await stripe.refunds.create({ payment_intent: paymentIntentId, reason: 'requested_by_customer' });
+          await stripe.refunds.create({ payment_intent: paymentIntentId, reason: 'requested_by_customer' }, {
+            idempotencyKey: `refund_terminal_activation_${paymentIntentId}`
+          });
           autoRefunded = true;
           console.error(`[Terminal] Auto-refunded PI ${paymentIntentId} - user ${userId} not found during activation`);
         } else {
@@ -843,6 +845,8 @@ router.post('/api/stripe/terminal/refund-payment', isStaffOrAdmin, async (req: R
     const refund = await stripe.refunds.create({
       payment_intent: paymentIntentId,
       reason: 'requested_by_customer'
+    }, {
+      idempotencyKey: `refund_terminal_${paymentIntentId}`
     });
     
     await logFromRequest(req, {

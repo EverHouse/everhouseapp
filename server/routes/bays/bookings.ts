@@ -1180,6 +1180,8 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
             const refund = await stripe.refunds.create({
               charge: paymentIntent.latest_charge as string,
               reason: 'requested_by_customer'
+            }, {
+              idempotencyKey: `refund_cancel_${bookingId}_${existing.overagePaymentIntentId}`
             });
             refundedAmountCents += refund.amount;
             refundType = 'overage';
@@ -1249,6 +1251,8 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
                       bookingId: bookingId.toString(),
                       participantId: participant.id.toString()
                     }
+                  }, {
+                    idempotencyKey: `refund_cancel_participant_${bookingId}_${participant.stripe_payment_intent_id}`
                   });
                   refundedAmountCents += refund.amount;
                   refundType = refundType === 'overage' ? 'both' : 'guest_fees';

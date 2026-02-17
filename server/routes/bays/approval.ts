@@ -797,6 +797,8 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                 const refund = await stripe.refunds.create({
                   charge: paymentIntent.latest_charge as string,
                   reason: 'requested_by_customer'
+                }, {
+                  idempotencyKey: `refund_staff_cancel_overage_${bookingId}_${existing.overagePaymentIntentId}`
                 });
                 console.log(`[Staff Cancel] Refunded overage payment ${existing.overagePaymentIntentId} for booking ${bookingId}, refund: ${refund.id}`);
                 overageRefundResult = { refunded: true, amount: (existing.overageFeeCents || 0) / 100 };
@@ -836,6 +838,8 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                 const refund = await stripe.refunds.create({
                   payment_intent: snapshot.stripe_payment_intent_id,
                   reason: 'requested_by_customer'
+                }, {
+                  idempotencyKey: `refund_staff_cancel_snapshot_${bookingId}_${snapshot.stripe_payment_intent_id}`
                 });
                 console.log(`[Staff Cancel] Refunded payment ${snapshot.stripe_payment_intent_id} for booking ${bookingId}: $${(pi.amount / 100).toFixed(2)}, refund: ${refund.id}`);
                 
@@ -970,6 +974,8 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                       bookingId: bookingId.toString(),
                       participantId: participant.id.toString()
                     }
+                  }, {
+                    idempotencyKey: `refund_staff_cancel_participant_${bookingId}_${participant.stripe_payment_intent_id}`
                   });
                   console.log(`[Staff Cancel] Refunded guest fee for ${participant.display_name}: $${(participant.cached_fee_cents / 100).toFixed(2)}, refund: ${refund.id}`);
                 }
@@ -1832,6 +1838,8 @@ router.put('/api/booking-requests/:id/complete-cancellation', isStaffOrAdmin, as
             await stripe.refunds.create({
               charge: paymentIntent.latest_charge as string,
               reason: 'requested_by_customer'
+            }, {
+              idempotencyKey: `refund_deny_overage_${bookingId}_${existing.overagePaymentIntentId}`
             });
           }
         } else {
@@ -1914,6 +1922,8 @@ router.put('/api/booking-requests/:id/complete-cancellation', isStaffOrAdmin, as
                     bookingId: bookingId.toString(),
                     participantId: participant.id.toString()
                   }
+                }, {
+                  idempotencyKey: `refund_deny_participant_${bookingId}_${participant.stripe_payment_intent_id}`
                 });
                 await pool.query(
                   `UPDATE booking_participants SET refunded_at = NOW(), payment_status = 'waived' WHERE id = $1`,
