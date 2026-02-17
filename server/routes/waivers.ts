@@ -5,6 +5,7 @@ import { users, systemSettings } from '../../shared/schema';
 import { isAuthenticated, isStaffOrAdmin } from '../core/middleware';
 import { getSessionUser } from '../types/session';
 import { isProduction } from '../core/db';
+import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
 
@@ -148,6 +149,7 @@ router.post('/api/waivers/update-version', isStaffOrAdmin, async (req, res) => {
     
     const affectedCount = Number((affectedUsersResult as any).rows?.[0]?.count || 0);
 
+    logFromRequest(req, 'update_waiver_version' as any, 'waiver', undefined, undefined, { version, affectedMembers: affectedCount });
     res.json({
       success: true,
       version,

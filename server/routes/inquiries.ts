@@ -3,6 +3,7 @@ import { db } from '../db';
 import { formSubmissions } from '../../shared/schema';
 import { eq, desc, and, SQL } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../core/middleware';
+import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
 
@@ -70,6 +71,8 @@ router.put('/api/admin/inquiries/:id', isStaffOrAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Inquiry not found' });
     }
     
+    logFromRequest(req, 'update_inquiry' as any, 'inquiry' as any, id);
+    
     res.json(updated);
   } catch (error: unknown) {
     console.error('Inquiry update error:', error);
@@ -102,6 +105,8 @@ router.delete('/api/admin/inquiries/:id', isStaffOrAdmin, async (req, res) => {
     if (!deleted) {
       return res.status(404).json({ error: 'Inquiry not found' });
     }
+    
+    logFromRequest(req, 'delete_inquiry' as any, 'inquiry' as any, id);
     
     res.json({ success: true, deleted });
   } catch (error: unknown) {

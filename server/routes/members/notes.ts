@@ -5,6 +5,7 @@ import { memberNotes } from '../../../shared/schema';
 import { isProduction } from '../../core/db';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { getSessionUser } from '../../types/session';
+import { logFromRequest } from '../../core/auditLog';
 
 const router = Router();
 
@@ -49,6 +50,7 @@ router.post('/api/members/:email/notes', isStaffOrAdmin, async (req, res) => {
       })
       .returning();
     
+    logFromRequest(req, 'create_note' as any, 'note' as any, String(result[0].id), normalizedEmail);
     res.status(201).json(result[0]);
   } catch (error: unknown) {
     if (!isProduction) console.error('Create note error:', error);
@@ -78,6 +80,7 @@ router.put('/api/members/:email/notes/:noteId', isStaffOrAdmin, async (req, res)
       return res.status(404).json({ error: 'Note not found' });
     }
     
+    logFromRequest(req, 'update_note' as any, 'note' as any, noteId as string, normalizedEmail);
     res.json(result[0]);
   } catch (error: unknown) {
     if (!isProduction) console.error('Update note error:', error);
@@ -101,6 +104,7 @@ router.delete('/api/members/:email/notes/:noteId', isStaffOrAdmin, async (req, r
       return res.status(404).json({ error: 'Note not found for this member' });
     }
     
+    logFromRequest(req, 'delete_note' as any, 'note' as any, noteId as string, normalizedEmail);
     res.json({ success: true });
   } catch (error: unknown) {
     if (!isProduction) console.error('Delete note error:', error);

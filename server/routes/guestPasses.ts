@@ -9,6 +9,7 @@ import { sendNotificationToUser, broadcastMemberStatsUpdated } from '../core/web
 import { logAndRespond } from '../core/logger';
 import { withRetry } from '../core/retry';
 import { getSessionUser } from '../types/session';
+import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
 
@@ -242,6 +243,7 @@ router.put('/api/guest-passes/:email', isStaffOrAdmin, async (req, res) => {
     
     try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: passesRemaining }); } catch (err: unknown) { console.error('[Broadcast] Stats update error:', err); }
     
+    logFromRequest(req, 'update_guest_passes' as any, 'guest_pass' as any, normalizedEmail, undefined, { passes_total: passes_total });
     res.json({
       passes_used: data.passesUsed,
       passes_total: data.passesTotal,

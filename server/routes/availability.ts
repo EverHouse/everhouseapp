@@ -3,6 +3,7 @@ import { pool, isProduction } from '../core/db';
 import { isStaffOrAdmin } from '../core/middleware';
 import { getCalendarBusyTimes, getCalendarIdByName, CALENDAR_CONFIG } from '../core/calendar/index';
 import { getTodayPacific, getPacificDateParts } from '../utils/dateUtils';
+import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
 
@@ -468,6 +469,7 @@ router.post('/api/availability-blocks', isStaffOrAdmin, async (req, res) => {
       [resource_id, block_date, start_time, end_time, block_type, notes, created_by]
     );
     
+    logFromRequest(req, 'create_availability_block' as any, 'availability' as any, String(result.rows[0].id), undefined, { resource_id, block_date, start_time, end_time });
     res.status(201).json(result.rows[0]);
   } catch (error: unknown) {
     if (!isProduction) console.error('Availability block creation error:', error);
@@ -530,6 +532,7 @@ router.put('/api/availability-blocks/:id', isStaffOrAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Block not found' });
     }
     
+    logFromRequest(req, 'update_availability_block' as any, 'availability' as any, id as string, undefined, { resource_id, block_date, start_time, end_time });
     res.json(result.rows[0]);
   } catch (error: unknown) {
     if (!isProduction) console.error('Update block error:', error);
@@ -541,6 +544,7 @@ router.delete('/api/availability-blocks/:id', isStaffOrAdmin, async (req, res) =
   try {
     const { id } = req.params;
     await pool.query('DELETE FROM availability_blocks WHERE id = $1', [id]);
+    logFromRequest(req, 'delete_availability_block' as any, 'availability' as any, id as string);
     res.json({ success: true });
   } catch (error: unknown) {
     if (!isProduction) console.error('Delete block error:', error);

@@ -8,6 +8,7 @@ import { getSessionUser } from '../../types/session';
 import { updateHubSpotContactPreferences } from '../../core/memberSync';
 import { getResendClient } from '../../utils/resend';
 import { withResendRetry } from '../../core/retryUtils';
+import { logFromRequest } from '../../core/auditLog';
 
 const router = Router();
 
@@ -56,6 +57,7 @@ router.post('/api/members/:email/communications', isStaffOrAdmin, async (req, re
       })
       .returning();
     
+    logFromRequest(req, 'create_communication' as any, 'communication' as any, String(result[0].id), normalizedEmail);
     res.status(201).json(result[0]);
   } catch (error: unknown) {
     if (!isProduction) console.error('Create communication log error:', error);
@@ -79,6 +81,7 @@ router.delete('/api/members/:email/communications/:logId', isStaffOrAdmin, async
       return res.status(404).json({ error: 'Communication log not found for this member' });
     }
     
+    logFromRequest(req, 'delete_communication' as any, 'communication' as any, logId as string, normalizedEmail);
     res.json({ success: true });
   } catch (error: unknown) {
     if (!isProduction) console.error('Delete communication log error:', error);

@@ -4,6 +4,7 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { isAdmin } from '../core/middleware';
 import { getErrorCode } from '../utils/errorUtils';
+import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
 
@@ -173,6 +174,7 @@ router.post('/api/tier-features', isAdmin, async (req, res) => {
 
     await client.query('COMMIT');
 
+    logFromRequest(req, 'create_tier_feature' as any, 'tier_feature' as any, String(newFeature.id), newFeature.feature_key);
     res.json({
       id: newFeature.id,
       featureKey: newFeature.feature_key,
@@ -220,6 +222,7 @@ router.put('/api/tier-features/:id', isAdmin, async (req, res) => {
     }
 
     const row = result.rows[0];
+    logFromRequest(req, 'update_tier_feature' as any, 'tier_feature' as any, String(row.id), row.feature_key as string);
     res.json({
       id: row.id,
       featureKey: row.feature_key,
@@ -244,6 +247,7 @@ router.delete('/api/tier-features/:id', isAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Feature not found' });
     }
 
+    logFromRequest(req, 'delete_tier_feature' as any, 'tier_feature' as any, String(result.rows[0].id));
     res.json({ success: true, deleted: result.rows[0].id });
   } catch (error: unknown) {
     if (!isProduction) console.error('Delete tier feature error:', error);
@@ -299,6 +303,7 @@ router.put('/api/tier-features/:featureId/values/:tierId', isAdmin, async (req, 
       returnValue = row.value_boolean;
     }
 
+    logFromRequest(req, 'update_tier_feature_value' as any, 'tier_feature' as any, String(row.feature_id), undefined, { tierId: row.tier_id, value: returnValue });
     res.json({
       featureId: row.feature_id,
       tierId: row.tier_id,
