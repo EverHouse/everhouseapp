@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db';
 import { isStaffOrAdmin } from '../../core/middleware';
+import { logger } from '../../core/logger';
 import { getPacificMidnightUTC, getTodayPacific } from '../../utils/dateUtils';
 import { bookingRequests, tours, adminAuditLog, users, resources } from '../../../shared/schema';
 import { eq, and, inArray, notInArray, desc, asc, sql, gte, lt, count } from 'drizzle-orm';
@@ -149,7 +150,7 @@ router.get('/api/admin/command-center', isStaffOrAdmin, async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error: unknown) {
-    console.error('Error fetching command center data:', error);
+    logger.error('Error fetching command center data', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch command center data' });
   }
 });
@@ -200,7 +201,7 @@ router.get('/api/admin/dashboard-summary', isStaffOrAdmin, async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error: unknown) {
-    console.error('Error fetching dashboard summary:', error);
+    logger.error('Error fetching dashboard summary', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch dashboard summary' });
   }
 });
@@ -275,7 +276,7 @@ router.get('/api/admin/financials/summary', isStaffOrAdmin, async (req, res) => 
       timestamp: new Date().toISOString()
     });
   } catch (error: unknown) {
-    console.error('Error fetching financials summary:', error);
+    logger.error('Error fetching financials summary', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch financials summary' });
   }
 });
@@ -319,7 +320,7 @@ router.get('/api/admin/todays-bookings', isStaffOrAdmin, async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error: unknown) {
-    console.error('Error fetching todays bookings:', error);
+    logger.error('Error fetching todays bookings', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch todays bookings' });
   }
 });
@@ -343,7 +344,7 @@ router.get('/api/staff/list', isStaffOrAdmin, async (req, res) => {
     `);
     res.json(result.rows);
   } catch (error: unknown) {
-    console.error('Error fetching staff list:', error);
+    logger.error('Error fetching staff list', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch staff list' });
   }
 });
@@ -380,7 +381,7 @@ router.get('/api/directory/team', isStaffOrAdmin, async (req, res) => {
     `);
     res.json(result.rows);
   } catch (error: unknown) {
-    console.error('Error fetching directory team:', error);
+    logger.error('Error fetching directory team', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch team directory' });
   }
 });

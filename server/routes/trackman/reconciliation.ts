@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { isStaffOrAdmin } from '../../core/middleware';
+import { logger } from '../../core/logger';
 import { 
   findAttendanceDiscrepancies, 
   markAsReconciled, 
@@ -31,7 +32,7 @@ router.get('/api/admin/trackman/reconciliation', isStaffOrAdmin, async (req, res
       totalCount: result.totalCount
     });
   } catch (error: unknown) {
-    console.error('Fetch reconciliation discrepancies error:', error);
+    logger.error('Fetch reconciliation discrepancies error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch attendance discrepancies' });
   }
 });
@@ -41,7 +42,7 @@ router.get('/api/admin/trackman/reconciliation/summary', isStaffOrAdmin, async (
     const summary = await getReconciliationSummary();
     res.json(summary);
   } catch (error: unknown) {
-    console.error('Fetch reconciliation summary error:', error);
+    logger.error('Fetch reconciliation summary error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch reconciliation summary' });
   }
 });
@@ -97,7 +98,7 @@ router.put('/api/admin/trackman/reconciliation/:id', isStaffOrAdmin, async (req,
     
     res.json(result);
   } catch (error: unknown) {
-    console.error('Update reconciliation error:', error);
+    logger.error('Update reconciliation error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update reconciliation status' });
   }
 });

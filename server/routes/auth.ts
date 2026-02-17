@@ -1,3 +1,4 @@
+import { logger } from '../core/logger';
 import { Router } from 'express';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
@@ -61,7 +62,7 @@ async function getStaffUserByEmail(email: string): Promise<StaffUserData | null>
     }
     return null;
   } catch (error: unknown) {
-    if (!isProduction) console.error('Error fetching staff user:', error);
+    if (!isProduction) logger.error('Error fetching staff user', { error: error instanceof Error ? error : new Error(String(error)) });
     return null;
   }
 }
@@ -141,9 +142,9 @@ async function upsertUserWithTier(data: UpsertUserData): Promise<void> {
       await db.execute(sql`UPDATE users SET membership_status = 'active', tier = 'VIP', membership_tier = 'VIP' WHERE LOWER(email) = LOWER(${normalizedEmailValue}) AND (membership_status IS NULL OR membership_status != 'active' OR tier IS NULL OR tier != 'VIP')`);
     }
     
-    if (!isProduction) console.log(`[Auth] Updated user ${normalizedEmailValue} with role ${data.role}, tier ${normalizedTier || 'none'}`);
+    if (!isProduction) logger.info('[Auth] Updated user with role , tier', { extra: { normalizedEmailValue, dataRole: data.role, normalizedTier_none: normalizedTier || 'none' } });
   } catch (error: unknown) {
-    console.error('[Auth] Error upserting user tier:', error);
+    logger.error('[Auth] Error upserting user tier', { error: error instanceof Error ? error : new Error(String(error)) });
   }
 }
 
@@ -183,7 +184,7 @@ async function createSupabaseToken(user: { id: string, email: string, role: stri
     if (linkError) {
       // Only log non-network errors
       if (!getErrorMessage(linkError)?.includes('fetch failed') && !getErrorMessage(linkError)?.includes('ENOTFOUND')) {
-        console.error('[Supabase] generateLink error:', linkError);
+        logger.error('[Supabase] generateLink error', { extra: { linkError } });
       }
       return null;
     }
@@ -201,7 +202,7 @@ async function createSupabaseToken(user: { id: string, email: string, role: stri
       
       if (otpError) {
         if (!otpError.message?.includes('fetch failed') && !otpError.message?.includes('ENOTFOUND')) {
-          console.error('[Supabase] verifyOtp error:', otpError);
+          logger.error('[Supabase] verifyOtp error', { extra: { otpError } });
         }
         return null;
       }
@@ -217,7 +218,7 @@ async function createSupabaseToken(user: { id: string, email: string, role: stri
     if (!getErrorMessage(e)?.includes('fetch failed') && 
         !getErrorMessage(e)?.includes('ENOTFOUND') && 
         !getErrorMessage(e)?.includes('ECONNREFUSED')) {
-      console.error('[Supabase] Failed to generate token:', e);
+      logger.error('[Supabase] Failed to generate token', { extra: { e } });
     }
     return null;
   }
@@ -263,7 +264,7 @@ const checkOtpRequestLimit = async (email: string, ip: string): Promise<{ allowe
     return { allowed: true };
   } catch (error: unknown) {
     // Fail-closed: deny requests when rate limiting is unavailable to prevent abuse
-    console.error('[RateLimit] Database error, denying request for safety:', error);
+    logger.error('[RateLimit] Database error, denying request for safety', { error: error instanceof Error ? error : new Error(String(error)) });
     return { allowed: false, retryAfter: 60 };
   }
 };
@@ -299,7 +300,7 @@ const checkMagicLinkRequestLimit = async (email: string, ip: string): Promise<{ 
     return { allowed: true };
   } catch (error: unknown) {
     // Fail-closed: deny requests when rate limiting is unavailable to prevent abuse
-    console.error('[RateLimit] Database error, denying request for safety:', error);
+    logger.error('[RateLimit] Database error, denying request for safety', { error: error instanceof Error ? error : new Error(String(error)) });
     return { allowed: false, retryAfter: 60 };
   }
 };
@@ -331,7 +332,7 @@ const checkOtpVerifyAttempts = async (email: string): Promise<{ allowed: boolean
     return { allowed: true };
   } catch (error: unknown) {
     // Fail-closed: deny requests when rate limiting is unavailable to prevent abuse
-    console.error('[RateLimit] Database error, denying request for safety:', error);
+    logger.error('[RateLimit] Database error, denying request for safety', { error: error instanceof Error ? error : new Error(String(error)) });
     return { allowed: false, retryAfter: 60 };
   }
 };
@@ -357,7 +358,7 @@ const recordOtpVerifyFailure = async (email: string): Promise<void> => {
       [key, resetAt, OTP_VERIFY_MAX_ATTEMPTS, lockedUntil]
     );
   } catch (error: unknown) {
-    console.error('[RateLimit] Database error recording failure:', error);
+    logger.error('[RateLimit] Database error recording failure', { error: error instanceof Error ? error : new Error(String(error)) });
   }
 };
 
@@ -366,7 +367,7 @@ const clearOtpVerifyAttempts = async (email: string): Promise<void> => {
   try {
     await pool.query(`DELETE FROM rate_limits WHERE key = $1`, [key]);
   } catch (error: unknown) {
-    console.error('[RateLimit] Database error clearing attempts:', error);
+    logger.error('[RateLimit] Database error clearing attempts', { error: error instanceof Error ? error : new Error(String(error)) });
   }
 };
 
@@ -427,22 +428,22 @@ router.post('/api/auth/verify-member', async (req, res) => {
               `UPDATE users SET membership_status = $1, updated_at = NOW() WHERE id = $2`,
               [subscription.status, dbUser[0].id]
             );
-            console.log(`[Auth] Auto-fixed membership_status for ${normalizedEmail}: ${dbMemberStatus} -> ${subscription.status}`);
+            logger.info('[Auth] Auto-fixed membership_status for : ->', { extra: { normalizedEmail, dbMemberStatus, subscriptionStatus: subscription.status } });
             dbMemberStatus = subscription.status; // Update for session
             
             // Sync corrected status to HubSpot
             try {
               const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
               await syncMemberToHubSpot({ email: normalizedEmail, status: subscription.status, billingProvider: 'stripe' });
-              console.log(`[Auth] Synced auto-fixed status to HubSpot for ${normalizedEmail}`);
+              logger.info('[Auth] Synced auto-fixed status to HubSpot for', { extra: { normalizedEmail } });
             } catch (hubspotError: unknown) {
-              console.error('[Auth] HubSpot sync failed for auto-fix:', hubspotError);
+              logger.error('[Auth] HubSpot sync failed for auto-fix', { extra: { hubspotError } });
             }
           } else {
             return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
           }
         } catch (stripeError: unknown) {
-          console.error(`[Auth] Failed to verify Stripe subscription for ${normalizedEmail}:`, getErrorMessage(stripeError));
+          logger.error('[Auth] Failed to verify Stripe subscription', { extra: { email: normalizedEmail, error: getErrorMessage(stripeError) } });
           return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
         }
       } else if (!activeStatuses.includes(dbMemberStatus)) {
@@ -561,7 +562,7 @@ router.post('/api/auth/verify-member', async (req, res) => {
     
     res.json({ success: true, member });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Member verification error:', error);
+    if (!isProduction) logger.error('Member verification error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to verify membership' });
   }
 });
@@ -614,15 +615,15 @@ router.post('/api/auth/request-otp', async (req, res) => {
               `UPDATE users SET membership_status = $1, updated_at = NOW() WHERE id = $2`,
               [subscription.status, dbUser[0].id]
             );
-            console.log(`[Auth] Auto-fixed membership_status for ${normalizedEmail}: ${dbMemberStatus} -> ${subscription.status}`);
+            logger.info('[Auth] Auto-fixed membership_status for : ->', { extra: { normalizedEmail, dbMemberStatus, subscriptionStatus: subscription.status } });
             
             // Sync corrected status to HubSpot
             try {
               const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
               await syncMemberToHubSpot({ email: normalizedEmail, status: subscription.status, billingProvider: 'stripe' });
-              console.log(`[Auth] Synced auto-fixed status to HubSpot for ${normalizedEmail}`);
+              logger.info('[Auth] Synced auto-fixed status to HubSpot for', { extra: { normalizedEmail } });
             } catch (hubspotError: unknown) {
-              console.error('[Auth] HubSpot sync failed for auto-fix:', hubspotError);
+              logger.error('[Auth] HubSpot sync failed for auto-fix', { extra: { hubspotError } });
             }
             // Continue with login - subscription is valid
           } else {
@@ -630,7 +631,7 @@ router.post('/api/auth/request-otp', async (req, res) => {
             return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
           }
         } catch (stripeError: unknown) {
-          console.error(`[Auth] Failed to verify Stripe subscription for ${normalizedEmail}:`, getErrorMessage(stripeError));
+          logger.error('[Auth] Failed to verify Stripe subscription', { extra: { email: normalizedEmail, error: getErrorMessage(stripeError) } });
           // If we can't verify with Stripe, fall back to database status
           return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
         }
@@ -687,11 +688,11 @@ router.post('/api/auth/request-otp', async (req, res) => {
     // Send email synchronously to ensure delivery before responding
     const logoUrl = 'https://everclub.app/images/everclub-logo-dark.png';
     const startTime = Date.now();
-    console.log(`[OTP Email] Starting send to ${normalizedEmail.substring(0, 5)}***`);
+    logger.info('[OTP Email] Starting send to ***', { extra: { normalizedEmailSubstring_0_5: normalizedEmail.substring(0, 5) } });
     
     try {
       const { client: resendClient, fromEmail } = await getResendClient();
-      console.log(`[OTP Email] Resend client ready in ${Date.now() - startTime}ms`);
+      logger.info('[OTP Email] Resend client ready in ms', { extra: { DateNow_startTime: Date.now() - startTime } });
       const emailResult = await withResendRetry(() => resendClient.emails.send({
           from: fromEmail || 'Ever Club <noreply@everclub.app>',
           to: normalizedEmail,
@@ -758,20 +759,20 @@ router.post('/api/auth/request-otp', async (req, res) => {
           `
         }));
         
-      console.log(`[OTP Email] Sent successfully in ${Date.now() - startTime}ms`, emailResult.data?.id);
+      logger.info('[OTP Email] Sent successfully in ms', { extra: { now_startTime: Date.now() - startTime, emailResult: emailResult.data?.id } });
       
       if (emailResult.error) {
-        console.error('[OTP Email] Resend API error:', emailResult.error);
+        logger.error('[OTP Email] Resend API error', { extra: { emailResult_error: emailResult.error } });
         return res.status(500).json({ error: 'Failed to send login code. Please try again.' });
       }
       
       return res.json({ success: true, message: 'Login code sent to your email' });
     } catch (emailError: unknown) {
-      console.error('[OTP Email] Error sending email:', (emailError as Error)?.message || emailError);
+      logger.error('[OTP Email] Error sending email', { extra: { emailError_as_Error_message_emailError: (emailError as Error)?.message || emailError } });
       return res.status(500).json({ error: 'Failed to send login code. Please try again.' });
     }
   } catch (error: unknown) {
-    if (!isProduction) console.error('OTP request error:', (error as Error)?.message || error);
+    if (!isProduction) logger.error('OTP request error', { extra: { error_as_Error_message_error: (error as Error)?.message || error } });
     
     if ((error as Error)?.message?.includes('HubSpot') || (error as Error)?.message?.includes('hubspot')) {
       return res.status(500).json({ error: 'Unable to verify membership. Please try again later.' });
@@ -878,7 +879,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
       const { resolveUserByEmail } = await import('../core/stripe/customers');
       const resolvedLogin = await resolveUserByEmail(normalizedEmail);
       if (resolvedLogin && resolvedLogin.matchType !== 'direct') {
-        console.log(`[Auth] Login email ${normalizedEmail} resolved to existing user ${resolvedLogin.primaryEmail} via ${resolvedLogin.matchType}`);
+        logger.info('[Auth] Login email resolved to existing user via', { extra: { normalizedEmail, resolvedLoginPrimaryEmail: resolvedLogin.primaryEmail, resolvedLoginMatchType: resolvedLogin.matchType } });
         normalizedEmail = resolvedLogin.primaryEmail.toLowerCase();
       }
 
@@ -1032,19 +1033,19 @@ router.post('/api/auth/verify-otp', async (req, res) => {
           }
         }
       } catch (e: unknown) {
-        console.error('[Welcome Email] Error checking/sending:', e);
+        logger.error('[Welcome Email] Error checking/sending', { extra: { e } });
       }
     })();
     
     req.session.save((err) => {
       if (err) {
-        if (!isProduction) console.error('Session save error:', err);
+        if (!isProduction) logger.error('Session save error', { extra: { err } });
         return res.status(500).json({ error: 'Failed to create session' });
       }
       res.json({ success: true, member, shouldSetupPassword, supabaseToken });
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('OTP verification error:', error);
+    if (!isProduction) logger.error('OTP verification error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to verify code' });
   }
 });
@@ -1052,7 +1053,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
 router.post('/api/auth/logout', (req, res) => {
   req.session.destroy((err) => {
     if (err) {
-      if (!isProduction) console.error('Session destroy error:', err);
+      if (!isProduction) logger.error('Session destroy error', { extra: { err } });
       return res.status(500).json({ error: 'Failed to logout' });
     }
     res.clearCookie('connect.sid');
@@ -1121,7 +1122,7 @@ router.get('/api/auth/check-staff-admin', async (req, res) => {
     
     res.json({ isStaffOrAdmin: false, role: null, hasPassword: false });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Check staff/admin error:', error);
+    if (!isProduction) logger.error('Check staff/admin error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to check user status' });
   }
 });
@@ -1202,7 +1203,7 @@ router.post('/api/auth/password-login', async (req, res) => {
         };
       }
     } catch (hubspotError: unknown) {
-      if (!isProduction) console.error('HubSpot lookup failed:', hubspotError);
+      if (!isProduction) logger.error('HubSpot lookup failed', { extra: { hubspotError } });
     }
     
     const sessionTtl = 7 * 24 * 60 * 60 * 1000;
@@ -1239,13 +1240,13 @@ router.post('/api/auth/password-login', async (req, res) => {
     
     req.session.save((err) => {
       if (err) {
-        if (!isProduction) console.error('Session save error:', err);
+        if (!isProduction) logger.error('Session save error', { extra: { err } });
         return res.status(500).json({ error: 'Failed to create session' });
       }
       res.json({ success: true, member, supabaseToken });
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Password login error:', error);
+    if (!isProduction) logger.error('Password login error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Login failed. Please try again.' });
   }
 });
@@ -1298,7 +1299,7 @@ router.post('/api/auth/set-password', async (req, res) => {
     
     res.status(403).json({ error: 'Password can only be set for staff or admin accounts' });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Set password error:', error);
+    if (!isProduction) logger.error('Set password error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to set password' });
   }
 });
@@ -1343,13 +1344,13 @@ router.post('/api/auth/dev-login', async (req, res) => {
     
     req.session.save((err) => {
       if (err) {
-        if (!isProduction) console.error('Session save error:', err);
+        if (!isProduction) logger.error('Session save error', { extra: { err } });
         return res.status(500).json({ error: 'Failed to create session' });
       }
       res.json({ success: true, member, supabaseToken });
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Dev login error:', error);
+    if (!isProduction) logger.error('Dev login error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Dev login failed' });
   }
 });
@@ -1374,7 +1375,7 @@ router.post('/api/auth/test-welcome-email', async (req, res) => {
       res.status(500).json({ error: result.error || 'Failed to send welcome email' });
     }
   } catch (error: unknown) {
-    console.error('Test welcome email error:', error);
+    logger.error('Test welcome email error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to send test email' });
   }
 });

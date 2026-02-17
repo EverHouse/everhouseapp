@@ -1,3 +1,4 @@
+import { logger } from '../../core/logger';
 import { Router, Request, Response } from 'express';
 import { isAuthenticated } from '../../core/middleware';
 import { paymentRateLimiter } from '../../middleware/rateLimiting';
@@ -86,7 +87,7 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
       });
       await applyFeeBreakdownToParticipants(booking.session_id, breakdown);
     } catch (feeError) {
-      console.error('[Stripe] Failed to compute fees:', feeError);
+      logger.error('[Stripe] Failed to compute fees', { extra: { feeError } });
       return res.status(500).json({ error: 'Failed to calculate fees' });
     }
 
@@ -133,13 +134,13 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
         if (existing.stripe_payment_intent_id && existing.total_cents === serverTotal && participantsMatch) {
           snapshotId = existing.id;
           existingPaymentIntentId = existing.stripe_payment_intent_id;
-          console.log(`[Stripe] Reusing existing pending snapshot ${snapshotId} for booking ${bookingId}`);
+          logger.info('[Stripe] Reusing existing pending snapshot for booking', { extra: { snapshotId, bookingId } });
         } else {
           await client.query(
             `UPDATE booking_fee_snapshots SET status = 'expired' WHERE id = $1`,
             [existing.id]
           );
-          console.log(`[Stripe] Expiring stale snapshot ${existing.id} (amount/participants changed or no intent)`);
+          logger.info('[Stripe] Expiring stale snapshot (amount/participants changed or no intent)', { extra: { existingId: existing.id } });
         }
       }
       
@@ -167,7 +168,7 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
         const existingIntent = await stripe.paymentIntents.retrieve(existingPaymentIntentId);
         if (existingIntent.status === 'requires_payment_method' || existingIntent.status === 'requires_confirmation') {
           existingClientSecret = existingIntent.client_secret;
-          console.log(`[Stripe] Returning existing payment intent ${existingPaymentIntentId} for snapshot ${snapshotId}`);
+          logger.info('[Stripe] Returning existing payment intent for snapshot', { extra: { existingPaymentIntentId, snapshotId } });
           return res.json({
             clientSecret: existingClientSecret,
             paymentIntentId: existingPaymentIntentId,
@@ -181,7 +182,7 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
           });
         }
       } catch (intentError) {
-        console.log(`[Stripe] Could not reuse intent ${existingPaymentIntentId}, creating new one`);
+        logger.info('[Stripe] Could not reuse intent , creating new one', { extra: { existingPaymentIntentId } });
       }
     }
 
@@ -283,7 +284,7 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
       [paymentRef, snapshotId]
     );
 
-    console.log(`[Stripe] Member payment created for booking ${bookingId}: $${(serverTotal / 100).toFixed(2)} (balance: $${(result.balanceApplied / 100).toFixed(2)}, remaining: $${(result.remainingCents / 100).toFixed(2)})`);
+    logger.info('[Stripe] Member payment created for booking : $ (balance: $, remaining: $)', { extra: { bookingId, serverTotal_100_ToFixed_2: (serverTotal / 100).toFixed(2), resultBalanceApplied_100_ToFixed_2: (result.balanceApplied / 100).toFixed(2), resultRemainingCents_100_ToFixed_2: (result.remainingCents / 100).toFixed(2) } });
 
     const participantFeesList = pendingFees.map(f => {
       const participant = pendingParticipants.rows.find(p => p.id === f.participantId);
@@ -322,7 +323,7 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
       error: result.error
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error creating member payment intent:', error);
+    logger.error('[Stripe] Error creating member payment intent', { error: error instanceof Error ? error : new Error(String(error)) });
     await alertOnExternalServiceError('Stripe', error as Error, 'create member payment intent');
     res.status(500).json({ 
       error: 'Payment processing failed. Please try again.',
@@ -420,7 +421,7 @@ router.post('/api/member/bookings/:id/confirm-payment', isAuthenticated, async (
       try {
         participantFees = JSON.parse(snapshot.participant_fees || '[]');
       } catch (parseErr) {
-        console.error('[MemberPayments] Failed to parse participant_fees for snapshot', snapshot.id, ':', parseErr);
+        logger.error('[MemberPayments] Failed to parse participant_fees for snapshot', { extra: { snapshot_id: snapshot.id, data: ':', parseErr } });
       }
       const participantIds = participantFees.map((pf: any) => pf.id);
 
@@ -439,7 +440,7 @@ router.post('/api/member/bookings/:id/confirm-payment', isAuthenticated, async (
       );
 
       await client.query('COMMIT');
-      console.log(`[Stripe] Member payment confirmed for booking ${bookingId}, ${participantIds.length} participants marked as paid (transaction committed)`);
+      logger.info('[Stripe] Member payment confirmed for booking , participants marked as paid (transaction committed)', { extra: { bookingId, participantIdsLength: participantIds.length } });
       
       // Notify member and broadcast billing update
       sendNotificationToUser(sessionEmail, {
@@ -457,7 +458,7 @@ router.post('/api/member/bookings/:id/confirm-payment', isAuthenticated, async (
       });
     } catch (txError) {
       await client.query('ROLLBACK');
-      console.error('[Stripe] Transaction rolled back for member payment confirmation:', txError);
+      logger.error('[Stripe] Transaction rolled back for member payment confirmation', { extra: { txError } });
       throw txError;
     } finally {
       client.release();
@@ -465,7 +466,7 @@ router.post('/api/member/bookings/:id/confirm-payment', isAuthenticated, async (
 
     res.json({ success: true });
   } catch (error: unknown) {
-    console.error('[Stripe] Error confirming member payment:', error);
+    logger.error('[Stripe] Error confirming member payment', { error: error instanceof Error ? error : new Error(String(error)) });
     await alertOnExternalServiceError('Stripe', error as Error, 'confirm member payment');
     res.status(500).json({ 
       error: 'Payment confirmation failed. Please try again.',
@@ -552,7 +553,7 @@ router.post('/api/member/invoices/:invoiceId/pay', isAuthenticated, async (req: 
       idempotencyKey: `invoice_payment_${invoiceId}_${stripeCustomerId}`
     });
 
-    console.log(`[Stripe] Member invoice payment intent created for ${invoiceId}: $${(amountDue / 100).toFixed(2)}`);
+    logger.info('[Stripe] Member invoice payment intent created for : $', { extra: { invoiceId, amountDue_100_ToFixed_2: (amountDue / 100).toFixed(2) } });
 
     res.json({
       clientSecret: paymentIntent.client_secret,
@@ -563,7 +564,7 @@ router.post('/api/member/invoices/:invoiceId/pay', isAuthenticated, async (req: 
       currency: invoice.currency || 'usd'
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error creating invoice payment intent:', error);
+    logger.error('[Stripe] Error creating invoice payment intent', { error: error instanceof Error ? error : new Error(String(error)) });
     await alertOnExternalServiceError('Stripe', error as Error, 'create invoice payment intent');
     res.status(500).json({ 
       error: 'Payment initialization failed. Please try again.',
@@ -614,7 +615,7 @@ router.post('/api/member/invoices/:invoiceId/confirm', isAuthenticated, async (r
       await stripe.invoices.pay(invoiceId, {
         paid_out_of_band: true,
       });
-      console.log(`[Stripe] Invoice ${invoiceId} marked as paid out of band after PaymentIntent ${paymentIntentId} succeeded`);
+      logger.info('[Stripe] Invoice marked as paid out of band after PaymentIntent succeeded', { extra: { invoiceId, paymentIntentId } });
       
       // Notify member and broadcast billing update
       sendNotificationToUser(sessionEmail, {
@@ -632,15 +633,15 @@ router.post('/api/member/invoices/:invoiceId/confirm', isAuthenticated, async (r
       });
     } catch (payErr: unknown) {
       if (getErrorCode(payErr) === 'invoice_already_paid') {
-        console.log(`[Stripe] Invoice ${invoiceId} was already marked as paid`);
+        logger.info('[Stripe] Invoice was already marked as paid', { extra: { invoiceId } });
       } else {
-        console.error('[Stripe] Error marking invoice as paid:', payErr);
+        logger.error('[Stripe] Error marking invoice as paid', { extra: { payErr } });
       }
     }
 
     res.json({ success: true });
   } catch (error: unknown) {
-    console.error('[Stripe] Error confirming invoice payment:', error);
+    logger.error('[Stripe] Error confirming invoice payment', { error: error instanceof Error ? error : new Error(String(error)) });
     await alertOnExternalServiceError('Stripe', error as Error, 'confirm invoice payment');
     res.status(500).json({ 
       error: 'Payment confirmation failed. Please try again.',
@@ -717,7 +718,7 @@ router.post('/api/member/guest-passes/purchase', isAuthenticated, async (req: Re
       throw new Error(result.error);
     }
 
-    console.log(`[Stripe] Guest pass purchase for ${sessionEmail}: ${quantity} passes, $${(amountCents / 100).toFixed(2)} (balance: $${(result.balanceApplied / 100).toFixed(2)})`);
+    logger.info('[Stripe] Guest pass purchase for : passes, $ (balance: $)', { extra: { sessionEmail, quantity, amountCents_100_ToFixed_2: (amountCents / 100).toFixed(2), resultBalanceApplied_100_ToFixed_2: (result.balanceApplied / 100).toFixed(2) } });
 
     if (result.paidInFull) {
       const existingPass = await pool.query(
@@ -730,13 +731,13 @@ router.post('/api/member/guest-passes/purchase', isAuthenticated, async (req: Re
           'UPDATE guest_passes SET passes_total = passes_total + $1 WHERE LOWER(member_email) = LOWER($2)',
           [quantity, sessionEmail]
         );
-        console.log(`[Stripe] Added ${quantity} guest passes to existing record for ${sessionEmail} (paid by credit)`);
+        logger.info('[Stripe] Added guest passes to existing record for (paid by credit)', { extra: { quantity, sessionEmail } });
       } else {
         await pool.query(
           'INSERT INTO guest_passes (member_email, passes_used, passes_total) VALUES ($1, 0, $2)',
           [sessionEmail, quantity]
         );
-        console.log(`[Stripe] Created new guest pass record with ${quantity} passes for ${sessionEmail} (paid by credit)`);
+        logger.info('[Stripe] Created new guest pass record with passes for (paid by credit)', { extra: { quantity, sessionEmail } });
       }
 
       return res.json({
@@ -757,7 +758,7 @@ router.post('/api/member/guest-passes/purchase', isAuthenticated, async (req: Re
       remainingCents: result.remainingCents
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error creating guest pass payment intent:', error);
+    logger.error('[Stripe] Error creating guest pass payment intent', { error: error instanceof Error ? error : new Error(String(error)) });
     await alertOnExternalServiceError('Stripe', error as Error, 'create guest pass payment intent');
     res.status(500).json({ 
       error: 'Payment initialization failed. Please try again.',
@@ -816,7 +817,7 @@ router.post('/api/member/guest-passes/confirm', isAuthenticated, async (req: Req
     const creditApplied = parseInt(paymentIntent.metadata?.creditToConsume || '0');
     const expectedChargeAmount = expectedAmount - creditApplied;
     if (paymentIntent.amount !== expectedChargeAmount && paymentIntent.amount !== expectedAmount) {
-      console.error(`[Stripe] Amount mismatch for guest pass purchase: expected ${expectedAmount} (or ${expectedChargeAmount} after credit), got ${paymentIntent.amount}`);
+      logger.error('[Stripe] Amount mismatch for guest pass purchase: expected (or after credit), got', { extra: { expectedAmount, expectedChargeAmount, paymentIntentAmount: paymentIntent.amount } });
       return res.status(400).json({ error: 'Payment amount mismatch' });
     }
 
@@ -830,18 +831,18 @@ router.post('/api/member/guest-passes/confirm', isAuthenticated, async (req: Req
         'UPDATE guest_passes SET passes_total = passes_total + $1 WHERE LOWER(member_email) = LOWER($2)',
         [quantity, sessionEmail]
       );
-      console.log(`[Stripe] Added ${quantity} guest passes to existing record for ${sessionEmail}`);
+      logger.info('[Stripe] Added guest passes to existing record for', { extra: { quantity, sessionEmail } });
     } else {
       await pool.query(
         'INSERT INTO guest_passes (member_email, passes_used, passes_total) VALUES ($1, 0, $2)',
         [sessionEmail, quantity]
       );
-      console.log(`[Stripe] Created new guest pass record with ${quantity} passes for ${sessionEmail}`);
+      logger.info('[Stripe] Created new guest pass record with passes for', { extra: { quantity, sessionEmail } });
     }
 
     res.json({ success: true, passesAdded: quantity });
   } catch (error: unknown) {
-    console.error('[Stripe] Error confirming guest pass purchase:', error);
+    logger.error('[Stripe] Error confirming guest pass purchase', { error: error instanceof Error ? error : new Error(String(error)) });
     await alertOnExternalServiceError('Stripe', error as Error, 'confirm guest pass purchase');
     res.status(500).json({ 
       error: 'Payment confirmation failed. Please try again.',
@@ -993,7 +994,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
         .filter(sid => !existingSessionIds.has(sid));
 
       if (uncachedSessions.length > 0) {
-        console.log(`[Member Balance] Computing fees on-the-fly for ${uncachedSessions.length} sessions`);
+        logger.info('[Member Balance] Computing fees on-the-fly for sessions', { extra: { uncachedSessionsLength: uncachedSessions.length } });
 
         const allCacheUpdates: Array<{ id: number; cents: number }> = [];
 
@@ -1030,7 +1031,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
               }
             }
           } catch (sessionErr) {
-            console.error(`[Member Balance] Failed to compute fees for session ${sessionId}:`, sessionErr);
+            logger.error('[Member Balance] Failed to compute fees for session', { extra: { sessionId, sessionErr } });
           }
         }
 
@@ -1046,12 +1047,12 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
               [ids, cents]
             );
           } catch (cacheErr) {
-            console.error('[Member Balance] Failed to write-through cache:', cacheErr);
+            logger.error('[Member Balance] Failed to write-through cache', { extra: { cacheErr } });
           }
         }
       }
     } catch (uncachedErr) {
-      console.error('[Member Balance] Error computing on-the-fly fees:', uncachedErr);
+      logger.error('[Member Balance] Error computing on-the-fly fees', { extra: { uncachedErr } });
     }
 
     const unfilledResult = await pool.query(
@@ -1109,7 +1110,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
       breakdown
     });
   } catch (error: unknown) {
-    console.error('[Member Balance] Error getting balance:', error);
+    logger.error('[Member Balance] Error getting balance', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to get balance' });
   }
 });
@@ -1230,14 +1231,14 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
             existingApplyCredit === applyCredit) {
           snapshotId = existing.id;
           existingPaymentIntentId = existing.stripe_payment_intent_id;
-          console.log(`[Member Balance] Reusing existing pending snapshot ${snapshotId}`);
+          logger.info('[Member Balance] Reusing existing pending snapshot', { extra: { snapshotId } });
         } else {
           // Expire stale snapshot (applyCredit changed or amounts/participants changed)
           await client.query(
             `UPDATE booking_fee_snapshots SET status = 'expired' WHERE id = $1`,
             [existing.id]
           );
-          console.log(`[Member Balance] Expiring stale snapshot ${existing.id} (applyCredit: ${existingApplyCredit} -> ${applyCredit}, amountMatch: ${existing.total_cents === totalCents}, participantsMatch: ${participantsMatch})`);
+          logger.info('[Member Balance] Expiring stale snapshot (applyCredit: -> , amountMatch: , participantsMatch: )', { extra: { existingId: existing.id, existingApplyCredit, applyCredit, existingTotal_cents_totalCents: existing.total_cents === totalCents, participantsMatch } });
         }
       }
       
@@ -1270,7 +1271,7 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
         const stripe = await getStripeClient();
         const existingIntent = await stripe.paymentIntents.retrieve(existingPaymentIntentId);
         if (existingIntent.status === 'requires_payment_method' || existingIntent.status === 'requires_confirmation') {
-          console.log(`[Member Balance] Returning existing payment intent ${existingPaymentIntentId}`);
+          logger.info('[Member Balance] Returning existing payment intent', { extra: { existingPaymentIntentId } });
           
           // Get customer balance for response
           const customer = await stripe.customers.retrieve((existingIntent.customer as string) || '');
@@ -1294,7 +1295,7 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
           });
         }
       } catch (intentError) {
-        console.log(`[Member Balance] Could not reuse intent ${existingPaymentIntentId}, creating new one`);
+        logger.info('[Member Balance] Could not reuse intent , creating new one', { extra: { existingPaymentIntentId } });
       }
     }
 
@@ -1402,7 +1403,7 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
     // Determine if credit was actually applied
     const creditApplied = applyCredit && availableCreditCents > 0 && paymentResult.balanceApplied > 0;
 
-    console.log(`[Member Balance] Payment created: $${(totalCents / 100).toFixed(2)} (balance: $${(paymentResult.balanceApplied / 100).toFixed(2)}, remaining: $${(paymentResult.remainingCents / 100).toFixed(2)}, applyCredit: ${applyCredit}, creditApplied: ${creditApplied})`);
+    logger.info('[Member Balance] Payment created: $ (balance: $, remaining: $, applyCredit: , creditApplied: )', { extra: { totalCents_100_ToFixed_2: (totalCents / 100).toFixed(2), paymentResultBalanceApplied_100_ToFixed_2: (paymentResult.balanceApplied / 100).toFixed(2), paymentResultRemainingCents_100_ToFixed_2: (paymentResult.remainingCents / 100).toFixed(2), applyCredit, creditApplied } });
 
     res.json({
       paidInFull: paymentResult.paidInFull,
@@ -1419,7 +1420,7 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
       error: paymentResult.error
     });
   } catch (error: unknown) {
-    console.error('[Member Balance] Error creating payment:', error);
+    logger.error('[Member Balance] Error creating payment', { error: error instanceof Error ? error : new Error(String(error)) });
     await alertOnExternalServiceError('Stripe', error as Error, 'create balance payment');
     res.status(500).json({ 
       error: 'Payment processing failed. Please try again.',
@@ -1452,7 +1453,7 @@ router.post('/api/member/balance/confirm', isAuthenticated, async (req: Request,
 
     res.json({ success: true });
   } catch (error: unknown) {
-    console.error('[Member Balance] Error confirming payment:', error);
+    logger.error('[Member Balance] Error confirming payment', { error: error instanceof Error ? error : new Error(String(error)) });
     await alertOnExternalServiceError('Stripe', error as Error, 'confirm balance payment');
     res.status(500).json({ 
       error: 'Payment confirmation failed. Please try again.',
@@ -1493,12 +1494,12 @@ router.post('/api/member/bookings/:bookingId/cancel-payment', isAuthenticated, a
     const result = await cancelPaymentIntent(paymentIntentId);
 
     if (result.success) {
-      console.log(`[Member Payment] User ${sessionUser.email} cancelled abandoned PI ${paymentIntentId} for booking ${bookingId}`);
+      logger.info('[Member Payment] User cancelled abandoned PI for booking', { extra: { sessionUserEmail: sessionUser.email, paymentIntentId, bookingId } });
     }
 
     res.json({ success: result.success });
   } catch (error: unknown) {
-    console.error('[Member Payment] Error cancelling payment:', error);
+    logger.error('[Member Payment] Error cancelling payment', { error: error instanceof Error ? error : new Error(String(error)) });
     res.json({ success: false });
   }
 });

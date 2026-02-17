@@ -6,6 +6,7 @@ import { isAuthenticated, isStaffOrAdmin } from '../core/middleware';
 import { getSessionUser } from '../types/session';
 import { isProduction } from '../core/db';
 import { logFromRequest } from '../core/auditLog';
+import { logger } from '../core/logger';
 
 const router = Router();
 
@@ -56,7 +57,7 @@ router.get('/api/waivers/status', isAuthenticated, async (req, res) => {
       signedAt: user.waiverSignedAt,
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Error checking waiver status:', error);
+    if (!isProduction) logger.error('Error checking waiver status', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to check waiver status' });
   }
 });
@@ -89,7 +90,7 @@ router.post('/api/waivers/sign', isAuthenticated, async (req, res) => {
       signedAt: new Date(),
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Error signing waiver:', error);
+    if (!isProduction) logger.error('Error signing waiver', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sign waiver' });
   }
 });
@@ -106,7 +107,7 @@ router.get('/api/waivers/current-version', isStaffOrAdmin, async (req, res) => {
       updatedAt: result[0]?.updatedAt,
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Error fetching waiver version:', error);
+    if (!isProduction) logger.error('Error fetching waiver version', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch waiver version' });
   }
 });
@@ -157,7 +158,7 @@ router.post('/api/waivers/update-version', isStaffOrAdmin, async (req, res) => {
       message: `Waiver version updated to ${version}. ${affectedCount} members will need to re-sign.`,
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Error updating waiver version:', error);
+    if (!isProduction) logger.error('Error updating waiver version', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update waiver version' });
   }
 });

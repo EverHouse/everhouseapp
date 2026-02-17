@@ -3,6 +3,7 @@ import { isStaffOrAdmin } from '../../core/middleware';
 import { getStripePublishableKey } from '../../core/stripe';
 import { getStripeClient } from '../../core/stripe/client';
 import { getErrorMessage } from '../../utils/errorUtils';
+import { logger } from '../../core/logger';
 
 const router = Router();
 
@@ -11,7 +12,7 @@ router.get('/api/stripe/config', async (req: Request, res: Response) => {
     const publishableKey = await getStripePublishableKey();
     res.json({ publishableKey });
   } catch (error: unknown) {
-    console.error('[Stripe] Error getting config:', error);
+    logger.error('[Stripe] Error getting config', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to get Stripe configuration' });
   }
 });
@@ -29,7 +30,7 @@ router.get('/api/stripe/debug-connection', isStaffOrAdmin, async (req: Request, 
       pending: balance.pending
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Debug connection error:', error);
+    logger.error('[Stripe] Debug connection error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ 
       connected: false,
       error: getErrorMessage(error) 

@@ -1,3 +1,4 @@
+import { logger } from '../../core/logger';
 import { Router } from 'express';
 import { eq, sql, desc } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -331,7 +332,7 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
       visitors
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Visitors list error:', error);
+    if (!isProduction) logger.error('Visitors list error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch visitors' });
   }
 });
@@ -383,7 +384,7 @@ router.get('/api/visitors/:id/purchases', isStaffOrAdmin, async (req, res) => {
       total: purchases.length
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Visitor purchases error:', error);
+    if (!isProduction) logger.error('Visitor purchases error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch visitor purchases' });
   }
 });
@@ -427,7 +428,7 @@ router.get('/api/guests/needs-email', isStaffOrAdmin, async (req, res) => {
       count: result.rows.length
     });
   } catch (error: unknown) {
-    console.error('[Guests Needs Email] Error:', error);
+    logger.error('[Guests Needs Email] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch guests needing email' });
   }
 });
@@ -455,7 +456,7 @@ router.patch('/api/guests/:guestId/email', isStaffOrAdmin, async (req, res) => {
       message: `Email updated for ${(result.rows[0] as any).name}`
     });
   } catch (error: unknown) {
-    console.error('[Update Guest Email] Error:', error);
+    logger.error('[Update Guest Email] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update guest email' });
   }
 });
@@ -478,7 +479,7 @@ router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
       : await db.execute(sql`SELECT id, email, role, membership_status, first_name, last_name FROM users WHERE LOWER(email) = ${normalizedEmail}`);
 
     if (resolved && resolved.matchType !== 'direct') {
-      console.log(`[Visitors] Email ${normalizedEmail} resolved to existing user ${resolved.primaryEmail} via ${resolved.matchType}`);
+      logger.info('[Visitors] Email resolved to existing user via', { extra: { normalizedEmail, resolvedPrimaryEmail: resolved.primaryEmail, resolvedMatchType: resolved.matchType } });
     }
     
     if (existingUser.rows.length > 0) {
@@ -574,7 +575,7 @@ router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
       }
     });
   } catch (error: unknown) {
-    console.error('[Visitors] Create visitor error:', error);
+    logger.error('[Visitors] Create visitor error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to create visitor' });
   }
 });
@@ -669,7 +670,7 @@ router.get('/api/visitors/search', isStaffOrAdmin, async (req, res) => {
     
     res.json(visitors);
   } catch (error: unknown) {
-    console.error('[Visitors] Search error:', error);
+    logger.error('[Visitors] Search error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to search visitors' });
   }
 });
@@ -755,7 +756,7 @@ router.post('/api/visitors/backfill-types', isAdmin, async (req, res) => {
       }
     });
   } catch (error: unknown) {
-    console.error('[Visitors] Backfill types error:', error);
+    logger.error('[Visitors] Backfill types error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to backfill visitor types' });
   }
 });
@@ -933,7 +934,7 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
         stripeDeleted = true;
         deletionLog.push('stripe_customer');
       } catch (stripeError: unknown) {
-        console.error(`[Visitors] Failed to delete Stripe customer ${visitor.stripeCustomerId}:`, getErrorMessage(stripeError));
+        logger.error('[Visitors] Failed to delete Stripe customer', { extra: { stripeCustomerId: visitor.stripeCustomerId, error: getErrorMessage(stripeError) } });
       }
     }
     
@@ -946,7 +947,7 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
         hubspotArchived = true;
         deletionLog.push('hubspot_contact (archived)');
       } catch (hubspotError: unknown) {
-        console.error(`[Visitors] Failed to archive HubSpot contact ${visitor.hubspotId}:`, getErrorMessage(hubspotError));
+        logger.error('[Visitors] Failed to archive HubSpot contact', { extra: { hubspotId: visitor.hubspotId, error: getErrorMessage(hubspotError) } });
       }
     }
     
@@ -967,7 +968,7 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
       }
     });
     
-    console.log(`[Visitors] Visitor permanently deleted: ${visitor.email} (${visitorName}) by ${sessionUser?.email}. Records: ${deletionLog.join(', ')}`);
+    logger.info('[Visitors] Visitor permanently deleted: () by . Records', { extra: { visitorEmail: visitor.email, visitorName, sessionUser: sessionUser?.email, deletionLogJoin: deletionLog.join(', ') } });
     
     res.json({ 
       success: true, 
@@ -979,7 +980,7 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
       message: `Visitor ${visitorName || visitor.email} permanently deleted`
     });
   } catch (error: unknown) {
-    console.error('[Visitors] Delete error:', error);
+    logger.error('[Visitors] Delete error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to delete visitor' });
   }
 });

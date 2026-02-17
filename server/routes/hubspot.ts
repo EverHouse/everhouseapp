@@ -1,3 +1,4 @@
+import { logger } from '../core/logger';
 import { Router, Request, Response } from 'express';
 import * as crypto from 'crypto';
 import { isProduction } from '../core/db';
@@ -139,10 +140,10 @@ function validateHubSpotWebhookSignature(req: Request): boolean {
   
   if (!webhookSecret) {
     if (isProduction) {
-      console.warn('[HubSpot Webhook] No HUBSPOT_WEBHOOK_SECRET configured - rejecting in production');
+      logger.warn('[HubSpot Webhook] No HUBSPOT_WEBHOOK_SECRET configured - rejecting in production');
       return false;
     }
-    console.warn('[HubSpot Webhook] No HUBSPOT_WEBHOOK_SECRET configured - allowing in development');
+    logger.warn('[HubSpot Webhook] No HUBSPOT_WEBHOOK_SECRET configured - allowing in development');
     return true;
   }
   
@@ -150,14 +151,14 @@ function validateHubSpotWebhookSignature(req: Request): boolean {
   const timestamp = req.headers['x-hubspot-request-timestamp'] as string | undefined;
   
   if (!signature || !timestamp) {
-    console.warn('[HubSpot Webhook] Missing signature headers');
+    logger.warn('[HubSpot Webhook] Missing signature headers');
     return false;
   }
   
   const currentTime = Date.now();
   const requestTime = parseInt(timestamp, 10);
   if (Math.abs(currentTime - requestTime) > 300000) {
-    console.warn('[HubSpot Webhook] Request timestamp too old');
+    logger.warn('[HubSpot Webhook] Request timestamp too old');
     return false;
   }
   
@@ -174,14 +175,14 @@ function validateHubSpotWebhookSignature(req: Request): boolean {
   const expectedBuf = Buffer.from(expectedSignature);
   
   if (signatureBuf.length !== expectedBuf.length) {
-    console.warn('[HubSpot Webhook] Signature length mismatch');
+    logger.warn('[HubSpot Webhook] Signature length mismatch');
     return false;
   }
   
   const isValid = crypto.timingSafeEqual(signatureBuf, expectedBuf);
   
   if (!isValid) {
-    console.warn('[HubSpot Webhook] Invalid signature');
+    logger.warn('[HubSpot Webhook] Invalid signature');
   }
   
   return isValid;
@@ -223,7 +224,7 @@ async function retryableHubSpotRequest<T>(fn: () => Promise<T>): Promise<T> {
         return await fn();
       } catch (error: unknown) {
         if (isRateLimitError(error)) {
-          if (!isProduction) console.warn('HubSpot Rate Limit hit, retrying...');
+          if (!isProduction) logger.warn('HubSpot Rate Limit hit, retrying...');
           throw error; // Trigger p-retry
         }
         // Non-rate-limit errors should abort immediately
@@ -361,13 +362,13 @@ async function fetchAllHubSpotContacts(forceRefresh: boolean = false): Promise<a
           }
           
           allContactsCache.data = Array.from(contactMap.values());
-          if (!isProduction) console.log(`[HubSpot] Incremental sync: updated ${modifiedContacts.length} contacts`);
+          if (!isProduction) logger.info('[HubSpot] Incremental sync: updated contacts', { extra: { modifiedContactsLength: modifiedContacts.length } });
         }
         
         allContactsCache.lastModifiedCheck = now;
       } catch (err) {
         // Incremental sync failed, continue with cached data
-        if (!isProduction) console.warn('[HubSpot] Incremental sync failed, using cached data:', err);
+        if (!isProduction) logger.warn('[HubSpot] Incremental sync failed, using cached data', { extra: { err } });
       }
     }
     
@@ -375,7 +376,7 @@ async function fetchAllHubSpotContacts(forceRefresh: boolean = false): Promise<a
   }
   
   // Full refresh needed
-  if (!isProduction) console.log('[HubSpot] Performing full contact sync...');
+  if (!isProduction) logger.info('[HubSpot] Performing full contact sync...');
   
   const hubspot = await getHubSpotClient();
   
@@ -390,7 +391,7 @@ async function fetchAllHubSpotContacts(forceRefresh: boolean = false): Promise<a
     after = response.paging?.next?.after;
   } while (after);
   
-  if (!isProduction) console.log(`[HubSpot] Full sync: fetched ${allContacts.length} contacts`);
+  if (!isProduction) logger.info('[HubSpot] Full sync: fetched contacts', { extra: { allContactsLength: allContacts.length } });
 
   // Transform raw HubSpot data
   const hubspotContacts = allContacts.map(transformHubSpotContact);
@@ -621,7 +622,7 @@ router.get('/api/hubspot/contacts', isStaffOrAdmin, async (req, res) => {
       backgroundRefreshInProgress = true;
       fetchAllHubSpotContacts(false)
         .catch(err => {
-          if (!isProduction) console.warn('[HubSpot] Background incremental sync failed:', err);
+          if (!isProduction) logger.warn('[HubSpot] Background incremental sync failed', { extra: { err } });
         })
         .finally(() => {
           backgroundRefreshInProgress = false;
@@ -640,7 +641,7 @@ router.get('/api/hubspot/contacts', isStaffOrAdmin, async (req, res) => {
       backgroundRefreshInProgress = true;
       fetchAllHubSpotContacts(forceRefresh)
         .catch(err => {
-          if (!isProduction) console.warn('[HubSpot] Background full sync failed:', err);
+          if (!isProduction) logger.warn('[HubSpot] Background full sync failed', { extra: { err } });
         })
         .finally(() => {
           backgroundRefreshInProgress = false;
@@ -657,7 +658,7 @@ router.get('/api/hubspot/contacts', isStaffOrAdmin, async (req, res) => {
         backgroundRefreshInProgress = false;
       })
       .catch(err => {
-        if (!isProduction) console.warn('[HubSpot] Initial sync failed:', err);
+        if (!isProduction) logger.warn('[HubSpot] Initial sync failed', { extra: { err } });
         backgroundRefreshInProgress = false;
       });
   }
@@ -704,7 +705,7 @@ router.get('/api/hubspot/contacts/:id', isStaffOrAdmin, async (req, res) => {
       joinDate: normalizeDateToYYYYMMDD(contact.properties.createdate) || null
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('API error:', error);
+    if (!isProduction) logger.error('API error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Request failed' });
   }
 });
@@ -770,7 +771,7 @@ async function enrichEventDeal(
     );
 
     if (!contactSearch.results?.length) {
-      console.warn(`[HubSpot DealEnrich] Contact not found for ${contactEmail}`);
+      logger.warn('[HubSpot DealEnrich] Contact not found for', { extra: { contactEmail } });
       return;
     }
 
@@ -795,7 +796,7 @@ async function enrichEventDeal(
               await retryableHubSpotRequest(() =>
                 hubspot.crm.deals.basicApi.update(assoc.id, { properties: dealProperties })
               );
-              console.log(`[HubSpot DealEnrich] Updated deal ${assoc.id} with event details for ${contactEmail}`);
+              logger.info('[HubSpot DealEnrich] Updated deal with event details for', { extra: { assocId: assoc.id, contactEmail } });
               return;
             }
           }
@@ -829,9 +830,9 @@ async function enrichEventDeal(
       })
     );
 
-    console.log(`[HubSpot DealEnrich] Created deal ${createResponse.id} with event details for ${contactEmail}`);
+    logger.info('[HubSpot DealEnrich] Created deal with event details for', { extra: { createResponseId: createResponse.id, contactEmail } });
   } catch (error: unknown) {
-    console.error(`[HubSpot DealEnrich] Error enriching deal for ${contactEmail}:`, error instanceof Error ? error.message : String(error));
+    logger.error('[HubSpot DealEnrich] Error enriching deal for', { extra: { contactEmail, error_instanceof_Error_error_String_error: error instanceof Error ? error.message : String(error) } });
   }
 }
 
@@ -957,7 +958,7 @@ router.post('/api/hubspot/forms/:formType', async (req, res) => {
     
     if (!response.ok) {
       const errorData = await response.json();
-      if (!isProduction) console.error('HubSpot form error:', errorData);
+      if (!isProduction) logger.error('HubSpot form error', { extra: { errorData } });
       return res.status(response.status).json({ error: 'Form submission failed' });
     }
     
@@ -1007,25 +1008,25 @@ router.post('/api/hubspot/forms/:formType', async (req, res) => {
           relatedType: 'inquiry',
           url: '/admin/inquiries'
         }
-      ).catch(err => console.error('Staff inquiry notification failed:', err));
+      ).catch(err => logger.error('Staff inquiry notification failed:', { extra: { err } }));
 
       if (formType === 'private-hire' || formType === 'event-inquiry') {
         const emailValue = getFieldValue('email') || '';
         if (emailValue) {
           setTimeout(() => {
             enrichEventDeal(emailValue, fields).catch(err => 
-              console.error('[HubSpot DealEnrich] Background enrichment failed:', err)
+              logger.error('[HubSpot DealEnrich] Background enrichment failed', { extra: { err } })
             );
           }, 5000);
         }
       }
     } catch (dbError: unknown) {
-      console.error('Failed to save form submission locally:', dbError);
+      logger.error('Failed to save form submission locally', { extra: { dbError } });
     }
     
     res.json({ success: true, message: result.inlineMessage || 'Form submitted successfully' });
   } catch (error: unknown) {
-    if (!isProduction) console.error('HubSpot form submission error:', error);
+    if (!isProduction) logger.error('HubSpot form submission error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Form submission failed' });
   }
 });
@@ -1086,7 +1087,7 @@ router.post('/api/hubspot/sync-tiers', isStaffOrAdmin, async (req, res) => {
     const csvContent = fs.readFileSync(csvPath, 'utf-8');
     const csvRows = parseCSV(csvContent);
     
-    console.log(`[Tier Sync] Loaded ${csvRows.length} rows from ${files[0]}`);
+    logger.info('[Tier Sync] Loaded rows from', { extra: { csvRowsLength: csvRows.length, files_0: files[0] } });
     
     // Build lookup map from CSV by email (normalized)
     const csvByEmail = new Map<string, { tier: string; mindbodyId: string; name: string }>();
@@ -1114,7 +1115,7 @@ router.post('/api/hubspot/sync-tiers', isStaffOrAdmin, async (req, res) => {
       after = response.paging?.next?.after;
     } while (after);
     
-    console.log(`[Tier Sync] Fetched ${allContacts.length} contacts from HubSpot`);
+    logger.info('[Tier Sync] Fetched contacts from HubSpot', { extra: { allContactsLength: allContacts.length } });
     
     // Match and prepare updates
     const results = {
@@ -1177,17 +1178,17 @@ router.post('/api/hubspot/sync-tiers', isStaffOrAdmin, async (req, res) => {
             })
           );
           results.updated += batch.length;
-          console.log(`[Tier Sync] Updated batch ${Math.floor(i / batchSize) + 1}: ${batch.length} contacts`);
+          logger.info('[Tier Sync] Updated batch : contacts', { extra: { MathFloor_i_batchSize_1: Math.floor(i / batchSize) + 1, batchLength: batch.length } });
         } catch (err: unknown) {
           results.errors.push(`Batch ${Math.floor(i / batchSize) + 1} failed: ${getErrorMessage(err)}`);
-          console.error(`[Tier Sync] Batch update error:`, err);
+          logger.error('[Tier Sync] Batch update error:', { extra: { err } });
         }
       }
     } else if (dryRun) {
       results.updated = 0;
     }
     
-    console.log(`[Tier Sync] Complete - Matched: ${results.matched}, Updates: ${results.updates.length}, Errors: ${results.errors.length}`);
+    logger.info('[Tier Sync] Complete - Matched: , Updates: , Errors', { extra: { resultsMatched: results.matched, resultsUpdatesLength: results.updates.length, resultsErrorsLength: results.errors.length } });
     
     if (!dryRun && results.updated > 0) {
       broadcastDirectoryUpdate('synced');
@@ -1208,7 +1209,7 @@ router.post('/api/hubspot/sync-tiers', isStaffOrAdmin, async (req, res) => {
       updates: results.updates.slice(0, 50) // Limit preview to first 50
     });
   } catch (error: unknown) {
-    console.error('[Tier Sync] Error:', error);
+    logger.error('[Tier Sync] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Tier sync failed: ' + getErrorMessage(error) });
   }
 });
@@ -1279,7 +1280,7 @@ router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) =>
       } as any)
       .where(eq(users.id, localUser.id));
     
-    console.log(`[Tier Update] Updated local database for ${contactEmail}`);
+    logger.info('[Tier Update] Updated local database for', { extra: { contactEmail } });
     
     if (hubspotContactId) {
       const hubspotTier = denormalizeTierForHubSpot(tier);
@@ -1293,7 +1294,7 @@ router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) =>
     }
     
     // Log the change for audit purposes
-    console.log(`[Tier Update] Contact ${id} (${contactName}, ${contactEmail}): ${oldTier} -> ${tierData.tier} by staff ${staffUser?.name || 'Unknown'}`);
+    logger.info('[Tier Update] Contact (, ): -> by staff', { extra: { id, contactName, contactEmail, oldTier, tierDataTier: tierData.tier, staffUser: staffUser?.name || 'Unknown' } });
     
     // Invalidate cache to reflect the change
     allContactsCache.timestamp = 0;
@@ -1311,7 +1312,7 @@ router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) =>
       updatedBy: staffUser?.name || 'Unknown'
     });
   } catch (error: unknown) {
-    console.error(`[Tier Update] Error updating contact ${id}:`, error);
+    logger.error('[Tier Update] Error updating contact', { error: error instanceof Error ? error : new Error(String(error)), extra: { id } });
     res.status(500).json({ error: 'Failed to update tier: ' + getErrorMessage(error) });
   }
 });
@@ -1323,7 +1324,7 @@ router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) =>
  */
 router.post('/api/hubspot/webhooks', async (req, res) => {
   if (!validateHubSpotWebhookSignature(req)) {
-    console.warn('[HubSpot Webhook] Signature validation failed');
+    logger.warn('[HubSpot Webhook] Signature validation failed');
     return res.status(401).json({ error: 'Invalid signature' });
   }
   
@@ -1336,7 +1337,7 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
     for (const event of events) {
       const { subscriptionType, objectId, propertyName, propertyValue } = event;
       
-      console.log(`[HubSpot Webhook] Received: ${subscriptionType} for object ${objectId}, ${propertyName}=${propertyValue}`);
+      logger.info('[HubSpot Webhook] Received: for object , =', { extra: { subscriptionType, objectId, propertyName, propertyValue } });
       
       if (subscriptionType === 'contact.propertyChange') {
         // Handle contact property changes (tier, status)
@@ -1347,7 +1348,7 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
           // Broadcast to all connected clients
           broadcastDirectoryUpdate('synced');
           
-          console.log(`[HubSpot Webhook] Contact ${objectId} ${propertyName} changed to: ${propertyValue}`);
+          logger.info('[HubSpot Webhook] Contact changed to', { extra: { objectId, propertyName, propertyValue } });
           
           // INSTANT DATABASE UPDATE: Update the user's status/tier immediately
           // This ensures MindBody billing status changes are reflected instantly
@@ -1365,13 +1366,13 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
                 if (newStatus === 'non-member') {
                   const stripeCheck = await db.execute(sql`SELECT stripe_subscription_id FROM users WHERE LOWER(email) = ${email}`);
                   if (stripeCheck.rows.length > 0 && stripeCheck.rows[0].stripe_subscription_id) {
-                    console.log(`[HubSpot Webhook] Skipping status change to 'non-member' for ${email} - has active Stripe subscription`);
+                    logger.info('[HubSpot Webhook] Skipping status change to \'non-member\' for - has active Stripe subscription', { extra: { email } });
                   } else {
                     const prevStatusResult = await db.execute(sql`SELECT membership_status, first_name, last_name FROM users WHERE LOWER(email) = ${email}`);
                     const prevStatus = prevStatusResult.rows[0]?.membership_status;
 
                     await db.execute(sql`UPDATE users SET membership_status = ${newStatus}, updated_at = NOW() WHERE LOWER(email) = ${email}`);
-                    console.log(`[HubSpot Webhook] Updated DB membership_status for ${email} to: ${newStatus}`);
+                    logger.info('[HubSpot Webhook] Updated DB membership_status for to', { extra: { email, newStatus } });
 
                     if (prevStatus && prevStatus !== 'non-member' && prevStatus !== 'visitor') {
                       const row = prevStatusResult.rows[0];
@@ -1386,7 +1387,7 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
                   }
                 } else {
                   await db.execute(sql`UPDATE users SET membership_status = ${newStatus}, updated_at = NOW() WHERE LOWER(email) = ${email}`);
-                  console.log(`[HubSpot Webhook] Updated DB membership_status for ${email} to: ${newStatus}`);
+                  logger.info('[HubSpot Webhook] Updated DB membership_status for to', { extra: { email, newStatus } });
 
                   // Notify staff of membership status changes from HubSpot/MindBody
                   const activeStatuses = ['active', 'trialing'];
@@ -1420,26 +1421,26 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
                 const normalizedTier = normalizeTierName(propertyValue || '');
                 if (normalizedTier) {
                   await db.execute(sql`UPDATE users SET tier = ${normalizedTier}, updated_at = NOW() WHERE LOWER(email) = ${email}`);
-                  console.log(`[HubSpot Webhook] Updated DB tier for ${email} to: ${normalizedTier}`);
+                  logger.info('[HubSpot Webhook] Updated DB tier for to', { extra: { email, normalizedTier } });
                 }
               }
             }
           } catch (updateError: unknown) {
-            console.error(`[HubSpot Webhook] Failed to update DB for contact ${objectId}:`, getErrorMessage(updateError));
+            logger.error('[HubSpot Webhook] Failed to update DB for contact', { extra: { objectId, error: getErrorMessage(updateError) } });
           }
         }
       } else if (subscriptionType === 'deal.propertyChange') {
         // Handle deal property changes (stage, amount)
-        console.log(`[HubSpot Webhook] Deal ${objectId} ${propertyName} changed to: ${propertyValue}`);
+        logger.info('[HubSpot Webhook] Deal changed to', { extra: { objectId, propertyName, propertyValue } });
         // Future: Update payment status, trigger notifications
       } else if (subscriptionType === 'deal.creation') {
         // Handle new deal creation
-        console.log(`[HubSpot Webhook] New deal created: ${objectId}`);
+        logger.info('[HubSpot Webhook] New deal created', { extra: { objectId } });
         // Future: Link deal to member, set up billing
       }
     }
   } catch (error) {
-    console.error('[HubSpot Webhook] Error processing event:', error);
+    logger.error('[HubSpot Webhook] Error processing event', { error: error instanceof Error ? error : new Error(String(error)) });
   }
 });
 
@@ -1465,7 +1466,7 @@ router.post('/api/hubspot/push-db-tiers', isStaffOrAdmin, async (req, res) => {
         sql`${users.archivedAt} IS NULL`
       ));
     
-    console.log(`[DB Tier Push] Found ${members.length} members with HubSpot IDs`);
+    logger.info('[DB Tier Push] Found members with HubSpot IDs', { extra: { membersLength: members.length } });
     
     const results = {
       total: members.length,
@@ -1514,10 +1515,10 @@ router.post('/api/hubspot/push-db-tiers', isStaffOrAdmin, async (req, res) => {
             hubspot.crm.contacts.batchApi.update({ inputs: batch })
           );
           results.updated += batch.length;
-          console.log(`[DB Tier Push] Updated batch ${Math.floor(i / batchSize) + 1}: ${batch.length} contacts`);
+          logger.info('[DB Tier Push] Updated batch : contacts', { extra: { MathFloor_i_batchSize_1: Math.floor(i / batchSize) + 1, batchLength: batch.length } });
         } catch (err: unknown) {
           results.errors.push(`Batch ${Math.floor(i / batchSize) + 1} failed: ${getErrorMessage(err)}`);
-          console.error(`[DB Tier Push] Batch update error:`, err);
+          logger.error('[DB Tier Push] Batch update error:', { extra: { err } });
         }
         
         // Rate limiting delay
@@ -1529,7 +1530,7 @@ router.post('/api/hubspot/push-db-tiers', isStaffOrAdmin, async (req, res) => {
       broadcastDirectoryUpdate('synced');
     }
     
-    console.log(`[DB Tier Push] Complete - Total: ${results.total}, Updated: ${results.updated}, Errors: ${results.errors.length}`);
+    logger.info('[DB Tier Push] Complete - Total: , Updated: , Errors', { extra: { resultsTotal: results.total, resultsUpdated: results.updated, resultsErrorsLength: results.errors.length } });
     
     res.json({
       success: true,
@@ -1542,7 +1543,7 @@ router.post('/api/hubspot/push-db-tiers', isStaffOrAdmin, async (req, res) => {
       sampleUpdates: results.updates.slice(0, 20)
     });
   } catch (error: unknown) {
-    console.error('[DB Tier Push] Error:', error);
+    logger.error('[DB Tier Push] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'DB tier push failed: ' + getErrorMessage(error) });
   }
 });
@@ -1562,7 +1563,7 @@ router.post('/api/hubspot/sync-billing-providers', isStaffOrAdmin, async (req, r
       ORDER BY email
     `);
     
-    console.log(`[HubSpot Sync] Found ${membersResult.rows.length} members with HubSpot IDs to sync`);
+    logger.info('[HubSpot Sync] Found members with HubSpot IDs to sync', { extra: { membersResultRowsLength: membersResult.rows.length } });
     
     const results = {
       total: membersResult.rows.length,
@@ -1633,7 +1634,7 @@ router.post('/api/hubspot/sync-billing-providers', isStaffOrAdmin, async (req, r
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     
-    console.log(`[HubSpot Sync] Completed: ${results.synced} synced, ${results.skipped} skipped, ${results.errors} errors`);
+    logger.info('[HubSpot Sync] Completed: synced, skipped, errors', { extra: { resultsSynced: results.synced, resultsSkipped: results.skipped, resultsErrors: results.errors } });
     
     res.json({
       dryRun,
@@ -1644,7 +1645,7 @@ router.post('/api/hubspot/sync-billing-providers', isStaffOrAdmin, async (req, r
       sampleDetails: results.details.slice(0, 50)
     });
   } catch (error: unknown) {
-    console.error('[HubSpot Sync] Error syncing billing providers:', error);
+    logger.error('[HubSpot Sync] Error syncing billing providers', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Sync failed: ' + getErrorMessage(error) });
   }
 });
@@ -1682,7 +1683,7 @@ router.get('/api/hubspot/products', isStaffOrAdmin, async (req, res) => {
     if (statusCode === 403 || category === 'MISSING_SCOPES') {
       return res.status(403).json({ error: 'HubSpot API key missing required scopes for products' });
     }
-    console.error('[HubSpot] Error fetching products:', error);
+    logger.error('[HubSpot] Error fetching products', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch HubSpot products' });
   }
 });
@@ -1693,7 +1694,7 @@ router.post('/api/admin/hubspot/sync-form-submissions', isStaffOrAdmin, async (r
     const result = await syncHubSpotFormSubmissions();
     res.json(result);
   } catch (error: unknown) {
-    console.error('[HubSpot FormSync] Manual sync error:', error);
+    logger.error('[HubSpot FormSync] Manual sync error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync form submissions' });
   }
 });

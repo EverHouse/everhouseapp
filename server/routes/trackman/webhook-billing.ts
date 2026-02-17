@@ -310,7 +310,7 @@ export async function createBookingForMember(
             feeInfo = ` Estimated fees: $${(totalFees / 100).toFixed(2)}.`;
           }
         } catch (e: unknown) {
-          console.error('[Trackman Webhook] Failed to fetch fee info for notification:', e);
+          logger.error('[Trackman Webhook] Failed to fetch fee info for notification', { extra: { error: e } });
         }
       }
       

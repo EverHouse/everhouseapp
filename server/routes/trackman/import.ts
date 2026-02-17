@@ -6,6 +6,7 @@ import { isStaffOrAdmin } from '../../core/middleware';
 import { importTrackmanBookings, getImportRuns, rescanUnmatchedBookings } from '../../core/trackmanImport';
 import { logFromRequest } from '../../core/auditLog';
 import { getErrorMessage } from '../../utils/errorUtils';
+import { logger } from '../../core/logger';
 
 const router = Router();
 
@@ -42,7 +43,7 @@ router.get('/api/admin/trackman/import-runs', isStaffOrAdmin, async (req, res) =
     const runs = await getImportRuns();
     res.json(runs);
   } catch (error: unknown) {
-    console.error('Error fetching import runs:', error);
+    logger.error('Error fetching import runs', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch import runs' });
   }
 });
@@ -72,7 +73,7 @@ router.post('/api/admin/trackman/import', isStaffOrAdmin, async (req, res) => {
       ...result
     });
   } catch (error: unknown) {
-    console.error('Import error:', error);
+    logger.error('Import error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to import bookings' });
   }
 });
@@ -95,14 +96,14 @@ router.post('/api/admin/trackman/upload', isStaffOrAdmin, upload.single('file'),
       ...result
     });
   } catch (error: unknown) {
-    console.error('Upload/Import error:', error);
+    logger.error('Upload/Import error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to upload and import bookings' });
   } finally {
     if (csvPath && fs.existsSync(csvPath)) {
       try {
         fs.unlinkSync(csvPath);
       } catch (cleanupErr) {
-        console.error('Failed to cleanup uploaded file:', cleanupErr);
+        logger.error('Failed to cleanup uploaded file', { extra: { error: cleanupErr } });
       }
     }
   }
@@ -132,7 +133,7 @@ router.post('/api/admin/trackman/rescan', isStaffOrAdmin, async (req, res) => {
       ...result
     });
   } catch (error: unknown) {
-    console.error('Rescan error:', error);
+    logger.error('Rescan error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to rescan unmatched bookings' });
   }
 });

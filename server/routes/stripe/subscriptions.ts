@@ -1,3 +1,4 @@
+import { logger } from '../../core/logger';
 import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { pool } from '../../core/db';
@@ -42,7 +43,7 @@ router.get('/api/stripe/subscriptions/:customerId', isStaffOrAdmin, async (req: 
       count: result.subscriptions?.length || 0
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error listing subscriptions:', error);
+    logger.error('[Stripe] Error listing subscriptions', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to list subscriptions' });
   }
 });
@@ -91,7 +92,7 @@ router.post('/api/stripe/subscriptions', isStaffOrAdmin, async (req: Request, re
         }
       }
     } catch (notifyError) {
-      console.error('[Stripe] Failed to send subscription creation notification:', notifyError);
+      logger.error('[Stripe] Failed to send subscription creation notification', { extra: { notifyError } });
     }
     
     res.json({
@@ -99,7 +100,7 @@ router.post('/api/stripe/subscriptions', isStaffOrAdmin, async (req: Request, re
       subscription: result.subscription
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error creating subscription:', error);
+    logger.error('[Stripe] Error creating subscription', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create subscription' });
   }
 });
@@ -131,12 +132,12 @@ router.delete('/api/stripe/subscriptions/:subscriptionId', isStaffOrAdmin, async
         (broadcastBillingUpdate as any)(memberEmail, 'subscription_cancelled');
       }
     } catch (notifyError) {
-      console.error('[Stripe] Failed to send subscription cancellation notification:', notifyError);
+      logger.error('[Stripe] Failed to send subscription cancellation notification', { extra: { notifyError } });
     }
     
     res.json({ success: true });
   } catch (error: unknown) {
-    console.error('[Stripe] Error canceling subscription:', error);
+    logger.error('[Stripe] Error canceling subscription', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to cancel subscription' });
   }
 });
@@ -161,7 +162,7 @@ router.post('/api/stripe/sync-subscriptions', isStaffOrAdmin, sensitiveActionRat
       errors: result.errors
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error syncing subscriptions:', error);
+    logger.error('[Stripe] Error syncing subscriptions', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync subscriptions' });
   }
 });
@@ -189,7 +190,7 @@ router.get('/api/stripe/coupons', isStaffOrAdmin, async (req: Request, res: Resp
     
     res.json({ coupons: activeCoupons });
   } catch (error: unknown) {
-    console.error('[Stripe] Error listing coupons:', error);
+    logger.error('[Stripe] Error listing coupons', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to load coupons' });
   }
 });
@@ -281,9 +282,9 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, async
       if (stripeSubscription?.subscriptionId) {
         try {
           await cancelSubscription(stripeSubscription.subscriptionId);
-          console.error(`[Stripe] Rolled back subscription ${stripeSubscription.subscriptionId} due to database update failure:`, dbError);
+          logger.error('[Stripe] Rolled back subscription  due to database update failure', { extra: { subscriptionId: stripeSubscription.subscriptionId, dbError } });
         } catch (cancelError) {
-          console.error(`[Stripe] CRITICAL: Failed to cancel subscription ${stripeSubscription.subscriptionId} during rollback. Customer was charged but access was not granted:`, cancelError);
+          logger.error('[Stripe] CRITICAL: Failed to cancel subscription  during rollback. Customer was charged but access was not granted', { extra: { subscriptionId: stripeSubscription.subscriptionId, cancelError } });
           throw new Error(
             `Failed to complete subscription setup. Database error: ${dbError instanceof Error ? dbError.message : String(dbError)}. ` +
             `Rollback attempt failed: ${cancelError instanceof Error ? cancelError.message : String(cancelError)}. ` +
@@ -315,12 +316,12 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, async
     try {
       const { syncMemberToHubSpot } = await import('../../core/hubspot/stages');
       await syncMemberToHubSpot({ email: member.email, status: memberStatus, tier: tierName, billingProvider: 'stripe', memberSince: new Date(), billingGroupRole: 'Primary' });
-      console.log(`[Stripe] Synced ${member.email} to HubSpot: status=${memberStatus}, tier=${tierName}, billing=stripe, memberSince=now`);
+      logger.info('[Stripe] Synced to HubSpot: status=, tier=, billing=stripe, memberSince=now', { extra: { memberEmail: member.email, memberStatus, tierName } });
     } catch (hubspotError) {
-      console.error('[Stripe] HubSpot sync failed for subscription creation:', hubspotError);
+      logger.error('[Stripe] HubSpot sync failed for subscription creation', { extra: { hubspotError } });
     }
     
-    console.log(`[Stripe] Created subscription for ${member.email}: ${subscriptionResult.subscription?.subscriptionId}`);
+    logger.info('[Stripe] Created subscription for', { extra: { memberEmail: member.email, subscriptionResultSubscription: subscriptionResult.subscription?.subscriptionId } });
     
     try {
       sendNotificationToUser(member.email, {
@@ -331,7 +332,7 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, async
       });
       (broadcastBillingUpdate as any)(member.email, 'subscription_created');
     } catch (notifyError) {
-      console.error('[Stripe] Failed to send membership activation notification:', notifyError);
+      logger.error('[Stripe] Failed to send membership activation notification', { extra: { notifyError } });
     }
     
     res.json({
@@ -341,7 +342,7 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, async
       message: `Successfully created ${tierName} subscription for ${memberName}`
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error creating subscription for member:', error);
+    logger.error('[Stripe] Error creating subscription for member', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to create subscription' });
   }
 });
@@ -371,7 +372,7 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
         );
 
     if (resolved && resolved.matchType !== 'direct') {
-      console.log(`[Stripe] Email ${email} resolved to existing user ${resolved.primaryEmail} via ${resolved.matchType}`);
+      logger.info('[Stripe] Email resolved to existing user via', { extra: { email, resolvedPrimaryEmail: resolved.primaryEmail, resolvedMatchType: resolved.matchType } });
     }
     
     let existingUserId: string | null = null;
@@ -380,10 +381,10 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
       const existing = existingUser.rows[0];
       if (existing.archived_at && ['non-member', 'visitor', null].includes(existing.membership_status)) {
         existingUserId = existing.id;
-        console.log(`[Stripe] Unarchiving user ${email} for new membership creation`);
+        logger.info('[Stripe] Unarchiving user for new membership creation', { extra: { email } });
       } else if (existing.membership_status === 'pending') {
         existingUserId = existing.id;
-        console.log(`[Stripe] Reusing pending user ${email} (${existing.id}) for new membership creation`);
+        logger.info('[Stripe] Reusing pending user () for new membership creation', { extra: { email, existingId: existing.id } });
         if (existing.stripe_customer_id) {
           try {
             const stripeClient = await getStripeClient();
@@ -391,13 +392,13 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
             for (const sub of subs.data) {
               if (['active', 'trialing', 'past_due', 'incomplete'].includes(sub.status)) {
                 await stripeClient.subscriptions.cancel(sub.id);
-                console.log(`[Stripe] Cancelled stale subscription ${sub.id} during pending user reuse`);
+                logger.info('[Stripe] Cancelled stale subscription during pending user reuse', { extra: { subId: sub.id } });
               }
             }
             await stripeClient.customers.del(existing.stripe_customer_id);
-            console.log(`[Stripe] Deleted stale Stripe customer ${existing.stripe_customer_id} during pending user reuse`);
+            logger.info('[Stripe] Deleted stale Stripe customer during pending user reuse', { extra: { existingStripe_customer_id: existing.stripe_customer_id } });
           } catch (cleanupErr: unknown) {
-            console.error(`[Stripe] Failed to cleanup stale Stripe data for pending user:`, getErrorMessage(cleanupErr));
+            logger.error('[Stripe] Failed to cleanup stale Stripe data for pending user:', { extra: { error: getErrorMessage(cleanupErr) } });
           }
           await pool.query('UPDATE users SET stripe_customer_id = NULL, stripe_subscription_id = NULL WHERE id = $1', [existing.id]);
         }
@@ -433,14 +434,14 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
         `UPDATE users SET archived_at = NULL, archived_by = NULL, first_name = COALESCE($2, first_name), last_name = COALESCE($3, last_name), phone = COALESCE($4, phone), date_of_birth = COALESCE($5, date_of_birth), street_address = COALESCE($6, street_address), city = COALESCE($7, city), state = COALESCE($8, state), zip_code = COALESCE($9, zip_code), tier = $10, membership_status = 'pending', billing_provider = 'stripe', updated_at = NOW() WHERE id = $1`,
         [existingUserId, firstName || null, lastName || null, phone || null, dob || null, streetAddress || null, city || null, state || null, zipCode || null, tier.name]
       );
-      console.log(`[Stripe] Unarchived and updated existing user ${email} with tier ${tier.name}`);
+      logger.info('[Stripe] Unarchived and updated existing user with tier', { extra: { email, tierName: tier.name } });
     } else {
       await pool.query(
         `INSERT INTO users (id, email, first_name, last_name, phone, date_of_birth, tier, membership_status, billing_provider, street_address, city, state, zip_code, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', 'stripe', $8, $9, $10, $11, NOW())`,
         [userId, email.toLowerCase(), firstName || null, lastName || null, phone || null, dob || null, tier.name, streetAddress || null, city || null, state || null, zipCode || null]
       );
-      console.log(`[Stripe] Created pending user ${email} with tier ${tier.name}`);
+      logger.info('[Stripe] Created pending user with tier', { extra: { email, tierName: tier.name } });
     }
     
     const { customerId } = await getOrCreateStripeCustomer(
@@ -488,11 +489,11 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
         [subscriptionResult.subscription?.subscriptionId, userId]
       );
     } catch (dbError: unknown) {
-      console.error('[Stripe] DB update failed after subscription creation. Rolling back...', getErrorMessage(dbError));
+      logger.error('[Stripe] DB update failed after subscription creation. Rolling back...', { extra: { dbError: getErrorMessage(dbError) } });
       if (subscriptionResult.subscription?.subscriptionId) {
         try {
           await cancelSubscription(subscriptionResult.subscription.subscriptionId);
-          console.log(`[Stripe] Emergency rollback: cancelled subscription ${subscriptionResult.subscription.subscriptionId}`);
+          logger.info('[Stripe] Emergency rollback: cancelled subscription', { extra: { subscriptionResultSubscriptionSubscriptionId: subscriptionResult.subscription.subscriptionId } });
           if (!existingUserId) {
             await pool.query('DELETE FROM users WHERE id = $1', [userId]);
           } else {
@@ -505,7 +506,7 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
             error: 'System error during activation. Payment has been voided. Please try again.' 
           });
         } catch (cancelError: unknown) {
-          console.error(`[Stripe] CRITICAL: Failed to cancel subscription ${subscriptionResult.subscription.subscriptionId} during rollback. User preserved for manual cleanup.`, getErrorMessage(cancelError));
+          logger.error('[Stripe] CRITICAL: Failed to cancel subscription  during rollback. User preserved for manual cleanup.', { extra: { subscriptionId: subscriptionResult.subscription.subscriptionId, error: getErrorMessage(cancelError) } });
           return res.status(500).json({ 
             error: 'CRITICAL: Account setup failed but the payment could not be automatically reversed. Please contact support immediately so we can issue a refund.' 
           });
@@ -536,11 +537,11 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
       }
     });
     
-    console.log(`[Stripe] Created subscription ${subscriptionResult.subscription?.subscriptionId} for new member ${email}`);
+    logger.info('[Stripe] Created subscription for new member', { extra: { subscriptionResultSubscription: subscriptionResult.subscription?.subscriptionId, email } });
     
     // If no clientSecret, the subscription may be fully paid (e.g., 100% discount) or there's an issue
     if (!subscriptionResult.subscription?.clientSecret) {
-      console.warn(`[Stripe] No clientSecret returned for subscription ${subscriptionResult.subscription?.subscriptionId}`);
+      logger.warn('[Stripe] No clientSecret returned for subscription', { extra: { subscriptionResultSubscription: subscriptionResult.subscription?.subscriptionId } });
     }
     
     res.json({
@@ -552,7 +553,7 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
       tierName: tier.name
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error creating new member subscription:', error);
+    logger.error('[Stripe] Error creating new member subscription', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to create subscription' });
   }
 });
@@ -595,10 +596,10 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
           await stripe.invoices.pay(invoiceId, {
             paid_out_of_band: true
           });
-          console.log(`[Stripe Subscriptions] Marked invoice ${invoiceId} as paid out of band`);
+          logger.info('[Stripe Subscriptions] Marked invoice as paid out of band', { extra: { invoiceId } });
         }
       } catch (invoiceError: unknown) {
-        console.error('[Stripe Subscriptions] Error paying invoice:', getErrorMessage(invoiceError));
+        logger.error('[Stripe Subscriptions] Error paying invoice', { extra: { invoiceError: getErrorMessage(invoiceError) } });
       }
     }
     
@@ -619,7 +620,7 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
           `UPDATE users SET membership_status = 'active', billing_provider = 'stripe', updated_at = NOW() WHERE id = $1`,
           [userId]
         );
-        console.log(`[Stripe Subscriptions] Activated member ${userEmail}`);
+        logger.info('[Stripe Subscriptions] Activated member', { extra: { userEmail } });
       }
     } else if (paymentIntent.customer) {
       const custResult = await pool.query(
@@ -635,7 +636,7 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
           `UPDATE users SET membership_status = 'active', billing_provider = 'stripe', updated_at = NOW() WHERE stripe_customer_id = $1`,
           [paymentIntent.customer]
         );
-        console.log(`[Stripe Subscriptions] Activated member ${userEmail} via customer ID`);
+        logger.info('[Stripe Subscriptions] Activated member via customer ID', { extra: { userEmail } });
       }
     }
     
@@ -650,9 +651,9 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
           memberSince: new Date(),
           billingGroupRole: 'Primary',
         });
-        console.log(`[Stripe Subscriptions] Synced ${userEmail} to HubSpot`);
+        logger.info('[Stripe Subscriptions] Synced to HubSpot', { extra: { userEmail } });
       } catch (hubspotError) {
-        console.error('[Stripe Subscriptions] HubSpot sync failed:', hubspotError);
+        logger.error('[Stripe Subscriptions] HubSpot sync failed', { extra: { hubspotError } });
       }
       
       try {
@@ -665,7 +666,7 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
         });
         broadcastUpdate(userEmail, 'subscription_created');
       } catch (notifyError) {
-        console.error('[Stripe Subscriptions] Notification failed:', notifyError);
+        logger.error('[Stripe Subscriptions] Notification failed', { extra: { notifyError } });
       }
     }
     
@@ -688,7 +689,7 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
       memberEmail: userEmail
     });
   } catch (error: unknown) {
-    console.error('[Stripe Subscriptions] Error confirming inline payment:', error);
+    logger.error('[Stripe Subscriptions] Error confirming inline payment', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to confirm payment' });
   }
 });
@@ -718,7 +719,7 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
         );
 
     if (resolved && resolved.matchType !== 'direct') {
-      console.log(`[Activation Link] Email ${email} resolved to existing user ${resolved.primaryEmail} via ${resolved.matchType}`);
+      logger.info('[Activation Link] Email resolved to existing user via', { extra: { email, resolvedPrimaryEmail: resolved.primaryEmail, resolvedMatchType: resolved.matchType } });
     }
     
     let existingUserId: string | null = null;
@@ -728,7 +729,7 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
       const existing = existingUser.rows[0];
       if (existing.archived_at && ['non-member', 'visitor', null].includes(existing.membership_status)) {
         existingUserId = existing.id;
-        console.log(`[Activation Link] Unarchiving user ${email} for new membership creation`);
+        logger.info('[Activation Link] Unarchiving user for new membership creation', { extra: { email } });
       } else if (existing.membership_status === 'pending') {
         const name = [existing.first_name, existing.last_name].filter(Boolean).join(' ') || email;
         return res.status(400).json({ 
@@ -747,7 +748,7 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
       } else {
         existingUserId = existing.id;
         isResend = true;
-        console.log(`[Activation Link] Resending activation link for existing user ${email} (status: ${existing.membership_status}, has subscription: ${!!existing.stripe_subscription_id})`);
+        logger.info('[Activation Link] Resending activation link for existing user (status: , has subscription: )', { extra: { email, existingMembership_status: existing.membership_status, existingStripe_subscription_id: !!existing.stripe_subscription_id } });
       }
     }
     
@@ -774,14 +775,14 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
         `UPDATE users SET archived_at = NULL, archived_by = NULL, first_name = COALESCE($2, first_name), last_name = COALESCE($3, last_name), phone = COALESCE($4, phone), date_of_birth = COALESCE($5, date_of_birth), street_address = COALESCE($6, street_address), city = COALESCE($7, city), state = COALESCE($8, state), zip_code = COALESCE($9, zip_code), tier = $10, membership_status = 'pending', billing_provider = 'stripe', updated_at = NOW() WHERE id = $1`,
         [existingUserId, firstName || null, lastName || null, phone || null, dob || null, streetAddress || null, city || null, state || null, zipCode || null, tier.name]
       );
-      console.log(`[Activation Link] ${isResend ? 'Updated existing' : 'Unarchived and updated existing'} user ${email} with tier ${tier.name}`);
+      logger.info('[Activation Link] user with tier', { extra: { isResend_Updated_existing_Unarchived_and_updated_existing: isResend ? 'Updated existing' : 'Unarchived and updated existing', email, tierName: tier.name } });
     } else {
       await pool.query(
         `INSERT INTO users (id, email, first_name, last_name, phone, date_of_birth, tier, membership_status, billing_provider, street_address, city, state, zip_code, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', 'stripe', $8, $9, $10, $11, NOW())`,
         [userId, email.toLowerCase(), firstName || null, lastName || null, phone || null, dob || null, tier.name, streetAddress || null, city || null, state || null, zipCode || null]
       );
-      console.log(`[Activation Link] Created pending user ${email} with tier ${tier.name}`);
+      logger.info('[Activation Link] Created pending user with tier', { extra: { email, tierName: tier.name } });
     }
     
     const { customerId } = await getOrCreateStripeCustomer(
@@ -842,11 +843,11 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
     const checkoutSession = await stripe.checkout.sessions.create(sessionParams);
     
     if (!checkoutSession.url) {
-      console.error(`[Activation Link] Stripe returned no checkout URL for session ${checkoutSession.id}`);
+      logger.error('[Activation Link] Stripe returned no checkout URL for session', { extra: { checkoutSessionId: checkoutSession.id } });
       return res.status(500).json({ error: 'Failed to create checkout session - no URL returned' });
     }
     
-    console.log(`[Activation Link] Created checkout session ${checkoutSession.id} for ${email}`);
+    logger.info('[Activation Link] Created checkout session for', { extra: { checkoutSessionId: checkoutSession.id, email } });
     
     const expiresAt = new Date(checkoutSession.expires_at * 1000);
     const emailResult = await sendMembershipActivationEmail(email, {
@@ -858,7 +859,7 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
     });
     
     if (!emailResult.success) {
-      console.error(`[Activation Link] Email failed for ${email}:`, emailResult.error);
+      logger.error('[Activation Link] Email failed for', { extra: { email, emailResult: emailResult.error } });
     }
     
     await logFromRequest(req, {
@@ -885,7 +886,7 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
       emailSent: emailResult.success
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error sending activation link:', error);
+    logger.error('[Stripe] Error sending activation link', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to send activation link' });
   }
 });
@@ -928,17 +929,17 @@ router.delete('/api/stripe/subscriptions/cleanup-pending/:userId', isStaffOrAdmi
           if (activeStatuses.includes(sub.status)) {
             try {
               await stripe.subscriptions.cancel(sub.id);
-              console.log(`[Stripe] Cancelled active subscription ${sub.id} (status: ${sub.status}) during pending user cleanup`);
+              logger.info('[Stripe] Cancelled active subscription (status: ) during pending user cleanup', { extra: { subId: sub.id, subStatus: sub.status } });
             } catch (cancelErr: unknown) {
-              console.error(`[Stripe] Failed to cancel subscription ${sub.id} during cleanup:`, getErrorMessage(cancelErr));
+              logger.error('[Stripe] Failed to cancel subscription  during cleanup', { extra: { id: sub.id, error: getErrorMessage(cancelErr) } });
             }
           }
         }
         
         await stripe.customers.del(user.stripe_customer_id);
-        console.log(`[Stripe] Deleted Stripe customer ${user.stripe_customer_id} for pending user cleanup`);
+        logger.info('[Stripe] Deleted Stripe customer for pending user cleanup', { extra: { userStripe_customer_id: user.stripe_customer_id } });
       } catch (stripeErr: unknown) {
-        console.error(`[Stripe] Failed to delete Stripe customer during cleanup:`, getErrorMessage(stripeErr));
+        logger.error('[Stripe] Failed to delete Stripe customer during cleanup:', { extra: { error: getErrorMessage(stripeErr) } });
       }
     }
     
@@ -946,14 +947,14 @@ router.delete('/api/stripe/subscriptions/cleanup-pending/:userId', isStaffOrAdmi
       try {
         await pool.query('UPDATE users SET id_image_url = NULL WHERE id = $1', [userId]);
       } catch (idErr: unknown) {
-        console.error(`[Stripe] Failed to clear ID image during cleanup:`, getErrorMessage(idErr));
+        logger.error('[Stripe] Failed to clear ID image during cleanup:', { extra: { error: getErrorMessage(idErr) } });
       }
     }
     
     await pool.query('DELETE FROM users WHERE id = $1', [userId]);
     
     const userName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email;
-    console.log(`[Stripe] Cleaned up pending user ${user.email} (${userName}) by ${sessionUser?.email}`);
+    logger.info('[Stripe] Cleaned up pending user () by', { extra: { userEmail: user.email, userName, sessionUser: sessionUser?.email } });
     
     logFromRequest(req, 'cleanup_pending_user', 'member', user.email,
       userName, { status: user.membership_status });
@@ -964,7 +965,7 @@ router.delete('/api/stripe/subscriptions/cleanup-pending/:userId', isStaffOrAdmi
       email: user.email
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error cleaning up pending user:', error);
+    logger.error('[Stripe] Error cleaning up pending user', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to cleanup pending user' });
   }
 });

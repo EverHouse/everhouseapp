@@ -1,3 +1,4 @@
+import { logger } from '../core/logger';
 import { Router } from 'express';
 import { isProduction } from '../core/db';
 import { getGoogleCalendarClient } from '../core/integrations';
@@ -32,7 +33,7 @@ router.get('/api/admin/calendars', isStaffOrAdmin, async (req, res) => {
       }
     });
   } catch (error: unknown) {
-    console.error('Calendar status check error:', error);
+    logger.error('Calendar status check error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ 
       error: 'Failed to check calendar status',
       details: getErrorMessage(error) 
@@ -73,7 +74,7 @@ router.get('/api/calendar-availability/conference', async (req, res) => {
       availableSlots: result.slots.filter(s => s.available)
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Conference calendar availability error:', error);
+    if (!isProduction) logger.error('Conference calendar availability error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch conference room availability' });
   }
 });
@@ -91,7 +92,7 @@ router.get('/api/calendars', async (req, res) => {
       }
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Calendar list error:', error);
+    if (!isProduction) logger.error('Calendar list error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to list calendars' });
   }
 });
@@ -129,7 +130,7 @@ router.get('/api/calendar/availability', async (req, res) => {
       })),
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Calendar availability error:', error);
+    if (!isProduction) logger.error('Calendar availability error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch calendar availability', details: getErrorMessage(error) });
   }
 });
@@ -139,14 +140,14 @@ router.post('/api/admin/conference-room/backfill', isAdmin, async (req, res) => 
   try {
     const { monthsBack = 12 } = req.body;
     
-    console.log(`[Admin] Starting conference room backfill for ${monthsBack} months...`);
+    logger.info('[Admin] Starting conference room backfill for months...', { extra: { monthsBack } });
     const result = await syncConferenceRoomCalendarToBookings({ monthsBack });
     
     if (result.error) {
       return res.status(400).json({ error: result.error });
     }
     
-    console.log(`[Admin] Conference room backfill complete: ${result.synced} events (${result.linked} linked, ${result.created} created, ${result.skipped} skipped)`);
+    logger.info('[Admin] Conference room backfill complete: events ( linked, created, skipped)', { extra: { resultSynced: result.synced, resultLinked: result.linked, resultCreated: result.created, resultSkipped: result.skipped } });
     
     res.json({
       success: true,
@@ -159,7 +160,7 @@ router.post('/api/admin/conference-room/backfill', isAdmin, async (req, res) => 
       }
     });
   } catch (error: unknown) {
-    console.error('Conference room backfill error:', error);
+    logger.error('Conference room backfill error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to run backfill', details: getErrorMessage(error) });
   }
 });
@@ -170,12 +171,12 @@ router.post('/api/admin/bookings/sync-history', isAdmin, async (req, res) => {
   try {
     const { monthsBack = 12 } = req.body;
     
-    console.log(`[Admin] Starting conference room booking history sync for ${monthsBack} months...`);
-    console.log(`[Admin] Note: Golf calendar sync is deprecated - bookings are done in-app only`);
+    logger.info('[Admin] Starting conference room booking history sync for months...', { extra: { monthsBack } });
+    logger.info('[Admin] Note: Golf calendar sync is deprecated - bookings are done in-app only');
     
     const conferenceResult = await syncConferenceRoomCalendarToBookings({ monthsBack });
     
-    console.log(`[Admin] Conference room sync complete: ${conferenceResult.synced} events`);
+    logger.info('[Admin] Conference room sync complete: events', { extra: { conferenceResultSynced: conferenceResult.synced } });
     
     res.json({
       success: !conferenceResult.error,
@@ -202,7 +203,7 @@ router.post('/api/admin/bookings/sync-history', isAdmin, async (req, res) => {
       }
     });
   } catch (error: unknown) {
-    console.error('Booking sync error:', error);
+    logger.error('Booking sync error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to run sync', details: getErrorMessage(error) });
   }
 });
@@ -210,11 +211,11 @@ router.post('/api/admin/bookings/sync-history', isAdmin, async (req, res) => {
 // Quick sync for conference room calendar (used by sync button on bookings page)
 router.post('/api/admin/bookings/sync-calendar', isStaffOrAdmin, async (req, res) => {
   try {
-    console.log('[Admin] Running conference room calendar sync...');
+    logger.info('[Admin] Running conference room calendar sync...');
     
     const conferenceResult = await syncConferenceRoomCalendarToBookings();
     
-    console.log(`[Admin] Conference room sync complete: ${conferenceResult.synced} events`);
+    logger.info('[Admin] Conference room sync complete: events', { extra: { conferenceResultSynced: conferenceResult.synced } });
     
     res.json({
       success: !conferenceResult.error,
@@ -227,7 +228,7 @@ router.post('/api/admin/bookings/sync-calendar', isStaffOrAdmin, async (req, res
       }
     });
   } catch (error: unknown) {
-    console.error('Calendar sync error:', error);
+    logger.error('Calendar sync error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync calendar' });
   }
 });

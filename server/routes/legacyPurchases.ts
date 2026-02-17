@@ -1,3 +1,4 @@
+import { logger } from '../core/logger';
 import { Router, Request, Response } from "express";
 import { db } from "../db";
 import { pool } from "../core/db";
@@ -67,7 +68,7 @@ router.get("/api/legacy-purchases/member/:email", isStaffOrAdmin, async (req: Re
     
     res.json(formattedPurchases);
   } catch (error: unknown) {
-    console.error("[LegacyPurchases] Error fetching purchases:", error);
+    logger.error('[LegacyPurchases] Error fetching purchases', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: "Failed to fetch purchases" });
   }
 });
@@ -112,10 +113,10 @@ router.get("/api/legacy-purchases/my-purchases", async (req: Request, res: Respo
       staffName: (p as any).staffName || null,
     }));
     
-    console.log(`[LegacyPurchases] my-purchases for ${targetEmail}: found ${formattedPurchases.length} purchases`);
+    logger.info('[LegacyPurchases] my-purchases for : found purchases', { extra: { targetEmail, formattedPurchasesLength: formattedPurchases.length } });
     res.json(formattedPurchases);
   } catch (error: unknown) {
-    console.error("[LegacyPurchases] Error fetching my purchases:", error);
+    logger.error('[LegacyPurchases] Error fetching my purchases', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: "Failed to fetch purchases" });
   }
 });
@@ -354,7 +355,7 @@ async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurcha
           source: 'Stripe',
         }));
     } catch (balanceError: unknown) {
-      console.error('[UnifiedPurchases] Error fetching balance transactions:', balanceError);
+      logger.error('[UnifiedPurchases] Error fetching balance transactions', { extra: { balanceError } });
     }
   }
   
@@ -381,10 +382,10 @@ router.get("/api/members/:email/unified-purchases", isStaffOrAdmin, async (req: 
     const { email } = req.params;
     const purchases = await getUnifiedPurchasesForEmail(email as string);
     
-    console.log(`[UnifiedPurchases] staff view for ${email}: found ${purchases.length} purchases`);
+    logger.info('[UnifiedPurchases] staff view for : found purchases', { extra: { email, purchasesLength: purchases.length } });
     res.json(purchases);
   } catch (error: unknown) {
-    console.error("[UnifiedPurchases] Error fetching unified purchases:", error);
+    logger.error('[UnifiedPurchases] Error fetching unified purchases', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: "Failed to fetch unified purchases" });
   }
 });
@@ -412,10 +413,10 @@ router.get("/api/my-unified-purchases", async (req: Request, res: Response) => {
     
     const purchases = await getUnifiedPurchasesForEmail(targetEmail);
     
-    console.log(`[UnifiedPurchases] my-unified-purchases for ${targetEmail}: found ${purchases.length} purchases`);
+    logger.info('[UnifiedPurchases] my-unified-purchases for : found purchases', { extra: { targetEmail, purchasesLength: purchases.length } });
     res.json(purchases);
   } catch (error: unknown) {
-    console.error("[UnifiedPurchases] Error fetching my unified purchases:", error);
+    logger.error('[UnifiedPurchases] Error fetching my unified purchases', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: "Failed to fetch unified purchases" });
   }
 });
@@ -441,7 +442,7 @@ router.get("/api/legacy-purchases/member/:email/stats", isStaffOrAdmin, async (r
       guestSimFees: stats[0]?.guestSimFees || 0,
     });
   } catch (error: unknown) {
-    console.error("[LegacyPurchases] Error fetching stats:", error);
+    logger.error('[LegacyPurchases] Error fetching stats', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: "Failed to fetch stats" });
   }
 });
@@ -473,7 +474,7 @@ router.post("/api/legacy-purchases/admin/import", isAdmin, async (req: Request, 
       results,
     });
   } catch (error: unknown) {
-    console.error("[LegacyPurchases] Import error:", error);
+    logger.error('[LegacyPurchases] Import error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ 
       error: "Import failed",
       details: getErrorMessage(error)
@@ -491,7 +492,7 @@ router.get("/api/legacy-purchases/admin/import-jobs", isAdmin, async (req: Reque
     
     res.json(jobs);
   } catch (error: unknown) {
-    console.error("[LegacyPurchases] Error fetching import jobs:", error);
+    logger.error('[LegacyPurchases] Error fetching import jobs', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: "Failed to fetch import jobs" });
   }
 });
@@ -542,7 +543,7 @@ router.post("/api/legacy-purchases/admin/upload-csv",
       
       if (files.firstVisitFile && files.firstVisitFile[0]) {
         const firstVisitContent = files.firstVisitFile[0].buffer.toString('utf-8');
-        console.log(`[CSVUpload] Processing First Visit Report: ${files.firstVisitFile[0].originalname}`);
+        logger.info('[CSVUpload] Processing First Visit Report', { extra: { filesFirstVisitFile_0_Originalname: files.firstVisitFile[0].originalname } });
         
         // Parse to build lookup map
         clientLookup = parseFirstVisitReport(firstVisitContent);
@@ -551,18 +552,18 @@ router.post("/api/legacy-purchases/admin/upload-csv",
         const firstVisitResult = await importFirstVisitReport(firstVisitContent);
         results.firstVisit = firstVisitResult;
         
-        console.log(`[CSVUpload] First Visit result: ${JSON.stringify(firstVisitResult)}`);
+        logger.info('[CSVUpload] First Visit result', { extra: { JSONStringify_firstVisitResult: JSON.stringify(firstVisitResult) } });
       }
       
       // Step 2: Process Sales Report with enhanced matching
       if (files.salesFile && files.salesFile[0]) {
         const salesContent = files.salesFile[0].buffer.toString('utf-8');
-        console.log(`[CSVUpload] Processing Sales Report: ${files.salesFile[0].originalname}`);
+        logger.info('[CSVUpload] Processing Sales Report', { extra: { filesSalesFile_0_Originalname: files.salesFile[0].originalname } });
         
         const salesResult = await importSalesFromContent(salesContent, clientLookup, batchId);
         results.sales = salesResult;
         
-        console.log(`[CSVUpload] Sales result: ${JSON.stringify(salesResult)}`);
+        logger.info('[CSVUpload] Sales result', { extra: { JSONStringify_salesResult: JSON.stringify(salesResult) } });
       }
       
       // Log the action
@@ -592,7 +593,7 @@ router.post("/api/legacy-purchases/admin/upload-csv",
         results,
       });
     } catch (error: unknown) {
-      console.error("[CSVUpload] Import error:", error);
+      logger.error('[CSVUpload] Import error', { error: error instanceof Error ? error : new Error(String(error)) });
       res.status(500).json({ 
         error: "CSV import failed",
         details: getErrorMessage(error)
@@ -612,7 +613,7 @@ router.get("/api/legacy-purchases/admin/unmatched", isAdmin, async (req: Request
     
     res.json(unmatched);
   } catch (error: unknown) {
-    console.error("[LegacyPurchases] Error fetching unmatched:", error);
+    logger.error('[LegacyPurchases] Error fetching unmatched', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: "Failed to fetch unmatched purchases" });
   }
 });
@@ -672,7 +673,7 @@ router.post("/api/legacy-purchases/admin/link-guest-fees", isAdmin, async (req: 
       linked,
     });
   } catch (error: unknown) {
-    console.error("[LegacyPurchases] Error linking guest fees:", error);
+    logger.error('[LegacyPurchases] Error linking guest fees', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: "Failed to link guest fees" });
   }
 });
@@ -803,7 +804,7 @@ async function createLegacyLineItem(
     
     return { success: true, lineItemId };
   } catch (error: unknown) {
-    console.error('[LegacyPurchases] Error creating line item:', error);
+    logger.error('[LegacyPurchases] Error creating line item', { error: error instanceof Error ? error : new Error(String(error)) });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -839,12 +840,12 @@ router.post("/api/legacy-purchases/admin/sync-hubspot", isAdmin, async (req: Req
       .map(m => m.memberEmail)
       .filter((email): email is string => !!email);
     
-    console.log(`[LegacyPurchases] Found ${uniqueEmails.length} members with unsynced purchases`);
+    logger.info('[LegacyPurchases] Found members with unsynced purchases', { extra: { uniqueEmailsLength: uniqueEmails.length } });
     
     // Step 2: Process members in batches
     for (let i = 0; i < uniqueEmails.length; i += BATCH_SIZE) {
       const batchEmails = uniqueEmails.slice(i, i + BATCH_SIZE);
-      console.log(`[LegacyPurchases] Processing batch ${Math.floor(i/BATCH_SIZE) + 1} of ${Math.ceil(uniqueEmails.length/BATCH_SIZE)}`);
+      logger.info('[LegacyPurchases] Processing batch of', { extra: { MathFloor_i_BATCH_SIZE_1: Math.floor(i/BATCH_SIZE) + 1, MathCeil_uniqueEmailsLength_BATCH_SIZE: Math.ceil(uniqueEmails.length/BATCH_SIZE) } });
       
       for (const memberEmail of batchEmails) {
         try {
@@ -985,10 +986,10 @@ router.post("/api/legacy-purchases/admin/sync-hubspot", isAdmin, async (req: Req
         }
       }
     } catch (contactErr: unknown) {
-      console.warn('[LegacyPurchases] Contact property sync failed:', getErrorMessage(contactErr));
+      logger.warn('[LegacyPurchases] Contact property sync failed', { extra: { contactErr: getErrorMessage(contactErr) } });
     }
     
-    console.log(`[LegacyPurchases] Sync complete:`, results);
+    logger.info('[LegacyPurchases] Sync complete:', { extra: { results } });
     
     res.json({
       success: true,
@@ -996,7 +997,7 @@ router.post("/api/legacy-purchases/admin/sync-hubspot", isAdmin, async (req: Req
       errorDetails: results.errorDetails.length > 0 ? results.errorDetails : undefined,
     });
   } catch (error: unknown) {
-    console.error("[LegacyPurchases] HubSpot sync error:", error);
+    logger.error('[LegacyPurchases] HubSpot sync error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ 
       error: "HubSpot sync failed",
       details: getErrorMessage(error)
@@ -1049,7 +1050,7 @@ router.post("/api/legacy-purchases/admin/sync-hubspot/:email", isAdmin, async (r
       properties,
     });
   } catch (error: unknown) {
-    console.error("[LegacyPurchases] HubSpot sync error:", error);
+    logger.error('[LegacyPurchases] HubSpot sync error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ 
       error: "HubSpot sync failed",
       details: getErrorMessage(error)

@@ -1,3 +1,4 @@
+import { logger } from '../core/logger';
 import { Router } from 'express';
 import { pool, isProduction } from '../core/db';
 import { isAdmin, isStaffOrAdmin } from '../core/middleware';
@@ -23,7 +24,7 @@ router.get('/api/membership-tiers', async (req, res) => {
     const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Membership tiers fetch error:', error);
+    if (!isProduction) logger.error('Membership tiers fetch error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch membership tiers' });
   }
 });
@@ -66,7 +67,7 @@ router.get('/api/membership-tiers/limits/:tierName', async (req, res) => {
     
     res.json(result.rows[0]);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Membership tier limits fetch error:', error);
+    if (!isProduction) logger.error('Membership tier limits fetch error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch tier limits' });
   }
 });
@@ -85,7 +86,7 @@ router.get('/api/membership-tiers/:id', async (req, res) => {
     
     res.json(result.rows[0]);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Membership tier fetch error:', error);
+    if (!isProduction) logger.error('Membership tier fetch error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch membership tier' });
   }
 });
@@ -162,7 +163,7 @@ router.put('/api/membership-tiers/:id', isAdmin, async (req, res) => {
     
     res.json(updatedTier);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Membership tier update error:', error);
+    if (!isProduction) logger.error('Membership tier update error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update membership tier' });
   }
 });
@@ -213,7 +214,7 @@ router.post('/api/membership-tiers', isAdmin, async (req, res) => {
     
     res.status(201).json(result.rows[0]);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Membership tier create error:', error);
+    if (!isProduction) logger.error('Membership tier create error', { error: error instanceof Error ? error : new Error(String(error)) });
     if (getErrorCode(error) === '23505') {
       res.status(400).json({ error: 'A tier with this name or slug already exists' });
     } else {
@@ -225,23 +226,23 @@ router.post('/api/membership-tiers', isAdmin, async (req, res) => {
 // Admin endpoint to sync all membership tiers to Stripe (two-way sync)
 router.post('/api/admin/stripe/sync-products', isStaffOrAdmin, async (req, res) => {
   try {
-    console.log('[Admin] Starting Stripe product sync...');
+    logger.info('[Admin] Starting Stripe product sync...');
     
     // Step 1: Push app products to Stripe
     const syncResult = await syncMembershipTiersToStripe();
-    console.log(`[Admin] Stripe sync complete: ${syncResult.synced} synced, ${syncResult.failed} failed, ${syncResult.skipped} skipped`);
+    logger.info('[Admin] Stripe sync complete: synced, failed, skipped', { extra: { syncResultSynced: syncResult.synced, syncResultFailed: syncResult.failed, syncResultSkipped: syncResult.skipped } });
     
     // Step 2: Archive orphan Stripe products not in the app
     const cleanupResult = await cleanupOrphanStripeProducts();
-    console.log(`[Admin] Stripe cleanup complete: ${cleanupResult.archived} archived, ${cleanupResult.skipped} skipped`);
+    logger.info('[Admin] Stripe cleanup complete: archived, skipped', { extra: { cleanupResultArchived: cleanupResult.archived, cleanupResultSkipped: cleanupResult.skipped } });
     
     // Step 3: Sync tier features to Stripe entitlements
     const featureResult = await syncTierFeaturesToStripe();
-    console.log(`[Admin] Feature sync complete: ${featureResult.featuresCreated} created, ${featureResult.featuresAttached} attached, ${featureResult.featuresRemoved} removed`);
+    logger.info('[Admin] Feature sync complete: created, attached, removed', { extra: { featureResultFeaturesCreated: featureResult.featuresCreated, featureResultFeaturesAttached: featureResult.featuresAttached, featureResultFeaturesRemoved: featureResult.featuresRemoved } });
     
     // Step 4: Sync cafe items to Stripe
     const cafeResult = await syncCafeItemsToStripe();
-    console.log(`[Admin] Cafe sync complete: ${cafeResult.synced} synced, ${cafeResult.failed} failed, ${cafeResult.skipped} skipped`);
+    logger.info('[Admin] Cafe sync complete: synced, failed, skipped', { extra: { cafeResultSynced: cafeResult.synced, cafeResultFailed: cafeResult.failed, cafeResultSkipped: cafeResult.skipped } });
     
     res.json({ 
       success: syncResult.success && cleanupResult.success && featureResult.success && cafeResult.success, 
@@ -257,7 +258,7 @@ router.post('/api/admin/stripe/sync-products', isStaffOrAdmin, async (req, res) 
       cafeSync: cafeResult,
     });
   } catch (error: unknown) {
-    console.error('[Admin] Stripe sync error:', error);
+    logger.error('[Admin] Stripe sync error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync products to Stripe', message: getErrorMessage(error) });
   }
 });
@@ -268,21 +269,21 @@ router.get('/api/admin/stripe/sync-status', isStaffOrAdmin, async (req, res) => 
     const status = await getTierSyncStatus();
     res.json({ tiers: status });
   } catch (error: unknown) {
-    console.error('[Admin] Error getting sync status:', error);
+    logger.error('[Admin] Error getting sync status', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to get sync status' });
   }
 });
 
 router.post('/api/admin/stripe/pull-from-stripe', isStaffOrAdmin, async (req, res) => {
   try {
-    console.log('[Admin] Starting pull from Stripe...');
+    logger.info('[Admin] Starting pull from Stripe...');
 
     const [tierResult, cafeResult] = await Promise.all([
       pullTierFeaturesFromStripe(),
       pullCafeItemsFromStripe(),
     ]);
 
-    console.log(`[Admin] Pull from Stripe complete: ${tierResult.tiersUpdated} tiers updated, ${cafeResult.synced} cafe items synced, ${cafeResult.created} created, ${cafeResult.deactivated} deactivated`);
+    logger.info('[Admin] Pull from Stripe complete: tiers updated, cafe items synced, created, deactivated', { extra: { tierResultTiersUpdated: tierResult.tiersUpdated, cafeResultSynced: cafeResult.synced, cafeResultCreated: cafeResult.created, cafeResultDeactivated: cafeResult.deactivated } });
 
     logFromRequest(req, {
       action: 'pull_from_stripe',
@@ -304,7 +305,7 @@ router.post('/api/admin/stripe/pull-from-stripe', isStaffOrAdmin, async (req, re
       cafe: cafeResult,
     });
   } catch (error: unknown) {
-    console.error('[Admin] Pull from Stripe error:', error);
+    logger.error('[Admin] Pull from Stripe error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to pull from Stripe', message: getErrorMessage(error) });
   }
 });

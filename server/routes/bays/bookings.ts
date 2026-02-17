@@ -7,7 +7,7 @@ import { sendPushNotification } from '../push';
 import { checkDailyBookingLimit, getMemberTierByEmail, getTierLimits, getDailyBookedMinutes } from '../../core/tierService';
 import { notifyAllStaff } from '../../core/notificationService';
 import { formatNotificationDateTime, formatDateDisplayWithDay, formatTime12Hour, createPacificDate } from '../../utils/dateUtils';
-import { logAndRespond } from '../../core/logger';
+import {logAndRespond, logger } from '../../core/logger';
 import { bookingEvents } from '../../core/bookingEvents';
 import { broadcastAvailabilityUpdate } from '../../core/websocket';
 import { getSessionUser } from '../../types/session';
@@ -567,7 +567,7 @@ router.post('/api/booking-requests', async (req, res) => {
               participant.userId = existingUser.id;
             }
           } catch (err: unknown) {
-            console.error(`[Booking] Failed to lookup user for email ${participant.email}:`, err);
+            logger.error('[Booking] Failed to lookup user for email', { extra: { email: participant.email, err } });
           }
         }
         
@@ -591,10 +591,10 @@ router.post('/api/booking-requests', async (req, res) => {
                   `${existingUser.firstName || ''} ${existingUser.lastName || ''}`.trim() || 
                   existingUser.email;
               }
-              console.log(`[Booking] Resolved email for directory-selected participant: ${participant.email}`);
+              logger.info('[Booking] Resolved email for directory-selected participant', { extra: { participantEmail: participant.email } });
             }
           } catch (err: unknown) {
-            console.error(`[Booking] Failed to lookup email for userId ${participant.userId}:`, err);
+            logger.error('[Booking] Failed to lookup email for userId', { extra: { userId: participant.userId, err } });
           }
         }
       }
@@ -734,7 +734,7 @@ router.post('/api/booking-requests', async (req, res) => {
           client
         );
         if (!holdResult.success) {
-          console.log(`[Booking] Guest pass hold not created (non-blocking): ${holdResult.error}`);
+          logger.info('[Booking] Guest pass hold not created (non-blocking)', { extra: { holdResultError: holdResult.error } });
         }
       }
       
@@ -758,7 +758,7 @@ router.post('/api/booking-requests', async (req, res) => {
           );
         }
         
-        console.log(`[Booking] Linked prepayment ${linkedPrepaymentId} to conference room booking ${insertResult.rows[0].id}`);
+        logger.info('[Booking] Linked prepayment to conference room booking', { extra: { linkedPrepaymentId, insertResultRows_0_Id: insertResult.rows[0].id } });
       }
       
       await client.query('COMMIT');
@@ -818,7 +818,7 @@ router.post('/api/booking-requests', async (req, res) => {
           resourceName = resource.name;
         }
       } catch (e: unknown) {
-        console.error('[Bookings] Failed to fetch resource name:', e);
+        logger.error('[Bookings] Failed to fetch resource name', { extra: { e } });
       }
     }
     
@@ -884,7 +884,7 @@ router.post('/api/booking-requests', async (req, res) => {
           url: '/admin/bookings',
           sendPush: true
         }
-      ).catch(err => console.error('Staff notification failed:', err));
+      ).catch(err => logger.error('Staff notification failed:', { extra: { err } }));
       
       bookingEvents.publish('booking_created', {
         bookingId: row.id,
@@ -898,7 +898,7 @@ router.post('/api/booking-requests', async (req, res) => {
         playerCount: declared_player_count || undefined,
         status: row.status || 'pending',
         actionBy: 'member'
-      }, { notifyMember: false, notifyStaff: true }).catch(err => console.error('Booking event publish failed:', err));
+      }, { notifyMember: false, notifyStaff: true }).catch(err => logger.error('Booking event publish failed:', { extra: { err } }));
       
       broadcastAvailabilityUpdate({
         resourceId: row.resourceId || undefined,
@@ -907,7 +907,7 @@ router.post('/api/booking-requests', async (req, res) => {
         action: 'booked'
       });
     } catch (postCommitError: unknown) {
-      console.error('[BookingRequest] Post-commit operations failed:', postCommitError);
+      logger.error('[BookingRequest] Post-commit operations failed', { extra: { postCommitError } });
     }
   } catch (error: unknown) {
     const { isConstraintError } = await import('../../core/db');
@@ -1039,12 +1039,12 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
     }
     
     if (!isOwnBooking && !isValidViewAs && !isLinkedEmail) {
-      console.warn('[Member Cancel] Email mismatch:', { 
+      logger.warn('[Member Cancel] Email mismatch', { extra: { bookingId_bookingEmail_existing_userEmail_sessionEmail_rawSessionEmail_actingAsEmail_actingAsEmail_none: { 
         bookingId, 
         bookingEmail: existing.userEmail, 
         sessionEmail: rawSessionEmail,
         actingAsEmail: actingAsEmail || 'none'
-      });
+      } } });
       return res.status(403).json({ error: 'You can only cancel your own bookings' });
     }
     
@@ -1097,7 +1097,7 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
           relatedType: 'booking_request',
           url: '/admin/bookings'
         }
-      ).catch(err => console.error('Staff cancellation notification failed:', err));
+      ).catch(err => logger.error('Staff cancellation notification failed:', { extra: { err } }));
       
       await db.insert(notifications).values({
         userEmail: existing.userEmail || '',
@@ -1168,7 +1168,7 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
         [bookingId]
       );
     } catch (sessionErr: unknown) {
-      console.error('[Member Cancel] Failed to fetch session (non-blocking):', sessionErr);
+      logger.error('[Member Cancel] Failed to fetch session (non-blocking)', { extra: { sessionErr } });
     }
     
     if (!shouldSkipRefund && existing.overagePaymentIntentId) {
@@ -1185,17 +1185,17 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
             });
             refundedAmountCents += refund.amount;
             refundType = 'overage';
-            console.log(`[Member Cancel] Refunded overage payment ${existing.overagePaymentIntentId} for booking ${bookingId}, refund: ${refund.id}`);
+            logger.info('[Member Cancel] Refunded overage payment for booking , refund', { extra: { existingOveragePaymentIntentId: existing.overagePaymentIntentId, bookingId, refundId: refund.id } });
           }
         } else {
           await cancelPaymentIntent(existing.overagePaymentIntentId);
-          console.log(`[Member Cancel] Cancelled overage payment intent ${existing.overagePaymentIntentId} for booking ${bookingId}`);
+          logger.info('[Member Cancel] Cancelled overage payment intent for booking', { extra: { existingOveragePaymentIntentId: existing.overagePaymentIntentId, bookingId } });
         }
         await db.update(bookingRequests)
           .set({ overagePaymentIntentId: null, overageFeeCents: 0, overageMinutes: 0 })
           .where(eq(bookingRequests.id, bookingId));
       } catch (paymentErr: unknown) {
-        console.error('[Member Cancel] Failed to handle overage payment (non-blocking):', paymentErr);
+        logger.error('[Member Cancel] Failed to handle overage payment (non-blocking)', { extra: { paymentErr } });
       }
     }
     
@@ -1211,14 +1211,14 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
         for (const row of pendingIntents.rows) {
           try {
             await cancelPaymentIntent(row.stripe_payment_intent_id);
-            console.log(`[Member Cancel] Cancelled payment intent ${row.stripe_payment_intent_id} for booking ${bookingId}`);
+            logger.info('[Member Cancel] Cancelled payment intent for booking', { extra: { rowStripe_payment_intent_id: row.stripe_payment_intent_id, bookingId } });
           } catch (cancelErr: unknown) {
-            console.error(`[Member Cancel] Failed to cancel payment intent ${row.stripe_payment_intent_id}:`, getErrorMessage(cancelErr));
+            logger.error('[Member Cancel] Failed to cancel payment intent', { extra: { stripe_payment_intent_id: row.stripe_payment_intent_id, error: getErrorMessage(cancelErr) } });
           }
         }
       }
     } catch (cancelIntentsErr: unknown) {
-      console.error('[Member Cancel] Failed to cancel pending payment intents (non-blocking):', cancelIntentsErr);
+      logger.error('[Member Cancel] Failed to cancel pending payment intents (non-blocking)', { extra: { cancelIntentsErr } });
     }
     
     // Refund participant payments (guest fees paid via Stripe)
@@ -1256,16 +1256,16 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
                   });
                   refundedAmountCents += refund.amount;
                   refundType = refundType === 'overage' ? 'both' : 'guest_fees';
-                  console.log(`[Member Cancel] Refunded guest fee for ${participant.display_name}: $${(participant.cached_fee_cents / 100).toFixed(2)}, refund: ${refund.id}`);
+                  logger.info('[Member Cancel] Refunded guest fee for : $, refund', { extra: { participantDisplay_name: participant.display_name, participantCached_fee_cents_100_ToFixed_2: (participant.cached_fee_cents / 100).toFixed(2), refundId: refund.id } });
                 }
               } catch (refundErr: unknown) {
-                console.error(`[Member Cancel] Failed to refund participant ${participant.id}:`, getErrorMessage(refundErr));
+                logger.error('[Member Cancel] Failed to refund participant', { extra: { id: participant.id, error: getErrorMessage(refundErr) } });
               }
             }
           }
         }
       } catch (participantRefundErr: unknown) {
-        console.error('[Member Cancel] Failed to process participant refunds (non-blocking):', participantRefundErr);
+        logger.error('[Member Cancel] Failed to process participant refunds (non-blocking)', { extra: { participantRefundErr } });
       }
     } else {
       refundSkippedDueToLateCancel = true;
@@ -1281,10 +1281,10 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
            AND payment_status = 'pending'`,
           [sessionResult.rows[0].session_id]
         );
-        console.log(`[Member Cancel] Cleared pending fees for session ${sessionResult.rows[0].session_id}`);
+        logger.info('[Member Cancel] Cleared pending fees for session', { extra: { sessionResultRows_0_Session_id: sessionResult.rows[0].session_id } });
       }
     } catch (feeCleanupErr: unknown) {
-      console.error('[Member Cancel] Failed to clear pending fees (non-blocking):', feeCleanupErr);
+      logger.error('[Member Cancel] Failed to clear pending fees (non-blocking)', { extra: { feeCleanupErr } });
     }
     
     if (wasApproved) {
@@ -1302,7 +1302,7 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
           relatedType: 'booking_request',
           url: '/admin/bookings'
         }
-      ).catch(err => console.error('Staff cancellation notification failed:', err));
+      ).catch(err => logger.error('Staff cancellation notification failed:', { extra: { err } }));
       
       if (existing.trackmanBookingId) {
         let bayName = 'Bay';
@@ -1324,7 +1324,7 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
             relatedType: 'booking_request',
             url: '/admin/bookings'
           }
-        ).catch(err => console.error('Staff trackman cancellation notification failed:', err));
+        ).catch(err => logger.error('Staff trackman cancellation notification failed:', { extra: { err } }));
       }
       
       if (existing.calendarEventId) {
@@ -1337,7 +1337,7 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
             }
           }
         } catch (calError: unknown) {
-          console.error('Failed to delete calendar event (non-blocking):', calError);
+          logger.error('Failed to delete calendar event (non-blocking)', { extra: { calError } });
         }
       }
       
@@ -1465,7 +1465,7 @@ async function calculateFeeEstimate(params: {
   }
   
   try {
-    console.log('[FeeEstimate] Calculating for:', {
+    logger.info('[FeeEstimate] Calculating for', { extra: { ownerEmail_ownerTier_durationMinutes_playerCount_perPersonMins_dailyAllowance_usedMinutesToday_isConferenceRoom_isUnlimitedTier_guestCount_requestDate: {
       ownerEmail,
       ownerTier,
       durationMinutes,
@@ -1477,7 +1477,7 @@ async function calculateFeeEstimate(params: {
       isUnlimitedTier,
       guestCount,
       requestDate
-    });
+    } } });
     
     // Use unified fee service for actual calculation
     // Only use sessionId lookup for existing sessions - use direct params otherwise
@@ -1501,11 +1501,11 @@ async function calculateFeeEstimate(params: {
       try {
         await applyFeeBreakdownToParticipants(sessionId, breakdown);
       } catch (syncErr: unknown) {
-        console.warn('[FeeEstimate] Non-blocking cache sync failed:', syncErr);
+        logger.warn('[FeeEstimate] Non-blocking cache sync failed', { extra: { syncErr } });
       }
     }
     
-    console.log('[FeeEstimate] Unified breakdown result:', {
+    logger.info('[FeeEstimate] Unified breakdown result', { extra: { overageCents_breakdown_totals_overageCents_guestCents_breakdown_totals_guestCents_totalCents_breakdown_totals_totalCents_participants_breakdown_participants_map_p_type_p_participantType_tierName_p_tierName_dailyAllowance_p_dailyAllowance_usedMinutesToday_p_usedMinutesToday_minutesAllocated_p_minutesAllocated_overageCents_p_overageCents_guestCents_p_guestCents: {
       overageCents: breakdown.totals.overageCents,
       guestCents: breakdown.totals.guestCents,
       totalCents: breakdown.totals.totalCents,
@@ -1518,7 +1518,7 @@ async function calculateFeeEstimate(params: {
         overageCents: p.overageCents,
         guestCents: p.guestCents
       }))
-    });
+    } } });
     
     // Map unified breakdown to legacy response format for backward compatibility
     const overageFee = Math.round(breakdown.totals.overageCents / 100);
@@ -1566,7 +1566,7 @@ async function calculateFeeEstimate(params: {
     };
   } catch (error: unknown) {
     // Do NOT use fallback - this could show incorrect prices
-    console.error('[FeeEstimate] Unified service error:', error);
+    logger.error('[FeeEstimate] Unified service error', { error: error instanceof Error ? error : new Error(String(error)) });
     throw new Error('Unable to calculate fee estimate. Please try again.');
   }
 }

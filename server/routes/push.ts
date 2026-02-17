@@ -1,3 +1,4 @@
+import { logger } from '../core/logger';
 import { Router } from 'express';
 import webpush from 'web-push';
 import { pool, isProduction } from '../core/db';
@@ -20,9 +21,9 @@ if (vapidConfigured) {
     process.env.VAPID_PUBLIC_KEY!,
     process.env.VAPID_PRIVATE_KEY!
   );
-  console.log('[Push] VAPID keys configured - push notifications enabled');
+  logger.info('[Push] VAPID keys configured - push notifications enabled');
 } else {
-  console.warn('[Push] VAPID keys not configured - push notifications will be skipped');
+  logger.warn('[Push] VAPID keys not configured - push notifications will be skipped');
 }
 
 export function isPushNotificationsEnabled(): boolean {
@@ -65,7 +66,7 @@ export async function sendPushNotification(userEmail: string, payload: { title: 
     await Promise.all(notifications);
     return { sent: true };
   } catch (error: unknown) {
-    console.error('Failed to send push notification:', error);
+    logger.error('Failed to send push notification', { error: error instanceof Error ? error : new Error(String(error)) });
     return { sent: false, reason: 'Error sending push' };
   }
 }
@@ -113,14 +114,14 @@ export async function sendPushNotificationToStaff(payload: { title: string; body
     await Promise.all(notifications);
     return { sent: true, count: staffSubscriptions.length };
   } catch (error: unknown) {
-    console.error('Failed to send push notification to staff:', error);
+    logger.error('Failed to send push notification to staff', { error: error instanceof Error ? error : new Error(String(error)) });
     return { sent: false, count: 0, reason: 'Error sending push' };
   }
 }
 
 export async function sendPushNotificationToAllMembers(payload: { title: string; body: string; url?: string; tag?: string }): Promise<number> {
   if (!vapidConfigured) {
-    console.log('[Push to Members] Skipped - VAPID not configured');
+    logger.info('[Push to Members] Skipped - VAPID not configured');
     return 0;
   }
   
@@ -133,7 +134,7 @@ export async function sendPushNotificationToAllMembers(payload: { title: string;
       .where(or(eq(users.role, 'member'), isNull(users.role)));
     
     if (allMembers.length === 0) {
-      console.log('[Push to Members] No members found');
+      logger.info('[Push to Members] No members found');
       return 0;
     }
     
@@ -160,7 +161,7 @@ export async function sendPushNotificationToAllMembers(payload: { title: string;
       await db.insert(notifications).values(notificationValues);
       results.sent = notificationValues.length;
     } catch (err: unknown) {
-      console.error('[Push to Members] Failed to insert in-app notifications:', getErrorMessage(err));
+      logger.error('[Push to Members] Failed to insert in-app notifications', { extra: { err: getErrorMessage(err) } });
     }
     
     for (const sub of memberSubscriptions) {
@@ -179,11 +180,11 @@ export async function sendPushNotificationToAllMembers(payload: { title: string;
       }
     }
     
-    console.log(`[Push to Members] Sent ${results.sent} in-app notifications, ${memberSubscriptions.length - results.pushFailed} push notifications. Failures: ${results.pushFailed}`);
+    logger.info('[Push to Members] Sent in-app notifications, push notifications. Failures', { extra: { resultsSent: results.sent, memberSubscriptionsLength_resultsPushFailed: memberSubscriptions.length - results.pushFailed, resultsPushFailed: results.pushFailed } });
     
     return results.sent;
   } catch (error: unknown) {
-    console.error('Failed to send push notification to members:', error);
+    logger.error('Failed to send push notification to members', { error: error instanceof Error ? error : new Error(String(error)) });
     return 0;
   }
 }
@@ -215,7 +216,7 @@ router.post('/api/push/subscribe', isAuthenticated, async (req: any, res) => {
     
     res.json({ success: true });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Push subscription error:', error);
+    if (!isProduction) logger.error('Push subscription error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to save push subscription' });
   }
 });
@@ -233,7 +234,7 @@ router.post('/api/push/unsubscribe', isAuthenticated, async (req: any, res) => {
     
     res.json({ success: true });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Push unsubscribe error:', error);
+    if (!isProduction) logger.error('Push unsubscribe error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to unsubscribe' });
   }
 });
@@ -250,7 +251,7 @@ router.post('/api/push/test', isAuthenticated, async (req: any, res) => {
     
     res.json({ success: true });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Test push error:', error);
+    if (!isProduction) logger.error('Test push error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to send test notification' });
   }
 });
@@ -393,7 +394,7 @@ export async function sendDailyReminders() {
       }
     }
     
-  console.log(`[Daily Reminders] Sent ${results.events} event, ${results.bookings} booking, ${results.wellness} wellness reminders. Push failures: ${results.pushFailed}`);
+  logger.info('[Daily Reminders] Sent event, booking, wellness reminders. Push failures', { extra: { resultsEvents: results.events, resultsBookings: results.bookings, resultsWellness: results.wellness, resultsPushFailed: results.pushFailed } });
   
   return {
     success: true,
@@ -407,7 +408,7 @@ router.post('/api/push/send-daily-reminders', isStaffOrAdmin, async (req, res) =
     const result = await sendDailyReminders();
     res.json(result);
   } catch (error: unknown) {
-    console.error('Daily reminders error:', error);
+    logger.error('Daily reminders error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to send daily reminders' });
   }
 });
@@ -444,7 +445,7 @@ export async function sendMorningClosureNotifications() {
       ));
     
     if (todayClosures.length === 0) {
-      console.log('[Morning Notifications] No closures starting today');
+      logger.info('[Morning Notifications] No closures starting today');
       return { success: true, message: 'No closures starting today', ...results };
     }
     
@@ -468,7 +469,7 @@ export async function sendMorningClosureNotifications() {
     
     if (closuresToNotify.length === 0) {
       const skippedCount = todayClosures.length;
-      console.log(`[Morning Notifications] All ${skippedCount} closures already notified today`);
+      logger.info('[Morning Notifications] All closures already notified today', { extra: { skippedCount } });
       return { success: true, message: `All ${skippedCount} closures already notified`, ...results, skipped: skippedCount };
     }
     
@@ -481,7 +482,7 @@ export async function sendMorningClosureNotifications() {
       .where(or(eq(users.role, 'member'), isNull(users.role)));
     
     if (allMembers.length === 0) {
-      console.log('[Morning Notifications] No members to notify');
+      logger.info('[Morning Notifications] No members to notify');
       return { success: true, message: 'No members to notify', ...results };
     }
     
@@ -545,7 +546,7 @@ export async function sendMorningClosureNotifications() {
       }
     }
     
-    console.log(`[Morning Notifications] Sent ${results.closures} closure notifications, skipped ${results.skipped} (already notified). Push failures: ${results.pushFailed}`);
+    logger.info('[Morning Notifications] Sent closure notifications, skipped (already notified). Push failures', { extra: { resultsClosures: results.closures, resultsSkipped: results.skipped, resultsPushFailed: results.pushFailed } });
     
     return {
       success: true,
@@ -553,7 +554,7 @@ export async function sendMorningClosureNotifications() {
       ...results
     };
   } catch (error: unknown) {
-    console.error('[Morning Notifications] Error:', error);
+    logger.error('[Morning Notifications] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     results.errors.push(getErrorMessage(error));
     return { success: false, message: 'Failed to send morning notifications', ...results };
   }
@@ -564,7 +565,7 @@ router.post('/api/push/send-morning-closure-notifications', isStaffOrAdmin, asyn
     const result = await sendMorningClosureNotifications();
     res.json(result);
   } catch (error: unknown) {
-    console.error('Morning closure notifications error:', error);
+    logger.error('Morning closure notifications error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to send morning closure notifications' });
   }
 });

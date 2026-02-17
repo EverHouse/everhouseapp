@@ -4,6 +4,7 @@ import { faqs } from '../../shared/schema';
 import { eq, asc, desc } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../core/middleware';
 import { logFromRequest } from '../core/auditLog';
+import { logger } from '../core/logger';
 
 const router = Router();
 
@@ -26,7 +27,7 @@ router.get('/api/faqs', async (req, res) => {
     
     res.json(result);
   } catch (error: unknown) {
-    console.error('FAQs fetch error:', error);
+    logger.error('FAQs fetch error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch FAQs' });
   }
 });
@@ -38,7 +39,7 @@ router.get('/api/admin/faqs', isStaffOrAdmin, async (req, res) => {
     
     res.json(result);
   } catch (error: unknown) {
-    console.error('Admin FAQs fetch error:', error);
+    logger.error('Admin FAQs fetch error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch FAQs' });
   }
 });
@@ -63,7 +64,7 @@ router.post('/api/admin/faqs', isStaffOrAdmin, async (req, res) => {
     
     res.status(201).json(newFaq);
   } catch (error: unknown) {
-    console.error('FAQ creation error:', error);
+    logger.error('FAQ creation error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create FAQ' });
   }
 });
@@ -93,7 +94,7 @@ router.put('/api/admin/faqs/:id', isStaffOrAdmin, async (req, res) => {
     
     res.json(updated);
   } catch (error: unknown) {
-    console.error('FAQ update error:', error);
+    logger.error('FAQ update error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update FAQ' });
   }
 });
@@ -114,7 +115,7 @@ router.delete('/api/admin/faqs/:id', isStaffOrAdmin, async (req, res) => {
     
     res.json({ success: true, deleted });
   } catch (error: unknown) {
-    console.error('FAQ deletion error:', error);
+    logger.error('FAQ deletion error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to delete FAQ' });
   }
 });
@@ -145,7 +146,7 @@ router.post('/api/admin/faqs/reorder', isStaffOrAdmin, async (req, res) => {
     
     res.json({ success: true, updated: order.length });
   } catch (error: unknown) {
-    console.error('FAQ reorder error:', error);
+    logger.error('FAQ reorder error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to reorder FAQs' });
   }
 });
@@ -169,7 +170,7 @@ router.post('/api/admin/faqs/seed', isStaffOrAdmin, async (req, res) => {
     
     res.json({ success: true, count: inserted.length, faqs: inserted });
   } catch (error: unknown) {
-    console.error('FAQ seeding error:', error);
+    logger.error('FAQ seeding error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to seed FAQs' });
   }
 });

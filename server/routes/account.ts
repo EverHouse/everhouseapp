@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { pool } from '../core/db';
 import { notifyAllStaff } from '../core/notificationService';
 import { getResendClient } from '../utils/resend';
-import { logAndRespond } from '../core/logger';
+import {logAndRespond, logger } from '../core/logger';
 import { isAuthenticated } from '../core/middleware';
 
 const router = Router();
@@ -67,10 +67,10 @@ router.post('/api/account/delete-request', isAuthenticated, async (req: any, res
         `
       });
     } catch (emailError: unknown) {
-      console.warn('[Account] Failed to send deletion confirmation email (non-blocking):', emailError);
+      logger.warn('[Account] Failed to send deletion confirmation email (non-blocking)', { extra: { emailError } });
     }
 
-    console.log(`[Account] Deletion request submitted for ${user.email}`);
+    logger.info('[Account] Deletion request submitted for', { extra: { userEmail: user.email } });
     
     return res.json({ 
       success: true,

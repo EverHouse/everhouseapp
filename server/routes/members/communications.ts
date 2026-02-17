@@ -1,3 +1,4 @@
+import { logger } from '../../core/logger';
 import { Router } from 'express';
 import { eq, sql, desc, and } from 'drizzle-orm';
 import { db } from '../../db';
@@ -24,7 +25,7 @@ router.get('/api/members/:email/communications', isStaffOrAdmin, async (req, res
     
     res.json(logs);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Communication logs error:', error);
+    if (!isProduction) logger.error('Communication logs error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch communication logs' });
   }
 });
@@ -60,7 +61,7 @@ router.post('/api/members/:email/communications', isStaffOrAdmin, async (req, re
     logFromRequest(req, 'create_communication' as any, 'communication' as any, String(result[0].id), normalizedEmail);
     res.status(201).json(result[0]);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Create communication log error:', error);
+    if (!isProduction) logger.error('Create communication log error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create communication log' });
   }
 });
@@ -84,7 +85,7 @@ router.delete('/api/members/:email/communications/:logId', isStaffOrAdmin, async
     logFromRequest(req, 'delete_communication' as any, 'communication' as any, logId as string, normalizedEmail);
     res.json({ success: true });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Delete communication log error:', error);
+    if (!isProduction) logger.error('Delete communication log error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to delete communication log' });
   }
 });
@@ -135,7 +136,7 @@ router.patch('/api/members/me/preferences', isAuthenticated, async (req, res) =>
       updateHubSpotContactPreferences(updated.hubspotId, { 
         emailOptIn: emailOptIn !== undefined ? emailOptIn : undefined,
         smsOptIn: smsOptIn !== undefined ? smsOptIn : undefined
-      }).catch(err => console.error('[Members] Failed to sync preferences to HubSpot:', err));
+      }).catch(err => logger.error('[Members] Failed to sync preferences to HubSpot:', { extra: { err } }));
     }
     
     res.json({ 
@@ -144,7 +145,7 @@ router.patch('/api/members/me/preferences', isAuthenticated, async (req, res) =>
       doNotSellMyInfo: updated.doNotSellMyInfo
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('API error:', error);
+    if (!isProduction) logger.error('API error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update preferences' });
   }
 });
@@ -183,7 +184,7 @@ router.get('/api/members/me/preferences', isAuthenticated, async (req, res) => {
     
     res.json(result[0]);
   } catch (error: unknown) {
-    if (!isProduction) console.error('API error:', error);
+    if (!isProduction) logger.error('API error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch preferences' });
   }
 });
@@ -327,7 +328,7 @@ router.get('/api/my-visits', isAuthenticated, async (req, res) => {
     
     res.json(visits);
   } catch (error: unknown) {
-    if (!isProduction) console.error('API error fetching my-visits:', error);
+    if (!isProduction) logger.error('API error fetching my-visits', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch visits' });
   }
 });
@@ -358,7 +359,7 @@ router.post('/api/members/me/data-export-request', isAuthenticated, async (req, 
     
     const member = result[0];
     const memberName = [member.firstName, member.lastName].filter(Boolean).join(' ') || 'Member';
-    console.log(`[Privacy] Data export requested by ${member.email} at ${member.dataExportRequestedAt}`);
+    logger.info('[Privacy] Data export requested by at', { extra: { memberEmail: member.email, memberDataExportRequestedAt: member.dataExportRequestedAt } });
     
     try {
       const adminStaff = await db.select({ email: staffUsers.email, name: staffUsers.name })
@@ -384,10 +385,10 @@ router.post('/api/members/me/data-export-request', isAuthenticated, async (req, 
             <p>Please prepare and send the member's data export.</p>
           `
         }));
-        console.log(`[Privacy] Data export notification sent to ${adminEmails.length} admin(s)`);
+        logger.info('[Privacy] Data export notification sent to admin(s)', { extra: { adminEmailsLength: adminEmails.length } });
       }
     } catch (emailError) {
-      console.error('[Privacy] Failed to send data export notification email:', emailError);
+      logger.error('[Privacy] Failed to send data export notification email', { extra: { emailError } });
     }
     
     res.json({ 
@@ -396,7 +397,7 @@ router.post('/api/members/me/data-export-request', isAuthenticated, async (req, 
       requestedAt: member.dataExportRequestedAt
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Data export request error:', error);
+    if (!isProduction) logger.error('Data export request error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to submit data export request' });
   }
 });

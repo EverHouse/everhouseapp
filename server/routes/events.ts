@@ -13,6 +13,7 @@ import { sendNotificationToUser, broadcastToStaff } from '../core/websocket';
 import { getSessionUser } from '../types/session';
 import { logFromRequest } from '../core/auditLog';
 import { getErrorMessage } from '../utils/errorUtils';
+import { logger } from '../core/logger';
 
 async function getMemberDisplayName(email: string): Promise<string> {
   try {
@@ -26,7 +27,7 @@ async function getMemberDisplayName(email: string): Promise<string> {
       return [result[0].firstName, result[0].lastName].filter(Boolean).join(' ');
     }
   } catch (err) {
-    if (!isProduction) console.warn('Failed to lookup member name:', err);
+    logger.warn('Failed to lookup member name', { extra: { error: err } });
   }
   return email.split('@')[0];
 }
@@ -139,7 +140,7 @@ router.post('/api/events/sync/google', isStaffOrAdmin, async (req, res) => {
       ...result
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Google Calendar sync error:', error);
+    logger.error('Google Calendar sync error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync Google Calendar events' });
   }
 });
@@ -171,7 +172,7 @@ router.post('/api/events/sync', isStaffOrAdmin, async (req, res) => {
       eventbrite: eventbriteResult.error ? { error: eventbriteResult.error } : eventbriteResult
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Event sync error:', error);
+    logger.error('Event sync error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync events' });
   }
 });
@@ -210,7 +211,7 @@ router.post('/api/calendars/sync-all', isStaffOrAdmin, async (req, res) => {
       message: `Synced ${eventsSynced} events and ${wellnessSynced} wellness classes from Google Calendar. Created ${wellnessBackfilled} calendar events for existing classes.`
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Calendar sync error:', error);
+    logger.error('Calendar sync error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync calendars' });
   }
 });
@@ -238,7 +239,7 @@ router.get('/api/events/needs-review', isStaffOrAdmin, async (req, res) => {
     
     res.json(result);
   } catch (error: unknown) {
-    if (!isProduction) console.error('API error:', error);
+    logger.error('API error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch events needing review' });
   }
 });
@@ -263,7 +264,7 @@ router.post('/api/events/:id/mark-reviewed', isStaffOrAdmin, async (req, res) =>
     
     res.json({ success: true, event: result[0] });
   } catch (error: unknown) {
-    if (!isProduction) console.error('API error:', error);
+    logger.error('API error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to mark event as reviewed' });
   }
 });
@@ -332,7 +333,7 @@ router.get('/api/events', async (req, res) => {
     
     res.json(result);
   } catch (error: unknown) {
-    if (!isProduction) console.error('API error:', error);
+    logger.error('API error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Request failed' });
   }
 });
@@ -388,7 +389,7 @@ router.post('/api/events', isStaffOrAdmin, async (req, res) => {
         trimmedEndTime || trimmedStartTime
       );
     } catch (calError: unknown) {
-      if (!isProduction) console.error('Failed to create Google Calendar event:', calError);
+      logger.error('Failed to create Google Calendar event', { extra: { error: calError } });
       return res.status(500).json({ error: 'Failed to create calendar event. Please try again.' });
     }
     
@@ -426,7 +427,7 @@ router.post('/api/events', isStaffOrAdmin, async (req, res) => {
         const userEmail = getSessionUser(req)?.email || 'system';
         await createEventAvailabilityBlocks(createdEvent.id, trimmedEventDate, trimmedStartTime, trimmedEndTime || trimmedStartTime, newBlockSimulators, newBlockConferenceRoom, userEmail, createdEvent.title);
       } catch (blockError) {
-        if (!isProduction) console.error('Failed to create availability blocks for event:', blockError);
+        logger.error('Failed to create availability blocks for event', { extra: { error: blockError } });
       }
     }
     
@@ -443,7 +444,7 @@ router.post('/api/events', isStaffOrAdmin, async (req, res) => {
     
     res.status(201).json(createdEvent);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Event creation error:', error);
+    logger.error('Event creation error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create event' });
   }
 });
@@ -559,7 +560,7 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
           );
         }
       } catch (calError) {
-        if (!isProduction) console.error('Failed to update Google Calendar event:', calError);
+        logger.error('Failed to update Google Calendar event', { extra: { error: calError } });
       }
     }
     
@@ -584,7 +585,7 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
         await updateEventAvailabilityBlocks(eventId, trimmedEventDate, trimmedStartTime, trimmedEndTime || trimmedStartTime, newBlockSimulators, newBlockConferenceRoom, userEmail, updatedEvent.title);
       }
     } catch (blockError) {
-      if (!isProduction) console.error('Failed to update availability blocks for event:', blockError);
+      logger.error('Failed to update availability blocks for event', { extra: { error: blockError } });
     }
     logFromRequest(req, 'update_event', 'event', String(updatedEvent.id), updatedEvent.title, {
       event_date: updatedEvent.eventDate,
@@ -600,7 +601,7 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
     
     res.json(updatedEvent);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Event update error:', error);
+    logger.error('Event update error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update event' });
   }
 });
@@ -628,7 +629,7 @@ router.get('/api/events/:id/cascade-preview', isStaffOrAdmin, async (req, res) =
       hasRelatedData: rsvpsCount > 0
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Event cascade preview error:', error);
+    logger.error('Event cascade preview error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch cascade preview' });
   }
 });
@@ -659,17 +660,17 @@ router.delete('/api/events/:id', isStaffOrAdmin, async (req, res) => {
         if (calendarId) {
           await deleteCalendarEvent(existing[0].googleCalendarId, calendarId);
         } else {
-          console.error(`[Events] Calendar "${CALENDAR_CONFIG.events.name}" not found for event deletion`);
+          logger.error(`[Events] Calendar "${CALENDAR_CONFIG.events.name}" not found for event deletion`);
         }
       } catch (calError: unknown) {
-        console.error('Failed to delete Google Calendar event:', (calError as any)?.message || calError);
+        logger.error('Failed to delete Google Calendar event', { extra: { error: (calError as any)?.message || calError } });
       }
     }
     
     try {
       await removeEventAvailabilityBlocks(eventId);
     } catch (blockError) {
-      if (!isProduction) console.error('Failed to remove availability blocks for event:', blockError);
+      logger.error('Failed to remove availability blocks for event', { extra: { error: blockError } });
     }
     
     const eventBeforeDelete = await db.select({
@@ -696,7 +697,7 @@ router.delete('/api/events/:id', isStaffOrAdmin, async (req, res) => {
     
     res.json({ success: true, archived: true, archivedBy });
   } catch (error: unknown) {
-    console.error('Event archive error:', (error as any)?.message || error);
+    logger.error('Event archive error', { extra: { error: (error as any)?.message || error } });
     res.status(500).json({ error: 'Failed to archive event', details: (error as any)?.message });
   }
 });
@@ -719,7 +720,7 @@ router.post('/api/eventbrite/sync', isStaffOrAdmin, async (req, res) => {
     
     if (!meResponse.ok) {
       const errorText = await meResponse.text();
-      if (!isProduction) console.error('Eventbrite org fetch error:', errorText);
+      logger.error('Eventbrite org fetch error', { extra: { errorText } });
       return res.status(400).json({ error: 'Failed to fetch Eventbrite organizations' });
     }
     
@@ -737,7 +738,7 @@ router.post('/api/eventbrite/sync', isStaffOrAdmin, async (req, res) => {
 
     if (!eventsResponse.ok) {
       const errorText = await eventsResponse.text();
-      if (!isProduction) console.error('Eventbrite events fetch error:', errorText);
+      logger.error('Eventbrite events fetch error', { extra: { errorText } });
       return res.status(400).json({ error: 'Failed to fetch Eventbrite events' });
     }
 
@@ -808,7 +809,7 @@ router.post('/api/eventbrite/sync', isStaffOrAdmin, async (req, res) => {
       updated
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Eventbrite sync error:', error);
+    logger.error('Eventbrite sync error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync Eventbrite events' });
   }
 });
@@ -840,7 +841,7 @@ router.get('/api/rsvps', async (req, res) => {
             );
             isStaff = result.rows.length > 0;
           } catch (e) {
-            if (!isProduction) console.warn('[events] Staff check query failed:', e);
+            logger.warn('[events] Staff check query failed', { extra: { error: e } });
           }
         }
         if (!isStaff) {
@@ -903,7 +904,7 @@ router.get('/api/rsvps', async (req, res) => {
     
     res.json(result);
   } catch (error: unknown) {
-    if (!isProduction) console.error('API error:', error);
+    logger.error('API error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Request failed' });
   }
 });
@@ -992,7 +993,7 @@ router.post('/api/rsvps', isAuthenticated, async (req, res) => {
       title: 'RSVP Confirmed!',
       body: memberMessage,
       url: '/member-events'
-    }).catch(err => console.error('Push notification failed:', err));
+    }).catch(err => logger.error('Push notification failed', { extra: { error: err } }));
     
     // Send real-time WebSocket notification to member
     sendNotificationToUser(user_email, {
@@ -1015,7 +1016,7 @@ router.post('/api/rsvps', isAuthenticated, async (req, res) => {
     if (getErrorMessage(error) === 'Event is at capacity') {
       return res.status(400).json({ error: 'Event is at capacity' });
     }
-    if (!isProduction) console.error('RSVP creation error:', error);
+    logger.error('RSVP creation error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create RSVP. Staff notification is required.' });
   }
 });
@@ -1091,7 +1092,7 @@ router.delete('/api/rsvps/:event_id/:user_email', async (req, res) => {
     
     res.json({ success: true });
   } catch (error: unknown) {
-    if (!isProduction) console.error('RSVP cancellation error:', error);
+    logger.error('RSVP cancellation error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to cancel RSVP. Staff notification is required.' });
   }
 });
@@ -1129,7 +1130,7 @@ router.get('/api/events/:id/rsvps', isStaffOrAdmin, async (req, res) => {
     
     res.json(result);
   } catch (error: unknown) {
-    if (!isProduction) console.error('API error:', error);
+    logger.error('API error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch RSVPs' });
   }
 });
@@ -1168,7 +1169,7 @@ router.delete('/api/events/:eventId/rsvps/:rsvpId', isStaffOrAdmin, async (req, 
     
     res.json({ success: true });
   } catch (error: unknown) {
-    if (!isProduction) console.error('RSVP deletion error:', error);
+    logger.error('RSVP deletion error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to delete RSVP' });
   }
 });
@@ -1215,7 +1216,7 @@ router.post('/api/events/:id/rsvps/manual', isStaffOrAdmin, async (req, res) => 
     
     res.json({ success: true });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Manual RSVP error:', error);
+    logger.error('Manual RSVP error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to add RSVP' });
   }
 });
@@ -1258,7 +1259,7 @@ router.post('/api/events/:id/sync-eventbrite-attendees', isStaffOrAdmin, async (
     
     if (!attendeesResponse.ok) {
       const errorText = await attendeesResponse.text();
-      if (!isProduction) console.error('Eventbrite attendees fetch error:', errorText);
+      logger.error('Eventbrite attendees fetch error', { extra: { errorText } });
       return res.status(400).json({ error: 'Failed to fetch attendees from Eventbrite' });
     }
     
@@ -1445,7 +1446,7 @@ router.post('/api/events/:id/sync-eventbrite-attendees', isStaffOrAdmin, async (
       message: `Synced ${synced} attendees, ${totalMatched} matched to members`
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Eventbrite attendees sync error:', error);
+    logger.error('Eventbrite attendees sync error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync Eventbrite attendees' });
   }
 });
@@ -1479,7 +1480,7 @@ router.get('/api/events/:id/eventbrite-attendees', isStaffOrAdmin, async (req, r
     
     res.json(result);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Eventbrite attendees fetch error:', error);
+    logger.error('Eventbrite attendees fetch error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch Eventbrite attendees' });
   }
 });

@@ -9,6 +9,7 @@ import { getSessionUser } from '../types/session';
 import { sendPushNotificationToAllMembers } from './push';
 import { broadcastAnnouncementUpdate } from '../core/websocket';
 import { logFromRequest } from '../core/auditLog';
+import { logger } from '../core/logger';
 import {
   createAnnouncementSheet,
   getLinkedSheetId,
@@ -67,7 +68,7 @@ router.get('/api/announcements', async (req, res) => {
     
     res.json(formatted);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Announcements fetch error:', error);
+    logger.error('Announcements fetch error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch announcements' });
   }
 });
@@ -111,7 +112,7 @@ router.get('/api/announcements/banner', async (req, res) => {
       showAsBanner: true
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Banner announcement fetch error:', error);
+    logger.error('Banner announcement fetch error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch banner announcement' });
   }
 });
@@ -166,7 +167,7 @@ router.get('/api/announcements/export', isStaffOrAdmin, async (req, res) => {
     
     res.send(csv);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Announcements export error:', error);
+    logger.error('Announcements export error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to export announcements' });
   }
 });
@@ -241,21 +242,21 @@ router.post('/api/announcements', isStaffOrAdmin, async (req, res) => {
           tag: `announcement-${newAnnouncement.id}`
         });
       } catch (pushErr: unknown) {
-        console.error('Failed to send push notifications for announcement:', getErrorMessage(pushErr));
+        logger.error('Failed to send push notifications for announcement', { extra: { error: getErrorMessage(pushErr) } });
       }
     }
     
     getLinkedSheetId().then(sheetId => {
       if (sheetId) {
         pushSingleAnnouncement(sheetId, newAnnouncement).catch(err => {
-          console.error('Failed to sync new announcement to Google Sheet:', getErrorMessage(err));
+          logger.error('Failed to sync new announcement to Google Sheet', { extra: { error: getErrorMessage(err) } });
         });
       }
-    }).catch(() => {});
+    }).catch(err => logger.error('[Announcements] Sheet sync error', { extra: { error: getErrorMessage(err) } }));
 
     res.status(201).json(responseData);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Announcement create error:', error);
+    logger.error('Announcement create error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create announcement' });
   }
 });
@@ -330,21 +331,21 @@ router.put('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
           tag: `announcement-${updated.id}`
         });
       } catch (pushErr: unknown) {
-        console.error('Failed to send push notifications for announcement:', getErrorMessage(pushErr));
+        logger.error('Failed to send push notifications for announcement', { extra: { error: getErrorMessage(pushErr) } });
       }
     }
     
     getLinkedSheetId().then(sheetId => {
       if (sheetId) {
         pushSingleAnnouncement(sheetId, updated).catch(err => {
-          console.error('Failed to sync updated announcement to Google Sheet:', getErrorMessage(err));
+          logger.error('Failed to sync updated announcement to Google Sheet', { extra: { error: getErrorMessage(err) } });
         });
       }
-    }).catch(() => {});
+    }).catch(err => logger.error('[Announcements] Sheet sync error', { extra: { error: getErrorMessage(err) } }));
 
     res.json(responseData);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Announcement update error:', error);
+    logger.error('Announcement update error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update announcement' });
   }
 });
@@ -372,14 +373,14 @@ router.delete('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
     getLinkedSheetId().then(sheetId => {
       if (sheetId) {
         deleteFromSheet(sheetId, id as string).catch(err => {
-          console.error('Failed to delete announcement from Google Sheet:', getErrorMessage(err));
+          logger.error('Failed to delete announcement from Google Sheet', { extra: { error: getErrorMessage(err) } });
         });
       }
-    }).catch(() => {});
+    }).catch(err => logger.error('[Announcements] Sheet sync error', { extra: { error: getErrorMessage(err) } }));
 
     res.json({ success: true, id });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Announcement delete error:', error);
+    logger.error('Announcement delete error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to delete announcement' });
   }
 });
@@ -396,7 +397,7 @@ router.post('/api/announcements/sheets/connect', isStaffOrAdmin, async (req, res
 
     res.json({ sheetId, sheetUrl });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Google Sheets connect error:', error);
+    logger.error('Google Sheets connect error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to connect Google Sheets: ' + getErrorMessage(error) });
   }
 });
@@ -410,7 +411,7 @@ router.get('/api/announcements/sheets/status', isStaffOrAdmin, async (req, res) 
       sheetUrl: sheetId ? getSheetUrl(sheetId) : null
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Google Sheets status error:', error);
+    logger.error('Google Sheets status error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to get Google Sheets status' });
   }
 });
@@ -434,7 +435,7 @@ router.post('/api/announcements/sheets/sync-from', isStaffOrAdmin, async (req, r
 
     res.json(result);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Google Sheets sync-from error:', error);
+    logger.error('Google Sheets sync-from error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync from Google Sheets: ' + getErrorMessage(error) });
   }
 });
@@ -454,7 +455,7 @@ router.post('/api/announcements/sheets/sync-to', isStaffOrAdmin, async (req, res
 
     res.json(result);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Google Sheets sync-to error:', error);
+    logger.error('Google Sheets sync-to error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync to Google Sheets: ' + getErrorMessage(error) });
   }
 });
@@ -468,7 +469,7 @@ router.post('/api/announcements/sheets/disconnect', isStaffOrAdmin, async (req, 
 
     res.json({ success: true });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Google Sheets disconnect error:', error);
+    logger.error('Google Sheets disconnect error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to disconnect Google Sheets' });
   }
 });

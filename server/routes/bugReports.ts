@@ -6,6 +6,7 @@ import { isAuthenticated, isStaffOrAdmin } from '../core/middleware';
 import { notifyAllStaff, notifyMember } from '../core/notificationService';
 import { getSessionUser } from '../types/session';
 import { logFromRequest } from '../core/auditLog';
+import { logger } from '../core/logger';
 
 const router = Router();
 
@@ -45,7 +46,7 @@ router.post('/api/bug-reports', isAuthenticated, async (req, res) => {
     
     res.status(201).json(report);
   } catch (error: unknown) {
-    console.error('Bug report creation error:', error);
+    logger.error('Bug report creation error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to submit bug report' });
   }
 });
@@ -69,7 +70,7 @@ router.get('/api/admin/bug-reports', isStaffOrAdmin, async (req, res) => {
     
     res.json(result);
   } catch (error: unknown) {
-    console.error('Bug reports fetch error:', error);
+    logger.error('Bug reports fetch error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch bug reports' });
   }
 });
@@ -87,7 +88,7 @@ router.get('/api/admin/bug-reports/:id', isStaffOrAdmin, async (req, res) => {
     
     res.json(report);
   } catch (error: unknown) {
-    console.error('Bug report fetch error:', error);
+    logger.error('Bug report fetch error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch bug report' });
   }
 });
@@ -143,7 +144,7 @@ router.put('/api/admin/bug-reports/:id', isStaffOrAdmin, async (req, res) => {
     logFromRequest(req, 'update_bug_report' as any, 'bug_report' as any, String(id), undefined, { status: req.body.status });
     res.json(updated);
   } catch (error: unknown) {
-    console.error('Bug report update error:', error);
+    logger.error('Bug report update error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update bug report' });
   }
 });
@@ -163,7 +164,7 @@ router.delete('/api/admin/bug-reports/:id', isStaffOrAdmin, async (req, res) => 
     logFromRequest(req, 'delete_bug_report' as any, 'bug_report' as any, String(id), undefined, {});
     res.json({ success: true });
   } catch (error: unknown) {
-    console.error('Bug report delete error:', error);
+    logger.error('Bug report delete error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to delete bug report' });
   }
 });

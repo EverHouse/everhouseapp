@@ -34,7 +34,7 @@ async function getMemberDisplayName(email: string): Promise<string> {
       return [result[0].firstName, result[0].lastName].filter(Boolean).join(' ');
     }
   } catch (error: unknown) {
-    console.error('[StaffCheckin] Error looking up member name:', error);
+    logger.error('[StaffCheckin] Error looking up member name', { error: error instanceof Error ? error : new Error(String(error)) });
   }
   return email.split('@')[0];
 }
@@ -171,7 +171,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
           await recalculateSessionFees(sessionId, 'checkin');
         }
       } catch (sessionError: unknown) {
-        console.warn(`[Checkin Context] Failed to create session for booking ${bookingId}:`, getErrorMessage(sessionError));
+        logger.warn('[Checkin Context] Failed to create session for booking', { extra: { bookingId, error: getErrorMessage(sessionError) } });
       }
     }
 
@@ -231,12 +231,12 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
             DELETE FROM booking_participants WHERE id = ANY($1::int[])
           `, [orphanedIds]);
           
-          console.log(`[Checkin Context Sync] Cleaned up ${orphanedIds.length} orphaned participants for booking ${bookingId}:`, orphanedNames);
+          logger.info('[Checkin Context Sync] Cleaned up  orphaned participants for booking', { extra: { length: orphanedIds.length, bookingId, orphanedNames } });
           // Recalculate fees after cleanup
           await recalculateSessionFees(sessionId, 'sync_cleanup' as any);
         }
       } catch (syncError: unknown) {
-        console.warn(`[Checkin Context Sync] Non-blocking sync cleanup failed for booking ${bookingId}:`, getErrorMessage(syncError));
+        logger.warn('[Checkin Context Sync] Non-blocking sync cleanup failed for booking', { extra: { bookingId, error: getErrorMessage(syncError) } });
       }
       
       const participantsResult = await pool.query(`
@@ -434,7 +434,7 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
       try {
         await recalculateSessionFees(sessionId, 'staff_action' as any);
       } catch (calcError: unknown) {
-        console.error('[StaffCheckin] Failed to recalculate fees before payment action:', calcError);
+        logger.error('[StaffCheckin] Failed to recalculate fees before payment action', { extra: { calcError } });
         // Continue with existing values - non-blocking error
       }
     }
@@ -519,7 +519,7 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
         });
         
         if (consumeResult.passesRemaining !== undefined) {
-          try { broadcastMemberStatsUpdated(booking.owner_email, { guestPasses: consumeResult.passesRemaining }); } catch (err: unknown) { console.error('[Broadcast] Stats update error:', err); }
+          try { broadcastMemberStatsUpdated(booking.owner_email, { guestPasses: consumeResult.passesRemaining }); } catch (err: unknown) {logger.error('[Broadcast] Stats update error:', err); }
         }
         
         return res.json({ 
@@ -586,10 +586,10 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
               bookingDescription: `${booking.resource_name} on ${new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}`
             });
             
-            console.log(`[StaffCheckin] Sent waiver notification to ${recipientEmail}`);
+            logger.info('[StaffCheckin] Sent waiver notification to', { extra: { recipientEmail } });
           }
         } catch (notifyErr: unknown) {
-          console.error('[StaffCheckin] Failed to send waiver notification:', notifyErr);
+          logger.error('[StaffCheckin] Failed to send waiver notification', { extra: { notifyErr } });
         }
       }
 
@@ -684,18 +684,18 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
             `, [bookingId, sessionId, JSON.stringify(participantFees), totalCents]);
             if (insertResult.rowCount === 0) {
               await snapshotClient.query('ROLLBACK');
-              console.log(`[StaffCheckin] Fee snapshot race: another check-in already created snapshot for session ${sessionId}`);
+              logger.info('[StaffCheckin] Fee snapshot race: another check-in already created snapshot for session', { extra: { sessionId } });
             } else {
               await snapshotClient.query('COMMIT');
-              console.log(`[StaffCheckin] Created fee snapshot for booking ${bookingId}, session ${sessionId}, total ${totalCents} cents`);
+              logger.info('[StaffCheckin] Created fee snapshot for booking , session , total cents', { extra: { bookingId, sessionId, totalCents } });
             }
           } else {
             await snapshotClient.query('ROLLBACK');
-            console.log(`[StaffCheckin] Fee snapshot already exists for session ${sessionId}, skipping`);
+            logger.info('[StaffCheckin] Fee snapshot already exists for session , skipping', { extra: { sessionId } });
           }
         } catch (snapshotErr: unknown) {
           await snapshotClient.query('ROLLBACK').catch(() => {});
-          console.error('[StaffCheckin] Failed to create fee snapshot:', snapshotErr);
+          logger.error('[StaffCheckin] Failed to create fee snapshot', { extra: { snapshotErr } });
         } finally {
           snapshotClient.release();
         }
@@ -736,9 +736,9 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
             bookingDescription: `${booking.resource_name} on ${new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })} (${pendingParticipants.rows.length} participant${pendingParticipants.rows.length > 1 ? 's' : ''})`
           });
           
-          console.log(`[StaffCheckin] Sent bulk waiver notification to ${booking.owner_email} for ${pendingParticipants.rows.length} participants`);
+          logger.info('[StaffCheckin] Sent bulk waiver notification to for participants', { extra: { bookingOwner_email: booking.owner_email, pendingParticipantsRowsLength: pendingParticipants.rows.length } });
         } catch (notifyErr: unknown) {
-          console.error('[StaffCheckin] Failed to send bulk waiver notification:', notifyErr);
+          logger.error('[StaffCheckin] Failed to send bulk waiver notification', { extra: { notifyErr } });
         }
       }
 
@@ -1403,7 +1403,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
           `DELETE FROM booking_participants WHERE id = ANY($1)`,
           [guestIds]
         );
-        console.log(`[Staff Add Member] Removed ${guestIds.length} duplicate guest entries for member ${member.email} in session ${sessionId}`);
+        logger.info('[Staff Add Member] Removed duplicate guest entries for member in session', { extra: { guestIdsLength: guestIds.length, memberEmail: member.email, sessionId } });
       }
       
       await pool.query(`
@@ -1436,7 +1436,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       try {
         await recalculateSessionFees(sessionId, 'staff_add_member' as any);
       } catch (feeErr: unknown) {
-        console.warn(`[Staff Add Member] Failed to recalculate fees for session ${sessionId}:`, feeErr);
+        logger.warn('[Staff Add Member] Failed to recalculate fees for session', { extra: { sessionId, feeErr } });
       }
 
       logFromRequest(req, 'direct_add_participant', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
@@ -1513,10 +1513,10 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
 
     if (member.hubspot_id) {
       updateHubSpotContactVisitCount(member.hubspot_id, newVisitCount)
-        .catch(err => console.error('[QR Checkin] Failed to sync visit count to HubSpot:', err));
+        .catch(err => logger.error('[QR Checkin] Failed to sync visit count to HubSpot:', { extra: { err } }));
     }
 
-    try { broadcastMemberStatsUpdated(member.email, { lifetimeVisits: newVisitCount }); } catch (err: unknown) { console.error('[Broadcast] Stats update error:', err); }
+    try { broadcastMemberStatsUpdated(member.email, { lifetimeVisits: newVisitCount }); } catch (err: unknown) {logger.error('[Broadcast] Stats update error:', err); }
 
     notifyMember({
       userEmail: member.email,
@@ -1524,7 +1524,7 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
       message: "Welcome back! You've been checked in by staff.",
       type: 'booking',
       relatedType: 'booking'
-    }).catch(err => console.error('[QR Checkin] Failed to send notification:', err));
+    }).catch(err => logger.error('[QR Checkin] Failed to send notification:', { extra: { err } }));
 
     await pool.query(
       `INSERT INTO walk_in_visits (member_email, checked_in_by, checked_in_by_name, created_at)
@@ -1534,8 +1534,8 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
 
     if (newVisitCount === 1 && member.membership_status?.toLowerCase() === 'trialing') {
       sendFirstVisitConfirmationEmail(member.email, { firstName: member.first_name || undefined })
-        .then(() => console.log('[QR Checkin] Sent first visit confirmation email to trial member:', member.email))
-        .catch(err => console.error('[QR Checkin] Failed to send first visit confirmation email:', err));
+        .then(() => logger.info('[QR Checkin] Sent first visit confirmation email to trial member:', { extra: { email: member.email } }))
+        .catch(err => logger.error('[QR Checkin] Failed to send first visit confirmation email:', { extra: { err } }));
     }
 
     const pinnedNotesResult = await pool.query<{ content: string; created_by_name: string | null }>(
@@ -1554,7 +1554,7 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
       type: 'walk_in'
     });
 
-    console.log(`[QR Checkin] Walk-in check-in: ${displayName} (${member.email}) by ${staffEmail}. Visit #${newVisitCount}`);
+    logger.info('[QR Checkin] Walk-in check-in: () by . Visit #', { extra: { displayName, memberEmail: member.email, staffEmail, newVisitCount } });
 
     res.json({
       success: true,

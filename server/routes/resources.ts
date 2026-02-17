@@ -710,7 +710,7 @@ router.put('/api/bookings/:id/approve', isStaffOrAdmin, async (req, res) => {
             createdBy: 'resource_confirmation'
           });
         } catch (sessionErr: unknown) {
-          console.error('[Resource Confirmation] Failed to ensure session:', sessionErr);
+          logger.error('[Resource Confirmation] Failed to ensure session', { extra: { error: sessionErr } });
         }
       }
 
@@ -2128,7 +2128,7 @@ router.post('/api/bookings', bookingRateLimiter, async (req, res) => {
         userTags = typeof user.tags === 'string' ? JSON.parse(user.tags) : (Array.isArray(user.tags) ? user.tags : []);
       }
     } catch (parseError: unknown) {
-      console.warn('[POST /api/bookings] Failed to parse user tags for', user_email, parseError);
+      logger.warn('[POST /api/bookings] Failed to parse user tags', { extra: { user_email, error: parseError } });
       userTags = [];
     }
     
@@ -2431,7 +2431,7 @@ router.delete('/api/bookings/:id', isStaffOrAdmin, async (req, res) => {
           }
         }
       } catch (calError: unknown) {
-        console.error('Failed to delete calendar event (non-blocking):', calError);
+        logger.error('Failed to delete calendar event (non-blocking)', { extra: { error: calError } });
       }
     }
     
@@ -2545,7 +2545,7 @@ router.put('/api/bookings/:id/member-cancel', async (req, res) => {
           relatedType: 'booking_request',
           url: '/admin/bookings'
         }
-      ).catch(err => console.error('Staff cancellation notification failed:', err));
+      ).catch(err => logger.error('Staff cancellation notification failed', { extra: { error: err } }));
       
       await db.insert(notifications).values({
         userEmail: existing.userEmail || '',
@@ -2637,7 +2637,7 @@ router.put('/api/bookings/:id/member-cancel', async (req, res) => {
         }
       );
     } catch (staffNotifyErr: unknown) {
-      console.error('Staff notification failed:', staffNotifyErr);
+      logger.error('Staff notification failed', { extra: { error: staffNotifyErr } });
     }
     
     if (existing.calendarEventId && existing.resourceId) {
@@ -2653,7 +2653,7 @@ router.put('/api/bookings/:id/member-cancel', async (req, res) => {
           }
         }
       } catch (calError: unknown) {
-        console.error('Failed to delete calendar event (non-blocking):', calError);
+        logger.error('Failed to delete calendar event (non-blocking)', { extra: { error: calError } });
       }
     }
     
@@ -2689,7 +2689,7 @@ router.put('/api/bookings/:id/member-cancel', async (req, res) => {
       notifyMember: true, 
       notifyStaff: true, 
       cleanupNotifications: true 
-    }).catch(err => console.error('Booking event publish failed:', err));
+    }).catch(err => logger.error('Booking event publish failed', { extra: { error: err } }));
   } catch (error: unknown) {
     logAndRespond(req, res, 500, 'Failed to cancel booking', error, 'BOOKING_CANCEL_ERROR');
   }
@@ -2758,7 +2758,7 @@ router.post('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
         message: 'You have been checked in for your booking',
         type: 'booking_checked_in'
       }
-    }).catch(err => console.error('Booking event publish failed:', err));
+    }).catch(err => logger.error('Booking event publish failed', { extra: { error: err } }));
   } catch (error: unknown) {
     logAndRespond(req, res, 500, 'Failed to check in', error, 'CHECKIN_ERROR');
   }
@@ -3002,7 +3002,7 @@ router.post('/api/staff/bookings/manual', isStaffOrAdmin, async (req, res) => {
 
       // Clean up notifications for the cancelled original booking
       bookingEvents.cleanupNotificationsForBooking(reschedule_from_id as number, { delete: true })
-        .catch(err => console.error('Failed to cleanup old booking notifications:', err));
+        .catch(err => logger.error('Failed to cleanup old booking notifications', { extra: { error: err } }));
     }
 
     try {
@@ -3059,7 +3059,7 @@ router.post('/api/staff/bookings/manual', isStaffOrAdmin, async (req, res) => {
       actionBy: 'staff',
       staffEmail: staffEmail,
       isManualBooking: true
-    }, { notifyMember: true, notifyStaff: true }).catch(err => console.error('Booking event publish failed:', err));
+    }, { notifyMember: true, notifyStaff: true }).catch(err => logger.error('Booking event publish failed', { extra: { error: err } }));
 
     res.status(201).json({
       success: true,

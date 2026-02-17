@@ -3,6 +3,7 @@ import multer from 'multer';
 import sharp from 'sharp';
 import { isStaffOrAdmin } from '../core/middleware';
 import { ObjectStorageService } from '../replit_integrations/object_storage';
+import { logger } from '../core/logger';
 
 const router = Router();
 const upload = multer({ 
@@ -51,7 +52,7 @@ router.post('/api/admin/upload-image', isStaffOrAdmin, upload.single('image'), a
       optimizedSize: webpBuffer.length
     });
   } catch (error: unknown) {
-    console.error('Image upload error:', error);
+    logger.error('Image upload error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to upload and convert image' });
   }
 });

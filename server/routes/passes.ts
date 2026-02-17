@@ -1,3 +1,4 @@
+import { logger } from '../core/logger';
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
 import { dayPassPurchases, passRedemptionLogs } from '../../shared/schema';
@@ -37,7 +38,7 @@ router.get('/api/staff/passes/unredeemed', isStaffOrAdmin, async (req: Request, 
 
     res.json({ passes });
   } catch (error: unknown) {
-    console.error('[Passes] Error fetching unredeemed passes:', error);
+    logger.error('[Passes] Error fetching unredeemed passes', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch unredeemed passes' });
   }
 });
@@ -73,7 +74,7 @@ router.get('/api/staff/passes/search', isStaffOrAdmin, async (req: Request, res:
 
     res.json({ passes });
   } catch (error: unknown) {
-    console.error('[Passes] Error searching passes:', error);
+    logger.error('[Passes] Error searching passes', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to search passes' });
   }
 });
@@ -219,7 +220,7 @@ router.post('/api/staff/passes/:id/redeem', isStaffOrAdmin, async (req: Request,
       .filter(Boolean)
       .join(' ') || 'Guest';
 
-    console.log(`[Passes] Pass ${id} redeemed by ${staffEmail}. Remaining uses: ${remainingUses}`);
+    logger.info('[Passes] Pass redeemed by . Remaining uses', { extra: { id, staffEmail, remainingUses } });
 
     if (passDetails?.purchaserEmail) {
       sendRedemptionConfirmationEmail(passDetails.purchaserEmail, {
@@ -227,7 +228,7 @@ router.post('/api/staff/passes/:id/redeem', isStaffOrAdmin, async (req: Request,
         passType: passDetails.productType,
         remainingUses: remainingUses ?? 0,
         redeemedAt: new Date(),
-      }).catch(err => console.error('[Passes] Email send failed:', err));
+      }).catch(err => logger.error('[Passes] Email send failed:', { extra: { err } }));
     }
 
     broadcastDayPassUpdate({
@@ -261,7 +262,7 @@ router.post('/api/staff/passes/:id/redeem', isStaffOrAdmin, async (req: Request,
       redeemedAt: new Date().toISOString(),
     });
   } catch (error: unknown) {
-    console.error('[Passes] Error redeeming pass:', error);
+    logger.error('[Passes] Error redeeming pass', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to redeem pass' });
   }
 });
@@ -283,7 +284,7 @@ router.get('/api/staff/passes/:passId/history', isStaffOrAdmin, async (req: Requ
 
     res.json({ logs });
   } catch (error: unknown) {
-    console.error('[Passes] Error fetching pass history:', error);
+    logger.error('[Passes] Error fetching pass history', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch pass history' });
   }
 });
@@ -334,9 +335,9 @@ router.post('/api/staff/passes/:passId/refund', isStaffOrAdmin, async (req: Requ
       }, {
         idempotencyKey: `refund_guest_pass_${passId}_${pass.stripePaymentIntentId}`
       });
-      console.log(`[Passes] Stripe refund created for pass ${passId}: ${refund.id}`);
+      logger.info('[Passes] Stripe refund created for pass', { extra: { passId, refundId: refund.id } });
     } catch (stripeError: unknown) {
-      console.error(`[Passes] Stripe refund failed for pass ${passId}:`, getErrorMessage(stripeError));
+      logger.error('[Passes] Stripe refund failed for pass', { extra: { passId, error: getErrorMessage(stripeError) } });
       return res.status(400).json({ 
         error: 'Failed to process refund with payment processor',
         errorCode: 'STRIPE_REFUND_FAILED',
@@ -357,7 +358,7 @@ router.post('/api/staff/passes/:passId/refund', isStaffOrAdmin, async (req: Requ
       .filter(Boolean)
       .join(' ') || 'Guest';
 
-    console.log(`[Passes] Pass ${passId} refunded by ${staffEmail}. Previous remaining uses: ${pass.remainingUses}`);
+    logger.info('[Passes] Pass refunded by . Previous remaining uses', { extra: { passId, staffEmail, passRemainingUses: pass.remainingUses } });
 
     broadcastDayPassUpdate({
       action: 'day_pass_refunded',
@@ -381,7 +382,7 @@ router.post('/api/staff/passes/:passId/refund', isStaffOrAdmin, async (req: Requ
       refundedBy: staffEmail,
     });
   } catch (error: unknown) {
-    console.error('[Passes] Error refunding pass:', error);
+    logger.error('[Passes] Error refunding pass', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to refund pass' });
   }
 });

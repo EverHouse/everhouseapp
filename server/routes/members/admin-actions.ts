@@ -1,3 +1,4 @@
+import { logger } from '../../core/logger';
 import { Router } from 'express';
 import { eq, sql, and } from 'drizzle-orm';
 import { db } from '../../db';
@@ -94,7 +95,7 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
       );
 
       if (!hubspotResult.success && hubspotResult.error) {
-        console.warn(`[Members] HubSpot tier change failed for ${normalizedEmail}, queuing for retry: ${hubspotResult.error}`);
+        logger.warn('[Members] HubSpot tier change failed for , queuing for retry', { extra: { normalizedEmail, hubspotResultError: hubspotResult.error } });
         await queueTierSync({
           email: normalizedEmail,
           newTier: normalizedTier,
@@ -104,7 +105,7 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
         });
       }
     } else {
-      console.log(`[Members] Tier cleared for ${normalizedEmail}, skipping HubSpot sync (no product mapping for cleared tier)`);
+      logger.info('[Members] Tier cleared for , skipping HubSpot sync (no product mapping for cleared tier)', { extra: { normalizedEmail } });
     }
 
     let stripeSync = { success: true, warning: null as string | null };
@@ -193,7 +194,7 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
       warning: stripeSync.warning
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Member tier update error:', error);
+    if (!isProduction) logger.error('Member tier update error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update member tier' });
   }
 });
@@ -299,7 +300,7 @@ router.post('/api/members/:id/suspend', isStaffOrAdmin, async (req, res) => {
     
     return res.status(400).json({ error: 'No active billing found for this member.' });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Member suspend error:', error);
+    if (!isProduction) logger.error('Member suspend error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to suspend member' });
   }
 });
@@ -362,10 +363,10 @@ router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
             if (['active', 'trialing', 'past_due', 'unpaid'].includes(sub.status)) {
               await stripe.subscriptions.cancel(stripeSubscriptionId);
               subscriptionCancelled = true;
-              console.log(`[Admin] Cancelled subscription ${stripeSubscriptionId} for archived member ${normalizedEmail}`);
+              logger.info('[Admin] Cancelled subscription for archived member', { extra: { stripeSubscriptionId, normalizedEmail } });
             }
           } catch (subError: unknown) {
-            console.error(`[Admin] Failed to cancel subscription ${stripeSubscriptionId}:`, getErrorMessage(subError));
+            logger.error('[Admin] Failed to cancel subscription', { extra: { stripeSubscriptionId, error: getErrorMessage(subError) } });
           }
         }
         
@@ -381,7 +382,7 @@ router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
                 if (['active', 'trialing', 'past_due', 'unpaid'].includes(sub.status)) {
                   await stripe.subscriptions.cancel(sub.id);
                   subscriptionCancelled = true;
-                  console.log(`[Admin] Cancelled subscription ${sub.id} for archived member ${normalizedEmail}`);
+                  logger.info('[Admin] Cancelled subscription for archived member', { extra: { subId: sub.id, normalizedEmail } });
                 }
               }
               hasMore = subscriptions.has_more;
@@ -390,11 +391,11 @@ router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
               }
             }
           } catch (listError: unknown) {
-            console.error(`[Admin] Failed to list/cancel subscriptions for customer ${stripeCustomerId}:`, getErrorMessage(listError));
+            logger.error('[Admin] Failed to list/cancel subscriptions for customer', { extra: { stripeCustomerId, error: getErrorMessage(listError) } });
           }
         }
       } catch (importError: unknown) {
-        console.error(`[Admin] Failed to import Stripe client for subscription cancellation:`, getErrorMessage(importError));
+        logger.error('[Admin] Failed to import Stripe client for subscription cancellation:', { extra: { error: getErrorMessage(importError) } });
       }
     }
 
@@ -406,7 +407,7 @@ router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
       message: 'Member archived successfully'
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Member archive error:', error);
+    if (!isProduction) logger.error('Member archive error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to archive member' });
   }
 });
@@ -446,7 +447,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
         await db.update(users).set({ idImageUrl: null }).where(eq(users.id, userId));
         deletionLog.push('id_image');
       } catch (idErr: unknown) {
-        console.error(`[Admin] Failed to clear ID image for ${normalizedEmail}:`, getErrorMessage(idErr));
+        logger.error('[Admin] Failed to clear ID image for', { extra: { normalizedEmail, error: getErrorMessage(idErr) } });
       }
     }
     
@@ -645,7 +646,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
           }
         }
       } catch (stripeSubError: unknown) {
-        console.error(`[Admin] Failed to cancel subscriptions for ${stripeCustomerId}:`, getErrorMessage(stripeSubError));
+        logger.error('[Admin] Failed to cancel subscriptions for', { extra: { stripeCustomerId, error: getErrorMessage(stripeSubError) } });
       }
     }
 
@@ -658,7 +659,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
         stripeDeleted = true;
         deletionLog.push('stripe_customer');
       } catch (stripeError: unknown) {
-        console.error(`[Admin] Failed to delete Stripe customer ${stripeCustomerId}:`, getErrorMessage(stripeError));
+        logger.error('[Admin] Failed to delete Stripe customer', { extra: { stripeCustomerId, error: getErrorMessage(stripeError) } });
       }
     }
     
@@ -671,7 +672,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
         hubspotArchived = true;
         deletionLog.push('hubspot_contact (archived)');
       } catch (hubspotError: unknown) {
-        console.error(`[Admin] Failed to archive HubSpot contact ${hubspotId}:`, getErrorMessage(hubspotError));
+        logger.error('[Admin] Failed to archive HubSpot contact', { extra: { hubspotId, error: getErrorMessage(hubspotError) } });
       }
     }
     
@@ -692,7 +693,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
       }
     });
     
-    console.log(`[Admin] Member permanently deleted: ${normalizedEmail} (${memberName}) by ${sessionUser?.email}. Records: ${deletionLog.join(', ')}`);
+    logger.info('[Admin] Member permanently deleted: () by . Records', { extra: { normalizedEmail, memberName, sessionUser: sessionUser?.email, deletionLogJoin: deletionLog.join(', ') } });
     
     res.json({ 
       success: true, 
@@ -705,7 +706,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
       message: `Member ${memberName || normalizedEmail} permanently deleted`
     });
   } catch (error: unknown) {
-    console.error('Member permanent delete error:', (error as Error)?.message || error);
+    logger.error('Member permanent delete error', { extra: { error_as_Error_message_error: (error as Error)?.message || error } });
     res.status(500).json({ error: 'Failed to permanently delete member' });
   }
 });
@@ -776,7 +777,7 @@ router.post('/api/members/:email/anonymize', isStaffOrAdmin, async (req, res) =>
       WHERE user_id = ${userId}
     `);
     
-    console.log(`[Privacy] Member ${normalizedEmail} anonymized by ${anonymizedBy} at ${now.toISOString()}`);
+    logger.info('[Privacy] Member anonymized by at', { extra: { normalizedEmail, anonymizedBy, nowToISOString: now.toISOString() } });
     
     logFromRequest(req, 'archive_member', 'member', normalizedEmail, 
       `${userResult[0].firstName} ${userResult[0].lastName}`.trim() || undefined,
@@ -789,7 +790,7 @@ router.post('/api/members/:email/anonymize', isStaffOrAdmin, async (req, res) =>
       message: 'Member data anonymized successfully. Financial records preserved for compliance.'
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Member anonymize error:', error);
+    if (!isProduction) logger.error('Member anonymize error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to anonymize member data' });
   }
 });
@@ -826,7 +827,7 @@ router.get('/api/members/add-options', isStaffOrAdmin, async (req, res) => {
         }))
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Add options error:', error);
+    if (!isProduction) logger.error('Add options error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch add member options' });
   }
 });
@@ -892,7 +893,7 @@ router.post('/api/members', isStaffOrAdmin, async (req, res) => {
       await queueMemberCreation(memberInput);
       hubspotSyncQueued = true;
     } catch (queueError) {
-      console.error('[CreateMember] Failed to queue HubSpot sync (member created locally):', queueError);
+      logger.error('[CreateMember] Failed to queue HubSpot sync (member created locally)', { extra: { queueError } });
     }
     
     res.status(201).json({
@@ -911,7 +912,7 @@ router.post('/api/members', isStaffOrAdmin, async (req, res) => {
         : 'HubSpot sync failed to queue - member created locally only'
     });
   } catch (error: unknown) {
-    console.error('Create member error:', error);
+    logger.error('Create member error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create member' });
   }
 });
@@ -1005,7 +1006,7 @@ router.post('/api/members/admin/bulk-tier-update', isStaffOrAdmin, async (req, r
             newTier: normalizedTier
           });
         } catch (error: unknown) {
-          console.error(`[BulkTierUpdate] Error validating ${normalizedEmail}:`, error);
+          logger.error('[BulkTierUpdate] Error validating', { error: error instanceof Error ? error : new Error(String(error)), extra: { normalizedEmail } });
           results.errors.push({ email: normalizedEmail, error: getErrorMessage(error) });
         }
       }
@@ -1097,7 +1098,7 @@ router.post('/api/members/admin/bulk-tier-update', isStaffOrAdmin, async (req, r
           newTier: normalizedTier
         });
       } catch (error: unknown) {
-        console.error(`[BulkTierUpdate] Error processing ${email}:`, error);
+        logger.error('[BulkTierUpdate] Error processing', { error: error instanceof Error ? error : new Error(String(error)), extra: { email } });
         results.errors.push({ email: email?.toLowerCase().trim() || 'unknown', error: getErrorMessage(error) });
       }
     }
@@ -1108,7 +1109,7 @@ router.post('/api/members/admin/bulk-tier-update', isStaffOrAdmin, async (req, r
       jobIds = await queueJobs(jobsToQueue);
       results.queued = jobIds.length;
       results.jobIds = jobIds;
-      console.log(`[BulkTierUpdate] Queued ${jobIds.length} member tier update jobs (IDs: ${jobIds.join(', ')})`);
+      logger.info('[BulkTierUpdate] Queued member tier update jobs (IDs: )', { extra: { jobIdsLength: jobIds.length, jobIdsJoin: jobIds.join(', ') } });
     }
     
     res.json({
@@ -1131,7 +1132,7 @@ router.post('/api/members/admin/bulk-tier-update', isStaffOrAdmin, async (req, r
       }
     });
   } catch (error: unknown) {
-    console.error('Bulk tier update error:', error);
+    logger.error('Bulk tier update error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to process bulk tier update' });
   }
 });
@@ -1162,7 +1163,7 @@ router.post('/api/admin/member/change-email', isStaffOrAdmin, async (req, res) =
       tablesUpdated: result.tablesUpdated
     });
   } catch (error: unknown) {
-    console.error('[Email Change] Error:', error);
+    logger.error('[Email Change] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to change email' });
   }
 });
@@ -1178,7 +1179,7 @@ router.get('/api/admin/member/change-email/preview', isStaffOrAdmin, async (req,
     const impact = await previewEmailChangeImpact(email);
     res.json(impact);
   } catch (error: unknown) {
-    console.error('[Email Change Preview] Error:', error);
+    logger.error('[Email Change Preview] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to preview email change impact' });
   }
 });
@@ -1188,7 +1189,7 @@ router.get('/api/admin/tier-change/tiers', isStaffOrAdmin, async (req, res) => {
     const tiers = await getAvailableTiersForChange();
     res.json({ tiers });
   } catch (error: unknown) {
-    console.error('[Tier Change] Error getting tiers:', error);
+    logger.error('[Tier Change] Error getting tiers', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to get tiers' });
   }
 });
@@ -1209,7 +1210,7 @@ router.post('/api/admin/tier-change/preview', isStaffOrAdmin, async (req, res) =
     
     res.json({ preview: result.preview });
   } catch (error: unknown) {
-    console.error('[Tier Change] Preview error:', error);
+    logger.error('[Tier Change] Preview error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to preview tier change' });
   }
 });
@@ -1231,7 +1232,7 @@ router.post('/api/admin/tier-change/commit', isStaffOrAdmin, async (req, res) =>
     
     res.json({ success: true });
   } catch (error: unknown) {
-    console.error('[Tier Change] Commit error:', error);
+    logger.error('[Tier Change] Commit error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to change tier' });
   }
 });
@@ -1242,7 +1243,7 @@ router.get('/api/members/:userId/duplicates', isStaffOrAdmin, async (req, res) =
     const duplicates = await findPotentialDuplicates(userId as string);
     res.json({ duplicates });
   } catch (error: unknown) {
-    console.error('[Duplicates] Error finding duplicates:', error);
+    logger.error('[Duplicates] Error finding duplicates', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to find duplicates' });
   }
 });
@@ -1258,7 +1259,7 @@ router.post('/api/members/merge/preview', isAdmin, async (req, res) => {
     const preview = await previewMerge(primaryUserId, secondaryUserId);
     res.json(preview);
   } catch (error: unknown) {
-    console.error('[Merge Preview] Error:', error);
+    logger.error('[Merge Preview] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(400).json({ error: getErrorMessage(error) || 'Failed to preview merge' });
   }
 });
@@ -1282,7 +1283,7 @@ router.post('/api/members/merge/execute', isAdmin, async (req, res) => {
     
     res.json(result);
   } catch (error: unknown) {
-    console.error('[Merge Execute] Error:', error);
+    logger.error('[Merge Execute] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(400).json({ error: getErrorMessage(error) || 'Failed to merge users' });
   }
 });

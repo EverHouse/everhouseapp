@@ -6,7 +6,7 @@ import { eq, and, or, gt, lt, lte, gte, ne, sql } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { sendPushNotification } from '../push';
 import { formatNotificationDateTime, formatDateDisplayWithDay, formatTime12Hour } from '../../utils/dateUtils';
-import { logAndRespond } from '../../core/logger';
+import {logAndRespond, logger } from '../../core/logger';
 import { logFromRequest } from '../../core/auditLog';
 import { notifyAllStaff } from '../../core/notificationService';
 import { checkClosureConflict, checkAvailabilityBlockConflict } from '../../core/bookingValidation';
@@ -144,7 +144,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
               }
             }
           } catch (calError) {
-            console.error('Calendar sync failed (non-blocking):', calError);
+            logger.error('Calendar sync failed (non-blocking)', { extra: { calError } });
           }
         }
         
@@ -223,7 +223,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
               for (const rp of requestParticipants) {
                 // Validate entry structure
                 if (!rp || typeof rp !== 'object') {
-                  console.warn('[Booking Approval] Skipping invalid request participant entry:', rp);
+                  logger.warn('[Booking Approval] Skipping invalid request participant entry', { extra: { rp } });
                   continue;
                 }
                 
@@ -273,7 +273,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                     resolvedUserId = memberResult[0].id;
                     isMember = true;
                     if (!resolvedName) resolvedName = memberResult[0].firstName || rpEmailNormalized;
-                    console.log(`[Booking Approval] Converted guest to member: ${rpEmailNormalized}`);
+                    logger.info('[Booking Approval] Converted guest to member', { extra: { rpEmailNormalized } });
                   }
                 }
                 
@@ -305,7 +305,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                   if (rpEmailNormalized) addedEmails.add(rpEmailNormalized);
                 }
               }
-              console.log(`[Booking Approval] Converted ${requestParticipants.length} request participants to ${sessionParticipants.length - 1} session participants (plus owner)`);
+              logger.info('[Booking Approval] Converted request participants to session participants (plus owner)', { extra: { requestParticipantsLength: requestParticipants.length, sessionParticipantsLength_1: sessionParticipants.length - 1 } });
             }
             
             const sessionResult = await createSessionWithUsageTracking(
@@ -335,14 +335,14 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                 })
                 .where(eq(bookingRequests.id, bookingId));
               
-              console.log(`[Booking Approval] Created session ${createdSessionId} for booking ${bookingId} with ${createdParticipantIds.length} participants, ${sessionResult.usageLedgerEntries || 0} ledger entries`);
+              logger.info('[Booking Approval] Created session for booking with participants, ledger entries', { extra: { createdSessionId, bookingId, createdParticipantIdsLength: createdParticipantIds.length, sessionResultUsageLedgerEntries_0: sessionResult.usageLedgerEntries || 0 } });
               
             } else {
-              console.error(`[Booking Approval] Session creation failed: ${sessionResult.error}`);
+              logger.error('[Booking Approval] Session creation failed', { extra: { sessionResultError: sessionResult.error } });
               throw { statusCode: 500, error: 'Failed to create booking session. Please try again.', details: sessionResult.error };
             }
           } catch (sessionError: unknown) {
-            console.error('[Booking Approval] Failed to create session:', sessionError);
+            logger.error('[Booking Approval] Failed to create session', { extra: { sessionError } });
             throw { statusCode: 500, error: 'Failed to create booking session. Please try again.', details: getErrorMessage(sessionError) || sessionError };
           }
         }
@@ -351,7 +351,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
         if (createdSessionId && createdParticipantIds.length > 0) {
           try {
             breakdown = await recalculateSessionFees(createdSessionId, 'approval');
-            console.log(`[Booking Approval] Applied unified fees for session ${createdSessionId}: $${(breakdown.totals.totalCents/100).toFixed(2)}, overage: $${(breakdown.totals.overageCents/100).toFixed(2)}`);
+            logger.info('[Booking Approval] Applied unified fees for session : $, overage: $', { extra: { createdSessionId, breakdownTotalsTotalCents_100_ToFixed_2: (breakdown.totals.totalCents/100).toFixed(2), breakdownTotalsOverageCents_100_ToFixed_2: (breakdown.totals.overageCents/100).toFixed(2) } });
             
             if (breakdown.totals.totalCents > 0) {
               try {
@@ -380,14 +380,14 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                     `UPDATE booking_participants SET payment_status = 'paid' WHERE session_id = $1 AND payment_status = 'pending'`,
                     [createdSessionId]
                   );
-                  console.log(`[Booking Approval] Prepayment fully covered by credit for session ${createdSessionId}`);
+                  logger.info('[Booking Approval] Prepayment fully covered by credit for session', { extra: { createdSessionId } });
                 }
               } catch (prepayError) {
-                console.error('[Booking Approval] Failed to create prepayment intent:', prepayError);
+                logger.error('[Booking Approval] Failed to create prepayment intent', { extra: { prepayError } });
               }
             }
           } catch (feeError) {
-            console.error('[Booking Approval] Failed to compute/apply fees:', feeError);
+            logger.error('[Booking Approval] Failed to compute/apply fees', { extra: { feeError } });
           }
         }
         
@@ -421,7 +421,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
         title: 'Booking Approved!',
         body: approvalMessage,
         url: '/sims'
-      }).catch(err => console.error('Push notification failed:', err));
+      }).catch(err => logger.error('Push notification failed:', { extra: { err } }));
       
       // Add request_participants to booking_members so they appear on dashboards (runs for ALL approved bookings)
       (async () => {
@@ -474,15 +474,15 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                     isPrimary: false,
                     createdAt: new Date()
                   }).onConflictDoNothing();
-                  console.log(`[Booking Approval] Added participant ${participantEmail} to booking_members for booking ${id} (slot ${slotNumber})`);
+                  logger.info('[Booking Approval] Added participant to booking_members for booking (slot )', { extra: { participantEmail, id, slotNumber } });
                 } catch (memberError) {
-                  console.error(`[Booking Approval] Failed to add participant to booking_members:`, memberError);
+                  logger.error('[Booking Approval] Failed to add participant to booking_members:', { extra: { memberError } });
                 }
               }
             }
           }
         } catch (err) {
-          console.error('[Booking Approval] Failed to populate booking_members:', err);
+          logger.error('[Booking Approval] Failed to populate booking_members', { extra: { err } });
         }
       })();
       
@@ -524,7 +524,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
             }
           }
         } catch (err) {
-          console.error('Failed to notify linked members:', err);
+          logger.error('Failed to notify linked members', { extra: { err } });
         }
       })();
       
@@ -539,7 +539,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
         endTime: updated.endTime,
         status: 'approved',
         actionBy: 'staff'
-      }, { notifyMember: true, notifyStaff: true, cleanupNotifications: true }).catch(err => console.error('Booking event publish failed:', err));
+      }, { notifyMember: true, notifyStaff: true, cleanupNotifications: true }).catch(err => logger.error('Booking event publish failed:', { extra: { err } }));
       
       broadcastAvailabilityUpdate({
         resourceId: updated.resourceId || undefined,
@@ -613,10 +613,10 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                 data: { bookingId: bookingId.toString(), eventType: 'booking_participant_added' }
               }, { action: 'booking_participant_added', bookingId, triggerSource: 'approval.ts' });
               
-              console.log(`[Approval] Sent 'Added to Booking' notification to ${participantEmail} for booking ${bookingId}`);
+              logger.info('[Approval] Sent Added to Booking notification', { extra: { participantEmail, bookingId } });
             }
           } catch (notifyErr) {
-            console.error('[Approval] Failed to notify participants (non-blocking):', notifyErr);
+            logger.error('[Approval] Failed to notify participants (non-blocking)', { extra: { notifyErr } });
           }
         })();
       }
@@ -684,7 +684,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
         title: 'Booking Request Update',
         body: declineMessage,
         url: '/sims'
-      }).catch(err => console.error('Push notification failed:', err));
+      }).catch(err => logger.error('Push notification failed:', { extra: { err } }));
       
       bookingEvents.publish('booking_declined', {
         bookingId: parseInt(id as string, 10),
@@ -694,7 +694,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
         startTime: updated.startTime,
         status: 'declined',
         actionBy: 'staff'
-      }, { notifyMember: true, notifyStaff: true, cleanupNotifications: true }).catch(err => console.error('Booking event publish failed:', err));
+      }, { notifyMember: true, notifyStaff: true, cleanupNotifications: true }).catch(err => logger.error('Booking event publish failed:', { extra: { err } }));
       
       sendNotificationToUser(updated.userEmail, {
         type: 'notification',
@@ -800,19 +800,19 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                 }, {
                   idempotencyKey: `refund_staff_cancel_overage_${bookingId}_${existing.overagePaymentIntentId}`
                 });
-                console.log(`[Staff Cancel] Refunded overage payment ${existing.overagePaymentIntentId} for booking ${bookingId}, refund: ${refund.id}`);
+                logger.info('[Staff Cancel] Refunded overage payment for booking , refund', { extra: { existingOveragePaymentIntentId: existing.overagePaymentIntentId, bookingId, refundId: refund.id } });
                 overageRefundResult = { refunded: true, amount: (existing.overageFeeCents || 0) / 100 };
               }
             } else {
               await cancelPaymentIntent(existing.overagePaymentIntentId);
-              console.log(`[Staff Cancel] Cancelled overage payment intent ${existing.overagePaymentIntentId} for booking ${bookingId}`);
+              logger.info('[Staff Cancel] Cancelled overage payment intent for booking', { extra: { existingOveragePaymentIntentId: existing.overagePaymentIntentId, bookingId } });
               overageRefundResult = { cancelled: true };
             }
             await tx.update(bookingRequests)
               .set({ overagePaymentIntentId: null, overageFeeCents: 0, overageMinutes: 0 })
               .where(eq(bookingRequests.id, bookingId));
           } catch (paymentErr: unknown) {
-            console.error('[Staff Cancel] Failed to handle overage payment (non-blocking):', paymentErr);
+            logger.error('[Staff Cancel] Failed to handle overage payment (non-blocking)', { extra: { paymentErr } });
             overageRefundResult = { error: getErrorMessage(paymentErr) };
           }
         }
@@ -841,7 +841,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                 }, {
                   idempotencyKey: `refund_staff_cancel_snapshot_${bookingId}_${snapshot.stripe_payment_intent_id}`
                 });
-                console.log(`[Staff Cancel] Refunded payment ${snapshot.stripe_payment_intent_id} for booking ${bookingId}: $${(pi.amount / 100).toFixed(2)}, refund: ${refund.id}`);
+                logger.info('[Staff Cancel] Refunded payment for booking : $, refund', { extra: { snapshotStripe_payment_intent_id: snapshot.stripe_payment_intent_id, bookingId, piAmount_100_ToFixed_2: (pi.amount / 100).toFixed(2), refundId: refund.id } });
                 
                 // Use centralized service to update all related records atomically
                 await PaymentStatusService.markPaymentRefunded({
@@ -853,7 +853,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
               } else if (['requires_payment_method', 'requires_confirmation', 'requires_action', 'processing'].includes(pi.status)) {
                 // Cancel pending payments
                 await stripe.paymentIntents.cancel(snapshot.stripe_payment_intent_id);
-                console.log(`[Staff Cancel] Cancelled payment intent ${snapshot.stripe_payment_intent_id} for booking ${bookingId}`);
+                logger.info('[Staff Cancel] Cancelled payment intent for booking', { extra: { snapshotStripe_payment_intent_id: snapshot.stripe_payment_intent_id, bookingId } });
                 
                 await PaymentStatusService.markPaymentCancelled({
                   paymentIntentId: snapshot.stripe_payment_intent_id
@@ -865,7 +865,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                 });
               }
             } catch (piErr: unknown) {
-              console.error(`[Staff Cancel] Failed to handle payment ${snapshot.stripe_payment_intent_id}:`, getErrorMessage(piErr));
+              logger.error('[Staff Cancel] Failed to handle payment', { extra: { stripe_payment_intent_id: snapshot.stripe_payment_intent_id, error: getErrorMessage(piErr) } });
             }
           }
           
@@ -884,7 +884,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
           for (const row of otherIntents.rows) {
             try {
               await cancelPaymentIntent(row.stripe_payment_intent_id);
-              console.log(`[Staff Cancel] Cancelled orphan payment intent ${row.stripe_payment_intent_id} for booking ${bookingId}`);
+              logger.info('[Staff Cancel] Cancelled orphan payment intent for booking', { extra: { rowStripe_payment_intent_id: row.stripe_payment_intent_id, bookingId } });
             } catch (cancelErr: unknown) {
               // Ignore errors for orphan intents
             }
@@ -905,10 +905,10 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                WHERE session_id = $1 AND (payment_status = 'pending' OR payment_status IS NULL)`,
               [existing.sessionId]
             );
-            console.log(`[Staff Cancel] Cleared pending fees for session ${existing.sessionId}`);
+            logger.info('[Staff Cancel] Cleared pending fees for session', { extra: { existingSessionId: existing.sessionId } });
           }
         } catch (cancelIntentsErr) {
-          console.error('[Staff Cancel] Failed to handle payment intents (non-blocking):', cancelIntentsErr);
+          logger.error('[Staff Cancel] Failed to handle payment intents (non-blocking)', { extra: { cancelIntentsErr } });
         }
         
         let updatedStaffNotes = staff_notes || '';
@@ -945,7 +945,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
           }
           
           if (guestParticipants.length > 0) {
-            console.log(`[bays] Refunded ${guestParticipants.length} guest pass(es) for cancelled booking ${bookingId}`);
+            logger.info('[bays] Refunded guest pass(es) for cancelled booking', { extra: { guestParticipantsLength: guestParticipants.length, bookingId } });
           }
           
           // Refund participant payments (guest fees paid via Stripe)
@@ -977,10 +977,10 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                   }, {
                     idempotencyKey: `refund_staff_cancel_participant_${bookingId}_${participant.stripe_payment_intent_id}`
                   });
-                  console.log(`[Staff Cancel] Refunded guest fee for ${participant.display_name}: $${(participant.cached_fee_cents / 100).toFixed(2)}, refund: ${refund.id}`);
+                  logger.info('[Staff Cancel] Refunded guest fee for : $, refund', { extra: { participantDisplay_name: participant.display_name, participantCached_fee_cents_100_ToFixed_2: (participant.cached_fee_cents / 100).toFixed(2), refundId: refund.id } });
                 }
               } catch (refundErr: unknown) {
-                console.error(`[Staff Cancel] Failed to refund participant ${participant.id}:`, getErrorMessage(refundErr));
+                logger.error('[Staff Cancel] Failed to refund participant', { extra: { id: participant.id, error: getErrorMessage(refundErr) } });
               }
             }
           }
@@ -994,9 +994,9 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
                AND payment_status = 'pending'`,
               [sessionResult[0].sessionId]
             );
-            console.log(`[Staff Cancel] Cleared pending fees for session ${sessionResult[0].sessionId}`);
+            logger.info('[Staff Cancel] Cleared pending fees for session', { extra: { sessionResult_0_SessionId: sessionResult[0].sessionId } });
           } catch (feeCleanupErr) {
-            console.error('[Staff Cancel] Failed to clear pending fees (non-blocking):', feeCleanupErr);
+            logger.error('[Staff Cancel] Failed to clear pending fees (non-blocking)', { extra: { feeCleanupErr } });
           }
         }
         
@@ -1068,7 +1068,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
             relatedType: 'booking_request',
             url: '/admin/bookings'
           }
-        ).catch(err => console.error('Staff cancellation notification failed:', err));
+        ).catch(err => logger.error('Staff cancellation notification failed:', { extra: { err } }));
         
         await db.insert(notifications).values({
           userEmail: bookingData.userEmail || '',
@@ -1084,7 +1084,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
             title: 'Booking Cancellation in Progress',
             body: `Your booking for ${bookingDate} at ${bookingTime} is being cancelled. You'll be notified once it's fully processed.`,
             url: '/sims'
-          }).catch(err => console.error('Member push notification failed:', err));
+          }).catch(err => logger.error('Member push notification failed:', { extra: { err } }));
         }
         
         logFromRequest(req, 'cancellation_requested', 'booking', id.toString(), undefined, {
@@ -1108,7 +1108,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
             }
           }
         } catch (calError) {
-          console.error('Failed to delete calendar event (non-blocking):', calError);
+          logger.error('Failed to delete calendar event (non-blocking)', { extra: { calError } });
         }
       }
       
@@ -1123,13 +1123,13 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
               relatedType: 'booking_request',
               url: '/admin/bookings'
             }
-          ).catch(err => console.error('Staff cancellation notification failed:', err));
+          ).catch(err => logger.error('Staff cancellation notification failed:', { extra: { err } }));
           if (pushInfo.email) {
             sendPushNotification(pushInfo.email, {
               title: 'Booking Cancelled',
               body: pushInfo.memberMessage || pushInfo.message,
               url: '/sims'
-            }).catch(err => console.error('Member push notification failed:', err));
+            }).catch(err => logger.error('Member push notification failed:', { extra: { err } }));
           }
         } else if (pushInfo.type === 'staff') {
           notifyAllStaff(
@@ -1141,13 +1141,13 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
               relatedType: 'booking_request',
               url: '/admin/bookings'
             }
-          ).catch(err => console.error('Staff cancellation notification failed:', err));
+          ).catch(err => logger.error('Staff cancellation notification failed:', { extra: { err } }));
         } else if (pushInfo.email) {
           sendPushNotification(pushInfo.email, {
             title: 'Booking Cancelled',
             body: pushInfo.message,
             url: '/sims'
-          }).catch(err => console.error('Member push notification failed:', err));
+          }).catch(err => logger.error('Member push notification failed:', { extra: { err } }));
         }
       }
       
@@ -1161,7 +1161,7 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
         startTime: bookingData.startTime,
         status: 'cancelled',
         actionBy: cancelledBy
-      }, { notifyMember: false, notifyStaff: true, cleanupNotifications: false }).catch(err => console.error('Booking event publish failed:', err));
+      }, { notifyMember: false, notifyStaff: true, cleanupNotifications: false }).catch(err => logger.error('Booking event publish failed:', { extra: { err } }));
       
       broadcastAvailabilityUpdate({
         resourceId: bookingData.resourceId || undefined,
@@ -1276,7 +1276,7 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
           await recalculateSessionFees(sessionResult.sessionId, 'checkin' as any);
         }
       } catch (err) {
-        console.error('[Checkin] Failed to auto-create session:', err);
+        logger.error('[Checkin] Failed to auto-create session', { extra: { err } });
       }
     }
     
@@ -1340,9 +1340,9 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
       if (parseInt(nullFeesCheck.rows[0]?.null_count) > 0) {
         try {
           await recalculateSessionFees(existing.session_id, 'checkin');
-          console.log(`[Check-in Guard] Recalculated fees for session ${existing.session_id} - some participants had NULL cached_fee_cents`);
+          logger.info('[Check-in Guard] Recalculated fees for session - some participants had NULL cached_fee_cents', { extra: { existingSession_id: existing.session_id } });
         } catch (recalcError) {
-          console.error(`[Check-in Guard] Failed to recalculate fees for session ${existing.session_id}:`, recalcError);
+          logger.error('[Check-in Guard] Failed to recalculate fees for session', { extra: { session_id: existing.session_id, recalcError } });
         }
       }
       
@@ -1386,7 +1386,7 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
             totalOutstanding,
             JSON.stringify({ unpaidParticipants, bypassed: true, reason: 'skipPaymentCheck flag used' })
           ]);
-          console.warn(`[Check-in Guard] AUDIT: Payment check bypassed by ${staffEmail} for booking ${bookingId}, outstanding: $${totalOutstanding.toFixed(2)}`);
+          logger.warn('[Check-in Guard] AUDIT: Payment check bypassed by for booking , outstanding: $', { extra: { staffEmail, bookingId, totalOutstandingToFixed_2: totalOutstanding.toFixed(2) } });
         } else {
           await pool.query(`
             INSERT INTO booking_payment_audit 
@@ -1468,11 +1468,11 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
       const updatedUser = updateResult.rows[0];
       if (updatedUser?.hubspot_id && updatedUser.lifetime_visits) {
         updateHubSpotContactVisitCount(updatedUser.hubspot_id, updatedUser.lifetime_visits)
-          .catch(err => console.error('[Bays] Failed to sync visit count to HubSpot:', err));
+          .catch(err => logger.error('[Bays] Failed to sync visit count to HubSpot:', { extra: { err } }));
       }
       
       if (updatedUser?.lifetime_visits) {
-        try { broadcastMemberStatsUpdated(booking.userEmail, { lifetimeVisits: updatedUser.lifetime_visits }); } catch (err: unknown) { console.error('[Broadcast] Stats update error:', err); }
+        try { broadcastMemberStatsUpdated(booking.userEmail, { lifetimeVisits: updatedUser.lifetime_visits }); } catch (err: unknown) { logger.error('[Broadcast] Stats update error', { extra: { err } }); }
       }
       
       // Send check-in confirmation notification to member
@@ -1631,7 +1631,7 @@ router.post('/api/admin/bookings/:id/dev-confirm', isStaffOrAdmin, async (req, r
             
             participantsCreated++;
           }
-          console.log(`[Dev Confirm] Created ${participantsCreated} participants from request_participants`);
+          logger.info('[Dev Confirm] Created participants from request_participants', { extra: { participantsCreated } });
         }
         
         // If not enough participants from request_participants, create generic guests for remaining slots
@@ -1668,9 +1668,9 @@ router.post('/api/admin/bookings/:id/dev-confirm', isStaffOrAdmin, async (req, r
                   ON CONFLICT DO NOTHING
                 `, [bookingId, participantEmail, slotNumber]);
                 slotNumber++;
-                console.log(`[Dev Confirm] Added participant ${participantEmail} to booking_members for booking ${bookingId}`);
+                logger.info('[Dev Confirm] Added participant to booking_members for booking', { extra: { participantEmail, bookingId } });
               } catch (memberError) {
-                console.error(`[Dev Confirm] Failed to add participant to booking_members:`, memberError);
+                logger.error('[Dev Confirm] Failed to add participant to booking_members:', { extra: { memberError } });
               }
             }
           }
@@ -1683,7 +1683,7 @@ router.post('/api/admin/bookings/:id/dev-confirm', isStaffOrAdmin, async (req, r
             totalFeeCents = feeResult.totalSessionFee;
           }
         } catch (feeError) {
-          console.warn('[Dev Confirm] Failed to calculate fees:', feeError);
+          logger.warn('[Dev Confirm] Failed to calculate fees', { extra: { feeError } });
         }
       }
     }
@@ -1773,10 +1773,10 @@ router.post('/api/admin/bookings/:id/dev-confirm', isStaffOrAdmin, async (req, r
             data: { bookingId: bookingId.toString(), eventType: 'booking_participant_added' }
           }, { action: 'booking_participant_added', bookingId, triggerSource: 'approval.ts' });
           
-          console.log(`[Dev Confirm] Sent 'Added to Booking' notification to ${participantEmail} for booking ${bookingId}`);
+          logger.info('[Dev Confirm] Sent Added to Booking notification', { extra: { participantEmail, bookingId } });
         }
       } catch (notifyErr) {
-        console.error('[Dev Confirm] Failed to notify participants (non-blocking):', notifyErr);
+        logger.error('[Dev Confirm] Failed to notify participants (non-blocking)', { extra: { notifyErr } });
       }
     }
 
@@ -1847,7 +1847,7 @@ router.put('/api/booking-requests/:id/complete-cancellation', isStaffOrAdmin, as
         }
       } catch (paymentErr: unknown) {
         errors.push(`Overage refund failed: ${getErrorMessage(paymentErr)}`);
-        console.error('[Complete Cancellation] Failed to handle overage payment:', paymentErr);
+        logger.error('[Complete Cancellation] Failed to handle overage payment', { extra: { paymentErr } });
       }
       
       // Always clear overage fields regardless of refund success
@@ -1856,7 +1856,7 @@ router.put('/api/booking-requests/:id/complete-cancellation', isStaffOrAdmin, as
           .set({ overagePaymentIntentId: null, overageFeeCents: 0 })
           .where(eq(bookingRequests.id, bookingId));
       } catch (clearErr) {
-        console.error('[Complete Cancellation] Failed to clear overage fields:', clearErr);
+        logger.error('[Complete Cancellation] Failed to clear overage fields', { extra: { clearErr } });
       }
     }
     
@@ -1873,12 +1873,12 @@ router.put('/api/booking-requests/:id/complete-cancellation', isStaffOrAdmin, as
           await cancelPaymentIntent(row.stripe_payment_intent_id);
         } catch (cancelErr: unknown) {
           errors.push(`Failed to cancel payment intent ${row.stripe_payment_intent_id.substring(0, 8)}: ${getErrorMessage(cancelErr)}`);
-          console.error(`[Complete Cancellation] Failed to cancel payment intent:`, getErrorMessage(cancelErr));
+          logger.error('[Complete Cancellation] Failed to cancel payment intent:', { extra: { error: getErrorMessage(cancelErr) } });
         }
       }
     } catch (err: unknown) {
       errors.push(`Failed to query pending intents: ${getErrorMessage(err)}`);
-      console.error('[Complete Cancellation] Failed to query pending intents:', err);
+      logger.error('[Complete Cancellation] Failed to query pending intents', { extra: { err } });
     }
     
     // 3. Clear pending fees and refund paid participant fees
@@ -1892,7 +1892,7 @@ router.put('/api/booking-requests/:id/complete-cancellation', isStaffOrAdmin, as
         );
       } catch (clearErr) {
         errors.push(`Failed to clear pending fees: ${(clearErr as any).message}`);
-        console.error('[Complete Cancellation] Failed to clear pending fees:', clearErr);
+        logger.error('[Complete Cancellation] Failed to clear pending fees', { extra: { clearErr } });
       }
       
       try {
@@ -1929,17 +1929,17 @@ router.put('/api/booking-requests/:id/complete-cancellation', isStaffOrAdmin, as
                   `UPDATE booking_participants SET refunded_at = NOW(), payment_status = 'waived' WHERE id = $1`,
                   [participant.id]
                 );
-                console.log(`[Complete Cancellation] Refunded ${participant.display_name}: $${(participant.cached_fee_cents / 100).toFixed(2)}`);
+                logger.info('[Complete Cancellation] Refunded : $', { extra: { participantDisplay_name: participant.display_name, participantCached_fee_cents_100_ToFixed_2: (participant.cached_fee_cents / 100).toFixed(2) } });
               }
             } catch (refundErr: unknown) {
               errors.push(`Failed to refund ${participant.display_name}: ${getErrorMessage(refundErr)}`);
-              console.error(`[Complete Cancellation] Failed to refund participant ${participant.id}:`, getErrorMessage(refundErr));
+              logger.error('[Complete Cancellation] Failed to refund participant', { extra: { id: participant.id, error: getErrorMessage(refundErr) } });
             }
           }
         }
       } catch (feeErr: unknown) {
         errors.push(`Failed to handle participant refunds: ${getErrorMessage(feeErr)}`);
-        console.error('[Complete Cancellation] Failed to handle fees:', feeErr);
+        logger.error('[Complete Cancellation] Failed to handle fees', { extra: { feeErr } });
       }
       
       // 4. Refund guest passes
@@ -1954,12 +1954,12 @@ router.put('/api/booking-requests/:id/complete-cancellation', isStaffOrAdmin, as
             await refundGuestPass(existing.userEmail || '', guest.display_name || undefined, false);
           } catch (guestErr: unknown) {
             errors.push(`Failed to refund guest pass for ${guest.display_name}: ${getErrorMessage(guestErr)}`);
-            console.error('[Complete Cancellation] Failed to refund guest pass:', guestErr);
+            logger.error('[Complete Cancellation] Failed to refund guest pass', { extra: { guestErr } });
           }
         }
       } catch (err: unknown) {
         errors.push(`Failed to query guest participants: ${getErrorMessage(err)}`);
-        console.error('[Complete Cancellation] Failed to query guest participants:', err);
+        logger.error('[Complete Cancellation] Failed to query guest participants', { extra: { err } });
       }
     }
     
@@ -1968,7 +1968,7 @@ router.put('/api/booking-requests/:id/complete-cancellation', isStaffOrAdmin, as
       await releaseGuestPassHold(bookingId);
     } catch (err: unknown) {
       errors.push(`Failed to release guest pass holds: ${getErrorMessage(err)}`);
-      console.error('[Complete Cancellation] Failed to release guest pass holds:', err);
+      logger.error('[Complete Cancellation] Failed to release guest pass holds', { extra: { err } });
     }
     
     // 6. NOW mark as cancelled with any error details in staff notes + notify member (in transaction)
@@ -2024,7 +2024,7 @@ router.put('/api/booking-requests/:id/complete-cancellation', isStaffOrAdmin, as
       actionBy: 'staff'
     } as any);
     
-    console.log(`[Complete Cancellation] Staff ${staffEmail} manually completed cancellation of booking ${bookingId}${errors.length > 0 ? ` with ${errors.length} error(s)` : ''}`);
+    logger.info('[Complete Cancellation] Staff manually completed cancellation of booking', { extra: { staffEmail, bookingId, errorCount: errors.length } });
     
     return res.json({ 
       success: true, 
@@ -2033,7 +2033,7 @@ router.put('/api/booking-requests/:id/complete-cancellation', isStaffOrAdmin, as
       cleanup_errors: errors.length > 0 ? errors : undefined
     });
   } catch (err: unknown) {
-    console.error('[Complete Cancellation] Error:', err);
+    logger.error('[Complete Cancellation] Error', { extra: { err } });
     return res.status(500).json({ error: 'Failed to complete cancellation' });
   }
 });

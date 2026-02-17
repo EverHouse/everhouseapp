@@ -1,3 +1,4 @@
+import { logger } from '../core/logger';
 import { Router } from 'express';
 import { db } from '../db';
 import { membershipTiers, users } from '../../shared/schema';
@@ -160,7 +161,7 @@ router.post('/api/checkout/sessions', checkoutRateLimiter, async (req, res) => {
 
       if (existingUser?.stripeCustomerId) {
         sessionParams.customer = existingUser.stripeCustomerId;
-        console.log(`[Checkout] Reusing existing Stripe customer ${existingUser.stripeCustomerId} for ${email}`);
+        logger.info('[Checkout] Reusing existing Stripe customer for', { extra: { existingUserStripeCustomerId: existingUser.stripeCustomerId, email } });
       } else {
         sessionParams.customer_email = email;
       }
@@ -173,7 +174,7 @@ router.post('/api/checkout/sessions', checkoutRateLimiter, async (req, res) => {
       clientSecret: session.client_secret,
     });
   } catch (error: unknown) {
-    console.error('[Checkout] Session creation error:', error);
+    logger.error('[Checkout] Session creation error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create checkout session' });
   }
 });
@@ -198,7 +199,7 @@ router.get('/api/checkout/session/:sessionId', checkoutRateLimiter, async (req, 
       paymentStatus: session.payment_status,
     });
   } catch (error: unknown) {
-    console.error('[Checkout] Session retrieval error:', error);
+    logger.error('[Checkout] Session retrieval error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to retrieve session' });
   }
 });

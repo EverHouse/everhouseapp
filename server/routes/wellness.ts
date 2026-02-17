@@ -13,6 +13,7 @@ import { sendNotificationToUser, broadcastToStaff, broadcastWaitlistUpdate } fro
 import { getSessionUser } from '../types/session';
 import { logFromRequest } from '../core/auditLog';
 import { getErrorMessage } from '../utils/errorUtils';
+import { logger } from '../core/logger';
 
 async function getMemberDisplayName(email: string): Promise<string> {
   try {
@@ -26,7 +27,7 @@ async function getMemberDisplayName(email: string): Promise<string> {
       return [result[0].firstName, result[0].lastName].filter(Boolean).join(' ');
     }
   } catch (err: unknown) {
-    if (!isProduction) console.warn('Failed to lookup member name:', err);
+    logger.warn('Failed to lookup member name', { extra: { error: err } });
   }
   return email.split('@')[0];
 }
@@ -108,7 +109,7 @@ router.post('/api/wellness-classes/sync', isStaffOrAdmin, async (req, res) => {
       total: result.synced
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Wellness calendar sync error:', error);
+    logger.error('Wellness calendar sync error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync wellness calendar events' });
   }
 });
@@ -196,7 +197,7 @@ router.post('/api/wellness-classes/backfill-calendar', isStaffOrAdmin, async (re
       errors: errors.length > 0 ? errors : undefined
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Wellness calendar backfill error:', error);
+    logger.error('Wellness calendar backfill error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to backfill wellness calendar events' });
   }
 });
@@ -212,7 +213,7 @@ router.get('/api/wellness-classes/needs-review', isStaffOrAdmin, async (req, res
        LIMIT 100`);
     res.json(result.rows);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Fetch needs review error:', error);
+    logger.error('Fetch needs review error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch wellness classes needing review' });
   }
 });
@@ -303,7 +304,7 @@ router.post('/api/wellness-classes/:id/mark-reviewed', isStaffOrAdmin, async (re
         : undefined 
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Mark reviewed error:', error);
+    logger.error('Mark reviewed error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to mark wellness class as reviewed' });
   }
 });
@@ -354,7 +355,7 @@ router.get('/api/wellness-classes', async (req, res) => {
     const result = await db.execute(fullQuery);
     res.json(result.rows);
   } catch (error: unknown) {
-    if (!isProduction) console.error('API error:', error);
+    logger.error('API error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch wellness classes' });
   }
 });
@@ -425,7 +426,7 @@ router.post('/api/wellness-classes', isStaffOrAdmin, async (req, res) => {
         endTime24
       );
     } catch (calError: unknown) {
-      if (!isProduction) console.error('Failed to create Google Calendar event for wellness class:', calError);
+      logger.error('Failed to create Google Calendar event for wellness class', { extra: { error: calError } });
       return res.status(500).json({ error: 'Failed to create calendar event. Please try again.' });
     }
     
@@ -446,7 +447,7 @@ router.post('/api/wellness-classes', isStaffOrAdmin, async (req, res) => {
         const userEmail = getSessionUser(req)?.email || 'system';
         await createWellnessAvailabilityBlocks((createdClass as any).id as number, date, startTime24, endTime24, newBlockSimulators, newBlockConferenceRoom, userEmail, title);
       } catch (blockError: unknown) {
-        if (!isProduction) console.error('Failed to create availability blocks for wellness class:', blockError);
+        logger.error('Failed to create availability blocks for wellness class', { extra: { error: blockError } });
       }
     }
     
@@ -464,7 +465,7 @@ router.post('/api/wellness-classes', isStaffOrAdmin, async (req, res) => {
     
     res.status(201).json(createdClass);
   } catch (error: unknown) {
-    if (!isProduction) console.error('API error:', error);
+    logger.error('API error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create wellness class' });
   }
 });
@@ -574,7 +575,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
           );
         }
       } catch (calError: unknown) {
-        if (!isProduction) console.error('Failed to update Google Calendar event for wellness class:', calError);
+        logger.error('Failed to update Google Calendar event for wellness class', { extra: { error: calError } });
       }
     }
     
@@ -693,7 +694,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
                   recurringUserEmail, row.title || updated.title
                 );
               } catch (blockError: unknown) {
-                if (!isProduction) console.error(`Failed to create blocks for recurring wellness class ${row.id}:`, blockError);
+                logger.error(`Failed to create blocks for recurring wellness class ${row.id}`, { extra: { error: blockError } });
               }
             }
           } else {
@@ -702,13 +703,13 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
               try {
                 await removeWellnessAvailabilityBlocks(row.id);
               } catch (blockError: unknown) {
-                if (!isProduction) console.error(`Failed to remove blocks for recurring wellness class ${row.id}:`, blockError);
+                logger.error(`Failed to remove blocks for recurring wellness class ${row.id}`, { extra: { error: blockError } });
               }
             }
           }
         }
       } catch (recurError: unknown) {
-        if (!isProduction) console.error('Failed to update recurring wellness classes:', recurError);
+        logger.error('Failed to update recurring wellness classes', { extra: { error: recurError } });
       }
     }
     
@@ -776,7 +777,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
         await updateWellnessAvailabilityBlocks(wellnessClassId, updated.date, startTime24, endTime24, newBlockSimulators, newBlockConferenceRoom, userEmail, updated.title);
       }
     } catch (blockError: unknown) {
-      if (!isProduction) console.error('Failed to update availability blocks for wellness class:', blockError);
+      logger.error('Failed to update availability blocks for wellness class', { extra: { error: blockError } });
     }
     
     // Auto-clear needs_review if all required fields are filled
@@ -795,14 +796,14 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
             Object.assign(updated, reviewedResult.rows[0]);
           }
         } catch (reviewError: unknown) {
-          if (!isProduction) console.error('Failed to auto-clear needs_review:', reviewError);
+          logger.error('Failed to auto-clear needs_review', { extra: { error: reviewError } });
         }
       }
     }
     
     res.json(updated);
   } catch (error: unknown) {
-    if (!isProduction) console.error('API error:', error);
+    logger.error('API error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update wellness class' });
   }
 });
@@ -840,7 +841,7 @@ router.get('/api/wellness-enrollments', async (req, res) => {
             );
             isStaff = result.rows.length > 0;
           } catch (e: unknown) {
-            if (!isProduction) console.warn('[wellness] Staff check query failed:', e);
+            logger.warn('[wellness] Staff check query failed', { extra: { error: e } });
           }
         }
         if (!isStaff) {
@@ -882,7 +883,7 @@ router.get('/api/wellness-enrollments', async (req, res) => {
     
     res.json(result);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Wellness enrollments error:', error);
+    logger.error('Wellness enrollments error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch enrollments' });
   }
 });
@@ -986,7 +987,7 @@ router.post('/api/wellness-enrollments', async (req, res) => {
       title: isWaitlisted ? 'Added to Waitlist' : 'Class Booked!',
       body: memberMessage,
       url: '/member-wellness'
-    }).catch(err => console.error('Push notification failed:', err));
+    }).catch(err => logger.error('Push notification failed', { extra: { error: err } }));
     
     // Send real-time WebSocket notification to member
     sendNotificationToUser(user_email, {
@@ -1009,7 +1010,7 @@ router.post('/api/wellness-enrollments', async (req, res) => {
     
     res.status(201).json({ ...result, isWaitlisted, message: isWaitlisted ? 'Added to waitlist' : 'Enrolled' });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Wellness enrollment error:', error);
+    logger.error('Wellness enrollment error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to enroll in class. Staff notification is required.' });
   }
 });
@@ -1091,7 +1092,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res
          AND type = 'wellness_booking'`);
     } catch (cleanupErr: unknown) {
       // Non-critical - log but don't fail the cancellation
-      if (!isProduction) console.warn('Failed to cleanup wellness confirmation notification:', cleanupErr);
+      logger.warn('Failed to cleanup wellness confirmation notification', { extra: { error: cleanupErr } });
     }
     
     await notifyMember({
@@ -1144,7 +1145,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res
             title: 'Spot Available - You\'re In!',
             body: promotedMessage,
             url: '/member-wellness'
-          }).catch(err => console.error('Push notification failed:', err));
+          }).catch(err => logger.error('Push notification failed', { extra: { error: err } }));
           
           // Send real-time WebSocket notification
           sendNotificationToUser(promotedEmail, {
@@ -1163,7 +1164,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res
           );
         }
       } catch (promoteError: unknown) {
-        if (!isProduction) console.error('Failed to promote waitlisted user:', promoteError);
+        logger.error('Failed to promote waitlisted user', { extra: { error: promoteError } });
       }
     }
     
@@ -1193,7 +1194,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res
     
     res.json({ success: true });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Wellness enrollment cancellation error:', error);
+    logger.error('Wellness enrollment cancellation error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to cancel enrollment. Staff notification is required.' });
   }
 });
@@ -1211,14 +1212,14 @@ router.delete('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
           await deleteCalendarEvent((existing.rows[0] as any).google_calendar_id, calendarId);
         }
       } catch (calError: unknown) {
-        if (!isProduction) console.error('Failed to delete Google Calendar event for wellness class:', calError);
+        logger.error('Failed to delete Google Calendar event for wellness class', { extra: { error: calError } });
       }
     }
     
     try {
       await removeWellnessAvailabilityBlocks(wellnessClassId);
     } catch (blockError: unknown) {
-      if (!isProduction) console.error('Failed to remove availability blocks for wellness class:', blockError);
+      logger.error('Failed to remove availability blocks for wellness class', { extra: { error: blockError } });
     }
     
     const result = await db.execute(sql`DELETE FROM wellness_classes WHERE id = ${id} RETURNING *`);
@@ -1239,7 +1240,7 @@ router.delete('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
     
     res.json({ message: 'Wellness class deleted', class: deletedClass });
   } catch (error: unknown) {
-    if (!isProduction) console.error('API error:', error);
+    logger.error('API error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to delete wellness class' });
   }
 });
@@ -1267,7 +1268,7 @@ router.get('/api/wellness-classes/:id/enrollments', isStaffOrAdmin, async (req, 
     
     res.json(result);
   } catch (error: unknown) {
-    if (!isProduction) console.error('API error:', error);
+    logger.error('API error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch enrollments' });
   }
 });
@@ -1311,7 +1312,7 @@ router.post('/api/wellness-classes/:id/enrollments/manual', isStaffOrAdmin, asyn
     
     res.json({ success: true });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Manual enrollment error:', error);
+    logger.error('Manual enrollment error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to add enrollment' });
   }
 });

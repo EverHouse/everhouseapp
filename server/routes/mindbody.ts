@@ -4,6 +4,7 @@ import { legacyPurchases, users, billingAuditLog } from "@shared/schema";
 import { eq, desc, sql, isNull, and, or, ilike } from "drizzle-orm";
 import { isStaffOrAdmin, isAdmin } from "../core/middleware";
 import { getSessionUser } from "../types/session";
+import { logger } from "../core/logger";
 
 const router = Router();
 
@@ -62,7 +63,7 @@ router.get("/api/admin/mindbody/unmatched", isStaffOrAdmin, async (req: Request,
       offset,
     });
   } catch (error: unknown) {
-    console.error("[Mindbody] Error fetching unmatched:", error);
+    logger.error("[Mindbody] Error fetching unmatched", { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: "Failed to fetch unmatched records" });
   }
 });
@@ -147,7 +148,7 @@ router.post("/api/admin/mindbody/link", isStaffOrAdmin, async (req: Request, res
       memberName: `${targetMember.firstName || ''} ${targetMember.lastName || ''}`.trim(),
     });
   } catch (error: unknown) {
-    console.error("[Mindbody] Error linking member:", error);
+    logger.error("[Mindbody] Error linking member", { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: "Failed to link member" });
   }
 });
@@ -172,7 +173,7 @@ router.get("/api/admin/mindbody/link-history", isStaffOrAdmin, async (req: Reque
 
     res.json(history);
   } catch (error: unknown) {
-    console.error("[Mindbody] Error fetching link history:", error);
+    logger.error("[Mindbody] Error fetching link history", { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: "Failed to fetch link history" });
   }
 });

@@ -1,3 +1,4 @@
+import { logger } from '../core/logger';
 import { Router } from 'express';
 import { pool } from '../core/db';
 import { getStripeClient } from '../core/stripe/client';
@@ -127,7 +128,7 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
           billingInfo.customerBalance = (customer as any).balance || 0;
         }
       } catch (stripeError: unknown) {
-        console.error('[MyBilling] Stripe error:', getErrorMessage(stripeError));
+        logger.error('[MyBilling] Stripe error', { extra: { stripeError: getErrorMessage(stripeError) } });
         billingInfo.stripeError = 'Unable to load billing details';
       }
     }
@@ -142,13 +143,13 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
           };
         }
       } catch (familyError: unknown) {
-        console.warn('[MyBilling] Family group lookup failed:', getErrorMessage(familyError));
+        logger.warn('[MyBilling] Family group lookup failed', { extra: { familyError: getErrorMessage(familyError) } });
       }
     }
     
     res.json(billingInfo);
   } catch (error: unknown) {
-    console.error('[MyBilling] Error:', error);
+    logger.error('[MyBilling] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to load billing info' });
   }
 });
@@ -194,7 +195,7 @@ router.get('/api/my/billing/invoices', requireAuth, async (req, res) => {
     
     res.json({ invoices });
   } catch (error: unknown) {
-    console.error('[MyBilling] Invoice error:', error);
+    logger.error('[MyBilling] Invoice error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to load invoices' });
   }
 });
@@ -231,7 +232,7 @@ router.post('/api/my/billing/update-payment-method', requireAuth, async (req, re
     
     res.json({ url: session.url });
   } catch (error: unknown) {
-    console.error('[MyBilling] Payment update error:', error);
+    logger.error('[MyBilling] Payment update error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create payment update link' });
   }
 });
@@ -274,7 +275,7 @@ router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
         const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
         await syncMemberToHubSpot({ email: member.email, billingProvider: 'stripe' });
       } catch (e: unknown) {
-        console.warn(`[MyBilling] Failed to sync billing provider to HubSpot for ${member.email}:`, (e as any)?.message || e);
+        logger.warn('[MyBilling] Failed to sync billing provider to HubSpot for', { extra: { email: member.email, e_as_any_e: (e as any)?.message || e } });
       }
     }
     
@@ -291,7 +292,7 @@ router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
     
     res.json({ url: session.url });
   } catch (error: unknown) {
-    console.error('[MyBilling] Portal error:', error);
+    logger.error('[MyBilling] Portal error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to open billing portal' });
   }
 });
@@ -342,10 +343,10 @@ router.post('/api/my/billing/add-payment-method-for-extras', requireAuth, async 
       },
     });
     
-    console.log(`[MyBilling] Payment method setup (for extras) initiated for ${member.email}`);
+    logger.info('[MyBilling] Payment method setup (for extras) initiated for', { extra: { memberEmail: member.email } });
     res.json({ url: session.url });
   } catch (error: unknown) {
-    console.error('[MyBilling] Add payment method for extras error:', error);
+    logger.error('[MyBilling] Add payment method for extras error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to open payment portal' });
   }
 });
@@ -413,14 +414,14 @@ router.post('/api/my/billing/migrate-to-stripe', requireAuth, async (req, res) =
         notificationMessage,
         'billing_migration'
       );
-      console.log(`[MyBilling] Staff notification sent for billing migration request from ${member.email}`);
+      logger.info('[MyBilling] Staff notification sent for billing migration request from', { extra: { memberEmail: member.email } });
     } catch (notifyError: unknown) {
-      console.error(`[MyBilling] Staff notification failed for ${member.email}:`, getErrorMessage(notifyError));
+      logger.error('[MyBilling] Staff notification failed for', { extra: { email: member.email, error: getErrorMessage(notifyError) } });
     }
     
     res.json({ url: session.url });
   } catch (error: unknown) {
-    console.error('[MyBilling] Migration error:', error);
+    logger.error('[MyBilling] Migration error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to initiate billing migration' });
   }
 });
@@ -457,7 +458,7 @@ router.get('/api/my/balance', requireAuth, async (req, res) => {
       isCredit: balanceCents < 0
     });
   } catch (error: unknown) {
-    console.error('[MyBilling] Balance fetch error:', error);
+    logger.error('[MyBilling] Balance fetch error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch balance' });
   }
 });
@@ -523,7 +524,7 @@ router.post('/api/my/add-funds', requireAuth, async (req, res) => {
     
     res.json({ checkoutUrl: session.url });
   } catch (error: unknown) {
-    console.error('[MyBilling] Add funds error:', error);
+    logger.error('[MyBilling] Add funds error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create checkout session' });
   }
 });
@@ -573,7 +574,7 @@ router.get('/api/my-billing/account-balance', requireAuth, async (req, res) => {
       isCredit: balanceCents < 0
     });
   } catch (error: unknown) {
-    console.error('[MyBilling] Account balance fetch error:', error);
+    logger.error('[MyBilling] Account balance fetch error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch balance' });
   }
 });
@@ -601,11 +602,11 @@ router.post('/api/member-billing/:email/sync-stripe', requireStaffAuth, async (r
     const custResult = await getOrCreateStripeCustomer(member.id, targetEmail, fullName, member.tier);
     const customerId = custResult.customerId;
     const created = custResult.isNew;
-    console.log(`[SyncStripe] ${created ? 'Created' : 'Found existing'} Stripe customer ${customerId} for ${targetEmail}`);
+    logger.info('[SyncStripe] Stripe customer for', { extra: { created_Created_Found_existing: created ? 'Created' : 'Found existing', customerId, targetEmail } });
     
     res.json({ success: true, created, customerId });
   } catch (error: unknown) {
-    console.error('[SyncStripe] Error:', error);
+    logger.error('[SyncStripe] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync to Stripe' });
   }
 });
@@ -640,10 +641,10 @@ router.post('/api/member-billing/:email/sync-metadata', requireStaffAuth, async 
       },
     });
     
-    console.log(`[SyncMetadata] Updated Stripe customer ${member.stripe_customer_id} metadata for ${targetEmail}`);
+    logger.info('[SyncMetadata] Updated Stripe customer metadata for', { extra: { memberStripe_customer_id: member.stripe_customer_id, targetEmail } });
     res.json({ success: true });
   } catch (error: unknown) {
-    console.error('[SyncMetadata] Error:', error);
+    logger.error('[SyncMetadata] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync metadata' });
   }
 });
@@ -756,15 +757,15 @@ router.post('/api/member-billing/:email/sync-tier-from-stripe', requireStaffAuth
       [newTier, member.id]
     );
     
-    console.log(`[SyncTierFromStripe] Updated tier for ${targetEmail}: ${previousTier} -> ${newTier} (matched by ${matchMethod})`);
+    logger.info('[SyncTierFromStripe] Updated tier for : -> (matched by )', { extra: { targetEmail, previousTier, newTier, matchMethod } });
     
     // Sync to HubSpot
     try {
       const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
       await syncMemberToHubSpot({ email: targetEmail, status: 'active', tier: newTier, billingProvider: 'stripe' });
-      console.log(`[SyncTierFromStripe] Synced ${targetEmail} to HubSpot: status=active, tier=${newTier}, billing=stripe`);
+      logger.info('[SyncTierFromStripe] Synced to HubSpot: status=active, tier=, billing=stripe', { extra: { targetEmail, newTier } });
     } catch (hubspotError) {
-      console.error('[SyncTierFromStripe] HubSpot sync failed:', hubspotError);
+      logger.error('[SyncTierFromStripe] HubSpot sync failed', { extra: { hubspotError } });
     }
     
     res.json({ 
@@ -775,7 +776,7 @@ router.post('/api/member-billing/:email/sync-tier-from-stripe', requireStaffAuth
       message: `Tier updated from ${previousTier || 'none'} to ${newTier}`
     });
   } catch (error: unknown) {
-    console.error('[SyncTierFromStripe] Error:', error);
+    logger.error('[SyncTierFromStripe] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync tier from Stripe' });
   }
 });
@@ -845,10 +846,10 @@ router.post('/api/member-billing/:email/backfill-cache', requireStaffAuth, async
       transactionCount++;
     }
     
-    console.log(`[BackfillCache] Cached ${transactionCount} transactions for ${targetEmail}`);
+    logger.info('[BackfillCache] Cached transactions for', { extra: { transactionCount, targetEmail } });
     res.json({ success: true, transactionCount });
   } catch (error: unknown) {
-    console.error('[BackfillCache] Error:', error);
+    logger.error('[BackfillCache] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to backfill cache' });
   }
 });
@@ -919,10 +920,10 @@ router.post('/api/my/billing/request-cancellation', requireAuth, async (req, res
         'membership_cancellation'
       );
     } catch (notifyErr) {
-      console.warn('[MyBilling] Failed to notify staff of cancellation request:', notifyErr);
+      logger.warn('[MyBilling] Failed to notify staff of cancellation request', { extra: { notifyErr } });
     }
     
-    console.log(`[MyBilling] Member ${email} requested cancellation, effective ${effectiveDate.toISOString()}`);
+    logger.info('[MyBilling] Member requested cancellation, effective', { extra: { email, effectiveDateToISOString: effectiveDate.toISOString() } });
     
     res.json({
       success: true,
@@ -932,7 +933,7 @@ router.post('/api/my/billing/request-cancellation', requireAuth, async (req, res
       noticePeriodDays: 30,
     });
   } catch (error: unknown) {
-    console.error('[MyBilling] Cancellation request error:', error);
+    logger.error('[MyBilling] Cancellation request error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to submit cancellation request' });
   }
 });
@@ -959,7 +960,7 @@ router.get('/api/my/billing/cancellation-status', requireAuth, async (req, res) 
       cancellationReason: member.cancellation_reason,
     });
   } catch (error: unknown) {
-    console.error('[MyBilling] Cancellation status error:', error);
+    logger.error('[MyBilling] Cancellation status error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to get cancellation status' });
   }
 });

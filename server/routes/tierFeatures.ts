@@ -5,6 +5,7 @@ import { sql } from 'drizzle-orm';
 import { isAdmin } from '../core/middleware';
 import { getErrorCode } from '../utils/errorUtils';
 import { logFromRequest } from '../core/auditLog';
+import { logger } from '../core/logger';
 
 const router = Router();
 
@@ -123,7 +124,7 @@ router.get('/api/tier-features', async (req, res) => {
 
     res.json({ features });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Tier features fetch error:', error);
+    if (!isProduction) logger.error('Tier features fetch error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch tier features' });
   }
 });
@@ -186,7 +187,7 @@ router.post('/api/tier-features', isAdmin, async (req, res) => {
     });
   } catch (error: unknown) {
     await client.query('ROLLBACK');
-    if (!isProduction) console.error('Create tier feature error:', error);
+    if (!isProduction) logger.error('Create tier feature error', { error: error instanceof Error ? error : new Error(String(error)) });
     
     if (getErrorCode(error) === '23505') {
       return res.status(409).json({ error: 'A feature with this key already exists' });
@@ -232,7 +233,7 @@ router.put('/api/tier-features/:id', isAdmin, async (req, res) => {
       isActive: row.is_active
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Update tier feature error:', error);
+    if (!isProduction) logger.error('Update tier feature error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update tier feature' });
   }
 });
@@ -250,7 +251,7 @@ router.delete('/api/tier-features/:id', isAdmin, async (req, res) => {
     logFromRequest(req, 'delete_tier_feature' as any, 'tier_feature' as any, String(result.rows[0].id));
     res.json({ success: true, deleted: result.rows[0].id });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Delete tier feature error:', error);
+    if (!isProduction) logger.error('Delete tier feature error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to delete tier feature' });
   }
 });
@@ -310,7 +311,7 @@ router.put('/api/tier-features/:featureId/values/:tierId', isAdmin, async (req, 
       value: returnValue
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Update tier feature value error:', error);
+    if (!isProduction) logger.error('Update tier feature value error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update tier feature value' });
   }
 });

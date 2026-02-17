@@ -1,3 +1,4 @@
+import { logger } from '../../core/logger';
 import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin, isAdmin } from '../../core/middleware';
 import { db } from '../../db';
@@ -30,7 +31,7 @@ router.post('/api/admin/check-expiring-cards', isAdmin, async (req: Request, res
     const result = await checkExpiringCards();
     res.json(result);
   } catch (error: unknown) {
-    console.error('[Stripe] Error checking expiring cards:', error);
+    logger.error('[Stripe] Error checking expiring cards', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to check expiring cards', details: getErrorMessage(error) });
   }
 });
@@ -40,7 +41,7 @@ router.post('/api/admin/check-stale-waivers', isAdmin, async (req: Request, res:
     const result = await checkStaleWaivers();
     res.json(result);
   } catch (error: unknown) {
-    console.error('[Admin] Error checking stale waivers:', error);
+    logger.error('[Admin] Error checking stale waivers', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to check stale waivers', details: getErrorMessage(error) });
   }
 });
@@ -56,7 +57,7 @@ router.get('/api/stripe/products', isStaffOrAdmin, async (req: Request, res: Res
       count: stripeProducts.length
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error getting products:', error);
+    logger.error('[Stripe] Error getting products', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to get Stripe products' });
   }
 });
@@ -88,7 +89,7 @@ router.post('/api/stripe/products/sync', isStaffOrAdmin, sensitiveActionRateLimi
       stripePriceId: result.stripePriceId
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error syncing product:', error);
+    logger.error('[Stripe] Error syncing product', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync product to Stripe' });
   }
 });
@@ -113,7 +114,7 @@ router.post('/api/stripe/products/sync-all', isStaffOrAdmin, sensitiveActionRate
       errors: result.errors
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error syncing all products:', error);
+    logger.error('[Stripe] Error syncing all products', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync products to Stripe' });
   }
 });
@@ -123,7 +124,7 @@ router.get('/api/stripe/tiers/status', isStaffOrAdmin, async (req: Request, res:
     const status = await getTierSyncStatus();
     res.json({ tiers: status });
   } catch (error: unknown) {
-    console.error('[Stripe] Error getting tier sync status:', error);
+    logger.error('[Stripe] Error getting tier sync status', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to get tier sync status' });
   }
 });
@@ -149,7 +150,7 @@ router.post('/api/stripe/tiers/sync', isAdmin, sensitiveActionRateLimiter, async
       results: result.results
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error syncing tiers:', error);
+    logger.error('[Stripe] Error syncing tiers', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync membership tiers to Stripe' });
   }
 });
@@ -159,7 +160,7 @@ router.get('/api/stripe/discounts/status', isStaffOrAdmin, async (req: Request, 
     const status = await getDiscountSyncStatus();
     res.json({ discounts: status });
   } catch (error: unknown) {
-    console.error('[Stripe] Error getting discount sync status:', error);
+    logger.error('[Stripe] Error getting discount sync status', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to get discount sync status' });
   }
 });
@@ -185,7 +186,7 @@ router.post('/api/stripe/discounts/sync', isAdmin, sensitiveActionRateLimiter, a
       results: result.results
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error syncing discounts:', error);
+    logger.error('[Stripe] Error syncing discounts', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync discount rules to Stripe coupons' });
   }
 });
@@ -195,7 +196,7 @@ router.get('/api/stripe/billing/classification', isAdmin, async (req: Request, r
     const summary = await getBillingClassificationSummary();
     res.json(summary);
   } catch (error: unknown) {
-    console.error('[Stripe] Error getting billing classification:', error);
+    logger.error('[Stripe] Error getting billing classification', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to classify member billing' });
   }
 });
@@ -216,7 +217,7 @@ router.get('/api/stripe/billing/needs-migration', isAdmin, async (req: Request, 
       }))
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error getting members needing migration:', error);
+    logger.error('[Stripe] Error getting members needing migration', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to get members needing migration' });
   }
 });
@@ -339,14 +340,14 @@ router.post('/api/stripe/staff/send-membership-link', isStaffOrAdmin, async (req
 </html>
 `,
       });
-      console.log(`[Stripe] Membership invite email sent to ${email}`);
+      logger.info('[Stripe] Membership invite email sent to', { extra: { email } });
     } catch (emailError: unknown) {
-      console.error('[Stripe] Failed to send membership invite email:', emailError);
+      logger.error('[Stripe] Failed to send membership invite email', { extra: { emailError } });
     }
 
     res.json({ success: true, checkoutUrl });
   } catch (error: unknown) {
-    console.error('[Stripe] Error sending membership invite:', error);
+    logger.error('[Stripe] Error sending membership invite', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create membership invite' });
   }
 });
@@ -391,9 +392,9 @@ router.post('/api/stripe/staff/send-reactivation-link', isStaffOrAdmin, async (r
           },
         });
         reactivationLink = session.url;
-        console.log(`[Stripe] Created billing portal session for reactivation: ${member.email}`);
+        logger.info('[Stripe] Created billing portal session for reactivation', { extra: { memberEmail: member.email } });
       } catch (portalError: unknown) {
-        console.warn(`[Stripe] Could not create billing portal for ${member.email}, using fallback link:`, getErrorMessage(portalError));
+        logger.warn('[Stripe] Could not create billing portal for , using fallback link', { extra: { email: member.email, error: getErrorMessage(portalError) } });
       }
     }
 
@@ -406,11 +407,11 @@ router.post('/api/stripe/staff/send-reactivation-link', isStaffOrAdmin, async (r
       reactivationLink
     });
 
-    console.log(`[Stripe] Reactivation link sent manually to ${member.email} by staff`);
+    logger.info('[Stripe] Reactivation link sent manually to by staff', { extra: { memberEmail: member.email } });
 
     res.json({ success: true, message: `Reactivation link sent to ${member.email}` });
   } catch (error: unknown) {
-    console.error('[Stripe] Error sending reactivation link:', error);
+    logger.error('[Stripe] Error sending reactivation link', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to send reactivation link' });
   }
 });
@@ -478,11 +479,11 @@ router.post('/api/public/day-pass/checkout', checkoutRateLimiter, async (req: Re
       },
     });
 
-    console.log(`[Stripe] Day pass checkout session created for ${email}, pass type: ${tier.name}`);
+    logger.info('[Stripe] Day pass checkout session created for , pass type', { extra: { email, tierName: tier.name } });
 
     res.json({ checkoutUrl: session.url });
   } catch (error: unknown) {
-    console.error('[Stripe] Error creating day pass checkout:', error);
+    logger.error('[Stripe] Error creating day pass checkout', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create checkout session' });
   }
 });
@@ -493,7 +494,7 @@ router.get('/api/stripe/customer-sync-status', isStaffOrAdmin, async (req: Reque
     const status = await getCustomerSyncStatus();
     res.json(status);
   } catch (error: unknown) {
-    console.error('[Stripe Customer Sync] Error getting status:', error);
+    logger.error('[Stripe Customer Sync] Error getting status', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) });
   }
 });
@@ -509,7 +510,7 @@ router.post('/api/stripe/sync-customers', isStaffOrAdmin, sensitiveActionRateLim
       });
     }
 
-    console.log('[Stripe Customer Sync] Manual sync triggered by staff');
+    logger.info('[Stripe Customer Sync] Manual sync triggered by staff');
     const { syncStripeCustomersForMindBodyMembers } = await import('../../core/stripe/customerSync');
     const result = await syncStripeCustomersForMindBodyMembers();
     
@@ -523,7 +524,7 @@ router.post('/api/stripe/sync-customers', isStaffOrAdmin, sensitiveActionRateLim
       message: `Created ${(result as any).created} new customers, linked ${(result as any).linked} existing customers`,
     });
   } catch (error: unknown) {
-    console.error('[Stripe Customer Sync] Error:', error);
+    logger.error('[Stripe Customer Sync] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync customers' });
   }
 });
@@ -554,7 +555,7 @@ router.post('/api/admin/stripe/replay-webhook', isAdmin, async (req: Request, re
 
     res.json(result);
   } catch (error: unknown) {
-    console.error('[Stripe Admin] Error replaying webhook event:', error);
+    logger.error('[Stripe Admin] Error replaying webhook event', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({
       success: false,
       error: 'Failed to replay webhook event',
@@ -782,7 +783,7 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
 
     res.json({ success: true, synced, updated, errors: errorCount, details });
   } catch (error: unknown) {
-    console.error('[Stripe] Error syncing member subscriptions:', error);
+    logger.error('[Stripe] Error syncing member subscriptions', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync member subscriptions', details: getErrorMessage(error) });
   }
 });

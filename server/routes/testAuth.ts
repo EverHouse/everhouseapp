@@ -1,3 +1,4 @@
+import { logger } from '../core/logger';
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { isProduction } from '../core/db';
@@ -134,7 +135,7 @@ router.post('/test-login', async (req: Request, res: Response) => {
 
     req.session.regenerate((err) => {
       if (err) {
-        console.error('[TestAuth] Session regeneration error:', err);
+        logger.error('[TestAuth] Session regeneration error', { extra: { err } });
         return res.status(500).json({ error: 'Session error' });
       }
 
@@ -150,11 +151,11 @@ router.post('/test-login', async (req: Request, res: Response) => {
 
       req.session.save((saveErr) => {
         if (saveErr) {
-          console.error('[TestAuth] Session save error:', saveErr);
+          logger.error('[TestAuth] Session save error', { extra: { saveErr } });
           return res.status(500).json({ error: 'Session save error' });
         }
 
-        console.log(`[TestAuth] Test login successful: ${user.email} as ${user.role}`);
+        logger.info('[TestAuth] Test login successful: as', { extra: { userEmail: user.email, userRole: user.role } });
         
         res.json({
           success: true,
@@ -169,7 +170,7 @@ router.post('/test-login', async (req: Request, res: Response) => {
       });
     });
   } catch (error: unknown) {
-    console.error('[TestAuth] Error:', error);
+    logger.error('[TestAuth] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -225,7 +226,7 @@ router.post('/test-cleanup', async (req: Request, res: Response) => {
       .returning({ id: notifications.id });
     notificationsDeleted += testMemberNotifs.length;
     
-    console.log(`[TestCleanup] Cleaned ${notificationsDeleted} notifications, ${bookingsDeleted} bookings`);
+    logger.info('[TestCleanup] Cleaned notifications, bookings', { extra: { notificationsDeleted, bookingsDeleted } });
     
     res.json({
       success: true,
@@ -235,7 +236,7 @@ router.post('/test-cleanup', async (req: Request, res: Response) => {
       }
     });
   } catch (error: unknown) {
-    console.error('[TestCleanup] Error:', error);
+    logger.error('[TestCleanup] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Cleanup failed' });
   }
 });

@@ -1,3 +1,4 @@
+import { logger } from '../../core/logger';
 import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { pool } from '../../core/db';
@@ -34,7 +35,7 @@ router.get('/api/stripe/invoices/preview', isStaffOrAdmin, async (req: Request, 
     
     res.json({ preview: result.preview });
   } catch (error: unknown) {
-    console.error('[Stripe] Error previewing invoice:', error);
+    logger.error('[Stripe] Error previewing invoice', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to preview invoice' });
   }
 });
@@ -54,7 +55,7 @@ router.get('/api/stripe/invoices/:customerId', isStaffOrAdmin, async (req: Reque
       count: result.invoices?.length || 0
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error listing invoices:', error);
+    logger.error('[Stripe] Error listing invoices', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to list invoices' });
   }
 });
@@ -93,7 +94,7 @@ router.post('/api/stripe/invoices', isStaffOrAdmin, async (req: Request, res: Re
         (broadcastBillingUpdate as any)(memberEmail, 'invoice_created');
       }
     } catch (notifyError) {
-      console.error('[Stripe] Failed to send invoice notification:', notifyError);
+      logger.error('[Stripe] Failed to send invoice notification', { extra: { notifyError } });
     }
     
     res.json({
@@ -101,7 +102,7 @@ router.post('/api/stripe/invoices', isStaffOrAdmin, async (req: Request, res: Re
       invoice: result.invoice
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error creating invoice:', error);
+    logger.error('[Stripe] Error creating invoice', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create invoice' });
   }
 });
@@ -137,7 +138,7 @@ router.post('/api/stripe/invoices/:invoiceId/finalize', isStaffOrAdmin, async (r
         }
       }
     } catch (notifyError) {
-      console.error('[Stripe] Failed to send invoice finalize notification:', notifyError);
+      logger.error('[Stripe] Failed to send invoice finalize notification', { extra: { notifyError } });
     }
     
     res.json({
@@ -145,7 +146,7 @@ router.post('/api/stripe/invoices/:invoiceId/finalize', isStaffOrAdmin, async (r
       invoice: result.invoice
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error finalizing invoice:', error);
+    logger.error('[Stripe] Error finalizing invoice', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to finalize invoice' });
   }
 });
@@ -162,7 +163,7 @@ router.get('/api/stripe/invoice/:invoiceId', isStaffOrAdmin, async (req: Request
     
     res.json({ invoice: result.invoice });
   } catch (error: unknown) {
-    console.error('[Stripe] Error getting invoice:', error);
+    logger.error('[Stripe] Error getting invoice', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to get invoice' });
   }
 });
@@ -202,12 +203,12 @@ router.post('/api/stripe/invoices/:invoiceId/void', isStaffOrAdmin, async (req: 
         }
       }
     } catch (notifyError) {
-      console.error('[Stripe] Failed to send invoice void notification:', notifyError);
+      logger.error('[Stripe] Failed to send invoice void notification', { extra: { notifyError } });
     }
     
     res.json({ success: true });
   } catch (error: unknown) {
-    console.error('[Stripe] Error voiding invoice:', error);
+    logger.error('[Stripe] Error voiding invoice', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to void invoice' });
   }
 });
@@ -254,14 +255,14 @@ router.get('/api/my-invoices', async (req: Request, res: Response) => {
       return res.status(500).json({ error: result.error || 'Failed to list invoices' });
     }
     
-    console.log(`[Stripe] my-invoices for ${targetEmail}: found ${result.invoices?.length || 0} invoices`);
+    logger.info('[Stripe] my-invoices for : found invoices', { extra: { targetEmail, resultInvoices: result.invoices?.length || 0 } });
     
     res.json({
       invoices: result.invoices,
       count: result.invoices?.length || 0
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error listing member invoices:', error);
+    logger.error('[Stripe] Error listing member invoices', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to list invoices' });
   }
 });

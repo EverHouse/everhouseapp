@@ -4,7 +4,7 @@ import { isStaffOrAdmin } from '../../core/middleware';
 import { notifyAllStaff } from '../../core/notificationService';
 import { broadcastAvailabilityUpdate } from '../../core/websocket';
 import { logFromRequest } from '../../core/auditLog';
-import { logAndRespond } from '../../core/logger';
+import {logAndRespond, logger } from '../../core/logger';
 import { formatDateDisplayWithDay, formatTime12Hour } from '../../utils/dateUtils';
 import { db } from '../../db';
 import { resources, dayPassPurchases, passRedemptionLogs } from '../../../shared/schema';
@@ -202,7 +202,7 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
         );
         
         dayPassRedeemed = true;
-        console.log(`[StaffManualBooking] Day pass ${dayPassPurchaseId} redeemed for booking ${bookingId}`);
+        logger.info('[StaffManualBooking] Day pass redeemed for booking', { extra: { dayPassPurchaseId, bookingId } });
       }
       
       await client.query('COMMIT');
@@ -240,7 +240,7 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
             createdBy: 'staff_manual_day_pass'
           });
         } catch (sessionErr) {
-          console.error('[StaffManualBooking] Failed to ensure session:', sessionErr);
+          logger.error('[StaffManualBooking] Failed to ensure session', { extra: { sessionErr } });
         }
       }
     } catch (error) {
@@ -258,7 +258,7 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
           resourceName = resource.name;
         }
       } catch (e) {
-        console.error('[ManualBooking] Failed to fetch resource name:', e);
+        logger.error('[ManualBooking] Failed to fetch resource name', { extra: { e } });
       }
     }
     
@@ -314,7 +314,7 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
           relatedId: row.id,
           relatedType: 'booking_request'
         }
-      ).catch(err => console.error('Staff notification failed:', err));
+      ).catch(err => logger.error('Staff notification failed:', { extra: { err } }));
       
       broadcastAvailabilityUpdate({
         resourceId: row.resourceId || undefined,
@@ -333,7 +333,7 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
         payment_status: isDayPassPayment ? 'paid_day_pass' : undefined
       });
     } catch (postCommitError) {
-      console.error('[StaffManualBooking] Post-commit operations failed:', postCommitError);
+      logger.error('[StaffManualBooking] Post-commit operations failed', { extra: { postCommitError } });
     }
   } catch (error: unknown) {
     logAndRespond(req, res, 500, 'Failed to create manual booking', error);

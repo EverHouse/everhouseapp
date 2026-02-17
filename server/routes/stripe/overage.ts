@@ -1,3 +1,4 @@
+import { logger } from '../../core/logger';
 import { Router, Request, Response } from 'express';
 import { isAuthenticated } from '../../core/middleware';
 import { db } from '../../db';
@@ -63,11 +64,11 @@ router.post('/api/stripe/overage/create-payment-intent', isAuthenticated, async 
         });
         
         if (breakdown.totals.overageCents !== booking.overage_fee_cents) {
-          console.log(`[Stripe Overage] Verified overage: unified=${breakdown.totals.overageCents}, stored=${booking.overage_fee_cents}`);
+          logger.info('[Stripe Overage] Verified overage: unified=, stored=', { extra: { breakdownTotalsOverageCents: breakdown.totals.overageCents, bookingOverage_fee_cents: booking.overage_fee_cents } });
           // Use the stored value for payment but log the discrepancy
         }
       } catch (verifyError) {
-        console.warn('[Stripe Overage] Failed to verify overage with unified service:', verifyError);
+        logger.warn('[Stripe Overage] Failed to verify overage with unified service', { extra: { verifyError } });
       }
     }
     
@@ -76,7 +77,7 @@ router.post('/api/stripe/overage/create-payment-intent', isAuthenticated, async 
     
     // Prevent creating Stripe customers for placeholder emails
     if (isPlaceholderEmail(booking.user_email as string)) {
-      console.log(`[Stripe] Skipping overage payment for placeholder email: ${booking.user_email}`);
+      logger.info('[Stripe] Skipping overage payment for placeholder email', { extra: { bookingUser_email: booking.user_email } });
       return res.status(400).json({ error: 'Cannot process payment for placeholder booking. Please assign this booking to a real member first.' });
     }
     
@@ -100,7 +101,7 @@ router.post('/api/stripe/overage/create-payment-intent', isAuthenticated, async 
         const existingPI = await stripe.paymentIntents.retrieve(booking.overage_payment_intent_id as string);
         if (['requires_payment_method', 'requires_confirmation', 'requires_action'].includes(existingPI.status) 
             && existingPI.amount === verifiedOverageCents) {
-          console.log(`[Overage Payment] Reusing existing intent ${existingPI.id} for booking ${bookingId}`);
+          logger.info('[Overage Payment] Reusing existing intent for booking', { extra: { existingPIId: existingPI.id, bookingId } });
           return res.json({
             clientSecret: existingPI.client_secret,
             paymentIntentId: existingPI.id,
@@ -117,7 +118,7 @@ router.post('/api/stripe/overage/create-payment-intent', isAuthenticated, async 
           return res.status(200).json({ alreadyPaid: true, message: 'Overage already paid' });
         }
       } catch (piErr) {
-        console.warn('[Overage Payment] Could not retrieve existing intent, creating new one:', (piErr as Error).message);
+        logger.warn('[Overage Payment] Could not retrieve existing intent, creating new one', { extra: { piErr_as_Error_message: (piErr as Error).message } });
       }
     } else if (booking.overage_payment_intent_id && String(booking.overage_payment_intent_id as string).startsWith('balance-')) {
       if (!booking.overage_paid) {
@@ -174,7 +175,7 @@ router.post('/api/stripe/overage/create-payment-intent', isAuthenticated, async 
 
     if (result.paidInFull) {
       await db.execute(sql`UPDATE booking_requests SET overage_paid = true, updated_at = NOW() WHERE id = ${bookingId}`);
-      console.log(`[Overage Payment] Fully covered by account credit for booking ${bookingId}: $${(Number(booking.overage_fee_cents) / 100).toFixed(2)}`);
+      logger.info('[Overage Payment] Fully covered by account credit for booking : $', { extra: { bookingId, Number_bookingOverage_fee_cents_100_ToFixed_2: (Number(booking.overage_fee_cents) / 100).toFixed(2) } });
 
       try {
         if (booking.user_email) {
@@ -187,7 +188,7 @@ router.post('/api/stripe/overage/create-payment-intent', isAuthenticated, async 
           (broadcastBillingUpdate as any)(booking.user_email as string, 'overage_paid');
         }
       } catch (notifyError) {
-        console.error('[Overage Payment] Failed to send notification for balance payment:', notifyError);
+        logger.error('[Overage Payment] Failed to send notification for balance payment', { extra: { notifyError } });
       }
 
       return res.json({
@@ -200,7 +201,7 @@ router.post('/api/stripe/overage/create-payment-intent', isAuthenticated, async 
       });
     }
     
-    console.log(`[Overage Payment] Created payment intent ${result.paymentIntentId} for booking ${bookingId}: $${(Number(booking.overage_fee_cents) / 100).toFixed(2)} (credit: $${(result.balanceApplied / 100).toFixed(2)})`);
+    logger.info('[Overage Payment] Created payment intent for booking : $ (credit: $)', { extra: { resultPaymentIntentId: result.paymentIntentId, bookingId, Number_bookingOverage_fee_cents_100_ToFixed_2: (Number(booking.overage_fee_cents) / 100).toFixed(2), resultBalanceApplied_100_ToFixed_2: (result.balanceApplied / 100).toFixed(2) } });
     
     res.json({
       clientSecret: result.clientSecret,
@@ -213,7 +214,7 @@ router.post('/api/stripe/overage/create-payment-intent', isAuthenticated, async 
       remainingCents: result.remainingCents,
     });
   } catch (error: unknown) {
-    console.error('[Overage Payment] Error creating payment intent:', error);
+    logger.error('[Overage Payment] Error creating payment intent', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to create payment intent.' });
   }
 });
@@ -263,7 +264,7 @@ router.post('/api/stripe/overage/confirm-payment', isAuthenticated, async (req: 
     }
     
     const booking = result.rows[0] as any;
-    console.log(`[Overage Payment] Confirmed payment for booking ${bookingId}: $${(Number(booking.overage_fee_cents) / 100).toFixed(2)}`);
+    logger.info('[Overage Payment] Confirmed payment for booking : $', { extra: { bookingId, Number_bookingOverage_fee_cents_100_ToFixed_2: (Number(booking.overage_fee_cents) / 100).toFixed(2) } });
     
     try {
       if (booking.user_email) {
@@ -276,7 +277,7 @@ router.post('/api/stripe/overage/confirm-payment', isAuthenticated, async (req: 
         (broadcastBillingUpdate as any)(booking.user_email as string, 'overage_paid');
       }
     } catch (notifyError) {
-      console.error('[Overage Payment] Failed to send notification:', notifyError);
+      logger.error('[Overage Payment] Failed to send notification', { extra: { notifyError } });
     }
     
     res.json({
@@ -286,7 +287,7 @@ router.post('/api/stripe/overage/confirm-payment', isAuthenticated, async (req: 
       overageMinutes: booking.overage_minutes,
     });
   } catch (error: unknown) {
-    console.error('[Overage Payment] Error confirming payment:', error);
+    logger.error('[Overage Payment] Error confirming payment', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to confirm payment.' });
   }
 });
@@ -329,7 +330,7 @@ router.get('/api/stripe/overage/check/:bookingId', isAuthenticated, async (req: 
       overageBlocks: Math.ceil(Number(booking.overage_minutes) / 30),
     });
   } catch (error: unknown) {
-    console.error('[Overage Check] Error:', error);
+    logger.error('[Overage Check] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to check overage status.' });
   }
 });

@@ -6,7 +6,7 @@ import { guestPasses, notifications, staffUsers, bookingRequests } from '../../s
 import { getTierLimits } from '../core/tierService';
 import { sendPushNotification } from './push';
 import { sendNotificationToUser, broadcastMemberStatsUpdated } from '../core/websocket';
-import { logAndRespond } from '../core/logger';
+import { logAndRespond, logger } from '../core/logger';
 import { withRetry } from '../core/retry';
 import { getSessionUser } from '../types/session';
 import { logFromRequest } from '../core/auditLog';
@@ -123,7 +123,7 @@ router.get('/api/guest-passes/:email', isAuthenticated, async (req, res) => {
         }
       }
     } catch (err: unknown) {
-      console.error('[GuestPasses] Error counting pending guests:', err);
+      logger.error('[GuestPasses] Error counting pending guests', { extra: { error: err } });
     }
     
     const passesRemaining = data.passesTotal - data.passesUsed;
@@ -198,9 +198,9 @@ router.post('/api/guest-passes/:email/use', isAuthenticated, async (req, res) =>
       title: 'Guest Pass Used',
       body: message,
       url: '/member/profile'
-    }).catch(err => console.error('Push notification failed:', err));
+    }).catch(err => logger.error('Push notification failed', { extra: { error: err } }));
     
-    try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining }); } catch (err: unknown) { console.error('[Broadcast] Stats update error:', err); }
+    try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining }); } catch (err: unknown) { logger.error('[Broadcast] Stats update error', { extra: { error: err } }); }
     
     res.json({
       passes_used: data.passesUsed,
@@ -241,7 +241,7 @@ router.put('/api/guest-passes/:email', isStaffOrAdmin, async (req, res) => {
     const data = result[0];
     const passesRemaining = data.passesTotal - data.passesUsed;
     
-    try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: passesRemaining }); } catch (err: unknown) { console.error('[Broadcast] Stats update error:', err); }
+    try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: passesRemaining }); } catch (err: unknown) { logger.error('[Broadcast] Stats update error', { extra: { error: err } }); }
     
     logFromRequest(req, 'update_guest_passes' as any, 'guest_pass' as any, normalizedEmail, undefined, { passes_total: passes_total });
     res.json({
@@ -307,10 +307,10 @@ export async function useGuestPass(
         title: 'Guest Pass Used',
         body: notificationMessage,
         url: '/member/profile'
-      }).catch(err => console.error('Push notification failed:', err));
+      }).catch(err => logger.error('Push notification failed', { extra: { error: err } }));
     }
     
-    try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining }); } catch (err: unknown) { console.error('[Broadcast] Stats update error:', err); }
+    try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining }); } catch (err: unknown) { logger.error('[Broadcast] Stats update error', { extra: { error: err } }); }
     
     return { success: true, remaining };
   } catch (error: unknown) {
@@ -318,7 +318,7 @@ export async function useGuestPass(
     if (msg === 'No guest passes remaining') {
       return { success: false, error: msg };
     }
-    console.error('[useGuestPass] Error:', error);
+    logger.error('[useGuestPass] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     return { success: false, error: 'Failed to use guest pass' };
   }
 }
@@ -369,7 +369,7 @@ export async function refundGuestPass(
         title: 'Guest Pass Refunded',
         body: notificationMessage,
         url: '/member/profile'
-      }).catch(err => console.error('Push notification failed:', err));
+      }).catch(err => logger.error('Push notification failed', { extra: { error: err } }));
       
       sendNotificationToUser(normalizedEmail, {
         type: 'guest_pass',
@@ -378,7 +378,7 @@ export async function refundGuestPass(
       });
     }
     
-    try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining }); } catch (err: unknown) { console.error('[Broadcast] Stats update error:', err); }
+    try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining }); } catch (err: unknown) { logger.error('[Broadcast] Stats update error', { extra: { error: err } }); }
     
     return { success: true, remaining };
   } catch (error: unknown) {
@@ -386,7 +386,7 @@ export async function refundGuestPass(
     if (msg === 'Member guest pass record not found') {
       return { success: false, error: msg };
     }
-    console.error('[refundGuestPass] Error:', error);
+    logger.error('[refundGuestPass] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     return { success: false, error: 'Failed to refund guest pass' };
   }
 }
@@ -407,7 +407,7 @@ export async function getGuestPassesRemaining(memberEmail: string, tier?: string
     
     return Math.max(0, result[0].passesTotal - result[0].passesUsed);
   } catch (error: unknown) {
-    console.error('[getGuestPassesRemaining] Error:', error);
+    logger.error('[getGuestPassesRemaining] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     return 0;
   }
 }
@@ -433,7 +433,7 @@ export async function ensureGuestPassRecord(memberEmail: string, tier?: string):
         });
     }
   } catch (error: unknown) {
-    console.error('[ensureGuestPassRecord] Error:', error);
+    logger.error('[ensureGuestPassRecord] Error', { error: error instanceof Error ? error : new Error(String(error)) });
   }
 }
 

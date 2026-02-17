@@ -1,3 +1,4 @@
+import { logger } from '../../core/logger';
 import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin, isAdmin } from '../../core/middleware';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
@@ -14,7 +15,7 @@ router.get('/api/stripe/coupons', isStaffOrAdmin, async (req: Request, res: Resp
       limit: 100,
     });
     
-    console.log(`[Stripe Coupons] Found ${coupons.data.length} coupons:`, coupons.data.map(c => ({ id: c.id, name: c.name })));
+    logger.info('[Stripe Coupons] Found coupons', { extra: { count: coupons.data.length, coupons: coupons.data.map(c => ({ id: c.id, name: c.name })) } });
     
     const formattedCoupons = coupons.data.map(coupon => ({
       id: coupon.id,
@@ -34,7 +35,7 @@ router.get('/api/stripe/coupons', isStaffOrAdmin, async (req: Request, res: Resp
     
     res.json({ coupons: formattedCoupons, count: formattedCoupons.length });
   } catch (error: unknown) {
-    console.error('[Stripe] Error listing coupons:', error);
+    logger.error('[Stripe] Error listing coupons', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to list coupons' });
   }
 });
@@ -104,7 +105,7 @@ router.post('/api/stripe/coupons', isAdmin, async (req: Request, res: Response) 
     
     const coupon = await stripe.coupons.create(couponParams);
     
-    console.log(`[Stripe] Created coupon ${coupon.id}`);
+    logger.info('[Stripe] Created coupon', { extra: { couponId: coupon.id } });
     logFromRequest(req, 'create_coupon', 'coupon', coupon.id, coupon.name || '', {});
     
     res.json({
@@ -122,7 +123,7 @@ router.post('/api/stripe/coupons', isAdmin, async (req: Request, res: Response) 
       },
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error creating coupon:', error);
+    logger.error('[Stripe] Error creating coupon', { error: error instanceof Error ? error : new Error(String(error)) });
     if (getErrorCode(error) === 'resource_already_exists') {
       return res.status(400).json({ error: 'A coupon with this ID already exists.' });
     }
@@ -146,7 +147,7 @@ router.put('/api/stripe/coupons/:id', isAdmin, async (req: Request, res: Respons
       name: name || undefined,
     });
     
-    console.log(`[Stripe] Updated coupon ${id} - name: "${name}"`);
+    logger.info('[Stripe] Updated coupon - name: ""', { extra: { id, name } });
     logFromRequest(req, 'update_coupon', 'coupon', req.params.id, '', {});
     
     res.json({
@@ -164,7 +165,7 @@ router.put('/api/stripe/coupons/:id', isAdmin, async (req: Request, res: Respons
       },
     });
   } catch (error: unknown) {
-    console.error('[Stripe] Error updating coupon:', error);
+    logger.error('[Stripe] Error updating coupon', { error: error instanceof Error ? error : new Error(String(error)) });
     if (getErrorCode(error) === 'resource_missing') {
       return res.status(404).json({ error: 'Coupon not found.' });
     }
@@ -185,12 +186,12 @@ router.delete('/api/stripe/coupons/:id', isAdmin, async (req: Request, res: Resp
     
     await stripe.coupons.del(id as string);
     
-    console.log(`[Stripe] Deleted coupon ${id}`);
+    logger.info('[Stripe] Deleted coupon', { extra: { id } });
     logFromRequest(req, 'delete_coupon', 'coupon', req.params.id, '', {});
     
     res.json({ success: true });
   } catch (error: unknown) {
-    console.error('[Stripe] Error deleting coupon:', error);
+    logger.error('[Stripe] Error deleting coupon', { error: error instanceof Error ? error : new Error(String(error)) });
     if (getErrorCode(error) === 'resource_missing') {
       return res.status(404).json({ error: 'Coupon not found.' });
     }

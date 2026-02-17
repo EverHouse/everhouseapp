@@ -1,3 +1,4 @@
+import { logger } from '../core/logger';
 import { Router } from 'express';
 import { db } from '../db';
 import { trainingSections } from '../../shared/schema';
@@ -691,7 +692,7 @@ export async function seedTrainingSections() {
     }
   }
   
-  console.log(`[Training] Seed complete: ${updated} updated, ${inserted} inserted, ${migrated} migrated`);
+  logger.info('[Training] Seed complete: updated, inserted, migrated', { extra: { updated, inserted, migrated } });
 }
 
 router.get('/api/training-sections', isStaffOrAdmin, async (req, res) => {
@@ -710,7 +711,7 @@ router.get('/api/training-sections', isStaffOrAdmin, async (req, res) => {
     }
     
     if (result.length === 0) {
-      console.log('[Training] No sections found, auto-seeding...');
+      logger.info('[Training] No sections found, auto-seeding...');
       try {
         await seedTrainingSections();
         if (isAdminUser) {
@@ -721,9 +722,9 @@ router.get('/api/training-sections', isStaffOrAdmin, async (req, res) => {
             .where(eq(trainingSections.isAdminOnly, false))
             .orderBy(asc(trainingSections.sortOrder), asc(trainingSections.id));
         }
-        console.log(`[Training] Auto-seeded ${result.length} sections`);
+        logger.info('[Training] Auto-seeded sections', { extra: { resultLength: result.length } });
       } catch (seedError) {
-        console.error('[Training] Auto-seed failed:', seedError);
+        logger.error('[Training] Auto-seed failed', { extra: { seedError } });
       }
     }
     
@@ -733,7 +734,7 @@ router.get('/api/training-sections', isStaffOrAdmin, async (req, res) => {
     
     res.json({ sections: result, lastUpdated: lastUpdated?.toISOString() ?? null });
   } catch (error: unknown) {
-    console.error('Training sections fetch error:', error);
+    logger.error('Training sections fetch error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch training sections' });
   }
 });
@@ -758,7 +759,7 @@ router.post('/api/admin/training-sections', isAdmin, async (req, res) => {
     logFromRequest(req, 'create_training' as any, 'training' as any, String(newSection.id), newSection.title, {});
     res.status(201).json(newSection);
   } catch (error: unknown) {
-    console.error('Training section creation error:', error);
+    logger.error('Training section creation error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create training section' });
   }
 });
@@ -788,7 +789,7 @@ router.put('/api/admin/training-sections/:id', isAdmin, async (req, res) => {
     logFromRequest(req, 'update_training' as any, 'training' as any, String(id), title, {});
     res.json(updated);
   } catch (error: unknown) {
-    console.error('Training section update error:', error);
+    logger.error('Training section update error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update training section' });
   }
 });
@@ -808,7 +809,7 @@ router.delete('/api/admin/training-sections/:id', isAdmin, async (req, res) => {
     logFromRequest(req, 'delete_training' as any, 'training' as any, String(id), undefined, {});
     res.json({ success: true, deleted });
   } catch (error: unknown) {
-    console.error('Training section deletion error:', error);
+    logger.error('Training section deletion error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to delete training section' });
   }
 });
@@ -828,7 +829,7 @@ router.post('/api/admin/training-sections/seed', isAdmin, async (req, res) => {
       sections: insertedSections 
     });
   } catch (error: unknown) {
-    console.error('Training seed error:', error);
+    logger.error('Training seed error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to seed training sections' });
   }
 });

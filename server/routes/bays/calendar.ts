@@ -6,7 +6,7 @@ import { eq, and, or, gte, lte, asc } from 'drizzle-orm';
 import { getConferenceRoomBookingsFromCalendar } from '../../core/calendar/index';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { getConferenceRoomId } from '../../core/affectedAreas';
-import { logAndRespond } from '../../core/logger';
+import { logAndRespond, logger } from '../../core/logger';
 import { getSessionUser } from '../../types/session';
 import { getTodayPacific } from '../../utils/dateUtils';
 
@@ -146,7 +146,7 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
           source: 'calendar'
         }));
     } catch (calError) {
-      console.error('Failed to fetch calendar conference bookings (non-blocking):', calError);
+      logger.error('Failed to fetch calendar conference bookings (non-blocking)', { extra: { error: calError } });
     }
     
     const bookingIds = dbResult.map(b => b.id).filter(Boolean);

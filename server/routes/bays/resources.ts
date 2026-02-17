@@ -4,7 +4,7 @@ import { resources, availabilityBlocks, bookingRequests } from '../../../shared/
 import { eq, and, or, asc, sql } from 'drizzle-orm';
 import { isProduction } from '../../core/db';
 import { getGoogleCalendarClient } from '../../core/integrations';
-import { logAndRespond } from '../../core/logger';
+import {logAndRespond, logger } from '../../core/logger';
 
 const router = Router();
 
@@ -92,7 +92,7 @@ router.get('/api/bays/:bayId/availability', async (req, res) => {
         };
       });
     } catch (calError) {
-      if (!isProduction) console.log('Calendar availability fetch skipped:', (calError as Error).message);
+      if (!isProduction) logger.info('Calendar availability fetch skipped', { extra: { calError_as_Error_message: (calError as Error).message } });
     }
     
     res.json({

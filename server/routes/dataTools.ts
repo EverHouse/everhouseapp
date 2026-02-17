@@ -1,3 +1,4 @@
+import { logger } from '../core/logger';
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
 import { isProduction } from '../core/db';
@@ -186,7 +187,7 @@ router.post('/api/data-tools/resync-member', isAdmin, async (req: Request, res: 
     });
     
     if (!isProduction) {
-      console.log(`[DataTools] Re-synced member ${normalizedEmail} from HubSpot by ${staffEmail}`);
+      logger.info('[DataTools] Re-synced member from HubSpot by', { extra: { normalizedEmail, staffEmail } });
     }
     
     logFromRequest(req, 'sync_hubspot', 'member', null, normalizedEmail, {
@@ -200,7 +201,7 @@ router.post('/api/data-tools/resync-member', isAdmin, async (req: Request, res: 
       hubspotContactId
     });
   } catch (error: unknown) {
-    console.error('[DataTools] Resync member error:', error);
+    logger.error('[DataTools] Resync member error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to resync member', details: getErrorMessage(error) });
   }
 });
@@ -241,7 +242,7 @@ router.get('/api/data-tools/unlinked-guest-fees', isAdmin, async (req: Request, 
     
     res.json(formatted);
   } catch (error: unknown) {
-    console.error('[DataTools] Get unlinked guest fees error:', error);
+    logger.error('[DataTools] Get unlinked guest fees error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to get unlinked guest fees', details: getErrorMessage(error) });
   }
 });
@@ -289,7 +290,7 @@ router.get('/api/data-tools/available-sessions', isAdmin, async (req: Request, r
       resourceName: row.resource_name
     })));
   } catch (error: unknown) {
-    console.error('[DataTools] Get available sessions error:', error);
+    logger.error('[DataTools] Get available sessions error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to get available sessions', details: getErrorMessage(error) });
   }
 });
@@ -341,7 +342,7 @@ router.post('/api/data-tools/link-guest-fee', isAdmin, async (req: Request, res:
     });
     
     if (!isProduction) {
-      console.log(`[DataTools] Linked guest fee ${guestFeeId} to booking ${bookingId} by ${staffEmail}`);
+      logger.info('[DataTools] Linked guest fee to booking by', { extra: { guestFeeId, bookingId, staffEmail } });
     }
     
     res.json({
@@ -349,7 +350,7 @@ router.post('/api/data-tools/link-guest-fee', isAdmin, async (req: Request, res:
       message: 'Guest fee successfully linked to booking session'
     });
   } catch (error: unknown) {
-    console.error('[DataTools] Link guest fee error:', error);
+    logger.error('[DataTools] Link guest fee error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to link guest fee', details: getErrorMessage(error) });
   }
 });
@@ -408,7 +409,7 @@ router.get('/api/data-tools/bookings-search', isStaffOrAdmin, async (req: Reques
       resourceName: row.resource_name
     })));
   } catch (error: unknown) {
-    console.error('[DataTools] Bookings search error:', error);
+    logger.error('[DataTools] Bookings search error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to search bookings', details: getErrorMessage(error) });
   }
 });
@@ -459,7 +460,7 @@ router.post('/api/data-tools/update-attendance', isAdmin, async (req: Request, r
     } as any);
     
     if (!isProduction) {
-      console.log(`[DataTools] Updated attendance for booking ${bookingId} to ${attendanceStatus} by ${staffEmail}`);
+      logger.info('[DataTools] Updated attendance for booking to by', { extra: { bookingId, attendanceStatus, staffEmail } });
     }
     
     res.json({
@@ -467,7 +468,7 @@ router.post('/api/data-tools/update-attendance', isAdmin, async (req: Request, r
       message: `Attendance status updated to ${attendanceStatus}`
     });
   } catch (error: unknown) {
-    console.error('[DataTools] Update attendance error:', error);
+    logger.error('[DataTools] Update attendance error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update attendance', details: getErrorMessage(error) });
   }
 });
@@ -507,7 +508,7 @@ router.post('/api/data-tools/mindbody-reimport', isAdmin, async (req: Request, r
     });
     
     if (!isProduction) {
-      console.log(`[DataTools] Mindbody reimport requested for ${startDate} to ${endDate} by ${staffEmail}`);
+      logger.info('[DataTools] Mindbody reimport requested for to by', { extra: { startDate, endDate, staffEmail } });
     }
     
     res.json({
@@ -516,7 +517,7 @@ router.post('/api/data-tools/mindbody-reimport', isAdmin, async (req: Request, r
       note: 'This feature requires manual file upload. Please use the legacy purchases import with updated CSV files for the date range.'
     });
   } catch (error: unknown) {
-    console.error('[DataTools] Mindbody reimport error:', error);
+    logger.error('[DataTools] Mindbody reimport error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to queue mindbody reimport', details: getErrorMessage(error) });
   }
 });
@@ -544,7 +545,7 @@ router.get('/api/data-tools/audit-log', isAdmin, async (req: Request, res: Respo
       ['member_resynced_from_hubspot', 'guest_fee_manually_linked', 'attendance_manually_updated', 'mindbody_reimport_requested'].includes(log.actionType)
     ));
   } catch (error: unknown) {
-    console.error('[DataTools] Get audit log error:', error);
+    logger.error('[DataTools] Get audit log error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to get audit log', details: getErrorMessage(error) });
   }
 });
@@ -591,7 +592,7 @@ router.get('/api/data-tools/staff-activity', isAdmin, async (req: Request, res: 
     
     res.json({ logs: parsedLogs });
   } catch (error: unknown) {
-    console.error('[DataTools] Get staff activity error:', error);
+    logger.error('[DataTools] Get staff activity error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to get staff activity', details: getErrorMessage(error) });
   }
 });
@@ -602,7 +603,7 @@ router.post('/api/data-tools/cleanup-mindbody-ids', isAdmin, async (req: Request
     const staffEmail = getSessionUser(req)?.email || 'unknown';
     const { dryRun = true } = req.body;
     
-    console.log(`[DataTools] Starting mindbody_client_id cleanup (dryRun: ${dryRun}) by ${staffEmail}`);
+    logger.info('[DataTools] Starting mindbody_client_id cleanup (dryRun: ) by', { extra: { dryRun, staffEmail } });
     
     // Get all users with mindbody_client_id
     const usersWithMindbody = await db.execute(sql`SELECT id, email, mindbody_client_id, hubspot_id 
@@ -675,7 +676,7 @@ router.post('/api/data-tools/cleanup-mindbody-ids', isAdmin, async (req: Request
             });
           } else {
             // HubSpot has a different value - flag for review but don't auto-clean
-            console.log(`[DataTools] Mindbody ID mismatch for ${user.email}: DB=${user.mindbody_client_id}, HubSpot=${hubspotMindbodyId}`);
+            logger.info('[DataTools] Mindbody ID mismatch for : DB=, HubSpot=', { extra: { userEmail: user.email, userMindbody_client_id: user.mindbody_client_id, hubspotMindbodyId } });
           }
         } catch (err: unknown) {
           errors.push(`Error checking ${user.email}: ${getErrorMessage(err)}`);
@@ -711,7 +712,7 @@ router.post('/api/data-tools/cleanup-mindbody-ids', isAdmin, async (req: Request
         }
       });
       
-      console.log(`[DataTools] Cleaned ${cleanedCount} stale mindbody_client_id values`);
+      logger.info('[DataTools] Cleaned stale mindbody_client_id values', { extra: { cleanedCount } });
     }
     
     res.json({
@@ -724,7 +725,7 @@ router.post('/api/data-tools/cleanup-mindbody-ids', isAdmin, async (req: Request
       errors: errors.slice(0, 10)
     });
   } catch (error: unknown) {
-    console.error('[DataTools] Cleanup mindbody IDs error:', error);
+    logger.error('[DataTools] Cleanup mindbody IDs error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to cleanup mindbody IDs', details: getErrorMessage(error) });
   }
 });
@@ -742,7 +743,7 @@ router.post('/api/data-tools/bulk-push-to-hubspot', isAdmin, async (req: Request
     }
     res.json(result);
   } catch (error: unknown) {
-    console.error('[DataTools] Bulk push to HubSpot error:', error);
+    logger.error('[DataTools] Bulk push to HubSpot error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to bulk push to HubSpot', details: getErrorMessage(error) });
   }
 });
@@ -752,7 +753,7 @@ router.post('/api/data-tools/sync-members-to-hubspot', isAdmin, async (req: Requ
     const staffEmail = getSessionUser(req)?.email || 'unknown';
     const { emails, dryRun = true } = req.body;
     
-    console.log(`[DataTools] Starting HubSpot sync for members without contacts (dryRun: ${dryRun}) by ${staffEmail}`);
+    logger.info('[DataTools] Starting HubSpot sync for members without contacts (dryRun: ) by', { extra: { dryRun, staffEmail } });
     
     // Get members without HubSpot ID
     const queryBuilder = sql`
@@ -802,12 +803,12 @@ router.post('/api/data-tools/sync-members-to-hubspot', isAdmin, async (req: Requ
             existing.push({ email: member.email, contactId: result.contactId });
           }
           
-          console.log(`[DataTools] ${result.isNew ? 'Created' : 'Found existing'} HubSpot contact for ${member.email}: ${result.contactId}`);
+          logger.info('[DataTools] HubSpot contact for', { extra: { resultIsNew_Created_Found_existing: result.isNew ? 'Created' : 'Found existing', memberEmail: member.email, resultContactId: result.contactId } });
           
           // Small delay between API calls
           await new Promise(resolve => setTimeout(resolve, 200));
         } catch (err: unknown) {
-          console.error(`[DataTools] Error syncing ${member.email} to HubSpot:`, err);
+          logger.error('[DataTools] Error syncing  to HubSpot', { extra: { email: member.email, err } });
           errors.push(`${member.email}: ${getErrorMessage(err)}`);
         }
       }
@@ -840,7 +841,7 @@ router.post('/api/data-tools/sync-members-to-hubspot', isAdmin, async (req: Requ
       errors: errors.slice(0, 10)
     });
   } catch (error: unknown) {
-    console.error('[DataTools] Sync members to HubSpot error:', error);
+    logger.error('[DataTools] Sync members to HubSpot error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync members to HubSpot', details: getErrorMessage(error) });
   }
 });
@@ -850,7 +851,7 @@ router.post('/api/data-tools/sync-subscription-status', isAdmin, async (req: Req
     const staffEmail = getSessionUser(req)?.email || 'unknown';
     const { dryRun = true } = req.body;
     
-    console.log(`[DataTools] Starting subscription status sync (dryRun: ${dryRun}) by ${staffEmail}`);
+    logger.info('[DataTools] Starting subscription status sync (dryRun: ) by', { extra: { dryRun, staffEmail } });
     
     const { getStripeClient } = await import('../core/stripe/client');
     const stripe = await getStripeClient();
@@ -959,7 +960,7 @@ router.post('/api/data-tools/sync-subscription-status', isAdmin, async (req: Req
                 const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
                 await syncMemberToHubSpot({ email: member.email, status: expectedAppStatus, billingProvider: 'stripe' });
               } catch (e: unknown) {
-                console.warn(`[DataTools] Failed to sync status to HubSpot for ${member.email}:`, (e as any)?.message || e);
+                logger.warn('[DataTools] Failed to sync status to HubSpot for', { extra: { email: member.email, e_as_any_e: (e as any)?.message || e } });
               }
               
               await db.insert(billingAuditLog).values({
@@ -984,14 +985,14 @@ router.post('/api/data-tools/sync-subscription-status', isAdmin, async (req: Req
               });
               
               if (!isProduction) {
-                console.log(`[DataTools] Updated ${member.email} status: ${member.membership_status} -> ${expectedAppStatus}`);
+                logger.info('[DataTools] Updated status: ->', { extra: { memberEmail: member.email, memberMembership_status: member.membership_status, expectedAppStatus } });
               }
             }
           }
         } catch (err: unknown) {
           errors.push(`${member.email}: ${getErrorMessage(err)}`);
           if (!isProduction) {
-            console.error(`[DataTools] Error checking subscription for ${member.email}:`, getErrorMessage(err));
+            logger.error('[DataTools] Error checking subscription for', { extra: { email: member.email, error: getErrorMessage(err) } });
           }
         }
       }));
@@ -1022,7 +1023,7 @@ router.post('/api/data-tools/sync-subscription-status', isAdmin, async (req: Req
       dryRun
     });
   } catch (error: unknown) {
-    console.error('[DataTools] Sync subscription status error:', error);
+    logger.error('[DataTools] Sync subscription status error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync subscription status', details: getErrorMessage(error) });
   }
 });
@@ -1032,7 +1033,7 @@ router.post('/api/data-tools/clear-orphaned-stripe-ids', isAdmin, async (req: Re
     const staffEmail = getSessionUser(req)?.email || 'unknown';
     const { dryRun = true } = req.body;
     
-    console.log(`[DataTools] Clearing orphaned Stripe customer IDs (dryRun: ${dryRun}) by ${staffEmail}`);
+    logger.info('[DataTools] Clearing orphaned Stripe customer IDs (dryRun: ) by', { extra: { dryRun, staffEmail } });
     
     const { getStripeClient } = await import('../core/stripe/client');
     const stripe = await getStripeClient();
@@ -1099,7 +1100,7 @@ router.post('/api/data-tools/clear-orphaned-stripe-ids', isAdmin, async (req: Re
                   stripeCustomerId: customerId
                 });
                 
-                console.log(`[DataTools] Cleared orphaned Stripe ID for ${user.email}: ${customerId}`);
+                logger.info('[DataTools] Cleared orphaned Stripe ID for', { extra: { userEmail: user.email, customerId } });
               }
             }
           }
@@ -1134,7 +1135,7 @@ router.post('/api/data-tools/clear-orphaned-stripe-ids', isAdmin, async (req: Re
       dryRun
     });
   } catch (error: unknown) {
-    console.error('[DataTools] Clear orphaned Stripe IDs error:', error);
+    logger.error('[DataTools] Clear orphaned Stripe IDs error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to clear orphaned Stripe IDs', details: getErrorMessage(error) });
   }
 });
@@ -1144,7 +1145,7 @@ router.post('/api/data-tools/link-stripe-hubspot', isAdmin, async (req: Request,
     const staffEmail = getSessionUser(req)?.email || 'unknown';
     const { dryRun = true } = req.body;
     
-    console.log(`[DataTools] Starting Stripe-HubSpot link tool (dryRun: ${dryRun}) by ${staffEmail}`);
+    logger.info('[DataTools] Starting Stripe-HubSpot link tool (dryRun: ) by', { extra: { dryRun, staffEmail } });
     
     const { getStripeClient } = await import('../core/stripe/client');
     const { findOrCreateHubSpotContact } = await import('../core/hubspot/members');
@@ -1219,13 +1220,13 @@ router.post('/api/data-tools/link-stripe-hubspot', isAdmin, async (req: Request,
           });
           
           if (!isProduction) {
-            console.log(`[DataTools] Created HubSpot contact for ${member.email}: ${result.contactId}`);
+            logger.info('[DataTools] Created HubSpot contact for', { extra: { memberEmail: member.email, resultContactId: result.contactId } });
           }
           
           await new Promise(resolve => setTimeout(resolve, 200));
         } catch (err: unknown) {
           errors.push(`HubSpot for ${member.email}: ${getErrorMessage(err)}`);
-          console.error(`[DataTools] Error creating HubSpot contact for ${member.email}:`, getErrorMessage(err));
+          logger.error('[DataTools] Error creating HubSpot contact for', { extra: { email: member.email, error: getErrorMessage(err) } });
         }
       }
       
@@ -1255,13 +1256,13 @@ router.post('/api/data-tools/link-stripe-hubspot', isAdmin, async (req: Request,
           });
           
           if (!isProduction) {
-            console.log(`[DataTools] Created Stripe customer for ${member.email}: ${result.customerId}`);
+            logger.info('[DataTools] Created Stripe customer for', { extra: { memberEmail: member.email, resultCustomerId: result.customerId } });
           }
           
           await new Promise(resolve => setTimeout(resolve, 200));
         } catch (err: unknown) {
           errors.push(`Stripe for ${member.email}: ${getErrorMessage(err)}`);
-          console.error(`[DataTools] Error creating Stripe customer for ${member.email}:`, getErrorMessage(err));
+          logger.error('[DataTools] Error creating Stripe customer for', { extra: { email: member.email, error: getErrorMessage(err) } });
         }
       }
       
@@ -1287,7 +1288,7 @@ router.post('/api/data-tools/link-stripe-hubspot', isAdmin, async (req: Request,
       dryRun
     });
   } catch (error: unknown) {
-    console.error('[DataTools] Link Stripe-HubSpot error:', error);
+    logger.error('[DataTools] Link Stripe-HubSpot error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to link Stripe-HubSpot', details: getErrorMessage(error) });
   }
 });
@@ -1297,7 +1298,7 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
     const staffEmail = getSessionUser(req)?.email || 'unknown';
     const { dryRun = true } = req.body;
     
-    console.log(`[DataTools] Starting visit count sync to HubSpot (dryRun: ${dryRun}) by ${staffEmail}`);
+    logger.info('[DataTools] Starting visit count sync to HubSpot (dryRun: ) by', { extra: { dryRun, staffEmail } });
     
     const hubspot = await getHubSpotClient();
     
@@ -1442,7 +1443,7 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
                 } as any);
                 
                 if (!isProduction) {
-                  console.log(`[DataTools] Updated HubSpot visit count for ${member.email}: ${hubspotVisitCount} -> ${appVisitCount}`);
+                  logger.info('[DataTools] Updated HubSpot visit count for : ->', { extra: { memberEmail: member.email, hubspotVisitCount, appVisitCount } });
                 }
               } catch (updateErr: unknown) {
                 errors.push(`Update ${member.email}: ${getErrorMessage(updateErr)}`);
@@ -1454,7 +1455,7 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
         } catch (err: unknown) {
           errors.push(`${member.email}: ${getErrorMessage(err)}`);
           if (!isProduction) {
-            console.error(`[DataTools] Error checking visit count for ${member.email}:`, getErrorMessage(err));
+            logger.error('[DataTools] Error checking visit count for', { extra: { email: member.email, error: getErrorMessage(err) } });
           }
         }
       }));
@@ -1486,7 +1487,7 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
       dryRun
     });
   } catch (error: unknown) {
-    console.error('[DataTools] Sync visit counts error:', error);
+    logger.error('[DataTools] Sync visit counts error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync visit counts', details: getErrorMessage(error) });
   }
 });
@@ -1500,7 +1501,7 @@ router.post('/api/data-tools/detect-duplicates', isAdmin, async (req: Request, r
       staffEmail
     });
     
-    console.log(`[DataTools] Starting duplicate detection by ${staffEmail}`);
+    logger.info('[DataTools] Starting duplicate detection by', { extra: { staffEmail } });
     
     const appDuplicatesResult = await db.execute(sql`
       SELECT LOWER(email) as normalized_email, 
@@ -1616,7 +1617,7 @@ router.post('/api/data-tools/detect-duplicates', isAdmin, async (req: Request, r
       errors: hubspotErrors.slice(0, 20)
     });
   } catch (error: unknown) {
-    console.error('[DataTools] Detect duplicates error:', error);
+    logger.error('[DataTools] Detect duplicates error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to detect duplicates', details: getErrorMessage(error) });
   }
 });
@@ -1626,7 +1627,7 @@ router.post('/api/data-tools/sync-payment-status', isAdmin, async (req: Request,
     const staffEmail = getSessionUser(req)?.email || 'unknown';
     const { dryRun = true } = req.body;
     
-    console.log(`[DataTools] Starting payment status sync to HubSpot (dryRun: ${dryRun}) by ${staffEmail}`);
+    logger.info('[DataTools] Starting payment status sync to HubSpot (dryRun: ) by', { extra: { dryRun, staffEmail } });
     
     const { getStripeClient } = await import('../core/stripe/client');
     const hubspot = await getHubSpotClient();
@@ -1771,7 +1772,7 @@ router.post('/api/data-tools/sync-payment-status', isAdmin, async (req: Request,
                 } as any);
                 
                 if (!isProduction) {
-                  console.log(`[DataTools] Updated HubSpot payment status for ${member.email}: ${hubspotPaymentStatus} -> ${stripePaymentStatus}`);
+                  logger.info('[DataTools] Updated HubSpot payment status for : ->', { extra: { memberEmail: member.email, hubspotPaymentStatus, stripePaymentStatus } });
                 }
               } catch (updateErr: unknown) {
                 errors.push(`Update ${member.email}: ${getErrorMessage(updateErr)}`);
@@ -1783,7 +1784,7 @@ router.post('/api/data-tools/sync-payment-status', isAdmin, async (req: Request,
         } catch (err: unknown) {
           errors.push(`${member.email}: ${getErrorMessage(err)}`);
           if (!isProduction) {
-            console.error(`[DataTools] Error checking payment status for ${member.email}:`, getErrorMessage(err));
+            logger.error('[DataTools] Error checking payment status for', { extra: { email: member.email, error: getErrorMessage(err) } });
           }
         }
       }));
@@ -1815,7 +1816,7 @@ router.post('/api/data-tools/sync-payment-status', isAdmin, async (req: Request,
       dryRun
     });
   } catch (error: unknown) {
-    console.error('[DataTools] Sync payment status error:', error);
+    logger.error('[DataTools] Sync payment status error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync payment status', details: getErrorMessage(error) });
   }
 });
@@ -1825,7 +1826,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
     const staffEmail = getSessionUser(req)?.email || 'unknown';
     const { dryRun = true, startDate, endDate, limit = 100 } = req.body;
     
-    console.log(`[DataTools] Starting Trackman ghost booking fix (dryRun: ${dryRun}) by ${staffEmail}`);
+    logger.info('[DataTools] Starting Trackman ghost booking fix (dryRun: ) by', { extra: { dryRun, staffEmail } });
     
     const ghostQuery = sql`SELECT 
         br.id,
@@ -2006,7 +2007,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
             }
           }
         } catch (billingErr: unknown) {
-          console.error(`[DataTools] Billing calculation error for booking ${booking.bookingId}:`, getErrorMessage(billingErr));
+          logger.error('[DataTools] Billing calculation error for booking', { extra: { bookingId: booking.bookingId, error: getErrorMessage(billingErr) } });
           await recordUsage(sessionId, {
             memberId: booking.userEmail,
             minutesCharged: booking.durationMinutes,
@@ -2043,7 +2044,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
           
           await recalculateSessionFees(sessionId, 'staff_manual' as any);
         } catch (participantErr: unknown) {
-          console.warn(`[DataTools] Failed to create participants for session ${sessionId}:`, getErrorMessage(participantErr));
+          logger.warn('[DataTools] Failed to create participants for session', { extra: { sessionId, error: getErrorMessage(participantErr) } });
         }
         
         fixed.push({
@@ -2069,12 +2070,12 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
         } as any);
         
         if (!isProduction) {
-          console.log(`[DataTools] Fixed ghost booking ${booking.bookingId} -> session ${sessionId}`);
+          logger.info('[DataTools] Fixed ghost booking -> session', { extra: { bookingBookingId: booking.bookingId, sessionId } });
         }
         
       } catch (err: unknown) {
         errors.push(`Booking ${booking.bookingId}: ${getErrorMessage(err)}`);
-        console.error(`[DataTools] Error fixing ghost booking ${booking.bookingId}:`, getErrorMessage(err));
+        logger.error('[DataTools] Error fixing ghost booking', { extra: { bookingId: booking.bookingId, error: getErrorMessage(err) } });
       }
     }
     
@@ -2095,7 +2096,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
       dryRun: false
     });
   } catch (error: unknown) {
-    console.error('[DataTools] Fix Trackman ghost bookings error:', error);
+    logger.error('[DataTools] Fix Trackman ghost bookings error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fix Trackman ghost bookings', details: getErrorMessage(error) });
   }
 });
@@ -2134,7 +2135,7 @@ async function runCleanupInBackground(dryRun: boolean, staffEmail: string, req: 
       }
     }
     
-    console.log(`[DataTools] Found ${allCustomers.length} total Stripe customers`);
+    logger.info('[DataTools] Found total Stripe customers', { extra: { allCustomersLength: allCustomers.length } });
     activeCleanupJob!.progress.totalCustomers = allCustomers.length;
     activeCleanupJob!.progress.phase = 'checking';
     broadcastToStaff({ type: 'stripe_cleanup_progress', data: activeCleanupJob!.progress });
@@ -2176,7 +2177,7 @@ async function runCleanupInBackground(dryRun: boolean, staffEmail: string, req: 
         activeCleanupJob!.progress.checked++;
         if (activeCleanupJob!.progress.checked % 25 === 0) broadcastToStaff({ type: 'stripe_cleanup_progress', data: activeCleanupJob!.progress });
       } catch (err: unknown) {
-        console.error(`[DataTools] Error checking customer ${customer.id}:`, getErrorMessage(err));
+        logger.error('[DataTools] Error checking customer', { extra: { id: customer.id, error: getErrorMessage(err) } });
         activeCleanupJob!.progress.errors++;
         activeCleanupJob!.progress.checked++;
         if (activeCleanupJob!.progress.checked % 25 === 0) broadcastToStaff({ type: 'stripe_cleanup_progress', data: activeCleanupJob!.progress });
@@ -2189,8 +2190,8 @@ async function runCleanupInBackground(dryRun: boolean, staffEmail: string, req: 
     
     broadcastToStaff({ type: 'stripe_cleanup_progress', data: activeCleanupJob!.progress });
     
-    console.log(`[DataTools] Found ${emptyCustomers.length} customers with zero transactions out of ${allCustomers.length} total`);
-    console.log(`[DataTools] Skipping ${skippedActiveCount} active members with zero transactions (keeping for future charges)`);
+    logger.info('[DataTools] Found customers with zero transactions out of total', { extra: { emptyCustomersLength: emptyCustomers.length, allCustomersLength: allCustomers.length } });
+    logger.info('[DataTools] Skipping active members with zero transactions (keeping for future charges)', { extra: { skippedActiveCount } });
     
     if (dryRun) {
       logFromRequest(req, 'cleanup_stripe_customers' as any, 'stripe', null, undefined, {
@@ -2247,7 +2248,7 @@ async function runCleanupInBackground(dryRun: boolean, staffEmail: string, req: 
       } catch (err: unknown) {
         errors.push(`${customer.id} (${customer.email}): ${getErrorMessage(err)}`);
         activeCleanupJob!.progress.errors++;
-        console.error(`[DataTools] Failed to delete customer ${customer.id}:`, getErrorMessage(err));
+        logger.error('[DataTools] Failed to delete customer', { extra: { id: customer.id, error: getErrorMessage(err) } });
       }
     }
     
@@ -2261,7 +2262,7 @@ async function runCleanupInBackground(dryRun: boolean, staffEmail: string, req: 
       staffEmail
     });
     
-    console.log(`[DataTools] Stripe customer cleanup complete: ${deleted} deleted, ${errors.length} errors`);
+    logger.info('[DataTools] Stripe customer cleanup complete: deleted, errors', { extra: { deleted, errorsLength: errors.length } });
     
     const result = {
       success: true,
@@ -2281,7 +2282,7 @@ async function runCleanupInBackground(dryRun: boolean, staffEmail: string, req: 
     activeCleanupJob!.progress.phase = 'done';
     broadcastToStaff({  type: 'stripe_cleanup_progress', data: activeCleanupJob!.progress, result } as any);
   } catch (error: unknown) {
-    console.error('[DataTools] Stripe customer cleanup error:', error);
+    logger.error('[DataTools] Stripe customer cleanup error', { error: error instanceof Error ? error : new Error(String(error)) });
     activeCleanupJob!.status = 'failed';
     activeCleanupJob!.completedAt = new Date();
     activeCleanupJob!.error = getErrorMessage(error);
@@ -2299,7 +2300,7 @@ router.post('/api/data-tools/cleanup-stripe-customers', isAdmin, async (req: Req
     const dryRun = req.body.dryRun !== false;
     const staffEmail = getSessionUser(req)?.email || 'admin';
     
-    console.log(`[DataTools] Stripe customer cleanup initiated by ${staffEmail} (dryRun: ${dryRun})`);
+    logger.info('[DataTools] Stripe customer cleanup initiated by (dryRun: )', { extra: { staffEmail, dryRun } });
     
     const jobId = Date.now().toString(36);
     activeCleanupJob = {
@@ -2322,7 +2323,7 @@ router.post('/api/data-tools/cleanup-stripe-customers', isAdmin, async (req: Req
     
     res.json({ success: true, jobId, message: 'Cleanup job started' });
   } catch (error: unknown) {
-    console.error('[DataTools] Stripe customer cleanup error:', error);
+    logger.error('[DataTools] Stripe customer cleanup error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to start cleanup job', details: getErrorMessage(error) });
   }
 });
@@ -2343,7 +2344,7 @@ router.post('/api/data-tools/archive-stale-visitors', isAdmin, async (req: Reque
     const dryRun = req.body.dryRun !== false;
     const staffEmail = getSessionUser(req)?.email || 'admin';
 
-    console.log(`[DataTools] Visitor archive initiated by ${staffEmail} (dryRun: ${dryRun})`);
+    logger.info('[DataTools] Visitor archive initiated by (dryRun: )', { extra: { staffEmail, dryRun } });
 
     const jobId = Date.now().toString(36);
     activeVisitorArchiveJob = {
@@ -2366,7 +2367,7 @@ router.post('/api/data-tools/archive-stale-visitors', isAdmin, async (req: Reque
 
     res.json({ success: true, jobId, message: 'Archive job started' });
   } catch (error: unknown) {
-    console.error('[DataTools] Visitor archive error:', error);
+    logger.error('[DataTools] Visitor archive error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to start archive job', details: getErrorMessage(error) });
   }
 });
@@ -2402,7 +2403,7 @@ async function runVisitorArchiveInBackground(dryRun: boolean, staffEmail: string
     activeVisitorArchiveJob!.progress.totalVisitors = candidates.length;
     broadcastToStaff({ type: 'visitor_archive_progress', data: activeVisitorArchiveJob!.progress });
 
-    console.log(`[DataTools] Found ${candidates.length} visitor/non-member candidates with no local activity`);
+    logger.info('[DataTools] Found visitor/non-member candidates with no local activity', { extra: { candidatesLength: candidates.length } });
 
     activeVisitorArchiveJob!.progress.phase = 'checking_stripe';
     broadcastToStaff({ type: 'visitor_archive_progress', data: activeVisitorArchiveJob!.progress });
@@ -2433,7 +2434,7 @@ async function runVisitorArchiveInBackground(dryRun: boolean, staffEmail: string
 
             eligible.push(visitor);
           } catch (err: unknown) {
-            console.error(`[DataTools] Error checking Stripe transactions for ${visitor.email}:`, getErrorMessage(err));
+            logger.error('[DataTools] Error checking Stripe transactions for', { extra: { email: visitor.email, error: getErrorMessage(err) } });
             keptCount++;
             activeVisitorArchiveJob!.progress.errors++;
           }
@@ -2455,7 +2456,7 @@ async function runVisitorArchiveInBackground(dryRun: boolean, staffEmail: string
     activeVisitorArchiveJob!.progress.checked = visitorsWithStripe.length;
     broadcastToStaff({ type: 'visitor_archive_progress', data: activeVisitorArchiveJob!.progress });
 
-    console.log(`[DataTools] ${eligible.length} eligible for archive, ${keptCount} kept (has Stripe charges)`);
+    logger.info('[DataTools] eligible for archive, kept (has Stripe charges)', { extra: { eligibleLength: eligible.length, keptCount } });
 
     const sampleArchived = eligible.slice(0, 20).map(v => ({
       name: [v.first_name, v.last_name].filter(Boolean).join(' ') || 'Unknown',
@@ -2479,7 +2480,7 @@ async function runVisitorArchiveInBackground(dryRun: boolean, staffEmail: string
             .where(inArray(users.id, ids as string[]));
           archivedCount += batch.length;
         } catch (err: unknown) {
-          console.error(`[DataTools] Error archiving batch (${ids.length} ids):`, getErrorMessage(err));
+          logger.error('[DataTools] Error archiving batch ( ids)', { extra: { length: ids.length, error: getErrorMessage(err) } });
           activeVisitorArchiveJob!.progress.errors++;
         }
 
@@ -2516,7 +2517,7 @@ async function runVisitorArchiveInBackground(dryRun: boolean, staffEmail: string
     activeVisitorArchiveJob!.progress.phase = 'done';
     broadcastToStaff({  type: 'visitor_archive_progress', data: activeVisitorArchiveJob!.progress, result } as any);
   } catch (error: unknown) {
-    console.error('[DataTools] Visitor archive error:', error);
+    logger.error('[DataTools] Visitor archive error', { error: error instanceof Error ? error : new Error(String(error)) });
     activeVisitorArchiveJob!.status = 'failed';
     activeVisitorArchiveJob!.completedAt = new Date();
     activeVisitorArchiveJob!.error = getErrorMessage(error);

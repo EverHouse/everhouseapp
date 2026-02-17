@@ -3,6 +3,7 @@ import { pool, isProduction } from '../core/db';
 import { isAdmin, isStaffOrAdmin } from '../core/middleware';
 import { broadcastCafeMenuUpdate } from '../core/websocket';
 import { logFromRequest } from '../core/auditLog';
+import { logger } from '../core/logger';
 
 const router = Router();
 
@@ -30,7 +31,7 @@ router.get('/api/cafe-menu', async (req, res) => {
     const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Cafe menu error:', error);
+    if (!isProduction) logger.error('Cafe menu error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch cafe menu' });
   }
 });
@@ -53,7 +54,7 @@ router.post('/api/cafe-menu', isStaffOrAdmin, async (req, res) => {
     logFromRequest(req, 'create_cafe_item' as any, 'cafe' as any, String(result.rows[0].id), result.rows[0].name || name, {});
     res.status(201).json(result.rows[0]);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Cafe item creation error:', error);
+    if (!isProduction) logger.error('Cafe item creation error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create cafe item' });
   }
 });
@@ -99,7 +100,7 @@ router.put('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
     logFromRequest(req, 'update_cafe_item' as any, 'cafe' as any, String(id), name, {});
     res.json(result.rows[0]);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Cafe item update error:', error);
+    if (!isProduction) logger.error('Cafe item update error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update cafe item' });
   }
 });
@@ -118,7 +119,7 @@ router.delete('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
     logFromRequest(req, 'delete_cafe_item' as any, 'cafe' as any, String(id), undefined, {});
     res.json({ success: true });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Cafe item delete error:', error);
+    if (!isProduction) logger.error('Cafe item delete error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to delete cafe item' });
   }
 });
@@ -200,7 +201,7 @@ router.post('/api/admin/seed-cafe', isAdmin, async (req, res) => {
       totalAfter: existingCount + inserted
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Cafe seed error:', error);
+    if (!isProduction) logger.error('Cafe seed error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to seed cafe menu' });
   }
 });

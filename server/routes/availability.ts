@@ -4,6 +4,7 @@ import { isStaffOrAdmin } from '../core/middleware';
 import { getCalendarBusyTimes, getCalendarIdByName, CALENDAR_CONFIG } from '../core/calendar/index';
 import { getTodayPacific, getPacificDateParts } from '../utils/dateUtils';
 import { logFromRequest } from '../core/auditLog';
+import { logger } from '../core/logger';
 
 const router = Router();
 
@@ -231,7 +232,7 @@ router.post('/api/availability/batch', async (req, res) => {
           conferenceRoomIds.forEach(id => calendarByResource.set(id, calendarSlots));
         }
       } catch (calError) {
-        console.error('Failed to fetch Google Calendar busy times (non-blocking):', calError);
+        logger.error('Failed to fetch Google Calendar busy times (non-blocking)', { extra: { error: calError } });
       }
     }
     
@@ -260,7 +261,7 @@ router.post('/api/availability/batch', async (req, res) => {
     
     res.json(result);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Batch availability API error:', error);
+    logger.error('Batch availability API error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Batch availability request failed' });
   }
 });
@@ -321,7 +322,7 @@ router.get('/api/availability', async (req, res) => {
       );
     } catch (e) {
       // Non-blocking: continue without unmatched booking checks if table doesn't exist
-      console.error('Failed to fetch unmatched Trackman bookings (non-blocking):', e);
+      logger.error('Failed to fetch unmatched Trackman bookings (non-blocking)', { extra: { error: e } });
     }
     
     // For conference room, also fetch busy times from Google Calendar (Mindbody bookings)
@@ -353,7 +354,7 @@ router.get('/api/availability', async (req, res) => {
           });
         }
       } catch (calError) {
-        console.error('Failed to fetch Google Calendar busy times (non-blocking):', calError);
+        logger.error('Failed to fetch Google Calendar busy times (non-blocking)', { extra: { error: calError } });
       }
     }
     
@@ -450,7 +451,7 @@ router.get('/api/availability', async (req, res) => {
     
     res.json(slots);
   } catch (error: unknown) {
-    if (!isProduction) console.error('API error:', error);
+    logger.error('API error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Request failed' });
   }
 });
@@ -472,7 +473,7 @@ router.post('/api/availability-blocks', isStaffOrAdmin, async (req, res) => {
     logFromRequest(req, 'create_availability_block' as any, 'availability' as any, String(result.rows[0].id), undefined, { resource_id, block_date, start_time, end_time });
     res.status(201).json(result.rows[0]);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Availability block creation error:', error);
+    logger.error('Availability block creation error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create availability block' });
   }
 });
@@ -506,7 +507,7 @@ router.get('/api/availability-blocks', async (req, res) => {
     const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Availability blocks error:', error);
+    logger.error('Availability blocks error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch availability blocks' });
   }
 });
@@ -535,7 +536,7 @@ router.put('/api/availability-blocks/:id', isStaffOrAdmin, async (req, res) => {
     logFromRequest(req, 'update_availability_block' as any, 'availability' as any, id as string, undefined, { resource_id, block_date, start_time, end_time });
     res.json(result.rows[0]);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Update block error:', error);
+    logger.error('Update block error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update availability block' });
   }
 });
@@ -547,7 +548,7 @@ router.delete('/api/availability-blocks/:id', isStaffOrAdmin, async (req, res) =
     logFromRequest(req, 'delete_availability_block' as any, 'availability' as any, id as string);
     res.json({ success: true });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Delete block error:', error);
+    logger.error('Delete block error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to delete availability block' });
   }
 });

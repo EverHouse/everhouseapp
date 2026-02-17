@@ -1,3 +1,4 @@
+import { logger } from '../core/logger';
 import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin } from '../core/middleware';
 import { db } from '../db';
@@ -145,7 +146,7 @@ router.get('/api/financials/recent-transactions', isStaffOrAdmin, async (req: Re
       nextCursor
     });
   } catch (error: unknown) {
-    console.error('[Financials] Error fetching recent transactions:', error);
+    logger.error('[Financials] Error fetching recent transactions', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch recent transactions'
@@ -170,7 +171,7 @@ router.post('/api/financials/backfill-stripe-cache', isStaffOrAdmin, async (req:
     let invoicesProcessed = 0;
     let errors: string[] = [];
     
-    console.log(`[Financials Backfill] Starting backfill for last ${daysBack} days...`);
+    logger.info('[Financials Backfill] Starting backfill for last days...', { extra: { daysBack } });
     
     let piHasMore = true;
     let piStartingAfter: string | undefined;
@@ -221,7 +222,7 @@ router.post('/api/financials/backfill-stripe-cache', isStaffOrAdmin, async (req:
         }
       } catch (err: unknown) {
         errors.push(`PaymentIntents batch error: ${getErrorMessage(err)}`);
-        console.error('[Financials Backfill] PaymentIntents error:', getErrorMessage(err));
+        logger.error('[Financials Backfill] PaymentIntents error', { extra: { err: getErrorMessage(err) } });
         break;
       }
     }
@@ -276,7 +277,7 @@ router.post('/api/financials/backfill-stripe-cache', isStaffOrAdmin, async (req:
         }
       } catch (err: unknown) {
         errors.push(`Charges batch error: ${getErrorMessage(err)}`);
-        console.error('[Financials Backfill] Charges error:', getErrorMessage(err));
+        logger.error('[Financials Backfill] Charges error', { extra: { err: getErrorMessage(err) } });
         break;
       }
     }
@@ -330,12 +331,12 @@ router.post('/api/financials/backfill-stripe-cache', isStaffOrAdmin, async (req:
         }
       } catch (err: unknown) {
         errors.push(`Invoices batch error: ${getErrorMessage(err)}`);
-        console.error('[Financials Backfill] Invoices error:', getErrorMessage(err));
+        logger.error('[Financials Backfill] Invoices error', { extra: { err: getErrorMessage(err) } });
         break;
       }
     }
     
-    console.log(`[Financials Backfill] Complete: ${paymentIntentsProcessed} payment intents, ${chargesProcessed} charges, ${invoicesProcessed} invoices`);
+    logger.info('[Financials Backfill] Complete: payment intents, charges, invoices', { extra: { paymentIntentsProcessed, chargesProcessed, invoicesProcessed } });
     
     logFromRequest(req, 'backfill_stripe_cache' as any, 'stripe', null, undefined, {
       action: 'backfill',
@@ -357,7 +358,7 @@ router.post('/api/financials/backfill-stripe-cache', isStaffOrAdmin, async (req:
       errors: errors.length > 0 ? errors : undefined
     });
   } catch (error: unknown) {
-    console.error('[Financials Backfill] Error:', error);
+    logger.error('[Financials Backfill] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({
       success: false,
       error: 'Failed to backfill Stripe cache'
@@ -398,7 +399,7 @@ router.post('/api/financials/sync-member-payments', isStaffOrAdmin, async (req: 
     let invoicesProcessed = 0;
     const errors: string[] = [];
     
-    console.log(`[Financials Sync] Syncing payments for ${email} (customer: ${user.stripe_customer_id})...`);
+    logger.info('[Financials Sync] Syncing payments for (customer: )...', { extra: { email, userStripe_customer_id: user.stripe_customer_id } });
     
     // Fetch all payment intents for this customer (with pagination)
     try {
@@ -494,7 +495,7 @@ router.post('/api/financials/sync-member-payments', isStaffOrAdmin, async (req: 
       errors.push(`Invoices error: ${getErrorMessage(err)}`);
     }
     
-    console.log(`[Financials Sync] Complete for ${email}: ${paymentsProcessed} payments, ${invoicesProcessed} invoices`);
+    logger.info('[Financials Sync] Complete for : payments, invoices', { extra: { email, paymentsProcessed, invoicesProcessed } });
     
     res.json({
       success: true,
@@ -511,7 +512,7 @@ router.post('/api/financials/sync-member-payments', isStaffOrAdmin, async (req: 
       errors: errors.length > 0 ? errors : undefined
     });
   } catch (error: unknown) {
-    console.error('[Financials Sync] Error:', error);
+    logger.error('[Financials Sync] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({
       success: false,
       error: 'Failed to sync member payments'
@@ -555,7 +556,7 @@ router.get('/api/financials/cache-stats', isStaffOrAdmin, async (req: Request, r
       byTypeAndSource: statsResult.rows
     });
   } catch (error: unknown) {
-    console.error('[Financials] Error fetching cache stats:', error);
+    logger.error('[Financials] Error fetching cache stats', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch cache stats'
@@ -589,9 +590,9 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
     
     try {
       const account = await stripe.accounts.retrieve();
-      console.log(`[Financials] Stripe account: ${account.id}`);
+      logger.info('[Financials] Stripe account', { extra: { accountId: account.id } });
     } catch (e: unknown) {
-      console.log('[Financials] Could not get account info:', getErrorMessage(e));
+      logger.info('[Financials] Could not get account info', { extra: { e: getErrorMessage(e) } });
     }
     
     const statusFilter = status && typeof status === 'string' && status !== 'all' 
@@ -610,9 +611,9 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
       listParams.starting_after = starting_after;
     }
     
-    console.log(`[Financials] Fetching subscriptions with params:`, listParams);
+    logger.info('[Financials] Fetching subscriptions with params:', { extra: { listParams } });
     const globalSubscriptions = await stripe.subscriptions.list(listParams);
-    console.log(`[Financials] Found ${globalSubscriptions.data.length} subscriptions from global list`);
+    logger.info('[Financials] Found subscriptions from global list', { extra: { globalSubscriptionsDataLength: globalSubscriptions.data.length } });
     
     const seenSubIds = new Set<string>(globalSubscriptions.data.map(s => s.id));
     const allSubs: Stripe.Subscription[] = [...globalSubscriptions.data];
@@ -620,7 +621,7 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
     const additionalSubs: Stripe.Subscription[] = [];
     
     if (globalSubscriptions.data.length === 0) {
-      console.log('[Financials] No subscriptions in global list - scanning database customers (for test clock support)...');
+      logger.info('[Financials] No subscriptions in global list - scanning database customers (for test clock support)...');
       
       const dbResult = await db.execute(sql`
         SELECT DISTINCT email, stripe_customer_id, first_name, last_name 
@@ -631,7 +632,7 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
         LIMIT 100
       `);
       
-      console.log(`[Financials] Found ${dbResult.rows.length} Stripe-billed customers in database`);
+      logger.info('[Financials] Found Stripe-billed customers in database', { extra: { dbResultRowsLength: dbResult.rows.length } });
       
       const uniqueCustomers = new Map<string, any>();
       for (const row of dbResult.rows as any[]) {
@@ -675,7 +676,7 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
             }
           } else {
             const error = result.reason as Error;
-            console.log(`[Financials] Error fetching subs: ${getErrorMessage(error)}`);
+            logger.info('[Financials] Error fetching subs', { extra: { error: getErrorMessage(error) } });
           }
         }
         
@@ -684,7 +685,7 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
         }
       }
       
-      console.log(`[Financials] Scanned ${uniqueCustomers.size} database customers, found ${additionalSubs.length} additional subscriptions`);
+      logger.info('[Financials] Scanned database customers, found additional subscriptions', { extra: { uniqueCustomersSize: uniqueCustomers.size, additionalSubsLength: additionalSubs.length } });
     }
     
     allSubs.push(...additionalSubs);
@@ -719,7 +720,7 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
       nextCursor: subscriptions.has_more && lastItem ? lastItem.id : null,
     });
   } catch (error: unknown) {
-    console.error('[Financials] Error fetching subscriptions:', error);
+    logger.error('[Financials] Error fetching subscriptions', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch subscriptions',
@@ -768,13 +769,13 @@ router.post('/api/financials/subscriptions/:subscriptionId/send-reminder', isSta
     });
 
     if (result.success) {
-      console.log(`[Financials] Sent payment reminder to ${customer.email} for subscription ${subscriptionId}`);
+      logger.info('[Financials] Sent payment reminder to for subscription', { extra: { customerEmail: customer.email, subscriptionId } });
       res.json({ success: true, message: 'Reminder sent successfully' });
     } else {
       res.status(500).json({ success: false, error: result.error || 'Failed to send reminder' });
     }
   } catch (error: unknown) {
-    console.error('[Financials] Error sending subscription reminder:', error);
+    logger.error('[Financials] Error sending subscription reminder', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({
       success: false,
       error: 'Failed to send reminder',
@@ -862,7 +863,7 @@ router.get('/api/financials/invoices', isStaffOrAdmin, async (req: Request, res:
       nextCursor: invoices.has_more && lastItem ? lastItem.id : null,
     });
   } catch (error: unknown) {
-    console.error('[Financials] Error fetching invoices:', error);
+    logger.error('[Financials] Error fetching invoices', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch invoices',

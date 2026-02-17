@@ -6,6 +6,7 @@ import { db } from '../db';
 import { users } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 import { logFromRequest } from '../core/auditLog';
+import { logger } from '../core/logger';
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
@@ -84,7 +85,7 @@ Even if quality is poor, still attempt to extract whatever information is visibl
     try {
       parsed = JSON.parse(content);
     } catch (parseErr) {
-      console.error('Failed to parse AI response:', content);
+      logger.error('Failed to parse AI response', { extra: { content } });
       return res.status(500).json({ error: 'Failed to parse scan results' });
     }
 
@@ -106,7 +107,7 @@ Even if quality is poor, still attempt to extract whatever information is visibl
       quality
     });
   } catch (error: unknown) {
-    console.error('ID scan error:', error);
+    logger.error('ID scan error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to scan ID document' });
   }
 });
@@ -149,7 +150,7 @@ router.post('/api/admin/save-id-image', isStaffOrAdmin, async (req, res) => {
 
     res.json({ success: true, imageUrl: publicUrl });
   } catch (error: unknown) {
-    console.error('Save ID image error:', error);
+    logger.error('Save ID image error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to save ID image' });
   }
 });
@@ -166,7 +167,7 @@ router.get('/api/admin/member/:userId/id-image', isStaffOrAdmin, async (req, res
 
     res.json({ idImageUrl: result[0].idImageUrl });
   } catch (error: unknown) {
-    console.error('Get ID image error:', error);
+    logger.error('Get ID image error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to get ID image' });
   }
 });
@@ -181,7 +182,7 @@ router.delete('/api/admin/member/:userId/id-image', isStaffOrAdmin, async (req, 
 
     res.json({ success: true });
   } catch (error: unknown) {
-    console.error('Delete ID image error:', error);
+    logger.error('Delete ID image error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to delete ID image' });
   }
 });

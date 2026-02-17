@@ -1,3 +1,4 @@
+import { logger } from '../core/logger';
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
 import { dayPassPurchases, membershipTiers, users } from '../../shared/schema';
@@ -36,7 +37,7 @@ router.get('/api/day-passes/products', async (req: Request, res: Response) => {
 
     res.json({ products: formattedProducts });
   } catch (error: unknown) {
-    console.error('[DayPasses] Error getting products:', error);
+    logger.error('[DayPasses] Error getting products', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to get day pass products' });
   }
 });
@@ -79,7 +80,7 @@ router.post('/api/day-passes/checkout', checkoutRateLimiter, async (req: Request
       : firstName || email.split('@')[0];
 
     if (resolved && ['active', 'trialing'].includes(resolved.membershipStatus || '')) {
-      console.log(`[DayPasses] Warning: active member ${resolved.primaryEmail} purchasing day pass with email ${email}`);
+      logger.info('[DayPasses] Warning: active member purchasing day pass with email', { extra: { resolvedPrimaryEmail: resolved.primaryEmail, email } });
     }
 
     const stripe = await getStripeClient();
@@ -115,14 +116,14 @@ router.post('/api/day-passes/checkout', checkoutRateLimiter, async (req: Request
       cancel_url: `${baseUrl}/checkout/cancel`,
     });
 
-    console.log(`[DayPasses] Created Checkout Session ${session.id} for ${productSlug}: $${((product.priceCents || 0) / 100).toFixed(2)}`);
+    logger.info('[DayPasses] Created Checkout Session for : $', { extra: { sessionId: session.id, productSlug, productPriceCents_0_100_ToFixed_2: ((product.priceCents || 0) / 100).toFixed(2) } });
 
     res.json({
       sessionId: session.id,
       sessionUrl: session.url,
     });
   } catch (error: unknown) {
-    console.error('[DayPasses] Error creating checkout session:', error);
+    logger.error('[DayPasses] Error creating checkout session', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create checkout session' });
   }
 });
@@ -199,7 +200,7 @@ router.post('/api/day-passes/confirm', async (req: Request, res: Response) => {
       .limit(1);
 
     if (!product) {
-      console.warn(`[DayPasses] Product not found: ${productSlug}`);
+      logger.warn('[DayPasses] Product not found', { extra: { productSlug } });
     }
 
     const user = await upsertVisitor({
@@ -217,7 +218,7 @@ router.post('/api/day-passes/confirm', async (req: Request, res: Response) => {
       : [];
 
     if (existingPurchase.length > 0) {
-      console.log(`[DayPasses] Purchase already recorded for payment ${resolvedPaymentIntentId}`);
+      logger.info('[DayPasses] Purchase already recorded for payment', { extra: { resolvedPaymentIntentId } });
       return res.json({
         success: true,
         purchaseId: existingPurchase[0].id,
@@ -248,7 +249,7 @@ router.post('/api/day-passes/confirm', async (req: Request, res: Response) => {
       await linkPurchaseToUser(purchase.id, user.id);
     }
 
-    console.log(`[DayPasses] Recorded purchase ${purchase.id} for ${productSlug}: $${(amountPaid / 100).toFixed(2)} from ${email}`);
+    logger.info('[DayPasses] Recorded purchase for : $ from', { extra: { purchaseId: purchase.id, productSlug, amountPaid_100_ToFixed_2: (amountPaid / 100).toFixed(2), email } });
 
     res.json({
       success: true,
@@ -256,7 +257,7 @@ router.post('/api/day-passes/confirm', async (req: Request, res: Response) => {
       userId: user.id
     });
   } catch (error: unknown) {
-    console.error('[DayPasses] Error confirming payment:', error);
+    logger.error('[DayPasses] Error confirming payment', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to confirm payment' });
   }
 });
@@ -329,7 +330,7 @@ router.post('/api/day-passes/staff-checkout', isStaffOrAdmin, async (req: Reques
       }
     });
 
-    console.log(`[DayPasses] Staff checkout initiated for ${productSlug}: $${(product.priceCents / 100).toFixed(2)} by ${staffEmail}`);
+    logger.info('[DayPasses] Staff checkout initiated for : $ by', { extra: { productSlug, productPriceCents_100_ToFixed_2: (product.priceCents / 100).toFixed(2), staffEmail } });
 
     res.json({
       clientSecret: result.clientSecret,
@@ -339,7 +340,7 @@ router.post('/api/day-passes/staff-checkout', isStaffOrAdmin, async (req: Reques
       productName: product.name
     });
   } catch (error: unknown) {
-    console.error('[DayPasses] Error creating staff checkout:', error);
+    logger.error('[DayPasses] Error creating staff checkout', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create payment' });
   }
 });
@@ -386,7 +387,7 @@ router.post('/api/day-passes/staff-checkout/confirm', isStaffOrAdmin, async (req
       .limit(1);
 
     if (existingPurchase.length > 0) {
-      console.log(`[DayPasses] Purchase already recorded for payment ${paymentIntentId}`);
+      logger.info('[DayPasses] Purchase already recorded for payment', { extra: { paymentIntentId } });
       return res.json({
         success: true,
         purchaseId: existingPurchase[0].id,
@@ -437,7 +438,7 @@ router.post('/api/day-passes/staff-checkout/confirm', isStaffOrAdmin, async (req
       await linkPurchaseToUser(purchase.id, user.id);
     }
 
-    console.log(`[DayPasses] Staff checkout confirmed: ${purchase.id} for ${productSlug}: $${(paymentIntent.amount / 100).toFixed(2)} by ${staffEmail}`);
+    logger.info('[DayPasses] Staff checkout confirmed: for : $ by', { extra: { purchaseId: purchase.id, productSlug, paymentIntentAmount_100_ToFixed_2: (paymentIntent.amount / 100).toFixed(2), staffEmail } });
 
     res.json({
       success: true,
@@ -447,7 +448,7 @@ router.post('/api/day-passes/staff-checkout/confirm', isStaffOrAdmin, async (req
       userEmail: email
     });
   } catch (error: unknown) {
-    console.error('[DayPasses] Error confirming staff checkout:', error);
+    logger.error('[DayPasses] Error confirming staff checkout', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to confirm payment' });
   }
 });
@@ -473,7 +474,7 @@ export async function recordDayPassPurchaseFromWebhook(data: {
       .limit(1);
 
     if (existingPurchase.length > 0) {
-      console.log(`[DayPasses] Purchase already recorded for payment ${data.paymentIntentId}`);
+      logger.info('[DayPasses] Purchase already recorded for payment', { extra: { dataPaymentIntentId: data.paymentIntentId } });
       return { 
         success: true, 
         purchaseId: existingPurchase[0].id, 
@@ -512,7 +513,7 @@ export async function recordDayPassPurchaseFromWebhook(data: {
       await linkPurchaseToUser(purchase.id, user.id);
     }
 
-    console.log(`[DayPasses Webhook] Recorded purchase ${purchase.id} for ${data.productSlug}: $${(data.amountCents / 100).toFixed(2)} from ${data.email}`);
+    logger.info('[DayPasses Webhook] Recorded purchase for : $ from', { extra: { purchaseId: purchase.id, dataProductSlug: data.productSlug, dataAmountCents_100_ToFixed_2: (data.amountCents / 100).toFixed(2), dataEmail: data.email } });
 
     return { 
       success: true, 
@@ -522,7 +523,7 @@ export async function recordDayPassPurchaseFromWebhook(data: {
       remainingUses: purchase.remainingUses ?? 1
     };
   } catch (error: unknown) {
-    console.error('[DayPasses Webhook] Error recording purchase:', error);
+    logger.error('[DayPasses Webhook] Error recording purchase', { error: error instanceof Error ? error : new Error(String(error)) });
     return { success: false, error: getErrorMessage(error) };
   }
 }

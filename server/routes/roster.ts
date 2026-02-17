@@ -69,7 +69,7 @@ async function isStaffOrAdminCheck(email: string): Promise<boolean> {
     );
     return result.rows.length > 0;
   } catch (error: unknown) {
-    console.error('[isStaffOrAdminCheck] DB error, defaulting to false:', (error as Error).message);
+    logger.error('[isStaffOrAdminCheck] DB error, defaulting to false', { extra: { error: (error as Error).message } });
     return false;
   }
 }

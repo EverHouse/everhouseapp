@@ -1,3 +1,4 @@
+import { logger } from '../../core/logger';
 import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { getStripeClient } from '../../core/stripe/client';
@@ -15,7 +16,7 @@ router.post('/api/stripe/terminal/connection-token', isStaffOrAdmin, async (req:
     
     res.json({ secret: connectionToken.secret });
   } catch (error: unknown) {
-    console.error('[Terminal] Error creating connection token:', error);
+    logger.error('[Terminal] Error creating connection token', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to create connection token' });
   }
 });
@@ -36,7 +37,7 @@ router.get('/api/stripe/terminal/readers', isStaffOrAdmin, async (req: Request, 
       }))
     });
   } catch (error: unknown) {
-    console.error('[Terminal] Error listing readers:', error);
+    logger.error('[Terminal] Error listing readers', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to list readers' });
   }
 });
@@ -88,7 +89,7 @@ router.post('/api/stripe/terminal/create-simulated-reader', isStaffOrAdmin, asyn
       }
     });
   } catch (error: unknown) {
-    console.error('[Terminal] Error creating simulated reader:', error);
+    logger.error('[Terminal] Error creating simulated reader', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to create simulated reader' });
   }
 });
@@ -117,7 +118,7 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
         );
         customerId = result.customerId;
       } catch (custErr: unknown) {
-        console.warn('[Terminal] Could not resolve Stripe customer for existing member (non-blocking):', getErrorMessage(custErr));
+        logger.warn('[Terminal] Could not resolve Stripe customer for existing member (non-blocking)', { extra: { custErr: getErrorMessage(custErr) } });
       }
     } else if (metadata?.ownerEmail) {
       try {
@@ -146,10 +147,10 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
                   [customerId, resolvedTerminal.userId]
                 );
                 if (terminalUserCheck.rows[0]?.archived_at) {
-                  console.log(`[Auto-Unarchive] User ${resolvedTerminal.primaryEmail} unarchived after receiving Stripe customer ID`);
+                  logger.info('[Auto-Unarchive] User unarchived after receiving Stripe customer ID', { extra: { resolvedTerminalPrimaryEmail: resolvedTerminal.primaryEmail } });
                 }
               }
-              console.log(`[Terminal] Linked Stripe customer to existing user ${resolvedTerminal.primaryEmail} via ${resolvedTerminal.matchType}`);
+              logger.info('[Terminal] Linked Stripe customer to existing user via', { extra: { resolvedTerminalPrimaryEmail: resolvedTerminal.primaryEmail, resolvedTerminalMatchType: resolvedTerminal.matchType } });
             } else {
               const crypto = await import('crypto');
               const visitorId = crypto.randomUUID();
@@ -165,14 +166,14 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
                    updated_at = NOW()`,
                 [visitorId, metadata.ownerEmail, firstName, lastName, customerId]
               );
-              console.log(`[Terminal] Created/updated visitor record for POS customer: ${metadata.ownerEmail}`);
+              logger.info('[Terminal] Created/updated visitor record for POS customer', { extra: { metadataOwnerEmail: metadata.ownerEmail } });
             }
           } catch (visitorErr: unknown) {
-            console.warn('[Terminal] Could not create visitor record for new POS customer (non-blocking):', getErrorMessage(visitorErr));
+            logger.warn('[Terminal] Could not create visitor record for new POS customer (non-blocking)', { extra: { visitorErr: getErrorMessage(visitorErr) } });
           }
         }
       } catch (custErr: unknown) {
-        console.warn('[Terminal] Could not create Stripe customer for new customer (non-blocking):', getErrorMessage(custErr));
+        logger.warn('[Terminal] Could not create Stripe customer for new customer (non-blocking)', { extra: { custErr: getErrorMessage(custErr) } });
       }
     }
     
@@ -197,7 +198,7 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
           finalDescription = `#${displayId} - ${finalDescription}`;
         }
       } catch (lookupErr) {
-        console.warn('[Terminal] Could not look up booking for description prefix:', (lookupErr as Error).message);
+        logger.warn('[Terminal] Could not look up booking for description prefix', { extra: { lookupErr_as_Error_message: (lookupErr as Error).message } });
       }
     }
 
@@ -218,7 +219,7 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
         invoiceId = invoiceResult.invoiceId;
         paymentIntent = await stripe.paymentIntents.retrieve(invoiceResult.paymentIntentId);
       } catch (invoiceErr: unknown) {
-        console.error('[Terminal] Invoice creation failed, falling back to bare PI:', getErrorMessage(invoiceErr));
+        logger.error('[Terminal] Invoice creation failed, falling back to bare PI', { extra: { invoiceErr: getErrorMessage(invoiceErr) } });
         paymentIntent = await stripe.paymentIntents.create({
           amount: Math.round(amount),
           currency,
@@ -271,7 +272,7 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
           ]
         );
       } catch (dbErr: unknown) {
-        console.warn('[Terminal] Non-blocking: Could not save local payment record:', getErrorMessage(dbErr));
+        logger.warn('[Terminal] Non-blocking: Could not save local payment record', { extra: { dbErr: getErrorMessage(dbErr) } });
       }
     }
 
@@ -283,7 +284,7 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
       try {
         await stripe.testHelpers.terminal.readers.presentPaymentMethod(readerId);
       } catch (simErr: unknown) {
-        console.error('[Terminal] Simulated card presentation error (non-blocking):', getErrorMessage(simErr));
+        logger.error('[Terminal] Simulated card presentation error (non-blocking)', { extra: { simErr: getErrorMessage(simErr) } });
       }
     }
     
@@ -309,7 +310,7 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
       readerAction: reader.action
     });
   } catch (error: unknown) {
-    console.error('[Terminal] Error processing payment:', error);
+    logger.error('[Terminal] Error processing payment', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to process payment' });
   }
 });
@@ -326,10 +327,10 @@ router.get('/api/stripe/terminal/payment-status/:paymentIntentId', isStaffOrAdmi
         const inv = await stripe.invoices.retrieve(paymentIntent.metadata.invoice_id);
         if (inv.status === 'open') {
           await stripe.invoices.pay(paymentIntent.metadata.invoice_id, { paid_out_of_band: true });
-          console.log(`[Terminal] Marked invoice ${paymentIntent.metadata.invoice_id} as paid after terminal PI ${paymentIntentId} succeeded`);
+          logger.info('[Terminal] Marked invoice as paid after terminal PI succeeded', { extra: { paymentIntentMetadataInvoice_id: paymentIntent.metadata.invoice_id, paymentIntentId } });
         }
       } catch (invErr: unknown) {
-        console.warn(`[Terminal] Could not reconcile invoice ${paymentIntent.metadata.invoice_id}:`, getErrorMessage(invErr));
+        logger.warn('[Terminal] Could not reconcile invoice', { extra: { invoice_id: paymentIntent.metadata.invoice_id, error: getErrorMessage(invErr) } });
       }
     }
     
@@ -346,7 +347,7 @@ router.get('/api/stripe/terminal/payment-status/:paymentIntentId', isStaffOrAdmi
       } : null
     });
   } catch (error: unknown) {
-    console.error('[Terminal] Error checking payment status:', error);
+    logger.error('[Terminal] Error checking payment status', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to check payment status' });
   }
 });
@@ -365,7 +366,7 @@ router.post('/api/stripe/terminal/cancel-payment', isStaffOrAdmin, async (req: R
       await stripe.terminal.readers.cancelAction(readerId);
     } catch (readerErr: unknown) {
       if (!getErrorMessage(readerErr)?.includes('no action')) {
-        console.warn('[Terminal] Could not cancel reader action:', getErrorMessage(readerErr));
+        logger.warn('[Terminal] Could not cancel reader action', { extra: { readerErr: getErrorMessage(readerErr) } });
       }
     }
 
@@ -378,10 +379,10 @@ router.post('/api/stripe/terminal/cancel-payment', isStaffOrAdmin, async (req: R
           paymentAlreadySucceeded = true;
         } else if (pi.status !== 'canceled') {
           await stripe.paymentIntents.cancel(paymentIntentId);
-          console.log(`[Terminal] Canceled PaymentIntent ${paymentIntentId}`);
+          logger.info('[Terminal] Canceled PaymentIntent', { extra: { paymentIntentId } });
         }
       } catch (piErr: unknown) {
-        console.warn('[Terminal] Could not cancel PaymentIntent:', getErrorMessage(piErr));
+        logger.warn('[Terminal] Could not cancel PaymentIntent', { extra: { piErr: getErrorMessage(piErr) } });
       }
     }
 
@@ -414,7 +415,7 @@ router.post('/api/stripe/terminal/cancel-payment', isStaffOrAdmin, async (req: R
       canceled: true
     });
   } catch (error: unknown) {
-    console.error('[Terminal] Error canceling payment:', error);
+    logger.error('[Terminal] Error canceling payment', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to cancel payment' });
   }
 });
@@ -479,14 +480,14 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
             (pi.status === 'requires_payment_method' || pi.status === 'requires_confirmation' || pi.status === 'requires_action')) {
           try {
             await stripe.paymentIntents.cancel(pi.id);
-            console.log(`[Terminal] Cancelled stale PI ${pi.id} for subscription ${subscriptionId}`);
+            logger.info('[Terminal] Cancelled stale PI for subscription', { extra: { piId: pi.id, subscriptionId } });
           } catch (cancelErr: unknown) {
-            console.error(`[Terminal] Failed to cancel stale PI ${pi.id}:`, getErrorMessage(cancelErr));
+            logger.error('[Terminal] Failed to cancel stale PI', { extra: { id: pi.id, error: getErrorMessage(cancelErr) } });
           }
         }
       }
     } catch (listErr: unknown) {
-      console.error(`[Terminal] Error listing existing PIs:`, getErrorMessage(listErr));
+      logger.error('[Terminal] Error listing existing PIs:', { extra: { error: getErrorMessage(listErr) } });
     }
 
     const invoicePI = invoice.payment_intent as any;
@@ -513,16 +514,16 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
             paymentType: 'subscription_terminal'
           }
         });
-        console.log(`[Terminal] Using invoice PI ${invoicePI.id} for subscription ${subscriptionId}`);
+        logger.info('[Terminal] Using invoice PI for subscription', { extra: { invoicePIId: invoicePI.id, subscriptionId } });
       } catch (updateErr: unknown) {
-        console.error(`[Terminal] Failed to update invoice PI ${invoicePI.id}:`, getErrorMessage(updateErr));
+        logger.error('[Terminal] Failed to update invoice PI', { extra: { id: invoicePI.id, error: getErrorMessage(updateErr) } });
         return res.status(500).json({ 
           error: `Failed to configure invoice payment for terminal: ${getErrorMessage(updateErr)}`,
           paymentIntentId: invoicePI.id
         });
       }
     } else {
-      console.warn(`[Terminal] No invoice PI found for subscription ${subscriptionId}, creating terminal PI linked to invoice`);
+      logger.warn('[Terminal] No invoice PI found for subscription , creating terminal PI linked to invoice', { extra: { subscriptionId } });
       paymentIntent = await stripe.paymentIntents.create({
         amount,
         currency: invoice.currency || 'usd',
@@ -545,7 +546,7 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
       }, {
         idempotencyKey: `terminal_sub_${subscriptionId}_${invoice.id}`
       });
-      console.log(`[Terminal] Created PI ${paymentIntent.id} for subscription ${subscriptionId} - will reconcile invoice after payment succeeds`);
+      logger.info('[Terminal] Created PI for subscription - will reconcile invoice after payment succeeds', { extra: { paymentIntentId: paymentIntent.id, subscriptionId } });
     }
     
     const reader = await stripe.terminal.readers.processPaymentIntent(readerId, {
@@ -556,7 +557,7 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
       try {
         await stripe.testHelpers.terminal.readers.presentPaymentMethod(readerId);
       } catch (simErr: unknown) {
-        console.error('[Terminal] Simulated card presentation error (non-blocking):', getErrorMessage(simErr));
+        logger.error('[Terminal] Simulated card presentation error (non-blocking)', { extra: { simErr: getErrorMessage(simErr) } });
       }
     }
     
@@ -583,7 +584,7 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
       readerAction: reader.action
     });
   } catch (error: unknown) {
-    console.error('[Terminal] Error processing subscription payment:', error);
+    logger.error('[Terminal] Error processing subscription payment', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to process subscription payment' });
   }
 });
@@ -613,12 +614,12 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
             idempotencyKey: `refund_terminal_activation_${paymentIntentId}`
           });
           autoRefunded = true;
-          console.error(`[Terminal] Auto-refunded PI ${paymentIntentId} - user ${userId} not found during activation`);
+          logger.error('[Terminal] Auto-refunded PI - user not found during activation', { extra: { paymentIntentId, userId } });
         } else {
-          console.error(`[Terminal] Cannot refund PI ${paymentIntentId} in status "${pi.status}" - user ${userId} not found`);
+          logger.error('[Terminal] Cannot refund PI in status "" - user not found', { extra: { paymentIntentId, piStatus: pi.status, userId } });
         }
       } catch (refundErr: unknown) {
-        console.error(`[Terminal] CRITICAL: Failed to auto-refund PI ${paymentIntentId} for missing user ${userId}:`, getErrorMessage(refundErr));
+        logger.error('[Terminal] CRITICAL: Failed to auto-refund PI  for missing user', { extra: { paymentIntentId, userId, error: getErrorMessage(refundErr) } });
       }
       return res.status(400).json({ 
         error: autoRefunded 
@@ -664,7 +665,7 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
         : latestInvoice.amount_due;
       
       if (paymentIntent.amount !== expectedAmount) {
-        console.error(`[Terminal] Amount mismatch: PI ${paymentIntentId} = $${(paymentIntent.amount / 100).toFixed(2)}, invoice ${actualInvoiceId} = $${(expectedAmount / 100).toFixed(2)}`);
+        logger.error('[Terminal] Amount mismatch: PI = $, invoice = $', { extra: { paymentIntentId, paymentIntentAmount_100_ToFixed_2: (paymentIntent.amount / 100).toFixed(2), actualInvoiceId, expectedAmount_100_ToFixed_2: (expectedAmount / 100).toFixed(2) } });
         return res.status(400).json({ 
           error: 'Payment amount mismatch',
           details: `Payment was $${(paymentIntent.amount / 100).toFixed(2)} but invoice ${latestInvoice.status === 'paid' ? 'was paid for' : 'requires'} $${(expectedAmount / 100).toFixed(2)}`,
@@ -680,9 +681,9 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
     if (piMetadata.requiresInvoiceReconciliation === 'true' && latestInvoice && latestInvoice.status !== 'paid') {
       try {
         await stripe.invoices.pay(actualInvoiceId, { paid_out_of_band: true });
-        console.log(`[Terminal] Reconciled invoice ${actualInvoiceId} as paid (out-of-band) after successful terminal payment ${paymentIntentId}`);
+        logger.info('[Terminal] Reconciled invoice as paid (out-of-band) after successful terminal payment', { extra: { actualInvoiceId, paymentIntentId } });
       } catch (invoicePayErr: unknown) {
-        console.error(`[Terminal] Failed to reconcile invoice ${actualInvoiceId} after terminal payment:`, getErrorMessage(invoicePayErr));
+        logger.error('[Terminal] Failed to reconcile invoice  after terminal payment', { extra: { actualInvoiceId, error: getErrorMessage(invoicePayErr) } });
       }
     }
     
@@ -705,7 +706,7 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
         status: 'succeeded',
         processedBy: staffEmail,
       });
-      console.log(`[Terminal] Payment record created for PI ${paymentIntentId}`);
+      logger.info('[Terminal] Payment record created for PI', { extra: { paymentIntentId } });
     }
     
     let cardSaved = false;
@@ -721,10 +722,10 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
 
           if (generatedCard) {
             reusablePaymentMethodId = generatedCard;
-            console.log(`[Terminal] Found generated_card ${generatedCard} from card_present payment`);
+            logger.info('[Terminal] Found generated_card from card_present payment', { extra: { generatedCard } });
           } else {
             cardSaveWarning = 'No reusable card was generated from this terminal payment. The member will need to add a payment method manually, or their next renewal will fail.';
-            console.warn(`[Terminal] ${cardSaveWarning} (PI: ${paymentIntentId})`);
+            logger.warn('[Terminal] (PI: )', { extra: { cardSaveWarning, paymentIntentId } });
           }
         } else {
           reusablePaymentMethodId = paymentIntent.payment_method as string;
@@ -752,19 +753,19 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
           });
 
           cardSaved = true;
-          console.log(`[Terminal] Saved payment method ${reusablePaymentMethodId} as default for customer ${customerId} and subscription ${subscriptionId}`);
+          logger.info('[Terminal] Saved payment method as default for customer and subscription', { extra: { reusablePaymentMethodId, customerId, subscriptionId } });
         }
       } catch (attachError: unknown) {
         cardSaveWarning = `Failed to save payment method for future billing: ${getErrorMessage(attachError)}. The member may need to add a card manually.`;
-        console.error(`[Terminal] ${cardSaveWarning}`);
+        logger.error('[Terminal]', { extra: { cardSaveWarning } });
       }
     } else {
       cardSaveWarning = 'No payment method found on the PaymentIntent. The member will need to add a payment method manually for future billing.';
-      console.warn(`[Terminal] ${cardSaveWarning} (PI: ${paymentIntentId})`);
+      logger.warn('[Terminal] (PI: )', { extra: { cardSaveWarning, paymentIntentId } });
     }
     
     if (existingUser?.membershipStatus === 'active') {
-      console.log(`[Terminal] User ${userId} already active, payment record ensured, card save attempted, returning early`);
+      logger.info('[Terminal] User already active, payment record ensured, card save attempted, returning early', { extra: { userId } });
       return res.json({
         success: true,
         membershipStatus: 'active',
@@ -796,7 +797,7 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
           billingGroupRole: 'Primary',
         });
       } catch (hubspotError) {
-        console.error('[Terminal] HubSpot sync error (non-blocking):', hubspotError);
+        logger.error('[Terminal] HubSpot sync error (non-blocking)', { extra: { hubspotError } });
       }
     }
     
@@ -823,7 +824,7 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
       cardSaveWarning
     });
   } catch (error: unknown) {
-    console.error('[Terminal] Error confirming subscription payment:', error);
+    logger.error('[Terminal] Error confirming subscription payment', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to confirm subscription payment' });
   }
 });
@@ -861,11 +862,11 @@ router.post('/api/stripe/terminal/refund-payment', isStaffOrAdmin, async (req: R
       }
     });
     
-    console.log(`[Terminal] Auto-refunded PI ${paymentIntentId}, refund ${refund.id}`);
+    logger.info('[Terminal] Auto-refunded PI , refund', { extra: { paymentIntentId, refundId: refund.id } });
     
     res.json({ success: true, refundId: refund.id });
   } catch (error: unknown) {
-    console.error('[Terminal] Error refunding payment:', error);
+    logger.error('[Terminal] Error refunding payment', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to refund payment' });
   }
 });
@@ -916,7 +917,7 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
     try {
       await stripe.paymentIntents.update(paymentIntentId, updateParams);
     } catch (updateErr: unknown) {
-      console.log(`[Terminal] First update attempt failed, trying stepwise:`, getErrorMessage(updateErr));
+      logger.info('[Terminal] First update attempt failed, trying stepwise:', { extra: { error: getErrorMessage(updateErr) } });
       await stripe.paymentIntents.update(paymentIntentId, {
         automatic_payment_methods: { enabled: false },
         ...(paymentIntent.setup_future_usage ? { setup_future_usage: '' } : {}),
@@ -940,7 +941,7 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
       try {
         await stripe.testHelpers.terminal.readers.presentPaymentMethod(readerId);
       } catch (simErr: unknown) {
-        console.error('[Terminal] Simulated card presentation error (non-blocking):', getErrorMessage(simErr));
+        logger.error('[Terminal] Simulated card presentation error (non-blocking)', { extra: { simErr: getErrorMessage(simErr) } });
       }
     }
 
@@ -963,7 +964,7 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
       readerAction: reader.action
     });
   } catch (error: unknown) {
-    console.error('[Terminal] Error processing existing payment:', error);
+    logger.error('[Terminal] Error processing existing payment', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to process existing payment on terminal' });
   }
 });
@@ -1002,7 +1003,7 @@ router.post('/api/stripe/terminal/save-card', isStaffOrAdmin, async (req: Reques
       try {
         await stripe.testHelpers.terminal.readers.presentPaymentMethod(readerId);
       } catch (simErr: unknown) {
-        console.error('[Terminal] Simulated card presentation error (non-blocking):', getErrorMessage(simErr));
+        logger.error('[Terminal] Simulated card presentation error (non-blocking)', { extra: { simErr: getErrorMessage(simErr) } });
       }
     }
 
@@ -1026,7 +1027,7 @@ router.post('/api/stripe/terminal/save-card', isStaffOrAdmin, async (req: Reques
       readerAction: reader.action
     });
   } catch (error: unknown) {
-    console.error('[Terminal] Error initiating save card:', error);
+    logger.error('[Terminal] Error initiating save card', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to initiate save card' });
   }
 });
@@ -1044,7 +1045,7 @@ router.get('/api/stripe/terminal/setup-status/:setupIntentId', isStaffOrAdmin, a
       paymentMethod: setupIntent.payment_method
     });
   } catch (error: unknown) {
-    console.error('[Terminal] Error checking setup status:', error);
+    logger.error('[Terminal] Error checking setup status', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to check setup status' });
   }
 });
@@ -1089,7 +1090,7 @@ router.post('/api/stripe/terminal/confirm-save-card', isStaffOrAdmin, async (req
 
     if (pm.type === 'card_present' && (pm as any).card_present?.generated_card) {
       reusablePaymentMethodId = (pm as any).card_present.generated_card;
-      console.log(`[Terminal] Found generated_card ${reusablePaymentMethodId} from SetupIntent card_present`);
+      logger.info('[Terminal] Found generated_card from SetupIntent card_present', { extra: { reusablePaymentMethodId } });
     }
 
     if (!reusablePaymentMethodId) {
@@ -1139,7 +1140,7 @@ router.post('/api/stripe/terminal/confirm-save-card', isStaffOrAdmin, async (req
       paymentMethodId
     });
   } catch (error: unknown) {
-    console.error('[Terminal] Error confirming save card:', error);
+    logger.error('[Terminal] Error confirming save card', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) || 'Failed to confirm save card' });
   }
 });

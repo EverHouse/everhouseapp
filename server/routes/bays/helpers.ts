@@ -3,6 +3,7 @@ import { resources } from '../../../shared/schema';
 import { eq } from 'drizzle-orm';
 import { CALENDAR_CONFIG } from '../../core/calendar/index';
 import { bookingEvents } from '../../core/bookingEvents';
+import { logger } from '../../core/logger';
 
 export async function getCalendarNameForBayAsync(bayId: number | null): Promise<string | null> {
   if (!bayId) return null;
@@ -15,7 +16,7 @@ export async function getCalendarNameForBayAsync(bayId: number | null): Promise<
       return CALENDAR_CONFIG.conference.name;
     }
   } catch (e) {
-    console.error('[Bays] Failed to get calendar name for bay:', e);
+    logger.error('[Bays] Failed to get calendar name for bay', { extra: { error: e } });
   }
   
   return null;
@@ -29,7 +30,7 @@ export async function dismissStaffNotificationsForBooking(bookingId: number): Pr
   try {
     await bookingEvents.cleanupNotificationsForBooking(bookingId, { markRead: true });
   } catch (error) {
-    console.error('Failed to dismiss staff notifications:', error);
+    logger.error('Failed to dismiss staff notifications', { error: error instanceof Error ? error : new Error(String(error)) });
   }
 }
 

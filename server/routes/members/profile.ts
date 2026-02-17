@@ -20,6 +20,7 @@ import { isStaffOrAdmin, isAuthenticated, isAdmin } from '../../core/middleware'
 import { syncSmsPreferencesToHubSpot } from '../../core/hubspot/contacts';
 import { getSessionUser } from '../../types/session';
 import { logSystemAction, logFromRequest } from '../../core/auditLog';
+import { logger } from '../../core/logger';
 import { memberLookupRateLimiter } from '../../middleware/rateLimiting';
 import { z } from 'zod';
 
@@ -223,7 +224,7 @@ router.get('/api/members/:email/details', isAuthenticated, memberLookupRateLimit
       smsRemindersOptIn: user.smsRemindersOptIn,
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('API error:', error);
+    logger.error('API error fetching member details', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch member details' });
   }
 });
@@ -282,7 +283,7 @@ router.put('/api/members/:email/sms-preferences', isAuthenticated, async (req, r
       smsTransactionalOptIn: result[0].smsTransactionalOptIn,
       smsRemindersOptIn: result[0].smsRemindersOptIn
     }).catch(err => {
-      console.error(`[Profile] Failed to sync SMS preferences to HubSpot for ${normalizedEmail}:`, err);
+      logger.error('[Profile] Failed to sync SMS preferences to HubSpot', { extra: { email: normalizedEmail, error: err } });
     });
     
     res.json({
@@ -292,7 +293,7 @@ router.put('/api/members/:email/sms-preferences', isAuthenticated, async (req, r
       smsRemindersOptIn: result[0].smsRemindersOptIn
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('SMS preferences update error:', error);
+    logger.error('SMS preferences update error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update SMS preferences' });
   }
 });
@@ -560,7 +561,7 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       attendedVisitsCount: totalAttendedVisits
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Member history error:', error);
+    logger.error('Member history error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch member history' });
   }
 });
@@ -589,7 +590,7 @@ router.get('/api/members/:email/guests', isStaffOrAdmin, async (req, res) => {
     
     res.json(guestHistory);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Member guests error:', error);
+    logger.error('Member guests error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch member guests' });
   }
 });
@@ -639,7 +640,7 @@ router.put('/api/members/:id/role', isAdmin, async (req, res) => {
     logFromRequest(req, 'change_member_role', 'user', req.params.id, '', { newRole: req.body.role, tags: req.body.tags });
     res.json(result[0]);
   } catch (error: unknown) {
-    if (!isProduction) console.error('API error:', error);
+    logger.error('API error updating member', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update member' });
   }
 });
@@ -699,7 +700,7 @@ router.get('/api/members/:email/cascade-preview', isStaffOrAdmin, async (req, re
       hasRelatedData: bookingsCount > 0 || rsvpsCount > 0 || enrollmentsCount > 0 || guestCheckInsCount > 0
     });
   } catch (error: unknown) {
-    if (!isProduction) console.error('Member cascade preview error:', error);
+    logger.error('Member cascade preview error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch cascade preview' });
   }
 });

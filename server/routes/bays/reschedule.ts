@@ -301,7 +301,7 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
         endTime: end_time,
         bayName: newBayName,
         memberName: (booking.user_name as string) || 'Member',
-      }).catch((err: unknown) => console.error('[Email] Reschedule email error:', err));
+      }).catch((err: unknown) => logger.error('[Email] Reschedule email error', { extra: { error: err } }));
     }
 
     return res.json({

@@ -4,6 +4,7 @@ import { db } from '../../db';
 import { users, staffUsers } from '../../../shared/schema';
 import { isProduction } from '../../core/db';
 import { isStaffOrAdmin, isAuthenticated } from '../../core/middleware';
+import { logger } from '../../core/logger';
 import { getSessionUser } from '../../types/session';
 import { redactEmail } from './helpers';
 
@@ -145,7 +146,7 @@ router.get('/api/members/search', isAuthenticated, async (req, res) => {
     
     res.json(formattedResults);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Member search error:', error);
+    logger.error('Member search error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to search members' });
   }
 });
@@ -263,7 +264,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
           ) all_bookings
           GROUP BY email
         `).catch((error: unknown) => {
-          console.error('[Members Directory] Bookings query error:', error);
+          logger.error('[Members Directory] Bookings query error', { error: error instanceof Error ? error : new Error(String(error)) });
           return { rows: [] };
         }),
         db.execute(sql`
@@ -275,7 +276,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
             AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           GROUP BY LOWER(user_email)
         `).catch((error: unknown) => {
-          console.error('[Members Directory] Events query error:', error);
+          logger.error('[Members Directory] Events query error', { error: error instanceof Error ? error : new Error(String(error)) });
           return { rows: [] };
         }),
         db.execute(sql`
@@ -287,7 +288,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
             AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           GROUP BY LOWER(we.user_email)
         `).catch((error: unknown) => {
-          console.error('[Members Directory] Wellness query error:', error);
+          logger.error('[Members Directory] Wellness query error', { error: error instanceof Error ? error : new Error(String(error)) });
           return { rows: [] };
         }),
         db.execute(sql`
@@ -334,7 +335,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
           ) combined
           GROUP BY email
         `).catch((error: unknown) => {
-          console.error('[Members Directory] Last activity query error:', error);
+          logger.error('[Members Directory] Last activity query error', { error: error instanceof Error ? error : new Error(String(error)) });
           return { rows: [] };
         }),
         db.execute(sql`
@@ -343,7 +344,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
           WHERE LOWER(member_email) IN (${sql.join(memberEmails.map(e => sql`${e}`), sql`, `)})
           GROUP BY LOWER(member_email)
         `).catch((error: unknown) => {
-          console.error('[Members Directory] Walk-in count query error:', error);
+          logger.error('[Members Directory] Walk-in count query error', { error: error instanceof Error ? error : new Error(String(error)) });
           return { rows: [] };
         }),
       ]);
@@ -435,7 +436,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
       refreshing: false,
     });
   } catch (error: unknown) {
-    console.error('[Members Directory] Error:', error);
+    logger.error('[Members Directory] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch members directory' });
   }
 });
@@ -485,7 +486,7 @@ router.get('/api/guests/search', isAuthenticated, async (req, res) => {
     
     res.json(formattedResults);
   } catch (error: unknown) {
-    if (!isProduction) console.error('Guest search error:', error);
+    logger.error('Guest search error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to search guests' });
   }
 });
