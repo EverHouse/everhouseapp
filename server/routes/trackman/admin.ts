@@ -1227,13 +1227,9 @@ router.put('/api/admin/trackman/matched/:id/reassign', isStaffOrAdmin, async (re
           [newMember.id, sessionId, oldOwnerId]
         );
       } else {
-        // Fallback: If no old owner found, update entries that aren't guests
-        await client.query(
-          `UPDATE usage_ledger 
-           SET member_id = $1
-           WHERE session_id = $2 AND member_id IS NOT NULL AND usage_type != 'guest'`,
-          [newMember.id, sessionId]
-        );
+        // Fallback: Skip ledger update when we can't identify the old owner
+        // Updating blindly risks corrupting guest entries
+        logger.warn('[Reassign] No old owner found in participants, skipping usage_ledger update', { extra: { sessionId } });
       }
     }
     

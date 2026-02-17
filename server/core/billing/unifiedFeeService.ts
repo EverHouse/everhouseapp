@@ -150,7 +150,7 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
           bm.id as participant_id,
           u.id as user_id,
           bm.user_email as email,
-          COALESCE(u.full_name, bm.user_email) as display_name,
+          COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), bm.user_email) as display_name,
           CASE WHEN bm.user_email = $2 THEN 'owner' ELSE 'member' END as participant_type
          FROM booking_members bm
          LEFT JOIN users u ON LOWER(u.email) = LOWER(bm.user_email)
