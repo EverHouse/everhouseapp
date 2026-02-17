@@ -874,6 +874,12 @@ router.post('/api/booking-requests', async (req, res) => {
     // Track first booking for onboarding (async, non-blocking)
     db.execute(sql`UPDATE users SET first_booking_at = NOW(), updated_at = NOW() WHERE LOWER(email) = LOWER(${row.userEmail}) AND first_booking_at IS NULL`).catch(() => {});
 
+    db.execute(sql`UPDATE users SET onboarding_completed_at = NOW(), updated_at = NOW() 
+      WHERE LOWER(email) = LOWER(${row.userEmail}) 
+      AND onboarding_completed_at IS NULL 
+      AND first_name IS NOT NULL AND last_name IS NOT NULL AND phone IS NOT NULL
+      AND waiver_signed_at IS NOT NULL AND app_installed_at IS NOT NULL`).catch(() => {});
+
     // All post-commit operations are now AFTER the response is sent
     // Wrap in try/catch so any failures don't crash the server
     try {

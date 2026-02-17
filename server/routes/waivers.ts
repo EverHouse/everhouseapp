@@ -84,6 +84,12 @@ router.post('/api/waivers/sign', isAuthenticated, async (req, res) => {
       })
       .where(sql`LOWER(${users.email}) = ${sessionUser.email.toLowerCase()}`);
 
+    db.execute(sql`UPDATE users SET onboarding_completed_at = NOW(), updated_at = NOW() 
+      WHERE LOWER(email) = ${sessionUser.email.toLowerCase()} 
+      AND onboarding_completed_at IS NULL 
+      AND first_name IS NOT NULL AND last_name IS NOT NULL AND phone IS NOT NULL
+      AND first_booking_at IS NOT NULL AND app_installed_at IS NOT NULL`).catch(() => {});
+
     res.json({
       success: true,
       version: currentVersion,

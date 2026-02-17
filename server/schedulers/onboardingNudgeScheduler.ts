@@ -18,6 +18,7 @@ async function processOnboardingNudges(): Promise<void> {
       WHERE membership_status IN ('active', 'trialing')
         AND billing_provider = 'stripe'
         AND first_login_at IS NULL
+        AND onboarding_completed_at IS NULL
         AND onboarding_nudge_count < 3
         AND (onboarding_last_nudge_at IS NULL OR onboarding_last_nudge_at < NOW() - INTERVAL '20 hours')
         AND created_at < NOW() - INTERVAL '20 hours'

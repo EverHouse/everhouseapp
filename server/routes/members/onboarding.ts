@@ -4,6 +4,7 @@ import { db } from '../../db';
 import { sql } from 'drizzle-orm';
 import { getSessionUser } from '../../types/session';
 import { logger } from '../../core/logger';
+import { z } from 'zod';
 
 const router = Router();
 
@@ -142,6 +143,57 @@ router.post('/api/member/onboarding/dismiss', isAuthenticated, async (req, res) 
   } catch (error: unknown) {
     logger.error('[onboarding] Failed to dismiss', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to dismiss onboarding' });
+  }
+});
+
+const profileUpdateSchema = z.object({
+  firstName: z.string().min(1).max(100).trim(),
+  lastName: z.string().min(1).max(100).trim(),
+  phone: z.string().min(1).max(30).trim(),
+});
+
+router.put('/api/member/profile', isAuthenticated, async (req, res) => {
+  try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser) return res.status(401).json({ error: 'Authentication required' });
+    
+    const email = sessionUser.email?.toLowerCase();
+    if (!email) return res.status(400).json({ error: 'User email required' });
+
+    const parseResult = profileUpdateSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: 'Invalid profile data. First name, last name, and phone are required.' });
+    }
+
+    const { firstName, lastName, phone } = parseResult.data;
+
+    const result = await db.execute(sql`
+      UPDATE users 
+      SET first_name = ${firstName}, last_name = ${lastName}, phone = ${phone},
+          profile_completed_at = COALESCE(profile_completed_at, NOW()),
+          updated_at = NOW()
+      WHERE LOWER(email) = ${email}
+      RETURNING first_name, last_name, phone, profile_completed_at
+    `);
+
+    const updated = (result as any).rows?.[0];
+    if (!updated) return res.status(404).json({ error: 'User not found' });
+
+    db.execute(sql`UPDATE users SET onboarding_completed_at = NOW(), updated_at = NOW() 
+      WHERE LOWER(email) = ${email} 
+      AND onboarding_completed_at IS NULL 
+      AND first_name IS NOT NULL AND last_name IS NOT NULL AND phone IS NOT NULL
+      AND waiver_signed_at IS NOT NULL AND first_booking_at IS NOT NULL AND app_installed_at IS NOT NULL`).catch(() => {});
+
+    res.json({
+      success: true,
+      firstName: updated.first_name,
+      lastName: updated.last_name,
+      phone: updated.phone,
+    });
+  } catch (error: unknown) {
+    logger.error('[onboarding] Failed to update profile', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to update profile' });
   }
 });
 

@@ -82,6 +82,10 @@ const Profile: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showWaiverModal, setShowWaiverModal] = useState(false);
   const [currentWaiverVersion, setCurrentWaiverVersion] = useState<string>('1.0');
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
 
   const [googleLinking, setGoogleLinking] = useState(false);
   const [googleUnlinking, setGoogleUnlinking] = useState(false);
@@ -254,6 +258,43 @@ const Profile: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['memberPreferences', user?.email] });
     },
   });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: (data: { firstName: string; lastName: string; phone: string }) =>
+      putWithCredentials<{ success: boolean; firstName: string; lastName: string; phone: string }>(
+        '/api/member/profile',
+        data
+      ),
+    onSuccess: async () => {
+      showToast('Profile updated', 'success');
+      setEditingProfile(false);
+      await refreshUser();
+      queryClient.invalidateQueries({ queryKey: ['memberOnboarding'] });
+    },
+    onError: (err: Error) => {
+      showToast((err instanceof Error ? err.message : String(err)) || 'Failed to update profile', 'error');
+    },
+  });
+
+  const handleStartEdit = () => {
+    const nameParts = (user.name || '').split(' ');
+    setEditFirstName(nameParts[0] || '');
+    setEditLastName(nameParts.slice(1).join(' ') || '');
+    setEditPhone(user.phone || '');
+    setEditingProfile(true);
+  };
+
+  const handleSaveProfile = () => {
+    if (!editFirstName.trim() || !editLastName.trim() || !editPhone.trim()) {
+      showToast('All fields are required', 'error');
+      return;
+    }
+    updateProfileMutation.mutate({
+      firstName: editFirstName.trim(),
+      lastName: editLastName.trim(),
+      phone: editPhone.trim(),
+    });
+  };
 
   const handlePreferenceToggle = (type: 'email' | 'sms', newValue: boolean) => {
     if (!user?.email || updatePreferencesMutation.isPending) return;
@@ -429,9 +470,97 @@ const Profile: React.FC = () => {
          )}
 
          <Section title="Account" isDark={isDark} staggerIndex={1}>
-            <Row icon="person" label="Name" value={user.name} isDark={isDark} />
-            <Row icon="mail" label="Email" value={user.email} isDark={isDark} />
-            <Row icon="call" label="Phone" value={formatPhoneNumber(staffDetails?.phone || user.phone)} isDark={isDark} />
+            {editingProfile ? (
+              <div className="p-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`text-xs font-medium mb-1 block ${isDark ? 'opacity-70' : 'text-primary/70'}`}>First Name</label>
+                    <input
+                      type="text"
+                      value={editFirstName}
+                      onChange={(e) => setEditFirstName(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl text-sm border transition-colors ${
+                        isDark 
+                          ? 'bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-white/40' 
+                          : 'bg-white border-black/10 text-primary placeholder:text-primary/40 focus:border-primary/40'
+                      } outline-none`}
+                      placeholder="First name"
+                    />
+                  </div>
+                  <div>
+                    <label className={`text-xs font-medium mb-1 block ${isDark ? 'opacity-70' : 'text-primary/70'}`}>Last Name</label>
+                    <input
+                      type="text"
+                      value={editLastName}
+                      onChange={(e) => setEditLastName(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl text-sm border transition-colors ${
+                        isDark 
+                          ? 'bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-white/40' 
+                          : 'bg-white border-black/10 text-primary placeholder:text-primary/40 focus:border-primary/40'
+                      } outline-none`}
+                      placeholder="Last name"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className={`text-xs font-medium mb-1 block ${isDark ? 'opacity-70' : 'text-primary/70'}`}>Phone</label>
+                  <input
+                    type="tel"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl text-sm border transition-colors ${
+                      isDark 
+                        ? 'bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-white/40' 
+                        : 'bg-white border-black/10 text-primary placeholder:text-primary/40 focus:border-primary/40'
+                    } outline-none`}
+                    placeholder="(555) 123-4567"
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={handleSaveProfile}
+                    disabled={updateProfileMutation.isPending}
+                    className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-colors ${
+                      updateProfileMutation.isPending ? 'opacity-50 cursor-not-allowed' : ''
+                    } bg-primary text-white hover:bg-primary/90`}
+                  >
+                    {updateProfileMutation.isPending ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => setEditingProfile(false)}
+                    disabled={updateProfileMutation.isPending}
+                    className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-colors ${
+                      isDark 
+                        ? 'bg-white/10 text-white hover:bg-white/20' 
+                        : 'bg-black/5 text-primary hover:bg-black/10'
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <Row icon="person" label="Name" value={user.name} isDark={isDark} />
+                <Row icon="mail" label="Email" value={user.email} isDark={isDark} />
+                <Row icon="call" label="Phone" value={formatPhoneNumber(staffDetails?.phone || user.phone)} isDark={isDark} />
+                {!isStaffOrAdminProfile && (
+                  <div className="p-3 flex justify-end">
+                    <button
+                      onClick={handleStartEdit}
+                      className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                        isDark 
+                          ? 'bg-white/10 text-white hover:bg-white/20' 
+                          : 'bg-primary/10 text-primary hover:bg-primary/20'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-base">edit</span>
+                      Edit Profile
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
          </Section>
 
          {/* Account Balance Section - only for members, not staff/admin */}
