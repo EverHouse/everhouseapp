@@ -775,7 +775,7 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
           }
           
           // IDEMPOTENCY: Check existing usage and handle ownership
-          const existingUsage = await db.execute(sql`SELECT id, member_id FROM usage_ledger WHERE session_id = ${sessionId} AND (guest_fee IS NULL OR guest_fee = 0) LIMIT 1`);
+          const existingUsage = await db.execute(sql`SELECT id, member_id FROM usage_ledger WHERE session_id = ${sessionId} AND (guest_fee IS NULL OR guest_fee = 0) AND source = 'trackman_import' LIMIT 1`);
           
           if (existingUsage.rows.length === 0) {
             await recordUsage(sessionId, {
@@ -787,7 +787,7 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
             // OWNERSHIP CORRECTION: If existing usage belongs to a different member, update it
             const existingMemberId = (existingUsage.rows[0] as any).member_id;
             if (existingMemberId !== member.id) {
-              await db.execute(sql`UPDATE usage_ledger SET member_id = ${member.id} WHERE session_id = ${sessionId} AND (guest_fee IS NULL OR guest_fee = 0)`);
+              await db.execute(sql`UPDATE usage_ledger SET member_id = ${member.id} WHERE session_id = ${sessionId} AND (guest_fee IS NULL OR guest_fee = 0) AND source = 'trackman_import'`);
               logger.info('[Trackman Resolve] Corrected usage ownership: -> for session', { extra: { existingMemberId, memberId: member.id, sessionId } });
             } else {
               logger.info('[Trackman Resolve] Session already has correct usage ledger, skipping', { extra: { sessionId } });
