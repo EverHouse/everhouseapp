@@ -84,6 +84,7 @@ const AdminDashboard: React.FC = () => {
       case 'team': return 'Team';
       case 'faqs': return 'FAQs';
       case 'inquiries': return 'Inquiries';
+      case 'applications': return 'Applications';
       case 'gallery': return 'Gallery';
       case 'tiers': return 'Products & Pricing';
       case 'blocks': return 'Facility';

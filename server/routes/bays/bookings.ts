@@ -871,6 +871,9 @@ router.post('/api/booking-requests', async (req, res) => {
       reschedule_booking_id: row.rescheduleBookingId
     });
     
+    // Track first booking for onboarding (async, non-blocking)
+    db.execute(sql`UPDATE users SET first_booking_at = NOW(), updated_at = NOW() WHERE LOWER(email) = LOWER(${row.userEmail}) AND first_booking_at IS NULL`).catch(() => {});
+
     // All post-commit operations are now AFTER the response is sent
     // Wrap in try/catch so any failures don't crash the server
     try {

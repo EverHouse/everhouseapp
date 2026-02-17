@@ -163,9 +163,13 @@ const Profile: React.FC = () => {
   }, [user?.email, queryClient]);
 
   useEffect(() => {
-    const state = location.state as { showPasswordSetup?: boolean } | null;
+    const state = location.state as { showPasswordSetup?: boolean; showWaiver?: boolean } | null;
     if (state?.showPasswordSetup && isStaffOrAdminProfile) {
       setShowPasswordSetupBanner(true);
+      window.history.replaceState({}, document.title);
+    }
+    if (state?.showWaiver) {
+      setShowWaiverModal(true);
       window.history.replaceState({}, document.title);
     }
   }, [location.state, isStaffOrAdminProfile]);

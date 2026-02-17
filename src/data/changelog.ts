@@ -13,6 +13,22 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.64.0",
+    date: "2026-02-17",
+    title: "Member Onboarding Overhaul",
+    isMajor: true,
+    changes: [
+      "New: Onboarding Checklist on the dashboard guides new members through 4 key steps — complete profile, sign waiver, book first session, and install the app",
+      "New: First-login welcome modal greets new members with quick-start actions on their first sign-in",
+      "New: Dashboard empty states now show helpful messages and action buttons instead of blank sections",
+      "New: Automated email nudge sequence sends friendly reminders to members who haven't logged in (at 24 hours, 3 days, and 7 days)",
+      "New: Application Pipeline admin view at /admin/applications lets staff track membership applications from inquiry through checkout invitation",
+      "New: Staff can now send checkout invitations directly from the application pipeline with tier selection",
+      "Improved: First login and first booking are now tracked automatically to measure member activation",
+      "Improved: Waiver CTA in welcome modal now opens the waiver signing modal directly",
+    ]
+  },
+  {
     version: "7.63.5",
     date: "2026-02-17",
     title: "Billing Security Audit — Final Hardening",

@@ -192,11 +192,38 @@ router.get('/api/checkout/session/:sessionId', checkoutRateLimiter, async (req, 
     
     const stripe = await getStripeClient();
     
-    const session = await stripe.checkout.sessions.retrieve(sessionId as string) as any;
+    const session = await stripe.checkout.sessions.retrieve(sessionId as string, { expand: ['customer'] }) as any;
     
+    const customerEmail = session.customer_details?.email || (session.customer as any)?.email || null;
+    const metadata = session.metadata || {};
+    
+    let tierName: string | null = null;
+    if (metadata.tier_slug) {
+      const [tierData] = await db
+        .select({ name: membershipTiers.name })
+        .from(membershipTiers)
+        .where(eq(membershipTiers.slug, metadata.tier_slug))
+        .limit(1);
+      tierName = tierData?.name || null;
+    }
+
+    let accountReady = false;
+    if (customerEmail) {
+      const [existingUser] = await db
+        .select({ membershipStatus: users.membershipStatus })
+        .from(users)
+        .where(sql`LOWER(${users.email}) = ${customerEmail.toLowerCase()}`)
+        .limit(1);
+      accountReady = !!existingUser && existingUser.membershipStatus !== 'pending';
+    }
+
     res.json({
       status: session.status,
       paymentStatus: session.payment_status,
+      customerEmail,
+      metadata,
+      tierName,
+      accountReady,
     });
   } catch (error: unknown) {
     logger.error('[Checkout] Session retrieval error', { error: error instanceof Error ? error : new Error(String(error)) });

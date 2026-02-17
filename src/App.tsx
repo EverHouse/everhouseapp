@@ -138,6 +138,7 @@ const FinancialsTab = lazy(() => import('./pages/Admin/tabs/FinancialsTab'));
 const GalleryAdmin = lazy(() => import('./pages/Admin/GalleryAdmin'));
 const FaqsAdmin = lazy(() => import('./pages/Admin/FaqsAdmin'));
 const InquiriesAdmin = lazy(() => import('./pages/Admin/InquiriesAdmin'));
+const ApplicationPipeline = lazy(() => import('./pages/Admin/ApplicationPipeline'));
 const BugReportsAdmin = lazy(() => import('./pages/Admin/BugReportsAdmin'));
 const SettingsTab = lazy(() => import('./pages/Admin/tabs/SettingsTab'));
 const ChangelogTab = lazy(() => import('./pages/Admin/tabs/ChangelogTab'));
@@ -402,6 +403,7 @@ const AnimatedRoutes: React.FC = () => {
               <Route path="gallery" element={<PageErrorBoundary pageName="Gallery"><GalleryAdmin /></PageErrorBoundary>} />
               <Route path="faqs" element={<PageErrorBoundary pageName="FAQs"><FaqsAdmin /></PageErrorBoundary>} />
               <Route path="inquiries" element={<PageErrorBoundary pageName="Inquiries"><InquiriesAdmin /></PageErrorBoundary>} />
+              <Route path="applications" element={<PageErrorBoundary pageName="ApplicationPipeline"><ApplicationPipeline /></PageErrorBoundary>} />
               <Route path="bugs" element={<PageErrorBoundary pageName="BugReports"><BugReportsAdmin /></PageErrorBoundary>} />
               <Route path="settings" element={<PageErrorBoundary pageName="Settings"><SettingsTab /></PageErrorBoundary>} />
               <Route path="changelog" element={<PageErrorBoundary pageName="Changelog"><ChangelogTab /></PageErrorBoundary>} />

@@ -9,7 +9,7 @@ import { useNavigationLoading } from '../../contexts/NavigationLoadingContext';
 import { useToast } from '../../components/Toast';
 import { bookingEvents } from '../../lib/bookingEvents';
 import GlassRow from '../../components/GlassRow';
-import WelcomeBanner from '../../components/WelcomeBanner';
+import OnboardingChecklist from '../../components/OnboardingChecklist';
 import { formatDateShort, getTodayString, getPacificHour, CLUB_TIMEZONE, formatDateTimePacific, formatMemberSince, formatTime12Hour, getNowTimePacific } from '../../utils/dateUtils';
 import { downloadICalFile } from '../../utils/icalUtils';
 import { DashboardSkeleton } from '../../components/skeletons';
@@ -31,6 +31,7 @@ import MetricsGrid from '../../components/MetricsGrid';
 import { RosterManager } from '../../components/booking';
 import { apiRequest } from '../../lib/apiRequest';
 import { AnimatedPage } from '../../components/motion';
+import FirstLoginWelcomeModal from '../../components/FirstLoginWelcomeModal';
 
 const GUEST_CHECKIN_FIELDS = [
   { name: 'guest_firstname', label: 'Guest First Name', type: 'text' as const, required: true, placeholder: 'John' },
@@ -179,6 +180,7 @@ const Dashboard: React.FC = () => {
   const [optimisticInviteAction, setOptimisticInviteAction] = useState<{ id: number; action: 'accepting' | 'declining' } | null>(null);
   const [overagePaymentBooking, setOveragePaymentBooking] = useState<{ id: number; amount: number; minutes: number } | null>(null);
   const [isPayingOverage, setIsPayingOverage] = useState(false);
+  const [showFirstLoginModal, setShowFirstLoginModal] = useState(false);
 
   const isStaffOrAdminProfile = user?.role === 'admin' || user?.role === 'staff';
   const { permissions: tierPermissions } = useTierPermissions(user?.tier);
@@ -248,6 +250,16 @@ const Dashboard: React.FC = () => {
       }
     }
   }, [user?.email, bannerAnnouncement]);
+
+  useEffect(() => {
+    if (user?.email) {
+      const key = `eh_first_login_shown_${user.email}`;
+      if (!localStorage.getItem(key)) {
+        setShowFirstLoginModal(true);
+        localStorage.setItem(key, 'true');
+      }
+    }
+  }, [user?.email]);
 
   const handleRefresh = useCallback(async () => {
     refetchAllData();
@@ -869,7 +881,7 @@ const Dashboard: React.FC = () => {
           </div>
         )}
         
-        <WelcomeBanner />
+        <OnboardingChecklist />
         
         <div className="mb-6 animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
           <div className="flex items-center gap-3">
@@ -1254,16 +1266,44 @@ const Dashboard: React.FC = () => {
                   </React.Fragment>
                 );
               }) : (
-                <div className="flex flex-col items-center justify-center text-center py-8 px-6 animate-pop-in">
-                  <div className="relative mb-4">
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center relative ${isDark ? 'bg-lavender/20' : 'bg-gradient-to-br from-brand-bone to-secondary'}`}>
-                      <span className={`material-symbols-outlined text-3xl ${isDark ? 'text-lavender' : 'text-primary/80'}`}>calendar_month</span>
+                <div className="space-y-4 animate-pop-in">
+                  <div className={`flex flex-col items-center justify-center text-center py-6 px-6 rounded-2xl ${isDark ? 'bg-white/5' : 'bg-primary/[0.03]'}`}>
+                    <div className="relative mb-3">
+                      <div className={`w-14 h-14 rounded-full flex items-center justify-center ${isDark ? 'bg-accent/20' : 'bg-accent/10'}`}>
+                        <span className={`material-symbols-outlined text-2xl ${isDark ? 'text-accent' : 'text-brand-green'}`}>sports_golf</span>
+                      </div>
+                    </div>
+                    <h4 className={`text-base font-semibold mb-1 ${isDark ? 'text-white' : 'text-primary'}`}>No upcoming bookings</h4>
+                    <p className={`text-xs max-w-[260px] mb-3 ${isDark ? 'text-white/50' : 'text-primary/50'}`}>
+                      Ready to play? Book a golf simulator session.
+                    </p>
+                    <button
+                      onClick={() => { startNavigation(); navigate('/book'); }}
+                      className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] ${isDark ? 'bg-accent text-brand-green' : 'bg-brand-green text-white'}`}
+                    >
+                      Book a Session
+                    </button>
+                  </div>
+
+                  <div className={`flex items-center gap-3 py-4 px-5 rounded-2xl ${isDark ? 'bg-white/5' : 'bg-primary/[0.03]'}`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isDark ? 'bg-lavender/20' : 'bg-lavender/10'}`}>
+                      <span className={`material-symbols-outlined text-xl ${isDark ? 'text-lavender' : 'text-primary/70'}`}>event</span>
+                    </div>
+                    <div>
+                      <p className={`text-sm font-medium ${isDark ? 'text-white' : 'text-primary'}`}>No upcoming events</p>
+                      <p className={`text-xs ${isDark ? 'text-white/50' : 'text-primary/50'}`}>Check back soon for club events and activities.</p>
                     </div>
                   </div>
-                  <h3 className={`text-lg font-semibold mb-1 ${isDark ? 'text-white' : 'text-primary'}`}>Nothing scheduled</h3>
-                  <p className={`text-sm max-w-[280px] ${isDark ? 'text-white/60' : 'text-primary/60'}`}>
-                    Book a simulator, RSVP to events, or enroll in wellness classes.
-                  </p>
+
+                  <div className={`flex items-center gap-3 py-4 px-5 rounded-2xl ${isDark ? 'bg-white/5' : 'bg-primary/[0.03]'}`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isDark ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
+                      <span className={`material-symbols-outlined text-xl ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>how_to_reg</span>
+                    </div>
+                    <div>
+                      <p className={`text-sm font-medium ${isDark ? 'text-white' : 'text-primary'}`}>No RSVPs yet</p>
+                      <p className={`text-xs ${isDark ? 'text-white/50' : 'text-primary/50'}`}>RSVP to events to see them here.</p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -1526,6 +1566,12 @@ const Dashboard: React.FC = () => {
         );
       })()}
     </ModalShell>
+
+    <FirstLoginWelcomeModal
+      isOpen={showFirstLoginModal}
+      onClose={() => setShowFirstLoginModal(false)}
+      firstName={user?.name?.split(' ')[0]}
+    />
     </>
   )}
     </div>

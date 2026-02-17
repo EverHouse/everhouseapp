@@ -22,6 +22,7 @@ import { startRelocationCleanupScheduler } from './relocationCleanupScheduler';
 import { startStuckCancellationScheduler } from './stuckCancellationScheduler';
 import { startPendingUserCleanupScheduler } from './pendingUserCleanupScheduler';
 import { startWebhookEventCleanupScheduler } from './webhookEventCleanupScheduler';
+import { startOnboardingNudgeScheduler } from './onboardingNudgeScheduler';
 import { startJobProcessor, stopJobProcessor } from '../core/jobQueue';
 import { schedulerTracker } from '../core/schedulerTracker';
 
@@ -52,6 +53,7 @@ export function initSchedulers(): void {
   schedulerTracker.registerScheduler('Stuck Cancellation', 2 * 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Pending User Cleanup', 6 * 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Webhook Event Cleanup', 24 * 60 * 60 * 1000);
+  schedulerTracker.registerScheduler('Onboarding Nudge', 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Job Queue Processor', 5000);
 
   startBackgroundSyncScheduler();
@@ -78,6 +80,7 @@ export function initSchedulers(): void {
   startStuckCancellationScheduler();
   startPendingUserCleanupScheduler();
   startWebhookEventCleanupScheduler();
+  startOnboardingNudgeScheduler();
   startJobProcessor(5000);
 }
 

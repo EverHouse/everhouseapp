@@ -1016,6 +1016,9 @@ router.post('/api/auth/verify-otp', async (req, res) => {
       role
     });
     
+    // Track first login for onboarding (async, non-blocking)
+    db.execute(sql`UPDATE users SET first_login_at = NOW(), updated_at = NOW() WHERE LOWER(email) = LOWER(${member.email}) AND first_login_at IS NULL`).catch(() => {});
+
     // Send welcome email on first login (async, non-blocking)
     (async () => {
       try {
@@ -1238,6 +1241,9 @@ router.post('/api/auth/password-login', async (req, res) => {
       role: userRole
     });
     
+    // Track first login for onboarding (async, non-blocking)
+    db.execute(sql`UPDATE users SET first_login_at = NOW(), updated_at = NOW() WHERE LOWER(email) = LOWER(${member.email}) AND first_login_at IS NULL`).catch(() => {});
+
     req.session.save((err) => {
       if (err) {
         if (!isProduction) logger.error('Session save error', { extra: { err } });
@@ -1342,6 +1348,9 @@ router.post('/api/auth/dev-login', async (req, res) => {
 
     const supabaseToken = await createSupabaseToken({ ...member, email: member.email as string });
     
+    // Track first login for onboarding (async, non-blocking)
+    db.execute(sql`UPDATE users SET first_login_at = NOW(), updated_at = NOW() WHERE LOWER(email) = LOWER(${member.email}) AND first_login_at IS NULL`).catch(() => {});
+
     req.session.save((err) => {
       if (err) {
         if (!isProduction) logger.error('Session save error', { extra: { err } });

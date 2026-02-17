@@ -38,6 +38,7 @@ const ADMIN_ITEMS: NavItem[] = [
   { id: 'gallery', icon: 'photo_library', label: 'Gallery' },
   { id: 'faqs', icon: 'help_outline', label: 'FAQs' },
   { id: 'inquiries', icon: 'mail', label: 'Inquiries' },
+  { id: 'applications', icon: 'how_to_reg', label: 'Applications' },
   { id: 'bugs', icon: 'bug_report', label: 'Bug Reports' },
   { id: 'email-templates', icon: 'forward_to_inbox', label: 'Email Templates' },
   { id: 'changelog', icon: 'history', label: 'Changelog' },

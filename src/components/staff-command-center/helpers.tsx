@@ -135,6 +135,7 @@ export const ADMIN_LINKS = [
   { id: 'tiers' as const, icon: 'loyalty', label: 'Stripe Config' },
   { id: 'bugs' as const, icon: 'bug_report', label: 'Bug Reports' },
   { id: 'inquiries' as const, icon: 'mail', label: 'Inquiries' },
+  { id: 'applications' as const, icon: 'how_to_reg', label: 'Applications' },
   { id: 'changelog' as const, icon: 'history', label: 'Version History' },
 ];
 

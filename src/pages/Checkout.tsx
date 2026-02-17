@@ -659,6 +659,9 @@ function CheckoutSuccess() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [customerEmail, setCustomerEmail] = useState<string | null>(null);
   const [purchaseType, setPurchaseType] = useState<'membership' | 'day_pass' | null>(null);
+  const [accountReady, setAccountReady] = useState(false);
+  const [pollingDone, setPollingDone] = useState(false);
+  const [tierName, setTierName] = useState<string | null>(null);
 
   useEffect(() => {
     if (!sessionId) {
@@ -670,15 +673,25 @@ function CheckoutSuccess() {
       try {
         const res = await fetch(`/api/checkout/session/${sessionId}`);
         if (!res.ok) throw new Error('Failed to fetch session');
-        
+
         const data = await res.json();
-        setCustomerEmail(data.customerEmail);
-        setStatus(data.status === 'complete' ? 'success' : 'error');
-        
+        setCustomerEmail(data.customerEmail || null);
+        setTierName(data.tierName || null);
+
         if (data.metadata?.purpose === 'day_pass') {
           setPurchaseType('day_pass');
         } else {
           setPurchaseType('membership');
+        }
+
+        if (data.status === 'complete') {
+          setStatus('success');
+          if (data.accountReady) {
+            setAccountReady(true);
+            setPollingDone(true);
+          }
+        } else {
+          setStatus('error');
         }
       } catch {
         setStatus('error');
@@ -687,6 +700,34 @@ function CheckoutSuccess() {
 
     fetchSession();
   }, [sessionId]);
+
+  useEffect(() => {
+    if (status !== 'success' || purchaseType !== 'membership' || accountReady || !sessionId) return;
+
+    let attempts = 0;
+    const maxAttempts = 15;
+    const interval = setInterval(async () => {
+      attempts++;
+      try {
+        const res = await fetch(`/api/checkout/session/${sessionId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.accountReady) {
+            setAccountReady(true);
+            setPollingDone(true);
+            clearInterval(interval);
+            return;
+          }
+        }
+      } catch {}
+      if (attempts >= maxAttempts) {
+        setPollingDone(true);
+        clearInterval(interval);
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [status, purchaseType, accountReady, sessionId]);
 
   if (status === 'loading') {
     return (
@@ -756,20 +797,79 @@ function CheckoutSuccess() {
       <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
         <span className="material-symbols-outlined text-5xl text-emerald-600 dark:text-emerald-400">check_circle</span>
       </div>
-      <h2 className="text-3xl font-bold text-primary dark:text-white mb-2">Welcome to EverClub!</h2>
-      <p className="text-primary/70 dark:text-white/70 text-lg mb-2">Your membership is now active.</p>
+      <h2 className="text-3xl font-bold text-primary dark:text-white mb-2">Welcome to Ever Club!</h2>
+      <p className="text-primary/70 dark:text-white/70 text-lg mb-2">
+        Your {tierName || 'membership'} is now active.
+      </p>
       {customerEmail && (
-        <p className="text-primary/60 dark:text-white/60 mb-8">A confirmation has been sent to {customerEmail}</p>
+        <p className="text-primary/60 dark:text-white/60 mb-2">A confirmation has been sent to {customerEmail}</p>
       )}
-      <div className="flex flex-col sm:flex-row gap-4 justify-center">
-        <a
-          href="/#/login"
-          className="inline-flex items-center justify-center gap-2 py-3 px-8 rounded-xl font-semibold bg-accent text-brand-green hover:opacity-90 transition-opacity"
-        >
-          <span className="material-symbols-outlined">login</span>
-          Sign In to Your Account
-        </a>
+
+      {!pollingDone && !accountReady && (
+        <div className="flex items-center justify-center gap-2 text-sm text-primary/60 dark:text-white/60 mb-6">
+          <div className="animate-spin rounded-full h-4 w-4 border-2 border-accent border-t-transparent" />
+          Setting up your account...
+        </div>
+      )}
+
+      <div className="glass-card rounded-2xl p-6 max-w-md mx-auto mb-8 text-left backdrop-blur-xl bg-white/40 dark:bg-white/5 border border-white/30 dark:border-white/10">
+        <h3 className="font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
+          <span className="material-symbols-outlined text-accent">rocket_launch</span>
+          What's Next
+        </h3>
+        <ul className="space-y-4">
+          <li className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="material-symbols-outlined text-accent text-lg">login</span>
+            </div>
+            <div>
+              <p className="font-medium text-primary dark:text-white text-sm">Sign in to your account</p>
+              <p className="text-primary/60 dark:text-white/60 text-xs">A login code will be sent to your email</p>
+            </div>
+          </li>
+          <li className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="material-symbols-outlined text-accent text-lg">sports_golf</span>
+            </div>
+            <div>
+              <p className="font-medium text-primary dark:text-white text-sm">Book your first simulator session</p>
+              <p className="text-primary/60 dark:text-white/60 text-xs">Browse available times from your dashboard</p>
+            </div>
+          </li>
+          <li className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="material-symbols-outlined text-accent text-lg">person</span>
+            </div>
+            <div>
+              <p className="font-medium text-primary dark:text-white text-sm">Complete your profile</p>
+              <p className="text-primary/60 dark:text-white/60 text-xs">Add your photo and preferences</p>
+            </div>
+          </li>
+          <li className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="material-symbols-outlined text-accent text-lg">install_mobile</span>
+            </div>
+            <div>
+              <p className="font-medium text-primary dark:text-white text-sm">Install the app</p>
+              <p className="text-primary/60 dark:text-white/60 text-xs">Add to your home screen for quick access</p>
+            </div>
+          </li>
+        </ul>
       </div>
+
+      <a
+        href="/#/login"
+        className="inline-flex items-center justify-center gap-2 py-3 px-8 rounded-xl font-semibold bg-accent text-brand-green hover:opacity-90 transition-opacity"
+      >
+        <span className="material-symbols-outlined">login</span>
+        Sign In to Your Account
+      </a>
+
+      {pollingDone && !accountReady && (
+        <p className="text-primary/50 dark:text-white/50 text-xs mt-4 max-w-sm mx-auto">
+          Your account is being set up. If you can't sign in right away, try again in a minute.
+        </p>
+      )}
     </div>
   );
 }
