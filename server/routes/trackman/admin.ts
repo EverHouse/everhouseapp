@@ -2060,7 +2060,7 @@ router.post('/api/admin/booking/:id/guests', isStaffOrAdmin, async (req, res) =>
       }
     }
     
-    const bookingResult = await db.execute(sql`SELECT b.*, u.id as owner_id FROM bookings b 
+    const bookingResult = await db.execute(sql`SELECT b.*, u.id as owner_id FROM booking_requests b 
        LEFT JOIN users u ON LOWER(u.email) = LOWER(b.user_email) 
        WHERE b.id = ${bookingId}`);
     if (bookingResult.rowCount === 0) {
@@ -2081,9 +2081,9 @@ router.post('/api/admin/booking/:id/guests', isStaffOrAdmin, async (req, res) =>
     const ownerEmail = (bookingResult.rows[0] as any).user_email;
     let guestPassesRemaining = 0;
     if (ownerEmail) {
-      const passesResult = await db.execute(sql`SELECT guest_passes_remaining FROM users WHERE LOWER(email) = LOWER(${ownerEmail})`);
+      const passesResult = await db.execute(sql`SELECT passes_total - passes_used as remaining FROM guest_passes WHERE LOWER(member_email) = LOWER(${ownerEmail})`);
       if (passesResult.rowCount && passesResult.rowCount > 0) {
-        guestPassesRemaining = (passesResult.rows[0] as any).guest_passes_remaining || 0;
+        guestPassesRemaining = (passesResult.rows[0] as any).remaining || 0;
       }
     }
     
