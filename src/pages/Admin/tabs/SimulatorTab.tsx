@@ -299,7 +299,7 @@ const SimulatorTab: React.FC = () => {
                             bookingId: booking.id,
                             mode: isUnmatched ? 'assign' as const : 'manage' as const,
                             bayName: booking.bay_name || booking.resource_name,
-                            bookingDate: formatDateShortAdmin(booking.request_date),
+                            bookingDate: booking.request_date,
                             timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
                             matchedBookingId: Number(booking.id),
                             currentMemberName: isUnmatched ? undefined : (booking.user_name || undefined),

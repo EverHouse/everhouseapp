@@ -10,7 +10,7 @@ import { useBottomNav } from '../../contexts/BottomNavContext';
 import { useIsMobile } from '../../hooks/useBreakpoint';
 import PullToRefresh from '../PullToRefresh';
 import { useToast } from '../Toast';
-import { getTodayPacific, formatTime12Hour, formatDateShort } from '../../utils/dateUtils';
+import { getTodayPacific, formatTime12Hour } from '../../utils/dateUtils';
 import { StaffCommandCenterSkeleton } from '../skeletons';
 import { AnimatedPage } from '../motion';
 import { useStaffWebSocketContext } from '../../contexts/StaffWebSocketContext';
@@ -619,7 +619,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
                 isOpen: true,
                 trackmanBookingId: booking.trackman_booking_id || null,
                 bayName: booking.bay_name || `Bay ${booking.resource_id}`,
-                bookingDate: formatDateShort(booking.request_date || booking.slot_date),
+                bookingDate: booking.request_date || booking.slot_date,
                 timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
                 matchedBookingId: Number(booking.id),
                 isRelink: false,
@@ -665,7 +665,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
                 isOpen: true,
                 trackmanBookingId: booking.trackman_booking_id || null,
                 bayName: booking.bay_name || `Bay ${booking.resource_id}`,
-                bookingDate: formatDateShort(booking.request_date || booking.slot_date),
+                bookingDate: booking.request_date || booking.slot_date,
                 timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
                 matchedBookingId: Number(booking.id),
                 isRelink: false,
@@ -754,7 +754,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
                 isOpen: true,
                 trackmanBookingId: booking.trackman_booking_id || null,
                 bayName: booking.bay_name || `Bay ${booking.resource_id}`,
-                bookingDate: formatDateShort(booking.request_date || booking.slot_date),
+                bookingDate: booking.request_date || booking.slot_date,
                 timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
                 matchedBookingId: Number(booking.id),
                 isRelink: false,

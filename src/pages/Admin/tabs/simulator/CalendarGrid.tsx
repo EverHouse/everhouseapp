@@ -429,7 +429,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                 bookingId: booking.id,
                                                 mode: isUnmatched ? 'assign' as const : 'manage' as const,
                                                 bayName: resource.type === 'conference_room' ? 'Conference Room' : resource.name,
-                                                bookingDate: formatDateShortAdmin(booking.request_date),
+                                                bookingDate: booking.request_date,
                                                 timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
                                                 matchedBookingId: Number(booking.id),
                                                 currentMemberName: isUnmatched ? undefined : ((booking as any).user_name || undefined),

@@ -1,6 +1,18 @@
 import { BookingContextType, ManageModeRosterData, FetchedContext } from './bookingSheetTypes';
 import TrackmanIcon from '../../icons/TrackmanIcon';
 
+const formatDateForDisplay = (dateStr: string): string => {
+  if (!dateStr) return 'No Date';
+  const datePart = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+  try {
+    const [y, m, d] = datePart.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  } catch {
+    return dateStr;
+  }
+};
+
 interface SheetHeaderProps {
   isManageMode: boolean;
   isConferenceRoom: boolean;
@@ -67,7 +79,7 @@ export function SheetHeader({
             {(bookingContext?.requestDate || bookingDate || fetchedContext?.bookingDate) && (
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary/60 dark:text-white/60 text-base">calendar_today</span>
-                <span className="text-primary/80 dark:text-white/80">{bookingContext?.requestDate || bookingDate || fetchedContext?.bookingDate}</span>
+                <span className="text-primary/80 dark:text-white/80">{formatDateForDisplay(bookingContext?.requestDate || bookingDate || fetchedContext?.bookingDate || '')}</span>
               </div>
             )}
             {(bookingContext?.startTime && bookingContext?.endTime) ? (
@@ -190,7 +202,7 @@ export function SheetHeader({
             {bookingDate && (
               <p className="flex items-center gap-1">
                 <span className="material-symbols-outlined text-sm">calendar_today</span>
-                {bookingDate}
+                {formatDateForDisplay(bookingDate)}
               </p>
             )}
             {timeSlot && (
@@ -222,7 +234,7 @@ export function SheetHeader({
             {bookingDate && (
               <p className="flex items-center gap-1">
                 <span className="material-symbols-outlined text-sm">calendar_today</span>
-                {bookingDate}
+                {formatDateForDisplay(bookingDate)}
               </p>
             )}
             {timeSlot && (
