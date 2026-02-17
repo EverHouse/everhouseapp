@@ -39,15 +39,22 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
     }
 
     if (trackman_id) {
-      const [duplicate] = await db.select({ id: bookingRequests.id })
+      const [duplicate] = await db.select({ id: bookingRequests.id, status: bookingRequests.status })
         .from(bookingRequests)
         .where(eq(bookingRequests.trackmanBookingId, trackman_id))
         .limit(1);
       
       if (duplicate) {
-        return res.status(409).json({ 
-          error: `Trackman Booking ID ${trackman_id} is already linked to another booking (#${duplicate.id}). Each Trackman booking can only be linked once.` 
-        });
+        const terminalStatuses = ['cancelled', 'cancellation_pending', 'declined', 'no_show'];
+        if (terminalStatuses.includes(duplicate.status || '')) {
+          await db.update(bookingRequests)
+            .set({ trackmanBookingId: null })
+            .where(eq(bookingRequests.id, duplicate.id));
+        } else {
+          return res.status(409).json({ 
+            error: `Trackman Booking ID ${trackman_id} is already linked to another booking (#${duplicate.id}). Each Trackman booking can only be linked once.` 
+          });
+        }
       }
     }
 
