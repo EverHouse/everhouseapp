@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.65.0",
+    date: "2026-02-17",
+    title: "Data Integrity & Zombie Member Prevention",
+    changes: [
+      "New: Permanently deleted members are now blocked from being re-created by external sync systems — they stay deleted",
+      "New: Automated data integrity checks run daily and auto-fix common issues (billing provider gaps, case-inconsistent statuses, staff role mismatches)",
+      "New: Calendar sync retry logic — temporary failures retry once before alerting, reducing false alarm notifications",
+      "Fixed: 3 zombie test members (nick+astoria, adam+core, jack+testcore) that kept reappearing have been permanently removed and blocked",
+      "Fixed: Onboarding checklist now properly tracks waiver signing, first booking, and profile completion",
+      "Improved: HubSpot form sync errors are now handled quietly when they're just permission issues",
+      "Improved: Payment reconciliation now has timeout protection to prevent stuck processes",
+    ]
+  },
+  {
     version: "7.64.0",
     date: "2026-02-17",
     title: "Member Onboarding Overhaul",
