@@ -46,7 +46,9 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
       console.log(`[Stripe Subscriptions] Applying coupon ${couponId} to subscription`);
     }
     
-    const subscription = await stripe.subscriptions.create(subscriptionParams);
+    const subscription = await stripe.subscriptions.create(subscriptionParams, {
+      idempotencyKey: `sub_create_${customerId}_${priceId}_${couponId || 'none'}`
+    });
     
     const invoice = (subscription as any).latest_invoice as Stripe.Invoice;
     let paymentIntent = (invoice as any)?.payment_intent as Stripe.PaymentIntent | null;
@@ -93,6 +95,8 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
             ...(metadata?.userId ? { userId: metadata.userId } : {}),
             ...(metadata?.memberEmail ? { email: metadata.memberEmail } : {}),
           },
+        }, {
+          idempotencyKey: `sub_pi_${subscription.id}_${invoice.id}_${invoice.amount_due}`
         });
         
         paymentIntent = newPaymentIntent;

@@ -13,6 +13,14 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.63.4",
+    date: "2026-02-17",
+    title: "Complete Billing Idempotency Coverage",
+    changes: [
+      "Fixed: Subscription creation and its fallback payment intent now include idempotency keys — prevents duplicate subscriptions or charges during signup retries",
+    ]
+  },
+  {
     version: "7.63.3",
     date: "2026-02-17",
     title: "Refund Safety & Complete Billing Hardening",

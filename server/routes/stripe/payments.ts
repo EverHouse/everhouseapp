@@ -1409,7 +1409,7 @@ router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, async (re
         productId: productId || ''
       }
     }, {
-      idempotencyKey: `pos_saved_card_${member.id}_${numericAmount}_${Date.now()}`
+      idempotencyKey: `pos_saved_card_${member.id}_${numericAmount}_${productId || 'none'}_${Math.floor(Date.now() / 30000)}`
     });
 
     if (paymentIntent.status === 'succeeded') {
