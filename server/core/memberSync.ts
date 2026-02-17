@@ -359,7 +359,8 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           const existingUser = await db.select({ 
             membershipStatus: users.membershipStatus,
             billingProvider: users.billingProvider,
-            lastHubspotNotesHash: users.lastHubspotNotesHash
+            lastHubspotNotesHash: users.lastHubspotNotesHash,
+            role: users.role
           })
             .from(users)
             .where(eq(users.email, email))
@@ -373,11 +374,18 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           }
           
           const isStripeProtected = existingUser[0]?.billingProvider === 'stripe';
+          const isVisitorProtected = existingUser[0]?.role === 'visitor';
 
           if (isStripeProtected) {
             stripeProtectedCount++;
             console.log(`[MemberSync] STRIPE WINS: Skipping membership_status/tier update for Stripe-billed member ${email} (HubSpot status: ${status})`);
           }
+          
+          if (isVisitorProtected) {
+            console.log(`[MemberSync] VISITOR PROTECTED: Skipping membership_status/tier/role update for visitor ${email} (HubSpot status: ${status})`);
+          }
+          
+          const isProtected = isStripeProtected || isVisitorProtected;
           
           // Extract address fields from HubSpot (synced from Mindbody)
           const streetAddress = contact.properties.address?.trim() || null;
@@ -429,11 +437,12 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
                 firstName: sql`COALESCE(${firstName}, ${users.firstName})`,
                 lastName: sql`COALESCE(${lastName}, ${users.lastName})`,
                 phone: sql`COALESCE(${contact.properties.phone || null}, ${users.phone})`,
-                tier: isStripeProtected ? sql`${users.tier}` : (normalizedTier ? normalizedTier : sql`${users.tier}`),
-                tierId: isStripeProtected ? sql`${users.tierId}` : (tierId !== null ? tierId : sql`${users.tierId}`),
+                tier: isProtected ? sql`${users.tier}` : (normalizedTier ? normalizedTier : sql`${users.tier}`),
+                tierId: isProtected ? sql`${users.tierId}` : (tierId !== null ? tierId : sql`${users.tierId}`),
                 tags: tags.length > 0 ? tags : sql`${users.tags}`,
                 hubspotId: contact.id,
-                membershipStatus: isStripeProtected ? sql`${users.membershipStatus}` : status,
+                membershipStatus: isProtected ? sql`${users.membershipStatus}` : status,
+                role: isVisitorProtected ? sql`${users.role}` : sql`COALESCE(${users.role}, 'member')`,
                 // Use HubSpot value directly - clear stale mindbody IDs not present in HubSpot
                 mindbodyClientId: contact.properties.mindbody_client_id || null,
                 joinDate: joinDate ? joinDate : sql`${users.joinDate}`,
@@ -453,7 +462,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
               }
             });
           
-          if (oldStatus !== status && !isStripeProtected) {
+          if (oldStatus !== status && !isProtected) {
             detectAndNotifyStatusChange(email, firstName, lastName, oldStatus, status).catch(err => {
               console.error(`[MemberSync] Failed to notify status change for ${email}:`, err);
             });
@@ -917,7 +926,8 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
           const existingUser = await db.select({ 
             membershipStatus: users.membershipStatus,
             billingProvider: users.billingProvider,
-            lastHubspotNotesHash: users.lastHubspotNotesHash
+            lastHubspotNotesHash: users.lastHubspotNotesHash,
+            role: users.role
           })
             .from(users)
             .where(eq(users.email, email))
@@ -931,11 +941,18 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
           }
           
           const isStripeProtected = existingUser[0]?.billingProvider === 'stripe';
+          const isVisitorProtected = existingUser[0]?.role === 'visitor';
 
           if (isStripeProtected) {
             stripeProtectedCount++;
             console.log(`[MemberSync] STRIPE WINS: Skipping membership_status/tier update for Stripe-billed member ${email} (HubSpot status: ${status})`);
           }
+          
+          if (isVisitorProtected) {
+            console.log(`[MemberSync] VISITOR PROTECTED: Skipping membership_status/tier/role update for visitor ${email} (HubSpot status: ${status})`);
+          }
+          
+          const isProtected = isStripeProtected || isVisitorProtected;
           
           const streetAddress = contact.properties.address?.trim() || null;
           const city = contact.properties.city?.trim() || null;
@@ -984,11 +1001,12 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
                 firstName: sql`COALESCE(${firstName}, ${users.firstName})`,
                 lastName: sql`COALESCE(${lastName}, ${users.lastName})`,
                 phone: sql`COALESCE(${contact.properties.phone || null}, ${users.phone})`,
-                tier: isStripeProtected ? sql`${users.tier}` : (normalizedTier ? normalizedTier : sql`${users.tier}`),
-                tierId: isStripeProtected ? sql`${users.tierId}` : (tierId !== null ? tierId : sql`${users.tierId}`),
+                tier: isProtected ? sql`${users.tier}` : (normalizedTier ? normalizedTier : sql`${users.tier}`),
+                tierId: isProtected ? sql`${users.tierId}` : (tierId !== null ? tierId : sql`${users.tierId}`),
                 tags: tags.length > 0 ? tags : sql`${users.tags}`,
                 hubspotId: contact.id,
-                membershipStatus: isStripeProtected ? sql`${users.membershipStatus}` : status,
+                membershipStatus: isProtected ? sql`${users.membershipStatus}` : status,
+                role: isVisitorProtected ? sql`${users.role}` : sql`COALESCE(${users.role}, 'member')`,
                 mindbodyClientId: contact.properties.mindbody_client_id || null,
                 joinDate: joinDate ? joinDate : sql`${users.joinDate}`,
                 emailOptIn: emailOptIn !== null ? emailOptIn : sql`${users.emailOptIn}`,
@@ -1007,7 +1025,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
               }
             });
           
-          if (oldStatus !== status && !isStripeProtected) {
+          if (oldStatus !== status && !isProtected) {
             detectAndNotifyStatusChange(email, firstName, lastName, oldStatus, status).catch(err => {
               console.error(`[MemberSync] Failed to notify status change for ${email}:`, err);
             });

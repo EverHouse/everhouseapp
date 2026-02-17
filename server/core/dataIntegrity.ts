@@ -2925,6 +2925,7 @@ export async function autoFixMissingTiers(): Promise<{
         AND billing_provider IS NULL
         AND mindbody_client_id IS NOT NULL
         AND mindbody_client_id != ''
+        AND role != 'visitor'
         AND email NOT LIKE '%test%'
         AND email NOT LIKE '%example.com'
       RETURNING email
