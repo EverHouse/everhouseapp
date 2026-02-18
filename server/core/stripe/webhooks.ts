@@ -1549,7 +1549,7 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: Stripe
   }
 
   const userResult = await client.query(
-    'SELECT id, first_name, last_name FROM users WHERE email = $1',
+    'SELECT id, first_name, last_name, billing_provider FROM users WHERE email = $1',
     [email]
   );
 
@@ -1561,6 +1561,11 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: Stripe
     ? `${userResult.rows[0].first_name || ''} ${userResult.rows[0].last_name || ''}`.trim() || email
     : email;
   const userId = userResult.rows[0]?.id;
+
+  const invoiceUserBillingProvider = userResult.rows[0]?.billing_provider;
+  if (invoiceUserBillingProvider && invoiceUserBillingProvider !== 'stripe') {
+    console.log(`[Stripe Webhook] Skipping billing_provider/grace-period update for ${email} — billing_provider is '${invoiceUserBillingProvider}', not 'stripe' (invoice.payment_succeeded)`);
+  }
 
   await client.query(
     `UPDATE hubspot_deals 
@@ -1591,7 +1596,7 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: Stripe
     `UPDATE users SET 
       grace_period_start = NULL,
       grace_period_email_count = 0,
-      billing_provider = 'stripe'${restoreTierClause},
+      billing_provider = CASE WHEN billing_provider IS NULL OR billing_provider = '' OR billing_provider = 'stripe' THEN 'stripe' ELSE billing_provider END${restoreTierClause},
       updated_at = NOW()
     WHERE LOWER(email) = LOWER($1)`,
     queryParams
@@ -1736,12 +1741,18 @@ async function handleInvoicePaymentFailed(client: PoolClient, invoice: Stripe.In
   }
 
   const userStatusCheck = await client.query(
-    'SELECT membership_status FROM users WHERE LOWER(email) = LOWER($1)',
+    'SELECT membership_status, billing_provider FROM users WHERE LOWER(email) = LOWER($1)',
     [email]
   );
   const currentStatus = userStatusCheck.rows[0]?.membership_status;
   if (currentStatus && ['cancelled', 'suspended'].includes(currentStatus)) {
     console.log(`[Stripe Webhook] Skipping grace period for ${email} — user already ${currentStatus}`);
+    return deferredActions;
+  }
+
+  const failedInvoiceBillingProvider = userStatusCheck.rows[0]?.billing_provider;
+  if (failedInvoiceBillingProvider && failedInvoiceBillingProvider !== 'stripe') {
+    console.log(`[Stripe Webhook] Skipping grace period for ${email} — billing_provider is '${failedInvoiceBillingProvider}', not 'stripe' (invoice.payment_failed)`);
     return deferredActions;
   }
 
@@ -1758,7 +1769,7 @@ async function handleInvoicePaymentFailed(client: PoolClient, invoice: Stripe.In
   const gracePeriodResult = await client.query(
     `UPDATE users SET 
       grace_period_start = COALESCE(grace_period_start, NOW()),
-      billing_provider = 'stripe',
+      billing_provider = CASE WHEN billing_provider IS NULL OR billing_provider = '' OR billing_provider = 'stripe' THEN 'stripe' ELSE billing_provider END,
       membership_status = CASE 
         WHEN membership_status = 'active' THEN 'past_due'
         ELSE membership_status 
@@ -3154,6 +3165,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
           const group = groupResult.rows[0];
           
           // Reactivate all sub-members that were suspended/past_due due to billing issues
+          // Guard: only update sub-members whose billing_provider is stripe or unset (protect mindbody/manual members)
           const subMembersResult = await client.query(
             `UPDATE users u SET membership_status = 'active', billing_provider = 'stripe', updated_at = NOW()
              FROM group_members gm
@@ -3161,6 +3173,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
              AND gm.is_active = true
              AND LOWER(u.email) = LOWER(gm.member_email)
              AND u.membership_status IN ('past_due', 'suspended')
+             AND (u.billing_provider IS NULL OR u.billing_provider = '' OR u.billing_provider = 'stripe' OR u.billing_provider = 'family_addon')
              RETURNING u.email`,
             [group.id]
           );
@@ -3247,6 +3260,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
           const group = groupResult.rows[0];
           
           // Update all active sub-members to past_due status
+          // Guard: only update sub-members whose billing_provider is stripe or unset (protect mindbody/manual members)
           const subMembersResult = await client.query(
             `UPDATE users u SET membership_status = 'past_due', billing_provider = 'stripe', updated_at = NOW()
              FROM group_members gm
@@ -3254,6 +3268,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
              AND gm.is_active = true
              AND LOWER(u.email) = LOWER(gm.member_email)
              AND u.membership_status NOT IN ('cancelled', 'terminated')
+             AND (u.billing_provider IS NULL OR u.billing_provider = '' OR u.billing_provider = 'stripe' OR u.billing_provider = 'family_addon')
              RETURNING u.email`,
             [group.id]
           );
@@ -3342,6 +3357,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
           const group = groupResult.rows[0];
           
           // Suspend all active sub-members
+          // Guard: only update sub-members whose billing_provider is stripe or unset (protect mindbody/manual members)
           const subMembersResult = await client.query(
             `UPDATE users u SET membership_status = 'suspended', billing_provider = 'stripe', updated_at = NOW()
              FROM group_members gm
@@ -3349,6 +3365,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
              AND gm.is_active = true
              AND LOWER(u.email) = LOWER(gm.member_email)
              AND u.membership_status NOT IN ('cancelled', 'terminated')
+             AND (u.billing_provider IS NULL OR u.billing_provider = '' OR u.billing_provider = 'stripe' OR u.billing_provider = 'family_addon')
              RETURNING u.email`,
             [group.id]
           );
