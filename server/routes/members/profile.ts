@@ -43,6 +43,10 @@ router.get('/api/members/:email/details', isAuthenticated, memberLookupRateLimit
   try {
     const { email } = req.params;
     
+    if (email === 'private-event@resolved' || email.endsWith('@trackman.local') || email.startsWith('unmatched-')) {
+      return res.status(200).json({ synthetic: true, email, firstName: 'Private', lastName: 'Event', tier: null, membershipStatus: null });
+    }
+    
     const parseResult = emailParamSchema.safeParse(email);
     if (!parseResult.success) {
       return res.status(400).json({ error: 'Invalid email format' });

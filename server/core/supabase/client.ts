@@ -109,6 +109,12 @@ export async function enableRealtimeForTable(tableName: string): Promise<boolean
     return false;
   }
 
+  const available = await isSupabaseAvailable();
+  if (!available) {
+    console.warn(`[Supabase] Skipping realtime for ${tableName} - Supabase not reachable`);
+    return false;
+  }
+
   try {
     const supabase = getSupabaseAdmin();
     
