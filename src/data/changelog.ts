@@ -13,6 +13,22 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.69.0",
+    date: "2026-02-18",
+    title: "Directory Filter Redesign — Operational Filters",
+    isMajor: true,
+    changes: [
+      "Redesigned: Active tab now uses membership status filter (Active, Grace Period, Past Due) instead of legacy HubSpot-based filters",
+      "Added: 'Never Logged In' app usage filter on Active tab — quickly find members who signed up but haven't opened the app yet",
+      "Added: Billing provider badge (Stripe, Mindbody, Comped, Family, Manual) next to each member's email for instant billing context",
+      "Removed: Legacy HubSpot tag filter row — tags still display on member rows but no longer clutter the filter bar",
+      "Added: 'Last Tier' column on Former tab — shows what tier a member had before they left",
+      "Added: Reactivation indicator on Former tab — shows 'Send Link' (has Stripe account) or 'New Signup' (needs fresh registration)",
+      "Improved: Former tab status badges now use consistent styling that works in both light and dark mode",
+      "Data: Migrated 49 former members' tier data to preserve their previous membership level for future reference",
+    ]
+  },
+  {
     version: "7.68.0",
     date: "2026-02-18",
     title: "Admin Email Change from Profile Drawer",
