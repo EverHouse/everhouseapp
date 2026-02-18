@@ -153,7 +153,7 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
     const originalBayName = booking.resource_name;
 
     const client = await pool.connect();
-    let updated: any;
+    let updated: Record<string, unknown>;
     try {
       await client.query('BEGIN');
 

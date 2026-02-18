@@ -21,7 +21,81 @@ import { releaseGuestPassHold } from '../billing/guestPassHoldService';
 import { createPrepaymentIntent } from '../billing/prepaymentService';
 import { getErrorMessage, getErrorStatusCode } from '../../utils/errorUtils';
 
-export function formatBookingRow(row: any) {
+type SqlQueryParam = string | number | boolean | null | Date;
+
+interface BookingRow {
+  id: number;
+  userEmail: string;
+  userName: string | null;
+  resourceId: number | null;
+  resourcePreference: string | null;
+  requestDate: string;
+  startTime: string;
+  durationMinutes: number;
+  endTime: string;
+  notes: string | null;
+  status: string | null;
+  staffNotes: string | null;
+  suggestedTime: string | null;
+  reviewedBy: string | null;
+  reviewedAt: Date | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  calendarEventId: string | null;
+  rescheduleBookingId: number | null;
+}
+
+interface BookingUpdateResult {
+  id: number;
+  userEmail: string;
+  userName: string | null;
+  userId: string | null;
+  resourceId: number | null;
+  requestDate: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  status: string | null;
+  calendarEventId: string | null;
+  trackmanBookingId: string | null;
+  sessionId: number | null;
+  overagePaymentIntentId: string | null;
+  requestParticipants: Array<{ email?: string; type: 'member' | 'guest'; userId?: string; name?: string }> | null;
+  memberNotes: string | null;
+  notes: string | null;
+}
+
+interface CancelBookingData {
+  userEmail: string;
+  userName: string | null;
+  resourceId: number | null;
+  requestDate: string;
+  startTime: string;
+  calendarEventId: string | null;
+  overagePaymentIntentId: string | null;
+  sessionId: number | null;
+  status: string | null;
+}
+
+interface CancelPushInfo {
+  type: 'both' | 'staff' | 'member';
+  email?: string;
+  message: string;
+  staffMessage?: string;
+  memberMessage?: string;
+  memberName?: string;
+  bookingDate?: string;
+  bookingTime?: string;
+  bayName?: string;
+}
+
+interface OverageRefundResult {
+  refunded?: boolean;
+  amountCents?: number;
+  error?: string;
+}
+
+export function formatBookingRow(row: BookingRow) {
   return {
     id: row.id,
     user_email: row.userEmail,
@@ -452,7 +526,7 @@ export async function approveBooking(params: ApproveBookingParams) {
   return { updated, isConferenceRoom };
 }
 
-async function populateBookingMembers(bookingId: number, updated: any) {
+async function populateBookingMembers(bookingId: number, updated: BookingUpdateResult) {
   try {
     const requestParticipants = updated.requestParticipants as Array<{
       email?: string;
@@ -506,7 +580,7 @@ async function populateBookingMembers(bookingId: number, updated: any) {
   }
 }
 
-async function notifyLinkedMembers(bookingId: number, updated: any) {
+async function notifyLinkedMembers(bookingId: number, updated: BookingUpdateResult) {
   try {
     const linkedMembers = await db.select({ userEmail: bookingMembers.userEmail })
       .from(bookingMembers)
@@ -548,7 +622,7 @@ async function notifyLinkedMembers(bookingId: number, updated: any) {
   }
 }
 
-async function notifyApprovalParticipants(bookingId: number, updated: any) {
+async function notifyApprovalParticipants(bookingId: number, updated: BookingUpdateResult) {
   if (!updated.userEmail) return;
 
   try {
@@ -1038,7 +1112,7 @@ export async function cancelBooking(params: CancelBookingParams) {
   return { updated, bookingData, pushInfo, overageRefundResult, isConferenceRoom: isConfRoom, isPendingCancel, alreadyPending };
 }
 
-export async function handlePendingCancellation(bookingId: number, bookingData: any, pushInfo: any) {
+export async function handlePendingCancellation(bookingId: number, bookingData: CancelBookingData, pushInfo: CancelPushInfo) {
   const { memberName, bookingDate, bookingTime, bayName } = pushInfo;
 
   const staffMessage = `Booking cancellation pending for ${memberName} on ${bookingDate} at ${bookingTime} (${bayName}). Please cancel in Trackman to complete.`;
@@ -1073,9 +1147,9 @@ export async function handlePendingCancellation(bookingId: number, bookingData: 
 
 export async function handleCancelPostTransaction(
   bookingId: number,
-  bookingData: any,
-  pushInfo: any,
-  overageRefundResult: any,
+  bookingData: CancelBookingData,
+  pushInfo: CancelPushInfo | null,
+  overageRefundResult: OverageRefundResult | null,
   isConfRoom: boolean
 ) {
   await releaseGuestPassHold(bookingId);

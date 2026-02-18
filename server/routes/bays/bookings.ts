@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../../db';
 import { pool } from '../../core/db';
 import { bookingRequests, resources, users, bookingMembers, bookingGuests, bookingParticipants, notifications } from '../../../shared/schema';
-import { eq, and, or, ne, desc, sql } from 'drizzle-orm';
+import { eq, and, or, ne, desc, sql, SQL } from 'drizzle-orm';
 import { sendPushNotification } from '../push';
 import { checkDailyBookingLimit, getMemberTierByEmail, getTierLimits, getDailyBookedMinutes } from '../../core/tierService';
 import { notifyAllStaff } from '../../core/notificationService';
@@ -23,6 +23,42 @@ import { createGuestPassHold, releaseGuestPassHold } from '../../core/billing/gu
 import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { normalizeToISODate } from '../../utils/dateNormalize';
+
+interface SanitizedParticipant {
+  email: string;
+  type: 'member' | 'guest';
+  userId?: string;
+  name?: string;
+}
+
+interface BookingInsertRow {
+  id: number;
+  userEmail: string;
+  userName: string | null;
+  resourceId: number | null;
+  resourcePreference: string | null;
+  requestDate: string;
+  startTime: string;
+  durationMinutes: number;
+  endTime: string;
+  notes: string | null;
+  status: string | null;
+  rescheduleBookingId: number | null;
+  declaredPlayerCount: number | null;
+  memberNotes: string | null;
+  guardianName: string | null;
+  guardianRelationship: string | null;
+  guardianPhone: string | null;
+  guardianConsentAt: Date | null;
+  requestParticipants: SanitizedParticipant[];
+  createdAt: Date | null;
+  updatedAt: Date | null;
+}
+
+interface SessionQueryResult {
+  rows: Array<{ session_id: number }>;
+  rowCount: number;
+}
 
 const router = Router();
 
@@ -56,7 +92,7 @@ router.get('/api/booking-requests', async (req, res) => {
       return res.status(400).json({ error: 'user_email or include_all parameter required' });
     }
     
-    const conditions: any[] = [];
+    const conditions: (SQL | undefined)[] = [];
     
     conditions.push(
       or(
@@ -436,7 +472,7 @@ router.post('/api/booking-requests', async (req, res) => {
     }
     
     const client = await pool.connect();
-    let row: any;
+    let row: BookingInsertRow;
     // Declare resourceType outside try block so it's available for notifications after transaction
     let resourceType = 'simulator';
     try {
@@ -539,21 +575,17 @@ router.post('/api/booking-requests', async (req, res) => {
         });
       }
       
-      let sanitizedParticipants: any[] = [];
+      let sanitizedParticipants: SanitizedParticipant[] = [];
       if (request_participants && Array.isArray(request_participants)) {
         sanitizedParticipants = request_participants
           .slice(0, 3)
-          .map((p: any) => ({
-            // Keep email if provided (for new guests entered by email)
+          .map((p: { email?: string; type?: string; userId?: string; name?: string }) => ({
             email: typeof p.email === 'string' ? p.email.toLowerCase().trim() : '',
-            type: p.type === 'member' ? 'member' : 'guest',
-            // CRITICAL: Also store userId and name for directory-selected participants
-            // Without this, guests selected from directory were being lost entirely
+            type: (p.type === 'member' ? 'member' : 'guest') as 'member' | 'guest',
             userId: typeof p.userId === 'string' ? p.userId : undefined,
             name: typeof p.name === 'string' ? p.name.trim() : undefined
           }))
-          // Keep participant if they have email OR userId (directory selection)
-          .filter((p: any) => p.email || p.userId);
+          .filter((p: SanitizedParticipant) => p.email || p.userId);
       }
       
       // FIX: Lookup userId for participants with email but no userId
@@ -621,7 +653,7 @@ router.post('/api/booking-requests', async (req, res) => {
       const seenEmails = new Set<string>();
       const seenUserIds = new Set<string>();
       seenEmails.add(user_email.toLowerCase());
-      sanitizedParticipants = sanitizedParticipants.filter((p: any) => {
+      sanitizedParticipants = sanitizedParticipants.filter((p: SanitizedParticipant) => {
         if (p.userId && seenUserIds.has(p.userId)) return false;
         if (p.email && seenEmails.has(p.email.toLowerCase())) return false;
         if (p.userId) seenUserIds.add(p.userId);
@@ -725,7 +757,7 @@ router.post('/api/booking-requests', async (req, res) => {
         ]
       );
       
-      const guestCount = sanitizedParticipants.filter((p: any) => p.type === 'guest').length;
+      const guestCount = sanitizedParticipants.filter((p: SanitizedParticipant) => p.type === 'guest').length;
       if (guestCount > 0) {
         const bookingId = insertResult.rows[0].id;
         const holdResult = await createGuestPassHold(
@@ -1169,7 +1201,7 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
     let refundType: 'none' | 'overage' | 'guest_fees' | 'both' = 'none';
     let refundSkippedDueToLateCancel = false;
     
-    let sessionResult: any = null;
+    let sessionResult: SessionQueryResult | null = null;
     try {
       sessionResult = await pool.query(
         `SELECT bs.id as session_id FROM booking_sessions bs 

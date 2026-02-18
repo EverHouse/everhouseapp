@@ -90,7 +90,7 @@ export async function findAttendanceDiscrepancies(
       AND br.declared_player_count IS NOT NULL
       AND br.trackman_player_count != br.declared_player_count
     `;
-    const params: any[] = [];
+    const params: (string | number | null)[] = [];
     let paramIndex = 1;
     
     if (startDate) {
@@ -231,7 +231,7 @@ export async function markAsReconciled(
   staffEmail: string,
   status: 'reviewed' | 'adjusted',
   notes?: string
-): Promise<{ success: boolean; booking?: any }> {
+): Promise<{ success: boolean; booking?: Record<string, unknown> }> {
   try {
     const bookingResult = await pool.query(
       `SELECT id, declared_player_count, trackman_player_count, duration_minutes, 

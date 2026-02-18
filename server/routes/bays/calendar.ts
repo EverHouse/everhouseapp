@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../../db';
 import { pool } from '../../core/db';
 import { bookingRequests, resources } from '../../../shared/schema';
-import { eq, and, or, gte, lte, asc } from 'drizzle-orm';
+import { eq, and, or, gte, lte, asc, SQL } from 'drizzle-orm';
 import { getConferenceRoomBookingsFromCalendar } from '../../core/calendar/index';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { getConferenceRoomId } from '../../core/affectedAreas';
@@ -56,7 +56,7 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
     const defaultStartDate = start_date || new Date(todayMs - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const defaultEndDate = end_date || new Date(todayMs + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
-    const conditions: any[] = [
+    const conditions: (SQL | undefined)[] = [
       or(
         eq(bookingRequests.status, 'approved'),
         eq(bookingRequests.status, 'confirmed'),
@@ -104,7 +104,7 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
     .where(and(...conditions))
     .orderBy(asc(bookingRequests.requestDate), asc(bookingRequests.startTime));
     
-    let calendarBookings: any[] = [];
+    let calendarBookings: Array<{ id: string; user_email: null; user_name: string; resource_id: number | null; resource_preference: null; request_date: string; start_time: string; duration_minutes: null; end_time: string; notes: string; status: string; staff_notes: null; suggested_time: null; reviewed_by: null; reviewed_at: null; created_at: null; updated_at: null; calendar_event_id: string; resource_name: string; resource_type: string; source: string }> = [];
     try {
       const calendarEvents = await getConferenceRoomBookingsFromCalendar();
       
@@ -176,7 +176,7 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
         INNER JOIN booking_fee_snapshots bfs ON bfs.session_id = br.session_id AND bfs.status = 'completed'
         WHERE br.id = ANY($1)
       `, [bookingIds]);
-      feeSnapshotPaidSet = new Set<number>(feeSnapshotResult.rows.map((r: any) => r.booking_id));
+      feeSnapshotPaidSet = new Set<number>(feeSnapshotResult.rows.map((r: { booking_id: number }) => r.booking_id));
 
       for (const row of paymentStatusResult.rows) {
         const totalOwed = parseFloat(row.total_owed) || 0;

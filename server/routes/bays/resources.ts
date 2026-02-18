@@ -62,7 +62,7 @@ router.get('/api/bays/:bayId/availability', async (req, res) => {
     ))
     .orderBy(asc(availabilityBlocks.startTime));
     
-    let calendarBlocks: any[] = [];
+    let calendarBlocks: Array<{ start_time: string; end_time: string; block_type: string; notes: string }> = [];
     try {
       const calendar = await getGoogleCalendarClient();
       const startTime = new Date(date as string);
@@ -79,7 +79,7 @@ router.get('/api/bays/:bayId/availability', async (req, res) => {
       });
       
       const busySlots = response.data.calendars?.primary?.busy || [];
-      calendarBlocks = busySlots.map((slot: any) => {
+      calendarBlocks = busySlots.map((slot: { start: string; end: string }) => {
         const start = new Date(slot.start);
         const end = new Date(slot.end);
         const startPT = start.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', hour: '2-digit', minute: '2-digit', hour12: false });

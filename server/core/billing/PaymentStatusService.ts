@@ -84,7 +84,7 @@ export class PaymentStatusService {
       const participantFees = snapshot.participant_fees;
       
       if (participantFees && Array.isArray(participantFees)) {
-        const participantIds = participantFees.map((f: any) => f.id).filter(Boolean);
+        const participantIds = participantFees.map((f: { id?: number; amountCents?: number }) => f.id).filter(Boolean);
         
         if (participantIds.length > 0) {
           // Bulk update all participants to match webhook behavior
@@ -162,7 +162,7 @@ export class PaymentStatusService {
         // Update participant payment statuses with refunded_at timestamp
         const participantFees = snapshot.participant_fees;
         if (participantFees && Array.isArray(participantFees)) {
-          const participantIds = participantFees.map((f: any) => f.id).filter(Boolean);
+          const participantIds = participantFees.map((f: { id?: number; amountCents?: number }) => f.id).filter(Boolean);
           
           if (participantIds.length > 0) {
             // Bulk update all participants

@@ -147,7 +147,7 @@ export async function getDailyUsageFromLedger(
   resourceType?: string
 ): Promise<number> {
   try {
-    const params: any[] = [memberEmail, date];
+    const params: (string | number | null)[] = [memberEmail, date];
     let paramIdx = 3;
 
     let excludeClause = '';
@@ -179,7 +179,7 @@ export async function getDailyUsageFromLedger(
     
     // Safety check: warn if there are sessions with participants but no ledger entries
     try {
-      const warningParams: any[] = [memberEmail, date];
+      const warningParams: (string | number | null)[] = [memberEmail, date];
       let warningExclude = '';
       if (excludeSessionId) {
         warningExclude = `AND bs.id != $3`;

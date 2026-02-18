@@ -6,6 +6,8 @@ import { FeeBreakdown, FeeComputeParams, FeeLineItem } from '../../../shared/mod
 import { logger } from '../logger';
 import { PRICING } from './pricingConfig';
 
+type SqlQueryParam = string | number | boolean | null | Date | string[];
+
 export function getEffectivePlayerCount(declared: number | undefined, actual: number): number {
   const declaredCount = declared && declared > 0 ? declared : 1;
   return Math.max(declaredCount, actual, 1);
@@ -52,7 +54,7 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
   
   try {
     let query: string;
-    let params: any[];
+    let params: SqlQueryParam[];
     
     if (sessionId) {
       // Use the GREATER of session duration and booking duration
@@ -365,7 +367,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
       
       // Dynamically build query params and clauses to avoid passing unused null params
       // which causes PostgreSQL to fail with "could not determine data type of parameter"
-      let queryParams: any[];
+      let queryParams: SqlQueryParam[];
       let timeFilterClause: string;
       let resourceTypeClause: string;
       
@@ -471,7 +473,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
       // $1=identifiers, $2=date, $3=resourceType
       // When excludeId: +$4=excludeId
       // When hasTimeFilter: +startTime param, +bookingId param
-      let usageParams: any[];
+      let usageParams: SqlQueryParam[];
       let pStartTime: string;
       let pBookingId: string;
       let pExcludeId: string;

@@ -106,7 +106,7 @@ export async function ensureSessionForBooking(params: {
   trackmanBookingId?: string;
   source: string;
   createdBy: string;
-}, client?: any): Promise<{ sessionId: number; created: boolean; error?: string }> {
+}, client?: PoolClient): Promise<{ sessionId: number; created: boolean; error?: string }> {
   const q = client || pool;
 
   const attemptSessionCreation = async (): Promise<{ sessionId: number; created: boolean }> => {
