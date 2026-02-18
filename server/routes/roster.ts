@@ -22,7 +22,6 @@ import {
   linkBookingRequestToSession,
   type ParticipantInput 
 } from '../core/bookingService/sessionManager';
-import { createPacificDate } from '../utils/dateUtils';
 import { 
   enforceSocialTierRules, 
   getMemberTier,
@@ -203,7 +202,6 @@ router.get('/api/bookings/:bookingId/participants', async (req: Request, res: Re
           displayName: bookingParticipants.displayName,
           slotDuration: bookingParticipants.slotDuration,
           paymentStatus: bookingParticipants.paymentStatus,
-          inviteStatus: bookingParticipants.inviteStatus,
           createdAt: bookingParticipants.createdAt,
         })
         .from(bookingParticipants)
@@ -536,15 +534,10 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
     if (type === 'member' && memberInfo) {
       const displayName = [memberInfo.firstName, memberInfo.lastName].filter(Boolean).join(' ') || memberInfo.email;
       
-      const bookingStartTime = createPacificDate(booking.request_date, booking.start_time);
-      const inviteExpiresAt = new Date(bookingStartTime.getTime() - 30 * 60 * 1000);
-      
       participantInput = {
         userId: memberInfo.id,
         participantType: 'member',
         displayName,
-        invitedAt: new Date(),
-        inviteExpiresAt,
       };
     } else {
       // Ensure guest pass record exists and decrement guest pass
@@ -637,17 +630,17 @@ router.post('/api/bookings/:bookingId/participants', async (req: Request, res: R
         
         await notifyMember({
           userEmail: memberInfo.email.toLowerCase(),
-          type: 'booking_invite',
-          title: 'You\'ve been added to a booking',
+          type: 'booking_update',
+          title: 'Added to a booking',
           message: `${booking.owner_name || 'A member'} has added you to their simulator booking on ${formattedDate}${timeDisplay}`,
           relatedId: bookingId
         });
         
-        logger.info('[roster] Invite notification sent', {
-          extra: { bookingId, invitedMember: memberInfo.email }
+        logger.info('[roster] Notification sent', {
+          extra: { bookingId, addedMember: memberInfo.email }
         });
       } catch (notifError: unknown) {
-        logger.warn('[roster] Failed to send invite notification (non-blocking)', {
+        logger.warn('[roster] Failed to send notification (non-blocking)', {
           error: notifError as Error,
           extra: { bookingId, memberEmail: memberInfo.email }
         });
@@ -1360,241 +1353,6 @@ router.post('/api/bookings/:bookingId/participants/preview-fees', async (req: Re
     });
   } catch (error: unknown) {
     logAndRespond(req, res, 500, 'Failed to preview fees', error);
-  }
-});
-
-// Accept an invite to a booking
-router.post('/api/bookings/:id/invite/accept', async (req: Request, res: Response) => {
-  try {
-    const sessionUser = getSessionUser(req);
-    if (!sessionUser) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    const bookingId = parseInt(req.params.id as string);
-    if (isNaN(bookingId)) {
-      return res.status(400).json({ error: 'Invalid booking ID' });
-    }
-
-    // Support "View As" mode: admin can accept on behalf of a member
-    const { onBehalfOf } = req.body || {};
-    let userEmail = sessionUser.email?.toLowerCase() || '';
-    
-    if (onBehalfOf && typeof onBehalfOf === 'string') {
-      // Only admins can act on behalf of others
-      if (sessionUser.role !== 'admin') {
-        return res.status(403).json({ error: 'Only admins can accept invites on behalf of others' });
-      }
-      userEmail = onBehalfOf.toLowerCase();
-      logger.info('[Invite Accept] Admin acting on behalf of member', {
-        extra: { adminEmail: sessionUser.email, targetEmail: userEmail, bookingId }
-      });
-    }
-    
-    // Get booking with session
-    const booking = await getBookingWithSession(bookingId);
-    if (!booking) {
-      return res.status(404).json({ error: 'Booking not found' });
-    }
-    
-    if (!booking.session_id) {
-      return res.status(400).json({ error: 'Booking has no session - cannot accept invite' });
-    }
-
-    // Find the participant record - join with users table since userId is a UUID
-    // This allows finding participants by their email address
-    const participantResult = await db
-      .select({
-        id: bookingParticipants.id,
-        sessionId: bookingParticipants.sessionId,
-        userId: bookingParticipants.userId,
-        inviteStatus: bookingParticipants.inviteStatus,
-        displayName: bookingParticipants.displayName,
-        participantType: bookingParticipants.participantType
-      })
-      .from(bookingParticipants)
-      .innerJoin(users, eq(bookingParticipants.userId, users.id))
-      .where(and(
-        eq(bookingParticipants.sessionId, booking.session_id),
-        sql`LOWER(${users.email}) = ${userEmail}`
-      ))
-      .limit(1);
-
-    if (!participantResult[0]) {
-      return res.status(404).json({ error: 'You are not a participant on this booking' });
-    }
-
-    const participant = participantResult[0];
-    
-    if (participant.inviteStatus === 'accepted') {
-      return res.json({ success: true, message: 'Invite already accepted' });
-    }
-
-    // Check for time conflicts with other bookings before accepting
-    const conflictResult = await findConflictingBookings(
-      userEmail,
-      booking.request_date,
-      booking.start_time,
-      booking.end_time,
-      bookingId
-    );
-    
-    if (conflictResult.hasConflict) {
-      const conflict = conflictResult.conflicts[0];
-      logger.warn('[Invite Accept] Conflict detected when accepting invite', {
-        extra: {
-          bookingId,
-          userEmail,
-          conflictingBookingId: conflict.bookingId,
-          conflictType: conflict.conflictType,
-          date: booking.request_date
-        }
-      });
-      
-      return res.status(409).json({
-        error: `Cannot accept invite: you have a scheduling conflict with another booking on ${booking.request_date}`,
-        errorType: 'booking_conflict',
-        conflict: {
-          id: conflict.bookingId,
-          bookingId: conflict.bookingId,
-          date: booking.request_date,
-          resourceName: conflict.resourceName,
-          startTime: conflict.startTime,
-          endTime: conflict.endTime,
-          ownerName: conflict.ownerName,
-          conflictType: conflict.conflictType
-        }
-      });
-    }
-
-    // Update invite status to accepted
-    await db
-      .update(bookingParticipants)
-      .set({ 
-        inviteStatus: 'accepted',
-        respondedAt: new Date()
-      })
-      .where(eq(bookingParticipants.id, participant.id));
-
-    logger.info('[Invite Accept] Member accepted invite', {
-      extra: { bookingId, userEmail, sessionId: booking.session_id }
-    });
-
-    // Notify the booking owner that invite was accepted
-    const invitedMemberName = participant.displayName || userEmail;
-    await notifyMember({
-      userEmail: booking.user_email || booking.owner_email,
-      title: 'Invite Accepted',
-      message: `${invitedMemberName} accepted your invite to the booking on ${booking.request_date}`,
-      type: 'booking_invite',
-      relatedId: bookingId,
-      relatedType: 'booking',
-      url: '/sims'
-    });
-
-    res.json({ success: true, message: 'Invite accepted successfully' });
-  } catch (error: unknown) {
-    logAndRespond(req, res, 500, 'Failed to accept invite', error);
-  }
-});
-
-// Decline an invite to a booking
-router.post('/api/bookings/:id/invite/decline', async (req: Request, res: Response) => {
-  try {
-    const sessionUser = getSessionUser(req);
-    if (!sessionUser) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    const bookingId = parseInt(req.params.id as string);
-    if (isNaN(bookingId)) {
-      return res.status(400).json({ error: 'Invalid booking ID' });
-    }
-
-    // Support "View As" mode: admin can decline on behalf of a member
-    const { onBehalfOf } = req.body || {};
-    let userEmail = sessionUser.email?.toLowerCase() || '';
-    
-    if (onBehalfOf && typeof onBehalfOf === 'string') {
-      // Only admins can act on behalf of others
-      if (sessionUser.role !== 'admin') {
-        return res.status(403).json({ error: 'Only admins can decline invites on behalf of others' });
-      }
-      userEmail = onBehalfOf.toLowerCase();
-      logger.info('[Invite Decline] Admin acting on behalf of member', {
-        extra: { adminEmail: sessionUser.email, targetEmail: userEmail, bookingId }
-      });
-    }
-    
-    // Get booking with session
-    const booking = await getBookingWithSession(bookingId);
-    if (!booking) {
-      return res.status(404).json({ error: 'Booking not found' });
-    }
-    
-    if (!booking.session_id) {
-      return res.status(400).json({ error: 'Booking has no session - cannot decline invite' });
-    }
-
-    // Find the participant record - join with users table since userId is a UUID
-    const participantResult = await db
-      .select({
-        id: bookingParticipants.id,
-        sessionId: bookingParticipants.sessionId,
-        userId: bookingParticipants.userId,
-        inviteStatus: bookingParticipants.inviteStatus,
-        displayName: bookingParticipants.displayName,
-        participantType: bookingParticipants.participantType
-      })
-      .from(bookingParticipants)
-      .innerJoin(users, eq(bookingParticipants.userId, users.id))
-      .where(and(
-        eq(bookingParticipants.sessionId, booking.session_id),
-        sql`LOWER(${users.email}) = ${userEmail}`
-      ))
-      .limit(1);
-
-    if (!participantResult[0]) {
-      return res.status(404).json({ error: 'You are not a participant on this booking' });
-    }
-
-    const participant = participantResult[0];
-    
-    // Import bookingMembers for removal
-    const { bookingMembers } = await import('../../shared/schema');
-    
-    // Remove from booking_members table (so it no longer shows on schedule)
-    await db
-      .delete(bookingMembers)
-      .where(and(
-        eq(bookingMembers.bookingId, bookingId),
-        sql`LOWER(${bookingMembers.userEmail}) = ${userEmail}`
-      ));
-
-    // Delete the participant record (release the slot)
-    await db
-      .delete(bookingParticipants)
-      .where(eq(bookingParticipants.id, participant.id));
-
-    logger.info('[Invite Decline] Member declined invite', {
-      extra: { bookingId, userEmail, sessionId: booking.session_id, participantId: participant.id }
-    });
-
-    // Notify the booking owner that invite was declined
-    const declinedMemberName = participant.displayName || userEmail;
-    await notifyMember({
-      userEmail: booking.user_email || booking.owner_email,
-      title: 'Invite Declined',
-      message: `${declinedMemberName} declined your invite to the booking on ${booking.request_date}`,
-      type: 'booking_invite',
-      relatedId: bookingId,
-      relatedType: 'booking',
-      url: '/sims'
-    });
-
-    res.json({ success: true, message: 'Invite declined successfully' });
-  } catch (error: unknown) {
-    logAndRespond(req, res, 500, 'Failed to decline invite', error);
   }
 });
 

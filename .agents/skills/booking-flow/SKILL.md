@@ -158,7 +158,7 @@ Three-step flow (all staff-only):
 `findConflictingBookings(memberEmail, date, startTime, endTime, excludeBookingId?)` checks two sources:
 
 1. **Owner conflicts**: Query `booking_requests` where `LOWER(user_email)` matches and `status IN OCCUPIED_STATUSES` on the same date. Apply `timePeriodsOverlap()` in application code.
-2. **Participant conflicts**: Query `booking_participants` → `booking_sessions` → `booking_requests` where `bp.user_id` matches the member's UUID and `bp.invite_status IN ('pending', 'accepted')`. Also apply `timePeriodsOverlap()`.
+2. **Participant conflicts**: Query `booking_participants` → `booking_sessions` → `booking_requests` where `bp.user_id` matches the member's UUID and `bp.invite_status = 'accepted'`. Also apply `timePeriodsOverlap()`. (Note: All participants are now auto-accepted — no invite flow.)
 
 `timePeriodsOverlap()` handles cross-midnight by adding 1440 minutes to any end time < start time. However, cross-midnight bookings cannot be created through normal flows (club closes at 10 PM).
 

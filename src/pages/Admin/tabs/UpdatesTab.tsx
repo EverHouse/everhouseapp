@@ -109,7 +109,7 @@ const UpdatesTab: React.FC = () => {
             booking_declined: '/admin/bookings',
             booking_cancelled: '/admin/bookings',
             booking_reminder: '/admin/bookings',
-            booking_invite: '/admin/bookings',
+            booking_update: '/admin/bookings',
             booking_pending: '/admin/bookings',
             trackman_booking: '/admin/bookings',
             trackman_unmatched: '/admin/trackman',

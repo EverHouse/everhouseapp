@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.73.0",
+    date: "2026-02-18",
+    title: "Simplified Booking Player Flow",
+    changes: [
+      "Improved: Players added to bookings are now instantly confirmed — no more invite/accept/decline steps required",
+      "Removed: Pending invites section from member dashboard (no longer needed)",
+      "Removed: Invite accept and decline buttons from booking notifications",
+      "Removed: Invite expiry countdown timer from roster manager",
+      "Removed: Background invite auto-expiry scheduler (was running every 5 minutes unnecessarily)",
+      "Changed: Added-player notifications now show as booking updates instead of invites",
+    ]
+  },
+  {
     version: "7.72.0",
     date: "2026-02-18",
     title: "App-Wide Animation & Motion Polish",

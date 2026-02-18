@@ -43,8 +43,6 @@ export interface ParticipantInput {
   displayName: string;
   slotDuration?: number;
   trackmanPlayerRowId?: string;
-  invitedAt?: Date;
-  inviteExpiresAt?: Date;
 }
 
 export interface RecordUsageInput {
@@ -296,9 +294,8 @@ export async function linkParticipants(
       displayName: p.displayName,
       slotDuration: p.slotDuration,
       trackmanPlayerRowId: p.trackmanPlayerRowId,
-      inviteStatus: p.participantType === 'owner' ? 'accepted' : 'pending',
-      invitedAt: p.invitedAt || new Date(),
-      inviteExpiresAt: p.inviteExpiresAt
+      inviteStatus: 'accepted',
+      invitedAt: new Date(),
     }));
     
     const inserted = await dbCtx
@@ -420,24 +417,6 @@ export async function getSessionParticipants(sessionId: number): Promise<Booking
   } catch (error) {
     logger.error('[getSessionParticipants] Error:', { error: error as Error });
     return [];
-  }
-}
-
-export async function updateParticipantInviteStatus(
-  participantId: number,
-  status: 'pending' | 'accepted' | 'declined'
-): Promise<void> {
-  try {
-    await db
-      .update(bookingParticipants)
-      .set({ 
-        inviteStatus: status,
-        respondedAt: status !== 'pending' ? new Date() : undefined
-      })
-      .where(eq(bookingParticipants.id, participantId));
-  } catch (error) {
-    logger.error('[updateParticipantInviteStatus] Error:', { error: error as Error });
-    throw error;
   }
 }
 

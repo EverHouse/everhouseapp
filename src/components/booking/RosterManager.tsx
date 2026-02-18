@@ -21,8 +21,6 @@ export interface RosterParticipant {
   displayName: string;
   slotDuration: number | null;
   paymentStatus: string | null;
-  inviteStatus: string | null;
-  inviteExpiresAt: string | null;
   createdAt: string;
 }
 
@@ -170,22 +168,6 @@ const RosterManager: React.FC<RosterManagerProps> = ({
 
   const canManage = isOwner || isStaff;
 
-  const getExpiryCountdown = useCallback((expiresAt: string): string | null => {
-    const now = Date.now();
-    const expiryStr = expiresAt.endsWith('Z') ? expiresAt : expiresAt + 'Z';
-    const expiry = new Date(expiryStr).getTime();
-    const diffMs = expiry - now;
-    
-    if (diffMs <= 0) return 'Expired';
-    
-    const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 60) {
-      return `Expires in ${diffMins} min`;
-    }
-    
-    const diffHours = Math.floor(diffMins / 60);
-    return `Expires in ${diffHours} hr${diffHours > 1 ? 's' : ''}`;
-  }, []);
   const remainingSlots = apiRemainingSlots;
 
   const fetchParticipants = useCallback(async () => {
@@ -501,16 +483,6 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                 <p className={`font-semibold truncate ${isDark ? 'text-white' : 'text-[#293515]'}`}>
                   {participant.displayName}
                 </p>
-                {participant.inviteStatus === 'pending' && participant.inviteExpiresAt && (
-                  <span className={`inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 text-[10px] font-bold rounded ${
-                    isDark 
-                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
-                      : 'bg-amber-100 text-amber-700 border border-amber-200'
-                  }`}>
-                    <span className="material-symbols-outlined text-xs">schedule</span>
-                    {getExpiryCountdown(participant.inviteExpiresAt)}
-                  </span>
-                )}
               </div>
               {getTypeBadge(participant.participantType)}
               {canManage && (

@@ -17,7 +17,6 @@ import {
   ensureSessionForBooking,
   type ParticipantInput
 } from './bookingService/sessionManager';
-import { createPacificDate } from '../utils/dateUtils';
 import {
   enforceSocialTierRules,
   getMemberTier,
@@ -440,15 +439,10 @@ export async function addParticipant(params: {
     if (type === 'member' && memberInfo) {
       const displayName = [memberInfo.firstName, memberInfo.lastName].filter(Boolean).join(' ') || memberInfo.email;
 
-      const bookingStartTime = createPacificDate(booking.request_date, booking.start_time);
-      const inviteExpiresAt = new Date(bookingStartTime.getTime() - 30 * 60 * 1000);
-
       participantInput = {
         userId: memberInfo.id,
         participantType: 'member',
         displayName,
-        invitedAt: new Date(),
-        inviteExpiresAt,
       };
     } else {
       await ensureGuestPassRecord(booking.owner_email, ownerTier || undefined);
@@ -531,17 +525,17 @@ export async function addParticipant(params: {
 
         await notifyMember({
           userEmail: memberInfo.email.toLowerCase(),
-          type: 'booking_invite',
-          title: 'You\'ve been added to a booking',
+          type: 'booking_update',
+          title: 'Added to a booking',
           message: `${booking.owner_name || 'A member'} has added you to their simulator booking on ${formattedDate}${timeDisplay}`,
           relatedId: bookingId
         });
 
-        logger.info('[roster] Invite notification sent', {
-          extra: { bookingId, invitedMember: memberInfo.email }
+        logger.info('[roster] Notification sent', {
+          extra: { bookingId, addedMember: memberInfo.email }
         });
       } catch (notifError: unknown) {
-        logger.warn('[roster] Failed to send invite notification (non-blocking)', {
+        logger.warn('[roster] Failed to send notification (non-blocking)', {
           error: notifError as Error,
           extra: { bookingId, memberEmail: memberInfo.email }
         });
@@ -1274,7 +1268,7 @@ export async function acceptInvite(params: {
     userEmail: booking.user_email || booking.owner_email,
     title: 'Invite Accepted',
     message: `${invitedMemberName} accepted your invite to the booking on ${booking.request_date}`,
-    type: 'booking_invite',
+    type: 'booking_update',
     relatedId: params.bookingId,
     relatedType: 'booking',
     url: '/sims'
@@ -1354,7 +1348,7 @@ export async function declineInvite(params: {
     userEmail: booking.user_email || booking.owner_email,
     title: 'Invite Declined',
     message: `${declinedMemberName} declined your invite to the booking on ${booking.request_date}`,
-    type: 'booking_invite',
+    type: 'booking_update',
     relatedId: params.bookingId,
     relatedType: 'booking',
     url: '/sims'

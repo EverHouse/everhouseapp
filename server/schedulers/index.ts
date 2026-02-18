@@ -8,7 +8,6 @@ import { startBackgroundSyncScheduler } from './backgroundSyncScheduler';
 import { startDailyReminderScheduler } from './dailyReminderScheduler';
 import { startMorningClosureScheduler } from './morningClosureScheduler';
 import { startWeeklyCleanupScheduler } from './weeklyCleanupScheduler';
-import { startInviteExpiryScheduler } from './inviteExpiryScheduler';
 import { startCommunicationLogsScheduler } from './communicationLogsScheduler';
 import { startWebhookLogCleanupScheduler } from './webhookLogCleanupScheduler';
 import { startHubSpotQueueScheduler } from './hubspotQueueScheduler';
@@ -31,7 +30,6 @@ export function initSchedulers(): void {
   schedulerTracker.registerScheduler('Daily Reminder', 30 * 60 * 1000);
   schedulerTracker.registerScheduler('Morning Closure', 30 * 60 * 1000);
   schedulerTracker.registerScheduler('Weekly Cleanup', 60 * 60 * 1000);
-  schedulerTracker.registerScheduler('Invite Expiry', 5 * 60 * 1000);
   schedulerTracker.registerScheduler('Integrity Check', 30 * 60 * 1000);
   schedulerTracker.registerScheduler('Auto-Fix Tiers', 4 * 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Abandoned Pending Cleanup', 6 * 60 * 60 * 1000);
@@ -60,7 +58,6 @@ export function initSchedulers(): void {
   startDailyReminderScheduler();
   startMorningClosureScheduler();
   startWeeklyCleanupScheduler();
-  startInviteExpiryScheduler();
   startIntegrityScheduler();
   startWaiverReviewScheduler();
   startStripeReconciliationScheduler();

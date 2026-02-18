@@ -112,7 +112,6 @@ interface DBBookingRequest {
   is_linked_member?: boolean;
   primary_booker_name?: string | null;
   declared_player_count?: number;
-  invite_status?: 'pending' | 'accepted' | 'declined' | null;
   overage_minutes?: number;
   overage_fee_cents?: number;
   overage_paid?: boolean;
@@ -171,15 +170,10 @@ const Dashboard: React.FC = () => {
   const [showGuestCheckin, setShowGuestCheckin] = useState(false);
   const [isCardOpen, setIsCardOpen] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
-  const [processingInviteId, setProcessingInviteId] = useState<number | null>(null);
   // Optimistic UI state
   const [optimisticCancellingIds, setOptimisticCancellingIds] = useState<Set<number>>(new Set());
   const [optimisticCancelledIds, setOptimisticCancelledIds] = useState<Set<number>>(new Set());
-  const [optimisticAcceptedInviteIds, setOptimisticAcceptedInviteIds] = useState<Set<number>>(new Set());
-  const [optimisticDeclinedInviteIds, setOptimisticDeclinedInviteIds] = useState<Set<number>>(new Set());
-  const [optimisticInviteAction, setOptimisticInviteAction] = useState<{ id: number; action: 'accepting' | 'declining' } | null>(null);
   const [scheduleRef] = useAutoAnimate();
-  const [invitesRef] = useAutoAnimate();
   const [overagePaymentBooking, setOveragePaymentBooking] = useState<{ id: number; amount: number; minutes: number } | null>(null);
   const [isPayingOverage, setIsPayingOverage] = useState(false);
   const [showFirstLoginModal, setShowFirstLoginModal] = useState(false);
@@ -459,27 +453,11 @@ const Dashboard: React.FC = () => {
     .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
     [0];
 
-  const pendingInvites = dbBookingRequests.filter(r => 
-    r.is_linked_member === true && 
-    r.invite_status === 'pending' &&
-    ['pending', 'pending_approval', 'approved', 'confirmed'].includes(r.status) &&
-    // Exclude invites that have been optimistically accepted or declined
-    !optimisticAcceptedInviteIds.has(r.id) &&
-    !optimisticDeclinedInviteIds.has(r.id)
-  );
-  
-  const pendingInviteIds = new Set(pendingInvites.map(p => p.id));
-  
   const upcomingItemsFiltered = upcomingItems.filter(item => {
     if (item.type === 'booking_request' || item.type === 'booking') {
       const raw = item.raw as DBBookingRequest;
       if (raw) {
-        // Exclude bookings that have been optimistically cancelled
         if (optimisticCancelledIds.has(raw.id)) {
-          return false;
-        }
-        // Exclude pending invites (unless optimistically accepted)
-        if (pendingInviteIds.has(raw.id) && !optimisticAcceptedInviteIds.has(raw.id)) {
           return false;
         }
       }
@@ -681,96 +659,6 @@ const Dashboard: React.FC = () => {
           }
         } catch (err) {
           showToast('Failed to cancel enrollment', 'error');
-        }
-      }
-    });
-  };
-
-  const handleAcceptInvite = async (bookingId: number) => {
-    setProcessingInviteId(bookingId);
-    // Optimistic UI: immediately show accepting state
-    setOptimisticInviteAction({ id: bookingId, action: 'accepting' });
-    setOptimisticAcceptedInviteIds(prev => new Set(prev).add(bookingId));
-    
-    try {
-      const body = isAdminViewingAs && user?.email ? { onBehalfOf: user.email } : {};
-      
-      const result = await apiRequest(`/api/bookings/${bookingId}/invite/accept`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      
-      if (result.ok) {
-        showToast('Invite accepted!', 'success');
-        refetchAllData();
-      } else {
-        // Revert optimistic state on failure
-        setOptimisticAcceptedInviteIds(prev => {
-          const next = new Set(prev);
-          next.delete(bookingId);
-          return next;
-        });
-        showToast(result.error || 'Failed to accept invite', 'error');
-      }
-    } catch (err) {
-      // Revert optimistic state on error
-      setOptimisticAcceptedInviteIds(prev => {
-        const next = new Set(prev);
-        next.delete(bookingId);
-        return next;
-      });
-      showToast('Failed to accept invite', 'error');
-    } finally {
-      setProcessingInviteId(null);
-      setOptimisticInviteAction(null);
-    }
-  };
-
-  const handleDeclineInvite = (bookingId: number, primaryBookerName?: string | null) => {
-    setConfirmModal({
-      isOpen: true,
-      title: "Decline Invite",
-      message: `Are you sure you want to decline this booking invite${primaryBookerName ? ` from ${primaryBookerName}` : ''}? This will remove you from the booking.`,
-      onConfirm: async () => {
-        setConfirmModal(null);
-        setProcessingInviteId(bookingId);
-        // Optimistic UI: immediately show declining state and hide invite
-        setOptimisticInviteAction({ id: bookingId, action: 'declining' });
-        setOptimisticDeclinedInviteIds(prev => new Set(prev).add(bookingId));
-        
-        try {
-          const body = isAdminViewingAs && user?.email ? { onBehalfOf: user.email } : {};
-          
-          const result = await apiRequest(`/api/bookings/${bookingId}/invite/decline`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-          });
-          
-          if (result.ok) {
-            showToast('Invite declined', 'success');
-            refetchAllData();
-          } else {
-            // Revert optimistic state on failure
-            setOptimisticDeclinedInviteIds(prev => {
-              const next = new Set(prev);
-              next.delete(bookingId);
-              return next;
-            });
-            showToast(result.error || 'Failed to decline invite', 'error');
-          }
-        } catch (err) {
-          // Revert optimistic state on error
-          setOptimisticDeclinedInviteIds(prev => {
-            const next = new Set(prev);
-            next.delete(bookingId);
-            return next;
-          });
-          showToast('Failed to decline invite', 'error');
-        } finally {
-          setProcessingInviteId(null);
-          setOptimisticInviteAction(null);
         }
       }
     });
@@ -983,105 +871,6 @@ const Dashboard: React.FC = () => {
         </div>
       ) : (
         <>
-          {/* Pending Invites Section */}
-          {pendingInvites.length > 0 && (
-            <div className="mb-6 animate-slide-up-stagger" style={{ '--stagger-index': 3 } as React.CSSProperties}>
-              <div className="flex justify-between items-center mb-4 px-1">
-                <h3 className={`text-sm font-bold uppercase tracking-wider ${isDark ? 'text-amber-400/90' : 'text-amber-600'}`}>
-                  <span className="material-symbols-outlined text-base mr-1 align-text-bottom">mail</span>
-                  Pending Invites ({pendingInvites.length})
-                </h3>
-              </div>
-              <div ref={invitesRef} className="space-y-3">
-                {pendingInvites.map((invite, idx) => (
-                  <div 
-                    key={`invite-${invite.id}`}
-                    className={`rounded-2xl p-4 border ${isDark ? 'bg-amber-900/20 border-amber-500/30' : 'bg-amber-50 border-amber-200'} animate-slide-up-stagger`}
-                    style={{ '--stagger-index': idx + 3 } as React.CSSProperties}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 min-w-0 flex-1">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isDark ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
-                          <span className={`material-symbols-outlined text-xl ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>sports_golf</span>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h4 className={`font-bold text-sm ${isDark ? 'text-white' : 'text-primary'}`}>
-                            {invite.resource_name || invite.bay_name || 'Simulator'}
-                          </h4>
-                          <p className={`text-xs mt-0.5 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
-                            {formatDate(invite.request_date)} • {formatTime12Hour(invite.start_time)} - {formatTime12Hour(invite.end_time)}
-                          </p>
-                          {invite.primary_booker_name && (
-                            <p className={`text-xs mt-1 ${isDark ? 'text-amber-400/80' : 'text-amber-600/80'}`}>
-                              Invited by {invite.primary_booker_name.split(' ')[0]}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full flex-shrink-0 ${isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-700'}`}>
-                        Invite
-                      </span>
-                    </div>
-                    <div className="flex gap-2 mt-3">
-                      {(() => {
-                        const isProcessing = processingInviteId === invite.id;
-                        const isAccepting = optimisticInviteAction?.id === invite.id && optimisticInviteAction?.action === 'accepting';
-                        const isDeclining = optimisticInviteAction?.id === invite.id && optimisticInviteAction?.action === 'declining';
-                        
-                        return (
-                          <>
-                            <button
-                              onClick={() => handleAcceptInvite(invite.id)}
-                              disabled={isProcessing}
-                              className={`flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 transition-all duration-fast ${
-                                isProcessing 
-                                  ? 'opacity-70 cursor-not-allowed' 
-                                  : 'hover:scale-[0.98] active:scale-95'
-                              } ${isDark ? 'bg-brand-green text-white' : 'bg-brand-green text-white'}`}
-                            >
-                              {isAccepting ? (
-                                <>
-                                  <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
-                                  Accepting...
-                                </>
-                              ) : (
-                                <>
-                                  <span className="material-symbols-outlined text-base">check</span>
-                                  Accept
-                                </>
-                              )}
-                            </button>
-                            <button
-                              onClick={() => handleDeclineInvite(invite.id, invite.primary_booker_name)}
-                              disabled={isProcessing}
-                              className={`flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 transition-all duration-fast ${
-                                isProcessing 
-                                  ? 'opacity-70 cursor-not-allowed' 
-                                  : 'hover:scale-[0.98] active:scale-95'
-                              } ${isDark ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-gray-100 text-primary hover:bg-gray-200'}`}
-                            >
-                              {isDeclining ? (
-                                <>
-                                  <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
-                                  Declining...
-                                </>
-                              ) : (
-                                <>
-                                  <span className="material-symbols-outlined text-base">close</span>
-                                  Decline
-                                </>
-                              )}
-                            </button>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Your Schedule - Combined Bookings, Events & Wellness */}
           <div className="animate-slide-up-stagger" style={{ '--stagger-index': 4 } as React.CSSProperties}>
             <div className="flex justify-between items-center mb-4 px-1">

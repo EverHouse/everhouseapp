@@ -54,7 +54,6 @@ export {
   recordUsage,
   getSessionById,
   getSessionParticipants,
-  updateParticipantInviteStatus,
   createOrFindGuest,
   linkBookingRequestToSession,
   createSessionWithUsageTracking,

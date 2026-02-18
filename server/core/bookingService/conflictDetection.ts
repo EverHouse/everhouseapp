@@ -12,7 +12,7 @@ export interface ConflictingBooking {
   endTime: string;
   ownerName: string | null;
   ownerEmail: string;
-  conflictType: 'owner' | 'participant' | 'invite';
+  conflictType: 'owner' | 'participant';
 }
 
 export interface ConflictCheckResult {
@@ -133,7 +133,7 @@ export async function findConflictingBookings(
         LEFT JOIN resources r ON bs.resource_id = r.id
         WHERE bp.user_id = $1
           AND bs.session_date = $2
-          AND bp.invite_status IN ('pending', 'accepted')
+          AND bp.invite_status = 'accepted'
           AND br.status IN (${statusPlaceholders})
           ${excludeBookingId ? `AND br.id != $${excludeIdPlaceholder}` : ''}
       `;
@@ -162,7 +162,7 @@ export async function findConflictingBookings(
       }
     }
 
-    const inviteQuery = `
+    const linkedMemberQuery = `
       SELECT 
         br.id as booking_id,
         COALESCE(r.name, 'Unknown Resource') as resource_name,
@@ -179,13 +179,13 @@ export async function findConflictingBookings(
         AND br.status IN (${statusPlaceholders})
         ${excludeBookingId ? `AND br.id != $${excludeIdPlaceholder}` : ''}
     `;
-    const inviteParams = excludeBookingId
+    const linkedMemberParams = excludeBookingId
       ? [normalizedEmail, date, ...OCCUPIED_STATUSES, excludeBookingId]
       : [normalizedEmail, date, ...OCCUPIED_STATUSES];
     
-    const inviteResult = await pool.query(inviteQuery, inviteParams);
+    const linkedMemberResult = await pool.query(linkedMemberQuery, linkedMemberParams);
     
-    for (const row of inviteResult.rows) {
+    for (const row of linkedMemberResult.rows) {
       if (timePeriodsOverlap(startTime, endTime, row.start_time, row.end_time)) {
         const isDuplicate = conflicts.some(c => c.bookingId === row.booking_id);
         if (!isDuplicate) {
@@ -197,7 +197,7 @@ export async function findConflictingBookings(
             endTime: row.end_time,
             ownerName: row.owner_name,
             ownerEmail: row.owner_email,
-            conflictType: 'invite'
+            conflictType: 'participant'
           });
         }
       }
