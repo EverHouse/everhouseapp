@@ -68,6 +68,7 @@ export interface MemberProfile {
   dateOfBirth?: string | null;
   billingGroupId?: number | null;
   billingProvider?: string | null;
+  discountCode?: string | null;
   streetAddress?: string | null;
   city?: string | null;
   state?: string | null;

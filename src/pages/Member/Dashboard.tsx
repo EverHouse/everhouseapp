@@ -15,11 +15,10 @@ import { downloadICalFile } from '../../utils/icalUtils';
 import { DashboardSkeleton } from '../../components/skeletons';
 import { usePricing } from '../../hooks/usePricing';
 import { SmoothReveal } from '../../components/motion/SmoothReveal';
-import { getBaseTier, isFoundingMember } from '../../utils/permissions';
+import { getBaseTier } from '../../utils/permissions';
 import { getTierColor } from '../../utils/tierUtils';
 import { getStatusBadge as getStatusBadgeColor, formatStatusLabel } from '../../utils/statusColors';
 import TierBadge from '../../components/TierBadge';
-import TagBadge from '../../components/TagBadge';
 import HubSpotFormModal from '../../components/HubSpotFormModal';
 import PullToRefresh from '../../components/PullToRefresh';
 import { useTierPermissions } from '../../hooks/useTierPermissions';
@@ -928,12 +927,6 @@ const Dashboard: React.FC = () => {
                             Expired
                           </span>
                         )}
-                        {!isExpired && (user?.tags || []).filter((tag): tag is string => typeof tag === 'string').map((tag) => (
-                          <TagBadge key={tag} tag={tag} size="sm" />
-                        ))}
-                        {!isExpired && !user?.tags?.length && isFoundingMember(user?.tier || '', user?.isFounding) && (
-                          <TagBadge tag="Founding Member" size="sm" />
-                        )}
                       </div>
                     </div>
                     <div>
@@ -1472,16 +1465,6 @@ const Dashboard: React.FC = () => {
                     </span>
                   )}
                 </div>
-                {!isExpiredModal && ((user.tags || []).length > 0 || isFoundingMember(user.tier || '', user.isFounding)) && (
-                  <div className="flex items-center justify-center gap-2 flex-wrap">
-                    {(user.tags || []).filter((tag): tag is string => typeof tag === 'string').map((tag) => (
-                      <TagBadge key={tag} tag={tag} size="sm" />
-                    ))}
-                    {!user.tags?.length && isFoundingMember(user.tier || '', user.isFounding) && (
-                      <TagBadge tag="Founding Member" size="sm" />
-                    )}
-                  </div>
-                )}
                 {isExpiredModal && (
                   <div className="mt-4 p-3 rounded-xl bg-red-500/20 border border-red-500/30">
                     <p className="text-sm text-red-200 text-center mb-2">Your membership has expired</p>

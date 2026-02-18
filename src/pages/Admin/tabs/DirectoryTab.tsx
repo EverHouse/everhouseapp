@@ -8,7 +8,6 @@ import { usePageReady } from '../../../contexts/PageReadyContext';
 import { useBottomNav } from '../../../contexts/BottomNavContext';
 import { useIsMobile } from '../../../hooks/useBreakpoint';
 import TierBadge from '../../../components/TierBadge';
-import TagBadge from '../../../components/TagBadge';
 import MemberProfileDrawer from '../../../components/MemberProfileDrawer';
 import { NewUserDrawer } from '../../../components/staff-command-center/drawers/NewUserDrawer';
 import { DirectoryTabSkeleton } from '../../../components/skeletons';
@@ -198,6 +197,7 @@ const DirectoryTab: React.FC = () => {
     const [membershipStatusFilter, setMembershipStatusFilter] = useState<string>('All');
     const [appUsageFilter, setAppUsageFilter] = useState<'All' | 'Logged In' | 'Never Logged In'>('All');
     const [billingFilter, setBillingFilter] = useState<BillingFilter>('All');
+    const [discountFilter, setDiscountFilter] = useState<string>('All');
     const [selectedMember, setSelectedMember] = useState<MemberProfile | null>(null);
     const [isViewingDetails, setIsViewingDetails] = useState(false);
     const [memberTab, setMemberTab] = useState<MemberTab>('active');
@@ -487,6 +487,7 @@ const DirectoryTab: React.FC = () => {
         setMemberTab(tab);
         setStatusFilter('All');
         setMembershipStatusFilter('All');
+        setDiscountFilter('All');
         setPurchaseFilter('all');
         if (tab === 'former') {
             setFormerLoading(true);
@@ -673,6 +674,14 @@ const DirectoryTab: React.FC = () => {
         return sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward';
     };
 
+    const discountCodes = useMemo(() => {
+        const codes = new Set<string>();
+        regularMembers.forEach(m => {
+            if (m.discountCode) codes.add(m.discountCode);
+        });
+        return Array.from(codes).sort();
+    }, [regularMembers]);
+
     const filteredList = useMemo(() => {
         let filtered = regularMembers;
         
@@ -712,6 +721,10 @@ const DirectoryTab: React.FC = () => {
             } else if (billingFilter === 'Comped') {
                 filtered = filtered.filter(m => m.billingProvider === 'comped');
             }
+        }
+
+        if (discountFilter !== 'All') {
+            filtered = filtered.filter(m => m.discountCode === discountFilter);
         }
         
         if (memberTab === 'former' && statusFilter !== 'All') {
@@ -765,7 +778,7 @@ const DirectoryTab: React.FC = () => {
         });
         
         return filtered;
-    }, [regularMembers, tierFilter, appUsageFilter, statusFilter, membershipStatusFilter, billingFilter, memberTab, searchQuery, sortField, sortDirection, showMissingTierOnly]);
+    }, [regularMembers, tierFilter, appUsageFilter, statusFilter, membershipStatusFilter, billingFilter, discountFilter, memberTab, searchQuery, sortField, sortDirection, showMissingTierOnly]);
     
     const { visibleItems, hasMore, loadMoreRef, totalCount, visibleCount } = useIncrementalLoad(filteredList);
     
@@ -1077,6 +1090,35 @@ const DirectoryTab: React.FC = () => {
                     </div>
                 )}
 
+                {memberTab !== 'visitors' && memberTab !== 'team' && discountCodes.length > 0 && (
+                    <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-1">
+                        <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap flex-shrink-0">Discount:</span>
+                        <button
+                            onClick={() => setDiscountFilter('All')}
+                            className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors flex-shrink-0 whitespace-nowrap ${
+                                discountFilter === 'All'
+                                    ? 'bg-primary dark:bg-lavender text-white'
+                                    : 'bg-gray-200 dark:bg-white/20 text-gray-400 dark:text-gray-500 hover:bg-gray-300 dark:hover:bg-white/30'
+                            }`}
+                        >
+                            All
+                        </button>
+                        {discountCodes.map(code => (
+                            <button
+                                key={code}
+                                onClick={() => setDiscountFilter(code)}
+                                className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors flex-shrink-0 whitespace-nowrap ${
+                                    discountFilter === code
+                                        ? 'bg-purple-600 text-white'
+                                        : 'bg-gray-200 dark:bg-white/20 text-gray-400 dark:text-gray-500 hover:bg-gray-300 dark:hover:bg-white/30'
+                                }`}
+                            >
+                                {code}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
                 {memberTab !== 'visitors' && memberTab !== 'team' && (
                     <div className="flex items-center gap-2">
                         <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">Sort:</span>
@@ -1148,11 +1190,11 @@ const DirectoryTab: React.FC = () => {
 
                 {!formerLoading && filteredList.length === 0 && memberTab !== 'visitors' && memberTab !== 'team' && (memberTab === 'active' || formerMembers.length > 0) && (
                     <EmptyState
-                        icon={searchQuery || tierFilter !== 'All' || appUsageFilter !== 'All' || statusFilter !== 'All' ? 'search_off' : 'group'}
-                        title={searchQuery || tierFilter !== 'All' || appUsageFilter !== 'All' || statusFilter !== 'All' 
+                        icon={searchQuery || tierFilter !== 'All' || appUsageFilter !== 'All' || statusFilter !== 'All' || discountFilter !== 'All' ? 'search_off' : 'group'}
+                        title={searchQuery || tierFilter !== 'All' || appUsageFilter !== 'All' || statusFilter !== 'All' || discountFilter !== 'All'
                             ? 'No results found' 
                             : memberTab === 'former' ? 'No former members' : 'No members yet'}
-                        description={searchQuery || tierFilter !== 'All' || appUsageFilter !== 'All' || statusFilter !== 'All'
+                        description={searchQuery || tierFilter !== 'All' || appUsageFilter !== 'All' || statusFilter !== 'All' || discountFilter !== 'All'
                             ? 'Try adjusting your search or filters to find what you\'re looking for'
                             : memberTab === 'former' ? 'Former members will appear here' : 'Members will appear here once they sign up'}
                         variant="compact"
@@ -1663,9 +1705,6 @@ const DirectoryTab: React.FC = () => {
                                                             {getMemberStatusLabel(m.membershipStatus)}
                                                         </span>
                                                     )}
-                                                    {m.tags?.filter((tag): tag is string => typeof tag === 'string').map(tag => (
-                                                        <TagBadge key={tag} tag={tag} size="sm" />
-                                                    ))}
                                                     {isAdmin && memberTab === 'active' && !getDisplayTier(m) && !isMemberPendingUpdate(m.email) && (
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); openAssignTierModal(m); }}
@@ -1739,9 +1778,6 @@ const DirectoryTab: React.FC = () => {
                                                             <span className="material-symbols-outlined text-[12px] text-primary dark:text-lavender animate-spin">progress_activity</span>
                                                         )}
                                                     </div>
-                                                    {m.tags?.filter((tag): tag is string => typeof tag === 'string').map(tag => (
-                                                        <TagBadge key={tag} tag={tag} size="sm" />
-                                                    ))}
                                                     {isAdmin && !getDisplayTier(m) && !isMemberPendingUpdate(m.email) && (
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); openAssignTierModal(m); }}

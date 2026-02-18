@@ -41,7 +41,7 @@ export function NewUserDrawer({
   
   const [tiers, setTiers] = useState<MembershipTier[]>([]);
   const [dayPassProducts, setDayPassProducts] = useState<DayPassProduct[]>([]);
-  const [discounts, setDiscounts] = useState<{ id: string; code: string; percentOff: number }[]>([]);
+  const [discounts, setDiscounts] = useState<{ id: string; name: string; code: string; percentOff: number; stripeCouponId: string }[]>([]);
   const [existingBillingGroups, setExistingBillingGroups] = useState<ExistingBillingGroup[]>([]);
   
   const [isLoading, setIsLoading] = useState(false);
@@ -132,7 +132,13 @@ export function NewUserDrawer({
 
       if (discountsRes.ok) {
         const discountsData = await discountsRes.json();
-        setDiscounts(discountsData.coupons || []);
+        setDiscounts((discountsData.coupons || []).filter((c: any) => c.valid && c.percentOff).map((c: any) => ({
+          id: c.id,
+          name: c.name || c.id,
+          code: c.id,
+          percentOff: c.percentOff,
+          stripeCouponId: c.id,
+        })));
       }
 
       if (billingGroupsRes.ok) {

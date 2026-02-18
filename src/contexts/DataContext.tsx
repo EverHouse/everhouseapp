@@ -406,7 +406,8 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             membershipStatus: contact.membershipStatus || null,
             firstLoginAt: contact.firstLoginAt || null,
             lastTier: contact.lastTier || null,
-            billingGroupId: contact.billingGroupId || null
+            billingGroupId: contact.billingGroupId || null,
+            discountCode: contact.discountCode || null
           }));
           setMembers(formatted);
           initialMembersFetchedRef.current = true;
@@ -475,7 +476,8 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           membershipStatus: contact.membershipStatus || null,
           firstLoginAt: contact.firstLoginAt || null,
           lastTier: contact.lastTier || null,
-          billingGroupId: contact.billingGroupId || null
+          billingGroupId: contact.billingGroupId || null,
+          discountCode: contact.discountCode || null
         }));
         setFormerMembers(formatted);
         formerMembersFetched.current = true;
@@ -581,7 +583,8 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           membershipStatus: contact.membershipStatus || null,
           firstLoginAt: contact.firstLoginAt || null,
           lastTier: contact.lastTier || null,
-          billingGroupId: contact.billingGroupId || null
+          billingGroupId: contact.billingGroupId || null,
+          discountCode: contact.discountCode || null
         }));
         
         // Update pagination info

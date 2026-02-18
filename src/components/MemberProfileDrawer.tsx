@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useBottomNav } from '../contexts/BottomNavContext';
 import TierBadge from './TierBadge';
-import TagBadge from './TagBadge';
 import { formatPhoneNumber } from '../utils/formatting';
 import { getMemberStatusColor, getMemberStatusLabel } from '../utils/statusColors';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -660,9 +659,6 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                     {getMemberStatusLabel(member.status)}
                   </span>
                 )}
-                {member.tags?.filter((tag): tag is string => typeof tag === 'string').map(tag => (
-                  <TagBadge key={tag} tag={tag} size="sm" />
-                ))}
               </div>
             </div>
             <button
