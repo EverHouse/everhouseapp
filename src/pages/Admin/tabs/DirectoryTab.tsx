@@ -720,6 +720,7 @@ const DirectoryTab: React.FC = () => {
                 m.name.toLowerCase().includes(query) ||
                 m.email.toLowerCase().includes(query) ||
                 (m.tier && m.tier.toLowerCase().includes(query)) ||
+                (m.lastTier && m.lastTier.toLowerCase().includes(query)) ||
                 (m.phone && m.phone.toLowerCase().includes(query)) ||
                 (m.tags?.filter((t): t is string => typeof t === 'string').some(t => t.toLowerCase().includes(query)))
             );
@@ -732,7 +733,11 @@ const DirectoryTab: React.FC = () => {
                     comparison = a.name.localeCompare(b.name);
                     break;
                 case 'tier':
-                    comparison = (a.tier || '').localeCompare(b.tier || '');
+                    if (memberTab === 'former') {
+                        comparison = (a.lastTier || '').localeCompare(b.lastTier || '');
+                    } else {
+                        comparison = (a.tier || '').localeCompare(b.tier || '');
+                    }
                     break;
                 case 'visits':
                     comparison = (a.lifetimeVisits || 0) - (b.lifetimeVisits || 0);
@@ -938,7 +943,7 @@ const DirectoryTab: React.FC = () => {
 
                 {memberTab !== 'visitors' && memberTab !== 'team' && (
                     <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-1">
-                        <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap flex-shrink-0">Tier:</span>
+                        <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap flex-shrink-0">{memberTab === 'former' ? 'Last Tier:' : 'Tier:'}</span>
                         {TIER_OPTIONS.map(tier => {
                             const isSelected = tierFilter === tier;
                             const colors = tier !== 'All' ? getTierColor(tier) : { bg: '', text: '', border: '' };
