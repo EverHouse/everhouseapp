@@ -63,6 +63,14 @@ The `billing_provider` column controls which system manages a member. Valid valu
 
 The cache is shared globally in memory (`memberCache` singleton) and is not persistent across server restarts.
 
+### Email Change Cascade
+
+`cascadeEmailChange()` in `server/core/memberService/emailChangeService.ts` updates a member's email across all tables atomically: users, bookings, sessions, guest passes, billing records, notifications, audit logs, and more. Returns a report of tables and rows affected. Always call this instead of updating email in a single table.
+
+### Type Definitions
+
+`server/core/memberService/memberTypes.ts` defines `MemberRecord`, `StaffRecord`, `BillingMemberMatch`, `MemberLookupOptions`, and identifier detection utilities (`isUUID`, `isEmail`, `isHubSpotId`, `detectIdentifierType`, `normalizeEmail`).
+
 ## Login-Time Auto-Fix (Stripe Member Auto-Fix)
 
 When a Stripe-billed member logs in and their database `membership_status` is not in `['active', 'trialing', 'past_due']`:
