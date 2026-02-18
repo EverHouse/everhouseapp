@@ -41,35 +41,6 @@ export function normalizeTierName(tierString: string | null | undefined): TierNa
   return DEFAULT_TIER;
 }
 
-export function isFoundingMember(tierString: string | null | undefined, foundingFlag?: boolean): boolean {
-  if (foundingFlag !== undefined) {
-    return foundingFlag;
-  }
-  if (!tierString) {
-    return false;
-  }
-  const normalized = tierString.toLowerCase();
-  return normalized.includes('founding');
-}
-
-export function extractTierTags(tierString: string | null | undefined, discountReason?: string | null): string[] {
-  const tags: string[] = [];
-  
-  const combined = `${tierString || ''} ${discountReason || ''}`.toLowerCase();
-  
-  if (combined.includes('founding')) {
-    tags.push('Founding Member');
-  }
-  if (combined.includes('investor')) {
-    tags.push('Investor');
-  }
-  if (combined.includes('referral')) {
-    tags.push('Referral');
-  }
-  
-  return tags;
-}
-
 export function compareTiers(tier1: TierName, tier2: TierName): number {
   return TIER_HIERARCHY[tier1] - TIER_HIERARCHY[tier2];
 }

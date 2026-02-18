@@ -1,6 +1,5 @@
 import { 
   normalizeTierName, 
-  isFoundingMember as sharedIsFoundingMember,
   TierName,
   DEFAULT_TIER,
   TIER_NAMES 
@@ -12,8 +11,8 @@ export function getBaseTier(tierName: string): BaseTier {
   return normalizeTierName(tierName);
 }
 
-export function isFoundingMember(tierName: string, isFounding?: boolean): boolean {
-  return sharedIsFoundingMember(tierName, isFounding);
+export function isFoundingMember(_tierName: string, isFounding?: boolean): boolean {
+  return isFounding === true;
 }
 
 export function isVIPMember(tierName: string): boolean {

@@ -1304,4 +1304,44 @@ router.post('/api/members/merge/execute', isAdmin, async (req, res) => {
   }
 });
 
+router.post('/api/members/backfill-discount-codes', isAdmin, async (req, res) => {
+  try {
+    const usersWithSubs = await db.execute(
+      sql`SELECT id, email, stripe_subscription_id FROM users WHERE stripe_subscription_id IS NOT NULL AND stripe_subscription_id != ''`
+    );
+    
+    const total = usersWithSubs.rows.length;
+    let updated = 0;
+    const BATCH_SIZE = 10;
+    
+    const { getStripeClient } = await import('../../core/stripe/client');
+    const stripe = await getStripeClient();
+    
+    for (let i = 0; i < total; i += BATCH_SIZE) {
+      const batch = usersWithSubs.rows.slice(i, i + BATCH_SIZE);
+      
+      await Promise.all(batch.map(async (row: any) => {
+        try {
+          const subscription = await stripe.subscriptions.retrieve(row.stripe_subscription_id);
+          const couponName = subscription.discount?.coupon?.name;
+          
+          if (couponName) {
+            await db.execute(
+              sql`UPDATE users SET discount_code = ${couponName}, updated_at = NOW() WHERE id = ${row.id}`
+            );
+            updated++;
+          }
+        } catch (err: unknown) {
+          logger.warn('[Backfill] Failed to retrieve subscription for user', { extra: { email: row.email, error: getErrorMessage(err) } });
+        }
+      }));
+    }
+    
+    res.json({ updated, total });
+  } catch (error: unknown) {
+    logger.error('[Backfill] Error backfilling discount codes', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to backfill discount codes' });
+  }
+});
+
 export default router;

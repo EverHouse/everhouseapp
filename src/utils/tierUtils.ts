@@ -1,5 +1,5 @@
 import { getBaseTier, type BaseTier, DEFAULT_TIER } from './permissions';
-import { normalizeTierName, extractTierTags } from '../../shared/constants/tiers';
+import { normalizeTierName } from '../../shared/constants/tiers';
 
 export type { BaseTier };
 
@@ -29,7 +29,7 @@ export const AVAILABLE_TAGS = ['Founding Member', 'Investor', 'Referral'];
 export function parseTierString(tierString: string): { tier: BaseTier; tags: string[] } {
   return { 
     tier: normalizeTierName(tierString), 
-    tags: extractTierTags(tierString) 
+    tags: [] 
   };
 }
 

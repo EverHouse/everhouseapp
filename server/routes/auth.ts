@@ -7,7 +7,7 @@ import { db } from '../db';
 import { users, magicLinks, staffUsers, membershipTiers } from '../../shared/schema';
 import { isProduction, pool } from '../core/db';
 import { getHubSpotClient } from '../core/integrations';
-import { normalizeTierName, extractTierTags, DEFAULT_TIER } from '../../shared/constants/tiers';
+import { normalizeTierName, DEFAULT_TIER } from '../../shared/constants/tiers';
 import { getResendClient } from '../utils/resend';
 import { triggerMemberSync } from '../core/memberSync';
 import { withResendRetry } from '../core/retryUtils';
@@ -554,7 +554,7 @@ router.post('/api/auth/verify-member', async (req, res) => {
       phone,
       jobTitle,
       tier: isStaffOrAdmin ? 'VIP' : normalizeTierName(dbUser[0]?.tier || contact?.properties.membership_tier),
-      tags: isStaffOrAdmin ? [] : (dbUser[0]?.tags || extractTierTags(contact?.properties.membership_tier, contact?.properties.membership_discount_reason)),
+      tags: dbUser[0]?.tags || [],
       mindbodyClientId: dbUser[0]?.mindbodyClientId || contact?.properties.mindbody_client_id || '',
       status: statusMap[memberStatusStr] || 'Active',
       role
@@ -971,7 +971,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
         }
         
         // Prefer database data, fall back to HubSpot
-        const tags = hasDbUser ? (dbUser[0].tags || []) : extractTierTags(contact?.properties.membership_tier, contact?.properties.membership_discount_reason);
+        const tags = hasDbUser ? (dbUser[0].tags || []) : [];
         
         const statusMap: { [key: string]: string } = {
           'active': 'Active',
@@ -1200,7 +1200,7 @@ router.post('/api/auth/password-login', async (req, res) => {
           email: normalizedEmail,
           phone: contact.properties.phone || '',
           tier: normalizeTierName(contact.properties.membership_tier),
-          tags: extractTierTags(contact.properties.membership_tier, contact.properties.membership_discount_reason),
+          tags: [],
           mindbodyClientId: contact.properties.mindbody_client_id || '',
           membershipStartDate: contact.properties.membership_start_date || '',
         };

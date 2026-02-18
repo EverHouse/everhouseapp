@@ -9,7 +9,7 @@ import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { notifyAllStaff } from '../core/notificationService';
 import { isStaffOrAdmin } from '../core/middleware';
 import { getSessionUser } from '../types/session';
-import { normalizeTierName, extractTierTags, TIER_NAMES } from '../../shared/constants/tiers';
+import { normalizeTierName, TIER_NAMES } from '../../shared/constants/tiers';
 import * as fs from 'fs';
 import * as path from 'path';
 import pRetry, { AbortError } from 'p-retry';
@@ -289,7 +289,7 @@ function transformHubSpotContact(contact: any): any {
     status: membershipStatus || (isActiveMember ? 'active' : ''),
     tier: normalizeTierName(rawTierValue),
     rawTier: rawTierValue && rawTierValue.trim() ? rawTierValue.trim() : null,
-    tags: extractTierTags(contact.properties.membership_tier, contact.properties.membership_discount_reason),
+    tags: [],
     membershipStartDate,
     createdAt: contact.properties.createdate,
     lastModified: contact.properties.lastmodifieddate,
@@ -700,7 +700,7 @@ router.get('/api/hubspot/contacts/:id', isStaffOrAdmin, async (req, res) => {
       company: contact.properties.company || '',
       status: normalizedStatus,
       tier: normalizeTierName(contact.properties.membership_tier),
-      tags: extractTierTags(contact.properties.membership_tier, contact.properties.membership_discount_reason),
+      tags: [],
       createdAt: contact.properties.createdate,
       joinDate: normalizeDateToYYYYMMDD(contact.properties.createdate) || null
     });

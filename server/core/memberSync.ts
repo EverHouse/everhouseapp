@@ -4,7 +4,7 @@ import { formatDatePacific } from '../utils/dateUtils';
 import { users, membershipTiers } from '../../shared/schema';
 import { memberNotes, communicationLogs, userLinkedEmails } from '../../shared/models/membership';
 import { getHubSpotClient } from './integrations';
-import { normalizeTierName, extractTierTags, TIER_NAMES } from '../../shared/constants/tiers';
+import { normalizeTierName, TIER_NAMES } from '../../shared/constants/tiers';
 import { sql, eq, and } from 'drizzle-orm';
 import { isProduction } from './db';
 import { broadcastMemberDataUpdated, broadcastDataIntegrityUpdate } from './websocket';
@@ -315,7 +315,8 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           }
           // If normalizedTier is null, the upsert will preserve the existing tier value via COALESCE
           const tierId = normalizedTier ? (tierCache.get(normalizedTier.toLowerCase()) || null) : null;
-          const tags = extractTierTags(contact.properties.membership_tier, contact.properties.membership_discount_reason);
+          const tags: string[] = [];
+          const discountCode = contact.properties.membership_discount_reason?.trim() || null;
           
           // PRIORITIZE membership_start_date for joinDate (when they became a member), fallback to createdate
           let joinDate: string | null = null;
@@ -423,6 +424,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
               smsTransactionalOptIn,
               smsRemindersOptIn,
               stripeDelinquent,
+              discountCode,
               streetAddress,
               city,
               state,
@@ -443,7 +445,6 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
                 hubspotId: contact.id,
                 membershipStatus: isProtected ? sql`${users.membershipStatus}` : status,
                 role: isVisitorProtected ? sql`${users.role}` : sql`COALESCE(${users.role}, 'member')`,
-                // Use HubSpot value directly - clear stale mindbody IDs not present in HubSpot
                 mindbodyClientId: contact.properties.mindbody_client_id || null,
                 joinDate: joinDate ? joinDate : sql`${users.joinDate}`,
                 emailOptIn: emailOptIn !== null ? emailOptIn : sql`${users.emailOptIn}`,
@@ -452,6 +453,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
                 smsTransactionalOptIn: smsTransactionalOptIn !== null ? smsTransactionalOptIn : sql`${users.smsTransactionalOptIn}`,
                 smsRemindersOptIn: smsRemindersOptIn !== null ? smsRemindersOptIn : sql`${users.smsRemindersOptIn}`,
                 stripeDelinquent: stripeDelinquent !== null ? stripeDelinquent : sql`${users.stripeDelinquent}`,
+                discountCode: discountCode !== null ? discountCode : sql`${users.discountCode}`,
                 streetAddress: sql`COALESCE(${streetAddress}, ${users.streetAddress})`,
                 city: sql`COALESCE(${city}, ${users.city})`,
                 state: sql`COALESCE(${state}, ${users.state})`,
@@ -491,8 +493,6 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
             console.error(`[MemberSync] Error checking for HubSpot ID collisions:`, dupError);
           }
           
-          // Sync HubSpot notes to member_notes table with change detection
-          // When notes change in HubSpot, create a NEW dated note (don't overwrite old ones)
           const hubspotNotes = contact.properties.membership_notes?.trim();
           const hubspotMessage = contact.properties.message?.trim();
           
@@ -886,7 +886,8 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
             console.warn(`[MemberSync] UNRECOGNIZED TIER "${rawTier}" for ${email} - requires manual mapping, tier will not be updated`);
           }
           const tierId = normalizedTier ? (tierCache.get(normalizedTier.toLowerCase()) || null) : null;
-          const tags = extractTierTags(contact.properties.membership_tier, contact.properties.membership_discount_reason);
+          const tags: string[] = [];
+          const discountCode = contact.properties.membership_discount_reason?.trim() || null;
           
           let joinDate: string | null = null;
           if (contact.properties.membership_start_date) {
@@ -987,6 +988,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
               smsTransactionalOptIn,
               smsRemindersOptIn,
               stripeDelinquent,
+              discountCode,
               streetAddress,
               city,
               state,
@@ -1015,6 +1017,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
                 smsTransactionalOptIn: smsTransactionalOptIn !== null ? smsTransactionalOptIn : sql`${users.smsTransactionalOptIn}`,
                 smsRemindersOptIn: smsRemindersOptIn !== null ? smsRemindersOptIn : sql`${users.smsRemindersOptIn}`,
                 stripeDelinquent: stripeDelinquent !== null ? stripeDelinquent : sql`${users.stripeDelinquent}`,
+                discountCode: discountCode !== null ? discountCode : sql`${users.discountCode}`,
                 streetAddress: sql`COALESCE(${streetAddress}, ${users.streetAddress})`,
                 city: sql`COALESCE(${city}, ${users.city})`,
                 state: sql`COALESCE(${state}, ${users.state})`,

@@ -24,6 +24,7 @@ export const users = pgTable("users", {
   tier: varchar("tier"),
   tierId: integer("tier_id"),
   tags: jsonb("tags").default(sql`'[]'::jsonb`),
+  discountCode: varchar("discount_code"),
   phone: varchar("phone"),
   mindbodyClientId: varchar("mindbody_client_id"),
   lifetimeVisits: integer("lifetime_visits").default(0),

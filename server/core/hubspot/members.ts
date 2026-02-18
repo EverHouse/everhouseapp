@@ -435,8 +435,8 @@ export async function createMemberLocally(input: AddMemberInput): Promise<Create
       `INSERT INTO users (
         email, first_name, last_name, phone, role, tier, 
         membership_status, billing_provider,
-        tags, data_source, join_date, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, 'member', $5, 'active', 'hubspot', $6, 'staff_manual', $7, NOW(), NOW())
+        tags, discount_code, data_source, join_date, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, 'member', $5, 'active', 'hubspot', $6, $8, 'staff_manual', $7, NOW(), NOW())
       RETURNING id`,
       [
         normalizedEmail,
@@ -445,7 +445,8 @@ export async function createMemberLocally(input: AddMemberInput): Promise<Create
         phone || null,
         tier,
         JSON.stringify(tags),
-        startDate || getTodayPacific()
+        startDate || getTodayPacific(),
+        discountReason || null
       ]
     );
 
