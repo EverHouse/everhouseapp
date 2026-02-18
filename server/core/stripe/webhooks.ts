@@ -2429,7 +2429,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
 
     // First try to find user by stripe_customer_id
     let userResult = await client.query(
-      'SELECT email, first_name, last_name, tier, membership_status FROM users WHERE stripe_customer_id = $1',
+      'SELECT email, first_name, last_name, tier, membership_status, billing_provider FROM users WHERE stripe_customer_id = $1',
       [customerId]
     );
     
@@ -2438,7 +2438,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
     if (userResult.rows.length === 0 && purchaserEmail) {
       console.log(`[Stripe Webhook] No user found by customer ID, trying by email from metadata: ${purchaserEmail}`);
       userResult = await client.query(
-        'SELECT email, first_name, last_name, tier, membership_status FROM users WHERE LOWER(email) = LOWER($1)',
+        'SELECT email, first_name, last_name, tier, membership_status, billing_provider FROM users WHERE LOWER(email) = LOWER($1)',
         [purchaserEmail]
       );
     }
@@ -2566,8 +2566,8 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
            ON CONFLICT (email) DO UPDATE SET 
              stripe_customer_id = EXCLUDED.stripe_customer_id,
              stripe_subscription_id = EXCLUDED.stripe_subscription_id,
-             membership_status = $7,
-             billing_provider = 'stripe',
+             membership_status = CASE WHEN users.billing_provider IS NULL OR users.billing_provider = '' OR users.billing_provider = 'stripe' THEN $7 ELSE users.membership_status END,
+             billing_provider = CASE WHEN users.billing_provider IS NULL OR users.billing_provider = '' OR users.billing_provider = 'stripe' THEN 'stripe' ELSE users.billing_provider END,
              stripe_current_period_end = COALESCE($9, users.stripe_current_period_end),
              tier = COALESCE(EXCLUDED.tier, users.tier),
              role = 'member',
@@ -2656,6 +2656,12 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
       last_name = userResult.rows[0].last_name;
       currentTier = userResult.rows[0].tier;
       currentStatus = userResult.rows[0].membership_status;
+
+      const existingBillingProvider = userResult.rows[0].billing_provider;
+      if (existingBillingProvider && existingBillingProvider !== 'stripe') {
+        console.log(`[Stripe Webhook] Skipping subscription created for ${email} — billing_provider is '${existingBillingProvider}', not 'stripe'`);
+        return deferredActions;
+      }
 
       const statusMap: Record<string, string> = {
         'active': 'active',
@@ -2998,7 +3004,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
     }
 
     const userResult = await client.query(
-      'SELECT id, email, first_name, last_name, tier FROM users WHERE stripe_customer_id = $1',
+      'SELECT id, email, first_name, last_name, tier, billing_provider FROM users WHERE stripe_customer_id = $1',
       [customerId]
     );
 
@@ -3009,6 +3015,12 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
 
     const { id: userId, email, first_name, last_name, tier: currentTier } = userResult.rows[0];
     const memberName = `${first_name || ''} ${last_name || ''}`.trim() || email;
+
+    const userBillingProvider = userResult.rows[0].billing_provider;
+    if (userBillingProvider && userBillingProvider !== 'stripe') {
+      console.log(`[Stripe Webhook] Skipping subscription updated for ${email} — billing_provider is '${userBillingProvider}', not 'stripe'`);
+      return deferredActions;
+    }
 
     if (currentPriceId) {
       let tierResult = await client.query(
@@ -3405,7 +3417,7 @@ async function handleSubscriptionPaused(client: PoolClient, subscription: Stripe
     const customerId = subscription.customer;
 
     const userResult = await client.query(
-      'SELECT id, email, first_name, last_name FROM users WHERE stripe_customer_id = $1',
+      'SELECT id, email, first_name, last_name, billing_provider FROM users WHERE stripe_customer_id = $1',
       [customerId]
     );
 
@@ -3416,6 +3428,12 @@ async function handleSubscriptionPaused(client: PoolClient, subscription: Stripe
 
     const { id: userId, email, first_name, last_name } = userResult.rows[0];
     const memberName = `${first_name || ''} ${last_name || ''}`.trim() || email;
+
+    const userBillingProvider = userResult.rows[0].billing_provider;
+    if (userBillingProvider && userBillingProvider !== 'stripe') {
+      console.log(`[Stripe Webhook] Skipping subscription paused for ${email} — billing_provider is '${userBillingProvider}', not 'stripe'`);
+      return deferredActions;
+    }
 
     await client.query(
       `UPDATE users SET membership_status = 'frozen', billing_provider = 'stripe', updated_at = NOW() WHERE id = $1`,
@@ -3492,7 +3510,7 @@ async function handleSubscriptionResumed(client: PoolClient, subscription: Strip
       : null;
 
     const userResult = await client.query(
-      'SELECT id, email, first_name, last_name FROM users WHERE stripe_customer_id = $1',
+      'SELECT id, email, first_name, last_name, billing_provider FROM users WHERE stripe_customer_id = $1',
       [customerId]
     );
 
@@ -3503,6 +3521,12 @@ async function handleSubscriptionResumed(client: PoolClient, subscription: Strip
 
     const { id: userId, email, first_name, last_name } = userResult.rows[0];
     const memberName = `${first_name || ''} ${last_name || ''}`.trim() || email;
+
+    const userBillingProvider = userResult.rows[0].billing_provider;
+    if (userBillingProvider && userBillingProvider !== 'stripe') {
+      console.log(`[Stripe Webhook] Skipping subscription resumed for ${email} — billing_provider is '${userBillingProvider}', not 'stripe'`);
+      return deferredActions;
+    }
 
     await client.query(
       `UPDATE users SET membership_status = 'active', billing_provider = 'stripe', stripe_current_period_end = COALESCE($2, stripe_current_period_end), updated_at = NOW() WHERE id = $1`,
@@ -3586,7 +3610,7 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: Strip
     }
 
     const userResult = await client.query(
-      'SELECT email, first_name, last_name, membership_status FROM users WHERE stripe_customer_id = $1',
+      'SELECT email, first_name, last_name, membership_status, billing_provider FROM users WHERE stripe_customer_id = $1',
       [customerId]
     );
 
@@ -3597,6 +3621,13 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: Strip
 
     const { email, first_name, last_name, membership_status: previousStatus } = userResult.rows[0];
     const memberName = `${first_name || ''} ${last_name || ''}`.trim() || email;
+
+    const userBillingProvider = userResult.rows[0].billing_provider;
+    if (userBillingProvider && userBillingProvider !== 'stripe') {
+      console.log(`[Stripe Webhook] Skipping subscription deleted for ${email} — billing_provider is '${userBillingProvider}', not 'stripe'`);
+      return deferredActions;
+    }
+
     const wasTrialing = previousStatus === 'trialing';
 
     if (wasTrialing) {

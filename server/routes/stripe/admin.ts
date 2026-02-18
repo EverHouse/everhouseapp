@@ -376,6 +376,7 @@ router.post('/api/stripe/staff/send-reactivation-link', isStaffOrAdmin, async (r
     const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email;
 
     let reactivationLink = 'https://everclub.app/billing';
+    let usedCheckout = false;
 
     if (member.stripe_customer_id) {
       try {
@@ -396,20 +397,138 @@ router.post('/api/stripe/staff/send-reactivation-link', isStaffOrAdmin, async (r
       } catch (portalError: unknown) {
         logger.warn('[Stripe] Could not create billing portal for , using fallback link', { extra: { email: member.email, error: getErrorMessage(portalError) } });
       }
+    } else {
+      const tierName = (member.last_tier || member.tier) as string | null;
+      if (tierName) {
+        try {
+          const tierResult = await db.execute(sql`SELECT id, name, stripe_price_id, price_cents, billing_interval
+            FROM membership_tiers
+            WHERE LOWER(name) = LOWER(${tierName}) AND is_active = true
+              AND product_type = 'subscription'
+              AND billing_interval IN ('month', 'year', 'week')
+            LIMIT 1`);
+
+          if (tierResult.rows.length > 0) {
+            const tier = tierResult.rows[0] as any;
+            if (tier.stripe_price_id) {
+              const stripe = await getStripeClient();
+              const baseUrl = process.env.REPLIT_DEV_DOMAIN
+                ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+                : 'https://everclub.app';
+
+              const sanitizedFirstName = String(member.first_name || '').trim().slice(0, 100);
+              const sanitizedLastName = String(member.last_name || '').trim().slice(0, 100);
+
+              const checkoutSession = await stripe.checkout.sessions.create({
+                mode: 'subscription',
+                customer_email: member.email as string,
+                line_items: [
+                  {
+                    price: tier.stripe_price_id as string,
+                    quantity: 1,
+                  },
+                ],
+                success_url: `${baseUrl}/welcome?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${baseUrl}/`,
+                metadata: {
+                  firstName: sanitizedFirstName,
+                  lastName: sanitizedLastName,
+                  tierId: String(tier.id),
+                  tierName: tier.name as string,
+                  source: 'reactivation',
+                },
+              });
+
+              reactivationLink = checkoutSession.url || reactivationLink;
+              usedCheckout = true;
+              logger.info('[Stripe] Created checkout session for reactivation', { extra: { memberEmail: member.email, tierName: tier.name } });
+            }
+          }
+        } catch (checkoutError: unknown) {
+          logger.warn('[Stripe] Could not create checkout session for reactivation, using fallback link', { extra: { email: member.email, error: getErrorMessage(checkoutError) } });
+        }
+      }
     }
 
-    const { sendGracePeriodReminderEmail } = await import('../../emails/membershipEmails');
-    
-    await sendGracePeriodReminderEmail(member.email as string, {
-      memberName,
-      currentDay: 1,
-      totalDays: 3,
-      reactivationLink
+    if (member.stripe_customer_id && !usedCheckout) {
+      const { sendGracePeriodReminderEmail } = await import('../../emails/membershipEmails');
+      await sendGracePeriodReminderEmail(member.email as string, {
+        memberName,
+        currentDay: 1,
+        totalDays: 3,
+        reactivationLink
+      });
+    } else {
+      try {
+        const { getResendClient } = await import('../../utils/resend');
+        const { client: resend, fromEmail } = await getResendClient();
+        const safeFirstName = escapeHtml(String(member.first_name || memberName).trim());
+
+        await resend.emails.send({
+          from: fromEmail || 'Ever Club <noreply@everclub.app>',
+          to: member.email as string,
+          subject: "We'd Love to Have You Back at Ever Club",
+          html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #F2F2EC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F2F2EC;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; padding: 40px;">
+          <tr>
+            <td style="text-align: center; padding-bottom: 32px;">
+              <img src="https://everclub.app/images/everclub-logo-dark.png" alt="Ever Club" width="180" height="60" style="display: inline-block;">
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <h1 style="margin: 0 0 24px; font-size: 24px; font-weight: 600; color: #1a1a1a;">We Miss You, ${safeFirstName}!</h1>
+              <p style="margin: 0 0 16px; font-size: 16px; line-height: 1.6; color: #4a4a4a;">We'd love to welcome you back to Ever Club. Your spot is waiting for you.</p>
+              <p style="margin: 0 0 32px; font-size: 16px; line-height: 1.6; color: #4a4a4a;">Click below to rejoin and pick up right where you left off:</p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center;">
+                    <a href="${reactivationLink}" style="display: inline-block; padding: 14px 32px; background-color: #1a1a1a; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 500; border-radius: 8px;">Rejoin Ever Club</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin: 32px 0 0; font-size: 14px; line-height: 1.6; color: #888888; text-align: center;">This link will expire in 24 hours. If you have any questions, please contact us.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`,
+        });
+        logger.info('[Stripe] Reactivation email sent to', { extra: { email: member.email } });
+      } catch (emailError: unknown) {
+        logger.error('[Stripe] Failed to send reactivation email', { extra: { emailError } });
+      }
+    }
+
+    logFromRequest(req, {
+      action: 'send_reactivation_link',
+      resourceType: 'member',
+      resourceId: String(member.id),
+      resourceName: memberName,
+      details: {
+        memberEmail: member.email,
+        hadStripeCustomer: !!member.stripe_customer_id,
+        usedCheckout,
+      }
     });
 
     logger.info('[Stripe] Reactivation link sent manually to by staff', { extra: { memberEmail: member.email } });
 
-    res.json({ success: true, message: `Reactivation link sent to ${member.email}` });
+    res.json({ success: true, message: `Reactivation link sent to ${member.email}`, checkoutUrl: reactivationLink });
   } catch (error: unknown) {
     logger.error('[Stripe] Error sending reactivation link', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to send reactivation link' });

@@ -222,6 +222,7 @@ const DirectoryTab: React.FC = () => {
     const [visitorSortDirection, setVisitorSortDirection] = useState<SortDirection>('desc');
     const [visitorsPage, setVisitorsPage] = useState(1);
     const [visitorArchiveView, setVisitorArchiveView] = useState<'active' | 'archived'>('active');
+    const [purchaseFilter, setPurchaseFilter] = useState<'all' | 'purchasers' | 'non-purchasers'>('all');
     const [teamSearchQuery, setTeamSearchQuery] = useState('');
     const [optimisticTiers, setOptimisticTiers] = useState<Record<string, string>>({});
     const [pendingTierUpdates, setPendingTierUpdates] = useState<Set<string>>(new Set());
@@ -486,6 +487,7 @@ const DirectoryTab: React.FC = () => {
         setMemberTab(tab);
         setStatusFilter('All');
         setMembershipStatusFilter('All');
+        setPurchaseFilter('all');
         if (tab === 'former') {
             setFormerLoading(true);
             setFormerError(false);
@@ -648,8 +650,14 @@ const DirectoryTab: React.FC = () => {
             }
             return visitorSortDirection === 'asc' ? comparison : -comparison;
         });
+        if (purchaseFilter === 'purchasers') {
+            return sorted.filter(v => v.purchaseCount > 0);
+        }
+        if (purchaseFilter === 'non-purchasers') {
+            return sorted.filter(v => !v.purchaseCount || v.purchaseCount === 0);
+        }
         return sorted;
-    }, [visitors, visitorSortField, visitorSortDirection]);
+    }, [visitors, visitorSortField, visitorSortDirection, purchaseFilter]);
 
     const handleSort = (field: SortField) => {
         if (sortField === field) {
@@ -1223,6 +1231,22 @@ const DirectoryTab: React.FC = () => {
                                 <option value="mindbody">MindBody</option>
                                 <option value="stripe">Stripe</option>
                             </select>
+                            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-1">
+                                <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap flex-shrink-0">Purchases:</span>
+                                {(['all', 'purchasers', 'non-purchasers'] as const).map(option => (
+                                    <button
+                                        key={option}
+                                        onClick={() => { setPurchaseFilter(option); setVisitorsPage(1); }}
+                                        className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors flex-shrink-0 whitespace-nowrap ${
+                                            purchaseFilter === option
+                                                ? 'bg-primary dark:bg-lavender text-white'
+                                                : 'bg-gray-200 dark:bg-white/20 text-gray-400 dark:text-gray-500 hover:bg-gray-300 dark:hover:bg-white/30'
+                                        }`}
+                                    >
+                                        {option === 'all' ? 'All' : option === 'purchasers' ? 'Purchasers' : 'Non-Purchasers'}
+                                    </button>
+                                ))}
+                            </div>
                             <span className="ml-auto text-sm text-gray-500 dark:text-white/60 self-center">
                                 {visitorsTotal.toLocaleString()} {visitorArchiveView === 'archived' ? 'archived' : ''} contacts
                             </span>
