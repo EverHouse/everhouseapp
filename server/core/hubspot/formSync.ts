@@ -16,6 +16,10 @@ const HUBSPOT_FORMS: Record<string, string> = {
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 let formSyncAccessDeniedLogged = false;
 
+export function resetFormSyncAccessDeniedFlag(): void {
+  formSyncAccessDeniedLogged = false;
+}
+
 interface HubSpotSubmissionValue {
   name: string;
   value: string;
@@ -116,13 +120,18 @@ export async function syncHubSpotFormSubmissions(): Promise<{
 
   try {
     let accessToken: string;
-    try {
-      accessToken = await getHubSpotAccessToken();
-    } catch (err: unknown) {
-      const msg = `Failed to get HubSpot access token: ${getErrorMessage(err)}`;
-      console.error(`[HubSpot FormSync] ${msg}`);
-      result.errors.push(msg);
-      return result;
+    const privateAppToken = process.env.HUBSPOT_PRIVATE_APP_TOKEN;
+    if (privateAppToken) {
+      accessToken = privateAppToken;
+    } else {
+      try {
+        accessToken = await getHubSpotAccessToken();
+      } catch (err: unknown) {
+        const msg = `Failed to get HubSpot access token: ${getErrorMessage(err)}`;
+        console.error(`[HubSpot FormSync] ${msg}`);
+        result.errors.push(msg);
+        return result;
+      }
     }
 
     const sinceTimestamp = Date.now() - THIRTY_DAYS_MS;
