@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.72.0",
+    date: "2026-02-18",
+    title: "App-Wide Animation & Motion Polish",
+    isMajor: true,
+    changes: [
+      "Added: Smooth list animations across 36 pages — items now slide in/out gracefully instead of snapping when lists change (dashboard, bookings, wellness classes, admin panels, etc.)",
+      "Added: Tactile press feedback on 565+ buttons, cards, and rows throughout the app — elements respond to touch/click with subtle lift and press effects",
+      "Improved: Replaced 12 large loading spinners with the branded walking golfer animation for a more polished loading experience",
+      "Improved: Standardized all transition speeds across the app for consistent, snappy feel — no more sluggish or jarring animations",
+      "Fixed: Wellness page crash caused by animation variable scope issue — page now loads correctly",
+    ]
+  },
+  {
     version: "7.71.0",
     date: "2026-02-18",
     title: "Save Concierge Contact — Onboarding Step",
