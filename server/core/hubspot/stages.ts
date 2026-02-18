@@ -7,6 +7,20 @@ import { eq, and } from 'drizzle-orm';
 import { retryableHubSpotRequest } from './request';
 import { validateMembershipPipeline, isValidStage } from './pipeline';
 import { isPlaceholderEmail } from '../stripe/customers';
+
+let _isLiveStripeCache: boolean | null = null;
+async function isLiveStripeEnvironment(): Promise<boolean> {
+  if (_isLiveStripeCache !== null) return _isLiveStripeCache;
+  try {
+    const { getStripeEnvironmentInfo } = await import('../stripe/client');
+    const envInfo = await getStripeEnvironmentInfo();
+    _isLiveStripeCache = envInfo.isLive;
+  } catch {
+    _isLiveStripeCache = process.env.REPLIT_DEPLOYMENT === '1';
+  }
+  return _isLiveStripeCache;
+}
+
 import { 
   HUBSPOT_STAGE_IDS, 
   MINDBODY_TO_STAGE_MAP, 
@@ -239,14 +253,7 @@ export async function syncMemberToHubSpot(
       updated.memberSince = true;
     }
 
-    let isLiveStripe = true;
-    try {
-      const { getStripeEnvironmentInfo } = await import('../stripe/client');
-      const envInfo = await getStripeEnvironmentInfo();
-      isLiveStripe = envInfo.isLive;
-    } catch {
-      isLiveStripe = isProduction;
-    }
+    const isLiveStripe = await isLiveStripeEnvironment();
 
     if (isLiveStripe) {
       if (input.stripeCustomerId) {
