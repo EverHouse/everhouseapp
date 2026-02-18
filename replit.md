@@ -1,3 +1,10 @@
+# 🧠 Skill Selection Protocol (MANDATORY)
+Before executing ANY task (Plan or Build), you must:
+1. **🔍 Scan Context:** Check `SKILL.md` and the `.agents/` directory.
+2. **🎯 Select Skill:** Identify the specific skill that matches the request (e.g., `billing-stripe-expert`, `postgres-drizzle`).
+3. **📢 Announce It:** Start your response by stating: *"Activating [Skill Name] protocols..."*
+4. **🔒 Enforce Rules:** Strictly follow that skill's constraints (e.g., "Always use `billing_provider` checks").
+
 # Ever Club Members App
 
 ## Overview
