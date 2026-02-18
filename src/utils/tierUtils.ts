@@ -17,15 +17,6 @@ export const TIER_COLORS: Record<BaseTier, TierColor> = {
   Social: { bg: '#CCB8E4', text: '#293515', border: '#B8A0D4' },
 };
 
-export const TAG_COLORS: Record<string, TierColor> = {
-  'Founding Member': { bg: '#FEF3C7', text: '#92400E', border: '#FCD34D' },
-  'Investor': { bg: '#DBEAFE', text: '#1E40AF', border: '#93C5FD' },
-  'Referral': { bg: '#D1FAE5', text: '#065F46', border: '#6EE7B7' },
-  default: { bg: '#F3F4F6', text: '#374151', border: '#D1D5DB' },
-};
-
-export const AVAILABLE_TAGS = ['Founding Member', 'Investor', 'Referral'];
-
 export function parseTierString(tierString: string): { tier: BaseTier; tags: string[] } {
   return { 
     tier: normalizeTierName(tierString), 

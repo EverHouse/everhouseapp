@@ -743,7 +743,7 @@ const DirectoryTab: React.FC = () => {
                 (m.tier && m.tier.toLowerCase().includes(query)) ||
                 (m.lastTier && m.lastTier.toLowerCase().includes(query)) ||
                 (m.phone && m.phone.toLowerCase().includes(query)) ||
-                (m.tags?.filter((t): t is string => typeof t === 'string').some(t => t.toLowerCase().includes(query)))
+                (m.discountCode && m.discountCode.toLowerCase().includes(query))
             );
         }
         
