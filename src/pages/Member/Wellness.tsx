@@ -78,7 +78,6 @@ const Wellness: React.FC = () => {
   const activeTab: 'classes' | 'medspa' = searchParams.get('tab') === 'medspa' ? 'medspa' : 'classes';
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState('Booking confirmed.');
-  const [wellnessParent] = useAutoAnimate();
 
   const setActiveTab = (tab: 'classes' | 'medspa') => {
     setSearchParams(prev => {
@@ -212,6 +211,7 @@ const ClassesView: React.FC<{onBook: (cls: WellnessClass) => void; isDark?: bool
   const [loadingRsvp, setLoadingRsvp] = useState<number | null>(null);
   const [recentlyEnrolled, setRecentlyEnrolled] = useState<Set<number>>(new Set());
   const recentlyEnrolledTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const [wellnessParent] = useAutoAnimate();
   const categories = ['All', 'Classes', 'MedSpa', 'Recovery', 'Therapy', 'Nutrition', 'Personal Training', 'Mindfulness', 'Outdoors', 'General'];
   
   const onRefreshCompleteRef = useRef(onRefreshComplete);
