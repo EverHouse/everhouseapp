@@ -282,7 +282,7 @@ const GalleryAdmin: React.FC = () => {
                     )}
                     <div className="space-y-4 mb-6">
                         <input 
-                            className="w-full border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+                            className="w-full border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" 
                             placeholder="Title (Optional)" 
                             value={newItem.title || ''} 
                             onChange={e => setNewItem({...newItem, title: e.target.value})} 
@@ -325,7 +325,7 @@ const GalleryAdmin: React.FC = () => {
                             </div>
                         </div>
                         <input 
-                            className="w-full border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+                            className="w-full border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" 
                             placeholder="Image URL *" 
                             value={newItem.imageUrl || ''} 
                             onChange={e => setNewItem({...newItem, imageUrl: e.target.value})} 
@@ -337,7 +337,7 @@ const GalleryAdmin: React.FC = () => {
                         )}
                         <div className="grid grid-cols-2 gap-3">
                             <select 
-                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-3.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-3.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" 
                                 value={newItem.category || 'venue'} 
                                 onChange={e => setNewItem({...newItem, category: e.target.value})}
                             >
@@ -346,7 +346,7 @@ const GalleryAdmin: React.FC = () => {
                                 ))}
                             </select>
                             <input 
-                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/40 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/40 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" 
                                 type="number" 
                                 placeholder="Sort Order" 
                                 value={newItem.sortOrder || 0} 

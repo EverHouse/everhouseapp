@@ -86,7 +86,7 @@ const FAQ: React.FC = () => {
           <div className="flex gap-2 overflow-x-auto pb-2 -mx-6 px-6 scrollbar-hide scroll-fade-right">
             <button
               onClick={() => setSelectedCategory(null)}
-              className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-all ${
+              className={`tactile-btn flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-fast ${
                 selectedCategory === null
                   ? 'bg-primary text-white'
                   : 'bg-white/60 dark:bg-white/5 text-primary/70 dark:text-white/70 hover:bg-white/80 dark:hover:bg-white/10'
@@ -98,7 +98,7 @@ const FAQ: React.FC = () => {
               <button
                 key={category}
                 onClick={() => setSelectedCategory(category)}
-                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${
+                className={`tactile-btn flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-fast whitespace-nowrap ${
                   selectedCategory === category
                     ? 'bg-primary text-white'
                     : 'bg-white/60 dark:bg-white/5 text-primary/70 dark:text-white/70 hover:bg-white/80 dark:hover:bg-white/10'
@@ -142,7 +142,7 @@ const AccordionItem: React.FC<{ question: string; answer: string }> = ({ questio
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="border border-primary/10 dark:border-white/10 rounded-xl overflow-hidden bg-white/40 dark:bg-white/5 backdrop-blur-xl">
+    <div className="tactile-row border border-primary/10 dark:border-white/10 rounded-xl overflow-hidden bg-white/40 dark:bg-white/5 backdrop-blur-xl">
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between p-4 text-left font-bold text-primary dark:text-white hover:bg-primary/5 dark:hover:bg-white/5 transition-colors"

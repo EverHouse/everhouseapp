@@ -70,7 +70,7 @@ const PrivateHire: React.FC = () => {
            <div className="flex flex-col gap-3 w-full max-w-xs animate-hero-cta">
              <Link 
                to="/private-hire/inquire"
-               className="w-full py-4 rounded-2xl bg-white/30 backdrop-blur-xl text-white font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-white/40 transition-all text-center border border-white/40"
+               className="w-full py-4 rounded-2xl bg-white/30 backdrop-blur-xl text-white font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-white/40 transition-all duration-fast text-center border border-white/40"
              >
                Plan Your Event
              </Link>

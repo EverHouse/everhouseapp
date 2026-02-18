@@ -213,7 +213,7 @@ const Contact: React.FC = () => {
                 <button 
                     type="submit" 
                     disabled={loading}
-                    className="w-full flex justify-center items-center gap-2 rounded-lg bg-primary px-3 py-4 text-sm font-bold leading-6 text-white shadow-lg dark:shadow-black/20 hover:bg-primary/90 transition-colors disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                    className="tactile-btn w-full flex justify-center items-center gap-2 rounded-lg bg-primary px-3 py-4 text-sm font-bold leading-6 text-white shadow-lg dark:shadow-black/20 hover:bg-primary/90 transition-colors disabled:opacity-70 disabled:cursor-not-allowed mt-2"
                 >
                     {loading ? (
                         <>Sending...</>
@@ -267,7 +267,7 @@ const Contact: React.FC = () => {
           <p className="text-white/70 text-sm mb-4">Join our community of golfers, creatives, and wellness enthusiasts.</p>
           <button 
             onClick={() => { startNavigation(); navigate('/membership'); }}
-            className="bg-white text-primary px-6 py-3 rounded-xl font-bold text-sm hover:bg-white/90 transition-colors"
+            className="tactile-btn bg-white text-primary px-6 py-3 rounded-xl font-bold text-sm hover:bg-white/90 transition-colors"
           >
             Apply for Membership
           </button>
@@ -283,7 +283,7 @@ const Contact: React.FC = () => {
 const ContactCard: React.FC<{icon: string; title: string; value: string; href?: string}> = ({ icon, title, value, href }) => {
   const Wrapper = href ? 'a' : 'div';
   return (
-    <Wrapper href={href} className="group flex items-center justify-between bg-white dark:bg-[#1a1d15] p-4 rounded-2xl border border-black/5 dark:border-white/10 shadow-sm dark:shadow-black/20 hover:shadow-md transition-all cursor-pointer">
+    <Wrapper href={href} className="tactile-card group flex items-center justify-between bg-white dark:bg-[#1a1d15] p-4 rounded-2xl border border-black/5 dark:border-white/10 shadow-sm dark:shadow-black/20 hover:shadow-md transition-all duration-fast cursor-pointer">
        <div className="flex items-center gap-4">
             <div className="flex items-center justify-center size-12 rounded-full bg-bone dark:bg-white/5 text-primary dark:text-white shrink-0">
                 <span className="material-symbols-outlined text-[24px]">{icon}</span>

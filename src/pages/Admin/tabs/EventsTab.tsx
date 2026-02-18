@@ -106,7 +106,7 @@ const EventsTab: React.FC = () => {
                         type="button"
                         onClick={() => setActiveSubTab('events')}
                         style={{ touchAction: 'manipulation' }}
-                        className={`flex-1 py-2.5 px-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-1.5 ${
+                        className={`tactile-btn flex-1 py-2.5 px-3 rounded-lg font-bold text-sm transition-all duration-fast flex items-center justify-center gap-1.5 ${
                             activeSubTab === 'events'
                                 ? 'bg-primary dark:bg-primary text-white shadow-md'
                                 : 'bg-white/60 dark:bg-white/10 text-gray-600 dark:text-white/80 border border-gray-200 dark:border-white/25'
@@ -119,7 +119,7 @@ const EventsTab: React.FC = () => {
                         type="button"
                         onClick={() => setActiveSubTab('wellness')}
                         style={{ touchAction: 'manipulation' }}
-                        className={`flex-1 py-2.5 px-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-1.5 ${
+                        className={`tactile-btn flex-1 py-2.5 px-3 rounded-lg font-bold text-sm transition-all duration-fast flex items-center justify-center gap-1.5 ${
                             activeSubTab === 'wellness'
                                 ? 'bg-accent text-primary shadow-md'
                                 : 'bg-white/60 dark:bg-white/10 text-gray-600 dark:text-white/80 border border-gray-200 dark:border-white/25'

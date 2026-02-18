@@ -125,7 +125,7 @@ const CafeTab: React.FC = () => {
                     <button
                         key={cat}
                         onClick={() => setActiveCategory(cat)}
-                        className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-all ${activeCategory === cat ? 'bg-primary dark:bg-lavender text-white shadow-md' : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/15'}`}
+                        className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-fast ${activeCategory === cat ? 'bg-primary dark:bg-lavender text-white shadow-md' : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/15'}`}
                     >
                         {cat}
                     </button>
@@ -140,10 +140,10 @@ const CafeTab: React.FC = () => {
                             Names, prices, and categories are managed in Stripe. Description and images can be edited here.
                         </div>
                     )}
-                    <input className={`w-full border border-gray-200 dark:border-white/20 ${editId ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' : 'bg-gray-50 dark:bg-black/30'} p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all`} placeholder="Item Name" value={newItem.name || ''} onChange={e => setNewItem({...newItem, name: e.target.value})} readOnly={!!editId} />
+                    <input className={`w-full border border-gray-200 dark:border-white/20 ${editId ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' : 'bg-gray-50 dark:bg-black/30'} p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast`} placeholder="Item Name" value={newItem.name || ''} onChange={e => setNewItem({...newItem, name: e.target.value})} readOnly={!!editId} />
                     <div className="grid grid-cols-2 gap-3">
-                        <input className={`w-full border border-gray-200 dark:border-white/20 ${editId ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' : 'bg-gray-50 dark:bg-black/30'} p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all`} type="number" placeholder="Price" value={newItem.price || ''} onChange={e => setNewItem({...newItem, price: Number(e.target.value)})} readOnly={!!editId} />
-                        <select className={`w-full border border-gray-200 dark:border-white/20 ${editId ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' : 'bg-gray-50 dark:bg-black/30'} p-3.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all`} value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} disabled={!!editId}>
+                        <input className={`w-full border border-gray-200 dark:border-white/20 ${editId ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' : 'bg-gray-50 dark:bg-black/30'} p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast`} type="number" placeholder="Price" value={newItem.price || ''} onChange={e => setNewItem({...newItem, price: Number(e.target.value)})} readOnly={!!editId} />
+                        <select className={`w-full border border-gray-200 dark:border-white/20 ${editId ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' : 'bg-gray-50 dark:bg-black/30'} p-3.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast`} value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} disabled={!!editId}>
                             <option>Coffee & Drinks</option>
                             <option>Breakfast</option>
                             <option>Lunch</option>
@@ -176,7 +176,7 @@ const CafeTab: React.FC = () => {
                                 {uploadImageMutation.isPending ? 'Uploading...' : 'Upload'}
                             </button>
                             <input
-                                className="flex-1 border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-sm"
+                                className="flex-1 border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast text-sm"
                                 placeholder="Or paste image URL"
                                 value={newItem.image || ''}
                                 onChange={e => setNewItem({...newItem, image: e.target.value})}
@@ -200,7 +200,7 @@ const CafeTab: React.FC = () => {
                             </div>
                         )}
                     </div>
-                    <textarea className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none" placeholder="Description" rows={3} value={newItem.desc || ''} onChange={e => setNewItem({...newItem, desc: e.target.value})} />
+                    <textarea className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast resize-none" placeholder="Description" rows={3} value={newItem.desc || ''} onChange={e => setNewItem({...newItem, desc: e.target.value})} />
                     <div className="flex gap-3 justify-end pt-2">
                         <button onClick={() => setIsEditing(false)} className="px-5 py-2.5 text-gray-500 dark:text-white/80 font-bold hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition-colors">Cancel</button>
                         <button onClick={handleSave} disabled={isLoading} className="px-6 py-2.5 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary/90 transition-colors disabled:opacity-50">Save</button>

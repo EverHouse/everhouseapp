@@ -379,7 +379,7 @@ const History: React.FC = () => {
                                     {purchase.itemCategory === 'invoice' && purchase.status === 'open' && (
                                       <button
                                         onClick={() => setPayingInvoice(purchase)}
-                                        className="bg-primary text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-primary/90 transition-colors flex items-center gap-1.5 mt-2 ml-auto"
+                                        className="tactile-btn bg-primary text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-primary/90 transition-colors flex items-center gap-1.5 mt-2 ml-auto"
                                       >
                                         <span className="material-symbols-outlined text-sm">credit_card</span>
                                         Pay Now
@@ -390,7 +390,7 @@ const History: React.FC = () => {
                                         href={purchase.hostedInvoiceUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className={`text-xs flex items-center gap-0.5 justify-end mt-1 ${isDark ? 'text-accent hover:text-accent/80' : 'text-brand-green hover:text-brand-green/80'}`}
+                                        className={`tactile-btn text-xs flex items-center gap-0.5 justify-end mt-1 ${isDark ? 'text-accent hover:text-accent/80' : 'text-brand-green hover:text-brand-green/80'}`}
                                       >
                                         View
                                         <span className="material-symbols-outlined text-xs">open_in_new</span>

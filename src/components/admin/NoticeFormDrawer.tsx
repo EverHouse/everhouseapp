@@ -257,7 +257,7 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
               value={formData.notice_type}
               onChange={e => setFormData({...formData, notice_type: e.target.value})}
               onBlur={() => markTouched('notice_type')}
-              className={`w-full border bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+              className={`w-full border bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast ${
                 touchedFields.has('notice_type') && closureValidation.notice_type 
                   ? 'border-red-500 dark:border-red-500' 
                   : 'border-gray-200 dark:border-white/20'
@@ -281,7 +281,7 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
             <input 
               type="text" 
               placeholder="e.g., Holiday Closure, Maintenance" 
-              className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+              className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" 
               value={formData.title} 
               onChange={e => setFormData({...formData, title: e.target.value})} 
             />
@@ -292,7 +292,7 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
             <select
               value={formData.reason}
               onChange={e => setFormData({...formData, reason: e.target.value})}
-              className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+              className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast"
             >
               <option value="">Select reason...</option>
               {closureReasons.filter(r => r.isActive).map(reason => (
@@ -307,7 +307,7 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
           <div>
             <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Notes</label>
             <textarea 
-              className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none" 
+              className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast resize-none" 
               placeholder="Internal notes, event details, logistics..." 
               rows={3} 
               value={formData.notes} 
@@ -405,7 +405,7 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
               value={formData.visibility}
               onChange={e => setFormData({...formData, visibility: e.target.value})}
               onBlur={() => markTouched('visibility')}
-              className={`w-full border bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+              className={`w-full border bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast ${
                 touchedFields.has('visibility') && closureValidation.visibility 
                   ? 'border-red-500 dark:border-red-500' 
                   : 'border-gray-200 dark:border-white/20'
@@ -456,7 +456,7 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
             <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Start Date *</label>
             <input 
               type="date" 
-              className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+              className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" 
               value={formData.start_date} 
               onChange={e => setFormData({...formData, start_date: e.target.value})} 
             />
@@ -465,7 +465,7 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
             <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Start Time</label>
             <input 
               type="time" 
-              className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+              className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" 
               value={formData.start_time} 
               onChange={e => setFormData({...formData, start_time: e.target.value})} 
             />
@@ -474,7 +474,7 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
             <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">End Date</label>
             <input 
               type="date" 
-              className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+              className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" 
               value={formData.end_date} 
               onChange={e => setFormData({...formData, end_date: e.target.value})} 
             />
@@ -483,7 +483,7 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
             <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">End Time</label>
             <input 
               type="time" 
-              className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+              className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" 
               value={formData.end_time} 
               onChange={e => setFormData({...formData, end_time: e.target.value})} 
             />

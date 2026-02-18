@@ -362,7 +362,7 @@ const Login: React.FC = () => {
                     onChange={(e) => handleOtpChange(idx, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(idx, e)}
                     onPaste={(e) => handleOtpPaste(e, idx)}
-                    className="w-12 h-14 text-center text-2xl font-bold rounded-xl border border-black/10 dark:border-white/10 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-primary dark:text-white dark:bg-white/5"
+                    className="w-12 h-14 text-center text-2xl font-bold rounded-xl border border-black/10 dark:border-white/10 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all duration-fast text-primary dark:text-white dark:bg-white/5"
                     disabled={loading}
                   />
                 ))}
@@ -385,7 +385,7 @@ const Login: React.FC = () => {
                 <button
                   onClick={() => handleRequestOTP()}
                   disabled={loading}
-                  className="w-full text-center text-sm text-primary dark:text-white font-medium hover:underline transition-colors disabled:opacity-50"
+                  className="tactile-btn w-full text-center text-sm text-primary dark:text-white font-medium hover:underline transition-colors disabled:opacity-50"
                 >
                   Resend code
                 </button>
@@ -395,7 +395,7 @@ const Login: React.FC = () => {
                     setOtpInputs(['', '', '', '', '', '']);
                     setError('');
                   }}
-                  className="w-full text-center text-sm text-primary/60 dark:text-white/60 hover:text-primary dark:hover:text-white transition-colors"
+                  className="tactile-btn w-full text-center text-sm text-primary/60 dark:text-white/60 hover:text-primary dark:hover:text-white transition-colors"
                 >
                   Use a different email
                 </button>
@@ -440,7 +440,7 @@ const Login: React.FC = () => {
                       placeholder="Membership Email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-black/10 dark:border-white/10 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-primary dark:text-white placeholder:text-primary/40 dark:placeholder-white/40 dark:bg-white/5"
+                      className="w-full px-4 py-3 rounded-xl border border-black/10 dark:border-white/10 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all duration-fast text-primary dark:text-white placeholder:text-primary/40 dark:placeholder-white/40 dark:bg-white/5"
                       required
                       autoFocus
                     />
@@ -458,7 +458,7 @@ const Login: React.FC = () => {
                         placeholder="Password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-black/10 dark:border-white/10 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-primary dark:text-white placeholder:text-primary/40 dark:placeholder-white/40 dark:bg-white/5"
+                        className="w-full px-4 py-3 rounded-xl border border-black/10 dark:border-white/10 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all duration-fast text-primary dark:text-white placeholder:text-primary/40 dark:placeholder-white/40 dark:bg-white/5"
                         required
                       />
                     </div>
@@ -468,7 +468,7 @@ const Login: React.FC = () => {
                     <button
                       type="submit"
                       disabled={loading || !password}
-                      className="flex w-full justify-center items-center gap-3 rounded-xl bg-primary px-3 py-4 text-sm font-bold leading-6 text-white shadow-lg dark:shadow-black/20 hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all active:scale-[0.98] disabled:opacity-50"
+                      className="tactile-btn flex w-full justify-center items-center gap-3 rounded-xl bg-primary px-3 py-4 text-sm font-bold leading-6 text-white shadow-lg dark:shadow-black/20 hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-fast active:scale-[0.98] disabled:opacity-50"
                     >
                       {loading ? <Spinner /> : <span className="material-symbols-outlined">login</span>}
                       {loading ? 'Signing in...' : 'Sign In'}
@@ -477,7 +477,7 @@ const Login: React.FC = () => {
                     <button
                       type="submit"
                       disabled={loading || !email.includes('@')}
-                      className="flex w-full justify-center items-center gap-3 rounded-xl bg-primary px-3 py-4 text-sm font-bold leading-6 text-white shadow-lg dark:shadow-black/20 hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all active:scale-[0.98] disabled:opacity-50"
+                      className="tactile-btn flex w-full justify-center items-center gap-3 rounded-xl bg-primary px-3 py-4 text-sm font-bold leading-6 text-white shadow-lg dark:shadow-black/20 hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-fast active:scale-[0.98] disabled:opacity-50"
                     >
                       {loading ? <Spinner /> : <span className="material-symbols-outlined">dialpad</span>}
                       {loading ? 'Sending...' : 'Send Verification Code'}
@@ -512,7 +512,7 @@ const Login: React.FC = () => {
                       type="button"
                       onClick={handleRequestOTP}
                       disabled={loading}
-                      className="flex w-full justify-center items-center gap-2 rounded-xl bg-gray-100 dark:bg-white/5 px-3 py-3 text-sm font-bold leading-6 text-primary dark:text-white hover:bg-gray-200 dark:hover:bg-white/10 transition-all active:scale-[0.98] disabled:opacity-50 mt-4"
+                      className="tactile-btn flex w-full justify-center items-center gap-2 rounded-xl bg-gray-100 dark:bg-white/5 px-3 py-3 text-sm font-bold leading-6 text-primary dark:text-white hover:bg-gray-200 dark:hover:bg-white/10 transition-all duration-fast active:scale-[0.98] disabled:opacity-50 mt-4"
                     >
                       <span className="material-symbols-outlined text-lg">dialpad</span>
                       Use Verification Code Instead
@@ -527,7 +527,7 @@ const Login: React.FC = () => {
                       type="button"
                       onClick={() => handleDevLogin()}
                       disabled={devLoading || devMemberLoading}
-                      className="flex w-full justify-center items-center gap-2 rounded-xl bg-amber-500 px-3 py-3 text-sm font-bold leading-6 text-white hover:bg-amber-600 transition-all active:scale-[0.98] disabled:opacity-50"
+                      className="tactile-btn flex w-full justify-center items-center gap-2 rounded-xl bg-amber-500 px-3 py-3 text-sm font-bold leading-6 text-white hover:bg-amber-600 transition-all duration-fast active:scale-[0.98] disabled:opacity-50"
                     >
                       <span className="material-symbols-outlined text-lg">developer_mode</span>
                       {devLoading ? 'Logging in...' : 'Dev Login (Nick)'}
@@ -539,7 +539,7 @@ const Login: React.FC = () => {
                       type="button"
                       onClick={() => handleDevLogin('nicholasallanluu@gmail.com')}
                       disabled={devLoading || devMemberLoading}
-                      className="flex w-full justify-center items-center gap-2 rounded-xl bg-purple-500 px-3 py-3 text-sm font-bold leading-6 text-white hover:bg-purple-600 transition-all active:scale-[0.98] disabled:opacity-50"
+                      className="tactile-btn flex w-full justify-center items-center gap-2 rounded-xl bg-purple-500 px-3 py-3 text-sm font-bold leading-6 text-white hover:bg-purple-600 transition-all duration-fast active:scale-[0.98] disabled:opacity-50"
                     >
                       <span className="material-symbols-outlined text-lg">person</span>
                       {devMemberLoading ? 'Logging in...' : 'Dev Login (Nick Luu Member)'}

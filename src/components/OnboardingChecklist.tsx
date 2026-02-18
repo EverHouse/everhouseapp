@@ -202,7 +202,7 @@ const OnboardingChecklist: React.FC = () => {
             key={step.key}
             onClick={() => !step.completed && handleStepAction(step)}
             disabled={step.completed}
-            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left ${
+            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-fast text-left ${
               step.completed
                 ? 'bg-accent/10 dark:bg-accent/5'
                 : 'hover:bg-primary/5 dark:hover:bg-white/5 cursor-pointer'

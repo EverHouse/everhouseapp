@@ -312,7 +312,7 @@ const MemberUpdates: React.FC = () => {
             return (
               <MotionListItem 
                 key={item.id}
-                className={`rounded-2xl transition-all overflow-hidden ${priorityCardClass}`}
+                className={`rounded-2xl transition-all duration-fast overflow-hidden ${priorityCardClass}`}
               >
                 <div 
                   className={`p-5 ${hasLongDesc || hasLink ? 'cursor-pointer' : ''}`}
@@ -457,7 +457,7 @@ const MemberUpdates: React.FC = () => {
     
     return (
       <MotionListItem 
-        className={`rounded-2xl transition-all overflow-hidden ${
+        className={`rounded-2xl transition-all duration-fast overflow-hidden ${
           isUpcoming
             ? isDark ? 'bg-blue-500/10 shadow-layered-dark' : 'bg-blue-50 shadow-layered'
             : isClosure
@@ -603,7 +603,7 @@ const MemberUpdates: React.FC = () => {
           {unreadCount > 0 && (
             <button
               onClick={markAllRead}
-              className={`mb-4 text-xs font-medium px-3 py-2 rounded-lg transition-colors ${
+              className={`tactile-btn mb-4 text-xs font-medium px-3 py-2 rounded-lg transition-colors ${
                 isDark ? 'bg-white/10 text-white/80 hover:bg-white/15' : 'bg-primary/10 text-primary/80 hover:bg-primary/15'
               }`}
             >
@@ -614,7 +614,7 @@ const MemberUpdates: React.FC = () => {
             {notifications.map((notification) => (
               <MotionListItem
                 key={notification.id}
-                className={`rounded-2xl transition-all overflow-hidden cursor-pointer ${
+                className={`rounded-2xl transition-all duration-fast overflow-hidden cursor-pointer ${
                   notification.read
                     ? isDark ? 'bg-white/[0.02] shadow-layered-dark' : 'bg-white/70 shadow-layered'
                     : isDark ? 'bg-white/[0.05] shadow-layered-dark' : 'bg-white shadow-layered'
@@ -668,7 +668,7 @@ const MemberUpdates: React.FC = () => {
       <div className="flex gap-1.5 mb-6">
         <button
           onClick={() => handleTabChange('activity')}
-          className={`flex-1 py-3 px-2 rounded-xl text-[11px] font-bold uppercase tracking-tight transition-all relative ${
+          className={`flex-1 py-3 px-2 rounded-xl text-[11px] font-bold uppercase tracking-tight transition-all duration-fast relative ${
             activeTab === 'activity'
               ? 'bg-accent text-primary'
               : isDark ? 'bg-white/5 text-white/80 hover:bg-white/10' : 'bg-primary/5 text-primary/80 hover:bg-primary/10'
@@ -683,7 +683,7 @@ const MemberUpdates: React.FC = () => {
         </button>
         <button
           onClick={() => handleTabChange('announcements')}
-          className={`flex-1 py-3 px-2 rounded-xl text-[11px] font-bold uppercase tracking-tight transition-all ${
+          className={`flex-1 py-3 px-2 rounded-xl text-[11px] font-bold uppercase tracking-tight transition-all duration-fast ${
             activeTab === 'announcements'
               ? 'bg-accent text-primary'
               : isDark ? 'bg-white/5 text-white/80 hover:bg-white/10' : 'bg-primary/5 text-primary/80 hover:bg-primary/10'
@@ -693,7 +693,7 @@ const MemberUpdates: React.FC = () => {
         </button>
         <button
           onClick={() => handleTabChange('notices')}
-          className={`flex-1 py-3 px-2 rounded-xl text-[11px] font-bold uppercase tracking-tight transition-all relative ${
+          className={`flex-1 py-3 px-2 rounded-xl text-[11px] font-bold uppercase tracking-tight transition-all duration-fast relative ${
             activeTab === 'notices'
               ? 'bg-amber-500 text-white'
               : isDark ? 'bg-white/5 text-white/80 hover:bg-white/10' : 'bg-primary/5 text-primary/80 hover:bg-primary/10'

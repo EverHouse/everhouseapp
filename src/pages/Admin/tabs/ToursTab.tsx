@@ -155,7 +155,7 @@ const ToursTab: React.FC = () => {
               <button
                 onClick={() => setStatusMenuTourId(isMenuOpen ? null : tour.id)}
                 disabled={isUpdating}
-                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${config.colors} ${isUpdating ? 'opacity-50' : 'hover:ring-2 hover:ring-primary/20 dark:hover:ring-white/20 cursor-pointer'}`}
+                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-fast ${config.colors} ${isUpdating ? 'opacity-50' : 'hover:ring-2 hover:ring-primary/20 dark:hover:ring-white/20 cursor-pointer'}`}
               >
                 {isUpdating ? (
                   <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin"></div>

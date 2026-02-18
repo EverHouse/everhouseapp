@@ -249,7 +249,7 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               placeholder="John"
-              className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+              className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all duration-fast"
             />
           </div>
           <div>
@@ -261,7 +261,7 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               placeholder="Doe"
-              className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+              className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all duration-fast"
             />
           </div>
         </div>
@@ -275,7 +275,7 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
             value={contactEmail}
             onChange={(e) => setContactEmail(e.target.value)}
             placeholder="you@company.com"
-            className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+            className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all duration-fast"
           />
         </div>
 
@@ -288,7 +288,7 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="(555) 123-4567"
-            className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+            className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all duration-fast"
           />
         </div>
 
@@ -301,7 +301,7 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
             value={companyName}
             onChange={(e) => setCompanyName(e.target.value)}
             placeholder="Acme Corporation"
-            className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+            className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all duration-fast"
           />
         </div>
 
@@ -314,7 +314,7 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
             value={jobTitle}
             onChange={(e) => setJobTitle(e.target.value)}
             placeholder="HR Manager, CEO, etc."
-            className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+            className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all duration-fast"
           />
         </div>
 

@@ -219,7 +219,7 @@ export function GuestPaymentChoiceModal({
                 <button
                   onClick={handleUseGuestPass}
                   disabled={loading || guestPassesRemaining <= 0}
-                  className={`w-full p-4 rounded-xl border-2 transition-all flex items-start gap-4 ${
+                  className={`w-full p-4 rounded-xl border-2 transition-all duration-fast flex items-start gap-4 ${
                     guestPassesRemaining > 0
                       ? isDark
                         ? 'border-emerald-500/50 bg-emerald-500/10 hover:bg-emerald-500/20'
@@ -270,7 +270,7 @@ export function GuestPaymentChoiceModal({
                 <button
                   onClick={handlePayFee}
                   disabled={loading}
-                  className={`w-full p-4 rounded-xl border-2 transition-all flex items-start gap-4 ${
+                  className={`w-full p-4 rounded-xl border-2 transition-all duration-fast flex items-start gap-4 ${
                     isDark
                       ? 'border-[#CCB8E4]/50 bg-[#CCB8E4]/10 hover:bg-[#CCB8E4]/20'
                       : 'border-[#CCB8E4] bg-[#CCB8E4]/10 hover:bg-[#CCB8E4]/20'

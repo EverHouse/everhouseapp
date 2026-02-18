@@ -99,7 +99,7 @@ const EmailTemplatesTab: React.FC = () => {
         <span className="material-symbols-outlined text-5xl text-primary/50 dark:text-white/50 mb-4">error_outline</span>
         <h3 className="text-lg font-bold text-primary dark:text-white mb-2">Something went wrong</h3>
         <p className="text-sm text-primary/70 dark:text-white/70 mb-6">{error}</p>
-        <button onClick={fetchTemplates} className="px-5 py-2.5 bg-primary dark:bg-accent text-white dark:text-primary rounded-full font-medium">
+        <button onClick={fetchTemplates} className="tactile-btn px-5 py-2.5 bg-primary dark:bg-accent text-white dark:text-primary rounded-full font-medium">
           Try Again
         </button>
       </div>
@@ -156,7 +156,7 @@ const EmailTemplatesTab: React.FC = () => {
                         <button
                           key={template.id}
                           onClick={() => selectTemplate(template)}
-                          className={`w-full text-left px-4 py-2.5 transition-all duration-fast ${
+                          className={`tactile-btn w-full text-left px-4 py-2.5 transition-all duration-fast ${
                             isActive
                               ? 'bg-accent/20 dark:bg-accent/10 border-l-2 border-accent'
                               : 'hover:bg-primary/5 dark:hover:bg-white/5 border-l-2 border-transparent'

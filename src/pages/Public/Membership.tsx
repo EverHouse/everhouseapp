@@ -133,7 +133,7 @@ const MembershipOverview: React.FC = () => {
         </p>
       </div>
 
-      <Link to="compare" className="w-full flex items-center justify-center gap-1 text-xs font-bold uppercase tracking-widest text-primary/60 dark:text-white/60 hover:text-primary dark:hover:text-white transition-colors py-2 animate-content-enter-delay-1">
+      <Link to="compare" className="tactile-btn w-full flex items-center justify-center gap-1 text-xs font-bold uppercase tracking-widest text-primary/60 dark:text-white/60 hover:text-primary dark:hover:text-white transition-colors py-2 animate-content-enter-delay-1">
         Compare full feature table
         <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
       </Link>
@@ -267,7 +267,7 @@ const MembershipOverview: React.FC = () => {
         <div className="mt-8 text-center">
           <button 
             onClick={() => navigate('/membership/apply')}
-            className="px-8 py-4 rounded-2xl bg-primary text-white font-bold text-sm tracking-widest uppercase hover:bg-primary/90 transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)]"
+            className="tactile-btn px-8 py-4 rounded-2xl bg-primary text-white font-bold text-sm tracking-widest uppercase hover:bg-primary/90 transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)]"
           >
             Apply Now — Limited Membership
           </button>
@@ -290,7 +290,7 @@ const MembershipOverview: React.FC = () => {
         <div className="grid grid-cols-2 gap-3">
            <button 
              onClick={() => setSelectedPass('workspace')}
-             className={`flex flex-col gap-2 p-3 rounded-2xl border transition-all text-left ${selectedPass === 'workspace' ? 'bg-primary text-white border-primary shadow-md dark:shadow-black/20' : 'bg-white/40 dark:bg-white/5 border-white/50 dark:border-white/10 hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.02] text-primary dark:text-white'}`}
+             className={`flex flex-col gap-2 p-3 rounded-2xl border transition-all duration-fast text-left ${selectedPass === 'workspace' ? 'bg-primary text-white border-primary shadow-md dark:shadow-black/20' : 'bg-white/40 dark:bg-white/5 border-white/50 dark:border-white/10 hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.02] text-primary dark:text-white'}`}
            >
               <span className={`material-symbols-outlined font-light ${selectedPass === 'workspace' ? 'text-white' : 'text-primary dark:text-white'}`}>work</span>
               <div>
@@ -300,7 +300,7 @@ const MembershipOverview: React.FC = () => {
            </button>
            <button 
              onClick={() => setSelectedPass('sim')}
-             className={`flex flex-col gap-2 p-3 rounded-2xl border transition-all text-left ${selectedPass === 'sim' ? 'bg-primary text-white border-primary shadow-md dark:shadow-black/20' : 'bg-white/40 dark:bg-white/5 border-white/50 dark:border-white/10 hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.02] text-primary dark:text-white'}`}
+             className={`flex flex-col gap-2 p-3 rounded-2xl border transition-all duration-fast text-left ${selectedPass === 'sim' ? 'bg-primary text-white border-primary shadow-md dark:shadow-black/20' : 'bg-white/40 dark:bg-white/5 border-white/50 dark:border-white/10 hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.02] text-primary dark:text-white'}`}
            >
               <span className={`material-symbols-outlined font-light ${selectedPass === 'sim' ? 'text-white' : 'text-primary dark:text-white'}`}>sports_golf</span>
               <div>
@@ -311,7 +311,7 @@ const MembershipOverview: React.FC = () => {
         </div>
         <Link 
             to={selectedPass === 'workspace' ? '/checkout?type=day-pass-coworking' : '/checkout?type=day-pass-golf-sim'}
-            className="w-full mt-4 py-3 text-sm font-semibold text-primary dark:text-white border-t border-primary/5 dark:border-white/10 hover:bg-primary/5 dark:hover:bg-white/5 transition-colors rounded-b-xl tracking-wide uppercase block text-center"
+            className="tactile-btn w-full mt-4 py-3 text-sm font-semibold text-primary dark:text-white border-t border-primary/5 dark:border-white/10 hover:bg-primary/5 dark:hover:bg-white/5 transition-colors rounded-b-xl tracking-wide uppercase block text-center"
         >
            Experience the Club
         </Link>
@@ -493,7 +493,7 @@ const Corporate: React.FC = () => {
 const DiscountRow: React.FC<{count: string; price: string; icon: string; isActive?: boolean}> = ({ count, price, icon, isActive }) => (
     <div className={`flex items-center justify-between p-5 transition-colors group ${isActive ? 'bg-primary/10 dark:bg-white/10' : 'hover:bg-white/40 dark:hover:bg-white/5'}`}>
         <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-sm dark:shadow-black/20 border group-hover:scale-105 transition-all ${isActive ? 'bg-primary border-primary' : 'bg-white dark:bg-[#1a1d15] border-white dark:border-white/10'}`}>
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-sm dark:shadow-black/20 border group-hover:scale-105 transition-all duration-fast ${isActive ? 'bg-primary border-primary' : 'bg-white dark:bg-[#1a1d15] border-white dark:border-white/10'}`}>
                 <span className={`text-xs font-bold ${isActive ? 'text-white' : 'text-primary/70 dark:text-white/70'}`}>{icon}</span>
             </div>
             <span className={`font-medium text-lg ${isActive ? 'text-primary dark:text-white font-semibold' : 'text-primary dark:text-white'}`}>{count} employees</span>
@@ -595,7 +595,7 @@ const CompareFeatures: React.FC = () => {
                     key={t} 
                     onClick={() => toggleTier(t)}
                     disabled={!isSelected && selectedTiers.length >= 3}
-                    className={`px-4 py-2 rounded-full text-xs font-bold border flex items-center gap-1 transition-all ${isSelected ? 'bg-primary text-white border-primary shadow-sm dark:shadow-black/20' : 'bg-white/30 dark:bg-white/5 text-primary/60 dark:text-white/60 border-primary/10 dark:border-white/10 hover:border-primary/20 dark:hover:border-white/20'} ${!isSelected && selectedTiers.length >= 3 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`px-4 py-2 rounded-full text-xs font-bold border flex items-center gap-1 transition-all duration-fast ${isSelected ? 'bg-primary text-white border-primary shadow-sm dark:shadow-black/20' : 'bg-white/30 dark:bg-white/5 text-primary/60 dark:text-white/60 border-primary/10 dark:border-white/10 hover:border-primary/20 dark:hover:border-white/20'} ${!isSelected && selectedTiers.length >= 3 ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                     {isSelected && <span className="material-symbols-outlined text-[14px]">check</span>} {t}
                 </button>

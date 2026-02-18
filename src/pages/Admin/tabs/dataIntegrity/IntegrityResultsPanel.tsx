@@ -278,7 +278,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
               <button
                 onClick={() => handleSyncMembersToHubspot(true)}
                 disabled={isSyncingToHubspot}
-                className="px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                className="tactile-btn px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
               >
                 {isSyncingToHubspot && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
                 <span className="material-symbols-outlined text-[14px]">visibility</span>
@@ -287,7 +287,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
               <button
                 onClick={() => handleSyncMembersToHubspot(false)}
                 disabled={isSyncingToHubspot}
-                className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                className="tactile-btn px-3 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
               >
                 {isSyncingToHubspot && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
                 <span className="material-symbols-outlined text-[14px]">sync</span>
@@ -317,7 +317,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                 <button
                   onClick={() => handleSyncSubscriptionStatus(true)}
                   disabled={isRunningSubscriptionSync}
-                  className="px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                  className="tactile-btn px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
                 >
                   {isRunningSubscriptionSync && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
                   <span className="material-symbols-outlined text-[14px]">visibility</span>
@@ -326,7 +326,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                 <button
                   onClick={() => handleSyncSubscriptionStatus(false)}
                   disabled={isRunningSubscriptionSync}
-                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                  className="tactile-btn px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
                 >
                   {isRunningSubscriptionSync && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
                   <span className="material-symbols-outlined text-[14px]">sync</span>
@@ -350,7 +350,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                 <button
                   onClick={() => handleClearOrphanedStripeIds(true)}
                   disabled={isRunningOrphanedStripeCleanup}
-                  className="px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                  className="tactile-btn px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
                 >
                   {isRunningOrphanedStripeCleanup && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
                   <span className="material-symbols-outlined text-[14px]">visibility</span>
@@ -359,7 +359,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                 <button
                   onClick={() => handleClearOrphanedStripeIds(false)}
                   disabled={isRunningOrphanedStripeCleanup}
-                  className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                  className="tactile-btn px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
                 >
                   {isRunningOrphanedStripeCleanup && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
                   <span className="material-symbols-outlined text-[14px]">delete_sweep</span>
@@ -392,7 +392,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                 <button
                   onClick={() => handleCleanupStripeCustomers(true)}
                   disabled={isRunningStripeCustomerCleanup}
-                  className="px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                  className="tactile-btn px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
                 >
                   {isRunningStripeCustomerCleanup && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
                   <span className="material-symbols-outlined text-[14px]">visibility</span>
@@ -401,7 +401,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                 <button
                   onClick={() => handleCleanupStripeCustomers(false)}
                   disabled={isRunningStripeCustomerCleanup || !stripeCleanupResult?.dryRun}
-                  className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                  className="tactile-btn px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
                 >
                   {isRunningStripeCustomerCleanup && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
                   <span className="material-symbols-outlined text-[14px]">delete_sweep</span>
@@ -484,7 +484,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                   <button
                     onClick={() => handleArchiveStaleVisitors(false)}
                     disabled={isRunningVisitorArchive || !visitorArchiveResult?.dryRun}
-                    className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                    className="tactile-btn px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
                   >
                     Archive Now
                   </button>
@@ -551,7 +551,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
               <button
                 onClick={() => handleFixGhostBookings(true)}
                 disabled={isRunningGhostBookingFix}
-                className="px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                className="tactile-btn px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
               >
                 {isRunningGhostBookingFix && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
                 <span className="material-symbols-outlined text-[14px]">visibility</span>
@@ -598,7 +598,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
               <button
                 onClick={() => handleCleanupMindbodyIds(true)}
                 disabled={isCleaningMindbodyIds}
-                className="px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                className="tactile-btn px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
               >
                 {isCleaningMindbodyIds && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
                 <span className="material-symbols-outlined text-[14px]">visibility</span>
@@ -607,7 +607,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
               <button
                 onClick={() => handleCleanupMindbodyIds(false)}
                 disabled={isCleaningMindbodyIds}
-                className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                className="tactile-btn px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
               >
                 {isCleaningMindbodyIds && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
                 <span className="material-symbols-outlined text-[14px]">cleaning_services</span>
@@ -635,7 +635,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
               <button
                 onClick={() => handleRemediateDealStages(true)}
                 disabled={isRunningDealStageRemediation}
-                className="px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                className="tactile-btn px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
               >
                 {isRunningDealStageRemediation && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
                 <span className="material-symbols-outlined text-[14px]">visibility</span>
@@ -644,7 +644,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
               <button
                 onClick={() => handleRemediateDealStages(false)}
                 disabled={isRunningDealStageRemediation}
-                className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                className="tactile-btn px-3 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
               >
                 {isRunningDealStageRemediation && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
                 <span className="material-symbols-outlined text-[14px]">sync</span>
@@ -672,7 +672,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
               <button
                 onClick={() => handleFixOrphanedParticipants(true)}
                 disabled={isRunningOrphanedParticipantFix}
-                className="px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                className="tactile-btn px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
               >
                 {isRunningOrphanedParticipantFix && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
                 <span className="material-symbols-outlined text-[14px]">visibility</span>
@@ -725,7 +725,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
               <button
                 onClick={() => handleApproveAllReviewItems(true)}
                 disabled={isRunningReviewItemsApproval}
-                className="px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                className="tactile-btn px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
               >
                 {isRunningReviewItemsApproval && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
                 <span className="material-symbols-outlined text-[14px]">visibility</span>

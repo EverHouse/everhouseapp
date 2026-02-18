@@ -385,7 +385,7 @@ const TrackmanTab: React.FC = () => {
           onDragLeave={handleDragLeave}
           onClick={() => !uploadMutation.isPending && fileInputRef.current?.click()}
           className={`
-            border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all
+            border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-fast
             ${isDragging 
               ? 'border-accent bg-accent/10' 
               : 'border-primary/20 dark:border-white/20 hover:border-accent hover:bg-accent/5'}
@@ -565,7 +565,7 @@ const TrackmanTab: React.FC = () => {
                       <button
                         onClick={() => setAssignPlayersModal({ booking, isOpen: true })}
                         disabled={isLinking}
-                        className="w-full py-2 bg-accent text-primary rounded-lg text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="tactile-btn w-full py-2 bg-accent text-primary rounded-lg text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isLinking ? 'Linking...' : 'Resolve'}
                       </button>
@@ -603,7 +603,7 @@ const TrackmanTab: React.FC = () => {
                       return (
                         <tr 
                           key={booking.id} 
-                          className={`transition-colors animate-slide-up-stagger ${
+                          className={`tactile-row transition-colors animate-slide-up-stagger ${
                             isLinking 
                               ? 'bg-green-50 dark:bg-green-500/10' 
                               : 'bg-white/50 dark:bg-white/5 hover:bg-white/80 dark:hover:bg-white/10'
@@ -630,7 +630,7 @@ const TrackmanTab: React.FC = () => {
                             <button
                               onClick={() => setAssignPlayersModal({ booking, isOpen: true })}
                               disabled={isLinking}
-                              className="px-3 py-1.5 bg-accent text-primary rounded-lg text-xs font-bold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="tactile-btn px-3 py-1.5 bg-accent text-primary rounded-lg text-xs font-bold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {isLinking ? 'Linking...' : 'Resolve'}
                             </button>
@@ -650,14 +650,14 @@ const TrackmanTab: React.FC = () => {
                   <button
                     onClick={() => { setUnmatchedPage(p => Math.max(1, p - 1)); unmatchedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
                     disabled={unmatchedPage <= 1}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 dark:bg-white/10 text-primary dark:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/20 dark:hover:bg-white/20 transition-colors"
+                    className="tactile-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 dark:bg-white/10 text-primary dark:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/20 dark:hover:bg-white/20 transition-colors"
                   >
                     Previous
                   </button>
                   <button
                     onClick={() => { setUnmatchedPage(p => Math.min(unmatchedTotalPages, p + 1)); unmatchedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
                     disabled={unmatchedPage >= unmatchedTotalPages}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 dark:bg-white/10 text-primary dark:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/20 dark:hover:bg-white/20 transition-colors"
+                    className="tactile-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 dark:bg-white/10 text-primary dark:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/20 dark:hover:bg-white/20 transition-colors"
                   >
                     Next
                   </button>
@@ -759,14 +759,14 @@ const TrackmanTab: React.FC = () => {
                 <button
                   onClick={() => { setNeedsPlayersPage(p => Math.max(1, p - 1)); needsPlayersSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
                   disabled={needsPlayersPage <= 1}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 dark:bg-white/10 text-primary dark:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/20 dark:hover:bg-white/20 transition-colors"
+                  className="tactile-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 dark:bg-white/10 text-primary dark:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/20 dark:hover:bg-white/20 transition-colors"
                 >
                   Previous
                 </button>
                 <button
                   onClick={() => { setNeedsPlayersPage(p => Math.min(needsPlayersTotalPages, p + 1)); needsPlayersSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
                   disabled={needsPlayersPage >= needsPlayersTotalPages}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 dark:bg-white/10 text-primary dark:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/20 dark:hover:bg-white/20 transition-colors"
+                  className="tactile-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 dark:bg-white/10 text-primary dark:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/20 dark:hover:bg-white/20 transition-colors"
                 >
                   Next
                 </button>
@@ -927,7 +927,7 @@ const TrackmanTab: React.FC = () => {
                       <button
                         key={match.email || idx}
                         onClick={() => setFuzzyMatchModal(prev => prev ? { ...prev, selectedEmail: match.email } : null)}
-                        className={`w-full p-3 text-left rounded-xl transition-all ${
+                        className={`w-full p-3 text-left rounded-xl transition-all duration-fast ${
                           fuzzyMatchModal?.selectedEmail === match.email
                             ? 'bg-amber-100 dark:bg-amber-500/20 border-2 border-amber-500 shadow-md'
                             : 'bg-white/70 dark:bg-white/5 border border-primary/10 dark:border-white/25 hover:bg-white dark:hover:bg-white/10 hover:border-primary/20 dark:hover:border-white/20'
@@ -978,7 +978,7 @@ const TrackmanTab: React.FC = () => {
                     <button
                       key={member.email}
                       onClick={() => setFuzzyMatchModal(prev => prev ? { ...prev, selectedEmail: member.email } : null)}
-                      className={`w-full p-3 text-left rounded-xl transition-all ${
+                      className={`w-full p-3 text-left rounded-xl transition-all duration-fast ${
                         fuzzyMatchModal?.selectedEmail === member.email
                           ? 'bg-amber-100 dark:bg-amber-500/20 border-2 border-amber-500 shadow-md'
                           : 'bg-white/70 dark:bg-white/5 border border-primary/10 dark:border-white/25 hover:bg-white dark:hover:bg-white/10 hover:border-primary/20 dark:hover:border-white/20'
@@ -1041,7 +1041,7 @@ const TrackmanTab: React.FC = () => {
             <button
               onClick={handleResolveFuzzyMatch}
               disabled={!fuzzyMatchModal?.selectedEmail || resolveMutation.isPending}
-              className="px-6 py-2.5 rounded-full bg-amber-500 text-white text-sm font-bold hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="px-6 py-2.5 rounded-full bg-amber-500 text-white text-sm font-bold hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-fast"
             >
               {resolveMutation.isPending ? 'Resolving...' : 'Resolve with Selected Member'}
             </button>

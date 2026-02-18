@@ -481,7 +481,7 @@ const POSRegister: React.FC = () => {
     <button
       key={product.productId}
       onClick={() => addToCart(product)}
-      className={`flex flex-col items-center gap-2 p-3 rounded-xl bg-white/60 dark:bg-white/5 border border-primary/10 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/10 transition-all text-center active:scale-95 ${
+      className={`flex flex-col items-center gap-2 p-3 rounded-xl bg-white/60 dark:bg-white/5 border border-primary/10 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/10 transition-all duration-fast text-center active:scale-95 ${
         addedProductId === product.productId ? 'scale-95 ring-2 ring-emerald-400/50' : ''
       }`}
     >
@@ -988,7 +988,7 @@ const POSRegister: React.FC = () => {
             <button
               onClick={handleSavedCardCharge}
               disabled={isProcessing}
-              className="w-full py-4 rounded-xl font-semibold bg-primary dark:bg-lavender text-white transition-all flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50"
+              className="w-full py-4 rounded-xl font-semibold bg-primary dark:bg-lavender text-white transition-all duration-fast flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50"
             >
               {isProcessing ? (
                 <>
@@ -1037,7 +1037,7 @@ const POSRegister: React.FC = () => {
               setDrawerOpen(true);
             }}
             disabled={!canReview}
-            className="w-full py-4 rounded-xl font-semibold bg-primary dark:bg-lavender text-white transition-all flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full py-4 rounded-xl font-semibold bg-primary dark:bg-lavender text-white transition-all duration-fast flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <span className="material-symbols-outlined">shopping_cart_checkout</span>
             Review & Charge
@@ -1114,7 +1114,7 @@ const POSRegister: React.FC = () => {
                   }
                 }}
                 disabled={cartItems.length === 0}
-                className="px-6 py-3 rounded-xl font-semibold bg-primary dark:bg-lavender text-white transition-all flex items-center gap-2 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-6 py-3 rounded-xl font-semibold bg-primary dark:bg-lavender text-white transition-all duration-fast flex items-center gap-2 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <span className="material-symbols-outlined text-lg">shopping_cart_checkout</span>
                 Review
@@ -1220,7 +1220,7 @@ const POSRegister: React.FC = () => {
           <button
             onClick={() => setDrawerOpen(true)}
             disabled={!canReview}
-            className="w-full py-4 rounded-xl font-semibold bg-primary dark:bg-lavender text-white transition-all flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full py-4 rounded-xl font-semibold bg-primary dark:bg-lavender text-white transition-all duration-fast flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <span className="material-symbols-outlined">shopping_cart_checkout</span>
             Review & Charge

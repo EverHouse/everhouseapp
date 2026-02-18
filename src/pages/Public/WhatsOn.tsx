@@ -167,7 +167,7 @@ const WhatsOn: React.FC = () => {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-4 py-2 min-h-[44px] rounded-full text-sm font-bold whitespace-nowrap transition-all flex-shrink-0 ${
+            className={`tactile-btn px-4 py-2 min-h-[44px] rounded-full text-sm font-bold whitespace-nowrap transition-all duration-fast flex-shrink-0 ${
               filter === f
                 ? 'bg-primary text-white'
                 : 'bg-white dark:bg-white/5 text-primary dark:text-white hover:bg-primary/10 dark:hover:bg-white/10'
@@ -199,11 +199,11 @@ const WhatsOn: React.FC = () => {
             return (
               <div 
                 key={itemId} 
-                className={`bg-white dark:bg-[#1a1d15] rounded-2xl overflow-hidden shadow-layered dark:shadow-black/20 transition-all animate-list-item-delay-${Math.min(index, 10)}`}
+                className={`tactile-card bg-white dark:bg-[#1a1d15] rounded-2xl overflow-hidden shadow-layered dark:shadow-black/20 transition-all duration-fast animate-list-item-delay-${Math.min(index, 10)}`}
               >
                 <div 
                   onClick={() => setExpandedId(isExpanded ? null : itemId)}
-                  className={`flex gap-4 p-4 cursor-pointer transition-all ${isExpanded ? '' : 'active:scale-[0.98]'}`}
+                  className={`flex gap-4 p-4 cursor-pointer transition-all duration-fast ${isExpanded ? '' : 'active:scale-[0.98]'}`}
                 >
                   <div className="w-14 h-14 flex-shrink-0 flex flex-col items-center justify-center rounded-xl bg-[#EAEBE6] dark:bg-white/5 text-primary dark:text-white">
                     <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">{date.month}</span>
@@ -315,7 +315,7 @@ const WhatsOn: React.FC = () => {
           {hasMore && (
             <button
               onClick={loadMore}
-              className="w-full bg-white dark:bg-[#1a1d15] hover:bg-bone dark:hover:bg-white/5 text-primary dark:text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-bold text-sm transition-colors shadow-layered dark:shadow-black/20 mt-4"
+              className="tactile-btn w-full bg-white dark:bg-[#1a1d15] hover:bg-bone dark:hover:bg-white/5 text-primary dark:text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-bold text-sm transition-colors shadow-layered dark:shadow-black/20 mt-4"
             >
               <span>Load More</span>
               <span className="text-xs text-primary/50 dark:text-white/50">({combinedItems.length - displayCount} remaining)</span>
@@ -331,7 +331,7 @@ const WhatsOn: React.FC = () => {
           <p className="text-white/70 text-sm mb-4">Join Ever Club and unlock exclusive member-only events and wellness classes.</p>
           <button 
             onClick={() => { startNavigation(); navigate('/membership'); }}
-            className="bg-bone dark:bg-white text-primary px-6 py-3 rounded-xl font-bold text-sm hover:bg-white transition-colors"
+            className="tactile-btn bg-bone dark:bg-white text-primary px-6 py-3 rounded-xl font-bold text-sm hover:bg-white transition-colors"
           >
             Explore Membership
           </button>

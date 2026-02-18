@@ -212,7 +212,7 @@ const BuyDayPass: React.FC = () => {
             {tiers.map((tier) => (
               <div 
                 key={tier.id}
-                className="bg-white dark:bg-[#1a1d15] rounded-2xl p-5 border border-black/5 dark:border-white/10 shadow-sm dark:shadow-none"
+                className="tactile-card bg-white dark:bg-[#1a1d15] rounded-2xl p-5 border border-black/5 dark:border-white/10 shadow-sm dark:shadow-none"
               >
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1">
@@ -231,7 +231,7 @@ const BuyDayPass: React.FC = () => {
                 <button
                   onClick={() => handlePurchase(tier)}
                   disabled={processingSlug !== null || !tier.stripePriceId}
-                  className="w-full flex justify-center items-center gap-2 rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-white shadow-md hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="tactile-btn w-full flex justify-center items-center gap-2 rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-white shadow-md hover:bg-primary/90 transition-all duration-fast disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {processingSlug === tier.slug ? (
                     <>
@@ -282,7 +282,7 @@ const BuyDayPass: React.FC = () => {
           <p className="text-white/70 text-sm mb-4">Become a member and enjoy unlimited access plus exclusive benefits.</p>
           <button 
             onClick={() => { startNavigation(); navigate('/membership'); }}
-            className="bg-bone text-primary px-6 py-3 rounded-xl font-bold text-sm hover:bg-white transition-colors"
+            className="tactile-btn bg-bone text-primary px-6 py-3 rounded-xl font-bold text-sm hover:bg-white transition-colors"
           >
             Explore Memberships
           </button>

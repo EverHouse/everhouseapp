@@ -275,7 +275,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                 setCalendarDate(getTodayPacific());
                                                 setShowDatePicker(false);
                                             }}
-                                            className={`w-full py-3 px-4 rounded-lg text-base font-semibold hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg ${isDark ? 'bg-[#CCB8E4] text-[#1a1d15]' : 'bg-primary text-white'}`}
+                                            className={`w-full py-3 px-4 rounded-lg text-base font-semibold hover:opacity-90 active:scale-95 transition-all duration-fast flex items-center justify-center gap-2 shadow-lg ${isDark ? 'bg-[#CCB8E4] text-[#1a1d15]' : 'bg-primary text-white'}`}
                                         >
                                             <span className="material-symbols-outlined text-lg">today</span>
                                             Today

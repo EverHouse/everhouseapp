@@ -64,7 +64,7 @@ const AuthCallback: React.FC = () => {
             <p className="text-primary/60 dark:text-white/60 mb-4">{error}</p>
             <button
               onClick={() => { startNavigation(); navigate('/login'); }}
-              className="w-full py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition-all"
+              className="w-full py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition-all duration-fast"
             >
               Back to Login
             </button>

@@ -352,7 +352,7 @@ export const WellnessAdminContent: React.FC = () => {
                     <button
                         key={tab.id}
                         onClick={() => setActiveCategory(tab.id)}
-                        className={`tactile-btn flex items-center gap-1.5 px-3 py-2 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-all flex-shrink-0 ${
+                        className={`tactile-btn flex items-center gap-1.5 px-3 py-2 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-all duration-fast flex-shrink-0 ${
                             activeCategory === tab.id 
                                 ? 'bg-primary text-white shadow-md' 
                                 : 'bg-white dark:bg-white/10 text-gray-600 dark:text-white/80 border border-gray-200 dark:border-white/25'
@@ -750,7 +750,7 @@ export const WellnessAdminContent: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => setFormData({...formData, visibility: 'public'})}
-                                className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                                className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-sm transition-all duration-fast flex items-center justify-center gap-2 ${
                                     (formData.visibility || 'public') === 'public'
                                         ? 'bg-primary text-white shadow-md'
                                         : 'bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-white/70 border border-gray-200 dark:border-white/25'
@@ -762,7 +762,7 @@ export const WellnessAdminContent: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => setFormData({...formData, visibility: 'members'})}
-                                className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                                className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-sm transition-all duration-fast flex items-center justify-center gap-2 ${
                                     formData.visibility === 'members'
                                         ? 'bg-primary text-white shadow-md'
                                         : 'bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-white/70 border border-gray-200 dark:border-white/25'

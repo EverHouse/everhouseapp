@@ -594,7 +594,7 @@ export function StaffManualBookingModal({
         <div className="flex p-1 bg-gray-100 dark:bg-white/10 rounded-lg">
           <button
             type="button"
-            className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${
+            className={`flex-1 py-2 text-xs font-medium rounded-md transition-all duration-fast ${
               mode === 'member' 
                 ? 'bg-white dark:bg-white/20 shadow text-gray-900 dark:text-white' 
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/5'
@@ -605,7 +605,7 @@ export function StaffManualBookingModal({
           </button>
           <button
             type="button"
-            className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${
+            className={`flex-1 py-2 text-xs font-medium rounded-md transition-all duration-fast ${
               mode === 'lesson' 
                 ? 'bg-white dark:bg-white/20 shadow text-gray-900 dark:text-white' 
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/5'
@@ -616,7 +616,7 @@ export function StaffManualBookingModal({
           </button>
           <button
             type="button"
-            className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${
+            className={`flex-1 py-2 text-xs font-medium rounded-md transition-all duration-fast ${
               mode === 'conference' 
                 ? 'bg-white dark:bg-white/20 shadow text-gray-900 dark:text-white' 
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/5'
@@ -649,7 +649,7 @@ export function StaffManualBookingModal({
                         value={resourceId ?? ''}
                         onChange={(e) => setResourceId(Number(e.target.value))}
                         disabled={loadingResources}
-                        className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all"
+                        className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all duration-fast"
                       >
                         {loadingResources ? (
                           <option value="">Loading...</option>
@@ -670,7 +670,7 @@ export function StaffManualBookingModal({
                         value={requestDate}
                         onChange={(e) => setRequestDate(e.target.value)}
                         min={getTodayPacific()}
-                        className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all"
+                        className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all duration-fast"
                       />
                     </div>
 
@@ -682,7 +682,7 @@ export function StaffManualBookingModal({
                         type="time"
                         value={startTime}
                         onChange={(e) => setStartTime(e.target.value)}
-                        className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all"
+                        className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all duration-fast"
                       />
                     </div>
 
@@ -693,7 +693,7 @@ export function StaffManualBookingModal({
                       <select
                         value={playerCount}
                         onChange={(e) => setPlayerCount(Number(e.target.value))}
-                        className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all"
+                        className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all duration-fast"
                       >
                         <option value={1}>1 player</option>
                         <option value={2}>2 players</option>
@@ -709,7 +709,7 @@ export function StaffManualBookingModal({
                       <select
                         value={durationMinutes}
                         onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                        className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all"
+                        className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all duration-fast"
                       >
                         {getSimulatorDurations(playerCount).map(mins => (
                           <option key={mins} value={mins}>{mins} minutes</option>
@@ -873,7 +873,7 @@ export function StaffManualBookingModal({
                       value={externalId}
                       onChange={(e) => setExternalId(e.target.value)}
                       placeholder="e.g., 19510379"
-                      className="w-full px-4 py-3 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all"
+                      className="w-full px-4 py-3 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all duration-fast"
                     />
                     <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                       After creating the booking in Trackman, copy the Booking ID and paste it here.
@@ -966,7 +966,7 @@ export function StaffManualBookingModal({
                       value={confDate}
                       onChange={(e) => setConfDate(e.target.value)}
                       min={getTodayPacific()}
-                      className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all"
+                      className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all duration-fast"
                     />
                   </div>
 
@@ -977,7 +977,7 @@ export function StaffManualBookingModal({
                     <select
                       value={confDuration}
                       onChange={(e) => setConfDuration(Number(e.target.value))}
-                      className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all"
+                      className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all duration-fast"
                     >
                       <option value={30}>30 minutes</option>
                       <option value={60}>60 minutes</option>
@@ -1008,7 +1008,7 @@ export function StaffManualBookingModal({
                     <select
                       value={confSelectedSlot}
                       onChange={(e) => setConfSelectedSlot(e.target.value)}
-                      className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all"
+                      className="w-full px-4 py-2.5 text-sm bg-white dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-primary dark:focus:ring-[#CCB8E4] focus:border-transparent outline-none transition-all duration-fast"
                     >
                       {confAvailableSlots.map(slot => (
                         <option key={slot} value={slot}>

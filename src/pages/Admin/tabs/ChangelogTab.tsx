@@ -777,7 +777,7 @@ const ChangelogTab: React.FC = () => {
                         <button
                             key={cat.key}
                             onClick={() => setFilterCategory(cat.key)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-fast ${
                                 filterCategory === cat.key
                                     ? 'bg-accent text-primary'
                                     : 'bg-primary/5 text-primary/80 hover:bg-primary/10 dark:bg-white/5 dark:text-white/80 dark:hover:bg-white/10'
@@ -882,7 +882,7 @@ const ChangelogTab: React.FC = () => {
                             <button
                                 onClick={loadMore}
                                 disabled={loading}
-                                className="w-full py-3 rounded-xl text-sm font-medium transition-all bg-primary/5 text-primary/80 hover:bg-primary/10 dark:bg-white/5 dark:text-white/80 dark:hover:bg-white/10 disabled:opacity-50"
+                                className="w-full py-3 rounded-xl text-sm font-medium transition-all duration-fast bg-primary/5 text-primary/80 hover:bg-primary/10 dark:bg-white/5 dark:text-white/80 dark:hover:bg-white/10 disabled:opacity-50"
                             >
                                 {loading ? 'Loading...' : 'Load More'}
                             </button>
@@ -900,7 +900,7 @@ const ChangelogTab: React.FC = () => {
                     <div className="flex gap-2 mb-6 animate-content-enter">
                         <button
                             onClick={() => setActiveTab('updates')}
-                            className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold uppercase tracking-wide transition-all ${
+                            className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold uppercase tracking-wide transition-all duration-fast ${
                                 activeTab === 'updates'
                                     ? 'bg-accent text-primary'
                                     : 'bg-primary/5 text-primary/80 hover:bg-primary/10 dark:bg-white/5 dark:text-white/80 dark:hover:bg-white/10'
@@ -910,7 +910,7 @@ const ChangelogTab: React.FC = () => {
                         </button>
                         <button
                             onClick={() => setActiveTab('activity')}
-                            className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold uppercase tracking-wide transition-all ${
+                            className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold uppercase tracking-wide transition-all duration-fast ${
                                 activeTab === 'activity'
                                     ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400'
                                     : 'bg-primary/5 text-primary/80 hover:bg-primary/10 dark:bg-white/5 dark:text-white/80 dark:hover:bg-white/10'

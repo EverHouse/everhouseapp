@@ -222,7 +222,7 @@ const BugReportModal: React.FC<BugReportModalProps> = ({
             <button
               type="submit"
               disabled={loading || !description.trim()}
-              className={`w-full py-4 min-h-[44px] rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`w-full py-4 min-h-[44px] rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all duration-fast disabled:opacity-50 disabled:cursor-not-allowed ${
                 isDark 
                   ? 'bg-accent text-primary hover:opacity-90' 
                   : 'bg-primary text-white hover:bg-primary/90'

@@ -179,7 +179,7 @@ const BugReportsAdmin: React.FC = () => {
                         <button
                             key={tab.id}
                             onClick={() => setActiveStatus(tab.id)}
-                            className={`flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 ${
+                            className={`flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-full text-xs font-medium whitespace-nowrap transition-all duration-fast flex-shrink-0 ${
                                 activeStatus === tab.id
                                     ? isDark ? 'bg-accent text-primary' : 'bg-primary text-white'
                                     : isDark ? 'glass-button text-white/80' : 'bg-white border border-black/10 text-primary/80'
@@ -308,7 +308,7 @@ const BugReportsAdmin: React.FC = () => {
                                         key={status}
                                         onClick={() => handleUpdateStatus(status)}
                                         disabled={isSaving}
-                                        className={`flex-1 py-2 px-3 min-h-[44px] rounded-xl text-sm font-medium transition-all ${
+                                        className={`flex-1 py-2 px-3 min-h-[44px] rounded-xl text-sm font-medium transition-all duration-fast ${
                                             selectedReport.status === status
                                                 ? getBugReportStatusColor(status)
                                                 : isDark ? 'bg-white/10 text-white/80 hover:bg-white/15' : 'bg-black/5 text-primary/80 hover:bg-black/10'
@@ -344,7 +344,7 @@ const BugReportsAdmin: React.FC = () => {
                             <button
                                 onClick={handleSaveNotes}
                                 disabled={isSaving || staffNotes === (selectedReport.staffNotes || '')}
-                                className={`mt-2 px-4 py-2 min-h-[44px] rounded-xl text-sm font-medium transition-all disabled:opacity-50 ${
+                                className={`mt-2 px-4 py-2 min-h-[44px] rounded-xl text-sm font-medium transition-all duration-fast disabled:opacity-50 ${
                                     isDark ? 'bg-accent text-primary' : 'bg-primary text-white'
                                 }`}
                             >

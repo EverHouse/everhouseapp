@@ -77,7 +77,7 @@ const SchedulerMonitorPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
 
   return (
     <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
-      <button onClick={onToggle} className="flex items-center justify-between w-full text-left">
+      <button onClick={onToggle} className="tactile-btn flex items-center justify-between w-full text-left">
         <div className="flex items-center gap-2">
           <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">schedule</span>
           <span className="font-bold text-primary dark:text-white">Scheduled Tasks</span>
@@ -121,7 +121,7 @@ const SchedulerMonitorPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
                   return (
                     <React.Fragment key={scheduler.taskName}>
                       <tr
-                        className={`border-b border-gray-100 dark:border-gray-800 ${idx % 2 === 0 ? 'bg-gray-50/50 dark:bg-white/[0.02]' : ''} ${status.bgClass} cursor-pointer hover:bg-gray-100 dark:hover:bg-white/[0.05]`}
+                        className={`tactile-row border-b border-gray-100 dark:border-gray-800 ${idx % 2 === 0 ? 'bg-gray-50/50 dark:bg-white/[0.02]' : ''} ${status.bgClass} cursor-pointer hover:bg-gray-100 dark:hover:bg-white/[0.05]`}
                         onClick={() => scheduler.lastError && setExpandedError(expandedError === scheduler.taskName ? null : scheduler.taskName)}
                       >
                         <td className="py-2 pr-3 font-medium text-gray-900 dark:text-gray-100">{scheduler.taskName}</td>

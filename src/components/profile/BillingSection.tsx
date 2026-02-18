@@ -258,7 +258,7 @@ export default function BillingSection({ isDark }: Props) {
           <button
             onClick={handleOpenBillingPortal}
             disabled={openingPortal}
-            className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium text-sm transition-all disabled:opacity-50 ${
+            className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium text-sm transition-all duration-fast disabled:opacity-50 ${
               isDark 
                 ? 'bg-accent/20 text-accent hover:bg-accent/30' 
                 : 'bg-primary/10 text-primary hover:bg-primary/20'
@@ -425,7 +425,7 @@ export default function BillingSection({ isDark }: Props) {
           <button
             onClick={handleAddPaymentMethod}
             disabled={migratingPayment}
-            className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium text-sm transition-all disabled:opacity-50 ${
+            className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium text-sm transition-all duration-fast disabled:opacity-50 ${
               isDark 
                 ? 'bg-accent/20 text-accent hover:bg-accent/30' 
                 : 'bg-primary/10 text-primary hover:bg-primary/20'

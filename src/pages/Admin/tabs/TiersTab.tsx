@@ -471,7 +471,7 @@ const TiersTab: React.FC = () => {
                     <button
                         key={tab.key}
                         onClick={() => setActiveSubTab(tab.key)}
-                        className={`flex items-center gap-1 px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
+                        className={`flex items-center gap-1 px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all duration-fast flex-shrink-0 ${
                             activeSubTab === tab.key
                                 ? 'bg-white dark:bg-white/10 text-primary dark:text-white shadow-sm'
                                 : 'text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-white'
@@ -505,7 +505,7 @@ const TiersTab: React.FC = () => {
                                         <div 
                                             key={pass.id} 
                                             onClick={() => openEdit(pass)}
-                                            className="bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 cursor-pointer hover:border-primary/30 transition-all animate-slide-up-stagger"
+                                            className="bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 cursor-pointer hover:border-primary/30 transition-all duration-fast animate-slide-up-stagger"
                                             style={{ '--stagger-index': index } as React.CSSProperties}
                                         >
                                             <div className="flex items-start justify-between">
@@ -594,7 +594,7 @@ const TiersTab: React.FC = () => {
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Name</label>
                                     <input 
-                                        className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+                                        className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" 
                                         value={selectedTier?.name || ''} 
                                         onChange={e => selectedTier && setSelectedTier({...selectedTier, name: e.target.value})} 
                                     />
@@ -602,7 +602,7 @@ const TiersTab: React.FC = () => {
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Price String</label>
                                     <input 
-                                        className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+                                        className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" 
                                         value={selectedTier?.price_string || ''} 
                                         onChange={e => selectedTier && setSelectedTier({...selectedTier, price_string: e.target.value})} 
                                         placeholder="e.g., $199/mo"
@@ -612,7 +612,7 @@ const TiersTab: React.FC = () => {
                             <div>
                                 <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Description</label>
                                 <textarea 
-                                    className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none" 
+                                    className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast resize-none" 
                                     rows={2}
                                     value={selectedTier?.description || ''} 
                                     onChange={e => selectedTier && setSelectedTier({...selectedTier, description: e.target.value})} 
@@ -639,7 +639,7 @@ const TiersTab: React.FC = () => {
                                     <div>
                                         <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Button Text</label>
                                         <input 
-                                            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+                                            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" 
                                             value={selectedTier?.button_text || ''} 
                                             onChange={e => selectedTier && setSelectedTier({...selectedTier, button_text: e.target.value})} 
                                         />
@@ -648,7 +648,7 @@ const TiersTab: React.FC = () => {
                                         <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Sort Order</label>
                                         <input 
                                             type="number"
-                                            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+                                            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" 
                                             value={selectedTier?.sort_order ?? 0} 
                                             onChange={e => selectedTier && setSelectedTier({...selectedTier, sort_order: parseInt(e.target.value) || 0})} 
                                         />
@@ -770,7 +770,7 @@ const TiersTab: React.FC = () => {
                                         <div>
                                             <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Link to Stripe Price</label>
                                             <select
-                                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast"
                                                 value=""
                                                 onChange={e => {
                                                     if (!selectedTier) return;
@@ -810,7 +810,7 @@ const TiersTab: React.FC = () => {
                                         </label>
                                         <input
                                             type="number"
-                                            className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                            className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast ${
                                                 selectedTier?.stripe_price_id 
                                                     ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
                                                     : 'bg-gray-50 dark:bg-black/30'
@@ -843,7 +843,7 @@ const TiersTab: React.FC = () => {
                                                     <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Daily Sim Minutes</label>
                                                     <input 
                                                         type="number"
-                                                        className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                                        className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast ${
                                                             selectedTier?.stripe_product_id 
                                                                 ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
                                                                 : 'bg-gray-50 dark:bg-black/30'
@@ -857,7 +857,7 @@ const TiersTab: React.FC = () => {
                                                     <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Guest Passes/Month</label>
                                                     <input 
                                                         type="number"
-                                                        className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                                        className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast ${
                                                             selectedTier?.stripe_product_id 
                                                                 ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
                                                                 : 'bg-gray-50 dark:bg-black/30'
@@ -871,7 +871,7 @@ const TiersTab: React.FC = () => {
                                                     <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Booking Window (Days)</label>
                                                     <input 
                                                         type="number"
-                                                        className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                                        className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast ${
                                                             selectedTier?.stripe_product_id 
                                                                 ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
                                                                 : 'bg-gray-50 dark:bg-black/30'
@@ -885,7 +885,7 @@ const TiersTab: React.FC = () => {
                                                     <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Daily Conf Room Minutes</label>
                                                     <input 
                                                         type="number"
-                                                        className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                                        className={`w-full border border-gray-200 dark:border-white/20 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast ${
                                                             selectedTier?.stripe_product_id 
                                                                 ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' 
                                                                 : 'bg-gray-50 dark:bg-black/30'

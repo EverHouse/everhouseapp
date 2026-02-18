@@ -135,7 +135,7 @@ const Landing: React.FC = () => {
             Formerly Even House — Orange County's private club for professionals who work, play, and connect — all under one roof.
           </p>
           <div className="flex flex-col gap-3 w-full max-w-xs animate-hero-cta">
-             <Link to="/tour" className="w-full py-4 rounded-2xl bg-white text-primary font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-white/90 transition-all text-center">
+             <Link to="/tour" className="w-full py-4 rounded-2xl bg-white text-primary font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-white/90 transition-all duration-fast text-center">
                 Book Your Private Tour
              </Link>
              <Link to="/membership" className="w-full py-3 text-white font-medium text-sm hover:opacity-80 transition-opacity flex items-center justify-center gap-2 group">
@@ -352,7 +352,7 @@ const Landing: React.FC = () => {
         <div className="max-w-md mx-auto text-center">
           <h2 className="text-2xl sm:text-3xl font-bold text-primary dark:text-white mb-3 font-serif">See it for yourself.</h2>
           <p className="text-sm sm:text-base text-primary/60 dark:text-white/60 mb-8">Book a private tour and experience Ever Club firsthand.</p>
-          <Link to="/tour" className="inline-block px-10 py-4 rounded-2xl bg-primary text-white font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-primary/90 transition-all">
+          <Link to="/tour" className="inline-block px-10 py-4 rounded-2xl bg-primary text-white font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-primary/90 transition-all duration-fast">
             Book Your Private Tour
           </Link>
         </div>

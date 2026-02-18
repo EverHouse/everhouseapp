@@ -182,7 +182,7 @@ const InquiriesAdmin: React.FC = () => {
                     <button
                         key={tab.id}
                         onClick={() => setActiveStatus(tab.id)}
-                        className={`flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-all flex-shrink-0 ${
+                        className={`flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-all duration-fast flex-shrink-0 ${
                             activeStatus === tab.id 
                                 ? 'bg-primary dark:bg-lavender text-white shadow-md' 
                                 : 'bg-white dark:bg-white/10 text-gray-600 dark:text-white/80 border border-gray-200 dark:border-white/25'
@@ -199,7 +199,7 @@ const InquiriesAdmin: React.FC = () => {
                     <button
                         key={chip.id}
                         onClick={() => setActiveFormType(chip.id)}
-                        className={`flex-shrink-0 px-3 py-2 min-h-[44px] rounded-full text-xs font-semibold transition-all ${
+                        className={`flex-shrink-0 px-3 py-2 min-h-[44px] rounded-full text-xs font-semibold transition-all duration-fast ${
                             activeFormType === chip.id 
                                 ? 'bg-accent dark:bg-lavender text-primary dark:text-white shadow-sm' 
                                 : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10'
@@ -278,7 +278,7 @@ const InquiriesAdmin: React.FC = () => {
                                             key={status}
                                             onClick={() => handleUpdateStatus(status)}
                                             disabled={isSaving || selectedInquiry.status === status}
-                                            className={`px-3 py-2 min-h-[44px] rounded-lg text-xs font-bold transition-all disabled:opacity-50 ${
+                                            className={`px-3 py-2 min-h-[44px] rounded-lg text-xs font-bold transition-all duration-fast disabled:opacity-50 ${
                                                 selectedInquiry.status === status 
                                                     ? 'bg-primary text-white' 
                                                     : 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-white/20'
@@ -297,7 +297,7 @@ const InquiriesAdmin: React.FC = () => {
                                     onChange={(e) => setNotes(e.target.value)}
                                     placeholder="Add internal notes about this inquiry..."
                                     rows={3}
-                                    className="w-full border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 p-3 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none text-sm"
+                                    className="w-full border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 p-3 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast resize-none text-sm"
                                 />
                                 <button
                                     onClick={handleSaveNotes}

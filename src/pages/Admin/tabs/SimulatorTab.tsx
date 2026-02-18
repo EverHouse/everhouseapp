@@ -1046,7 +1046,7 @@ const SimulatorTab: React.FC = () => {
                     <div className="flex">
                         <button
                             onClick={() => setActiveView('requests')}
-                            className={`py-3 px-6 font-medium text-sm transition-all relative ${
+                            className={`tactile-btn py-3 px-6 font-medium text-sm transition-all duration-fast relative ${
                                 activeView === 'requests'
                                     ? 'text-primary dark:text-white'
                                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
@@ -1059,7 +1059,7 @@ const SimulatorTab: React.FC = () => {
                         </button>
                         <button
                             onClick={() => setActiveView('calendar')}
-                            className={`py-3 px-6 font-medium text-sm transition-all relative ${
+                            className={`tactile-btn py-3 px-6 font-medium text-sm transition-all duration-fast relative ${
                                 activeView === 'calendar'
                                     ? 'text-primary dark:text-white'
                                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'

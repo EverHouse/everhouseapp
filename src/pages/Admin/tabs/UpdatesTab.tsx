@@ -332,7 +332,7 @@ const UpdatesTab: React.FC = () => {
                 <div className="flex gap-1.5 sm:gap-2 mb-6 animate-content-enter-delay-1">
                     <button
                         onClick={() => setActiveSubTab('alerts')}
-                        className={`flex-1 py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wide transition-all relative ${
+                        className={`flex-1 py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wide transition-all duration-fast relative ${
                             activeSubTab === 'alerts'
                                 ? 'bg-accent text-primary'
                                 : 'bg-primary/5 text-primary/80 hover:bg-primary/10 dark:bg-white/5 dark:text-white/80 dark:hover:bg-white/10'
@@ -347,7 +347,7 @@ const UpdatesTab: React.FC = () => {
                     </button>
                     <button
                         onClick={() => setActiveSubTab('announcements')}
-                        className={`flex-1 py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wide transition-all ${
+                        className={`flex-1 py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wide transition-all duration-fast ${
                             activeSubTab === 'announcements'
                                 ? 'bg-[#CCB8E4] text-[#293515]'
                                 : 'bg-primary/5 text-primary/80 hover:bg-primary/10 dark:bg-white/5 dark:text-white/80 dark:hover:bg-white/10'

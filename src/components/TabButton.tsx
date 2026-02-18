@@ -23,7 +23,7 @@ const TabButton: React.FC<TabButtonProps> = ({ label, active, onClick, isDark = 
       type="button"
       onClick={handleClick}
       style={{ touchAction: 'manipulation' }}
-      className={`pb-3 border-b-[3px] text-sm whitespace-nowrap flex-shrink-0 transition-colors min-h-[44px] focus:ring-2 focus:ring-offset-1 focus:ring-accent focus:outline-none rounded-sm ${
+      className={`tactile-btn pb-3 border-b-[3px] text-sm whitespace-nowrap flex-shrink-0 transition-colors min-h-[44px] focus:ring-2 focus:ring-offset-1 focus:ring-accent focus:outline-none rounded-sm ${
         active 
           ? (isDark ? 'border-white text-white font-bold' : 'border-primary text-primary font-bold') 
           : (isDark ? 'border-transparent text-white/60 font-medium' : 'border-transparent text-primary/60 font-medium')

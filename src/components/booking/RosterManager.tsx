@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { apiRequest } from '../../lib/apiRequest';
 import { useToast } from '../Toast';
@@ -135,6 +136,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
   const isDark = effectiveTheme === 'dark';
   const { showToast } = useToast();
   const { guestFeeDollars } = usePricing();
+  const [rosterListRef] = useAutoAnimate();
 
   const [loading, setLoading] = useState(true);
   const [participants, setParticipants] = useState<RosterParticipant[]>([]);
@@ -476,7 +478,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
           </div>
         </div>
 
-        <div className="p-5 space-y-3">
+        <div ref={rosterListRef} className="p-5 space-y-3">
           {ownerParticipant && (
             <div className={`flex items-center gap-3 p-3 rounded-2xl ${isDark ? 'bg-white/5' : 'bg-black/[0.02]'}`}>
               <Avatar name={ownerParticipant.displayName} size="md" />
@@ -542,14 +544,14 @@ const RosterManager: React.FC<RosterManagerProps> = ({
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowAddMemberModal(true)}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#293515] text-white font-semibold text-sm transition-all hover:bg-[#3a4a20] active:scale-[0.98]"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#293515] text-white font-semibold text-sm transition-all duration-fast hover:bg-[#3a4a20] active:scale-[0.98]"
                 >
                   <span className="material-symbols-outlined text-lg">person_add</span>
                   Add Member
                 </button>
                 <button
                   onClick={() => setShowGuestModal(true)}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-semibold text-sm transition-all active:scale-[0.98] bg-[#CCB8E4] text-[#293515] hover:bg-[#baa6d6]"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-semibold text-sm transition-all duration-fast active:scale-[0.98] bg-[#CCB8E4] text-[#293515] hover:bg-[#baa6d6]"
                 >
                   <span className="material-symbols-outlined text-lg">group_add</span>
                   Add Guest
@@ -824,7 +826,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
           <button
             onClick={handleAddGuest}
             disabled={!guestFirstName.trim() || !guestLastName.trim() || !guestEmail.trim()}
-            className={`w-full py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+            className={`w-full py-3 px-4 rounded-xl font-bold text-sm transition-all duration-fast flex items-center justify-center gap-2 ${
               guestFirstName.trim() && guestLastName.trim() && guestEmail.trim()
                 ? 'bg-[#293515] text-white hover:bg-[#3a4a20] active:scale-[0.98]'
                 : isDark
@@ -905,7 +907,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
               setShowConflictModal(false);
               setConflictDetails(null);
             }}
-            className="w-full py-3 px-4 rounded-xl bg-[#293515] text-white font-bold text-sm transition-all hover:bg-[#3a4a20] active:scale-[0.98]"
+            className="w-full py-3 px-4 rounded-xl bg-[#293515] text-white font-bold text-sm transition-all duration-fast hover:bg-[#3a4a20] active:scale-[0.98]"
           >
             Understood
           </button>

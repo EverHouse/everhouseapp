@@ -79,7 +79,7 @@ export function WaiverModal({ isOpen, onComplete, currentVersion }: WaiverModalP
       <button
         onClick={handleSign}
         disabled={!agreed || isSubmitting}
-        className={`w-full py-3 px-4 rounded-xl font-semibold transition-all ${
+        className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-fast ${
           agreed && !isSubmitting
             ? isDark
               ? 'bg-[#a3e635] text-[#1a1d15] hover:bg-[#bef264]'

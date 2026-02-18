@@ -251,7 +251,7 @@ const BookTour: React.FC = () => {
 
               <Link
                 to="/"
-                className="inline-block px-8 py-4 bg-primary text-white rounded-[2rem] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all"
+                className="inline-block px-8 py-4 bg-primary text-white rounded-[2rem] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-fast"
               >
                 Back to Home
               </Link>
@@ -260,14 +260,14 @@ const BookTour: React.FC = () => {
             <div className="bg-white/60 dark:bg-white/5 backdrop-blur-xl rounded-[2rem] border border-white/80 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden">
               <div className="flex items-center justify-center gap-3 py-6 border-b border-primary/10 dark:border-white/10">
                 <div className="flex flex-col items-center gap-1">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all ${step === 1 ? 'bg-primary text-white' : step > 1 ? 'bg-green-500 text-white' : 'bg-primary/10 dark:bg-white/10 text-primary dark:text-white'}`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-fast ${step === 1 ? 'bg-primary text-white' : step > 1 ? 'bg-green-500 text-white' : 'bg-primary/10 dark:bg-white/10 text-primary dark:text-white'}`}>
                     {step > 1 ? <span className="material-symbols-outlined text-lg">check</span> : '1'}
                   </div>
                   <span className={`text-[10px] font-medium ${step === 1 ? 'text-primary dark:text-white' : 'text-primary/40 dark:text-white/40'}`}>Your Info</span>
                 </div>
                 <div className="w-16 h-0.5 bg-primary/20 dark:bg-white/20 mb-5" />
                 <div className="flex flex-col items-center gap-1">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all ${step === 2 ? 'bg-primary text-white' : 'bg-primary/10 dark:bg-white/10 text-primary dark:text-white'}`}>2</div>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-fast ${step === 2 ? 'bg-primary text-white' : 'bg-primary/10 dark:bg-white/10 text-primary dark:text-white'}`}>2</div>
                   <span className={`text-[10px] font-medium ${step === 2 ? 'text-primary dark:text-white' : 'text-primary/40 dark:text-white/40'}`}>Pick a Time</span>
                 </div>
               </div>
@@ -370,7 +370,7 @@ const BookTour: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleContinueToStep2}
-                    className="w-full py-4 rounded-xl bg-primary text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                    className="tactile-btn w-full py-4 rounded-xl bg-primary text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                   >
                     Continue to Select Time
                     <span className="material-symbols-outlined text-lg">arrow_forward</span>
@@ -391,7 +391,7 @@ const BookTour: React.FC = () => {
                             key={date}
                             type="button"
                             onClick={() => setSelectedDate(date)}
-                            className={`flex-shrink-0 w-[72px] py-3 rounded-2xl border text-center transition-all ${
+                            className={`flex-shrink-0 w-[72px] py-3 rounded-2xl border text-center transition-all duration-fast ${
                               isSelected
                                 ? 'bg-primary text-white border-primary shadow-lg scale-[1.02]'
                                 : 'bg-white/60 dark:bg-white/5 border-primary/10 dark:border-white/10 text-primary dark:text-white hover:border-primary/30 dark:hover:border-white/30'
@@ -431,7 +431,7 @@ const BookTour: React.FC = () => {
                                   setSelectedTime(slot.start);
                                   triggerHaptic('light');
                                 }}
-                                className={`py-3 px-2 rounded-xl text-sm font-medium transition-all ${
+                                className={`tactile-btn py-3 px-2 rounded-xl text-sm font-medium transition-all duration-fast ${
                                   isSelected
                                     ? 'bg-primary text-white shadow-lg scale-[1.02]'
                                     : 'bg-white/60 dark:bg-white/5 border border-primary/10 dark:border-white/10 text-primary dark:text-white hover:border-primary/30 dark:hover:border-white/30'
@@ -454,7 +454,7 @@ const BookTour: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => { setStep(1); setError(''); }}
-                      className="flex-1 py-4 rounded-xl border border-primary/20 dark:border-white/20 text-primary dark:text-white font-bold text-sm hover:bg-primary/5 dark:hover:bg-white/5 transition-colors"
+                      className="tactile-btn flex-1 py-4 rounded-xl border border-primary/20 dark:border-white/20 text-primary dark:text-white font-bold text-sm hover:bg-primary/5 dark:hover:bg-white/5 transition-colors"
                     >
                       Back
                     </button>
@@ -462,7 +462,7 @@ const BookTour: React.FC = () => {
                       type="button"
                       onClick={handleBook}
                       disabled={!selectedDate || !selectedTime || booking}
-                      className="flex-[2] py-4 rounded-xl bg-primary text-white font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
+                      className="tactile-btn flex-[2] py-4 rounded-xl bg-primary text-white font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
                     >
                       {booking ? (
                         <>

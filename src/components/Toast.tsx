@@ -122,7 +122,7 @@ const ToastItem: React.FC<{ toast: ToastMessage; onDismiss: () => void; isDark: 
         </div>
         <button
           onClick={onDismiss}
-          className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${
+          className={`tactile-btn p-1.5 rounded-lg transition-colors flex-shrink-0 ${
             isDark ? 'hover:bg-white/10 text-white/40 hover:text-white/70' : 'hover:bg-black/5 text-gray-400 hover:text-gray-600'
           }`}
           aria-label="Dismiss notification"

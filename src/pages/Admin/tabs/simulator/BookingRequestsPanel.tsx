@@ -328,14 +328,14 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => setTrackmanModal({ isOpen: true, booking: req })}
-                                                className="flex-1 py-2 px-3 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-amber-200 dark:hover:bg-amber-900/50 hover:shadow-md active:scale-95 transition-all duration-fast"
+                                                className="tactile-btn flex-1 py-2 px-3 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-amber-200 dark:hover:bg-amber-900/50 hover:shadow-md active:scale-95 transition-all duration-fast"
                                             >
                                                 <span aria-hidden="true" className="material-symbols-outlined text-sm">sports_golf</span>
                                                 Book on Trackman
                                             </button>
                                             <button
                                                 onClick={() => { setSelectedRequest(req); setActionModal('decline'); }}
-                                                className="flex-1 py-2 px-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-red-200 dark:hover:bg-red-900/50 hover:shadow-md active:scale-95 transition-all duration-fast"
+                                                className="tactile-btn flex-1 py-2 px-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-red-200 dark:hover:bg-red-900/50 hover:shadow-md active:scale-95 transition-all duration-fast"
                                             >
                                                 <span aria-hidden="true" className="material-symbols-outlined text-sm">close</span>
                                                 Deny
@@ -386,7 +386,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                             <button
                                 key={filter}
                                 onClick={() => setScheduledFilter(filter)}
-                                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                                className={`tactile-btn flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-fast ${
                                     scheduledFilter === filter 
                                         ? 'bg-primary dark:bg-lavender text-white shadow-md' 
                                         : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/15'

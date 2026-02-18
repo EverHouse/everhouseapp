@@ -457,7 +457,7 @@ const Profile: React.FC = () => {
            <div className="lg:hidden">
              <button
                onClick={() => { startNavigation(); navigate('/admin'); }}
-               className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl transition-colors ${
+               className={`tactile-btn w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl transition-colors ${
                  isDark 
                    ? 'bg-white/10 hover:bg-white/15 text-white' 
                    : 'bg-primary/10 hover:bg-primary/15 text-primary'
@@ -520,7 +520,7 @@ const Profile: React.FC = () => {
                   <button
                     onClick={handleSaveProfile}
                     disabled={updateProfileMutation.isPending}
-                    className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-colors ${
+                    className={`tactile-btn flex-1 py-2.5 rounded-xl font-semibold text-sm transition-colors ${
                       updateProfileMutation.isPending ? 'opacity-50 cursor-not-allowed' : ''
                     } bg-primary text-white hover:bg-primary/90`}
                   >
@@ -529,7 +529,7 @@ const Profile: React.FC = () => {
                   <button
                     onClick={() => setEditingProfile(false)}
                     disabled={updateProfileMutation.isPending}
-                    className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-colors ${
+                    className={`tactile-btn flex-1 py-2.5 rounded-xl font-semibold text-sm transition-colors ${
                       isDark 
                         ? 'bg-white/10 text-white hover:bg-white/20' 
                         : 'bg-black/5 text-primary hover:bg-black/10'
@@ -548,7 +548,7 @@ const Profile: React.FC = () => {
                   <div className="p-3 flex justify-end">
                     <button
                       onClick={handleStartEdit}
-                      className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                      className={`tactile-btn flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                         isDark 
                           ? 'bg-white/10 text-white hover:bg-white/20' 
                           : 'bg-primary/10 text-primary hover:bg-primary/20'
@@ -795,7 +795,7 @@ const Profile: React.FC = () => {
                    <button
                      onClick={handleGoogleUnlink}
                      disabled={googleUnlinking}
-                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-fast ${
                        isDark 
                          ? 'bg-white/10 text-white/70 hover:bg-white/20' 
                          : 'bg-black/5 text-primary/70 hover:bg-black/10'

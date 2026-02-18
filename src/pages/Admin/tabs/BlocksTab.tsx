@@ -679,7 +679,7 @@ const BlocksTab: React.FC = () => {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => setShowClosureReasonsSection(!showClosureReasonsSection)}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-sm border transition-all tactile-btn ${
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-sm border transition-all duration-fast tactile-btn ${
                                 showClosureReasonsSection
                                     ? 'bg-primary/10 dark:bg-white/15 border-primary/30 dark:border-white/20 text-primary dark:text-white'
                                     : 'bg-white/60 dark:bg-white/10 border-gray-200/50 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/15 text-gray-600 dark:text-white/70'
@@ -693,7 +693,7 @@ const BlocksTab: React.FC = () => {
                         </button>
                         <button
                             onClick={() => setShowNoticeTypesSection(!showNoticeTypesSection)}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-sm border transition-all tactile-btn ${
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-sm border transition-all duration-fast tactile-btn ${
                                 showNoticeTypesSection
                                     ? 'bg-primary/10 dark:bg-white/15 border-primary/30 dark:border-white/20 text-primary dark:text-white'
                                     : 'bg-white/60 dark:bg-white/10 border-gray-200/50 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/15 text-gray-600 dark:text-white/70'
@@ -754,7 +754,7 @@ const BlocksTab: React.FC = () => {
                             <button
                                 onClick={handleAddClosureReason}
                                 disabled={!newReasonLabel.trim() || addClosureReasonMutation.isPending}
-                                className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5"
+                                className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-fast flex items-center justify-center gap-1.5"
                             >
                                 <span aria-hidden="true" className="material-symbols-outlined text-base">add</span>
                                 Add
@@ -833,7 +833,7 @@ const BlocksTab: React.FC = () => {
                             <button
                                 onClick={handleAddNoticeType}
                                 disabled={!newNoticeTypeName.trim() || addNoticeTypeMutation.isPending}
-                                className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5"
+                                className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-fast flex items-center justify-center gap-1.5"
                             >
                                 <span aria-hidden="true" className="material-symbols-outlined text-base">add</span>
                                 Add
@@ -1084,7 +1084,7 @@ const BlocksTab: React.FC = () => {
                                             <div className="flex gap-2 pt-2">
                                                 <button
                                                     onClick={(e) => handleEditClosure(closure, e)}
-                                                    className={`flex-1 py-2 px-4 rounded-xl font-medium transition-all ${
+                                                    className={`flex-1 py-2 px-4 rounded-xl font-medium transition-all duration-fast ${
                                                         blocking 
                                                             ? 'bg-red-500 text-white hover:bg-red-600'
                                                             : 'bg-amber-500 text-white hover:bg-amber-600'
@@ -1094,7 +1094,7 @@ const BlocksTab: React.FC = () => {
                                                 </button>
                                                 <button
                                                     onClick={(e) => handleDeleteClosure(closure.id, e)}
-                                                    className="py-2 px-4 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-white/70 hover:bg-gray-200 dark:hover:bg-white/20 transition-all"
+                                                    className="py-2 px-4 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-white/70 hover:bg-gray-200 dark:hover:bg-white/20 transition-all duration-fast"
                                                 >
                                                     Delete
                                                 </button>
@@ -1203,13 +1203,13 @@ const BlocksTab: React.FC = () => {
                                                 <div className="flex gap-2">
                                                     <button
                                                         onClick={(e) => handleEditClosure(closure, e)}
-                                                        className="flex-1 py-2 px-3 rounded-lg bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-white/70 text-sm font-medium hover:bg-gray-300 dark:hover:bg-white/20 transition-all"
+                                                        className="flex-1 py-2 px-3 rounded-lg bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-white/70 text-sm font-medium hover:bg-gray-300 dark:hover:bg-white/20 transition-all duration-fast"
                                                     >
                                                         Edit
                                                     </button>
                                                     <button
                                                         onClick={(e) => handleDeleteClosure(closure.id, e)}
-                                                        className="py-2 px-3 rounded-lg bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-white/50 text-sm hover:bg-gray-200 dark:hover:bg-white/10 transition-all"
+                                                        className="py-2 px-3 rounded-lg bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-white/50 text-sm hover:bg-gray-200 dark:hover:bg-white/10 transition-all duration-fast"
                                                     >
                                                         Delete
                                                     </button>
@@ -1260,7 +1260,7 @@ const BlocksTab: React.FC = () => {
                                 value={closureForm.notice_type}
                                 onChange={e => setClosureForm({...closureForm, notice_type: e.target.value})}
                                 onBlur={() => markTouched('notice_type')}
-                                className={`w-full border bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                className={`w-full border bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast ${
                                     touchedFields.has('notice_type') && closureValidation.notice_type 
                                         ? 'border-red-500 dark:border-red-500' 
                                         : 'border-gray-200 dark:border-white/20'
@@ -1283,7 +1283,7 @@ const BlocksTab: React.FC = () => {
                             <input 
                                 type="text" 
                                 placeholder="e.g., Holiday Closure, Maintenance" 
-                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" 
                                 value={closureForm.title} 
                                 onChange={e => setClosureForm({...closureForm, title: e.target.value})} 
                             />
@@ -1293,7 +1293,7 @@ const BlocksTab: React.FC = () => {
                             <select
                                 value={closureForm.reason}
                                 onChange={e => setClosureForm({...closureForm, reason: e.target.value})}
-                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast"
                             >
                                 <option value="">Select reason...</option>
                                 {closureReasons.filter(r => r.isActive).map(reason => (
@@ -1307,7 +1307,7 @@ const BlocksTab: React.FC = () => {
                         <div>
                             <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Notes</label>
                             <textarea 
-                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none" 
+                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast resize-none" 
                                 placeholder="Internal notes, event details, logistics..." 
                                 rows={3} 
                                 value={closureForm.notes} 
@@ -1403,7 +1403,7 @@ const BlocksTab: React.FC = () => {
                                 value={closureForm.visibility}
                                 onChange={e => setClosureForm({...closureForm, visibility: e.target.value})}
                                 onBlur={() => markTouched('visibility')}
-                                className={`w-full border bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                                className={`w-full border bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast ${
                                     touchedFields.has('visibility') && closureValidation.visibility 
                                         ? 'border-red-500 dark:border-red-500' 
                                         : 'border-gray-200 dark:border-white/20'
@@ -1452,7 +1452,7 @@ const BlocksTab: React.FC = () => {
                             <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Start Date *</label>
                             <input 
                                 type="date" 
-                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" 
                                 value={closureForm.start_date} 
                                 onChange={e => setClosureForm({...closureForm, start_date: e.target.value})} 
                             />
@@ -1461,7 +1461,7 @@ const BlocksTab: React.FC = () => {
                             <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Start Time</label>
                             <input 
                                 type="time" 
-                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" 
                                 value={closureForm.start_time} 
                                 onChange={e => setClosureForm({...closureForm, start_time: e.target.value})} 
                             />
@@ -1470,7 +1470,7 @@ const BlocksTab: React.FC = () => {
                             <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">End Date</label>
                             <input 
                                 type="date" 
-                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" 
                                 value={closureForm.end_date} 
                                 onChange={e => setClosureForm({...closureForm, end_date: e.target.value})} 
                             />
@@ -1479,7 +1479,7 @@ const BlocksTab: React.FC = () => {
                             <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">End Time</label>
                             <input 
                                 type="time" 
-                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" 
+                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" 
                                 value={closureForm.end_time} 
                                 onChange={e => setClosureForm({...closureForm, end_time: e.target.value})} 
                             />
@@ -1519,7 +1519,7 @@ const BlocksTab: React.FC = () => {
                             value={reasonDrawerData?.label || ''}
                             onChange={(e) => setReasonDrawerData(prev => prev ? { ...prev, label: e.target.value } : null)}
                             placeholder="e.g., Private Event, Maintenance"
-                            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast"
                         />
                     </div>
                     <div>
@@ -1528,7 +1528,7 @@ const BlocksTab: React.FC = () => {
                             type="number"
                             value={reasonDrawerData?.sortOrder || 100}
                             onChange={(e) => setReasonDrawerData(prev => prev ? { ...prev, sortOrder: parseInt(e.target.value) || 100 } : null)}
-                            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast"
                         />
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Lower numbers appear first in dropdown menus</p>
                     </div>
@@ -1566,7 +1566,7 @@ const BlocksTab: React.FC = () => {
                             value={noticeTypeDrawerData?.name || ''}
                             onChange={(e) => setNoticeTypeDrawerData(prev => prev ? { ...prev, name: e.target.value } : null)}
                             placeholder="e.g., Maintenance, Holiday"
-                            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast"
                         />
                     </div>
                     <div>
@@ -1575,7 +1575,7 @@ const BlocksTab: React.FC = () => {
                             type="number"
                             value={noticeTypeDrawerData?.sortOrder || 100}
                             onChange={(e) => setNoticeTypeDrawerData(prev => prev ? { ...prev, sortOrder: parseInt(e.target.value) || 100 } : null)}
-                            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast"
                         />
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Lower numbers appear first in dropdown menus</p>
                     </div>

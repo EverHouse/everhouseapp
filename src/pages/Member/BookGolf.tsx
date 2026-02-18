@@ -21,6 +21,7 @@ import ModalShell from '../../components/ModalShell';
 import { GuardianConsentForm, type GuardianConsentData } from '../../components/booking';
 import { AnimatedPage } from '../../components/motion';
 import { TabTransition } from '../../components/motion/TabTransition';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { StripePaymentWithSecret } from '../../components/stripe/StripePaymentForm';
 import {
   type APIResource,
@@ -69,6 +70,7 @@ const BookGolf: React.FC = () => {
   const [memberNotes, setMemberNotes] = useState<string>('');
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
+  const [resourcesRef] = useAutoAnimate();
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
@@ -1227,7 +1229,7 @@ const BookGolf: React.FC = () => {
                       haptic.light();
                       setShowCancelConfirm(true);
                     }}
-                    className={`w-full py-3 rounded-xl font-bold text-sm border transition-colors flex items-center justify-center gap-2 ${
+                    className={`tactile-btn w-full py-3 rounded-xl font-bold text-sm border transition-colors flex items-center justify-center gap-2 ${
                       isDark 
                         ? 'border-red-500/50 text-red-400 hover:bg-red-500/10' 
                         : 'border-red-300 text-red-600 hover:bg-red-50'
@@ -1354,7 +1356,7 @@ const BookGolf: React.FC = () => {
                           haptic.light();
                           setExpandedHour(isExpanded ? null : hourGroup.hour24);
                         }}
-                        className={`w-full p-4 rounded-xl border text-left transition-all active:scale-[0.99] flex items-center justify-between ${
+                        className={`w-full p-4 rounded-xl border text-left transition-all duration-fast active:scale-[0.99] flex items-center justify-between ${
                           hasSelectedSlot
                             ? 'bg-accent/20 border-accent/50'
                             : isExpanded
@@ -1394,7 +1396,7 @@ const BookGolf: React.FC = () => {
                               setSelectedResource(null);
                             }}
                             aria-pressed={selectedSlot?.id === slot.id}
-                            className={`p-3 rounded-xl border text-left transition-all active:scale-[0.98] focus:ring-2 focus:ring-accent focus:outline-none ${
+                            className={`p-3 rounded-xl border text-left transition-all duration-fast active:scale-[0.98] focus:ring-2 focus:ring-accent focus:outline-none ${
                               selectedSlot?.id === slot.id
                               ? 'bg-accent text-primary border-accent shadow-glow'
                               : (isDark ? 'glass-card text-white hover:bg-white/10 border-white/25' : 'bg-white text-primary hover:bg-black/5 border-black/10 shadow-sm')
@@ -1425,7 +1427,7 @@ const BookGolf: React.FC = () => {
               <h3 className={`text-sm font-bold uppercase tracking-wider mb-3 pl-1 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
                 Select {activeTab === 'simulator' ? 'Bay' : 'Room'}
               </h3>
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+              <div ref={resourcesRef} className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
                 {getAvailableResourcesForSlot(selectedSlot).map((resource, index) => (
                   <div key={resource.id} className="animate-slide-up-stagger" style={{ '--stagger-index': index, animationFillMode: 'both' } as React.CSSProperties}>
                     <ResourceCard
@@ -1497,7 +1499,7 @@ const BookGolf: React.FC = () => {
               <button
                 onClick={() => handleConferencePrepayment(false)}
                 disabled={isProcessingPayment}
-                className={`flex-1 py-3 px-3 rounded-xl font-bold text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
+                className={`flex-1 py-3 px-3 rounded-xl font-bold text-sm transition-all duration-fast active:scale-[0.98] flex items-center justify-center gap-2 ${
                   isProcessingPayment 
                     ? 'opacity-50 cursor-not-allowed' 
                     : ''
@@ -1515,7 +1517,7 @@ const BookGolf: React.FC = () => {
               <button
                 onClick={() => handleConferencePrepayment(true)}
                 disabled={isProcessingPayment}
-                className={`flex-1 py-3 px-3 rounded-xl font-bold text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
+                className={`flex-1 py-3 px-3 rounded-xl font-bold text-sm transition-all duration-fast active:scale-[0.98] flex items-center justify-center gap-2 ${
                   isProcessingPayment 
                     ? 'opacity-50 cursor-not-allowed' 
                     : ''
@@ -1566,7 +1568,7 @@ const BookGolf: React.FC = () => {
           <button 
             onClick={() => { haptic.heavy(); handleConfirm(); }}
             disabled={isBooking}
-            className="w-full py-4 rounded-xl font-bold text-lg shadow-glow transition-all flex items-center justify-center gap-2 bg-accent text-primary hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 focus:ring-2 focus:ring-white focus:outline-none"
+            className="w-full py-4 rounded-xl font-bold text-lg shadow-glow transition-all duration-fast flex items-center justify-center gap-2 bg-accent text-primary hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 focus:ring-2 focus:ring-white focus:outline-none"
           >
             {isBooking ? (
               <>

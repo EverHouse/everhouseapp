@@ -181,7 +181,7 @@ const FilterButton: React.FC<{label: string; active?: boolean; onClick?: () => v
         active 
         ? 'bg-primary text-white shadow-md dark:shadow-black/20' 
         : 'bg-white/40 dark:bg-white/5 text-primary dark:text-white border border-white/50 dark:border-white/10 hover:bg-white/60 dark:hover:bg-white/10 backdrop-blur-md'
-    } px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed`}
+    } tactile-btn px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-fast whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed`}
   >
     {label}
   </button>
@@ -206,7 +206,7 @@ const GalleryItem: React.FC<GalleryItemProps> = React.memo(({ img, title, catego
   
   return (
     <div 
-      className={`break-inside-avoid relative group rounded-2xl overflow-hidden shadow-sm dark:shadow-black/20 cursor-pointer mb-4 border border-white/20 dark:border-white/10 active:scale-[0.98] transition-transform animate-list-item-delay-${Math.min(index, 10)}`}
+      className={`tactile-card break-inside-avoid relative group rounded-2xl overflow-hidden shadow-sm dark:shadow-black/20 cursor-pointer mb-4 border border-white/20 dark:border-white/10 active:scale-[0.98] transition-transform animate-list-item-delay-${Math.min(index, 10)}`}
       onClick={handleClick}
     >
       {!loaded && !error && (

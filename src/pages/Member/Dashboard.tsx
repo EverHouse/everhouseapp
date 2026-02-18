@@ -30,6 +30,7 @@ import MetricsGrid from '../../components/MetricsGrid';
 import { RosterManager } from '../../components/booking';
 import { apiRequest } from '../../lib/apiRequest';
 import { AnimatedPage } from '../../components/motion';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import FirstLoginWelcomeModal from '../../components/FirstLoginWelcomeModal';
 
 const GUEST_CHECKIN_FIELDS = [
@@ -177,6 +178,8 @@ const Dashboard: React.FC = () => {
   const [optimisticAcceptedInviteIds, setOptimisticAcceptedInviteIds] = useState<Set<number>>(new Set());
   const [optimisticDeclinedInviteIds, setOptimisticDeclinedInviteIds] = useState<Set<number>>(new Set());
   const [optimisticInviteAction, setOptimisticInviteAction] = useState<{ id: number; action: 'accepting' | 'declining' } | null>(null);
+  const [scheduleRef] = useAutoAnimate();
+  const [invitesRef] = useAutoAnimate();
   const [overagePaymentBooking, setOveragePaymentBooking] = useState<{ id: number; amount: number; minutes: number } | null>(null);
   const [isPayingOverage, setIsPayingOverage] = useState(false);
   const [showFirstLoginModal, setShowFirstLoginModal] = useState(false);
@@ -989,7 +992,7 @@ const Dashboard: React.FC = () => {
                   Pending Invites ({pendingInvites.length})
                 </h3>
               </div>
-              <div className="space-y-3">
+              <div ref={invitesRef} className="space-y-3">
                 {pendingInvites.map((invite, idx) => (
                   <div 
                     key={`invite-${invite.id}`}
@@ -1030,7 +1033,7 @@ const Dashboard: React.FC = () => {
                             <button
                               onClick={() => handleAcceptInvite(invite.id)}
                               disabled={isProcessing}
-                              className={`flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 transition-all ${
+                              className={`flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 transition-all duration-fast ${
                                 isProcessing 
                                   ? 'opacity-70 cursor-not-allowed' 
                                   : 'hover:scale-[0.98] active:scale-95'
@@ -1051,7 +1054,7 @@ const Dashboard: React.FC = () => {
                             <button
                               onClick={() => handleDeclineInvite(invite.id, invite.primary_booker_name)}
                               disabled={isProcessing}
-                              className={`flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 transition-all ${
+                              className={`flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 transition-all duration-fast ${
                                 isProcessing 
                                   ? 'opacity-70 cursor-not-allowed' 
                                   : 'hover:scale-[0.98] active:scale-95'
@@ -1085,14 +1088,14 @@ const Dashboard: React.FC = () => {
               <h3 className={`text-sm font-bold uppercase tracking-wider ${isDark ? 'text-white/80' : 'text-primary/80'}`}>Your Schedule</h3>
               <button
                 onClick={() => { startNavigation(); navigate('/book'); }}
-                className={`text-xs font-semibold flex items-center gap-1 ${isDark ? 'text-accent' : 'text-brand-green'}`}
+                className={`tactile-btn text-xs font-semibold flex items-center gap-1 ${isDark ? 'text-accent' : 'text-brand-green'}`}
                 aria-label="Book new"
               >
                 <span className="material-symbols-outlined text-base">add</span>
                 Book
               </button>
             </div>
-            <div className="space-y-3">
+            <div ref={scheduleRef} className="space-y-3">
               {upcomingItemsFiltered.length > 0 ? upcomingItemsFiltered.slice(0, 6).map((item, idx) => {
                 let actions;
                 const isCancelling = optimisticCancellingIds.has(item.dbId);
@@ -1272,7 +1275,7 @@ const Dashboard: React.FC = () => {
                     </p>
                     <button
                       onClick={() => { startNavigation(); navigate('/book'); }}
-                      className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] ${isDark ? 'bg-accent text-brand-green' : 'bg-brand-green text-white'}`}
+                      className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-fast hover:scale-[1.02] active:scale-[0.98] ${isDark ? 'bg-accent text-brand-green' : 'bg-brand-green text-white'}`}
                     >
                       Book a Session
                     </button>

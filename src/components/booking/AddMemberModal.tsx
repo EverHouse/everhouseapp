@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import ModalShell from '../ModalShell';
 import Input from '../Input';
 import TierBadge from '../TierBadge';
@@ -29,6 +30,7 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
 }) => {
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === 'dark';
+  const [searchListRef] = useAutoAnimate();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<MemberSearchResult[]>([]);
@@ -124,7 +126,7 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
         )}
         
         {!isSearching && searchResults.length > 0 && (
-          <div className="space-y-2 max-h-72 overflow-y-auto">
+          <div ref={searchListRef} className="space-y-2 max-h-72 overflow-y-auto">
             {searchResults.map((member) => (
               <button
                 key={member.id}

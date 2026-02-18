@@ -304,14 +304,14 @@ const SettingsTab: React.FC = () => {
             <button
               onClick={handleReset}
               disabled={saveMutation.isPending}
-              className="px-4 py-2 rounded-full text-primary dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-sm font-medium"
+              className="tactile-btn px-4 py-2 rounded-full text-primary dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-sm font-medium"
             >
               Reset
             </button>
             <button
               onClick={handleSave}
               disabled={saveMutation.isPending}
-              className="px-6 py-2 rounded-full bg-primary dark:bg-accent text-white dark:text-primary font-medium text-sm disabled:opacity-50 flex items-center gap-2"
+              className="tactile-btn px-6 py-2 rounded-full bg-primary dark:bg-accent text-white dark:text-primary font-medium text-sm disabled:opacity-50 flex items-center gap-2"
             >
               {saveMutation.isPending ? (
                 <>

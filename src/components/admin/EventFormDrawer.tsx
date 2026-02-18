@@ -267,7 +267,7 @@ export const EventFormDrawer: React.FC<EventFormDrawerProps> = ({ isOpen, onClos
             <button
               type="button"
               onClick={() => setFormData({...formData, visibility: 'public'})}
-              className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-sm transition-all duration-fast flex items-center justify-center gap-2 ${
                 formData.visibility === 'public'
                   ? 'bg-primary text-white shadow-md'
                   : 'bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-white/70 border border-gray-200 dark:border-white/25'
@@ -279,7 +279,7 @@ export const EventFormDrawer: React.FC<EventFormDrawerProps> = ({ isOpen, onClos
             <button
               type="button"
               onClick={() => setFormData({...formData, visibility: 'members'})}
-              className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-sm transition-all duration-fast flex items-center justify-center gap-2 ${
                 formData.visibility === 'members'
                   ? 'bg-primary text-white shadow-md'
                   : 'bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-white/70 border border-gray-200 dark:border-white/25'

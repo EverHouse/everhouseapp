@@ -304,7 +304,7 @@ const MemberEvents: React.FC = () => {
                   <MotionListItem 
                     key={event.id}
                     index={index}
-                    className={`rounded-2xl overflow-hidden transition-all glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}
+                    className={`rounded-2xl overflow-hidden transition-all duration-fast glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}
                   >
                     <button 
                       onClick={() => handleCardClick(event.id)}
@@ -338,7 +338,7 @@ const MemberEvents: React.FC = () => {
                               Cancelling
                             </span>
                           ) : isRsvpd ? (
-                            <span className="text-[10px] font-bold uppercase tracking-wider bg-accent text-brand-green px-1.5 py-0.5 rounded-md whitespace-nowrap transition-all">Going</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider bg-accent text-brand-green px-1.5 py-0.5 rounded-md whitespace-nowrap transition-all duration-fast">Going</span>
                           ) : event.source === 'eventbrite' ? (
                             <span className="text-[10px] font-bold uppercase tracking-wider bg-[#F05537]/20 text-[#F05537] px-1.5 py-0.5 rounded-md whitespace-nowrap">Ticketed</span>
                           ) : (
@@ -374,7 +374,7 @@ const MemberEvents: React.FC = () => {
                         <div className="flex gap-3">
                           <button 
                             onClick={(e) => { e.stopPropagation(); handleAddToCalendar(event); }}
-                            className={`flex-1 py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 ${isDark ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-black/5 text-primary hover:bg-black/10'}`}
+                            className={`tactile-btn flex-1 py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 ${isDark ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-black/5 text-primary hover:bg-black/10'}`}
                           >
                             <span className="material-symbols-outlined text-lg">calendar_add_on</span>
                             Add to Cal
@@ -386,7 +386,7 @@ const MemberEvents: React.FC = () => {
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
-                              className={`flex-1 py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 ${isDark ? 'bg-white text-brand-green hover:bg-white/90' : 'bg-brand-green text-white hover:opacity-90'}`}
+                              className={`tactile-btn flex-1 py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 ${isDark ? 'bg-white text-brand-green hover:bg-white/90' : 'bg-brand-green text-white hover:opacity-90'}`}
                             >
                               <span>Learn More</span>
                               <span className="material-symbols-outlined text-sm">open_in_new</span>
@@ -415,14 +415,14 @@ const MemberEvents: React.FC = () => {
                             <button 
                               onClick={(e) => { e.stopPropagation(); handleCancelRSVP(event); }}
                               disabled={isLoadingThis}
-                              className={`flex-1 py-3 rounded-xl font-semibold text-sm transition-colors border flex items-center justify-center gap-2 ${isDark ? 'border-red-500/50 text-red-400 hover:bg-red-500/10' : 'border-red-500/50 text-red-500 hover:bg-red-500/10'} ${isLoadingThis ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              className={`tactile-btn flex-1 py-3 rounded-xl font-semibold text-sm transition-colors border flex items-center justify-center gap-2 ${isDark ? 'border-red-500/50 text-red-400 hover:bg-red-500/10' : 'border-red-500/50 text-red-500 hover:bg-red-500/10'} ${isLoadingThis ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                               {isLoadingThis ? <WalkingGolferSpinner size="sm" variant={isDark ? 'light' : 'dark'} /> : 'Cancel RSVP'}
                             </button>
                           ) : event.source === 'eventbrite' ? (
                             <button 
                               onClick={(e) => { e.stopPropagation(); handleRSVP(event); }}
-                              className="flex-1 py-3 rounded-xl font-semibold text-sm bg-[#F05537] text-white hover:bg-[#d94829] transition-colors"
+                              className="tactile-btn flex-1 py-3 rounded-xl font-semibold text-sm bg-[#F05537] text-white hover:bg-[#d94829] transition-colors"
                             >
                               Get Tickets
                             </button>
@@ -430,7 +430,7 @@ const MemberEvents: React.FC = () => {
                             <button 
                               onClick={(e) => { e.stopPropagation(); handleRSVP(event); }}
                               disabled={isLoadingThis}
-                              className={`flex-1 py-3 rounded-xl font-semibold text-sm bg-brand-green text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2 ${isLoadingThis ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              className={`tactile-btn flex-1 py-3 rounded-xl font-semibold text-sm bg-brand-green text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2 ${isLoadingThis ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                               {isLoadingThis ? <WalkingGolferSpinner size="sm" variant="light" /> : 'RSVP'}
                             </button>

@@ -507,7 +507,7 @@ const MedSpaView: React.FC<{isDark?: boolean}> = ({ isDark = true }) => (
          href="https://www.amarieaesthetics.co" 
          target="_blank" 
          rel="noopener noreferrer"
-         className={`w-full py-3.5 rounded-xl font-bold tracking-wide active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${isDark ? 'bg-lavender text-primary hover:bg-lavender/90' : 'bg-primary text-white hover:bg-primary/90'}`}
+         className={`w-full py-3.5 rounded-xl font-bold tracking-wide active:scale-[0.98] transition-all duration-fast flex items-center justify-center gap-2 ${isDark ? 'bg-lavender text-primary hover:bg-lavender/90' : 'bg-primary text-white hover:bg-primary/90'}`}
        >
          <span className="material-symbols-outlined text-[20px]">calendar_add_on</span>
          Book with Amarie
@@ -586,7 +586,7 @@ const MedSpaView: React.FC<{isDark?: boolean}> = ({ isDark = true }) => (
 );
 
 const FilterPill: React.FC<{label: string; active?: boolean; onClick?: () => void; isDark?: boolean}> = ({ label, active, onClick, isDark = true }) => (
-  <button onClick={onClick} className={`flex-shrink-0 px-5 py-2.5 rounded-full text-sm font-bold border transition-colors ${active ? 'bg-accent text-primary border-accent shadow-glow' : (isDark ? 'bg-transparent border-white/20 text-white hover:bg-white/5' : 'bg-white border-black/10 text-primary hover:bg-black/5')}`}>
+  <button onClick={onClick} className={`tactile-btn flex-shrink-0 px-5 py-2.5 rounded-full text-sm font-bold border transition-colors ${active ? 'bg-accent text-primary border-accent shadow-glow' : (isDark ? 'bg-transparent border-white/20 text-white hover:bg-white/5' : 'bg-white border-black/10 text-primary hover:bg-black/5')}`}>
     {label}
   </button>
 );
@@ -659,16 +659,16 @@ const ClassCard: React.FC<any> = ({ title, date, time, instructor, duration, cat
 
   return (
   <div 
-    className={`rounded-xl relative overflow-hidden transition-all glass-card ${isDark ? 'border-white/25' : 'border-black/10'} ${isPending ? 'ring-2 ring-offset-2 ring-offset-transparent animate-pulse' : ''} ${isCancelling ? 'ring-red-500/50' : isRsvping ? (showJoinWaitlist ? 'ring-amber-500/50' : 'ring-green-500/50') : ''}`}
+    className={`rounded-xl relative overflow-hidden transition-all duration-fast glass-card ${isDark ? 'border-white/25' : 'border-black/10'} ${isPending ? 'ring-2 ring-offset-2 ring-offset-transparent animate-pulse' : ''} ${isCancelling ? 'ring-red-500/50' : isRsvping ? (showJoinWaitlist ? 'ring-amber-500/50' : 'ring-green-500/50') : ''}`}
   >
     <button 
       onClick={onToggle}
       aria-expanded={isExpanded}
       aria-label={`${title} on ${date} at ${formattedTime.time} ${formattedTime.period}. ${isExpanded ? 'Collapse' : 'Expand'} for details`}
-      className={`w-full p-4 cursor-pointer transition-all text-left ${isExpanded ? '' : 'active:scale-[0.98]'}`}
+      className={`w-full p-4 cursor-pointer transition-all duration-fast text-left ${isExpanded ? '' : 'active:scale-[0.98]'}`}
     >
       <div className="flex gap-4 items-start">
-        <div className={`w-14 h-14 flex-shrink-0 rounded-xl flex items-center justify-center transition-all ${isDark ? 'bg-lavender/20' : 'bg-lavender/30'} ${isPending ? 'animate-pulse' : ''}`}>
+        <div className={`w-14 h-14 flex-shrink-0 rounded-xl flex items-center justify-center transition-all duration-fast ${isDark ? 'bg-lavender/20' : 'bg-lavender/30'} ${isPending ? 'animate-pulse' : ''}`}>
           <span className="material-symbols-outlined text-2xl text-lavender">
             {getCategoryIcon(category)}
           </span>
@@ -708,7 +708,7 @@ const ClassCard: React.FC<any> = ({ title, date, time, instructor, duration, cat
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className={`w-full py-2.5 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${isDark ? 'bg-white text-brand-green hover:bg-white/90' : 'bg-brand-green text-white hover:opacity-90'}`}
+            className={`w-full py-2.5 rounded-lg font-bold text-sm transition-all duration-fast flex items-center justify-center gap-2 active:scale-[0.98] ${isDark ? 'bg-white text-brand-green hover:bg-white/90' : 'bg-brand-green text-white hover:opacity-90'}`}
           >
             <span>Learn More</span>
             <span className="material-symbols-outlined text-sm">open_in_new</span>
@@ -721,7 +721,7 @@ const ClassCard: React.FC<any> = ({ title, date, time, instructor, duration, cat
           <button 
             onClick={(e) => { e.stopPropagation(); if (!isCancelDisabled) onCancel(); }}
             disabled={isCancelling || isCancelDisabled}
-            className={`w-full py-2.5 rounded-lg font-bold text-sm transition-all border flex items-center justify-center gap-2 ${isDark ? 'border-red-500/50 text-red-400 hover:bg-red-500/10' : 'border-red-500/50 text-red-500 hover:bg-red-500/10'} ${isCancelling || isCancelDisabled ? 'opacity-70 cursor-not-allowed' : 'active:scale-[0.98]'}`}
+            className={`w-full py-2.5 rounded-lg font-bold text-sm transition-all duration-fast border flex items-center justify-center gap-2 ${isDark ? 'border-red-500/50 text-red-400 hover:bg-red-500/10' : 'border-red-500/50 text-red-500 hover:bg-red-500/10'} ${isCancelling || isCancelDisabled ? 'opacity-70 cursor-not-allowed' : 'active:scale-[0.98]'}`}
           >
             {isCancelling && <LoadingSpinner />}
             {isCancelDisabled ? (isOnWaitlist ? 'On Waitlist' : 'Confirmed') : isCancelling ? (isOnWaitlist ? 'Leaving Waitlist...' : 'Cancelling...') : isOnWaitlist ? 'Leave Waitlist' : 'Cancel'}
@@ -734,7 +734,7 @@ const ClassCard: React.FC<any> = ({ title, date, time, instructor, duration, cat
           <button 
             onClick={(e) => { e.stopPropagation(); onBook(); }}
             disabled={isRsvping}
-            className={`w-full py-2.5 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${isRsvping ? 'opacity-70 cursor-not-allowed' : 'active:scale-[0.98]'} ${showJoinWaitlist ? 'bg-amber-500/20 text-amber-500 border border-amber-500/50' : (isDark ? 'bg-white text-brand-green' : 'bg-brand-green text-white')}`}
+            className={`w-full py-2.5 rounded-lg font-bold text-sm transition-all duration-fast flex items-center justify-center gap-2 ${isRsvping ? 'opacity-70 cursor-not-allowed' : 'active:scale-[0.98]'} ${showJoinWaitlist ? 'bg-amber-500/20 text-amber-500 border border-amber-500/50' : (isDark ? 'bg-white text-brand-green' : 'bg-brand-green text-white')}`}
           >
             {isRsvping && <LoadingSpinner className={showJoinWaitlist ? '' : (isDark ? 'text-brand-green' : 'text-white')} />}
             {isRsvping ? (showJoinWaitlist ? 'Joining Waitlist...' : 'Confirming...') : showJoinWaitlist ? 'Join Waitlist' : 'RSVP'}
