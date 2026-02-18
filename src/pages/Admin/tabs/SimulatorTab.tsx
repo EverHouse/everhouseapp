@@ -809,10 +809,16 @@ const SimulatorTab: React.FC = () => {
         return isUnmatched && bookingDate >= today;
     });
     
+    const cancellationPendingBookings = approvedBookings.filter(b => 
+        b.status === 'cancellation_pending'
+    );
+
     const queueItems = [
+        ...cancellationPendingBookings.map(b => ({ ...b, queueType: 'cancellation' as const })),
         ...pendingRequests.map(r => ({ ...r, queueType: 'pending' as const })),
-        ...unmatchedWebhookBookings.map(b => ({ ...b, queueType: 'unmatched' as const }))
     ].sort((a, b) => {
+        if (a.queueType === 'cancellation' && b.queueType !== 'cancellation') return -1;
+        if (a.queueType !== 'cancellation' && b.queueType === 'cancellation') return 1;
         if (a.request_date !== b.request_date) {
             return a.request_date.localeCompare(b.request_date);
         }
@@ -1085,7 +1091,7 @@ const SimulatorTab: React.FC = () => {
                     <BookingRequestsPanel
                         queueItems={queueItems}
                         pendingRequests={pendingRequests}
-                        unmatchedWebhookBookings={unmatchedWebhookBookings}
+                        cancellationPendingBookings={cancellationPendingBookings}
                         scheduledBookings={scheduledBookings}
                         scheduledFilter={scheduledFilter}
                         setScheduledFilter={setScheduledFilter}

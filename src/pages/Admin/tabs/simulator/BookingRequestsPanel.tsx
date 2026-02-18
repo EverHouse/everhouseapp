@@ -45,9 +45,9 @@ function BookingFeeButton({ bookingId, dbOwed, hasUnpaidFees, setBookingSheet, f
 }
 
 export interface BookingRequestsPanelProps {
-    queueItems: (BookingRequest & { queueType: 'pending' | 'unmatched' })[];
+    queueItems: (BookingRequest & { queueType: 'pending' | 'cancellation' })[];
     pendingRequests: BookingRequest[];
-    unmatchedWebhookBookings: BookingRequest[];
+    cancellationPendingBookings: BookingRequest[];
     scheduledBookings: BookingRequest[];
     scheduledFilter: 'all' | 'today' | 'tomorrow' | 'week';
     setScheduledFilter: (filter: 'all' | 'today' | 'tomorrow' | 'week') => void;
@@ -81,7 +81,7 @@ export interface BookingRequestsPanelProps {
 const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
     queueItems,
     pendingRequests,
-    unmatchedWebhookBookings,
+    cancellationPendingBookings,
     scheduledBookings,
     scheduledFilter,
     setScheduledFilter,
@@ -139,9 +139,9 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                         </div>
                         {queueItems.length > 0 && (
                             <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {cancellationPendingBookings.length > 0 && `${cancellationPendingBookings.length} cancellation${cancellationPendingBookings.length !== 1 ? 's' : ''}`}
+                                {cancellationPendingBookings.length > 0 && pendingRequests.length > 0 && ', '}
                                 {pendingRequests.length > 0 && `${pendingRequests.length} pending`}
-                                {pendingRequests.length > 0 && unmatchedWebhookBookings.length > 0 && ', '}
-                                {unmatchedWebhookBookings.length > 0 && `${unmatchedWebhookBookings.length} unassigned`}
                             </p>
                         )}
                     </div>
@@ -152,72 +152,103 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                     ) : (
                         <div className="space-y-3">
                             {queueItems.map((item, index) => {
-                                const isUnmatchedItem = item.queueType === 'unmatched';
                                 const req = item;
                                 
-                                if (isUnmatchedItem) {
+                                if (item.queueType === 'cancellation') {
+                                    const bookingResource = resources.find(r => r.id === item.resource_id);
+                                    const bookingEmail = item.user_email?.toLowerCase() || '';
+                                    const displayName = bookingEmail && memberNameMap[bookingEmail] 
+                                        ? memberNameMap[bookingEmail] 
+                                        : item.user_name || item.user_email;
                                     return (
                                         <div 
-                                            key={`unmatched-${item.id}`} 
-                                            className="bg-amber-50/80 dark:bg-amber-500/10 p-4 rounded-xl border-2 border-dashed border-amber-300 dark:border-amber-500/30 animate-slide-up-stagger cursor-pointer hover:bg-amber-100/80 dark:hover:bg-amber-500/20 hover:scale-[1.01] active:scale-[0.98] shadow-sm hover:shadow-md transition-all duration-200" 
+                                            key={`cancel-${item.id}`}
+                                            className="bg-red-50/80 dark:bg-red-500/10 p-4 rounded-xl border-2 border-red-300 dark:border-red-500/30 animate-slide-up-stagger shadow-sm hover:shadow-md hover:bg-red-100/80 dark:hover:bg-red-500/20 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200 cursor-pointer"
                                             style={{ '--stagger-index': index + 2 } as React.CSSProperties}
                                             onClick={() => setBookingSheet({
                                                 isOpen: true,
                                                 trackmanBookingId: (item as any).trackman_booking_id || null,
-                                                matchedBookingId: item.id,
-                                                bayName: (item as any).bay_name || `Bay ${item.resource_id}`,
+                                                bookingId: item.id,
+                                                mode: 'manage' as const,
+                                                bayName: bookingResource?.name || (item as any).bay_name || `Bay ${item.resource_id}`,
                                                 bookingDate: item.request_date,
                                                 timeSlot: `${formatTime12Hour(item.start_time)} - ${formatTime12Hour(item.end_time)}`,
-                                                importedName: item.user_name || (item as any).userName,
-                                                notes: (item as any).notes || (item as any).trackman_customer_notes || (item as any).staff_notes
+                                                matchedBookingId: Number(item.id),
+                                                currentMemberName: item.user_name || undefined,
+                                                currentMemberEmail: item.user_email || undefined,
+                                                ownerName: item.user_name || undefined,
+                                                ownerEmail: item.user_email || undefined,
+                                                bookingStatus: item.status,
                                             })}
                                         >
                                             <div className="flex justify-between items-start mb-2">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="px-2.5 py-1 text-xs font-semibold bg-amber-200 dark:bg-amber-500/30 text-amber-700 dark:text-amber-400 rounded-lg">
-                                                        Needs Assignment
+                                                    <span className="px-2.5 py-1 text-xs font-semibold bg-red-200 dark:bg-red-500/30 text-red-700 dark:text-red-400 rounded-lg flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-xs">cancel</span>
+                                                        Cancellation Request
                                                     </span>
-                                                    <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400">
-                                                        {(item as any).bay_name || `Bay ${item.resource_id}`}
+                                                    <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400">
+                                                        {bookingResource?.name?.replace('Simulator Bay ', 'Bay ') || `Bay ${item.resource_id}`}
                                                     </span>
                                                 </div>
                                             </div>
-                                            <p className="text-sm text-amber-700 dark:text-amber-400 mb-1">
+                                            <p className="font-bold text-primary dark:text-white mb-1">{displayName}</p>
+                                            <p className="text-sm text-red-700 dark:text-red-400 mb-1">
                                                 {formatDateShortAdmin(item.request_date)} • {formatTime12Hour(item.start_time)} - {formatTime12Hour(item.end_time)}
                                             </p>
-                                            {(item.user_name && item.user_name !== 'Unknown (Trackman)') && (
-                                                <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
-                                                    {item.user_name}
+                                            {(item as any).cancellation_reason && (
+                                                <p className="text-sm text-red-600/80 dark:text-red-400/80 italic mb-2">
+                                                    "{(item as any).cancellation_reason}"
                                                 </p>
                                             )}
-                                            {item.user_email && !item.user_email.includes('unmatched@') && (
-                                                <p className="text-xs text-amber-600 dark:text-amber-500">
-                                                    {item.user_email}
-                                                </p>
-                                            )}
-                                            {(item as any).trackman_booking_id && (
-                                                <p className="text-xs text-amber-600/70 dark:text-amber-500/70">
-                                                    Trackman ID: {(item as any).trackman_booking_id}
+                                            {item.created_at && (
+                                                <p className="text-[10px] text-red-500/70 dark:text-red-400/60 mb-2">
+                                                    Requested {formatRelativeTime(item.created_at)}
                                                 </p>
                                             )}
                                             <button
-                                                onClick={(e) => {
+                                                onClick={async (e) => {
                                                     e.stopPropagation();
-                                                    setBookingSheet({
-                                                        isOpen: true,
-                                                        trackmanBookingId: (item as any).trackman_booking_id || null,
-                                                        matchedBookingId: item.id,
-                                                        bayName: (item as any).bay_name || `Bay ${item.resource_id}`,
-                                                        bookingDate: item.request_date,
-                                                        timeSlot: `${formatTime12Hour(item.start_time)} - ${formatTime12Hour(item.end_time)}`,
-                                                        importedName: item.user_name || (item as any).userName,
-                                                        notes: (item as any).notes || (item as any).trackman_customer_notes || (item as any).staff_notes
+                                                    const confirmed = await confirm({
+                                                        title: 'Complete Cancellation',
+                                                        message: `Complete cancellation for ${displayName}? This will cancel the billing session and refund any charges.`,
+                                                        confirmText: 'Complete Cancellation',
+                                                        variant: 'warning'
                                                     });
+                                                    if (!confirmed) return;
+                                                    
+                                                    const bookingKey = `${item.source || 'booking'}-${item.id}`;
+                                                    setActionInProgress(prev => ({ ...prev, [bookingKey]: 'completing cancellation' }));
+                                                    
+                                                    try {
+                                                        const res = await fetch(`/api/booking-requests/${item.id}/complete-cancellation`, {
+                                                            method: 'PUT',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            credentials: 'include'
+                                                        });
+                                                        
+                                                        if (!res.ok) {
+                                                            const errData = await res.json();
+                                                            throw new Error(errData.error || 'Failed to complete cancellation');
+                                                        }
+                                                        
+                                                        showToast('Cancellation completed successfully', 'success');
+                                                        queryClient.invalidateQueries({ queryKey: simulatorKeys.approvedBookings(startDate, endDate) });
+                                                        queryClient.invalidateQueries({ queryKey: simulatorKeys.allRequests() });
+                                                    } catch (err: unknown) {
+                                                        showToast((err instanceof Error ? err.message : String(err)) || 'Failed to complete cancellation', 'error');
+                                                    } finally {
+                                                        setActionInProgress(prev => {
+                                                            const next = { ...prev };
+                                                            delete next[bookingKey];
+                                                            return next;
+                                                        });
+                                                    }
                                                 }}
-                                                className="w-full mt-3 py-2 px-3 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 hover:shadow-md active:scale-95 transition-all duration-200"
+                                                className="w-full mt-3 py-2 px-3 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 hover:shadow-md active:scale-95 transition-all duration-200"
                                             >
-                                                <span aria-hidden="true" className="material-symbols-outlined text-sm">person_add</span>
-                                                Assign Member
+                                                <span aria-hidden="true" className="material-symbols-outlined text-sm">check_circle</span>
+                                                Complete Cancellation
                                             </button>
                                         </div>
                                     );

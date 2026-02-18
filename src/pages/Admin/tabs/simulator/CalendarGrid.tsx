@@ -81,8 +81,11 @@ function CalendarFeeIndicator({
         enabled: !skipFeeEstimate,
     });
 
+    const isCancellationPending = bookingStatus === 'cancellation_pending';
     const isPartialRoster = !isConference && declaredPlayerCount > 1 && filledPlayerCount < declaredPlayerCount;
-    const textColor = isConference
+    const textColor = isCancellationPending
+        ? 'text-red-700 dark:text-red-300'
+        : isConference
         ? 'text-purple-700 dark:text-purple-300'
         : isUnmatched
             ? 'text-amber-700 dark:text-amber-300'
@@ -456,6 +459,8 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                                 ? 'group relative hover:scale-105 hover:z-10 bg-amber-100 dark:bg-amber-500/20 border-2 border-dashed border-amber-400 dark:border-amber-400/50 cursor-pointer hover:bg-amber-200 dark:hover:bg-amber-500/30'
                                                             : isInactiveMember
                                                                 ? 'group relative hover:scale-105 hover:z-10 bg-green-100/50 dark:bg-green-500/10 border border-dashed border-orange-300 dark:border-orange-500/40 cursor-pointer hover:bg-green-200/50 dark:hover:bg-green-500/20'
+                                                            : booking.status === 'cancellation_pending'
+                                                                ? 'group relative hover:scale-105 hover:z-10 bg-red-100 dark:bg-red-500/15 border-2 border-red-400 dark:border-red-500/50 cursor-pointer hover:bg-red-200 dark:hover:bg-red-500/25'
                                                                 : hasPartialRoster
                                                                     ? 'group relative hover:scale-105 hover:z-10 bg-blue-100 dark:bg-blue-600/20 border-2 border-dashed border-blue-400 dark:border-blue-400/50 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-600/30'
                                                                     : 'group relative hover:scale-105 hover:z-10 bg-green-100 dark:bg-green-500/20 border border-green-300 dark:border-green-500/30 cursor-pointer hover:bg-green-200 dark:hover:bg-green-500/30' 
@@ -502,6 +507,11 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                         endTime={booking.end_time}
                                                         showHoverTooltip
                                                     />
+                                                    {booking.status === 'cancellation_pending' && (
+                                                        <span className="absolute top-0 right-0 text-red-500 dark:text-red-400" title="Cancellation Pending">
+                                                            <span aria-hidden="true" className="material-symbols-outlined text-[10px]">cancel</span>
+                                                        </span>
+                                                    )}
                                                 </div>
                                             ) : pendingRequest && (
                                                 <div className="px-0.5 sm:px-1 h-full flex items-center justify-center sm:justify-start">
