@@ -3,12 +3,13 @@ import { db } from '../../db';
 import { sql } from 'drizzle-orm';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 
+import { logger } from '../logger';
 export async function validateStripeEnvironmentIds(): Promise<void> {
   try {
     const stripe = await getStripeClient();
     const { mode } = await getStripeEnvironmentInfo();
 
-    console.log(`[Stripe Env] Validating stored Stripe IDs against ${mode} environment...`);
+    logger.info(`[Stripe Env] Validating stored Stripe IDs against ${mode} environment...`);
 
     let tiersChecked = 0;
     let tiersCleared = 0;
@@ -38,7 +39,7 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
               await db.execute(
                 sql`UPDATE membership_tiers SET stripe_product_id = NULL, stripe_price_id = NULL WHERE id = ${tier.id}`
               );
-              console.log(`[Stripe Env] Cleared stale Stripe IDs for tier "${tier.name}" (product ${oldId} not found in ${mode} Stripe)`);
+              logger.info(`[Stripe Env] Cleared stale Stripe IDs for tier "${tier.name}" (product ${oldId} not found in ${mode} Stripe)`);
               tiersCleared++;
               if (tier.product_type === 'subscription') {
                 clearedSubscriptionTierCount++;
@@ -52,7 +53,7 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
 
       for (const result of results) {
         if (result.status === 'rejected') {
-          console.warn(`[Stripe Env] Error checking tier product:`, result.reason?.message || result.reason);
+          logger.warn(`[Stripe Env] Error checking tier product:`, { extra: { detail: result.reason?.message || result.reason } });
         }
       }
     }
@@ -75,7 +76,7 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
               await db.execute(
                 sql`UPDATE cafe_items SET stripe_product_id = NULL, stripe_price_id = NULL WHERE id = ${item.id}`
               );
-              console.log(`[Stripe Env] Cleared stale Stripe IDs for cafe item "${item.name}"`);
+              logger.info(`[Stripe Env] Cleared stale Stripe IDs for cafe item "${item.name}"`);
               cafeCleared++;
             } else {
               throw error;
@@ -86,7 +87,7 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
 
       for (const result of results) {
         if (result.status === 'rejected') {
-          console.warn(`[Stripe Env] Error checking cafe item product:`, result.reason?.message || result.reason);
+          logger.warn(`[Stripe Env] Error checking cafe item product:`, { extra: { detail: result.reason?.message || result.reason } });
         }
       }
     }
@@ -109,7 +110,7 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
               await db.execute(
                 sql`UPDATE users SET stripe_subscription_id = NULL WHERE id = ${user.id}`
               );
-              console.log(`[Stripe Env] Cleared stale subscription ID for user "${user.email}"`);
+              logger.info(`[Stripe Env] Cleared stale subscription ID for user "${user.email}"`);
               subsCleared++;
             } else {
               throw error;
@@ -120,7 +121,7 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
 
       for (const result of results) {
         if (result.status === 'rejected') {
-          console.warn(`[Stripe Env] Error checking user subscription:`, result.reason?.message || result.reason);
+          logger.warn(`[Stripe Env] Error checking user subscription:`, { extra: { detail: result.reason?.message || result.reason } });
         }
       }
     }
@@ -131,26 +132,26 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
       try {
         await db.execute(sql`TRUNCATE TABLE stripe_transaction_cache`);
         transactionCacheCleared = true;
-        console.log(`[Stripe Env] Cleared transaction cache (environment change detected)`);
+        logger.info(`[Stripe Env] Cleared transaction cache (environment change detected)`);
       } catch (truncateErr: unknown) {
-        console.warn(`[Stripe Env] Could not clear transaction cache:`, getErrorMessage(truncateErr));
+        logger.warn(`[Stripe Env] Could not clear transaction cache:`, { extra: { detail: getErrorMessage(truncateErr) } });
       }
     }
 
     // e) Log summary
-    console.log(`[Stripe Env] Environment validation complete (${mode} mode):
+    logger.info(`[Stripe Env] Environment validation complete (${mode} mode):
   - Tiers: ${tiersChecked} checked, ${tiersCleared} stale IDs cleared
   - Cafe items: ${cafeChecked} checked, ${cafeCleared} stale IDs cleared
   - User subscriptions: ${subsChecked} checked, ${subsCleared} stale IDs cleared${transactionCacheCleared ? '\n  - Transaction cache: cleared' : ''}`);
 
     if (clearedSubscriptionTierCount > 0) {
-      console.warn(`[STARTUP WARNING] ⚠️ ${clearedSubscriptionTierCount} subscription tiers lost their Stripe product links due to environment change. Run "Sync to Stripe" from Products & Pricing before member signups will work.`);
+      logger.warn(`[STARTUP WARNING] ⚠️ ${clearedSubscriptionTierCount} subscription tiers lost their Stripe product links due to environment change. Run "Sync to Stripe" from Products & Pricing before member signups will work.`);
     }
 
     if (cafeCleared > 0) {
-      console.warn(`[STARTUP WARNING] ⚠️ ${cafeCleared} cafe items lost their Stripe product links. Run "Sync to Stripe" to restore.`);
+      logger.warn(`[STARTUP WARNING] ⚠️ ${cafeCleared} cafe items lost their Stripe product links. Run "Sync to Stripe" to restore.`);
     }
   } catch (error: unknown) {
-    console.error('[Stripe Env] Environment validation failed (non-blocking):', getErrorMessage(error));
+    logger.error('[Stripe Env] Environment validation failed (non-blocking):', { extra: { detail: getErrorMessage(error) } });
   }
 }

@@ -3,12 +3,13 @@ import { pool } from '../db';
 import { discountRules } from '../../../shared/schema';
 import { eq } from 'drizzle-orm';
 
+import { logger } from '../logger';
 export async function getAllDiscountRules(): Promise<any[]> {
   try {
     const rules = await db.select().from(discountRules).orderBy(discountRules.discountPercent);
     return rules;
   } catch (error) {
-    console.error('[HubSpotDeals] Error fetching discount rules:', error);
+    logger.error('[HubSpotDeals] Error fetching discount rules:', { error: error });
     return [];
   }
 }
@@ -29,7 +30,7 @@ export async function updateDiscountRule(
     
     return true;
   } catch (error) {
-    console.error('[HubSpotDeals] Error updating discount rule:', error);
+    logger.error('[HubSpotDeals] Error updating discount rule:', { error: error });
     return false;
   }
 }
@@ -45,7 +46,7 @@ export async function getBillingAuditLog(memberEmail: string, limit: number = 50
     );
     return result.rows;
   } catch (error) {
-    console.error('[HubSpotDeals] Error fetching billing audit log:', error);
+    logger.error('[HubSpotDeals] Error fetching billing audit log:', { error: error });
     return [];
   }
 }

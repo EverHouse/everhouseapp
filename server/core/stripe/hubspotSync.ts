@@ -4,6 +4,7 @@ import { hubspotDeals, hubspotLineItems, billingAuditLog } from '../../../shared
 import { eq } from 'drizzle-orm';
 import { getHubSpotClient } from '../integrations';
 
+import { logger } from '../logger';
 export interface SyncPaymentParams {
   email: string;
   amountCents: number;
@@ -32,7 +33,7 @@ export async function syncPaymentToHubSpot(params: SyncPaymentParams): Promise<v
     .limit(1);
 
   if (deal.length === 0) {
-    console.log(`[Stripe->HubSpot] No deal found for ${email}, skipping HubSpot sync`);
+    logger.info(`[Stripe->HubSpot] No deal found for ${email}, skipping HubSpot sync`);
     return;
   }
 
@@ -113,9 +114,9 @@ export async function syncPaymentToHubSpot(params: SyncPaymentParams): Promise<v
       performedByName: 'Stripe Webhook'
     });
 
-    console.log(`[Stripe->HubSpot] Synced payment ${paymentIntentId} to deal ${hubspotDealId} as line item ${lineItemId}`);
+    logger.info(`[Stripe->HubSpot] Synced payment ${paymentIntentId} to deal ${hubspotDealId} as line item ${lineItemId}`);
   } catch (error) {
-    console.error('[Stripe->HubSpot] Error syncing payment:', error);
+    logger.error('[Stripe->HubSpot] Error syncing payment:', { error: error });
     throw error;
   }
 }
@@ -135,10 +136,10 @@ export async function syncDayPassToHubSpot(params: SyncDayPassParams): Promise<v
     if (deal.length > 0) {
       // Use existing deal if it exists
       hubspotDealId = deal[0].hubspotDealId;
-      console.log(`[DayPass->HubSpot] Using existing deal ${hubspotDealId} for ${email}`);
+      logger.info(`[DayPass->HubSpot] Using existing deal ${hubspotDealId} for ${email}`);
     } else {
       // For non-members, log the day pass purchase but don't fail if no deal exists
-      console.log(`[DayPass->HubSpot] No deal found for ${email} - this is a non-member day pass purchase. Skipping HubSpot sync.`);
+      logger.info(`[DayPass->HubSpot] No deal found for ${email} - this is a non-member day pass purchase. Skipping HubSpot sync.`);
       return;
     }
 
@@ -217,13 +218,13 @@ export async function syncDayPassToHubSpot(params: SyncDayPassParams): Promise<v
         performedByName: 'Stripe Webhook'
       });
 
-      console.log(`[DayPass->HubSpot] Synced day pass ${purchaseId} to deal ${hubspotDealId} as line item ${lineItemId}`);
+      logger.info(`[DayPass->HubSpot] Synced day pass ${purchaseId} to deal ${hubspotDealId} as line item ${lineItemId}`);
     } catch (error) {
-      console.error('[DayPass->HubSpot] Error syncing day pass to HubSpot:', error);
+      logger.error('[DayPass->HubSpot] Error syncing day pass to HubSpot:', { error: error });
       throw error;
     }
   } catch (error) {
-    console.error('[DayPass->HubSpot] Error in syncDayPassToHubSpot:', error);
+    logger.error('[DayPass->HubSpot] Error in syncDayPassToHubSpot:', { error: error });
     // Don't throw - day pass purchases should not fail if HubSpot sync fails
   }
 }

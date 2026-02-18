@@ -1,6 +1,7 @@
 import { Pool, PoolClient, QueryResult } from 'pg';
 import { getErrorMessage, getErrorCode, getErrorDetail } from '../utils/errorUtils';
 
+import { logger } from './logger';
 export const isProduction = process.env.NODE_ENV === 'production';
 
 export const pool = new Pool({
@@ -17,11 +18,11 @@ export const pool = new Pool({
 });
 
 pool.on('error', (err) => {
-  console.error('[Database] Pool error:', err.message);
+  logger.error('[Database] Pool error:', { extra: { detail: err.message } });
 });
 
 pool.on('connect', () => {
-  console.log('[Database] New client connected');
+  logger.info('[Database] New client connected');
 });
 
 const RETRYABLE_ERRORS = [
@@ -71,7 +72,7 @@ export async function queryWithRetry<T = any>(
       
       const delay = Math.min(100 * Math.pow(2, attempt - 1), 2000);
       if (!isProduction) {
-        console.log(`[Database] Retrying query (attempt ${attempt}/${maxRetries}) after ${delay}ms...`);
+        logger.info(`[Database] Retrying query (attempt ${attempt}/${maxRetries}) after ${delay}ms...`);
       }
       await new Promise(resolve => setTimeout(resolve, delay));
     }

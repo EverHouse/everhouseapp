@@ -1,5 +1,6 @@
 import { db } from '../db';
 import { getErrorMessage, getErrorCode, getErrorStatusCode, isStripeError } from '../utils/errorUtils';
+import { logger } from './logger';
 import { 
   bookingParticipants, 
   bookingSessions, 
@@ -274,7 +275,7 @@ async function checkUnmatchedTrackmanBookings(): Promise<IntegrityCheckResult> {
       lastRun: new Date()
     };
   } catch (error: unknown) {
-    console.error('[DataIntegrity] Error checking unmatched Trackman bookings:', getErrorMessage(error));
+    logger.error('[DataIntegrity] Error checking unmatched Trackman bookings:', { extra: { detail: getErrorMessage(error) } });
     return {
       checkName: 'Unmatched Trackman Bookings',
       status: 'warning',
@@ -443,7 +444,7 @@ async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> {
   try {
     hubspot = await getHubSpotClient();
   } catch (err) {
-    if (!isProduction) console.error('[DataIntegrity] HubSpot API error:', err);
+    if (!isProduction) logger.error('[DataIntegrity] HubSpot API error:', { error: err });
     issues.push({
       category: 'sync_mismatch',
       severity: 'info',
@@ -572,7 +573,7 @@ async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> {
     for (const issue of staleHubSpotIssues) {
       const userId = issue.recordId;
       await db.execute(sql`UPDATE users SET hubspot_id = NULL, updated_at = NOW() WHERE id = ${userId}`);
-      console.log(`[AutoFix] Cleared stale HubSpot ID for user ${issue.context?.memberEmail}`);
+      logger.info(`[AutoFix] Cleared stale HubSpot ID for user ${issue.context?.memberEmail}`);
     }
   }
 
@@ -754,7 +755,7 @@ async function checkStalePastTours(): Promise<IntegrityCheckResult> {
   `);
   
   if (autoFixResult.rows.length > 0) {
-    console.log(`[DataIntegrity] Auto-fixed ${autoFixResult.rows.length} stale tours older than 7 days to 'no_show'`);
+    logger.info(`[DataIntegrity] Auto-fixed ${autoFixResult.rows.length} stale tours older than 7 days to 'no_show'`);
   }
   
   const staleTours = await db.execute(sql`
@@ -950,7 +951,7 @@ async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResult> {
   try {
     stripe = await getStripeClient();
   } catch (err) {
-    if (!isProduction) console.error('[DataIntegrity] Stripe API error:', err);
+    if (!isProduction) logger.error('[DataIntegrity] Stripe API error:', { error: err });
     issues.push({
       category: 'sync_mismatch',
       severity: 'info',
@@ -1159,7 +1160,7 @@ async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResult> {
           }
         });
       } else {
-        if (!isProduction) console.warn(`[DataIntegrity] Stripe API error for ${customerId}:`, getErrorMessage(err));
+        if (!isProduction) logger.warn(`[DataIntegrity] Stripe API error for ${customerId}:`, { extra: { detail: getErrorMessage(err) } });
         issues.push({
           category: 'sync_mismatch',
           severity: 'warning',
@@ -1243,7 +1244,7 @@ async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
   try {
     stripe = await getStripeClient();
   } catch (err) {
-    if (!isProduction) console.error('[DataIntegrity] Stripe API error for tier reconciliation:', err);
+    if (!isProduction) logger.error('[DataIntegrity] Stripe API error for tier reconciliation:', { error: err });
     return {
       checkName: 'Tier Reconciliation',
       status: 'warning',
@@ -1264,7 +1265,7 @@ async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
   try {
     hubspot = await getHubSpotClient();
   } catch (err) {
-    if (!isProduction) console.error('[DataIntegrity] HubSpot API error for tier reconciliation:', err);
+    if (!isProduction) logger.error('[DataIntegrity] HubSpot API error for tier reconciliation:', { error: err });
   }
   
   const appMembersResult = await db.execute(sql`
@@ -1412,7 +1413,7 @@ async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
         });
       }
     } catch (err: unknown) {
-      if (!isProduction) console.error(`[DataIntegrity] Error checking tier reconciliation for ${member.email}:`, getErrorMessage(err));
+      if (!isProduction) logger.error(`[DataIntegrity] Error checking tier reconciliation for ${member.email}:`, { extra: { detail: getErrorMessage(err) } });
     }
   };
   
@@ -1852,7 +1853,7 @@ async function checkHubSpotIdDuplicates(): Promise<IntegrityCheckResult> {
       });
     }
   } catch (error: unknown) {
-    console.error('[DataIntegrity] Error checking HubSpot ID duplicates:', getErrorMessage(error));
+    logger.error('[DataIntegrity] Error checking HubSpot ID duplicates:', { extra: { detail: getErrorMessage(error) } });
   }
   
   return {
@@ -2154,7 +2155,7 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
     await alertOnCriticalIntegrityIssues(checkSummaries, severityMap);
     await alertOnHighIntegrityIssues(checkSummaries, severityMap);
   } catch (err) {
-    if (!isProduction) console.error('[DataIntegrity] Failed to store history:', err);
+    if (!isProduction) logger.error('[DataIntegrity] Failed to store history:', { error: err });
   }
   
   return checks;
@@ -2895,12 +2896,12 @@ export async function runDataCleanup(): Promise<{
     orphanedFeeSnapshots = feeSnapshotResult.rows.length;
 
     if (orphanedFeeSnapshots > 0) {
-      console.log(`[DataCleanup] Removed ${orphanedFeeSnapshots} orphaned fee snapshots`);
+      logger.info(`[DataCleanup] Removed ${orphanedFeeSnapshots} orphaned fee snapshots`);
     }
 
-    console.log(`[DataCleanup] Removed ${orphanedNotifications} orphaned notifications, marked ${orphanedBookings} orphaned bookings, normalized ${normalizedEmails} emails, removed ${orphanedFeeSnapshots} orphaned fee snapshots`);
+    logger.info(`[DataCleanup] Removed ${orphanedNotifications} orphaned notifications, marked ${orphanedBookings} orphaned bookings, normalized ${normalizedEmails} emails, removed ${orphanedFeeSnapshots} orphaned fee snapshots`);
   } catch (error: unknown) {
-    console.error('[DataCleanup] Error during cleanup:', getErrorMessage(error));
+    logger.error('[DataCleanup] Error during cleanup:', { extra: { detail: getErrorMessage(error) } });
     throw error;
   }
 
@@ -2928,7 +2929,7 @@ export async function autoFixMissingTiers(): Promise<{
     normalizedStatusCase = caseNormResult.rows.length;
     if (normalizedStatusCase > 0) {
       const details = (caseNormResult.rows as any[]).map(r => `${r.email} -> ${r.membership_status}`).join(', ');
-      console.log(`[AutoFix] Normalized membership_status case for ${normalizedStatusCase} members: ${details}`);
+      logger.info(`[AutoFix] Normalized membership_status case for ${normalizedStatusCase} members: ${details}`);
     }
 
     const billingProviderResult = await db.execute(sql`
@@ -2945,7 +2946,7 @@ export async function autoFixMissingTiers(): Promise<{
     fixedBillingProvider = billingProviderResult.rows.length;
     if (fixedBillingProvider > 0) {
       const emails = (billingProviderResult.rows as any[]).map(r => r.email).join(', ');
-      console.log(`[AutoFix] Set billing_provider='mindbody' for ${fixedBillingProvider} members with MindBody IDs: ${emails}`);
+      logger.info(`[AutoFix] Set billing_provider='mindbody' for ${fixedBillingProvider} members with MindBody IDs: ${emails}`);
     }
 
     const fixResult = await db.execute(sql`
@@ -2984,7 +2985,7 @@ export async function autoFixMissingTiers(): Promise<{
     fixedFromAlternateEmail = (fixResult as any).rowCount || 0;
     
     if (fixedFromAlternateEmail > 0) {
-      console.log(`[AutoFix] Fixed ${fixedFromAlternateEmail} members missing tier by copying from alternate email`);
+      logger.info(`[AutoFix] Fixed ${fixedFromAlternateEmail} members missing tier by copying from alternate email`);
     }
     
     const remainingResult = await db.execute(sql`
@@ -3012,7 +3013,7 @@ export async function autoFixMissingTiers(): Promise<{
         LIMIT 20
       `);
       const emails = (emailsResult.rows as any[]).map(r => `${r.first_name || ''} ${r.last_name || ''} <${r.email}>${r.mindbody_client_id ? ` (MindBody: ${r.mindbody_client_id})` : ''}`).join(', ');
-      console.log(`[AutoFix] ${remainingWithoutTier} active members still without tier (cannot auto-determine): ${emails}`);
+      logger.info(`[AutoFix] ${remainingWithoutTier} active members still without tier (cannot auto-determine): ${emails}`);
     }
 
     const staffSyncResult = await db.execute(sql`
@@ -3030,12 +3031,12 @@ export async function autoFixMissingTiers(): Promise<{
     syncedStaffRoles = staffSyncResult.rows.length;
     if (syncedStaffRoles > 0) {
       const details = (staffSyncResult.rows as any[]).map(r => `${r.email} -> role=${r.new_role}, tier=VIP, status=active`).join(', ');
-      console.log(`[AutoFix] Synced staff role for ${syncedStaffRoles} users: ${details}`);
+      logger.info(`[AutoFix] Synced staff role for ${syncedStaffRoles} users: ${details}`);
     }
     
     return { fixedBillingProvider, fixedFromAlternateEmail, remainingWithoutTier, normalizedStatusCase, syncedStaffRoles };
   } catch (error: unknown) {
-    console.error('[AutoFix] Error in periodic auto-fixes:', getErrorMessage(error));
+    logger.error('[AutoFix] Error in periodic auto-fixes:', { extra: { detail: getErrorMessage(error) } });
     return { fixedBillingProvider: 0, fixedFromAlternateEmail: 0, remainingWithoutTier: -1, normalizedStatusCase: 0, syncedStaffRoles: 0 };
   }
 }

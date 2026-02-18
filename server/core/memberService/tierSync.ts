@@ -1,6 +1,7 @@
 import { pool } from '../db';
 import { getErrorMessage } from '../../utils/errorUtils';
 
+import { logger } from '../logger';
 export interface TierSyncResult {
   success: boolean;
   newTier?: string;
@@ -20,7 +21,7 @@ export async function syncMemberTierFromStripe(
     );
     
     if (tierResult.rows.length === 0) {
-      console.warn(`[TierSync] No tier found for price ${stripePriceId}`);
+      logger.warn(`[TierSync] No tier found for price ${stripePriceId}`);
       return { success: false, error: `No tier found for price ID: ${stripePriceId}` };
     }
     
@@ -34,24 +35,24 @@ export async function syncMemberTierFromStripe(
     );
     
     if (updateResult.rowCount === 0) {
-      console.warn(`[TierSync] No user found for email ${email}`);
+      logger.warn(`[TierSync] No user found for email ${email}`);
       return { success: false, error: `No user found for email: ${email}` };
     }
     
-    console.log(`[TierSync] Synced ${email} to tier ${tierSlug} (${tierName})`);
+    logger.info(`[TierSync] Synced ${email} to tier ${tierSlug} (${tierName})`);
     
     // Sync tier change to HubSpot
     try {
       const { syncMemberToHubSpot } = await import('../hubspot/stages');
       await syncMemberToHubSpot({ email, tier: tierName, billingProvider: 'stripe' });
-      console.log(`[TierSync] Synced ${email} tier=${tierName} to HubSpot`);
+      logger.info(`[TierSync] Synced ${email} tier=${tierName} to HubSpot`);
     } catch (hubspotError) {
-      console.error('[TierSync] HubSpot sync failed:', hubspotError);
+      logger.error('[TierSync] HubSpot sync failed:', { error: hubspotError });
     }
     
     return { success: true, newTier: tierSlug, newTierId: tierId };
   } catch (error: unknown) {
-    console.error('[TierSync] Error syncing tier:', error);
+    logger.error('[TierSync] Error syncing tier:', { error: error });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -92,24 +93,24 @@ export async function syncMemberStatusFromStripe(
     );
     
     if (updateResult.rowCount === 0) {
-      console.warn(`[TierSync] No user found for email ${email}`);
+      logger.warn(`[TierSync] No user found for email ${email}`);
       return { success: false, error: `No user found for email: ${email}` };
     }
     
-    console.log(`[TierSync] Updated ${email} membership_status to ${membershipStatus}`);
+    logger.info(`[TierSync] Updated ${email} membership_status to ${membershipStatus}`);
     
     // Sync status change to HubSpot
     try {
       const { syncMemberToHubSpot } = await import('../hubspot/stages');
       await syncMemberToHubSpot({ email, status: membershipStatus, billingProvider: 'stripe' });
-      console.log(`[TierSync] Synced ${email} status=${membershipStatus} to HubSpot`);
+      logger.info(`[TierSync] Synced ${email} status=${membershipStatus} to HubSpot`);
     } catch (hubspotError) {
-      console.error('[TierSync] HubSpot sync failed:', hubspotError);
+      logger.error('[TierSync] HubSpot sync failed:', { error: hubspotError });
     }
     
     return { success: true };
   } catch (error: unknown) {
-    console.error('[TierSync] Error syncing status:', error);
+    logger.error('[TierSync] Error syncing status:', { error: error });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -132,7 +133,7 @@ export async function getTierFromPriceId(stripePriceId: string): Promise<{
     
     return tierResult.rows[0];
   } catch (error: unknown) {
-    console.error('[TierSync] Error getting tier from price ID:', error);
+    logger.error('[TierSync] Error getting tier from price ID:', { error: error });
     return null;
   }
 }
@@ -179,7 +180,7 @@ export async function validateTierConsistency(email: string): Promise<{
         : undefined
     };
   } catch (error: unknown) {
-    console.error('[TierSync] Error validating tier consistency:', error);
+    logger.error('[TierSync] Error validating tier consistency:', { error: error });
     return { isConsistent: false, issues: [getErrorMessage(error) || 'Unknown error'] };
   }
 }

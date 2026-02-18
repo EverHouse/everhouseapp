@@ -3,6 +3,7 @@ import { createPacificDate } from '../../utils/dateUtils';
 import { CALENDAR_CONFIG, TimeSlot, BusyPeriod } from './config';
 import { getCalendarIdByName } from './cache';
 
+import { logger } from '../logger';
 export async function getCalendarBusyTimes(calendarId: string, date: string): Promise<BusyPeriod[]> {
   try {
     const calendar = await getGoogleCalendarClient();
@@ -33,7 +34,7 @@ export async function getCalendarBusyTimes(calendarId: string, date: string): Pr
     
     return busyPeriods;
   } catch (error) {
-    console.error('Error fetching busy times:', error);
+    logger.error('Error fetching busy times:', { error: error });
     return [];
   }
 }

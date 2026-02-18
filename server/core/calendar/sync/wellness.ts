@@ -10,6 +10,7 @@ import { getCalendarIdByName, discoverCalendarIds } from '../cache';
 import { createCalendarEventOnCalendar } from '../google-client';
 import { alertOnSyncFailure } from '../../dataAlerts';
 
+import { logger } from '../../logger';
 export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boolean }): Promise<{ synced: number; created: number; updated: number; deleted: number; pushedToCalendar: number; error?: string }> {
   try {
     const calendar = await getGoogleCalendarClient();
@@ -242,7 +243,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
               );
               pushedToCalendar++;
             } catch (pushError) {
-              console.error(`[Wellness Sync] Failed to push local edits to calendar for class #${dbRow.id}:`, pushError);
+              logger.error(`[Wellness Sync] Failed to push local edits to calendar for class #${dbRow.id}:`, { error: pushError });
             }
           }
         } else {
@@ -311,7 +312,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
     
     return { synced: events.length, created, updated, deleted, pushedToCalendar };
   } catch (error) {
-    console.error('Error syncing Wellness Calendar events:', error);
+    logger.error('Error syncing Wellness Calendar events:', { error: error });
     
     if (!options?.suppressAlert) {
       alertOnSyncFailure(
@@ -320,7 +321,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
         error instanceof Error ? error : new Error(String(error)),
         { calendarName: CALENDAR_CONFIG.wellness.name }
       ).catch(alertErr => {
-        console.error('[Wellness Sync] Failed to send staff alert:', alertErr);
+        logger.error('[Wellness Sync] Failed to send staff alert:', { error: alertErr });
       });
     }
     
@@ -405,7 +406,7 @@ export async function backfillWellnessToCalendar(): Promise<{ created: number; t
     
     return { created, total: classesWithoutCalendarRows.length, errors };
   } catch (error: unknown) {
-    console.error('Error backfilling wellness to calendar:', error);
+    logger.error('Error backfilling wellness to calendar:', { error: error });
     return { created: 0, total: 0, errors: [`Backfill failed: ${getErrorMessage(error)}`] };
   }
 }

@@ -209,7 +209,7 @@ export async function ensureSessionForBooking(params: {
       throw firstError;
     }
 
-    console.error('[ensureSessionForBooking] First attempt failed, retrying in 500ms...', firstError);
+    logger.error('[ensureSessionForBooking] First attempt failed, retrying in 500ms...', { error: firstError });
 
     await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -217,7 +217,7 @@ export async function ensureSessionForBooking(params: {
       return await attemptSessionCreation();
     } catch (retryError: unknown) {
       const errorMsg = getErrorMessage(retryError);
-      console.error('[ensureSessionForBooking] Retry also failed, flagging booking for staff review', retryError);
+      logger.error('[ensureSessionForBooking] Retry also failed, flagging booking for staff review', { error: retryError });
 
       try {
         const existing = await db
@@ -236,7 +236,7 @@ export async function ensureSessionForBooking(params: {
           .set({ staffNotes: updatedNotes })
           .where(eq(bookingRequests.id, params.bookingId));
       } catch (noteError: unknown) {
-        console.error('[ensureSessionForBooking] Failed to write staff note on booking', noteError);
+        logger.error('[ensureSessionForBooking] Failed to write staff note on booking', { error: noteError });
       }
 
       return { sessionId: 0, created: false, error: errorMsg };

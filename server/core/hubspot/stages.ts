@@ -8,6 +8,7 @@ import { retryableHubSpotRequest } from './request';
 import { validateMembershipPipeline, isValidStage } from './pipeline';
 import { isPlaceholderEmail } from '../stripe/customers';
 
+import { logger } from '../logger';
 let _isLiveStripeCache: boolean | null = null;
 async function isLiveStripeEnvironment(): Promise<boolean> {
   if (_isLiveStripeCache !== null) return _isLiveStripeCache;
@@ -79,10 +80,10 @@ export async function updateDealStage(
       });
     }
     
-    if (!isProduction) console.log(`[HubSpotDeals] Updated deal ${hubspotDealId} to stage ${newStage}`);
+    if (!isProduction) logger.info(`[HubSpotDeals] Updated deal ${hubspotDealId} to stage ${newStage}`);
     return true;
   } catch (error: unknown) {
-    console.error('[HubSpotDeals] Error updating deal stage:', error);
+    logger.error('[HubSpotDeals] Error updating deal stage:', { error: error });
     
     await db.update(hubspotDeals)
       .set({
@@ -111,10 +112,10 @@ export async function updateContactMembershipStatus(
       })
     );
     
-    if (!isProduction) console.log(`[HubSpotDeals] Updated contact ${hubspotContactId} membership_status to ${newStatus}`);
+    if (!isProduction) logger.info(`[HubSpotDeals] Updated contact ${hubspotContactId} membership_status to ${newStatus}`);
     return true;
   } catch (error) {
-    console.error('[HubSpotDeals] Error updating contact membership_status:', error);
+    logger.error('[HubSpotDeals] Error updating contact membership_status:', { error: error });
     return false;
   }
 }
@@ -154,7 +155,7 @@ export async function syncMemberToHubSpot(
   const { email, status, billingProvider, tier, memberSince, createIfMissing = true, stripeCustomerId, stripeCreatedDate, stripeDelinquent, stripeDiscountId, stripePricingInterval, billingGroupRole } = input;
   
   if (isPlaceholderEmail(email)) {
-    console.log(`[HubSpot Sync] Skipping sync for placeholder email: ${email}`);
+    logger.info(`[HubSpot Sync] Skipping sync for placeholder email: ${email}`);
     return { success: false, error: 'Placeholder email skipped', updated: {} };
   }
   
@@ -179,20 +180,20 @@ export async function syncMemberToHubSpot(
     
     if (!searchResponse.results || searchResponse.results.length === 0) {
       if (!createIfMissing) {
-        console.log(`[HubSpot Sync] Contact not found for ${email}, skipping sync`);
+        logger.info(`[HubSpot Sync] Contact not found for ${email}, skipping sync`);
         return { success: false, error: 'Contact not found', updated: {} };
       }
       
       // Create the contact if it doesn't exist
-      console.log(`[HubSpot Sync] Contact not found for ${email}, creating...`);
+      logger.info(`[HubSpot Sync] Contact not found for ${email}, creating...`);
       const { findOrCreateHubSpotContact } = await import('./members');
       const result = await findOrCreateHubSpotContact(email, '', '');
       if (!result.contactId) {
-        console.error(`[HubSpot Sync] Failed to create contact for ${email}`);
+        logger.error(`[HubSpot Sync] Failed to create contact for ${email}`);
         return { success: false, error: 'Failed to create contact', updated: {} };
       }
       contactId = result.contactId;
-      console.log(`[HubSpot Sync] Created contact ${contactId} for ${email}`);
+      logger.info(`[HubSpot Sync] Created contact ${contactId} for ${email}`);
     } else {
       contactId = searchResponse.results[0].id;
     }
@@ -215,7 +216,7 @@ export async function syncMemberToHubSpot(
 
     const isMindbodyBilled = effectiveBillingProvider === 'mindbody';
     if (isMindbodyBilled && status) {
-      console.log(`[HubSpot Sync] Skipping status push for Mindbody-billed member ${email} to prevent sync loop`);
+      logger.info(`[HubSpot Sync] Skipping status push for Mindbody-billed member ${email} to prevent sync loop`);
     }
     
     if (status && !isMindbodyBilled) {
@@ -278,7 +279,7 @@ export async function syncMemberToHubSpot(
       }
     } else {
       if (input.stripeCustomerId || input.stripeCreatedDate || input.stripeDelinquent !== undefined || input.stripeDiscountId || input.stripePricingInterval) {
-        console.log(`[HubSpot Sync] Skipping Stripe field push for ${email} — sandbox/test Stripe environment detected`);
+        logger.info(`[HubSpot Sync] Skipping Stripe field push for ${email} — sandbox/test Stripe environment detected`);
       }
     }
 
@@ -288,7 +289,7 @@ export async function syncMemberToHubSpot(
     }
     
     if (Object.keys(properties).length === 0) {
-      console.log(`[HubSpot Sync] No properties to update for ${email}`);
+      logger.info(`[HubSpot Sync] No properties to update for ${email}`);
       return { success: true, contactId, updated };
     }
     
@@ -297,7 +298,7 @@ export async function syncMemberToHubSpot(
       await retryableHubSpotRequest(() =>
         hubspot.crm.contacts.basicApi.update(contactId, { properties })
       );
-      console.log(`[HubSpot Sync] Updated ${email}: ${JSON.stringify(properties)}`);
+      logger.info(`[HubSpot Sync] Updated ${email}: ${JSON.stringify(properties)}`);
       return { success: true, contactId, updated };
     } catch (updateError: unknown) {
       // If some properties don't exist, retry with only the valid ones
@@ -315,18 +316,18 @@ export async function syncMemberToHubSpot(
         }
         
         if (Object.keys(validProperties).length > 0) {
-          console.log(`[HubSpot Sync] Retrying ${email} without missing properties: ${invalidProps.join(', ')}`);
+          logger.info(`[HubSpot Sync] Retrying ${email} without missing properties: ${invalidProps.join(', ')}`);
           await retryableHubSpotRequest(() =>
             hubspot.crm.contacts.basicApi.update(contactId, { properties: validProperties })
           );
-          console.log(`[HubSpot Sync] Updated ${email}: ${JSON.stringify(validProperties)}`);
+          logger.info(`[HubSpot Sync] Updated ${email}: ${JSON.stringify(validProperties)}`);
           return { success: true, contactId, updated };
         }
       }
       throw updateError;
     }
   } catch (error) {
-    console.error(`[HubSpot Sync] Error syncing ${email}:`, error);
+    logger.error(`[HubSpot Sync] Error syncing ${email}:`, { error: error });
     return { success: false, error: error instanceof Error ? error.message : String(error), updated: {} };
   }
 }
@@ -337,14 +338,14 @@ export async function syncDealStageFromMindbodyStatus(
   performedBy: string = 'system',
   performedByName?: string
 ): Promise<{ success: boolean; dealId?: string; newStage?: string; contactUpdated?: boolean; error?: string }> {
-  console.log(`[HubSpot] Deal sync disabled — skipping stage sync for ${memberEmail}`);
+  logger.info(`[HubSpot] Deal sync disabled — skipping stage sync for ${memberEmail}`);
   return { success: true, error: 'Deal sync disabled' };
   const { createDealForLegacyMember } = await import('./members');
   
   try {
     const pipelineValidation = await validateMembershipPipeline();
     if (!pipelineValidation.pipelineExists) {
-      console.error(`[HubSpotDeals] Cannot sync: ${pipelineValidation.error}`);
+      logger.error(`[HubSpotDeals] Cannot sync: ${pipelineValidation.error}`);
       return { success: false, error: pipelineValidation.error };
     }
     
@@ -352,12 +353,12 @@ export async function syncDealStageFromMindbodyStatus(
     const targetStage = MINDBODY_TO_STAGE_MAP[normalizedStatus];
     
     if (!targetStage) {
-      if (!isProduction) console.log(`[HubSpotDeals] No stage mapping for status: ${mindbodyStatus}`);
+      if (!isProduction) logger.info(`[HubSpotDeals] No stage mapping for status: ${mindbodyStatus}`);
       return { success: false, error: `No stage mapping for status: ${mindbodyStatus}` };
     }
     
     if (!isValidStage(targetStage)) {
-      console.warn(`[HubSpotDeals] Target stage ${targetStage} not found in pipeline, check HubSpot configuration`);
+      logger.warn(`[HubSpotDeals] Target stage ${targetStage} not found in pipeline, check HubSpot configuration`);
     }
     
     const existingDeal = await db.select()
@@ -376,7 +377,7 @@ export async function syncDealStageFromMindbodyStatus(
       : existingDeal;
     
     if (fallbackDeal.length === 0) {
-      if (!isProduction) console.log(`[HubSpotDeals] No deal found for member: ${memberEmail}, creating deal for legacy member`);
+      if (!isProduction) logger.info(`[HubSpotDeals] No deal found for member: ${memberEmail}, creating deal for legacy member`);
       
       const legacyDealResult = await createDealForLegacyMember(
         memberEmail,
@@ -386,7 +387,7 @@ export async function syncDealStageFromMindbodyStatus(
       );
       
       if (!legacyDealResult.success) {
-        if (!isProduction) console.log(`[HubSpotDeals] Skipped deal creation for ${memberEmail}: ${legacyDealResult.error}`);
+        if (!isProduction) logger.info(`[HubSpotDeals] Skipped deal creation for ${memberEmail}: ${legacyDealResult.error}`);
         return { success: false, error: legacyDealResult.error };
       }
       
@@ -437,9 +438,9 @@ export async function syncDealStageFromMindbodyStatus(
     }
     
     if (isRecovery) {
-      if (!isProduction) console.log(`[HubSpotDeals] Recovery: Member ${memberEmail} status changed to Active, deal moved to ${targetStage}`);
+      if (!isProduction) logger.info(`[HubSpotDeals] Recovery: Member ${memberEmail} status changed to Active, deal moved to ${targetStage}`);
     } else if (isChurned) {
-      if (!isProduction) console.log(`[HubSpotDeals] Churned: Member ${memberEmail} marked as former_member, deal moved to ${targetStage}`);
+      if (!isProduction) logger.info(`[HubSpotDeals] Churned: Member ${memberEmail} marked as former_member, deal moved to ${targetStage}`);
       
       // Remove all line items and update contact for churned members (MindBody cancelled/terminated)
       if (deal.hubspotDealId) {
@@ -463,7 +464,7 @@ export async function syncDealStageFromMindbodyStatus(
                 
                 lineItemsRemoved++;
               } catch (removeError: unknown) {
-                console.error(`[HubSpotDeals] Failed to remove line item ${lineItem.hubspotLineItemId}:`, removeError);
+                logger.error(`[HubSpotDeals] Failed to remove line item ${lineItem.hubspotLineItemId}:`, { error: removeError });
               }
             }
           }
@@ -478,26 +479,26 @@ export async function syncDealStageFromMindbodyStatus(
                   }
                 })
               );
-              if (!isProduction) console.log(`[HubSpotDeals] Cleared membership_tier for churned member ${memberEmail}`);
+              if (!isProduction) logger.info(`[HubSpotDeals] Cleared membership_tier for churned member ${memberEmail}`);
             } catch (tierClearError: unknown) {
-              console.warn(`[HubSpotDeals] Failed to clear membership_tier for ${memberEmail}:`, tierClearError);
+              logger.warn(`[HubSpotDeals] Failed to clear membership_tier for ${memberEmail}:`, { error: tierClearError });
             }
           }
           
           if (lineItemsRemoved > 0) {
-            console.log(`[HubSpotDeals] Removed ${lineItemsRemoved} line items for churned MindBody member ${memberEmail}`);
+            logger.info(`[HubSpotDeals] Removed ${lineItemsRemoved} line items for churned MindBody member ${memberEmail}`);
           }
         } catch (lineItemError: unknown) {
-          console.error(`[HubSpotDeals] Error removing line items for churned member:`, lineItemError);
+          logger.error(`[HubSpotDeals] Error removing line items for churned member:`, { error: lineItemError });
         }
       }
     } else {
-      if (!isProduction) console.log(`[HubSpotDeals] Payment Issue: Member ${memberEmail} marked as inactive, deal moved to ${targetStage}`);
+      if (!isProduction) logger.info(`[HubSpotDeals] Payment Issue: Member ${memberEmail} marked as inactive, deal moved to ${targetStage}`);
     }
     
     return { success: dealUpdated, dealId: deal.hubspotDealId, newStage: targetStage, contactUpdated };
   } catch (error) {
-    console.error('[HubSpotDeals] Error syncing deal stage from Mindbody:', error);
+    logger.error('[HubSpotDeals] Error syncing deal stage from Mindbody:', { error: error });
     return { success: false };
   }
 }
@@ -536,7 +537,7 @@ export async function ensureHubSpotPropertiesExist(): Promise<{ success: boolean
           hubspot.crm.properties.coreApi.getByName('contacts', prop.name)
         );
         existing.push(prop.name);
-        console.log(`[HubSpot] Property ${prop.name} already exists`);
+        logger.info(`[HubSpot] Property ${prop.name} already exists`);
 
         if (prop.type === 'enumeration' && prop.options) {
           const existingValues = new Set(
@@ -555,7 +556,7 @@ export async function ensureHubSpotPropertiesExist(): Promise<{ success: boolean
                 options: allOptions,
               } as any)
             );
-            console.log(`[HubSpot] Added options to ${prop.name}: ${missingOptions.map((o: any) => o.label).join(', ')}`);
+            logger.info(`[HubSpot] Added options to ${prop.name}: ${missingOptions.map((o: any) => o.label).join(', ')}`);
           }
         }
       } catch (getError: unknown) {
@@ -565,10 +566,10 @@ export async function ensureHubSpotPropertiesExist(): Promise<{ success: boolean
               hubspot.crm.properties.coreApi.create('contacts', prop as any)
             );
             created.push(prop.name);
-            console.log(`[HubSpot] Created property ${prop.name}`);
+            logger.info(`[HubSpot] Created property ${prop.name}`);
           } catch (createError: unknown) {
             errors.push(`${prop.name}: ${getErrorMessage(createError)}`);
-            console.error(`[HubSpot] Failed to create property ${prop.name}:`, getErrorMessage(createError));
+            logger.error(`[HubSpot] Failed to create property ${prop.name}:`, { extra: { detail: getErrorMessage(createError) } });
           }
         } else {
           errors.push(`${prop.name}: ${getErrorMessage(getError)}`);
@@ -578,7 +579,7 @@ export async function ensureHubSpotPropertiesExist(): Promise<{ success: boolean
     
     return { success: errors.length === 0, created, existing, errors };
   } catch (error: unknown) {
-    console.error('[HubSpot] Error ensuring properties exist:', error);
+    logger.error('[HubSpot] Error ensuring properties exist:', { error: error });
     return { success: false, created, existing, errors: [getErrorMessage(error)] };
   }
 }

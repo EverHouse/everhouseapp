@@ -10,6 +10,7 @@ import { sendMembershipRenewalEmail, sendMembershipFailedEmail } from '../emails
 import { sendPassWithQrEmail } from '../emails/passEmails';
 import { queuePaymentSyncToHubSpot, queueDayPassSyncToHubSpot, syncCompanyToHubSpot } from './hubspot';
 
+import { logger } from './logger';
 const WORKER_ID = `worker-${process.pid}-${Date.now()}`;
 const LOCK_TIMEOUT_MS = 5 * 60 * 1000;
 const BATCH_SIZE = 10;
@@ -216,7 +217,7 @@ async function executeJob(job: { id: number; jobType: string; payload: any; retr
         }, {
           idempotencyKey: `credit_refund_${payload.paymentIntentId}_${payload.amountCents}`
         });
-        console.log(`[JobQueue] Applied credit refund of $${(payload.amountCents / 100).toFixed(2)} for ${payload.email}`);
+        logger.info(`[JobQueue] Applied credit refund of $${(payload.amountCents / 100).toFixed(2)} for ${payload.email}`);
         break;
       }
       case 'stripe_credit_consume': {
@@ -233,7 +234,7 @@ async function executeJob(job: { id: number; jobType: string; payload: any; retr
             idempotencyKey: `credit_consume_${payload.paymentIntentId}_${payload.amountCents}`
           }
         );
-        console.log(`[JobQueue] Consumed account credit of $${(payload.amountCents / 100).toFixed(2)} for ${payload.email}`);
+        logger.info(`[JobQueue] Consumed account credit of $${(payload.amountCents / 100).toFixed(2)} for ${payload.email}`);
         break;
       }
       case 'update_member_tier':
@@ -241,15 +242,15 @@ async function executeJob(job: { id: number; jobType: string; payload: any; retr
         await processMemberTierUpdate(payload);
         break;
       case 'generic_async_task':
-        console.log(`[JobQueue] Executing generic task: ${payload.description || 'no description'}`);
+        logger.info(`[JobQueue] Executing generic task: ${payload.description || 'no description'}`);
         break;
       default:
-        console.warn(`[JobQueue] Unknown job type: ${jobType}`);
+        logger.warn(`[JobQueue] Unknown job type: ${jobType}`);
     }
     
     await markJobCompleted(job.id);
   } catch (error: unknown) {
-    console.error(`[JobQueue] Job ${job.id} (${jobType}) failed:`, getErrorMessage(error) || error);
+    logger.error(`[JobQueue] Job ${job.id} (${jobType}) failed:`, { error: getErrorMessage(error) || error });
     await markJobFailed(job.id, getErrorMessage(error) || String(error), job.retryCount, job.maxRetries);
   }
 }
@@ -261,7 +262,7 @@ export async function processJobs(): Promise<number> {
   
   if (jobs.length === 0) return 0;
   
-  console.log(`[JobQueue] Processing ${jobs.length} job(s)`);
+  logger.info(`[JobQueue] Processing ${jobs.length} job(s)`);
   
   await Promise.allSettled(jobs.map(job => executeJob(job)));
   
@@ -270,18 +271,18 @@ export async function processJobs(): Promise<number> {
 
 export function startJobProcessor(intervalMs: number = 5000): void {
   if (processingInterval) {
-    console.log('[JobQueue] Processor already running');
+    logger.info('[JobQueue] Processor already running');
     return;
   }
   
-  console.log(`[Startup] Job queue processor enabled (runs every ${intervalMs / 1000}s)`);
+  logger.info(`[Startup] Job queue processor enabled (runs every ${intervalMs / 1000}s)`);
   
   processingInterval = setInterval(async () => {
     try {
       await processJobs();
       schedulerTracker.recordRun('Job Queue Processor', true);
     } catch (error) {
-      console.error('[JobQueue] Processing error:', error);
+      logger.error('[JobQueue] Processing error:', { error: error });
       schedulerTracker.recordRun('Job Queue Processor', false, String(error));
     }
   }, intervalMs);
@@ -291,7 +292,7 @@ export function stopJobProcessor(): void {
   if (processingInterval) {
     clearInterval(processingInterval);
     processingInterval = null;
-    console.log('[JobQueue] Processor stopped');
+    logger.info('[JobQueue] Processor stopped');
   }
 }
 
@@ -302,7 +303,7 @@ export async function cleanupOldJobs(daysToKeep: number = 7): Promise<number> {
      RETURNING id`);
   
   if (result.rowCount && result.rowCount > 0) {
-    console.log(`[JobQueue] Cleaned up ${result.rowCount} old jobs`);
+    logger.info(`[JobQueue] Cleaned up ${result.rowCount} old jobs`);
   }
   
   return result.rowCount || 0;

@@ -57,7 +57,7 @@ function getSessionPool(): Pool | null {
   if (sessionPool) return sessionPool;
   
   if (!process.env.DATABASE_URL) {
-    console.warn('[WebSocket] DATABASE_URL not configured - session verification disabled');
+    logger.warn('[WebSocket] DATABASE_URL not configured - session verification disabled');
     return null;
   }
   
@@ -69,7 +69,7 @@ function getSessionPool(): Pool | null {
     });
     return sessionPool;
   } catch (err: unknown) {
-    console.warn('[WebSocket] Failed to create session pool:', getErrorMessage(err));
+    logger.warn('[WebSocket] Failed to create session pool:', { extra: { detail: getErrorMessage(err) } });
     return null;
   }
 }
@@ -90,7 +90,7 @@ function parseSessionId(cookieHeader: string | undefined, sessionSecret: string)
     
     return signedCookie;
   } catch (err: unknown) {
-    console.error('[WebSocket] Error parsing session cookie:', err);
+    logger.error('[WebSocket] Error parsing session cookie:', { error: err });
     return null;
   }
 }
@@ -124,7 +124,7 @@ async function verifySessionFromDatabase(sessionId: string): Promise<SessionData
     const sessionData = result.rows[0].sess as SessionData;
     return sessionData;
   } catch (err: unknown) {
-    console.error('[WebSocket] Error verifying session:', err);
+    logger.error('[WebSocket] Error verifying session:', { error: err });
     return null;
   }
 }
@@ -137,7 +137,7 @@ async function getVerifiedUserFromRequest(req: IncomingMessage): Promise<{
 } | null> {
   const sessionSecret = process.env.SESSION_SECRET;
   if (!sessionSecret) {
-    console.warn('[WebSocket] SESSION_SECRET not configured - session verification disabled');
+    logger.warn('[WebSocket] SESSION_SECRET not configured - session verification disabled');
     return null;
   }
   
@@ -220,9 +220,9 @@ export function closeWebSocketServer(): void {
     
     wss.close((err) => {
       if (err) {
-        console.error('[WebSocket] Error closing server:', err);
+        logger.error('[WebSocket] Error closing server:', { error: err });
       } else {
-        console.log('[WebSocket] Server closed gracefully');
+        logger.info('[WebSocket] Server closed gracefully');
       }
     });
     wss = null;
@@ -234,7 +234,7 @@ export function initWebSocketServer(server: Server) {
   
   wss.on('error', (error) => {
     logger.error('[WebSocket] Server error:', { error: error.message, stack: error.stack });
-    console.error('[WebSocket] Server error:', error);
+    logger.error('[WebSocket] Server error:', { error: error });
   });
 
   wss.on('connection', async (ws, req) => {
@@ -372,7 +372,7 @@ export function initWebSocketServer(server: Server) {
             }));
           }
         } catch (e: unknown) {
-          console.error('[WebSocket] Error parsing message from unauthenticated client:', e);
+          logger.error('[WebSocket] Error parsing message from unauthenticated client:', { error: e });
         }
         return;
       }
@@ -400,7 +400,7 @@ export function initWebSocketServer(server: Server) {
               }
             });
             staffEmails.add(userEmail);
-            console.log(`[WebSocket] Staff verified and registered: ${userEmail}`);
+            logger.info(`[WebSocket] Staff verified and registered: ${userEmail}`);
           } else {
             logger.warn(`[WebSocket] Staff register rejected - user is not staff`, {
               userEmail,
@@ -413,7 +413,7 @@ export function initWebSocketServer(server: Server) {
           ws.send(JSON.stringify({ type: 'pong' }));
         }
       } catch (e: unknown) {
-        console.error('[WebSocket] Error parsing message:', e);
+        logger.error('[WebSocket] Error parsing message:', { error: e });
       }
     });
 
@@ -427,7 +427,7 @@ export function initWebSocketServer(server: Server) {
           clients.delete(userEmail);
           staffEmails.delete(userEmail);
         }
-        console.log(`[WebSocket] Client disconnected: ${userEmail}`);
+        logger.info(`[WebSocket] Client disconnected: ${userEmail}`);
       }
     });
 
@@ -465,7 +465,7 @@ export function initWebSocketServer(server: Server) {
     clearInterval(heartbeatInterval);
   });
 
-  console.log('[WebSocket] Server initialized on /ws with session-based authentication');
+  logger.info('[WebSocket] Server initialized on /ws with session-based authentication');
   return wss;
 }
 
@@ -585,7 +585,7 @@ export function broadcastToAllMembers(notification: {
     });
   });
 
-  console.log(`[WebSocket] Broadcast notification to ${sent} connections`);
+  logger.info(`[WebSocket] Broadcast notification to ${sent} connections`);
   return sent;
 }
 
@@ -620,7 +620,7 @@ export function broadcastToStaff(notification: {
   });
 
   if (sent > 0) {
-    console.log(`[WebSocket] Broadcast to staff: ${sent} connections`);
+    logger.info(`[WebSocket] Broadcast to staff: ${sent} connections`);
   }
   return sent;
 }
@@ -653,9 +653,9 @@ export function broadcastBookingEvent(event: BookingEvent) {
   });
 
   if (sent > 0) {
-    console.log(`[WebSocket] Broadcast booking event ${event.eventType} to ${sent} staff connections`);
+    logger.info(`[WebSocket] Broadcast booking event ${event.eventType} to ${sent} staff connections`);
   } else {
-    console.log(`[WebSocket] No staff connections for booking event ${event.eventType} (total: ${totalConnections}, staff: ${staffConnections}, staffEmails: ${Array.from(staffEmails).join(', ')})`);
+    logger.info(`[WebSocket] No staff connections for booking event ${event.eventType} (total: ${totalConnections}, staff: ${staffConnections}, staffEmails: ${Array.from(staffEmails).join(', ')})`);
   }
   return sent;
 }
@@ -681,7 +681,7 @@ export function broadcastAnnouncementUpdate(action: 'created' | 'updated' | 'del
     });
   });
 
-  console.log(`[WebSocket] Broadcast announcement ${action} to ${sent} connections`);
+  logger.info(`[WebSocket] Broadcast announcement ${action} to ${sent} connections`);
   return sent;
 }
 
@@ -711,7 +711,7 @@ export function broadcastAvailabilityUpdate(data: {
   });
 
   if (sent > 0) {
-    console.log(`[WebSocket] Broadcast availability ${data.action} to ${sent} connections`);
+    logger.info(`[WebSocket] Broadcast availability ${data.action} to ${sent} connections`);
   }
   return sent;
 }
@@ -742,7 +742,7 @@ export function broadcastWaitlistUpdate(data: {
   });
 
   if (sent > 0) {
-    console.log(`[WebSocket] Broadcast waitlist ${data.action} to ${sent} connections`);
+    logger.info(`[WebSocket] Broadcast waitlist ${data.action} to ${sent} connections`);
   }
   return sent;
 }
@@ -768,7 +768,7 @@ export function broadcastDirectoryUpdate(action: 'synced' | 'updated' | 'created
   });
 
   if (sent > 0) {
-    console.log(`[WebSocket] Broadcast directory ${action} to ${sent} staff connections`);
+    logger.info(`[WebSocket] Broadcast directory ${action} to ${sent} staff connections`);
   }
   return sent;
 }
@@ -794,7 +794,7 @@ export function broadcastCafeMenuUpdate(action: 'created' | 'updated' | 'deleted
   });
 
   if (sent > 0) {
-    console.log(`[WebSocket] Broadcast cafe menu ${action} to ${sent} connections`);
+    logger.info(`[WebSocket] Broadcast cafe menu ${action} to ${sent} connections`);
   }
   return sent;
 }
@@ -821,7 +821,7 @@ export function broadcastClosureUpdate(action: 'created' | 'updated' | 'deleted'
   });
 
   if (sent > 0) {
-    console.log(`[WebSocket] Broadcast closure ${action} to ${sent} connections`);
+    logger.info(`[WebSocket] Broadcast closure ${action} to ${sent} connections`);
   }
   return sent;
 }
@@ -847,7 +847,7 @@ export function broadcastMemberDataUpdated(changedEmails: string[] = []) {
   });
 
   if (sent > 0 && changedEmails.length > 0) {
-    console.log(`[WebSocket] Broadcast member data updated (${changedEmails.length} members) to ${sent} staff connections`);
+    logger.info(`[WebSocket] Broadcast member data updated (${changedEmails.length} members) to ${sent} staff connections`);
   }
   return sent;
 }
@@ -888,7 +888,7 @@ export function broadcastMemberStatsUpdated(memberEmail: string, data: { guestPa
   });
 
   if (sent > 0) {
-    console.log(`[WebSocket] Broadcast member stats updated for ${memberEmail} to ${sent} connections`);
+    logger.info(`[WebSocket] Broadcast member stats updated for ${memberEmail} to ${sent} connections`);
   }
   return sent;
 }
@@ -936,7 +936,7 @@ export function broadcastTierUpdate(data: {
   });
 
   if (sent > 0) {
-    console.log(`[WebSocket] Broadcast tier ${data.action} for ${memberEmail} to ${sent} connections`);
+    logger.info(`[WebSocket] Broadcast tier ${data.action} for ${memberEmail} to ${sent} connections`);
   }
   return sent;
 }
@@ -963,7 +963,7 @@ export function broadcastDataIntegrityUpdate(action: 'check_complete' | 'issue_r
   });
 
   if (sent > 0) {
-    console.log(`[WebSocket] Broadcast data integrity ${action} to ${sent} staff connections`);
+    logger.info(`[WebSocket] Broadcast data integrity ${action} to ${sent} staff connections`);
   }
   return sent;
 }
@@ -1020,7 +1020,7 @@ export function broadcastBillingUpdate(data: {
   });
 
   if (sent > 0) {
-    console.log(`[WebSocket] Broadcast billing ${data.action} to ${sent} connections (member: ${data.memberEmail || 'none'})`);
+    logger.info(`[WebSocket] Broadcast billing ${data.action} to ${sent} connections (member: ${data.memberEmail || 'none'})`);
   }
   return sent;
 }
@@ -1055,7 +1055,7 @@ export function broadcastDayPassUpdate(data: {
   });
 
   if (sent > 0) {
-    console.log(`[WebSocket] Broadcast day pass ${data.action} to ${sent} staff connections`);
+    logger.info(`[WebSocket] Broadcast day pass ${data.action} to ${sent} staff connections`);
   }
   return sent;
 }

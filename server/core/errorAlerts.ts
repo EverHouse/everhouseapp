@@ -120,7 +120,7 @@ function canSendAlert(key: string): boolean {
 function recordAlertSent(key: string): void {
   dailyState.keyLastSent[key] = Date.now();
   dailyState.alertsToday++;
-  saveDailyStateToDb().catch((err: unknown) => console.error('[Alerts] Record alert sent error:', err));
+  saveDailyStateToDb().catch((err: unknown) => logger.error('[Alerts] Record alert sent error:', { error: err }));
 }
 
 export type AlertType = 

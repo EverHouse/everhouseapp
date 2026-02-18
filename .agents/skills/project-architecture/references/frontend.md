@@ -85,7 +85,7 @@ Staff/admin only:
 
 | Directory | Contains |
 |-----------|----------|
-| `admin/` | Admin-specific UI (member drawers, data tools, settings panels). Sub-dirs: `billing/`, `payments/`. **DEPRECATED**: `BookingMembersEditor.tsx` — inline roster editor, replaced by Unified Player Modal |
+| `admin/` | Admin-specific UI (member drawers, data tools, settings panels). Sub-dirs: `billing/`, `payments/` |
 | `billing/` | Payment forms, fee displays, invoice views |
 | `booking/` | Booking cards, calendar views, slot pickers |
 | `guides/` | Guided flows and walkthroughs |
@@ -104,8 +104,6 @@ Staff/admin only:
 Sub-dirs: `drawers/`, `hooks/`, `modals/`, `sections/`.
 
 **Key component**: `UnifiedBookingSheet.tsx` + `useUnifiedBookingLogic.ts` — the SINGLE AUTHORITY for all roster edits.
-
-**DEPRECATED**: `CompleteRosterModal.tsx`, `PlayerManagementModal.tsx` — replaced by Unified Booking Sheet.
 
 **Modals** (`modals/`):
 - `UnifiedBookingSheet.tsx` — Unified booking management sheet
@@ -143,7 +141,6 @@ Sub-dirs: `drawers/`, `hooks/`, `modals/`, `sections/`.
 - `ModalShell.tsx` — Shared modal shell wrapper
 - `ContextualHelp.tsx` — Context-aware help tooltips
 - `OnboardingChecklist.tsx` — New member onboarding checklist
-- `WelcomeBanner.tsx` — Welcome banner for new members
 - `MenuOverlay.tsx` — General menu overlay
 - `MemberMenuOverlay.tsx` — Member-specific menu overlay
 - `Toast.tsx` — Toast notification system

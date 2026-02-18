@@ -6,8 +6,9 @@ import { updateContactMembershipStatus } from '../hubspot/stages';
 import Stripe from 'stripe';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 
+import { logger } from '../logger';
 export async function reconcileDailyPayments() {
-  console.log('[Reconcile] Starting daily payment reconciliation...');
+  logger.info('[Reconcile] Starting daily payment reconciliation...');
   
   try {
     const stripe = await getStripeClient();
@@ -42,7 +43,7 @@ export async function reconcileDailyPayments() {
 
           // If missing in DB OR status mismatch (DB says pending, Stripe says succeeded)
           if (result.rows.length === 0 || result.rows[0].status !== 'succeeded') {
-            console.warn(`[Reconcile] Healing payment: ${pi.id} (${(pi.amount / 100).toFixed(2)} ${pi.currency})`);
+            logger.warn(`[Reconcile] Healing payment: ${pi.id} (${(pi.amount / 100).toFixed(2)} ${pi.currency})`);
             
             // A. Update the Audit Log / Intent Table
             await pool.query(
@@ -75,7 +76,7 @@ export async function reconcileDailyPayments() {
       }
     }
 
-    console.log(`[Reconcile] Complete - Checked: ${totalChecked}, Missing: ${missingPayments}, Status mismatches fixed: ${statusMismatches}`);
+    logger.info(`[Reconcile] Complete - Checked: ${totalChecked}, Missing: ${missingPayments}, Status mismatches fixed: ${statusMismatches}`);
     
     return {
       totalChecked,
@@ -83,13 +84,13 @@ export async function reconcileDailyPayments() {
       statusMismatches
     };
   } catch (error) {
-    console.error('[Reconcile] Error during reconciliation:', error);
+    logger.error('[Reconcile] Error during reconciliation:', { error: error });
     throw error;
   }
 }
 
 export async function reconcileSubscriptions() {
-  console.log('[Reconcile] Starting subscription reconciliation...');
+  logger.info('[Reconcile] Starting subscription reconciliation...');
   
   try {
     const stripe = await getStripeClient();
@@ -120,20 +121,20 @@ export async function reconcileSubscriptions() {
         );
 
         if (!hasActiveSubscription) {
-          console.warn(`[Reconcile] Member ${member.email} (status: ${member.membership_status}) has no active Stripe subscription`);
+          logger.warn(`[Reconcile] Member ${member.email} (status: ${member.membership_status}) has no active Stripe subscription`);
           mismatches++;
         }
       } catch (err: unknown) {
         if (getErrorCode(err) !== 'resource_missing') {
-          console.error(`[Reconcile] Error checking subscription for ${member.email}:`, getErrorMessage(err));
+          logger.error(`[Reconcile] Error checking subscription for ${member.email}:`, { extra: { detail: getErrorMessage(err) } });
         }
       }
     }
 
-    console.log(`[Reconcile] Phase 1 complete - ${activeMembers.rows.length} members checked, ${mismatches} mismatches found`);
+    logger.info(`[Reconcile] Phase 1 complete - ${activeMembers.rows.length} members checked, ${mismatches} mismatches found`);
     
     // Phase 2: Check for Stripe subscriptions missing DB users
-    console.log('[Reconcile] Phase 2: Checking for Stripe subscriptions missing DB users...');
+    logger.info('[Reconcile] Phase 2: Checking for Stripe subscriptions missing DB users...');
     
     let subscriptionsChecked = 0;
     let usersCreated = 0;
@@ -168,12 +169,12 @@ export async function reconcileSubscriptions() {
             try {
               const fetchedCustomer = await stripe.customers.retrieve(subscription.customer);
               if (!fetchedCustomer || (fetchedCustomer as Stripe.DeletedCustomer).deleted) {
-                console.warn(`[Reconcile] Subscription ${subscription.id} has deleted customer - skipping`);
+                logger.warn(`[Reconcile] Subscription ${subscription.id} has deleted customer - skipping`);
                 continue;
               }
               customer = fetchedCustomer as Stripe.Customer;
             } catch (fetchErr: unknown) {
-              console.warn(`[Reconcile] Failed to fetch customer for subscription ${subscription.id}: ${getErrorMessage(fetchErr)}`);
+              logger.warn(`[Reconcile] Failed to fetch customer for subscription ${subscription.id}: ${getErrorMessage(fetchErr)}`);
               continue;
             }
           } else {
@@ -181,14 +182,14 @@ export async function reconcileSubscriptions() {
             
             // Handle deleted customer
             if (!customer || customer.deleted) {
-              console.warn(`[Reconcile] Subscription ${subscription.id} has deleted/missing customer - skipping`);
+              logger.warn(`[Reconcile] Subscription ${subscription.id} has deleted/missing customer - skipping`);
               continue;
             }
           }
           
           const customerEmail = customer.email?.toLowerCase();
           if (!customerEmail) {
-            console.warn(`[Reconcile] Subscription ${subscription.id} customer ${customer.id} has no email - skipping`);
+            logger.warn(`[Reconcile] Subscription ${subscription.id} customer ${customer.id} has no email - skipping`);
             continue;
           }
           
@@ -205,13 +206,13 @@ export async function reconcileSubscriptions() {
                 `UPDATE users SET stripe_customer_id = $1, updated_at = NOW() WHERE id = $2`,
                 [customer.id, existingUser.rows[0].id]
               );
-              console.log(`[Reconcile] Updated missing stripe_customer_id for ${customerEmail}`);
+              logger.info(`[Reconcile] Updated missing stripe_customer_id for ${customerEmail}`);
             }
             continue;
           }
           
           // User doesn't exist - check linked emails before creating
-          console.warn(`[Reconcile] MISSING USER: Stripe subscription ${subscription.id} for ${customerEmail} has no DB user - checking linked emails...`);
+          logger.warn(`[Reconcile] MISSING USER: Stripe subscription ${subscription.id} for ${customerEmail} has no DB user - checking linked emails...`);
           
           const customerName = customer.name || '';
           const nameParts = customerName.split(' ');
@@ -248,12 +249,12 @@ export async function reconcileSubscriptions() {
                WHERE id = $4`,
               [customer.id, subscription.id, tierSlug, resolved.userId]
             );
-            console.log(`[Reconcile] Updated existing user ${resolved.primaryEmail} (matched ${customerEmail} via ${resolved.matchType})`);
+            logger.info(`[Reconcile] Updated existing user ${resolved.primaryEmail} (matched ${customerEmail} via ${resolved.matchType})`);
             usersCreated++;
           } else {
           const exclusionCheck = await pool.query('SELECT 1 FROM sync_exclusions WHERE email = $1', [customerEmail.toLowerCase()]);
           if (exclusionCheck.rows.length > 0) {
-            console.log(`[Reconcile] Skipping user creation for ${customerEmail} — permanently deleted (sync_exclusions)`);
+            logger.info(`[Reconcile] Skipping user creation for ${customerEmail} — permanently deleted (sync_exclusions)`);
           } else {
           // Create user in DB
           await pool.query(
@@ -269,7 +270,7 @@ export async function reconcileSubscriptions() {
             [customerEmail, firstName, lastName, tierSlug, customer.id, subscription.id]
           );
           
-          console.log(`[Reconcile] Created user ${customerEmail} with tier ${tierSlug || 'none'}, subscription ${subscription.id}`);
+          logger.info(`[Reconcile] Created user ${customerEmail} with tier ${tierSlug || 'none'}, subscription ${subscription.id}`);
           usersCreated++;
           }
           }
@@ -286,13 +287,13 @@ export async function reconcileSubscriptions() {
               tier: tierName || undefined,
               memberSince: new Date()
             });
-            console.log(`[Reconcile] Synced ${customerEmail} to HubSpot: status=active, tier=${tierName}, billing=stripe`);
+            logger.info(`[Reconcile] Synced ${customerEmail} to HubSpot: status=active, tier=${tierName}, billing=stripe`);
           } catch (hubspotError) {
-            console.error(`[Reconcile] HubSpot sync failed for ${customerEmail}:`, hubspotError);
+            logger.error(`[Reconcile] HubSpot sync failed for ${customerEmail}:`, { error: hubspotError });
           }
           
         } catch (err: unknown) {
-          console.error(`[Reconcile] Error processing subscription ${subscription.id}:`, getErrorMessage(err));
+          logger.error(`[Reconcile] Error processing subscription ${subscription.id}:`, { extra: { detail: getErrorMessage(err) } });
         }
       }
       
@@ -303,8 +304,8 @@ export async function reconcileSubscriptions() {
     }
     } // end for loop over statuses
     
-    console.log(`[Reconcile] Phase 2 complete - ${subscriptionsChecked} subscriptions checked, ${usersCreated} users created`);
-    console.log(`[Reconcile] Subscription reconciliation complete`);
+    logger.info(`[Reconcile] Phase 2 complete - ${subscriptionsChecked} subscriptions checked, ${usersCreated} users created`);
+    logger.info(`[Reconcile] Subscription reconciliation complete`);
     
     return { 
       membersChecked: activeMembers.rows.length, 
@@ -313,7 +314,7 @@ export async function reconcileSubscriptions() {
       usersCreated
     };
   } catch (error) {
-    console.error('[Reconcile] Error during subscription reconciliation:', error);
+    logger.error('[Reconcile] Error during subscription reconciliation:', { error: error });
     throw error;
   }
 }

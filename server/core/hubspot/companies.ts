@@ -3,6 +3,7 @@ import { getErrorMessage, getErrorCode, getErrorStatusCode } from '../../utils/e
 import { isProduction } from '../db';
 import { retryableHubSpotRequest } from './request';
 
+import { logger } from '../logger';
 export interface SyncCompanyInput {
   companyName: string;
   userEmail: string;
@@ -68,7 +69,7 @@ export async function syncCompanyToHubSpot(
         if (searchResponse.results && searchResponse.results.length > 0) {
           companyId = searchResponse.results[0].id;
           if (!isProduction) {
-            console.log(`[CompanyHubSpot] Found existing company ${companyId} for "${companyName}" or domain "${domain}"`);
+            logger.info(`[CompanyHubSpot] Found existing company ${companyId} for "${companyName}" or domain "${domain}"`);
           }
         }
       } catch (error: unknown) {
@@ -92,7 +93,7 @@ export async function syncCompanyToHubSpot(
         }
 
         if (!isProduction) {
-          console.warn('[CompanyHubSpot] Error searching for company, will create new one:', error);
+          logger.warn('[CompanyHubSpot] Error searching for company, will create new one:', { error: error });
         }
       }
     }
@@ -112,7 +113,7 @@ export async function syncCompanyToHubSpot(
         created = true;
 
         if (!isProduction) {
-          console.log(`[CompanyHubSpot] Created new company ${companyId} for "${companyName}"`);
+          logger.info(`[CompanyHubSpot] Created new company ${companyId} for "${companyName}"`);
         }
       } catch (createError: unknown) {
         const statusCode = getErrorStatusCode(createError) || (getErrorCode(createError) ? Number(getErrorCode(createError)) : undefined);
@@ -123,7 +124,7 @@ export async function syncCompanyToHubSpot(
           if (match && match[1]) {
             companyId = match[1];
             if (!isProduction) {
-              console.log(`[CompanyHubSpot] Company "${companyName}" already exists (ID: ${companyId}), using existing`);
+              logger.info(`[CompanyHubSpot] Company "${companyName}" already exists (ID: ${companyId}), using existing`);
             }
           } else {
             throw createError;
@@ -154,12 +155,12 @@ export async function syncCompanyToHubSpot(
         if (contactSearchResponse.results && contactSearchResponse.results.length > 0) {
           contactId = contactSearchResponse.results[0].id;
           if (!isProduction) {
-            console.log(`[CompanyHubSpot] Found contact ${contactId} for ${normalizedEmail}`);
+            logger.info(`[CompanyHubSpot] Found contact ${contactId} for ${normalizedEmail}`);
           }
         }
       } catch (error: unknown) {
         if (!isProduction) {
-          console.warn('[CompanyHubSpot] Error searching for contact:', error);
+          logger.warn('[CompanyHubSpot] Error searching for contact:', { error: error });
         }
       }
     }
@@ -177,10 +178,10 @@ export async function syncCompanyToHubSpot(
         );
 
         if (!isProduction) {
-          console.log(`[CompanyHubSpot] Associated contact ${contactId} with company ${companyId}`);
+          logger.info(`[CompanyHubSpot] Associated contact ${contactId} with company ${companyId}`);
         }
       } catch (assocError: unknown) {
-        console.warn('[CompanyHubSpot] Failed to associate contact with company:', assocError);
+        logger.warn('[CompanyHubSpot] Failed to associate contact with company:', { error: assocError });
       }
     }
 
@@ -192,7 +193,7 @@ export async function syncCompanyToHubSpot(
 
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error('[CompanyHubSpot] Error syncing company:', error);
+    logger.error('[CompanyHubSpot] Error syncing company:', { error: error });
     return {
       success: false,
       error: errorMsg || 'Failed to sync company to HubSpot'

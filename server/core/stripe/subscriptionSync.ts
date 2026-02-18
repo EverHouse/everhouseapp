@@ -5,6 +5,7 @@ import { findOrCreateHubSpotContact } from '../hubspot/members';
 import Stripe from 'stripe';
 import { getErrorMessage } from '../../utils/errorUtils';
 
+import { logger } from '../logger';
 export interface SubscriptionSyncResult {
   success: boolean;
   created: number;
@@ -48,12 +49,12 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
     // Debug: Check which Stripe mode we're using by looking at the account
     try {
       const account = await stripe.accounts.retrieve();
-      console.log(`[Stripe Sync] Connected to Stripe account: ${account.id}, mode: ${account.settings?.dashboard?.display_name || 'unknown'}`);
+      logger.info(`[Stripe Sync] Connected to Stripe account: ${account.id}, mode: ${account.settings?.dashboard?.display_name || 'unknown'}`);
     } catch (e: unknown) {
-      console.log('[Stripe Sync] Could not retrieve account info:', getErrorMessage(e));
+      logger.info('[Stripe Sync] Could not retrieve account info:', { extra: { detail: getErrorMessage(e) } });
     }
     
-    console.log('[Stripe Sync] Starting subscription sync from Stripe (active, trialing, past_due)...');
+    logger.info('[Stripe Sync] Starting subscription sync from Stripe (active, trialing, past_due)...');
     
     const subscriptions: Stripe.Subscription[] = [];
     
@@ -82,11 +83,11 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
       }
     }
 
-    console.log(`[Stripe Sync] Found ${subscriptions.length} subscriptions (active/trialing/past_due) from global list`);
+    logger.info(`[Stripe Sync] Found ${subscriptions.length} subscriptions (active/trialing/past_due) from global list`);
     
     // If no subscriptions found globally, try per-customer fetch (for test clock subscriptions)
     if (subscriptions.length === 0) {
-      console.log('[Stripe Sync] No subscriptions from global list - checking per-customer for test clock support...');
+      logger.info('[Stripe Sync] No subscriptions from global list - checking per-customer for test clock support...');
       
       let hasMoreCustomers = true;
       let customerStartingAfter: string | undefined;
@@ -117,7 +118,7 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
               }
             }
           } catch (e: unknown) {
-            console.log(`[Stripe Sync] Error fetching subs for ${cust.email}: ${getErrorMessage(e)}`);
+            logger.info(`[Stripe Sync] Error fetching subs for ${cust.email}: ${getErrorMessage(e)}`);
           }
         }
         
@@ -128,12 +129,12 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
         
         // Safety limit
         if (customerCount >= 1000) {
-          console.log('[Stripe Sync] Reached customer limit (1000)');
+          logger.info('[Stripe Sync] Reached customer limit (1000)');
           break;
         }
       }
       
-      console.log(`[Stripe Sync] Scanned ${customerCount} customers, found ${subscriptions.length} subscriptions via per-customer fetch`);
+      logger.info(`[Stripe Sync] Scanned ${customerCount} customers, found ${subscriptions.length} subscriptions via per-customer fetch`);
     }
 
     // Collect all product IDs that need fetching (products not expanded)
@@ -157,7 +158,7 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
           productMap.set(product.id, product);
         }
       }
-      console.log(`[Stripe Sync] Fetched ${productMap.size} product details`);
+      logger.info(`[Stripe Sync] Fetched ${productMap.size} product details`);
     }
 
     const batchSize = 10;
@@ -249,9 +250,9 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
                     tier
                   );
                   hubspotId = hubspotResult.contactId;
-                  console.log(`[Stripe Sync] Created/found HubSpot contact ${hubspotId} for existing user ${email}`);
+                  logger.info(`[Stripe Sync] Created/found HubSpot contact ${hubspotId} for existing user ${email}`);
                 } catch (hubspotErr: unknown) {
-                  console.warn(`[Stripe Sync] Failed to create HubSpot contact for ${email}:`, getErrorMessage(hubspotErr));
+                  logger.warn(`[Stripe Sync] Failed to create HubSpot contact for ${email}:`, { extra: { detail: getErrorMessage(hubspotErr) } });
                 }
               }
 
@@ -270,14 +271,14 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
                  AND (updated_at IS NULL OR updated_at < NOW() - INTERVAL '5 minutes')`,
                 [stripeCustomerId, stripeSubscriptionId, tier, user.id, hubspotId]
               );
-              console.log(`[Stripe Sync] Cleared grace period for migrated member ${email}`);
+              logger.info(`[Stripe Sync] Cleared grace period for migrated member ${email}`);
               
               // Sync to HubSpot
               try {
                 const { syncMemberToHubSpot } = await import('../hubspot/stages');
                 await syncMemberToHubSpot({ email, status: 'active', tier, billingProvider: 'stripe' });
               } catch (e: unknown) {
-                console.warn(`[Stripe Sync] Failed to sync to HubSpot for ${email}:`, getErrorMessage(e));
+                logger.warn(`[Stripe Sync] Failed to sync to HubSpot for ${email}:`, { extra: { detail: getErrorMessage(e) } });
               }
               
               result.updated++;
@@ -286,7 +287,7 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
                 action: 'updated',
                 tier,
               });
-              console.log(`[Stripe Sync] Updated user ${email} with tier ${tier}`);
+              logger.info(`[Stripe Sync] Updated user ${email} with tier ${tier}`);
             } else {
               result.skipped++;
               result.details.push({
@@ -306,9 +307,9 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
                 tier
               );
               hubspotId = hubspotResult.contactId;
-              console.log(`[Stripe Sync] Created/found HubSpot contact ${hubspotId} for ${email}`);
+              logger.info(`[Stripe Sync] Created/found HubSpot contact ${hubspotId} for ${email}`);
             } catch (hubspotErr: unknown) {
-              console.warn(`[Stripe Sync] Failed to create HubSpot contact for ${email}:`, getErrorMessage(hubspotErr));
+              logger.warn(`[Stripe Sync] Failed to create HubSpot contact for ${email}:`, { extra: { detail: getErrorMessage(hubspotErr) } });
             }
 
             // Check if this email resolves to an existing user via linked email
@@ -326,14 +327,14 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
                  WHERE id = $5`,
                 [stripeCustomerId, stripeSubscriptionId, tier, hubspotId, resolved.userId]
               );
-              console.log(`[Stripe Sync] Cleared grace period for migrated member ${email}`);
+              logger.info(`[Stripe Sync] Cleared grace period for migrated member ${email}`);
               result.updated++;
               result.details.push({ email, action: 'updated', tier, reason: `Matched via ${resolved.matchType}` });
-              console.log(`[Stripe Sync] Updated existing user ${resolved.primaryEmail} (matched ${email} via ${resolved.matchType}) with tier ${tier}`);
+              logger.info(`[Stripe Sync] Updated existing user ${resolved.primaryEmail} (matched ${email} via ${resolved.matchType}) with tier ${tier}`);
             } else {
             const exclusionCheck = await pool.query('SELECT 1 FROM sync_exclusions WHERE email = $1', [email.toLowerCase()]);
             if (exclusionCheck.rows.length > 0) {
-              console.log(`[Stripe Sync] Skipping user creation for ${email} — permanently deleted (sync_exclusions)`);
+              logger.info(`[Stripe Sync] Skipping user creation for ${email} — permanently deleted (sync_exclusions)`);
               result.details.push({ email, action: 'skipped', tier, reason: 'sync_exclusions' });
             } else {
             await pool.query(
@@ -352,7 +353,7 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
               const { syncMemberToHubSpot } = await import('../hubspot/stages');
               await syncMemberToHubSpot({ email, status: 'active', tier, billingProvider: 'stripe', memberSince: new Date() });
             } catch (e: unknown) {
-              console.warn(`[Stripe Sync] Failed to sync new user to HubSpot for ${email}:`, getErrorMessage(e));
+              logger.warn(`[Stripe Sync] Failed to sync new user to HubSpot for ${email}:`, { extra: { detail: getErrorMessage(e) } });
             }
             
             result.created++;
@@ -361,7 +362,7 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
               action: 'created',
               tier,
             });
-            console.log(`[Stripe Sync] Created user ${email} with tier ${tier}`);
+            logger.info(`[Stripe Sync] Created user ${email} with tier ${tier}`);
             }
             }
           }
@@ -373,7 +374,7 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
             action: 'error',
             reason: getErrorMessage(err),
           });
-          console.error(`[Stripe Sync] Error processing subscription:`, err);
+          logger.error(`[Stripe Sync] Error processing subscription:`, { error: err });
         }
       }
 
@@ -382,11 +383,11 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
       }
     }
 
-    console.log(`[Stripe Sync] Completed: created=${result.created}, updated=${result.updated}, skipped=${result.skipped}, errors=${result.errors.length}`);
+    logger.info(`[Stripe Sync] Completed: created=${result.created}, updated=${result.updated}, skipped=${result.skipped}, errors=${result.errors.length}`);
     
     return result;
   } catch (error: unknown) {
-    console.error('[Stripe Sync] Fatal error during sync:', error);
+    logger.error('[Stripe Sync] Fatal error during sync:', { error: error });
     result.success = false;
     result.errors.push(`Fatal error: ${getErrorMessage(error)}`);
     return result;

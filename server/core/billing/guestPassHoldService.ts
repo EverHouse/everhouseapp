@@ -1,6 +1,7 @@
 import { pool } from '../db';
 import { PoolClient } from 'pg';
 
+import { logger } from '../logger';
 export interface GuestPassHoldResult {
   success: boolean;
   error?: string;
@@ -127,7 +128,7 @@ export async function createGuestPassHold(
     if (manageTransaction) {
       await client.query('ROLLBACK');
     }
-    console.error('[GuestPassHoldService] Error creating hold:', error);
+    logger.error('[GuestPassHoldService] Error creating hold:', { error: error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error creating guest pass hold'
@@ -151,11 +152,11 @@ export async function releaseGuestPassHold(
     );
     
     const passesReleased = result.rows.reduce((sum, row) => sum + (row.passes_held || 0), 0);
-    console.log(`[GuestPassHoldService] Released ${passesReleased} guest pass holds for booking ${bookingId}`);
+    logger.info(`[GuestPassHoldService] Released ${passesReleased} guest pass holds for booking ${bookingId}`);
     
     return { success: true, passesReleased };
   } catch (error) {
-    console.error('[GuestPassHoldService] Error releasing hold:', error);
+    logger.error('[GuestPassHoldService] Error releasing hold:', { error: error });
     return { success: false, passesReleased: 0 };
   } finally {
     client.release();
@@ -202,11 +203,11 @@ export async function convertHoldToUsage(
     
     await client.query('COMMIT');
     
-    console.log(`[GuestPassHoldService] Converted ${passesToConvert} held passes to usage for booking ${bookingId}`);
+    logger.info(`[GuestPassHoldService] Converted ${passesToConvert} held passes to usage for booking ${bookingId}`);
     return { success: true, passesConverted: passesToConvert };
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('[GuestPassHoldService] Error converting hold:', error);
+    logger.error('[GuestPassHoldService] Error converting hold:', { error: error });
     return { success: false, passesConverted: 0 };
   } finally {
     client.release();
@@ -223,7 +224,7 @@ export async function cleanupExpiredHolds(): Promise<number> {
     
     const deleted = result.rowCount || 0;
     if (deleted > 0) {
-      console.log(`[GuestPassHoldService] Cleaned up ${deleted} expired guest pass holds`);
+      logger.info(`[GuestPassHoldService] Cleaned up ${deleted} expired guest pass holds`);
     }
     return deleted;
   } finally {

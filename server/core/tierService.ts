@@ -3,6 +3,7 @@ import { normalizeTierName, DEFAULT_TIER } from '../../shared/constants/tiers';
 import { normalizeEmail } from './utils/emailNormalization';
 import { normalizeToISODate } from '../utils/dateNormalize';
 
+import { logger } from './logger';
 export interface TierLimits {
   daily_sim_minutes: number;
   guest_passes_per_month: number;
@@ -65,7 +66,7 @@ export async function getTierLimits(tierName: string): Promise<TierLimits> {
     );
     
     if (result.rows.length === 0) {
-      console.warn(`[getTierLimits] No tier found for "${normalizedTier}" (original: "${tierName}"), using defaults`);
+      logger.warn(`[getTierLimits] No tier found for "${normalizedTier}" (original: "${tierName}"), using defaults`);
       return DEFAULT_TIER_LIMITS;
     }
     
@@ -74,7 +75,7 @@ export async function getTierLimits(tierName: string): Promise<TierLimits> {
     
     return data;
   } catch (error: unknown) {
-    console.error('[getTierLimits] Error fetching tier limits:', error);
+    logger.error('[getTierLimits] Error fetching tier limits:', { error: error });
     return DEFAULT_TIER_LIMITS;
   }
 }
@@ -110,14 +111,14 @@ export async function getMemberTierByEmail(email: string, options?: { allowInact
     if (!options?.allowInactive) {
       const validStatuses = ['active', 'trialing', 'past_due'];
       if (!user.membership_status || !validStatuses.includes(user.membership_status)) {
-        console.warn(`[TierService] Denying tier access for ${email} (Status: ${user.membership_status || 'none'})`);
+        logger.warn(`[TierService] Denying tier access for ${email} (Status: ${user.membership_status || 'none'})`);
         return null;
       }
     }
     
     return user.tier_name || user.tier || null;
   } catch (error: unknown) {
-    console.error('[getMemberTierByEmail] Error:', error);
+    logger.error('[getMemberTierByEmail] Error:', { error: error });
     return null;
   }
 }
@@ -148,7 +149,7 @@ export async function getDailyBookedMinutes(email: string, date: string, resourc
     
     return parseInt(result.rows[0].total_minutes) || 0;
   } catch (error: unknown) {
-    console.error('[getDailyBookedMinutes] Error:', error);
+    logger.error('[getDailyBookedMinutes] Error:', { error: error });
     return 0;
   }
 }
@@ -227,7 +228,7 @@ export async function getDailyParticipantMinutes(email: string, date: string, ex
 
     return Math.max(membersMinutes, participantsMinutes);
   } catch (error: unknown) {
-    console.error('[getDailyParticipantMinutes] Error:', error);
+    logger.error('[getDailyParticipantMinutes] Error:', { error: error });
     return 0;
   }
 }
@@ -288,7 +289,7 @@ export async function getTotalDailyUsageMinutes(
       totalMinutes: ownerMinutes + participantMinutes
     };
   } catch (error: unknown) {
-    console.error('[getTotalDailyUsageMinutes] Error:', error);
+    logger.error('[getTotalDailyUsageMinutes] Error:', { error: error });
     return { ownerMinutes: 0, participantMinutes: 0, totalMinutes: 0 };
   }
 }

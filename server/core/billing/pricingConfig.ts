@@ -1,3 +1,4 @@
+import { logger } from '../logger';
 /**
  * Centralized pricing configuration - THE ONLY source of truth for fees
  * 
@@ -18,12 +19,12 @@ export const PRICING = {
 
 export function updateOverageRate(cents: number): void {
   _overageRateCents = cents;
-  console.log('[PricingConfig] Overage rate updated from Stripe:', { cents, dollars: cents / 100 });
+  logger.info('[PricingConfig] Overage rate updated from Stripe:', { extra: { detail: { cents, dollars: cents / 100 } } });
 }
 
 export function updateGuestFee(cents: number): void {
   _guestFeeCents = cents;
-  console.log('[PricingConfig] Guest fee updated from Stripe:', { cents, dollars: cents / 100 });
+  logger.info('[PricingConfig] Guest fee updated from Stripe:', { extra: { detail: { cents, dollars: cents / 100 } } });
 }
 
 export function getOverageRateCents(): number {
@@ -82,10 +83,10 @@ export function updateCorporateVolumePricing(tiers: VolumeTier[], basePrice: num
   _corporateVolumeTiers = tiers.sort((a, b) => b.minMembers - a.minMembers);
   _corporateBasePrice = basePrice;
   if (stripeProductId) _corporatePricingProductId = stripeProductId;
-  console.log('[PricingConfig] Corporate volume pricing updated from Stripe:', { tiers: _corporateVolumeTiers, basePrice: _corporateBasePrice });
+  logger.info('[PricingConfig] Corporate volume pricing updated from Stripe:', { extra: { detail: { tiers: _corporateVolumeTiers, basePrice: _corporateBasePrice } } });
 }
 
 export function updateFamilyDiscountPercent(percent: number): void {
   _familyDiscountPercent = percent;
-  console.log('[PricingConfig] Family discount updated from Stripe:', { percent });
+  logger.info('[PricingConfig] Family discount updated from Stripe:', { extra: { detail: { percent } } });
 }

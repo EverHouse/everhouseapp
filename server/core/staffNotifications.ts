@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../db';
 import { notifications, staffUsers } from '../../shared/schema';
 
+import { logger } from './logger';
 export async function getStaffAndAdminEmails(): Promise<string[]> {
   const staffEmails = await db.select({ email: staffUsers.email })
     .from(staffUsers)
@@ -44,7 +45,7 @@ export async function notifyAllStaff(
   try {
     await notifyAllStaffRequired(title, message, type, relatedId, relatedType);
   } catch (error) {
-    console.error('Failed to insert staff notifications:', error);
+    logger.error('Failed to insert staff notifications:', { error: error });
   }
 }
 

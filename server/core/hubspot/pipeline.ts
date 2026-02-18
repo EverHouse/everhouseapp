@@ -3,6 +3,7 @@ import { getErrorMessage } from '../../utils/errorUtils';
 import { HUBSPOT_STAGE_IDS, MEMBERSHIP_PIPELINE_ID } from './constants';
 import { retryableHubSpotRequest } from './request';
 
+import { logger } from '../logger';
 let pipelineValidationCache: { 
   validated: boolean; 
   pipelineExists: boolean;
@@ -68,7 +69,7 @@ export async function validateMembershipPipeline(): Promise<{
     };
     
     if (missingStages.length > 0) {
-      console.warn(`[HubSpotDeals] Missing stages in Membership Pipeline: ${missingStages.join(', ')}`);
+      logger.warn(`[HubSpotDeals] Missing stages in Membership Pipeline: ${missingStages.join(', ')}`);
     }
     
     return {
@@ -77,7 +78,7 @@ export async function validateMembershipPipeline(): Promise<{
       missingStages
     };
   } catch (error: unknown) {
-    console.error('[HubSpotDeals] Error validating membership pipeline:', error);
+    logger.error('[HubSpotDeals] Error validating membership pipeline:', { error: error });
     return {
       valid: false,
       pipelineExists: false,

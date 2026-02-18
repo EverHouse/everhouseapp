@@ -8,6 +8,7 @@ import { getCalendarIdByName } from '../cache';
 import { getConferenceRoomId } from '../../affectedAreas';
 import { ensureSessionForBooking } from '../../bookingService/sessionManager';
 
+import { logger } from '../../logger';
 export async function getConferenceRoomBookingsFromCalendar(
   memberName?: string,
   memberEmail?: string
@@ -123,7 +124,7 @@ export async function getConferenceRoomBookingsFromCalendar(
     
     return bookings;
   } catch (error) {
-    console.error('Error fetching conference room bookings from calendar:', error);
+    logger.error('Error fetching conference room bookings from calendar:', { error: error });
     return [];
   }
 }
@@ -502,7 +503,7 @@ export async function syncConferenceRoomCalendarToBookings(options?: { monthsBac
                 createdBy: 'calendar_sync'
               });
             } catch (sessionErr) {
-              console.error('[Conference Room Sync] Failed to ensure session for linked booking:', sessionErr);
+              logger.error('[Conference Room Sync] Failed to ensure session for linked booking:', { error: sessionErr });
             }
           }
         } else {
@@ -536,7 +537,7 @@ export async function syncConferenceRoomCalendarToBookings(options?: { monthsBac
                 createdBy: 'calendar_sync'
               });
             } catch (sessionErr) {
-              console.error('[Conference Room Sync] Failed to ensure session for new booking:', sessionErr);
+              logger.error('[Conference Room Sync] Failed to ensure session for new booking:', { error: sessionErr });
             }
           }
         }
@@ -544,10 +545,10 @@ export async function syncConferenceRoomCalendarToBookings(options?: { monthsBac
     } while (pageToken);
 
     const synced = linked + created;
-    console.log(`[Conference Room Sync] Synced ${synced} events (linked: ${linked}, created: ${created}, skipped: ${skipped})`);
+    logger.info(`[Conference Room Sync] Synced ${synced} events (linked: ${linked}, created: ${created}, skipped: ${skipped})`);
     return { synced, linked, created, skipped };
   } catch (error) {
-    console.error('Error syncing conference room calendar to bookings:', error);
+    logger.error('Error syncing conference room calendar to bookings:', { error: error });
     return { synced: 0, linked: 0, created: 0, skipped: 0, error: String(error) };
   }
 }

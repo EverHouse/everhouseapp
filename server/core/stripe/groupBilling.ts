@@ -10,6 +10,7 @@ import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 import { normalizeTierName } from '../../utils/tierUtils';
 import { findOrCreateHubSpotContact } from '../hubspot/members';
 
+import { logger } from '../logger';
 export interface BillingGroupWithMembers {
   id: number;
   primaryEmail: string;
@@ -57,7 +58,7 @@ export async function getOrCreateFamilyCoupon(): Promise<string> {
       if (existingCoupon.percent_off) {
         updateFamilyDiscountPercent(existingCoupon.percent_off);
       }
-      console.log(`[GroupBilling] Found existing FAMILY20 coupon: ${existingCoupon.id}`);
+      logger.info(`[GroupBilling] Found existing FAMILY20 coupon: ${existingCoupon.id}`);
       return existingCoupon.id;
     } catch (retrieveError: unknown) {
       if (getErrorCode(retrieveError) === 'resource_missing') {
@@ -71,13 +72,13 @@ export async function getOrCreateFamilyCoupon(): Promise<string> {
             type: 'family_addon',
           },
         });
-        console.log(`[GroupBilling] Created FAMILY20 coupon: ${newCoupon.id}`);
+        logger.info(`[GroupBilling] Created FAMILY20 coupon: ${newCoupon.id}`);
         return newCoupon.id;
       }
       throw retrieveError;
     }
   } catch (err: unknown) {
-    console.error('[GroupBilling] Error getting/creating FAMILY20 coupon:', err);
+    logger.error('[GroupBilling] Error getting/creating FAMILY20 coupon:', { error: err });
     throw err;
   }
 }
@@ -294,7 +295,7 @@ export async function createBillingGroup(params: {
     
     return { success: true, groupId: result[0].id };
   } catch (err: unknown) {
-    console.error('[GroupBilling] Error creating billing group:', err);
+    logger.error('[GroupBilling] Error creating billing group:', { error: err });
     return { success: false, error: 'Operation failed. Please try again.' };
   }
 }
@@ -315,7 +316,7 @@ export async function createCorporateBillingGroupFromSubscription(params: {
       .limit(1);
     
     if (existingGroup.length > 0) {
-      console.log(`[GroupBilling] Corporate billing group already exists for ${params.primaryEmail}, updating subscription ID and seats`);
+      logger.info(`[GroupBilling] Corporate billing group already exists for ${params.primaryEmail}, updating subscription ID and seats`);
       await db.update(billingGroups)
         .set({
           primaryStripeSubscriptionId: params.stripeSubscriptionId,
@@ -348,11 +349,11 @@ export async function createCorporateBillingGroupFromSubscription(params: {
       [result[0].id, params.primaryEmail.toLowerCase()]
     );
     
-    console.log(`[GroupBilling] Auto-created corporate billing group: ${params.companyName} (ID: ${result[0].id}) for ${params.primaryEmail} with ${params.quantity} seats`);
+    logger.info(`[GroupBilling] Auto-created corporate billing group: ${params.companyName} (ID: ${result[0].id}) for ${params.primaryEmail} with ${params.quantity} seats`);
     
     return { success: true, groupId: result[0].id };
   } catch (err: unknown) {
-    console.error('[GroupBilling] Error auto-creating corporate billing group:', err);
+    logger.error('[GroupBilling] Error auto-creating corporate billing group:', { error: err });
     return { success: false, error: getErrorMessage(err) };
   }
 }
@@ -380,7 +381,7 @@ export async function updateBillingGroupName(
     
     return { success: true };
   } catch (err: unknown) {
-    console.error('[GroupBilling] Error updating billing group name:', err);
+    logger.error('[GroupBilling] Error updating billing group name:', { error: err });
     return { success: false, error: 'Operation failed. Please try again.' };
   }
 }
@@ -421,7 +422,7 @@ export async function deleteBillingGroup(
     
     return { success: true };
   } catch (err: unknown) {
-    console.error('[GroupBilling] Error deleting billing group:', err);
+    logger.error('[GroupBilling] Error deleting billing group:', { error: err });
     return { success: false, error: 'Operation failed. Please try again.' };
   }
 }
@@ -474,7 +475,7 @@ export async function addGroupMember(params: {
         );
     
     if (resolvedFamily && resolvedFamily.matchType !== 'direct') {
-      console.log(`[GroupBilling] Email ${params.memberEmail} resolved to existing user ${resolvedFamily.primaryEmail} via ${resolvedFamily.matchType}`);
+      logger.info(`[GroupBilling] Email ${params.memberEmail} resolved to existing user ${resolvedFamily.primaryEmail} via ${resolvedFamily.matchType}`);
     }
     
     let userExists = userResult.rows.length > 0;
@@ -597,19 +598,19 @@ export async function addGroupMember(params: {
             `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`,
             updateValues
           );
-          console.log(`[GroupBilling] Updated existing user ${resolvedFamily.primaryEmail} (matched ${params.memberEmail} via ${resolvedFamily.matchType}) with family group`);
+          logger.info(`[GroupBilling] Updated existing user ${resolvedFamily.primaryEmail} (matched ${params.memberEmail} via ${resolvedFamily.matchType}) with family group`);
         } else {
           updateValues.push(params.memberEmail.toLowerCase());
           await client.query(
             `UPDATE users SET ${updateFields.join(', ')} WHERE LOWER(email) = $${paramIndex}`,
             updateValues
           );
-          console.log(`[GroupBilling] Updated existing user ${params.memberEmail} with family group`);
+          logger.info(`[GroupBilling] Updated existing user ${params.memberEmail} with family group`);
         }
       } else {
         const exclusionCheck = await client.query('SELECT 1 FROM sync_exclusions WHERE email = $1', [params.memberEmail.toLowerCase()]);
         if (exclusionCheck.rows.length > 0) {
-          console.log(`[GroupBilling] Skipping family sub-member creation for ${params.memberEmail} — permanently deleted (sync_exclusions)`);
+          logger.info(`[GroupBilling] Skipping family sub-member creation for ${params.memberEmail} — permanently deleted (sync_exclusions)`);
         } else {
           const userId = randomUUID();
           await client.query(
@@ -630,7 +631,7 @@ export async function addGroupMember(params: {
               params.zipCode || null
             ]
           );
-          console.log(`[GroupBilling] Created new user ${params.memberEmail} for family group with tier ${normalizedTier}`);
+          logger.info(`[GroupBilling] Created new user ${params.memberEmail} for family group with tier ${normalizedTier}`);
         }
       }
 
@@ -655,9 +656,9 @@ export async function addGroupMember(params: {
             try {
               const couponId = await getOrCreateFamilyCoupon();
               subscriptionItemParams.discounts = [{ coupon: couponId }];
-              console.log(`[GroupBilling] Applying FAMILY20 coupon to family member ${params.memberEmail}`);
+              logger.info(`[GroupBilling] Applying FAMILY20 coupon to family member ${params.memberEmail}`);
             } catch (couponErr: unknown) {
-              console.warn(`[GroupBilling] Could not apply FAMILY20 coupon: ${getErrorMessage(couponErr)}. Proceeding without discount.`);
+              logger.warn(`[GroupBilling] Could not apply FAMILY20 coupon: ${getErrorMessage(couponErr)}. Proceeding without discount.`);
             }
           }
           
@@ -669,7 +670,7 @@ export async function addGroupMember(params: {
             [stripeSubscriptionItemId, insertedMemberId]
           );
         } catch (stripeErr: unknown) {
-          console.error('[GroupBilling] Stripe API failed, rolling back DB reservation:', stripeErr);
+          logger.error('[GroupBilling] Stripe API failed, rolling back DB reservation:', { error: stripeErr });
           await client.query('ROLLBACK');
           return { success: false, error: `Failed to add billing: ${getErrorMessage(stripeErr)}` };
         }
@@ -684,29 +685,29 @@ export async function addGroupMember(params: {
         params.lastName || '',
         params.phone
       ).catch((err) => {
-        console.error('[GroupBilling] Background HubSpot sync for sub-member failed:', err);
+        logger.error('[GroupBilling] Background HubSpot sync for sub-member failed:', { error: err });
       });
       
       return { success: true, memberId: insertedMemberId };
 
     } catch (dbErr: unknown) {
       await client.query('ROLLBACK');
-      console.error('[GroupBilling] DB transaction failed:', dbErr);
+      logger.error('[GroupBilling] DB transaction failed:', { error: dbErr });
       
       if (stripeSubscriptionItemId) {
         try {
           const stripe = await getStripeClient();
           await stripe.subscriptionItems.del(stripeSubscriptionItemId);
-          console.log(`[GroupBilling] Successfully rolled back Stripe item ${stripeSubscriptionItemId}`);
+          logger.info(`[GroupBilling] Successfully rolled back Stripe item ${stripeSubscriptionItemId}`);
         } catch (rollbackErr: unknown) {
-          console.error(`[GroupBilling] CRITICAL: Failed to rollback Stripe item ${stripeSubscriptionItemId}. Manual intervention required.`, rollbackErr);
+          logger.error(`[GroupBilling] CRITICAL: Failed to rollback Stripe item ${stripeSubscriptionItemId}. Manual intervention required.`, { error: rollbackErr });
         }
       }
       
       return { success: false, error: 'System error. Please try again.' };
     }
   } catch (err: unknown) {
-    console.error('[GroupBilling] Error adding group member:', err);
+    logger.error('[GroupBilling] Error adding group member:', { error: err });
     return { success: false, error: 'Operation failed. Please try again.' };
   } finally {
     client.release();
@@ -792,7 +793,7 @@ export async function addCorporateMember(params: {
           );
     
       if (resolvedCorporate && resolvedCorporate.matchType !== 'direct') {
-        console.log(`[GroupBilling] Email ${params.memberEmail} resolved to existing user ${resolvedCorporate.primaryEmail} via ${resolvedCorporate.matchType}`);
+        logger.info(`[GroupBilling] Email ${params.memberEmail} resolved to existing user ${resolvedCorporate.primaryEmail} via ${resolvedCorporate.matchType}`);
       }
     
       if (userResult.rows.length > 0) {
@@ -893,19 +894,19 @@ export async function addCorporateMember(params: {
             `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`,
             updateValues
           );
-          console.log(`[GroupBilling] Updated existing user ${resolvedCorporate.primaryEmail} (matched ${params.memberEmail} via ${resolvedCorporate.matchType}) with corporate group`);
+          logger.info(`[GroupBilling] Updated existing user ${resolvedCorporate.primaryEmail} (matched ${params.memberEmail} via ${resolvedCorporate.matchType}) with corporate group`);
         } else {
           updateValues.push(params.memberEmail.toLowerCase());
           await client.query(
             `UPDATE users SET ${updateFields.join(', ')} WHERE LOWER(email) = $${paramIndex}`,
             updateValues
           );
-          console.log(`[GroupBilling] Updated existing user ${params.memberEmail} with corporate group`);
+          logger.info(`[GroupBilling] Updated existing user ${params.memberEmail} with corporate group`);
         }
       } else {
         const corpExclusionCheck = await client.query('SELECT 1 FROM sync_exclusions WHERE email = $1', [params.memberEmail.toLowerCase()]);
         if (corpExclusionCheck.rows.length > 0) {
-          console.log(`[GroupBilling] Skipping corporate sub-member creation for ${params.memberEmail} — permanently deleted (sync_exclusions)`);
+          logger.info(`[GroupBilling] Skipping corporate sub-member creation for ${params.memberEmail} — permanently deleted (sync_exclusions)`);
         } else {
           const userId = randomUUID();
           await client.query(
@@ -922,14 +923,14 @@ export async function addCorporateMember(params: {
               params.billingGroupId
             ]
           );
-          console.log(`[GroupBilling] Created new user ${params.memberEmail} with tier ${normalizedTier}`);
+          logger.info(`[GroupBilling] Created new user ${params.memberEmail} with tier ${normalizedTier}`);
         }
       }
 
       const hasPrePaidSeats = group[0].max_seats && group[0].max_seats > 0;
       
       if (hasPrePaidSeats) {
-        console.log(`[GroupBilling] Pre-paid seats mode: ${newMemberCount} of ${group[0].max_seats} seats used (no Stripe billing change needed)`);
+        logger.info(`[GroupBilling] Pre-paid seats mode: ${newMemberCount} of ${group[0].max_seats} seats used (no Stripe billing change needed)`);
       } else if (group[0].primary_stripe_subscription_id) {
         try {
           const stripe = await getStripeClient();
@@ -945,7 +946,7 @@ export async function addCorporateMember(params: {
             originalQuantity = corporateItem.quantity || 0;
             originalPricePerSeat = corporateItem.price?.unit_amount ?? 0;
             if (!originalPricePerSeat) {
-              console.error(`[GroupBilling] Corporate seat price is missing from Stripe subscription item ${corporateItem.id} — cannot adjust`);
+              logger.error(`[GroupBilling] Corporate seat price is missing from Stripe subscription item ${corporateItem.id} — cannot adjust`);
               throw new Error('Corporate seat price not found on Stripe subscription item');
             }
             originalProductId = corporateItem.price?.product as string;
@@ -954,7 +955,7 @@ export async function addCorporateMember(params: {
             const newPricePerSeat = getCorporateVolumePrice(newMemberCount);
             
             if (originalPricePerSeat !== newPricePerSeat) {
-              console.log(`[GroupBilling] Price tier change: ${originalPricePerSeat} -> ${newPricePerSeat} cents/seat for ${newMemberCount} members`);
+              logger.info(`[GroupBilling] Price tier change: ${originalPricePerSeat} -> ${newPricePerSeat} cents/seat for ${newMemberCount} members`);
               
               // Preserve existing metadata from the old item while ensuring corporate_membership is set
               const existingMetadata = corporateItem.metadata || {};
@@ -988,19 +989,19 @@ export async function addCorporateMember(params: {
             }
             stripeUpdated = true;
           } else {
-            console.log('[GroupBilling] No corporate_membership item found - assuming pre-paid seats via checkout');
+            logger.info('[GroupBilling] No corporate_membership item found - assuming pre-paid seats via checkout');
           }
         } catch (stripeErr: unknown) {
-          console.error('[GroupBilling] Stripe API failed, rolling back DB reservation:', stripeErr);
+          logger.error('[GroupBilling] Stripe API failed, rolling back DB reservation:', { error: stripeErr });
           if (newStripeItemId) {
             try {
               const stripeForRollback = await getStripeClient();
               await stripeForRollback.subscriptionItems.del(newStripeItemId, {
                 proration_behavior: 'none',
               });
-              console.log(`[GroupBilling] Rolled back newly created Stripe subscription item ${newStripeItemId}`);
+              logger.info(`[GroupBilling] Rolled back newly created Stripe subscription item ${newStripeItemId}`);
             } catch (rollbackErr: unknown) {
-              console.error(`[GroupBilling] CRITICAL: Failed to delete newly created Stripe subscription item ${newStripeItemId}. Customer may be double-billed. Manual intervention required.`, rollbackErr);
+              logger.error(`[GroupBilling] CRITICAL: Failed to delete newly created Stripe subscription item ${newStripeItemId}. Customer may be double-billed. Manual intervention required.`, { error: rollbackErr });
             }
           }
           await client.query('ROLLBACK');
@@ -1017,14 +1018,14 @@ export async function addCorporateMember(params: {
         params.lastName || '',
         params.phone
       ).catch((err) => {
-        console.error('[GroupBilling] Background HubSpot sync for sub-member failed:', err);
+        logger.error('[GroupBilling] Background HubSpot sync for sub-member failed:', { error: err });
       });
       
       return { success: true, memberId: insertedMemberId };
       
     } catch (dbErr: unknown) {
       await client.query('ROLLBACK');
-      console.error('[GroupBilling] DB transaction failed:', dbErr);
+      logger.error('[GroupBilling] DB transaction failed:', { error: dbErr });
       
       if (stripeUpdated && originalQuantity !== null) {
         try {
@@ -1056,23 +1057,23 @@ export async function addCorporateMember(params: {
               await stripe.subscriptionItems.del(currentCorporateItem.id, {
                 proration_behavior: 'none',
               });
-              console.log(`[GroupBilling] Rolled back Stripe to original price ${originalPricePerSeat} and quantity ${originalQuantity}`);
+              logger.info(`[GroupBilling] Rolled back Stripe to original price ${originalPricePerSeat} and quantity ${originalQuantity}`);
             }
           } else if (corporateItemId) {
             await stripe.subscriptionItems.update(corporateItemId, {
               quantity: originalQuantity,
             });
-            console.log(`[GroupBilling] Rolled back Stripe quantity to ${originalQuantity}`);
+            logger.info(`[GroupBilling] Rolled back Stripe quantity to ${originalQuantity}`);
           }
         } catch (rollbackErr: unknown) {
-          console.error(`[GroupBilling] CRITICAL: Failed to rollback Stripe. Manual intervention required.`, rollbackErr);
+          logger.error(`[GroupBilling] CRITICAL: Failed to rollback Stripe. Manual intervention required.`, { error: rollbackErr });
         }
       }
       
       return { success: false, error: 'System error. Please try again.' };
     }
   } catch (err: unknown) {
-    console.error('[GroupBilling] Error adding corporate member:', err);
+    logger.error('[GroupBilling] Error adding corporate member:', { error: err });
     return { success: false, error: 'Failed to add corporate member. Please try again.' };
   } finally {
     client.release();
@@ -1147,12 +1148,12 @@ export async function removeCorporateMember(params: {
         if (corporateItem) {
           const oldPricePerSeat = corporateItem.price?.unit_amount ?? 0;
           if (!oldPricePerSeat) {
-            console.error(`[GroupBilling] Corporate seat price is missing from Stripe subscription item ${corporateItem.id} — cannot adjust`);
+            logger.error(`[GroupBilling] Corporate seat price is missing from Stripe subscription item ${corporateItem.id} — cannot adjust`);
             throw new Error('Corporate seat price not found on Stripe subscription item');
           }
           
           if (oldPricePerSeat !== newPricePerSeat) {
-            console.log(`[GroupBilling] Price tier change on removal: ${oldPricePerSeat} -> ${newPricePerSeat} cents/seat for ${newMemberCount} members`);
+            logger.info(`[GroupBilling] Price tier change on removal: ${oldPricePerSeat} -> ${newPricePerSeat} cents/seat for ${newMemberCount} members`);
             
             await stripe.subscriptionItems.create({
               subscription: group[0].primary_stripe_subscription_id,
@@ -1180,17 +1181,17 @@ export async function removeCorporateMember(params: {
         }
       } catch (stripeErr: unknown) {
         await client.query('ROLLBACK');
-        console.error('[GroupBilling] Failed to update Stripe on member removal:', stripeErr);
+        logger.error('[GroupBilling] Failed to update Stripe on member removal:', { error: stripeErr });
         return { success: false, error: 'Failed to update billing. Please try again.' };
       }
     }
     
     await client.query('COMMIT');
-    console.log(`[GroupBilling] Successfully removed corporate member ${params.memberEmail}`);
+    logger.info(`[GroupBilling] Successfully removed corporate member ${params.memberEmail}`);
     return { success: true };
   } catch (err: unknown) {
     await client.query('ROLLBACK');
-    console.error('[GroupBilling] Error removing corporate member:', err);
+    logger.error('[GroupBilling] Error removing corporate member:', { error: err });
     return { success: false, error: 'Failed to remove member. Please try again.' };
   } finally {
     client.release();
@@ -1240,10 +1241,10 @@ export async function removeGroupMember(params: {
       try {
         const stripe = await getStripeClient();
         await stripe.subscriptionItems.del(memberRecord.stripe_subscription_item_id);
-        console.log(`[GroupBilling] Deleted Stripe subscription item ${memberRecord.stripe_subscription_item_id}`);
+        logger.info(`[GroupBilling] Deleted Stripe subscription item ${memberRecord.stripe_subscription_item_id}`);
       } catch (stripeErr: unknown) {
         await client.query('ROLLBACK');
-        console.error('[GroupBilling] Failed to remove Stripe subscription item:', stripeErr);
+        logger.error('[GroupBilling] Failed to remove Stripe subscription item:', { error: stripeErr });
         return { 
           success: false, 
           error: 'Cannot remove billing. Member is still being charged. Please try again or contact support.' 
@@ -1252,11 +1253,11 @@ export async function removeGroupMember(params: {
     }
     
     await client.query('COMMIT');
-    console.log(`[GroupBilling] Successfully removed group member ${params.memberId}`);
+    logger.info(`[GroupBilling] Successfully removed group member ${params.memberId}`);
     return { success: true };
   } catch (err: unknown) {
     await client.query('ROLLBACK');
-    console.error('[GroupBilling] Error removing group member:', err);
+    logger.error('[GroupBilling] Error removing group member:', { error: err });
     return { success: false, error: 'Failed to remove member. Please try again.' };
   } finally {
     client.release();
@@ -1279,7 +1280,7 @@ export async function linkStripeSubscriptionToBillingGroup(params: {
     
     return { success: true };
   } catch (err: unknown) {
-    console.error('[GroupBilling] Error linking subscription:', err);
+    logger.error('[GroupBilling] Error linking subscription:', { error: err });
     return { success: false, error: 'Operation failed. Please try again.' };
   }
 }
@@ -1335,7 +1336,7 @@ export async function updateGroupAddOnPricing(params: {
             })
             .where(eq(familyAddOnProducts.id, product.id));
         } catch (stripeErr: unknown) {
-          console.error('[GroupBilling] Error creating new Stripe price:', stripeErr);
+          logger.error('[GroupBilling] Error creating new Stripe price:', { error: stripeErr });
           return { success: false, error: getErrorMessage(stripeErr) };
         }
       } else {
@@ -1350,7 +1351,7 @@ export async function updateGroupAddOnPricing(params: {
     
     return { success: true };
   } catch (err: unknown) {
-    console.error('[GroupBilling] Error updating pricing:', err);
+    logger.error('[GroupBilling] Error updating pricing:', { error: err });
     return { success: false, error: 'Operation failed. Please try again.' };
   }
 }
@@ -1662,10 +1663,8 @@ export async function handleSubscriptionItemsChanged(
         const existingItemForEmail = currentEmailToItemMap.get(memberEmail);
         if (existingItemForEmail) {
           // The member still has an active subscription item (possibly modified/replaced)
-          console.warn(
-            `[GroupBilling] Skipping deactivation for ${memberEmail} - item ${item.id} removed but ` +
-            `member still has active item ${existingItemForEmail.id}. Item may have been modified, not cancelled.`
-          );
+          logger.warn(`[GroupBilling] Skipping deactivation for ${memberEmail} - item ${item.id} removed but ` +
+            `member still has active item ${existingItemForEmail.id}. Item may have been modified, not cancelled.`);
           
           // Update the member's subscription item ID to the new one if different
           const member = await db.select()
@@ -1683,7 +1682,7 @@ export async function handleSubscriptionItemsChanged(
                 stripeSubscriptionItemId: existingItemForEmail.id,
               } as any)
               .where(eq(groupMembers.id, member[0].id));
-            console.log(`[GroupBilling] Updated member ${memberEmail} subscription item ID from ${item.id} to ${existingItemForEmail.id}`);
+            logger.info(`[GroupBilling] Updated member ${memberEmail} subscription item ID from ${item.id} to ${existingItemForEmail.id}`);
           }
           continue;
         }
@@ -1711,12 +1710,12 @@ export async function handleSubscriptionItemsChanged(
             [memberEmail]
           );
           
-          console.log(`[GroupBilling] Auto-deactivated member ${memberEmail} - subscription item ${item.id} fully removed`);
+          logger.info(`[GroupBilling] Auto-deactivated member ${memberEmail} - subscription item ${item.id} fully removed`);
         }
       }
     }
   } catch (err: unknown) {
-    console.error('[GroupBilling] Error handling subscription items change:', err);
+    logger.error('[GroupBilling] Error handling subscription items change:', { error: err });
   }
 }
 
@@ -1739,7 +1738,7 @@ export async function handlePrimarySubscriptionCancelled(subscriptionId: string)
     }
 
     const groupId = group[0].id;
-    console.log(`[GroupBilling] Primary subscription ${subscriptionId} cancelled. Deactivating group ${groupId}...`);
+    logger.info(`[GroupBilling] Primary subscription ${subscriptionId} cancelled. Deactivating group ${groupId}...`);
 
     // 2. Find all active members in this group
     const activeMembers = await db.select()
@@ -1750,7 +1749,7 @@ export async function handlePrimarySubscriptionCancelled(subscriptionId: string)
       ));
 
     if (activeMembers.length === 0) {
-      console.log(`[GroupBilling] No active members in group ${groupId} - nothing to deactivate`);
+      logger.info(`[GroupBilling] No active members in group ${groupId} - nothing to deactivate`);
       return;
     }
 
@@ -1786,9 +1785,9 @@ export async function handlePrimarySubscriptionCancelled(subscriptionId: string)
         for (const subEmail of emailsToDeactivate) {
           await syncMemberToHubSpot({ email: subEmail, status: 'cancelled', billingProvider: 'stripe', billingGroupRole: 'Sub-member' });
         }
-        console.log(`[GroupBilling] Synced ${emailsToDeactivate.length} cancelled sub-members to HubSpot`);
+        logger.info(`[GroupBilling] Synced ${emailsToDeactivate.length} cancelled sub-members to HubSpot`);
       } catch (hubspotErr) {
-        console.error('[GroupBilling] HubSpot sync failed for cancelled sub-members:', hubspotErr);
+        logger.error('[GroupBilling] HubSpot sync failed for cancelled sub-members:', { error: hubspotErr });
       }
     }
 
@@ -1797,10 +1796,10 @@ export async function handlePrimarySubscriptionCancelled(subscriptionId: string)
       [groupId]
     );
 
-    console.log(`[GroupBilling] Successfully deactivated group ${groupId} and ${emailsToDeactivate.length} members`);
+    logger.info(`[GroupBilling] Successfully deactivated group ${groupId} and ${emailsToDeactivate.length} members`);
 
   } catch (err) {
-    console.error('[GroupBilling] Error handling primary subscription cancellation:', err);
+    logger.error('[GroupBilling] Error handling primary subscription cancellation:', { error: err });
     throw err; // Re-throw to ensure webhook retries if this fails
   }
 }

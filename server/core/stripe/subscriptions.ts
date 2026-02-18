@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { isExpandedProduct, SubscriptionPendingUpdate } from '../../types/stripe-helpers';
 import { getErrorMessage, isStripeError } from '../../utils/errorUtils';
 
+import { logger } from '../logger';
 export interface CreateSubscriptionParams {
   customerId: string;
   priceId: string;
@@ -43,7 +44,7 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
     
     if (couponId) {
       (subscriptionParams as any).coupon = couponId;
-      console.log(`[Stripe Subscriptions] Applying coupon ${couponId} to subscription`);
+      logger.info(`[Stripe Subscriptions] Applying coupon ${couponId} to subscription`);
     }
     
     const subscription = await stripe.subscriptions.create(subscriptionParams, {
@@ -54,9 +55,9 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
     let paymentIntent = (invoice as any)?.payment_intent as Stripe.PaymentIntent | null;
     const pendingSetupIntent = subscription.pending_setup_intent as Stripe.SetupIntent | null;
     
-    console.log(`[Stripe Subscriptions] Created subscription ${subscription.id} for customer ${customerId}`);
-    console.log(`[Stripe Subscriptions] Invoice status: ${invoice?.status}, Invoice ID: ${invoice?.id}`);
-    console.log(`[Stripe Subscriptions] Initial payment intent: ${paymentIntent?.id || 'none'}, Setup intent: ${pendingSetupIntent?.id || 'none'}`);
+    logger.info(`[Stripe Subscriptions] Created subscription ${subscription.id} for customer ${customerId}`);
+    logger.info(`[Stripe Subscriptions] Invoice status: ${invoice?.status}, Invoice ID: ${invoice?.id}`);
+    logger.info(`[Stripe Subscriptions] Initial payment intent: ${paymentIntent?.id || 'none'}, Setup intent: ${pendingSetupIntent?.id || 'none'}`);
     
     if (paymentIntent?.id) {
       try {
@@ -71,14 +72,14 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
         if (metadata?.memberEmail) piMetadata.email = metadata.memberEmail;
         
         await stripe.paymentIntents.update(paymentIntent.id, { metadata: piMetadata });
-        console.log(`[Stripe Subscriptions] Updated invoice PI ${paymentIntent.id} with membership metadata`);
+        logger.info(`[Stripe Subscriptions] Updated invoice PI ${paymentIntent.id} with membership metadata`);
       } catch (metaErr: unknown) {
-        console.error(`[Stripe Subscriptions] Failed to update PI metadata:`, getErrorMessage(metaErr));
+        logger.error(`[Stripe Subscriptions] Failed to update PI metadata:`, { extra: { detail: getErrorMessage(metaErr) } });
       }
     }
     
     if (!paymentIntent && invoice && invoice.amount_due > 0) {
-      console.log(`[Stripe Subscriptions] No payment intent found, creating one for invoice amount: ${invoice.amount_due}`);
+      logger.info(`[Stripe Subscriptions] No payment intent found, creating one for invoice amount: ${invoice.amount_due}`);
       
       try {
         const newPaymentIntent = await stripe.paymentIntents.create({
@@ -100,16 +101,16 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
         });
         
         paymentIntent = newPaymentIntent;
-        console.log(`[Stripe Subscriptions] Created PaymentIntent ${newPaymentIntent.id} for invoice ${invoice.id}`);
+        logger.info(`[Stripe Subscriptions] Created PaymentIntent ${newPaymentIntent.id} for invoice ${invoice.id}`);
       } catch (piError: unknown) {
-        console.error(`[Stripe Subscriptions] Failed to create PaymentIntent:`, getErrorMessage(piError));
+        logger.error(`[Stripe Subscriptions] Failed to create PaymentIntent:`, { extra: { detail: getErrorMessage(piError) } });
       }
     }
     
     // Use payment_intent client_secret if available, otherwise use pending_setup_intent
     const clientSecret = paymentIntent?.client_secret || pendingSetupIntent?.client_secret;
     
-    console.log(`[Stripe Subscriptions] Final client secret exists: ${!!clientSecret}`);
+    logger.info(`[Stripe Subscriptions] Final client secret exists: ${!!clientSecret}`);
     
     return {
       success: true,
@@ -121,7 +122,7 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
       },
     };
   } catch (error: unknown) {
-    console.error('[Stripe Subscriptions] Error creating subscription:', error);
+    logger.error('[Stripe Subscriptions] Error creating subscription:', { error: error });
     return {
       success: false,
       error: getErrorMessage(error),
@@ -138,11 +139,11 @@ export async function cancelSubscription(subscriptionId: string): Promise<{
     
     await stripe.subscriptions.cancel(subscriptionId);
     
-    console.log(`[Stripe Subscriptions] Canceled subscription ${subscriptionId}`);
+    logger.info(`[Stripe Subscriptions] Canceled subscription ${subscriptionId}`);
     
     return { success: true };
   } catch (error: unknown) {
-    console.error('[Stripe Subscriptions] Error canceling subscription:', error);
+    logger.error('[Stripe Subscriptions] Error canceling subscription:', { error: error });
     return {
       success: false,
       error: getErrorMessage(error),
@@ -267,7 +268,7 @@ export async function listCustomerSubscriptions(customerId: string): Promise<{
       getErrorMessage(error).includes('No such customer');
     
     if (isCustomerNotFound) {
-      console.warn(`[Stripe Subscriptions] Customer not found: ${customerId}`);
+      logger.warn(`[Stripe Subscriptions] Customer not found: ${customerId}`);
       return {
         success: false,
         error: 'Customer not found in Stripe',
@@ -275,7 +276,7 @@ export async function listCustomerSubscriptions(customerId: string): Promise<{
       };
     }
     
-    console.error('[Stripe Subscriptions] Error listing subscriptions:', error);
+    logger.error('[Stripe Subscriptions] Error listing subscriptions:', { error: error });
     return {
       success: false,
       error: getErrorMessage(error),
@@ -327,7 +328,7 @@ export async function getSubscription(subscriptionId: string): Promise<{
       },
     };
   } catch (error: unknown) {
-    console.error('[Stripe Subscriptions] Error getting subscription:', error);
+    logger.error('[Stripe Subscriptions] Error getting subscription:', { error: error });
     return {
       success: false,
       error: getErrorMessage(error),
@@ -352,10 +353,10 @@ export async function pauseSubscription(
       },
     });
 
-    console.log(`[Stripe Subscriptions] Paused subscription ${subscriptionId} until ${resumeDate.toISOString()}`);
+    logger.info(`[Stripe Subscriptions] Paused subscription ${subscriptionId} until ${resumeDate.toISOString()}`);
     return { success: true, resumeDate };
   } catch (error: unknown) {
-    console.error('[Stripe Subscriptions] Error pausing subscription:', error);
+    logger.error('[Stripe Subscriptions] Error pausing subscription:', { error: error });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -368,10 +369,10 @@ export async function resumeSubscription(subscriptionId: string): Promise<{ succ
       pause_collection: null as unknown as Stripe.SubscriptionUpdateParams.PauseCollection,
     });
 
-    console.log(`[Stripe Subscriptions] Resumed subscription ${subscriptionId}`);
+    logger.info(`[Stripe Subscriptions] Resumed subscription ${subscriptionId}`);
     return { success: true };
   } catch (error: unknown) {
-    console.error('[Stripe Subscriptions] Error resuming subscription:', error);
+    logger.error('[Stripe Subscriptions] Error resuming subscription:', { error: error });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -418,7 +419,7 @@ export async function changeSubscriptionTier(
       });
       if (paymentMethods.data.length > 0) {
         defaultPaymentMethod = paymentMethods.data[0].id;
-        console.log(`[Stripe Subscriptions] Using first attached card ${defaultPaymentMethod} for tier change`);
+        logger.info(`[Stripe Subscriptions] Using first attached card ${defaultPaymentMethod} for tier change`);
       }
     }
 
@@ -435,19 +436,19 @@ export async function changeSubscriptionTier(
       }
       
       await stripe.subscriptions.update(subscriptionId, updateParams);
-      console.log(`[Stripe Subscriptions] Immediately upgraded subscription ${subscriptionId} to price ${newPriceId} (payment method: ${defaultPaymentMethod || 'none'})`);
+      logger.info(`[Stripe Subscriptions] Immediately upgraded subscription ${subscriptionId} to price ${newPriceId} (payment method: ${defaultPaymentMethod || 'none'})`);
     } else {
       await stripe.subscriptions.update(subscriptionId, {
         items: [{ id: itemId, price: newPriceId }],
         proration_behavior: 'none',
         cancel_at_period_end: false,
       });
-      console.log(`[Stripe Subscriptions] Changed subscription ${subscriptionId} to price ${newPriceId} (next cycle)`);
+      logger.info(`[Stripe Subscriptions] Changed subscription ${subscriptionId} to price ${newPriceId} (next cycle)`);
     }
 
     return { success: true };
   } catch (error: unknown) {
-    console.error('[Stripe Subscriptions] Error changing tier:', error);
+    logger.error('[Stripe Subscriptions] Error changing tier:', { error: error });
     return { success: false, error: getErrorMessage(error) };
   }
 }

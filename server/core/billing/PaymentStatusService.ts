@@ -2,6 +2,7 @@ import { pool } from '../db';
 import { PoolClient } from 'pg';
 import { getErrorMessage } from '../../utils/errorUtils';
 
+import { logger } from '../logger';
 export interface PaymentStatusUpdate {
   paymentIntentId: string;
   bookingId?: number;
@@ -111,12 +112,12 @@ export class PaymentStatusService {
       }
       
       await client.query('COMMIT');
-      console.log(`[PaymentStatusService] Marked payment ${paymentIntentId} as succeeded, updated ${participantsUpdated} participants`);
+      logger.info(`[PaymentStatusService] Marked payment ${paymentIntentId} as succeeded, updated ${participantsUpdated} participants`);
       
       return { success: true, participantsUpdated, snapshotsUpdated: 1 };
     } catch (error: unknown) {
       await client.query('ROLLBACK');
-      console.error('[PaymentStatusService] Error marking payment succeeded:', error);
+      logger.error('[PaymentStatusService] Error marking payment succeeded:', { error: error });
       return { success: false, error: getErrorMessage(error) };
     } finally {
       client.release();
@@ -189,12 +190,12 @@ export class PaymentStatusService {
       }
       
       await client.query('COMMIT');
-      console.log(`[PaymentStatusService] Marked payment ${paymentIntentId} as refunded`);
+      logger.info(`[PaymentStatusService] Marked payment ${paymentIntentId} as refunded`);
       
       return { success: true, snapshotsUpdated: snapshotResult.rows.length };
     } catch (error: unknown) {
       await client.query('ROLLBACK');
-      console.error('[PaymentStatusService] Error marking payment refunded:', error);
+      logger.error('[PaymentStatusService] Error marking payment refunded:', { error: error });
       return { success: false, error: getErrorMessage(error) };
     } finally {
       client.release();
@@ -236,12 +237,12 @@ export class PaymentStatusService {
       );
       
       await client.query('COMMIT');
-      console.log(`[PaymentStatusService] Marked payment ${paymentIntentId} as cancelled`);
+      logger.info(`[PaymentStatusService] Marked payment ${paymentIntentId} as cancelled`);
       
       return { success: true, snapshotsUpdated: snapshotResult.rows.length };
     } catch (error: unknown) {
       await client.query('ROLLBACK');
-      console.error('[PaymentStatusService] Error marking payment cancelled:', error);
+      logger.error('[PaymentStatusService] Error marking payment cancelled:', { error: error });
       return { success: false, error: getErrorMessage(error) };
     } finally {
       client.release();

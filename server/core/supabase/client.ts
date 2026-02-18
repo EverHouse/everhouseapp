@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { getErrorMessage } from '../../utils/errorUtils';
 
+import { logger } from '../logger';
 let supabaseAdmin: SupabaseClient | null = null;
 let supabaseAvailable: boolean | null = null;
 let lastAvailabilityCheck: number = 0;
@@ -66,7 +67,7 @@ export async function isSupabaseAvailable(): Promise<boolean> {
         errMsg.includes('timeout')) {
       // Only log once when status changes
       if (supabaseAvailable !== false) {
-        console.warn('[Supabase] Service unreachable - Supabase features disabled');
+        logger.warn('[Supabase] Service unreachable - Supabase features disabled');
       }
       supabaseAvailable = false;
     } else {
@@ -105,13 +106,13 @@ export function isSupabaseConfigured(): boolean {
 
 export async function enableRealtimeForTable(tableName: string): Promise<boolean> {
   if (!isSupabaseConfigured()) {
-    console.warn(`[Supabase] Skipping realtime for ${tableName} - Supabase not configured`);
+    logger.warn(`[Supabase] Skipping realtime for ${tableName} - Supabase not configured`);
     return false;
   }
 
   const available = await isSupabaseAvailable();
   if (!available) {
-    console.warn(`[Supabase] Skipping realtime for ${tableName} - Supabase not reachable`);
+    logger.warn(`[Supabase] Skipping realtime for ${tableName} - Supabase not reachable`);
     return false;
   }
 
@@ -125,26 +126,26 @@ export async function enableRealtimeForTable(tableName: string): Promise<boolean
     if (error) {
       const msg = error.message || '';
       if (msg.includes('function') && msg.includes('does not exist')) {
-        console.warn(`[Supabase] Realtime RPC not available for ${tableName} - this is normal for some Supabase configurations`);
+        logger.warn(`[Supabase] Realtime RPC not available for ${tableName} - this is normal for some Supabase configurations`);
         return false;
       }
       if (msg.includes('fetch failed') || msg.includes('ENOTFOUND') || msg.includes('ECONNREFUSED') || msg.includes('TypeError')) {
-        console.warn(`[Supabase] Cannot reach Supabase for ${tableName} realtime - service may be unreachable`);
+        logger.warn(`[Supabase] Cannot reach Supabase for ${tableName} realtime - service may be unreachable`);
         supabaseAvailable = false;
         return false;
       }
-      console.error(`[Supabase] Failed to enable realtime for ${tableName}:`, msg);
+      logger.error(`[Supabase] Failed to enable realtime for ${tableName}:`, { extra: { detail: msg } });
       return false;
     }
 
-    console.log(`[Supabase] Realtime enabled for table: ${tableName}`);
+    logger.info(`[Supabase] Realtime enabled for table: ${tableName}`);
     return true;
   } catch (err: unknown) {
     const errMsg = getErrorMessage(err);
     if (errMsg.includes('fetch failed') || errMsg.includes('ENOTFOUND') || errMsg.includes('ECONNREFUSED')) {
-      console.warn(`[Supabase] Cannot reach Supabase for ${tableName} - check SUPABASE_URL configuration`);
+      logger.warn(`[Supabase] Cannot reach Supabase for ${tableName} - check SUPABASE_URL configuration`);
     } else {
-      console.error(`[Supabase] Error enabling realtime for ${tableName}:`, errMsg);
+      logger.error(`[Supabase] Error enabling realtime for ${tableName}:`, { extra: { detail: errMsg } });
     }
     return false;
   }

@@ -1,6 +1,7 @@
 import { pool } from '../db';
 import { getErrorMessage } from '../../utils/errorUtils';
 
+import { logger } from '../logger';
 export interface GuestPassConsumptionResult {
   success: boolean;
   error?: string;
@@ -37,7 +38,7 @@ export async function consumeGuestPassForParticipant(
     
     if (alreadyUsed.rows[0]?.used_guest_pass === true) {
       await client.query('ROLLBACK');
-      console.log(`[GuestPassConsumer] Guest pass already consumed for participant ${participantId}, skipping (idempotency)`);
+      logger.info(`[GuestPassConsumer] Guest pass already consumed for participant ${participantId}, skipping (idempotency)`);
       return {
         success: true,
         passesRemaining: undefined
@@ -188,10 +189,10 @@ export async function consumeGuestPassForParticipant(
         );
       }
     } catch (holdErr) {
-      console.log(`[GuestPassConsumer] Hold cleanup failed (non-blocking):`, holdErr);
+      logger.info(`[GuestPassConsumer] Hold cleanup failed (non-blocking):`, { extra: { detail: holdErr } });
     }
     
-    console.log(`[GuestPassConsumer] Pass consumed for ${guestName} by ${ownerEmailLower}, ${passesRemaining} remaining`);
+    logger.info(`[GuestPassConsumer] Pass consumed for ${guestName} by ${ownerEmailLower}, ${passesRemaining} remaining`);
     
     return {
       success: true,
@@ -200,7 +201,7 @@ export async function consumeGuestPassForParticipant(
     };
   } catch (error: unknown) {
     await client.query('ROLLBACK');
-    console.error('[GuestPassConsumer] Error consuming guest pass:', error);
+    logger.error('[GuestPassConsumer] Error consuming guest pass:', { error: error });
     return {
       success: false,
       error: getErrorMessage(error) || 'Failed to consume guest pass'
@@ -245,7 +246,7 @@ export async function canUseGuestPass(ownerEmail: string): Promise<{
       total: passes_total
     };
   } catch (error) {
-    console.error('[GuestPassConsumer] Error checking guest pass availability:', error);
+    logger.error('[GuestPassConsumer] Error checking guest pass availability:', { error: error });
     return { canUse: false, remaining: 0, total: 0 };
   }
 }
@@ -268,7 +269,7 @@ export async function refundGuestPassForParticipant(
     
     if (participantCheck.rows[0]?.used_guest_pass !== true) {
       await client.query('ROLLBACK');
-      console.log(`[GuestPassConsumer] Guest pass not used for participant ${participantId}, nothing to refund`);
+      logger.info(`[GuestPassConsumer] Guest pass not used for participant ${participantId}, nothing to refund`);
       return { success: true, passesRemaining: undefined };
     }
     
@@ -300,7 +301,7 @@ export async function refundGuestPassForParticipant(
         }
       }
     } catch (err) {
-      console.warn(`[GuestPassConsumer] Failed to fetch Stripe guest fee price, using default $${PRICING.GUEST_FEE_DOLLARS}:`, err);
+      logger.warn(`[GuestPassConsumer] Failed to fetch Stripe guest fee price, using default $${PRICING.GUEST_FEE_DOLLARS}:`, { error: err });
     }
     
     await client.query(
@@ -333,7 +334,7 @@ export async function refundGuestPassForParticipant(
     await client.query('COMMIT');
     
     const remaining = passResult.rows[0]?.remaining ?? 0;
-    console.log(`[GuestPassConsumer] Pass refunded for ${guestName}, ${ownerEmailLower} now has ${remaining} remaining`);
+    logger.info(`[GuestPassConsumer] Pass refunded for ${guestName}, ${ownerEmailLower} now has ${remaining} remaining`);
     
     return {
       success: true,
@@ -341,7 +342,7 @@ export async function refundGuestPassForParticipant(
     };
   } catch (error: unknown) {
     await client.query('ROLLBACK');
-    console.error('[GuestPassConsumer] Error refunding guest pass:', error);
+    logger.error('[GuestPassConsumer] Error refunding guest pass:', { error: error });
     return {
       success: false,
       error: getErrorMessage(error) || 'Failed to refund guest pass'

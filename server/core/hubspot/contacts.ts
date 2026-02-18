@@ -3,6 +3,7 @@ import { getErrorMessage, getErrorCode, getErrorStatusCode } from '../../utils/e
 import { isProduction } from '../db';
 import { retryableHubSpotRequest } from './request';
 
+import { logger } from '../logger';
 export interface SmsPreferences {
   smsPromoOptIn: boolean | null;
   smsTransactionalOptIn: boolean | null;
@@ -39,7 +40,7 @@ export async function syncSmsPreferencesToHubSpot(
 
     if (!searchResponse.results || searchResponse.results.length === 0) {
       if (!isProduction) {
-        console.log(`[HubSpot SMS Sync] Contact not found for ${normalizedEmail}`);
+        logger.info(`[HubSpot SMS Sync] Contact not found for ${normalizedEmail}`);
       }
       return { success: false, error: 'Contact not found in HubSpot' };
     }
@@ -69,14 +70,14 @@ export async function syncSmsPreferencesToHubSpot(
     );
 
     if (!isProduction) {
-      console.log(`[HubSpot SMS Sync] Updated SMS preferences for contact ${contactId}`);
+      logger.info(`[HubSpot SMS Sync] Updated SMS preferences for contact ${contactId}`);
     }
 
     return { success: true };
 
   } catch (error: unknown) {
     const errorMsg = getErrorMessage(error);
-    console.error('[HubSpot SMS Sync] Error syncing SMS preferences:', error);
+    logger.error('[HubSpot SMS Sync] Error syncing SMS preferences:', { error: error });
     return {
       success: false,
       error: errorMsg || 'Failed to sync SMS preferences to HubSpot'
@@ -135,7 +136,7 @@ export async function syncDayPassPurchaseToHubSpot(
       if (searchResponse.results && searchResponse.results.length > 0) {
         contactId = searchResponse.results[0].id;
         if (!isProduction) {
-          console.log(`[DayPassHubSpot] Found existing contact ${contactId} for ${normalizedEmail}`);
+          logger.info(`[DayPassHubSpot] Found existing contact ${contactId} for ${normalizedEmail}`);
         }
       }
     } catch (error: unknown) {
@@ -162,7 +163,7 @@ export async function syncDayPassPurchaseToHubSpot(
       }
 
       if (!isProduction) {
-        console.warn('[DayPassHubSpot] Error searching for contact, will create new one:', error);
+        logger.warn('[DayPassHubSpot] Error searching for contact, will create new one:', { error: error });
       }
     }
 
@@ -186,7 +187,7 @@ export async function syncDayPassPurchaseToHubSpot(
         isNewContact = true;
 
         if (!isProduction) {
-          console.log(`[DayPassHubSpot] Created new contact ${contactId} for ${normalizedEmail}`);
+          logger.info(`[DayPassHubSpot] Created new contact ${contactId} for ${normalizedEmail}`);
         }
       } catch (createError: unknown) {
         const statusCode = getErrorStatusCode(createError) || (getErrorCode(createError) ? Number(getErrorCode(createError)) : undefined);
@@ -194,7 +195,7 @@ export async function syncDayPassPurchaseToHubSpot(
         // Handle duplicate contact (409 Conflict)
         if (statusCode === 409) {
           // Re-query by email instead of parsing error message
-          console.log(`[DayPassHubSpot] Contact ${normalizedEmail} already exists (409), re-querying...`);
+          logger.info(`[DayPassHubSpot] Contact ${normalizedEmail} already exists (409), re-querying...`);
           
           const searchResponse = await hubspot.crm.contacts.searchApi.doSearch({
             filterGroups: [{
@@ -210,9 +211,9 @@ export async function syncDayPassPurchaseToHubSpot(
           
           if (searchResponse.results?.length > 0) {
             contactId = searchResponse.results[0].id;
-            console.log(`[DayPassHubSpot] Found existing contact via re-query: ${contactId}`);
+            logger.info(`[DayPassHubSpot] Found existing contact via re-query: ${contactId}`);
           } else {
-            console.error(`[DayPassHubSpot] 409 conflict but contact not found on re-query`);
+            logger.error(`[DayPassHubSpot] 409 conflict but contact not found on re-query`);
             throw createError;
           }
         } else {
@@ -237,11 +238,11 @@ export async function syncDayPassPurchaseToHubSpot(
         );
 
         if (!isProduction) {
-          console.log(`[DayPassHubSpot] Added purchase note to contact ${contactId}`);
+          logger.info(`[DayPassHubSpot] Added purchase note to contact ${contactId}`);
         }
       } catch (noteError: unknown) {
         // Log error but don't fail the entire operation - contact was created successfully
-        console.warn('[DayPassHubSpot] Failed to add purchase note to contact:', noteError);
+        logger.warn('[DayPassHubSpot] Failed to add purchase note to contact:', { error: noteError });
       }
     }
 
@@ -252,7 +253,7 @@ export async function syncDayPassPurchaseToHubSpot(
 
   } catch (error: unknown) {
     const errorMsg = getErrorMessage(error);
-    console.error('[DayPassHubSpot] Error syncing day pass purchase:', error);
+    logger.error('[DayPassHubSpot] Error syncing day pass purchase:', { error: error });
     return {
       success: false,
       error: errorMsg || 'Failed to sync day pass purchase to HubSpot'

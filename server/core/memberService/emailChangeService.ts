@@ -1,6 +1,7 @@
 import { pool } from '../db';
 import { getErrorMessage } from '../../utils/errorUtils';
 
+import { logger } from '../logger';
 export interface EmailChangeResult {
   success: boolean;
   oldEmail: string;
@@ -126,7 +127,7 @@ export async function cascadeEmailChange(
 
     await client.query('COMMIT');
 
-    console.log(`[EmailChangeService] Successfully cascaded email change from ${oldEmail} to ${newEmail}. Tables updated:`, tablesUpdated);
+    logger.info(`[EmailChangeService] Successfully cascaded email change from ${oldEmail} to ${newEmail}. Tables updated:`, { extra: { detail: tablesUpdated } });
 
     (async () => {
       try {
@@ -141,7 +142,7 @@ export async function cascadeEmailChange(
           const { getStripeClient } = await import('../stripe/client');
           const stripe = await getStripeClient();
           await stripe.customers.update(user.stripe_customer_id, { email: normalizedNewEmail });
-          console.log(`[EmailChangeService] Updated Stripe customer ${user.stripe_customer_id} email to ${normalizedNewEmail}`);
+          logger.info(`[EmailChangeService] Updated Stripe customer ${user.stripe_customer_id} email to ${normalizedNewEmail}`);
         }
 
         if (user.hubspot_id) {
@@ -150,10 +151,10 @@ export async function cascadeEmailChange(
           await hubspotClient.crm.contacts.basicApi.update(user.hubspot_id, {
             properties: { email: normalizedNewEmail },
           });
-          console.log(`[EmailChangeService] Updated HubSpot contact ${user.hubspot_id} email to ${normalizedNewEmail}`);
+          logger.info(`[EmailChangeService] Updated HubSpot contact ${user.hubspot_id} email to ${normalizedNewEmail}`);
         }
       } catch (err) {
-        console.error('[EmailChangeService] Background sync failed:', err);
+        logger.error('[EmailChangeService] Background sync failed:', { error: err });
       }
     })();
 
@@ -165,7 +166,7 @@ export async function cascadeEmailChange(
     };
   } catch (error: unknown) {
     await client.query('ROLLBACK');
-    console.error('[EmailChangeService] Error cascading email change:', error);
+    logger.error('[EmailChangeService] Error cascading email change:', { error: error });
     return {
       success: false,
       oldEmail,
@@ -213,7 +214,7 @@ export async function previewEmailChangeImpact(
         tables.push({ tableName: table, columnName: column, rowCount: count });
       }
     } catch (error) {
-      console.warn(`[EmailChangeService] Could not check table ${table}:`, error);
+      logger.warn(`[EmailChangeService] Could not check table ${table}:`, { error: error });
     }
   }
 

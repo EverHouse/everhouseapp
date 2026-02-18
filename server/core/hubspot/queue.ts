@@ -231,11 +231,11 @@ async function executeHubSpotOperation(operation: string, payload: any): Promise
       break;
       
     case 'create_deal':
-      console.log(`[HubSpot Queue] Deal creation disabled — skipping create_deal for ${payload.email}`);
+      logger.info(`[HubSpot Queue] Deal creation disabled — skipping create_deal for ${payload.email}`);
       break;
       
     case 'sync_member':
-      console.log(`[HubSpot Queue] Deal creation disabled — skipping sync_member for ${payload.email}`);
+      logger.info(`[HubSpot Queue] Deal creation disabled — skipping sync_member for ${payload.email}`);
       break;
       
     case 'sync_tier':

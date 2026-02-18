@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { getStripeClient } from './client';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 
+import { logger } from '../logger';
 export interface DiscountSyncResult {
   discountTag: string;
   discountPercent: number;
@@ -29,12 +30,12 @@ export async function syncDiscountRulesToStripeCoupons(): Promise<{
     const stripe = await getStripeClient();
     const rules = await db.select().from(discountRules).where(eq(discountRules.isActive, true));
 
-    console.log(`[Discount Sync] Starting sync for ${rules.length} active discount rules`);
+    logger.info(`[Discount Sync] Starting sync for ${rules.length} active discount rules`);
 
     for (const rule of rules) {
       try {
         if (rule.discountPercent <= 0 || rule.discountPercent > 100) {
-          console.log(`[Discount Sync] Skipping ${rule.discountTag}: Invalid percent (${rule.discountPercent})`);
+          logger.info(`[Discount Sync] Skipping ${rule.discountTag}: Invalid percent (${rule.discountPercent})`);
           results.push({
             discountTag: rule.discountTag,
             discountPercent: rule.discountPercent,
@@ -62,7 +63,7 @@ export async function syncDiscountRulesToStripeCoupons(): Promise<{
                 source: 'app_discount_rules',
               },
             });
-            console.log(`[Discount Sync] Updated coupon ${couponId} (changed percent)`);
+            logger.info(`[Discount Sync] Updated coupon ${couponId} (changed percent)`);
             results.push({
               discountTag: rule.discountTag,
               discountPercent: rule.discountPercent,
@@ -72,7 +73,7 @@ export async function syncDiscountRulesToStripeCoupons(): Promise<{
             });
             synced++;
           } else {
-            console.log(`[Discount Sync] Coupon ${couponId} already exists with correct percent`);
+            logger.info(`[Discount Sync] Coupon ${couponId} already exists with correct percent`);
             results.push({
               discountTag: rule.discountTag,
               discountPercent: rule.discountPercent,
@@ -94,7 +95,7 @@ export async function syncDiscountRulesToStripeCoupons(): Promise<{
                 source: 'app_discount_rules',
               },
             });
-            console.log(`[Discount Sync] Created coupon ${couponId}`);
+            logger.info(`[Discount Sync] Created coupon ${couponId}`);
             results.push({
               discountTag: rule.discountTag,
               discountPercent: rule.discountPercent,
@@ -108,7 +109,7 @@ export async function syncDiscountRulesToStripeCoupons(): Promise<{
           }
         }
       } catch (error: unknown) {
-        console.error(`[Discount Sync] Error syncing ${rule.discountTag}:`, error);
+        logger.error(`[Discount Sync] Error syncing ${rule.discountTag}:`, { error: error });
         results.push({
           discountTag: rule.discountTag,
           discountPercent: rule.discountPercent,
@@ -120,10 +121,10 @@ export async function syncDiscountRulesToStripeCoupons(): Promise<{
       }
     }
 
-    console.log(`[Discount Sync] Complete: ${synced} synced, ${failed} failed, ${skipped} skipped`);
+    logger.info(`[Discount Sync] Complete: ${synced} synced, ${failed} failed, ${skipped} skipped`);
     return { success: true, results, synced, failed, skipped };
   } catch (error: unknown) {
-    console.error('[Discount Sync] Fatal error:', error);
+    logger.error('[Discount Sync] Fatal error:', { error: error });
     return { success: false, results, synced, failed, skipped };
   }
 }
@@ -163,7 +164,7 @@ export async function getDiscountSyncStatus(): Promise<Array<{
     
     return statuses;
   } catch (error: unknown) {
-    console.error('[Discount Sync] Error getting status:', error);
+    logger.error('[Discount Sync] Error getting status:', { error: error });
     return [];
   }
 }
@@ -195,7 +196,7 @@ export async function findOrCreateCoupon(discountTag: string, discountPercent: n
       throw error;
     }
   } catch (error: unknown) {
-    console.error(`[Discount] Error finding/creating coupon for ${discountTag}:`, error);
+    logger.error(`[Discount] Error finding/creating coupon for ${discountTag}:`, { error: error });
     return null;
   }
 }

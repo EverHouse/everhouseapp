@@ -3,6 +3,7 @@ import { pool } from '../db';
 import Stripe from 'stripe';
 import { getErrorMessage } from '../../utils/errorUtils';
 
+import { logger } from '../logger';
 export interface InvoiceItem {
   priceId?: string;
   quantity?: number;
@@ -83,14 +84,14 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<{
       expand: ['lines.data'],
     });
 
-    console.log(`[Stripe Invoices] Created draft invoice ${invoice.id} for customer ${customerId}`);
+    logger.info(`[Stripe Invoices] Created draft invoice ${invoice.id} for customer ${customerId}`);
 
     return {
       success: true,
       invoice: mapInvoice(updatedInvoice),
     };
   } catch (error: unknown) {
-    console.error('[Stripe Invoices] Error creating invoice:', error);
+    logger.error('[Stripe Invoices] Error creating invoice:', { error: error });
     return {
       success: false,
       error: getErrorMessage(error),
@@ -127,7 +128,7 @@ export async function previewInvoice(params: {
       },
     });
 
-    console.log(`[Stripe Invoices] Generated preview for customer ${customerId}, price ${priceId}`);
+    logger.info(`[Stripe Invoices] Generated preview for customer ${customerId}, price ${priceId}`);
 
     return {
       success: true,
@@ -144,7 +145,7 @@ export async function previewInvoice(params: {
       },
     };
   } catch (error: unknown) {
-    console.error('[Stripe Invoices] Error previewing invoice:', error);
+    logger.error('[Stripe Invoices] Error previewing invoice:', { error: error });
     return {
       success: false,
       error: getErrorMessage(error),
@@ -164,14 +165,14 @@ export async function finalizeAndSendInvoice(invoiceId: string): Promise<{
 
     await stripe.invoices.sendInvoice(invoiceId);
 
-    console.log(`[Stripe Invoices] Finalized and sent invoice ${invoiceId}`);
+    logger.info(`[Stripe Invoices] Finalized and sent invoice ${invoiceId}`);
 
     return {
       success: true,
       invoice: mapInvoice(finalized),
     };
   } catch (error: unknown) {
-    console.error('[Stripe Invoices] Error finalizing invoice:', error);
+    logger.error('[Stripe Invoices] Error finalizing invoice:', { error: error });
     return {
       success: false,
       error: getErrorMessage(error),
@@ -193,14 +194,14 @@ export async function listCustomerInvoices(customerId: string): Promise<{
       expand: ['data.lines.data'],
     });
 
-    console.log(`[Stripe Invoices] Listed ${invoices.data.length} invoices for customer ${customerId}`);
+    logger.info(`[Stripe Invoices] Listed ${invoices.data.length} invoices for customer ${customerId}`);
 
     return {
       success: true,
       invoices: invoices.data.map(mapInvoice),
     };
   } catch (error: unknown) {
-    console.error('[Stripe Invoices] Error listing invoices:', error);
+    logger.error('[Stripe Invoices] Error listing invoices:', { error: error });
     return {
       success: false,
       error: getErrorMessage(error),
@@ -225,7 +226,7 @@ export async function getInvoice(invoiceId: string): Promise<{
       invoice: mapInvoice(invoice),
     };
   } catch (error: unknown) {
-    console.error('[Stripe Invoices] Error getting invoice:', error);
+    logger.error('[Stripe Invoices] Error getting invoice:', { error: error });
     return {
       success: false,
       error: getErrorMessage(error),
@@ -242,11 +243,11 @@ export async function voidInvoice(invoiceId: string): Promise<{
 
     await stripe.invoices.voidInvoice(invoiceId);
 
-    console.log(`[Stripe Invoices] Voided invoice ${invoiceId}`);
+    logger.info(`[Stripe Invoices] Voided invoice ${invoiceId}`);
 
     return { success: true };
   } catch (error: unknown) {
-    console.error('[Stripe Invoices] Error voiding invoice:', error);
+    logger.error('[Stripe Invoices] Error voiding invoice:', { error: error });
     return {
       success: false,
       error: getErrorMessage(error),
@@ -305,7 +306,7 @@ export async function chargeOneTimeFee(params: {
         await stripe.invoices.pay(invoice.id);
       } catch (payError: unknown) {
         // Payment might fail if no card on file - invoice remains open
-        console.warn(`[Stripe Invoices] Auto-pay failed for invoice ${invoice.id}: ${getErrorMessage(payError)}`);
+        logger.warn(`[Stripe Invoices] Auto-pay failed for invoice ${invoice.id}: ${getErrorMessage(payError)}`);
       }
     }
 
@@ -320,7 +321,7 @@ export async function chargeOneTimeFee(params: {
     const amountFromBalance = Math.max(0, Math.abs(startingBalance) - Math.abs(endingBalance));
     const amountCharged = paidInvoice.amount_paid - amountFromBalance;
 
-    console.log(`[Stripe Invoices] Charged one-time fee ${invoice.id}: $${(amountCents / 100).toFixed(2)} (balance: $${(amountFromBalance / 100).toFixed(2)}, card: $${(amountCharged / 100).toFixed(2)})`);
+    logger.info(`[Stripe Invoices] Charged one-time fee ${invoice.id}: $${(amountCents / 100).toFixed(2)} (balance: $${(amountFromBalance / 100).toFixed(2)}, card: $${(amountCharged / 100).toFixed(2)})`);
 
     return {
       success: true,
@@ -329,7 +330,7 @@ export async function chargeOneTimeFee(params: {
       amountCharged: Math.max(0, amountCharged),
     };
   } catch (error: unknown) {
-    console.error('[Stripe Invoices] Error charging one-time fee:', error);
+    logger.error('[Stripe Invoices] Error charging one-time fee:', { error: error });
     return {
       success: false,
       error: getErrorMessage(error),
@@ -406,7 +407,7 @@ export async function getCustomerPaymentHistory(customerId: string, limit = 50):
       })),
     };
   } catch (error: unknown) {
-    console.error('[Stripe Invoices] Error getting cached payment history:', error);
+    logger.error('[Stripe Invoices] Error getting cached payment history:', { error: error });
     return {
       success: false,
       error: getErrorMessage(error),

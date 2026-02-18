@@ -7,6 +7,7 @@ import { pool } from '../db';
 import { syncCustomerMetadataToStripe } from './customers';
 import { getErrorMessage } from '../../utils/errorUtils';
 
+import { logger } from '../logger';
 export interface TierChangePreview {
   currentTier: string;
   currentPriceId: string;
@@ -94,7 +95,7 @@ export async function previewTierChange(
       };
     }
   } catch (error: unknown) {
-    console.error('[Tier Change] Preview error:', error);
+    logger.error('[Tier Change] Preview error:', { error: error });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -155,9 +156,9 @@ export async function commitTierChange(
       try {
         const { syncMemberToHubSpot } = await import('../hubspot/stages');
         await syncMemberToHubSpot({ email: memberEmail, tier: tier.name, billingProvider: 'stripe' });
-        console.log(`[TierChange] Synced ${memberEmail} tier=${tier.name} to HubSpot`);
+        logger.info(`[TierChange] Synced ${memberEmail} tier=${tier.name} to HubSpot`);
       } catch (hubspotError) {
-        console.error('[TierChange] HubSpot sync failed:', hubspotError);
+        logger.error('[TierChange] HubSpot sync failed:', { error: hubspotError });
       }
     }
     
@@ -173,7 +174,7 @@ export async function commitTierChange(
       isPinned: false,
     });
     
-    console.log(`[Tier Change] Staff ${staffEmail} changed ${memberEmail} from ${currentTierName} to ${tier.name} (${changeType})`);
+    logger.info(`[Tier Change] Staff ${staffEmail} changed ${memberEmail} from ${currentTierName} to ${tier.name} (${changeType})`);
     
     // Verification: Check if DB tier was properly updated
     let warning: string | undefined;
@@ -186,14 +187,14 @@ export async function commitTierChange(
         const actualTier = userResult.rows[0].tier;
         if (actualTier !== tier.name) {
           warning = `Expected ${tier.name} but DB shows ${actualTier}`;
-          console.log(`[Tier Change] VERIFICATION FAILED: ${warning}`);
+          logger.info(`[Tier Change] VERIFICATION FAILED: ${warning}`);
         }
       }
     }
     
     return { success: true, ...(warning && { warning }) };
   } catch (error: unknown) {
-    console.error('[Tier Change] Commit error:', error);
+    logger.error('[Tier Change] Commit error:', { error: error });
     return { success: false, error: getErrorMessage(error) };
   }
 }

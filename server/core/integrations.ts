@@ -1,6 +1,7 @@
 import { Client } from '@hubspot/api-client';
 import { google } from 'googleapis';
 
+import { logger } from './logger';
 let hubspotConnectionSettings: any;
 let googleCalendarConnectionSettings: any;
 
@@ -26,7 +27,7 @@ export async function getHubSpotAccessToken() {
     : null;
 
   if (!xReplitToken) {
-    console.error('[HubSpot] Connector auth failed - missing token. REPL_IDENTITY:', !!process.env.REPL_IDENTITY, 'WEB_REPL_RENEWAL:', !!process.env.WEB_REPL_RENEWAL);
+    logger.error('[HubSpot] Connector auth failed - missing token', { extra: { REPL_IDENTITY: !!process.env.REPL_IDENTITY, WEB_REPL_RENEWAL: !!process.env.WEB_REPL_RENEWAL } });
     throw new Error('HubSpot connector not available - deployment token missing. Please ensure the HubSpot integration is enabled for this deployment.');
   }
 
@@ -44,24 +45,24 @@ export async function getHubSpotAccessToken() {
   
   // Debug logging to understand what's coming back
   if (!data.items || data.items.length === 0) {
-    console.error('[HubSpot] Connector API response:', JSON.stringify({ 
+    logger.error('[HubSpot] Connector API response:', { extra: { detail: JSON.stringify({ 
       status: response.status,
       hasItems: !!data.items,
       itemCount: data.items?.length || 0,
       hostname,
       error: data.error || data.message || null
-    }));
+    }) } });
     throw new Error('HubSpot not connected - please add HubSpot from the Integrations panel (All Connectors tab)');
   }
   
   hubspotConnectionSettings = data.items[0];
 
   if (!hubspotConnectionSettings || !hubspotConnectionSettings.settings) {
-    console.error('[HubSpot] Connection found but missing settings:', JSON.stringify({
+    logger.error('[HubSpot] Connection found but missing settings:', { extra: { detail: JSON.stringify({
       hasConnection: !!hubspotConnectionSettings,
       hasSettings: !!hubspotConnectionSettings?.settings,
       connectionId: hubspotConnectionSettings?.id
-    }));
+    }) } });
     throw new Error('HubSpot connection found but not authenticated - please reconnect in Integrations panel');
   }
   
@@ -118,7 +119,7 @@ async function getGoogleCalendarAccessToken() {
     : null;
 
   if (!xReplitToken) {
-    console.error('[Google Calendar] Connector auth failed - missing token. REPL_IDENTITY:', !!process.env.REPL_IDENTITY, 'WEB_REPL_RENEWAL:', !!process.env.WEB_REPL_RENEWAL);
+    logger.error('[Google Calendar] Connector auth failed - missing token', { extra: { REPL_IDENTITY: !!process.env.REPL_IDENTITY, WEB_REPL_RENEWAL: !!process.env.WEB_REPL_RENEWAL } });
     throw new Error('Google Calendar connector not available - deployment token missing. Please ensure the Google Calendar integration is enabled for this deployment.');
   }
 

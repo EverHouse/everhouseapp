@@ -2,6 +2,7 @@ import { pool } from './db';
 import { alertOnScheduledTaskFailure } from './dataAlerts';
 import { PoolClient } from 'pg';
 
+import { logger } from './logger';
 export async function safeDbOperation<T>(
   label: string,
   callback: () => Promise<T>,
@@ -10,7 +11,7 @@ export async function safeDbOperation<T>(
   try {
     return await callback();
   } catch (error) {
-    console.error(`[safeDbOperation] ${label}:`, error);
+    logger.error(`[safeDbOperation] ${label}:`, { error: error });
     if (critical) {
       await alertOnScheduledTaskFailure(label, error instanceof Error ? error : String(error));
     }
@@ -35,7 +36,7 @@ export async function safeDbTransaction<T>(
     } catch {
       // ROLLBACK failed, but we still want to report the original error
     }
-    console.error(`[safeDbTransaction] ${label}:`, error);
+    logger.error(`[safeDbTransaction] ${label}:`, { error: error });
     if (critical) {
       await alertOnScheduledTaskFailure(label, error instanceof Error ? error : String(error));
     }

@@ -2,6 +2,7 @@ import { notifyAllStaff } from './notificationService';
 import { isProduction } from './db';
 import { getTodayPacific } from '../utils/dateUtils';
 
+import { logger } from './logger';
 export type DataAlertType = 
   | 'import_failure'
   | 'low_match_rate'
@@ -20,7 +21,7 @@ function canSendAlert(alertKey: string): boolean {
   
   if (lastSent && (now - lastSent) < ALERT_COOLDOWN_MS) {
     if (!isProduction) {
-      console.log(`[DataAlerts] Alert rate-limited: ${alertKey} (${Math.round((ALERT_COOLDOWN_MS - (now - lastSent)) / 60000)} min remaining)`);
+      logger.info(`[DataAlerts] Alert rate-limited: ${alertKey} (${Math.round((ALERT_COOLDOWN_MS - (now - lastSent)) / 60000)} min remaining)`);
     }
     return false;
   }
@@ -61,7 +62,7 @@ export async function alertOnImportFailure(
     `Issues: ${errorSummary}${moreErrors}`;
 
   if (!isProduction) {
-    console.log(`[DataAlerts] Creating import failure alert: ${title}`);
+    logger.info(`[DataAlerts] Creating import failure alert: ${title}`);
   }
 
   await notifyAllStaff(title, message, 'system', { url: '/admin/data-integrity' });
@@ -86,7 +87,7 @@ export async function alertOnLowMatchRate(
     `Consider reviewing the source data or updating member records.`;
 
   if (!isProduction) {
-    console.log(`[DataAlerts] Creating low match rate alert: ${matchRate.toFixed(1)}%`);
+    logger.info(`[DataAlerts] Creating low match rate alert: ${matchRate.toFixed(1)}%`);
   }
 
   await notifyAllStaff(title, message, 'system', { url: '/admin/data-integrity' });
@@ -121,7 +122,7 @@ export async function alertOnCriticalIntegrityIssues(
 
   if (!issuesChanged && !cooldownExpired) {
     if (!isProduction) {
-      console.log(`[DataAlerts] Critical integrity alert rate-limited (same issues, ${Math.round((INTEGRITY_COOLDOWN_MS - (now - (lastSent || 0))) / 60000)} min remaining)`);
+      logger.info(`[DataAlerts] Critical integrity alert rate-limited (same issues, ${Math.round((INTEGRITY_COOLDOWN_MS - (now - (lastSent || 0))) / 60000)} min remaining)`);
     }
     return;
   }
@@ -134,7 +135,7 @@ export async function alertOnCriticalIntegrityIssues(
     `Please review the Data Integrity tab in the admin panel.`;
 
   if (!isProduction) {
-    console.log(`[DataAlerts] Creating critical integrity alert: ${totalCriticalIssues} issues${issuesChanged ? ' (issues changed)' : ' (cooldown expired)'}`);
+    logger.info(`[DataAlerts] Creating critical integrity alert: ${totalCriticalIssues} issues${issuesChanged ? ' (issues changed)' : ' (cooldown expired)'}`);
   }
 
   await notifyAllStaff(title, message, 'system', { url: '/admin/data-integrity' });
@@ -165,7 +166,7 @@ export async function alertOnHighIntegrityIssues(
 
   if (!issuesChanged && !cooldownExpired) {
     if (!isProduction) {
-      console.log(`[DataAlerts] High priority integrity alert rate-limited (same issues, ${Math.round((INTEGRITY_COOLDOWN_MS - (now - (lastSent || 0))) / 60000)} min remaining)`);
+      logger.info(`[DataAlerts] High priority integrity alert rate-limited (same issues, ${Math.round((INTEGRITY_COOLDOWN_MS - (now - (lastSent || 0))) / 60000)} min remaining)`);
     }
     return;
   }
@@ -178,7 +179,7 @@ export async function alertOnHighIntegrityIssues(
     `Review the Data Integrity tab in the admin panel.`;
 
   if (!isProduction) {
-    console.log(`[DataAlerts] Creating high priority integrity alert: ${totalHighIssues} issues${issuesChanged ? ' (issues changed)' : ' (cooldown expired)'}`);
+    logger.info(`[DataAlerts] Creating high priority integrity alert: ${totalHighIssues} issues${issuesChanged ? ' (issues changed)' : ' (cooldown expired)'}`);
   }
 
   await notifyAllStaff(title, message, 'system', { url: '/admin/data-integrity' });
@@ -223,7 +224,7 @@ export async function alertOnSyncFailure(
   }
 
   if (!isProduction) {
-    console.log(`[DataAlerts] Creating sync failure alert: ${service} - ${operation}`);
+    logger.info(`[DataAlerts] Creating sync failure alert: ${service} - ${operation}`);
   }
 
   await notifyAllStaff(title, message, 'system', { url: '/admin/data-integrity' });
@@ -251,7 +252,7 @@ export async function alertOnHubSpotSyncComplete(
       `Review member data for potential issues.`;
 
     if (!isProduction) {
-      console.log(`[DataAlerts] Creating HubSpot sync error alert: ${errors} errors`);
+      logger.info(`[DataAlerts] Creating HubSpot sync error alert: ${errors} errors`);
     }
 
     await notifyAllStaff(title, message, 'system', { url: '/admin/data-integrity' });
@@ -279,7 +280,7 @@ export async function alertOnScheduledTaskFailure(
   }
   
   if (!isProduction) {
-    console.log(`[DataAlerts] Creating scheduled task failure alert: ${taskName}`);
+    logger.info(`[DataAlerts] Creating scheduled task failure alert: ${taskName}`);
   }
   
   await notifyAllStaff(title, message, 'system', { url: '/admin/data-integrity' });
@@ -311,7 +312,7 @@ export async function alertOnTrackmanImportIssues(result: TrackmanImportResult):
         `Skipped: ${result.skippedRows}. Issues: ${errorSummary}${moreErrors}`;
       
       if (!isProduction) {
-        console.log(`[DataAlerts] Creating Trackman import error alert: ${result.errors.length} errors`);
+        logger.info(`[DataAlerts] Creating Trackman import error alert: ${result.errors.length} errors`);
       }
       
       await notifyAllStaff(title, message, 'system', { url: '/admin/trackman' });
@@ -333,7 +334,7 @@ export async function alertOnTrackmanImportIssues(result: TrackmanImportResult):
           `Please review unmatched bookings in the Trackman tab.`;
         
         if (!isProduction) {
-          console.log(`[DataAlerts] Creating Trackman low match rate alert: ${matchRate.toFixed(1)}%`);
+          logger.info(`[DataAlerts] Creating Trackman low match rate alert: ${matchRate.toFixed(1)}%`);
         }
         
         await notifyAllStaff(title, message, 'system', { url: '/admin/trackman' });

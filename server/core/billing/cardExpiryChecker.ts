@@ -4,6 +4,7 @@ import { notifyMember, notifyAllStaff } from '../notificationService';
 import { sendCardExpiringEmail } from '../../emails/membershipEmails';
 import { getErrorMessage } from '../../utils/errorUtils';
 
+import { logger } from '../logger';
 interface CheckExpiringCardsResult {
   checked: number;
   notified: number;
@@ -121,9 +122,9 @@ export async function checkExpiringCards(): Promise<CheckExpiringCardsResult> {
       }
     }
 
-    console.log(`[CardExpiryChecker] Complete - checked: ${result.checked}, notified: ${result.notified}`);
+    logger.info(`[CardExpiryChecker] Complete - checked: ${result.checked}, notified: ${result.notified}`);
   } catch (error: unknown) {
-    console.error('[CardExpiryChecker] Error:', getErrorMessage(error));
+    logger.error('[CardExpiryChecker] Error:', { extra: { detail: getErrorMessage(error) } });
     result.errors.push(`Fatal error: ${getErrorMessage(error)}`);
   }
 

@@ -6,6 +6,7 @@ import path from "path";
 import { alertOnImportFailure, alertOnLowMatchRate } from "../dataAlerts";
 import { findMatchingUser, normalizePhone } from "../visitors/matchingService";
 
+import { logger } from '../logger';
 const isProduction = process.env.NODE_ENV === 'production';
 
 // Tier name mapping: Mindbody tier names → normalized tier names (Title Case for HubSpot compatibility)
@@ -221,7 +222,7 @@ export function parseFirstVisitReport(content: string): Map<string, ClientLookup
     });
   }
   
-  console.log(`[MindbodyImport] Parsed ${clientMap.size} clients from First Visit Report`);
+  logger.info(`[MindbodyImport] Parsed ${clientMap.size} clients from First Visit Report`);
   return clientMap;
 }
 
@@ -274,7 +275,7 @@ export async function importFirstVisitReport(content: string): Promise<{
           .where(eq(users.id, matchedUser.id));
         
         result.linked++;
-        console.log(`[MindbodyImport] Linked client ${clientId} to user ${matchedUser.email}`);
+        logger.info(`[MindbodyImport] Linked client ${clientId} to user ${matchedUser.email}`);
       } else {
         result.skipped++;
       }
@@ -283,7 +284,7 @@ export async function importFirstVisitReport(content: string): Promise<{
     }
   }
   
-  console.log(`[MindbodyImport] First Visit import: ${result.linked} linked, ${result.alreadyLinked} already linked, ${result.skipped} skipped`);
+  logger.info(`[MindbodyImport] First Visit import: ${result.linked} linked, ${result.alreadyLinked} already linked, ${result.skipped} skipped`);
   return result;
 }
 
@@ -505,8 +506,8 @@ export async function importSalesFromContent(content: string, clientLookup?: Map
     }
   }
   
-  console.log(`[MindbodyImport] Sales import: ${result.imported} imported, ${result.skipped} skipped, ${result.unmatched} unmatched`);
-  console.log(`[MindbodyImport] Matching: ${result.matchedByEmail} by email, ${result.matchedByPhone} by phone, ${result.matchedByName} by name`);
+  logger.info(`[MindbodyImport] Sales import: ${result.imported} imported, ${result.skipped} skipped, ${result.unmatched} unmatched`);
+  logger.info(`[MindbodyImport] Matching: ${result.matchedByEmail} by email, ${result.matchedByPhone} by phone, ${result.matchedByName} by name`);
   return result;
 }
 
@@ -778,7 +779,7 @@ export async function runFullMindbodyImport(
   sales: Awaited<ReturnType<typeof importSalesFromCSV>>;
   attendance: Awaited<ReturnType<typeof importAttendanceFromCSV>>;
 }> {
-  console.log('[MindbodyImport] Starting full import...');
+  logger.info('[MindbodyImport] Starting full import...');
   
   const batchId = `full_import_${Date.now()}`;
   
@@ -791,21 +792,21 @@ export async function runFullMindbodyImport(
   }).returning({ id: legacyImportJobs.id });
   
   // Step 1: Import members first (to establish mindbody_client_id links)
-  console.log('[MindbodyImport] Importing members...');
+  logger.info('[MindbodyImport] Importing members...');
   const membersResult = await importMembersFromCSV(membersCSV);
-  console.log(`[MindbodyImport] Members: ${membersResult.matched} matched, ${membersResult.updated} updated, ${membersResult.skipped} skipped`);
+  logger.info(`[MindbodyImport] Members: ${membersResult.matched} matched, ${membersResult.updated} updated, ${membersResult.skipped} skipped`);
   
   // Step 2: Import sales
-  console.log('[MindbodyImport] Importing sales...');
+  logger.info('[MindbodyImport] Importing sales...');
   const salesResult = await importSalesFromCSV(salesCSV, batchId);
-  console.log(`[MindbodyImport] Sales: ${salesResult.imported} imported, ${salesResult.skipped} skipped, ${salesResult.linked} guest-related`);
+  logger.info(`[MindbodyImport] Sales: ${salesResult.imported} imported, ${salesResult.skipped} skipped, ${salesResult.linked} guest-related`);
   
   // Step 3: Import attendance
-  console.log('[MindbodyImport] Importing attendance...');
+  logger.info('[MindbodyImport] Importing attendance...');
   const attendanceResult = await importAttendanceFromCSV(attendanceCSV);
-  console.log(`[MindbodyImport] Attendance: ${attendanceResult.updated} updated, ${attendanceResult.skipped} skipped`);
+  logger.info(`[MindbodyImport] Attendance: ${attendanceResult.updated} updated, ${attendanceResult.skipped} skipped`);
   
-  console.log('[MindbodyImport] Import complete!');
+  logger.info('[MindbodyImport] Import complete!');
   
   await alertOnImportFailure('members', membersResult);
   await alertOnImportFailure('sales', salesResult);

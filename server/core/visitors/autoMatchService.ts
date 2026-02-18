@@ -4,6 +4,7 @@ import { updateVisitorType, VisitorType } from './typeService';
 import { getMemberTierByEmail } from '../tierService';
 import { recordUsage, ensureSessionForBooking } from '../bookingService/sessionManager';
 
+import { logger } from '../logger';
 export interface BookingTypeInfo {
   keyword: string | null;
   visitorType: VisitorType;
@@ -270,7 +271,7 @@ export async function matchBookingToPurchase(
       source: row.source as 'legacy' | 'day_pass'
     };
   } catch (error: unknown) {
-    console.error('[AutoMatch] Error matching booking to purchase:', error);
+    logger.error('[AutoMatch] Error matching booking to purchase:', { error: error });
     return null;
   }
 }
@@ -360,7 +361,7 @@ async function createBookingSessionForAutoMatch(
     
     const resourceId = await getResourceIdByBay(booking.bayNumber);
     if (!resourceId) {
-      console.log(`[AutoMatch] No resource found for bay ${booking.bayNumber}, skipping session creation`);
+      logger.info(`[AutoMatch] No resource found for bay ${booking.bayNumber}, skipping session creation`);
       await client.query('ROLLBACK');
       return null;
     }
@@ -396,7 +397,7 @@ async function createBookingSessionForAutoMatch(
         guestFee: 0,
         tierAtBooking: memberTier
       }, 'trackman' as any);
-      console.log(`[AutoMatch] Created session ${sessionId} for member ${email} (${memberTier})`);
+      logger.info(`[AutoMatch] Created session ${sessionId} for member ${email} (${memberTier})`);
     } else {
       await recordUsage(sessionId, {
         memberId: String(userId),
@@ -405,14 +406,14 @@ async function createBookingSessionForAutoMatch(
         guestFee: 0,
         tierAtBooking: undefined
       }, 'trackman' as any);
-      console.log(`[AutoMatch] Created session ${sessionId} for visitor ${email}`);
+      logger.info(`[AutoMatch] Created session ${sessionId} for visitor ${email}`);
     }
     
     await client.query('COMMIT');
     return sessionId;
   } catch (error: unknown) {
     await client.query('ROLLBACK');
-    console.error('[AutoMatch] Error creating booking session:', error);
+    logger.error('[AutoMatch] Error creating booking session:', { error: error });
     return null;
   } finally {
     client.release();
@@ -547,7 +548,7 @@ export async function autoMatchSingleBooking(
     result.reason = 'No matching purchase found and no fallback applicable';
     return result;
   } catch (error: unknown) {
-    console.error('[AutoMatch] Error auto-matching booking:', error);
+    logger.error('[AutoMatch] Error auto-matching booking:', { error: error });
     result.reason = error instanceof Error ? error.message : 'Unknown error';
     return result;
   }
@@ -612,9 +613,9 @@ async function linkPurchaseToSession(purchaseId: number | string, sessionId: num
     `, [purchaseId, trackmanBookingId || null]);
     
     if (result.rowCount === 0) {
-      console.warn(`[AutoMatch] Day pass ${purchaseId} not updated - may be exhausted or already linked to different booking`);
+      logger.warn(`[AutoMatch] Day pass ${purchaseId} not updated - may be exhausted or already linked to different booking`);
     } else {
-      console.log(`[AutoMatch] Linked day pass purchase ${purchaseId} to session ${sessionId}${trackmanBookingId ? ` (trackman: ${trackmanBookingId})` : ''}`);
+      logger.info(`[AutoMatch] Linked day pass purchase ${purchaseId} to session ${sessionId}${trackmanBookingId ? ` (trackman: ${trackmanBookingId})` : ''}`);
     }
   } else {
     await pool.query(`
@@ -624,7 +625,7 @@ async function linkPurchaseToSession(purchaseId: number | string, sessionId: num
         linked_at = NOW()
       WHERE id = $1
     `, [purchaseId, sessionId]);
-    console.log(`[AutoMatch] Linked legacy purchase ${purchaseId} to session ${sessionId}`);
+    logger.info(`[AutoMatch] Linked legacy purchase ${purchaseId} to session ${sessionId}`);
   }
 }
 
@@ -651,9 +652,9 @@ async function markPurchaseAsUsed(purchaseId: number | string, unmatchedBookingI
     `, [purchaseId, trackmanBookingId || null]);
     
     if (result.rowCount === 0) {
-      console.warn(`[AutoMatch] Day pass ${purchaseId} not updated - may be exhausted or already linked to different booking`);
+      logger.warn(`[AutoMatch] Day pass ${purchaseId} not updated - may be exhausted or already linked to different booking`);
     } else {
-      console.log(`[AutoMatch] Marked day pass purchase ${purchaseId} as redeemed (historical, unmatched booking ${unmatchedBookingId})`);
+      logger.info(`[AutoMatch] Marked day pass purchase ${purchaseId} as redeemed (historical, unmatched booking ${unmatchedBookingId})`);
     }
   } else {
     await pool.query(`
@@ -661,7 +662,7 @@ async function markPurchaseAsUsed(purchaseId: number | string, unmatchedBookingI
       SET linked_at = NOW()
       WHERE id = $1 AND linked_at IS NULL
     `, [purchaseId]);
-    console.log(`[AutoMatch] Marked legacy purchase ${purchaseId} as used (historical, unmatched booking ${unmatchedBookingId})`);
+    logger.info(`[AutoMatch] Marked legacy purchase ${purchaseId} as used (historical, unmatched booking ${unmatchedBookingId})`);
   }
 }
 
@@ -691,7 +692,7 @@ async function createGolfNowVisitor(
 ): Promise<string | null> {
   // No longer create placeholder visitors - return null to keep booking unmatched
   // Staff will manually assign via TrackmanLinkModal
-  console.log(`[AutoMatch] GolfNow booking for "${userName}" will remain unmatched - staff must assign manually`);
+  logger.info(`[AutoMatch] GolfNow booking for "${userName}" will remain unmatched - staff must assign manually`);
   return null;
 }
 
@@ -716,7 +717,7 @@ async function autoMatchLegacyUnmatchedBookings(
   
   const { rows } = await pool.query(query);
   
-  console.log(`[AutoMatch] Processing ${rows.length} legacy unmatched bookings...`);
+  logger.info(`[AutoMatch] Processing ${rows.length} legacy unmatched bookings...`);
   
   for (const row of rows) {
     const result = await autoMatchSingleBooking(
@@ -732,7 +733,7 @@ async function autoMatchLegacyUnmatchedBookings(
     
     if (result.matched) {
       matched++;
-      console.log(`[AutoMatch] Matched legacy booking #${row.id}: ${result.matchType} -> ${result.visitorEmail || 'private_event'}`);
+      logger.info(`[AutoMatch] Matched legacy booking #${row.id}: ${result.matchType} -> ${result.visitorEmail || 'private_event'}`);
     } else {
       failed++;
     }
@@ -796,7 +797,7 @@ async function autoMatchBookingRequests(
   
   const { rows } = await pool.query(query);
   
-  console.log(`[AutoMatch] Processing ${rows.length} GolfNow/walk-in booking_requests...`);
+  logger.info(`[AutoMatch] Processing ${rows.length} GolfNow/walk-in booking_requests...`);
   
   for (const row of rows) {
     try {
@@ -836,7 +837,7 @@ async function autoMatchBookingRequests(
           reason: `Auto-resolved as private event: ${userName}`
         });
         matched++;
-        console.log(`[AutoMatch] Marked booking_request #${row.id} as private event: ${userName}`);
+        logger.info(`[AutoMatch] Marked booking_request #${row.id} as private event: ${userName}`);
         continue;
       }
       
@@ -898,13 +899,13 @@ async function autoMatchBookingRequests(
         if (existingVisitorResult.rows.length > 0) {
           const existing = existingVisitorResult.rows[0];
           visitor = { id: existing.id, email: existing.email };
-          console.log(`[AutoMatch] Found existing REAL visitor ${firstName} ${lastName} (${existing.email}) - linking booking`);
+          logger.info(`[AutoMatch] Found existing REAL visitor ${firstName} ${lastName} (${existing.email}) - linking booking`);
         }
       }
       
       // If no existing real visitor found, skip this booking - staff must manually assign
       if (!visitor) {
-        console.log(`[AutoMatch] No existing real visitor found for "${userName}" - booking #${row.id} will remain unmatched for staff to assign`);
+        logger.info(`[AutoMatch] No existing real visitor found for "${userName}" - booking #${row.id} will remain unmatched for staff to assign`);
         results.push({
           bookingId: row.id,
           matched: false,
@@ -952,7 +953,7 @@ async function autoMatchBookingRequests(
             }, 'trackman' as any);
           }
         } catch (sessionError: unknown) {
-          console.log(`[AutoMatch] Could not create session for booking ${row.id}:`, sessionError);
+          logger.info(`[AutoMatch] Could not create session for booking ${row.id}:`, { extra: { detail: sessionError } });
         }
       }
       
@@ -999,9 +1000,9 @@ async function autoMatchBookingRequests(
         sessionId: sessionId || undefined
       });
       matched++;
-      console.log(`[AutoMatch] Matched booking_request #${row.id} -> ${visitor.email} (existing real visitor)`);
+      logger.info(`[AutoMatch] Matched booking_request #${row.id} -> ${visitor.email} (existing real visitor)`);
     } catch (error: unknown) {
-      console.error(`[AutoMatch] Error matching booking_request #${row.id}:`, error);
+      logger.error(`[AutoMatch] Error matching booking_request #${row.id}:`, { error: error });
       results.push({
         bookingId: row.id,
         matched: false,
@@ -1029,11 +1030,11 @@ export async function autoMatchAllUnmatchedBookings(
     const totalFailed = legacyResults.failed + requestsResults.failed;
     const allResults = [...legacyResults.results, ...requestsResults.results];
     
-    console.log(`[AutoMatch] Complete: ${totalMatched} matched, ${totalFailed} failed (legacy: ${legacyResults.matched}/${legacyResults.failed}, requests: ${requestsResults.matched}/${requestsResults.failed})`);
+    logger.info(`[AutoMatch] Complete: ${totalMatched} matched, ${totalFailed} failed (legacy: ${legacyResults.matched}/${legacyResults.failed}, requests: ${requestsResults.matched}/${requestsResults.failed})`);
     
     return { matched: totalMatched, failed: totalFailed, results: allResults };
   } catch (error: unknown) {
-    console.error('[AutoMatch] Error in batch auto-match:', error);
+    logger.error('[AutoMatch] Error in batch auto-match:', { error: error });
     throw error;
   }
 }

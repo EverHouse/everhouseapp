@@ -7,6 +7,7 @@ import { getOrCreateStripeCustomer } from './customers';
 import { PaymentStatusService } from '../billing/PaymentStatusService';
 import { getErrorMessage } from '../../utils/errorUtils';
 
+import { logger } from '../logger';
 /**
  * Generate a deterministic idempotency key for Stripe payment intents.
  * This prevents duplicate charges when users click pay multiple times.
@@ -93,7 +94,7 @@ export async function createPaymentIntent(
       const existingIntent = existingIntentResult.rows[0];
       const stripeClient = await getStripeClient();
       const existingPI = await stripeClient.paymentIntents.retrieve(existingIntent.stripe_payment_intent_id);
-      console.log(`[Stripe] Reusing existing PaymentIntent ${existingPI.id} for booking #${bookingId}`);
+      logger.info(`[Stripe] Reusing existing PaymentIntent ${existingPI.id} for booking #${bookingId}`);
       return {
         paymentIntentId: existingPI.id,
         clientSecret: existingPI.client_secret!,
@@ -153,7 +154,7 @@ export async function createPaymentIntent(
     [dbUserId, paymentIntent.id, customerId, amountCents, purpose, bookingId || null, sessionId || null, description, 'pending', productId || null, productName || null]
   );
 
-  console.log(`[Stripe] Created PaymentIntent ${paymentIntent.id} for ${purpose}: $${(amountCents / 100).toFixed(2)}${productName ? ` (${productName})` : ''}`);
+  logger.info(`[Stripe] Created PaymentIntent ${paymentIntent.id} for ${purpose}: $${(amountCents / 100).toFixed(2)}${productName ? ` (${productName})` : ''}`);
 
   return {
     paymentIntentId: paymentIntent.id,
@@ -227,9 +228,9 @@ export async function createInvoiceWithLineItems(params: CreatePOSInvoiceParams)
       if (invoicePiId) {
         try {
           await stripe.paymentIntents.cancel(invoicePiId);
-          console.log(`[Stripe] Cancelled invoice-generated PI ${invoicePiId} — will use standalone card_present PI instead`);
+          logger.info(`[Stripe] Cancelled invoice-generated PI ${invoicePiId} — will use standalone card_present PI instead`);
         } catch (cancelErr: unknown) {
-          console.warn(`[Stripe] Could not cancel invoice PI ${invoicePiId}: ${getErrorMessage(cancelErr)}`);
+          logger.warn(`[Stripe] Could not cancel invoice PI ${invoicePiId}: ${getErrorMessage(cancelErr)}`);
         }
       }
 
@@ -250,7 +251,7 @@ export async function createInvoiceWithLineItems(params: CreatePOSInvoiceParams)
         idempotencyKey: `terminal_standalone_${customerId}_${finalizedInvoice.id}`
       });
 
-      console.log(`[Stripe] Created invoice ${invoice.id} with standalone terminal PI: ${standalonePi.id}, total: ${cartTotal}`);
+      logger.info(`[Stripe] Created invoice ${invoice.id} with standalone terminal PI: ${standalonePi.id}, total: ${cartTotal}`);
 
       return {
         invoiceId: finalizedInvoice.id,
@@ -276,7 +277,7 @@ export async function createInvoiceWithLineItems(params: CreatePOSInvoiceParams)
 
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
-    console.log(`[Stripe] Created invoice ${invoice.id} with ${cartItems.length} line items, PI: ${paymentIntentId}, total: ${cartTotal}`);
+    logger.info(`[Stripe] Created invoice ${invoice.id} with ${cartItems.length} line items, PI: ${paymentIntentId}, total: ${cartTotal}`);
 
     return {
       invoiceId: finalizedInvoice.id,
@@ -289,13 +290,13 @@ export async function createInvoiceWithLineItems(params: CreatePOSInvoiceParams)
       const currentInvoice = await stripe.invoices.retrieve(invoice.id);
       if (currentInvoice.status === 'draft') {
         await stripe.invoices.del(invoice.id);
-        console.log(`[POS Invoice] Deleted draft invoice ${invoice.id} after error`);
+        logger.info(`[POS Invoice] Deleted draft invoice ${invoice.id} after error`);
       } else if (currentInvoice.status === 'open') {
         await stripe.invoices.voidInvoice(invoice.id);
-        console.log(`[POS Invoice] Voided open invoice ${invoice.id} after error`);
+        logger.info(`[POS Invoice] Voided open invoice ${invoice.id} after error`);
       }
     } catch (cleanupErr: unknown) {
-      console.error(`[POS Invoice] Failed to clean up invoice ${invoice.id}:`, getErrorMessage(cleanupErr));
+      logger.error(`[POS Invoice] Failed to clean up invoice ${invoice.id}:`, { extra: { detail: getErrorMessage(cleanupErr) } });
     }
     throw error;
   }
@@ -324,7 +325,7 @@ export async function confirmPaymentSuccess(
     });
 
     if (!result.success) {
-      console.error(`[Stripe] PaymentStatusService failed:`, result.error);
+      logger.error(`[Stripe] PaymentStatusService failed:`, { error: result.error });
       // Fall back to updating just stripe_payment_intents
       const queryClient = txClient || pool;
       await queryClient.query(
@@ -364,10 +365,10 @@ export async function confirmPaymentSuccess(
       });
     }
 
-    console.log(`[Stripe] Payment ${paymentIntentId} confirmed as succeeded (${result.participantsUpdated || 0} participants updated)`);
+    logger.info(`[Stripe] Payment ${paymentIntentId} confirmed as succeeded (${result.participantsUpdated || 0} participants updated)`);
     return { success: true };
   } catch (error: unknown) {
-    console.error('[Stripe] Error confirming payment:', error);
+    logger.error('[Stripe] Error confirming payment:', { error: error });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -405,10 +406,10 @@ export async function cancelPaymentIntent(
       [paymentIntentId]
     );
 
-    console.log(`[Stripe] Payment ${paymentIntentId} canceled`);
+    logger.info(`[Stripe] Payment ${paymentIntentId} canceled`);
     return { success: true };
   } catch (error: unknown) {
-    console.error('[Stripe] Error canceling payment:', error);
+    logger.error('[Stripe] Error canceling payment:', { error: error });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -482,7 +483,7 @@ export async function createBalanceAwarePayment(params: {
         [email, `balance-${balanceTransaction.id}`, stripeCustomerId, amountCents, purpose, bookingId || null, sessionId || null, description, 'succeeded']
       );
 
-      console.log(`[Stripe] Member payment fully covered by balance: $${(amountCents / 100).toFixed(2)} for ${email}`);
+      logger.info(`[Stripe] Member payment fully covered by balance: $${(amountCents / 100).toFixed(2)} for ${email}`);
 
       return {
         paidInFull: true,
@@ -541,7 +542,7 @@ export async function createBalanceAwarePayment(params: {
       [email, paymentIntent.id, stripeCustomerId, amountCents, purpose, bookingId || null, sessionId || null, description, 'pending']
     );
 
-    console.log(`[Stripe] Member payment: total $${(amountCents / 100).toFixed(2)}, card charge: $${(remainingCents / 100).toFixed(2)}, credit to consume: $${(balanceToApply / 100).toFixed(2)}`);
+    logger.info(`[Stripe] Member payment: total $${(amountCents / 100).toFixed(2)}, card charge: $${(remainingCents / 100).toFixed(2)}, credit to consume: $${(balanceToApply / 100).toFixed(2)}`);
 
     return {
       paidInFull: false,
@@ -552,7 +553,7 @@ export async function createBalanceAwarePayment(params: {
       remainingCents,
     };
   } catch (error: unknown) {
-    console.error(`[Stripe] Error creating balance-aware payment:`, error);
+    logger.error(`[Stripe] Error creating balance-aware payment:`, { error: error });
     return {
       paidInFull: false,
       totalCents: amountCents,
@@ -622,7 +623,7 @@ export async function chargeWithBalance(params: {
       try {
         await stripe.invoices.pay(invoice.id);
       } catch (payError: unknown) {
-        console.warn(`[Stripe] Auto-pay failed for invoice ${invoice.id}: ${getErrorMessage(payError)}`);
+        logger.warn(`[Stripe] Auto-pay failed for invoice ${invoice.id}: ${getErrorMessage(payError)}`);
       }
     }
 
@@ -645,7 +646,7 @@ export async function chargeWithBalance(params: {
       [email, `invoice-${invoice.id}`, stripeCustomerId, amountCents, purpose, bookingId || null, sessionId || null, description, paidInvoice.status === 'paid' ? 'succeeded' : paidInvoice.status]
     );
 
-    console.log(`[Stripe] Charged ${purpose} via invoice ${invoice.id}: $${(amountCents / 100).toFixed(2)} (balance: $${(amountFromBalance / 100).toFixed(2)}, card: $${(amountCharged / 100).toFixed(2)})`);
+    logger.info(`[Stripe] Charged ${purpose} via invoice ${invoice.id}: $${(amountCents / 100).toFixed(2)} (balance: $${(amountFromBalance / 100).toFixed(2)}, card: $${(amountCharged / 100).toFixed(2)})`);
 
     return {
       success: paidInvoice.status === 'paid',
@@ -655,7 +656,7 @@ export async function chargeWithBalance(params: {
       error: paidInvoice.status !== 'paid' ? `Invoice status: ${paidInvoice.status}` : undefined,
     };
   } catch (error: unknown) {
-    console.error(`[Stripe] Error charging ${purpose} with balance:`, error);
+    logger.error(`[Stripe] Error charging ${purpose} with balance:`, { error: error });
     return {
       success: false,
       amountFromBalance: 0,

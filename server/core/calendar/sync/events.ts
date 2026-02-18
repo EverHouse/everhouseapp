@@ -8,6 +8,7 @@ import { getCalendarIdByName } from '../cache';
 import { alertOnSyncFailure } from '../../dataAlerts';
 import { getPacificMidnightUTC } from '../../../utils/dateUtils';
 
+import { logger } from '../../logger';
 export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boolean }): Promise<{ synced: number; created: number; updated: number; deleted: number; pushedToCalendar: number; error?: string }> {
   try {
     const calendar = await getGoogleCalendarClient();
@@ -202,7 +203,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
               );
               pushedToCalendar++;
             } catch (pushError) {
-              console.error(`[Events Sync] Failed to push local edits to calendar for event #${dbRow.id}:`, pushError);
+              logger.error(`[Events Sync] Failed to push local edits to calendar for event #${dbRow.id}:`, { error: pushError });
             }
           }
         } else {
@@ -286,7 +287,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
     
     return { synced: calendarEvents.length, created, updated, deleted, pushedToCalendar };
   } catch (error) {
-    console.error('Error syncing Google Calendar events:', error);
+    logger.error('Error syncing Google Calendar events:', { error: error });
     
     if (!options?.suppressAlert) {
       alertOnSyncFailure(
@@ -295,7 +296,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
         error instanceof Error ? error : new Error(String(error)),
         { calendarName: CALENDAR_CONFIG.events.name }
       ).catch(alertErr => {
-        console.error('[Events Sync] Failed to send staff alert:', alertErr);
+        logger.error('[Events Sync] Failed to send staff alert:', { error: alertErr });
       });
     }
     

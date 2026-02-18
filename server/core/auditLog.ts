@@ -3,6 +3,7 @@ import { adminAuditLog, InsertAdminAuditLog } from '../../shared/schema';
 import { Request } from 'express';
 import { desc, eq, and, gte, lte } from 'drizzle-orm';
 
+import { logger } from './logger';
 export type AuditAction = 
   // Member actions
   | 'view_member'
@@ -238,7 +239,7 @@ export async function logAdminAction(params: AuditLogParams): Promise<void> {
     
     await db.insert(adminAuditLog).values(entry);
   } catch (error: unknown) {
-    console.error('[AuditLog] Failed to log admin action:', error);
+    logger.error('[AuditLog] Failed to log admin action:', { error: error });
   }
 }
 
@@ -270,7 +271,7 @@ export async function logSystemAction(params: SystemActionParams): Promise<void>
     
     await db.insert(adminAuditLog).values(entry);
   } catch (error: unknown) {
-    console.error('[AuditLog] Failed to log system action:', error);
+    logger.error('[AuditLog] Failed to log system action:', { error: error });
   }
 }
 
@@ -305,7 +306,7 @@ export async function logMemberAction(params: MemberActionParams): Promise<void>
     
     await db.insert(adminAuditLog).values(entry);
   } catch (error: unknown) {
-    console.error('[AuditLog] Failed to log member action:', error);
+    logger.error('[AuditLog] Failed to log member action:', { error: error });
   }
 }
 
@@ -415,7 +416,7 @@ export async function getAuditLogs(params: {
     
     return { logs, total: logs.length };
   } catch (error: unknown) {
-    console.error('[AuditLog] Failed to fetch audit logs:', error);
+    logger.error('[AuditLog] Failed to fetch audit logs:', { error: error });
     return { logs: [], total: 0 };
   }
 }
@@ -429,10 +430,10 @@ export async function cleanupOldAuditLogs(daysToKeep: number = 365): Promise<num
       .where(lte(adminAuditLog.createdAt, cutoffDate))
       .returning({ id: adminAuditLog.id });
     
-    console.log(`[AuditLog] Cleaned up ${deleted.length} old audit log entries`);
+    logger.info(`[AuditLog] Cleaned up ${deleted.length} old audit log entries`);
     return deleted.length;
   } catch (error: unknown) {
-    console.error('[AuditLog] Failed to cleanup old audit logs:', error);
+    logger.error('[AuditLog] Failed to cleanup old audit logs:', { error: error });
     return 0;
   }
 }

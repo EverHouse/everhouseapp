@@ -5,6 +5,7 @@ import { hubspotDeals, hubspotLineItems, hubspotProductMappings, billingAuditLog
 import { eq } from 'drizzle-orm';
 import { retryableHubSpotRequest } from './request';
 
+import { logger } from '../logger';
 export async function addLineItemToDeal(
   hubspotDealId: string,
   productId: string,
@@ -21,7 +22,7 @@ export async function addLineItemToDeal(
       .limit(1);
     
     if (product.length === 0) {
-      console.error('[HubSpotDeals] Product not found:', productId);
+      logger.error('[HubSpotDeals] Product not found:', { extra: { detail: productId } });
       return { success: false };
     }
     
@@ -99,10 +100,10 @@ export async function addLineItemToDeal(
       });
     }
     
-    if (!isProduction) console.log(`[HubSpotDeals] Added line item ${lineItemId} to deal ${hubspotDealId}`);
+    if (!isProduction) logger.info(`[HubSpotDeals] Added line item ${lineItemId} to deal ${hubspotDealId}`);
     return { success: true, lineItemId };
   } catch (error: unknown) {
-    console.error('[HubSpotDeals] Error adding line item:', error);
+    logger.error('[HubSpotDeals] Error adding line item:', { error: error });
     return { success: false };
   }
 }
@@ -119,7 +120,7 @@ export async function removeLineItemFromDeal(
       .limit(1);
     
     if (lineItem.length === 0) {
-      console.error('[HubSpotDeals] Line item not found:', lineItemId);
+      logger.error('[HubSpotDeals] Line item not found:', { extra: { detail: lineItemId } });
       return false;
     }
     
@@ -153,10 +154,10 @@ export async function removeLineItemFromDeal(
       });
     }
     
-    if (!isProduction) console.log(`[HubSpotDeals] Removed line item ${lineItemId}`);
+    if (!isProduction) logger.info(`[HubSpotDeals] Removed line item ${lineItemId}`);
     return true;
   } catch (error) {
-    console.error('[HubSpotDeals] Error removing line item:', error);
+    logger.error('[HubSpotDeals] Error removing line item:', { error: error });
     return false;
   }
 }
@@ -181,7 +182,7 @@ export async function getMemberDealWithLineItems(memberEmail: string): Promise<a
       lineItems
     };
   } catch (error) {
-    console.error('[HubSpotDeals] Error fetching member deal:', error);
+    logger.error('[HubSpotDeals] Error fetching member deal:', { error: error });
     return null;
   }
 }

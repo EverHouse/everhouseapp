@@ -6,6 +6,7 @@ import { eq, ilike, and, sql } from "drizzle-orm";
 import { findOrCreateHubSpotContact } from "../hubspot/members";
 import { syncCustomerMetadataToStripe } from "../stripe/customers";
 
+import { logger } from '../logger';
 const PLACEHOLDER_EMAIL_PATTERNS = [
   '@visitors.evenhouse.club',
   '@trackman.local',
@@ -182,7 +183,7 @@ export async function upsertVisitor(data: VisitorData, createStripeCustomer: boo
         archivedBy: null,
         updatedAt: new Date(),
       }).where(eq(users.id, archivedUser[0].id)).returning();
-      console.log(`[Auto-Unarchive] User ${data.email} unarchived via upsertVisitor (day pass purchase or similar)`);
+      logger.info(`[Auto-Unarchive] User ${data.email} unarchived via upsertVisitor (day pass purchase or similar)`);
       if (updated[0].email) {
         findOrCreateHubSpotContact(
           updated[0].email,
@@ -190,11 +191,11 @@ export async function upsertVisitor(data: VisitorData, createStripeCustomer: boo
           updated[0].lastName || '',
           updated[0].phone || undefined
         ).catch((err) => {
-          console.error('[upsertVisitor] Background HubSpot sync failed:', err instanceof Error ? err.message : String(err));
+          logger.error('[upsertVisitor] Background HubSpot sync failed:', { extra: { detail: err instanceof Error ? err.message : String(err) } });
         });
         if (updated[0].stripeCustomerId) {
           syncCustomerMetadataToStripe(updated[0].email).catch((err) => {
-            console.error('[upsertVisitor] Background Stripe sync failed:', err instanceof Error ? err.message : String(err));
+            logger.error('[upsertVisitor] Background Stripe sync failed:', { extra: { detail: err instanceof Error ? err.message : String(err) } });
           });
         }
       }
@@ -225,11 +226,11 @@ export async function upsertVisitor(data: VisitorData, createStripeCustomer: boo
         updated[0].lastName || '',
         updated[0].phone || undefined
       ).catch((err) => {
-        console.error('[upsertVisitor] Background HubSpot sync failed:', err instanceof Error ? err.message : String(err));
+        logger.error('[upsertVisitor] Background HubSpot sync failed:', { extra: { detail: err instanceof Error ? err.message : String(err) } });
       });
       if (updated[0].stripeCustomerId) {
         syncCustomerMetadataToStripe(updated[0].email).catch((err) => {
-          console.error('[upsertVisitor] Background Stripe sync failed:', err instanceof Error ? err.message : String(err));
+          logger.error('[upsertVisitor] Background Stripe sync failed:', { extra: { detail: err instanceof Error ? err.message : String(err) } });
         });
       }
     }

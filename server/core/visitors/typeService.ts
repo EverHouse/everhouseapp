@@ -1,5 +1,6 @@
 import { pool } from '../db';
 
+import { logger } from '../logger';
 export type VisitorType = 'classpass' | 'sim_walkin' | 'private_lesson' | 'guest' | 'day_pass' | 'lead' | 'golfnow' | 'private_event';
 export type ActivitySource = 'day_pass_purchase' | 'guest_booking' | 'booking_participant' | 'legacy_purchase' | 'trackman_auto_match';
 
@@ -83,7 +84,7 @@ export async function updateVisitorType({
     
     return false;
   } catch (error) {
-    console.error('[VisitorType] Error updating visitor type:', error);
+    logger.error('[VisitorType] Error updating visitor type:', { error: error });
     return false;
   }
 }
@@ -157,7 +158,7 @@ export async function updateVisitorTypeByUserId(
     
     return false;
   } catch (error) {
-    console.error('[VisitorType] Error updating visitor type by ID:', error);
+    logger.error('[VisitorType] Error updating visitor type by ID:', { error: error });
     return false;
   }
 }
@@ -242,7 +243,7 @@ export async function calculateVisitorTypeFromHistory(email: string): Promise<Vi
     
     return purchaseType || null;
   } catch (error) {
-    console.error('[VisitorType] Error calculating visitor type from history:', error);
+    logger.error('[VisitorType] Error calculating visitor type from history:', { error: error });
     return null;
   }
 }

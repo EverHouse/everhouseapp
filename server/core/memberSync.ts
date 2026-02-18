@@ -14,6 +14,7 @@ import pLimit from 'p-limit';
 import { notifyMember, notifyAllStaff } from './notificationService';
 import { sendOutstandingBalanceEmail } from '../emails/paymentEmails';
 
+import { logger } from './logger';
 // Check if a tier string represents a valid/recognized tier (not blank/unknown)
 function isRecognizedTier(tierString: string | null | undefined): boolean {
   if (!tierString || typeof tierString !== 'string') return false;
@@ -55,7 +56,7 @@ async function detectAndNotifyStatusChange(
       { relatedType: 'membership_status' }
     );
     
-    console.log(`[MemberSync] Notified about status change for ${email}: ${oldStatus} -> ${newStatus}`);
+    logger.info(`[MemberSync] Notified about status change for ${email}: ${oldStatus} -> ${newStatus}`);
     
     // Start grace period for Mindbody-billed members who become inactive
     // They'll receive daily emails with Stripe reactivation link for 3 days
@@ -80,10 +81,10 @@ async function detectAndNotifyStatusChange(
           })
           .where(eq(users.email, email));
         
-        console.log(`[MemberSync] Started grace period for Mindbody member ${email} - status changed to ${newStatus}`);
+        logger.info(`[MemberSync] Started grace period for Mindbody member ${email} - status changed to ${newStatus}`);
       }
     } catch (err: unknown) {
-      console.error(`[MemberSync] Failed to start grace period for ${email}:`, err);
+      logger.error(`[MemberSync] Failed to start grace period for ${email}:`, { error: err });
     }
   }
 }
@@ -150,10 +151,10 @@ export async function initMemberSyncSettings(): Promise<void> {
     const result = await db.execute(sql`SELECT value FROM app_settings WHERE key = 'last_member_sync_time'`);
     if (result.rows.length > 0 && result.rows[0].value) {
       lastSyncTime = parseInt(result.rows[0].value as string, 10);
-      console.log(`[MemberSync] Loaded last sync time: ${new Date(lastSyncTime).toISOString()}`);
+      logger.info(`[MemberSync] Loaded last sync time: ${new Date(lastSyncTime).toISOString()}`);
     }
   } catch (err: unknown) {
-    console.error('[MemberSync] Failed to load last sync time:', err);
+    logger.error('[MemberSync] Failed to load last sync time:', { error: err });
   }
 }
 
@@ -168,19 +169,19 @@ export async function setLastMemberSyncTime(time: number): Promise<void> {
        VALUES ('last_member_sync_time', ${time.toString()}, 'sync', NOW())
        ON CONFLICT (key) DO UPDATE SET value = ${time.toString()}, updated_at = NOW()`);
   } catch (err: unknown) {
-    console.error('[MemberSync] Failed to persist last sync time:', err);
+    logger.error('[MemberSync] Failed to persist last sync time:', { error: err });
   }
 }
 
 export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; errors: number }> {
   if (syncInProgress) {
-    if (!isProduction) console.log('[MemberSync] Sync already in progress, skipping');
+    if (!isProduction) logger.info('[MemberSync] Sync already in progress, skipping');
     return { synced: 0, errors: 0 };
   }
   
   const now = Date.now();
   if (now - lastSyncTime < SYNC_COOLDOWN) {
-    if (!isProduction) console.log('[MemberSync] Sync cooldown active, skipping');
+    if (!isProduction) logger.info('[MemberSync] Sync cooldown active, skipping');
     return { synced: 0, errors: 0 };
   }
   
@@ -238,7 +239,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
       after = response.paging?.next?.after;
     } while (after);
     
-    if (!isProduction) console.log(`[MemberSync] Fetched ${allContacts.length} contacts from HubSpot`);
+    if (!isProduction) logger.info(`[MemberSync] Fetched ${allContacts.length} contacts from HubSpot`);
     
     const exclusionResult = await db.execute(sql`SELECT email FROM sync_exclusions`);
     const excludedEmails = new Set((exclusionResult.rows as any[]).map(r => r.email?.toLowerCase()));
@@ -296,7 +297,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           if (!email) return null;
           
           if (excludedEmails.has(email)) {
-            if (!isProduction) console.log(`[MemberSync] Skipping excluded email: ${email}`);
+            if (!isProduction) logger.info(`[MemberSync] Skipping excluded email: ${email}`);
             return null;
           }
           
@@ -311,7 +312,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
             normalizedTier = normalizeTierName(rawTier);
           } else if (rawTier && rawTier.trim()) {
             // Unrecognized non-empty tier - log warning for manual review, don't overwrite existing
-            console.warn(`[MemberSync] UNRECOGNIZED TIER "${rawTier}" for ${email} - requires manual mapping, tier will not be updated`);
+            logger.warn(`[MemberSync] UNRECOGNIZED TIER "${rawTier}" for ${email} - requires manual mapping, tier will not be updated`);
           }
           // If normalizedTier is null, the upsert will preserve the existing tier value via COALESCE
           const tierId = normalizedTier ? (tierCache.get(normalizedTier.toLowerCase()) || null) : null;
@@ -353,7 +354,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           const { resolveUserByEmail } = await import('./stripe/customers');
           const resolvedSync = await resolveUserByEmail(email);
           if (resolvedSync && resolvedSync.matchType !== 'direct') {
-            console.log(`[MemberSync] HubSpot email ${email} resolved to existing user ${resolvedSync.primaryEmail} via ${resolvedSync.matchType}`);
+            logger.info(`[MemberSync] HubSpot email ${email} resolved to existing user ${resolvedSync.primaryEmail} via ${resolvedSync.matchType}`);
             email = resolvedSync.primaryEmail.toLowerCase();
           }
 
@@ -379,11 +380,11 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
 
           if (isStripeProtected) {
             stripeProtectedCount++;
-            console.log(`[MemberSync] STRIPE WINS: Skipping membership_status/tier update for Stripe-billed member ${email} (HubSpot status: ${status})`);
+            logger.info(`[MemberSync] STRIPE WINS: Skipping membership_status/tier update for Stripe-billed member ${email} (HubSpot status: ${status})`);
           }
           
           if (isVisitorProtected) {
-            console.log(`[MemberSync] VISITOR PROTECTED: Skipping membership_status/tier/role update for visitor ${email} (HubSpot status: ${status})`);
+            logger.info(`[MemberSync] VISITOR PROTECTED: Skipping membership_status/tier/role update for visitor ${email} (HubSpot status: ${status})`);
           }
           
           const isProtected = isStripeProtected || isVisitorProtected;
@@ -466,7 +467,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           
           if (oldStatus !== status && !isProtected) {
             detectAndNotifyStatusChange(email, firstName, lastName, oldStatus, status).catch(err => {
-              console.error(`[MemberSync] Failed to notify status change for ${email}:`, err);
+              logger.error(`[MemberSync] Failed to notify status change for ${email}:`, { error: err });
             });
           }
           
@@ -481,7 +482,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
             
             if (duplicateCheck.rows.length > 0) {
               for (const dup of duplicateCheck.rows) {
-                console.warn(`[MemberSync] HubSpot ID collision detected: ${email} and ${dup.email} share HubSpot contact ${contact.id}. These may be the same person.`);
+                logger.warn(`[MemberSync] HubSpot ID collision detected: ${email} and ${dup.email} share HubSpot contact ${contact.id}. These may be the same person.`);
                 
                 await db.execute(sql`INSERT INTO user_linked_emails (primary_email, linked_email, source, created_at)
                    VALUES (${email}, ${dup.email}, 'hubspot_dedup', NOW())
@@ -490,7 +491,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
               hubspotIdCollisions++;
             }
           } catch (dupError: unknown) {
-            console.error(`[MemberSync] Error checking for HubSpot ID collisions:`, dupError);
+            logger.error(`[MemberSync] Error checking for HubSpot ID collisions:`, { error: dupError });
           }
           
           const hubspotNotes = contact.properties.membership_notes?.trim();
@@ -560,18 +561,18 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           }
         } else if (result.status === 'rejected') {
           errors++;
-          if (!isProduction) console.error(`[MemberSync] Error syncing contact:`, result.reason);
+          if (!isProduction) logger.error(`[MemberSync] Error syncing contact:`, { extra: { detail: result.reason } });
         }
       }
     }
     
-    if (!isProduction) console.log(`[MemberSync] Complete - Synced: ${synced}, Errors: ${errors}, Status Changes: ${statusChanges}, HubSpot ID Collisions: ${hubspotIdCollisions}, ${skippedNonTransacting} non-transacting skipped, ${stripeProtectedCount} Stripe-protected`);
+    if (!isProduction) logger.info(`[MemberSync] Complete - Synced: ${synced}, Errors: ${errors}, Status Changes: ${statusChanges}, HubSpot ID Collisions: ${hubspotIdCollisions}, ${skippedNonTransacting} non-transacting skipped, ${stripeProtectedCount} Stripe-protected`);
     
     // Process merged contact IDs to extract linked emails
     // hs_merged_object_ids contains semicolon-separated HubSpot contact IDs that were merged into this contact
     const contactsWithMergedIds = allContacts.filter(c => c.properties.hs_merged_object_ids);
     if (contactsWithMergedIds.length > 0) {
-      if (!isProduction) console.log(`[MemberSync] Processing ${contactsWithMergedIds.length} contacts with merged IDs`);
+      if (!isProduction) logger.info(`[MemberSync] Processing ${contactsWithMergedIds.length} contacts with merged IDs`);
       
       // Collect all merged IDs to batch fetch
       const mergedIdsByPrimaryEmail = new Map<string, string[]>();
@@ -611,7 +612,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
               }
             }
           } catch (err: unknown) {
-            if (!isProduction) console.error(`[MemberSync] Error fetching merged contacts:`, err);
+            if (!isProduction) logger.error(`[MemberSync] Error fetching merged contacts:`, { error: err });
           }
           
           // Add delay between batches
@@ -643,7 +644,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
         }
         
         if (!isProduction && linkedEmailsAdded > 0) {
-          console.log(`[MemberSync] Added ${linkedEmailsAdded} linked emails from HubSpot merged contacts`);
+          logger.info(`[MemberSync] Added ${linkedEmailsAdded} linked emails from HubSpot merged contacts`);
         }
       }
     }
@@ -658,7 +659,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
     });
     
     if (contactsNeedingDealSync.length > 0) {
-      if (!isProduction) console.log(`[MemberSync] Starting deal sync for ${contactsNeedingDealSync.length} members (throttled)`);
+      if (!isProduction) logger.info(`[MemberSync] Starting deal sync for ${contactsNeedingDealSync.length} members (throttled)`);
       
       // Process deals in batches of 5 with 2 second delay between batches
       // HubSpot has 110 requests per 10 seconds limit, so we stay well under
@@ -677,7 +678,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
               try {
                 await syncDealStageFromMindbodyStatus(email, status, 'system', 'Mindbody Sync');
               } catch (err: unknown) {
-                if (!isProduction) console.error(`[MemberSync] Failed to sync deal stage for ${email}:`, err);
+                if (!isProduction) logger.error(`[MemberSync] Failed to sync deal stage for ${email}:`, { error: err });
               }
             })
           )
@@ -689,7 +690,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
         }
       }
       
-      if (!isProduction) console.log(`[MemberSync] Deal sync complete for ${contactsNeedingDealSync.length} members`);
+      if (!isProduction) logger.info(`[MemberSync] Deal sync complete for ${contactsNeedingDealSync.length} members`);
     }
     
     // Broadcast to staff that member data has been updated
@@ -704,7 +705,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
     
     return { synced, errors };
   } catch (error: unknown) {
-    console.error('[MemberSync] Fatal error:', error);
+    logger.error('[MemberSync] Fatal error:', { error: error });
     await alertOnSyncFailure(
       'hubspot',
       'Member sync from HubSpot',
@@ -718,19 +719,19 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
 
 export function triggerMemberSync(): void {
   syncAllMembersFromHubSpot().catch(err => {
-    console.error('[MemberSync] Background sync failed:', err);
+    logger.error('[MemberSync] Background sync failed:', { error: err });
   });
 }
 
 export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number; errors: number }> {
   if (syncInProgress) {
-    if (!isProduction) console.log('[MemberSync] Sync already in progress, skipping');
+    if (!isProduction) logger.info('[MemberSync] Sync already in progress, skipping');
     return { synced: 0, errors: 0 };
   }
   
   const now = Date.now();
   if (now - lastSyncTime < SYNC_COOLDOWN) {
-    if (!isProduction) console.log('[MemberSync] Sync cooldown active, skipping');
+    if (!isProduction) logger.info('[MemberSync] Sync cooldown active, skipping');
     return { synced: 0, errors: 0 };
   }
   
@@ -817,7 +818,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
       after = response.paging?.next?.after;
     } while (after);
     
-    console.log(`[MemberSync] Focused sync: fetched ${allContacts.length} relevant contacts from HubSpot`);
+    logger.info(`[MemberSync] Focused sync: fetched ${allContacts.length} relevant contacts from HubSpot`);
     
     const exclusionResult = await db.execute(sql`SELECT email FROM sync_exclusions`);
     const excludedEmails = new Set((exclusionResult.rows as any[]).map(r => r.email?.toLowerCase()));
@@ -871,7 +872,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
           if (!email) return null;
           
           if (excludedEmails.has(email)) {
-            if (!isProduction) console.log(`[MemberSync] Skipping excluded email: ${email}`);
+            if (!isProduction) logger.info(`[MemberSync] Skipping excluded email: ${email}`);
             return null;
           }
           
@@ -883,7 +884,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
           if (isRecognizedTier(rawTier)) {
             normalizedTier = normalizeTierName(rawTier);
           } else if (rawTier && rawTier.trim()) {
-            console.warn(`[MemberSync] UNRECOGNIZED TIER "${rawTier}" for ${email} - requires manual mapping, tier will not be updated`);
+            logger.warn(`[MemberSync] UNRECOGNIZED TIER "${rawTier}" for ${email} - requires manual mapping, tier will not be updated`);
           }
           const tierId = normalizedTier ? (tierCache.get(normalizedTier.toLowerCase()) || null) : null;
           const tags: string[] = [];
@@ -903,7 +904,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
                 joinDate = formatDatePacific(createDate);
               }
             } catch (e: unknown) {
-              console.error('[MemberSync] Failed to parse createdate:', e);
+              logger.error('[MemberSync] Failed to parse createdate:', { error: e });
             }
           }
           
@@ -920,7 +921,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
           const { resolveUserByEmail } = await import('./stripe/customers');
           const resolvedSync = await resolveUserByEmail(email);
           if (resolvedSync && resolvedSync.matchType !== 'direct') {
-            console.log(`[MemberSync] HubSpot email ${email} resolved to existing user ${resolvedSync.primaryEmail} via ${resolvedSync.matchType}`);
+            logger.info(`[MemberSync] HubSpot email ${email} resolved to existing user ${resolvedSync.primaryEmail} via ${resolvedSync.matchType}`);
             email = resolvedSync.primaryEmail.toLowerCase();
           }
 
@@ -946,11 +947,11 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
 
           if (isStripeProtected) {
             stripeProtectedCount++;
-            console.log(`[MemberSync] STRIPE WINS: Skipping membership_status/tier update for Stripe-billed member ${email} (HubSpot status: ${status})`);
+            logger.info(`[MemberSync] STRIPE WINS: Skipping membership_status/tier update for Stripe-billed member ${email} (HubSpot status: ${status})`);
           }
           
           if (isVisitorProtected) {
-            console.log(`[MemberSync] VISITOR PROTECTED: Skipping membership_status/tier/role update for visitor ${email} (HubSpot status: ${status})`);
+            logger.info(`[MemberSync] VISITOR PROTECTED: Skipping membership_status/tier/role update for visitor ${email} (HubSpot status: ${status})`);
           }
           
           const isProtected = isStripeProtected || isVisitorProtected;
@@ -1030,7 +1031,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
           
           if (oldStatus !== status && !isProtected) {
             detectAndNotifyStatusChange(email, firstName, lastName, oldStatus, status).catch(err => {
-              console.error(`[MemberSync] Failed to notify status change for ${email}:`, err);
+              logger.error(`[MemberSync] Failed to notify status change for ${email}:`, { error: err });
             });
           }
           
@@ -1045,7 +1046,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
             
             if (duplicateCheck.rows.length > 0) {
               for (const dup of duplicateCheck.rows) {
-                console.warn(`[MemberSync] HubSpot ID collision detected: ${email} and ${dup.email} share HubSpot contact ${contact.id}. These may be the same person.`);
+                logger.warn(`[MemberSync] HubSpot ID collision detected: ${email} and ${dup.email} share HubSpot contact ${contact.id}. These may be the same person.`);
                 
                 await db.execute(sql`INSERT INTO user_linked_emails (primary_email, linked_email, source, created_at)
                    VALUES (${email}, ${dup.email}, 'hubspot_dedup', NOW())
@@ -1054,7 +1055,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
               hubspotIdCollisions++;
             }
           } catch (dupError: unknown) {
-            console.error(`[MemberSync] Error checking for HubSpot ID collisions:`, dupError);
+            logger.error(`[MemberSync] Error checking for HubSpot ID collisions:`, { error: dupError });
           }
           
           const hubspotNotes = contact.properties.membership_notes?.trim();
@@ -1118,16 +1119,16 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
           }
         } else if (result.status === 'rejected') {
           errors++;
-          if (!isProduction) console.error(`[MemberSync] Error syncing contact:`, result.reason);
+          if (!isProduction) logger.error(`[MemberSync] Error syncing contact:`, { extra: { detail: result.reason } });
         }
       }
     }
     
-    if (!isProduction) console.log(`[MemberSync] Focused sync complete - Synced: ${synced}, Errors: ${errors}, Status Changes: ${statusChanges}, HubSpot ID Collisions: ${hubspotIdCollisions}, ${skippedNonTransacting} non-transacting skipped, ${stripeProtectedCount} Stripe-protected`);
+    if (!isProduction) logger.info(`[MemberSync] Focused sync complete - Synced: ${synced}, Errors: ${errors}, Status Changes: ${statusChanges}, HubSpot ID Collisions: ${hubspotIdCollisions}, ${skippedNonTransacting} non-transacting skipped, ${stripeProtectedCount} Stripe-protected`);
     
     const contactsWithMergedIds = allContacts.filter(c => c.properties.hs_merged_object_ids);
     if (contactsWithMergedIds.length > 0) {
-      if (!isProduction) console.log(`[MemberSync] Processing ${contactsWithMergedIds.length} contacts with merged IDs`);
+      if (!isProduction) logger.info(`[MemberSync] Processing ${contactsWithMergedIds.length} contacts with merged IDs`);
       
       const mergedIdsByPrimaryEmail = new Map<string, string[]>();
       for (const contact of contactsWithMergedIds) {
@@ -1165,7 +1166,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
               }
             }
           } catch (err: unknown) {
-            if (!isProduction) console.error(`[MemberSync] Error fetching merged contacts:`, err);
+            if (!isProduction) logger.error(`[MemberSync] Error fetching merged contacts:`, { error: err });
           }
           
           if (i + BATCH_SIZE < allMergedIds.length) {
@@ -1188,14 +1189,14 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
                   .onConflictDoNothing();
                 linkedEmailsAdded++;
               } catch (err: unknown) {
-                console.error('[MemberSync] Failed to add linked email from HubSpot merge:', err);
+                logger.error('[MemberSync] Failed to add linked email from HubSpot merge:', { error: err });
               }
             }
           }
         }
         
         if (!isProduction && linkedEmailsAdded > 0) {
-          console.log(`[MemberSync] Added ${linkedEmailsAdded} linked emails from HubSpot merged contacts`);
+          logger.info(`[MemberSync] Added ${linkedEmailsAdded} linked emails from HubSpot merged contacts`);
         }
       }
     }
@@ -1208,7 +1209,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
     });
     
     if (contactsNeedingDealSync.length > 0) {
-      if (!isProduction) console.log(`[MemberSync] Starting deal sync for ${contactsNeedingDealSync.length} members (throttled)`);
+      if (!isProduction) logger.info(`[MemberSync] Starting deal sync for ${contactsNeedingDealSync.length} members (throttled)`);
       
       const BATCH_SIZE = 5;
       const BATCH_DELAY_MS = 2000;
@@ -1225,7 +1226,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
               try {
                 await syncDealStageFromMindbodyStatus(email, status, 'system', 'Mindbody Sync');
               } catch (err: unknown) {
-                if (!isProduction) console.error(`[MemberSync] Failed to sync deal stage for ${email}:`, err);
+                if (!isProduction) logger.error(`[MemberSync] Failed to sync deal stage for ${email}:`, { error: err });
               }
             })
           )
@@ -1236,7 +1237,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
         }
       }
       
-      if (!isProduction) console.log(`[MemberSync] Deal sync complete for ${contactsNeedingDealSync.length} members`);
+      if (!isProduction) logger.info(`[MemberSync] Deal sync complete for ${contactsNeedingDealSync.length} members`);
     }
     
     if (synced > 0) {
@@ -1248,7 +1249,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
     
     return { synced, errors };
   } catch (error: unknown) {
-    console.error('[MemberSync] Fatal error in focused sync:', error);
+    logger.error('[MemberSync] Fatal error in focused sync:', { error: error });
     await alertOnSyncFailure(
       'hubspot',
       'Focused member sync from HubSpot',
@@ -1269,10 +1270,10 @@ export async function updateHubSpotContactVisitCount(hubspotId: string, visitCou
         total_visit_count: String(visitCount)
       }
     });
-    if (!isProduction) console.log(`[MemberSync] Updated HubSpot contact ${hubspotId} visit count to ${visitCount}`);
+    if (!isProduction) logger.info(`[MemberSync] Updated HubSpot contact ${hubspotId} visit count to ${visitCount}`);
     return true;
   } catch (error: unknown) {
-    console.error(`[MemberSync] Failed to update HubSpot visit count for ${hubspotId}:`, error);
+    logger.error(`[MemberSync] Failed to update HubSpot visit count for ${hubspotId}:`, { error: error });
     return false;
   }
 }
@@ -1285,13 +1286,13 @@ const COMM_LOGS_SYNC_COOLDOWN = 30 * 60 * 1000; // 30 minutes cooldown
 
 export async function syncCommunicationLogsFromHubSpot(): Promise<{ synced: number; errors: number }> {
   if (commLogsSyncInProgress) {
-    if (!isProduction) console.log('[CommLogs] Sync already in progress, skipping');
+    if (!isProduction) logger.info('[CommLogs] Sync already in progress, skipping');
     return { synced: 0, errors: 0 };
   }
   
   const now = Date.now();
   if (now - lastCommLogsSyncTime < COMM_LOGS_SYNC_COOLDOWN) {
-    if (!isProduction) console.log('[CommLogs] Sync cooldown active, skipping');
+    if (!isProduction) logger.info('[CommLogs] Sync cooldown active, skipping');
     return { synced: 0, errors: 0 };
   }
   
@@ -1319,7 +1320,7 @@ export async function syncCommunicationLogsFromHubSpot(): Promise<{ synced: numb
       }
     }
     
-    if (!isProduction) console.log(`[CommLogs] Found ${emailByHubSpotId.size} members with HubSpot IDs`);
+    if (!isProduction) logger.info(`[CommLogs] Found ${emailByHubSpotId.size} members with HubSpot IDs`);
     
     // Fetch calls from HubSpot (paginated)
     const callProperties = [
@@ -1365,7 +1366,7 @@ export async function syncCommunicationLogsFromHubSpot(): Promise<{ synced: numb
       } catch (err: unknown) {
         // Handle rate limits gracefully
         if (getErrorStatusCode(err) === 429) {
-          if (!isProduction) console.log('[CommLogs] Rate limited, waiting 10 seconds...');
+          if (!isProduction) logger.info('[CommLogs] Rate limited, waiting 10 seconds...');
           await delay(10000);
           continue;
         }
@@ -1373,7 +1374,7 @@ export async function syncCommunicationLogsFromHubSpot(): Promise<{ synced: numb
       }
     } while (after && allCalls.length < 1000); // Cap at 1000 calls per sync
     
-    if (!isProduction) console.log(`[CommLogs] Fetched ${allCalls.length} calls from HubSpot`);
+    if (!isProduction) logger.info(`[CommLogs] Fetched ${allCalls.length} calls from HubSpot`);
     
     // Process calls in batches
     const BATCH_SIZE = 10;
@@ -1477,7 +1478,7 @@ export async function syncCommunicationLogsFromHubSpot(): Promise<{ synced: numb
               synced++;
             } catch (err: unknown) {
               errors++;
-              if (!isProduction) console.error('[CommLogs] Error processing call:', err);
+              if (!isProduction) logger.error('[CommLogs] Error processing call:', { error: err });
             }
           })
         )
@@ -1531,13 +1532,13 @@ export async function syncCommunicationLogsFromHubSpot(): Promise<{ synced: numb
             continue;
           }
           // Communications object may not be available in all HubSpot accounts
-          if (!isProduction) console.log('[CommLogs] Communications object not available, skipping SMS sync');
+          if (!isProduction) logger.info('[CommLogs] Communications object not available, skipping SMS sync');
           break;
         }
       } while (commAfter && allComms.length < 500);
       
       if (!isProduction && allComms.length > 0) {
-        console.log(`[CommLogs] Fetched ${allComms.length} SMS/communications from HubSpot`);
+        logger.info(`[CommLogs] Fetched ${allComms.length} SMS/communications from HubSpot`);
       }
       
       // Process SMS communications
@@ -1604,20 +1605,20 @@ export async function syncCommunicationLogsFromHubSpot(): Promise<{ synced: numb
           synced++;
         } catch (err: unknown) {
           errors++;
-          if (!isProduction) console.error('[CommLogs] Error processing SMS:', err);
+          if (!isProduction) logger.error('[CommLogs] Error processing SMS:', { error: err });
         }
       }
       
     } catch (err: unknown) {
       // SMS sync is optional, don't fail the whole sync
-      if (!isProduction) console.log('[CommLogs] SMS sync skipped:', err);
+      if (!isProduction) logger.info('[CommLogs] SMS sync skipped:', { extra: { detail: err } });
     }
     
-    if (!isProduction) console.log(`[CommLogs] Complete - Synced: ${synced}, Errors: ${errors}`);
+    if (!isProduction) logger.info(`[CommLogs] Complete - Synced: ${synced}, Errors: ${errors}`);
     
     return { synced, errors };
   } catch (error: unknown) {
-    console.error('[CommLogs] Fatal error:', error);
+    logger.error('[CommLogs] Fatal error:', { error: error });
     return { synced: 0, errors: 1 };
   } finally {
     commLogsSyncInProgress = false;
@@ -1626,7 +1627,7 @@ export async function syncCommunicationLogsFromHubSpot(): Promise<{ synced: numb
 
 export function triggerCommunicationLogsSync(): void {
   syncCommunicationLogsFromHubSpot().catch(err => {
-    console.error('[CommLogs] Background sync failed:', err);
+    logger.error('[CommLogs] Background sync failed:', { error: err });
   });
 }
 
@@ -1651,10 +1652,10 @@ export async function updateHubSpotContactPreferences(
     }
     
     await hubspot.crm.contacts.basicApi.update(hubspotId, { properties });
-    if (!isProduction) console.log(`[MemberSync] Updated HubSpot contact ${hubspotId} preferences:`, properties);
+    if (!isProduction) logger.info(`[MemberSync] Updated HubSpot contact ${hubspotId} preferences:`, { extra: { detail: properties } });
     return true;
   } catch (error: unknown) {
-    console.error(`[MemberSync] Failed to update HubSpot preferences for ${hubspotId}:`, error);
+    logger.error(`[MemberSync] Failed to update HubSpot preferences for ${hubspotId}:`, { error: error });
     return false;
   }
 }

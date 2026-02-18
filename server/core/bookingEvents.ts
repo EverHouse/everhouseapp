@@ -5,6 +5,7 @@ import { sendNotificationToUser, broadcastToStaff, broadcastBookingEvent } from 
 import { sendPushNotification, sendPushNotificationToStaff } from '../routes/push';
 import { formatTime12Hour, formatDateDisplayWithDay } from '../utils/dateUtils';
 
+import { logger } from './logger';
 interface RequestParticipant {
   email: string;
   type: 'member' | 'guest';
@@ -76,7 +77,7 @@ export async function cleanupNotificationsForBooking(
         .returning({ id: notifications.id });
       
       if (result.length > 0) {
-        console.log(`[BookingEvents] Deleted ${result.length} notifications for booking ${bookingId}`);
+        logger.info(`[BookingEvents] Deleted ${result.length} notifications for booking ${bookingId}`);
       }
       return result.length;
     } else if (options.markRead) {
@@ -92,13 +93,13 @@ export async function cleanupNotificationsForBooking(
         .returning({ id: notifications.id });
       
       if (result.length > 0) {
-        console.log(`[BookingEvents] Marked ${result.length} notifications as read for booking ${bookingId}`);
+        logger.info(`[BookingEvents] Marked ${result.length} notifications as read for booking ${bookingId}`);
       }
       return result.length;
     }
     return 0;
   } catch (error: unknown) {
-    console.error('[BookingEvents] Failed to cleanup notifications:', error);
+    logger.error('[BookingEvents] Failed to cleanup notifications:', { error: error });
     return 0;
   }
 }
@@ -120,7 +121,7 @@ export async function validateBookingStatus(
     const isValid = allowedStatuses.includes(booking.status);
     return { valid: isValid, currentStatus: booking.status, booking };
   } catch (error: unknown) {
-    console.error('[BookingEvents] Failed to validate booking status:', error);
+    logger.error('[BookingEvents] Failed to validate booking status:', { error: error });
     return { valid: false };
   }
 }
@@ -141,7 +142,7 @@ export async function publish(
   const friendlyDateTime = formatBookingDateTime(data.bookingDate, data.startTime);
   const resourceLabel = data.resourceType === 'conference_room' ? 'conference room' : 'golf simulator';
 
-  console.log(`[BookingEvents] Publishing ${eventType} for booking ${data.bookingId}`);
+  logger.info(`[BookingEvents] Publishing ${eventType} for booking ${data.bookingId}`);
 
   try {
     if (cleanupNotifications) {
@@ -163,7 +164,7 @@ export async function publish(
           relatedType: 'booking'
         });
       } catch (err: unknown) {
-        console.error('[BookingEvents] Failed to create member notification:', err);
+        logger.error('[BookingEvents] Failed to create member notification:', { error: err });
       }
 
       sendNotificationToUser(data.memberEmail, {
@@ -177,7 +178,7 @@ export async function publish(
         title: memberNotification.title,
         body: memberNotification.message,
         url: '/dashboard'
-      }).catch(err => console.error('[BookingEvents] Push notification failed:', err));
+      }).catch(err => logger.error('[BookingEvents] Push notification failed:', { error: err }));
     }
 
     if (notifyStaff) {
@@ -216,7 +217,7 @@ export async function publish(
               }))
             );
           } catch (err: unknown) {
-            console.error('[BookingEvents] Failed to create staff notifications:', err);
+            logger.error('[BookingEvents] Failed to create staff notifications:', { error: err });
           }
         }
 
@@ -224,13 +225,13 @@ export async function publish(
           title: staffNotification.title,
           body: staffNotification.message,
           url: '/admin'
-        }).catch(err => console.error('[BookingEvents] Staff push notification failed:', err));
+        }).catch(err => logger.error('[BookingEvents] Staff push notification failed:', { error: err }));
       }
     }
 
-    console.log(`[BookingEvents] Successfully published ${eventType}`);
+    logger.info(`[BookingEvents] Successfully published ${eventType}`);
   } catch (error: unknown) {
-    console.error(`[BookingEvents] Failed to publish ${eventType}:`, error);
+    logger.error(`[BookingEvents] Failed to publish ${eventType}:`, { error: error });
   }
 }
 
@@ -241,7 +242,7 @@ async function getStaffEmails(): Promise<string[]> {
       .where(eq(staffUsers.isActive, true));
     return staff.map(s => s.email.toLowerCase());
   } catch (error: unknown) {
-    console.error('[BookingEvents] Failed to get staff emails:', error);
+    logger.error('[BookingEvents] Failed to get staff emails:', { error: error });
     return [];
   }
 }
@@ -272,7 +273,7 @@ export async function linkAndNotifyParticipants(
     .where(eq(bookingRequests.id, bookingId));
     
     if (!booking) {
-      console.warn(`[BookingEvents] Booking ${bookingId} not found`);
+      logger.warn(`[BookingEvents] Booking ${bookingId} not found`);
       return result;
     }
     
@@ -362,7 +363,7 @@ export async function linkAndNotifyParticipants(
           
           result.notified++;
         } catch (notifErr: unknown) {
-          console.error(`[BookingEvents] Failed to notify participant ${email}:`, notifErr);
+          logger.error(`[BookingEvents] Failed to notify participant ${email}:`, { error: notifErr });
         }
       } else if (participant.type === 'guest') {
         if (existingGuestEmails.has(email)) continue;
@@ -379,10 +380,10 @@ export async function linkAndNotifyParticipants(
       }
     }
     
-    console.log(`[BookingEvents] Linked ${result.linkedMembers} members and ${result.linkedGuests} guests to booking ${bookingId}, notified ${result.notified}`);
+    logger.info(`[BookingEvents] Linked ${result.linkedMembers} members and ${result.linkedGuests} guests to booking ${bookingId}, notified ${result.notified}`);
     return result;
   } catch (error: unknown) {
-    console.error(`[BookingEvents] Failed to link participants for booking ${bookingId}:`, error);
+    logger.error(`[BookingEvents] Failed to link participants for booking ${bookingId}:`, { error: error });
     return result;
   }
 }

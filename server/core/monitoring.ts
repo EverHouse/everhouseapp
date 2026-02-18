@@ -40,7 +40,7 @@ export async function logAlert(event: Omit<AlertEvent, 'timestamp'>): Promise<vo
   });
   
   if (event.severity === 'critical') {
-    console.error(`[CRITICAL ALERT] [${event.category}] ${event.message}`, event.details);
+    logger.error(`[CRITICAL ALERT] [${event.category}] ${event.message}`, { extra: { detail: event.details } });
   }
   
   try {

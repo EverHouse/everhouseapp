@@ -1,3 +1,4 @@
+import { logger } from '../logger';
 export async function upsertTransactionCache(payload: any): Promise<void> {
-  console.log('[TransactionCache] upsertTransactionCache called (stub)', payload);
+  logger.info('[TransactionCache] upsertTransactionCache called (stub)', { extra: { detail: payload } });
 }

@@ -1,6 +1,7 @@
 import { getGoogleCalendarClient } from '../integrations';
 import { CALENDAR_CONFIG } from './config';
 
+import { logger } from '../logger';
 const calendarIdCache: Record<string, string> = {};
 let cacheLastRefreshed: number = 0;
 const CACHE_TTL_MS = 30 * 60 * 1000;
@@ -40,11 +41,11 @@ export async function discoverCalendarIds(forceRefresh: boolean = false): Promis
     cacheLastRefreshed = Date.now();
     
     if (!calendarDiscoveryLogged) {
-      console.log(`[Calendar] Discovered ${calendars.length} calendars`);
+      logger.info(`[Calendar] Discovered ${calendars.length} calendars`);
       calendarDiscoveryLogged = true;
     }
   } catch (error) {
-    console.error('[Calendar] Error discovering calendars:', error);
+    logger.error('[Calendar] Error discovering calendars:', { error: error });
   }
 }
 

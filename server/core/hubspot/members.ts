@@ -11,6 +11,7 @@ import { addLineItemToDeal } from './lineItems';
 import { isPlaceholderEmail } from '../stripe/customers';
 import { getTodayPacific } from '../../utils/dateUtils';
 
+import { logger } from '../logger';
 export interface AddMemberInput {
   firstName: string;
   lastName: string;
@@ -61,7 +62,7 @@ export async function getContactDeals(hubspotContactId: string): Promise<any[]> 
     
     return deals;
   } catch (error) {
-    console.error('[HubSpotDeals] Error fetching contact deals:', error);
+    logger.error('[HubSpotDeals] Error fetching contact deals:', { error: error });
     return [];
   }
 }
@@ -74,7 +75,7 @@ export async function findOrCreateHubSpotContact(
   tier?: string
 ): Promise<{ contactId: string; isNew: boolean }> {
   if (isPlaceholderEmail(email)) {
-    console.log(`[HubSpot] Skipping contact creation for placeholder email: ${email}`);
+    logger.info(`[HubSpot] Skipping contact creation for placeholder email: ${email}`);
     throw new Error(`Cannot create HubSpot contact for placeholder email: ${email}`);
   }
   
@@ -116,11 +117,11 @@ export async function findOrCreateHubSpotContact(
       );
     
     if (isNetworkOrAuthError) {
-      console.error('[HubSpotDeals] Network/Auth error during contact search:', error);
+      logger.error('[HubSpotDeals] Network/Auth error during contact search:', { error: error });
       throw error;
     }
     
-    if (!isProduction) console.warn('[HubSpotDeals] Error searching for contact, will create new one:', error);
+    if (!isProduction) logger.warn('[HubSpotDeals] Error searching for contact, will create new one:', { error: error });
   }
   
   try {
@@ -152,7 +153,7 @@ export async function findOrCreateHubSpotContact(
     if (statusCode === 409 && errorBody?.message) {
       const match = errorBody.message.match(/Existing ID:\s*(\d+)/);
       if (match && match[1]) {
-        console.log(`[HubSpotDeals] Contact ${email} already exists (ID: ${match[1]}), using existing`);
+        logger.info(`[HubSpotDeals] Contact ${email} already exists (ID: ${match[1]}), using existing`);
         return { contactId: match[1], isNew: false };
       }
     }
@@ -169,7 +170,7 @@ export async function createMembershipDeal(
   startDate?: string,
   stage?: string
 ): Promise<string> {
-  console.log(`[HubSpot] Deal creation disabled — skipping deal for ${memberEmail}`);
+  logger.info(`[HubSpot] Deal creation disabled — skipping deal for ${memberEmail}`);
   return 'DEALS_DISABLED';
   const hubspot = await getHubSpotClient();
   const { denormalizeTierForHubSpot } = await import('../../utils/tierUtils');
@@ -211,7 +212,7 @@ export async function createDealForLegacyMember(
   performedBy: string,
   performedByName?: string
 ): Promise<{ success: boolean; dealId?: string; contactId?: string; lineItemId?: string; error?: string }> {
-  console.log(`[HubSpot] Deal creation disabled — skipping legacy deal for ${memberEmail}`);
+  logger.info(`[HubSpot] Deal creation disabled — skipping legacy deal for ${memberEmail}`);
   return { success: true, dealId: undefined, error: 'Deal creation disabled' };
   const normalizedEmail = memberEmail.toLowerCase().trim();
   
@@ -222,7 +223,7 @@ export async function createDealForLegacyMember(
     );
     
     if (memberResult.rows.length === 0) {
-      if (!isProduction) console.log(`[HubSpotDeals] Member not found in users table: ${memberEmail}`);
+      if (!isProduction) logger.info(`[HubSpotDeals] Member not found in users table: ${memberEmail}`);
       return { success: false, error: 'Member not found in users table' };
     }
     
@@ -234,7 +235,7 @@ export async function createDealForLegacyMember(
     
     const product = await getProductMapping(tier);
     if (!product) {
-      if (!isProduction) console.log(`[HubSpotDeals] No product mapping for tier: ${tier}`);
+      if (!isProduction) logger.info(`[HubSpotDeals] No product mapping for tier: ${tier}`);
       return { success: false, error: `No HubSpot product found for tier: ${tier}` };
     }
     
@@ -255,7 +256,7 @@ export async function createDealForLegacyMember(
     );
     
     if (existingMembershipDeal) {
-      console.log(`[HubSpotDeals] Contact ${normalizedEmail} already has a membership deal in HubSpot (ID: ${existingMembershipDeal.id}), skipping creation`);
+      logger.info(`[HubSpotDeals] Contact ${normalizedEmail} already has a membership deal in HubSpot (ID: ${existingMembershipDeal.id}), skipping creation`);
       
       const localRecord = await db.select()
         .from(hubspotDeals)
@@ -308,7 +309,7 @@ export async function createDealForLegacyMember(
     );
     
     if (!lineItemResult.success) {
-      console.error('[HubSpotDeals] Failed to add line item for legacy member deal');
+      logger.error('[HubSpotDeals] Failed to add line item for legacy member deal');
     }
     
     await db.insert(hubspotDeals).values({
@@ -347,7 +348,7 @@ export async function createDealForLegacyMember(
     });
     
     if (!isProduction) {
-      console.log(`[HubSpotDeals] Created deal ${dealId} for legacy member ${normalizedEmail} (stage: ${targetStage})`);
+      logger.info(`[HubSpotDeals] Created deal ${dealId} for legacy member ${normalizedEmail} (stage: ${targetStage})`);
     }
     
     return {
@@ -358,7 +359,7 @@ export async function createDealForLegacyMember(
     };
     
   } catch (error: unknown) {
-    console.error('[HubSpotDeals] Error creating deal for legacy member:', error);
+    logger.error('[HubSpotDeals] Error creating deal for legacy member:', { error: error });
     return { success: false, error: getErrorMessage(error) || 'Failed to create deal for legacy member' };
   }
 }
@@ -397,7 +398,7 @@ export async function createMemberLocally(input: AddMemberInput): Promise<Create
         );
 
     if (resolved && resolved.matchType !== 'direct') {
-      console.log(`[AddMember] Email ${normalizedEmail} resolved to existing user ${resolved.primaryEmail} via ${resolved.matchType}`);
+      logger.info(`[AddMember] Email ${normalizedEmail} resolved to existing user ${resolved.primaryEmail} via ${resolved.matchType}`);
     }
     
     if (existingUser.rows.length > 0) {
@@ -423,10 +424,10 @@ export async function createMemberLocally(input: AddMemberInput): Promise<Create
         [existing.id, firstName, lastName, phone || null, tier, startDate || getTodayPacific(), discountReason || null]
       );
       
-      console.log(`[AddMember] Converted existing visitor ${normalizedEmail} to member with tier ${tier}`);
+      logger.info(`[AddMember] Converted existing visitor ${normalizedEmail} to member with tier ${tier}`);
 
       findOrCreateHubSpotContact(normalizedEmail, firstName, lastName, phone || undefined, tier)
-        .catch((err: unknown) => console.error(`[AddMember] HubSpot contact sync failed for converted visitor ${normalizedEmail}:`, getErrorMessage(err)));
+        .catch((err: unknown) => logger.error(`[AddMember] HubSpot contact sync failed for converted visitor ${normalizedEmail}:`, { extra: { detail: getErrorMessage(err) } }));
 
       return { success: true, userId: updateResult.rows[0].id };
     }
@@ -452,17 +453,17 @@ export async function createMemberLocally(input: AddMemberInput): Promise<Create
     );
 
     findOrCreateHubSpotContact(normalizedEmail, firstName, lastName, phone || undefined, tier)
-      .catch((err: unknown) => console.error(`[AddMember] HubSpot contact sync failed for ${normalizedEmail}:`, getErrorMessage(err)));
+      .catch((err: unknown) => logger.error(`[AddMember] HubSpot contact sync failed for ${normalizedEmail}:`, { extra: { detail: getErrorMessage(err) } }));
     
     return { success: true, userId: result.rows[0].id };
   } catch (error: unknown) {
-    console.error('[AddMember] Failed to create user locally:', error);
+    logger.error('[AddMember] Failed to create user locally:', { error: error });
     return { success: false, error: getErrorMessage(error) || 'Failed to create member' };
   }
 }
 
 export async function syncNewMemberToHubSpot(input: AddMemberInput): Promise<void> {
-  console.log(`[HubSpot] Deal creation disabled — skipping syncNewMemberToHubSpot`);
+  logger.info(`[HubSpot] Deal creation disabled — skipping syncNewMemberToHubSpot`);
   return;
   const { firstName, lastName, email, phone, tier, startDate, discountReason, createdBy, createdByName } = input;
   const normalizedEmail = email.toLowerCase().trim();
@@ -473,7 +474,7 @@ export async function syncNewMemberToHubSpot(input: AddMemberInput): Promise<voi
   );
   
   if (existingUser.rows.length === 0) {
-    console.warn(`[SyncMember] User ${normalizedEmail} not found in database - skipping HubSpot sync`);
+    logger.warn(`[SyncMember] User ${normalizedEmail} not found in database - skipping HubSpot sync`);
     return;
   }
   
@@ -525,7 +526,7 @@ export async function syncNewMemberToHubSpot(input: AddMemberInput): Promise<voi
       const hubspot = await getHubSpotClient();
       await hubspot.crm.deals.basicApi.archive(dealId);
     } catch (rollbackError) {
-      console.error('[SyncMember] Failed to rollback deal creation:', rollbackError);
+      logger.error('[SyncMember] Failed to rollback deal creation:', { error: rollbackError });
     }
     throw new Error('Failed to add line item to deal');
   }
@@ -547,7 +548,7 @@ export async function syncNewMemberToHubSpot(input: AddMemberInput): Promise<voi
       lastKnownMindbodyStatus: 'active'
     });
   } catch (dealError: unknown) {
-    console.warn('[SyncMember] Failed to store deal record locally:', dealError);
+    logger.warn('[SyncMember] Failed to store deal record locally:', { error: dealError });
   }
   
   await db.insert(billingAuditLog).values({
@@ -570,7 +571,7 @@ export async function syncNewMemberToHubSpot(input: AddMemberInput): Promise<voi
   });
   
   if (!isProduction) {
-    console.log(`[SyncMember] Successfully synced member ${normalizedEmail} to HubSpot with deal ${dealId}`);
+    logger.info(`[SyncMember] Successfully synced member ${normalizedEmail} to HubSpot with deal ${dealId}`);
   }
 }
 
@@ -587,7 +588,7 @@ export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMe
     createdByName
   } = input;
   
-  console.log(`[HubSpot] Deal creation disabled — skipping createMemberWithDeal for ${email}`);
+  logger.info(`[HubSpot] Deal creation disabled — skipping createMemberWithDeal for ${email}`);
   return { success: false, error: 'Deal creation is currently disabled' };
   const normalizedEmail = email.toLowerCase().trim();
   
@@ -606,7 +607,7 @@ export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMe
         );
 
     if (resolved && resolved.matchType !== 'direct') {
-      console.log(`[AddMemberWithDeal] Email ${normalizedEmail} resolved to existing user ${resolved.primaryEmail} via ${resolved.matchType}`);
+      logger.info(`[AddMemberWithDeal] Email ${normalizedEmail} resolved to existing user ${resolved.primaryEmail} via ${resolved.matchType}`);
     }
     
     if (existingUser.rows.length > 0) {
@@ -661,7 +662,7 @@ export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMe
         const hubspot = await getHubSpotClient();
         await hubspot.crm.deals.basicApi.archive(dealId);
       } catch (rollbackError) {
-        console.error('[AddMember] Failed to rollback deal creation:', rollbackError);
+        logger.error('[AddMember] Failed to rollback deal creation:', { error: rollbackError });
       }
       return { success: false, error: 'Failed to add line item to deal' };
     }
@@ -690,7 +691,7 @@ export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMe
         ]
       );
     } catch (userError: unknown) {
-      console.error('[AddMember] Failed to create user in database:', userError);
+      logger.error('[AddMember] Failed to create user in database:', { error: userError });
       return { success: false, error: 'Failed to create user record in database' };
     }
     
@@ -706,7 +707,7 @@ export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMe
         lastKnownMindbodyStatus: 'active'
       });
     } catch (dealError: unknown) {
-      console.warn('[AddMember] Failed to store deal record locally (HubSpot has the deal though):', dealError);
+      logger.warn('[AddMember] Failed to store deal record locally (HubSpot has the deal though):', { error: dealError });
     }
     
     await db.insert(billingAuditLog).values({
@@ -728,7 +729,7 @@ export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMe
     });
     
     if (!isProduction) {
-      console.log(`[AddMember] Successfully created member ${normalizedEmail} with deal ${dealId}`);
+      logger.info(`[AddMember] Successfully created member ${normalizedEmail} with deal ${dealId}`);
     }
     
     return {
@@ -740,7 +741,7 @@ export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMe
     };
     
   } catch (error: unknown) {
-    console.error('[AddMember] Error creating member:', error);
+    logger.error('[AddMember] Error creating member:', { error: error });
     return { success: false, error: getErrorMessage(error) || 'Failed to create member' };
   }
 }
@@ -794,7 +795,7 @@ export async function getMemberPaymentStatus(email: string): Promise<{
     
     return { status };
   } catch (error) {
-    console.error('[HubSpotDeals] Error getting payment status:', error);
+    logger.error('[HubSpotDeals] Error getting payment status:', { error: error });
     return { status: 'unknown' };
   }
 }
@@ -832,7 +833,7 @@ export async function handleTierChange(
         .limit(1);
       
       if (fallbackDeal.length === 0) {
-        console.warn(`[HubSpotDeals] No deal found for member ${normalizedEmail} during tier change - skipping HubSpot sync`);
+        logger.warn(`[HubSpotDeals] No deal found for member ${normalizedEmail} during tier change - skipping HubSpot sync`);
         return { success: true, oldLineItemRemoved: false, newLineItemAdded: false };
       }
       
@@ -846,7 +847,7 @@ export async function handleTierChange(
     const newProduct = await getProductMapping(newTier);
     
     if (!newProduct) {
-      console.error(`[HubSpotDeals] No product mapping found for new tier: ${newTier}`);
+      logger.error(`[HubSpotDeals] No product mapping found for new tier: ${newTier}`);
       return { success: false, error: `No HubSpot product found for tier: ${newTier}` };
     }
     
@@ -878,10 +879,10 @@ export async function handleTierChange(
         oldLineItemRemoved = true;
         
         if (!isProduction) {
-          console.log(`[HubSpotDeals] Removed old tier line item ${oldTierLineItem.hubspotLineItemId} for tier ${oldTier}`);
+          logger.info(`[HubSpotDeals] Removed old tier line item ${oldTierLineItem.hubspotLineItemId} for tier ${oldTier}`);
         }
       } catch (removeError: unknown) {
-        console.error(`[HubSpotDeals] Failed to remove old line item:`, removeError);
+        logger.error(`[HubSpotDeals] Failed to remove old line item:`, { error: removeError });
       }
     }
     
@@ -918,7 +919,7 @@ export async function handleTierChange(
           })
         );
       } catch (dealUpdateError) {
-        console.warn('[HubSpotDeals] Failed to update deal membership_tier property:', dealUpdateError);
+        logger.warn('[HubSpotDeals] Failed to update deal membership_tier property:', { error: dealUpdateError });
       }
       
       if (deal.hubspotContactId) {
@@ -932,7 +933,7 @@ export async function handleTierChange(
             })
           );
         } catch (contactUpdateError) {
-          console.warn('[HubSpotDeals] Failed to update contact membership_tier property:', contactUpdateError);
+          logger.warn('[HubSpotDeals] Failed to update contact membership_tier property:', { error: contactUpdateError });
         }
       }
     }
@@ -963,7 +964,7 @@ export async function handleTierChange(
       .where(eq(hubspotDeals.id, deal.id));
     
     if (!isProduction) {
-      console.log(`[HubSpotDeals] Tier change completed for ${normalizedEmail}: ${oldTier} -> ${newTier}`);
+      logger.info(`[HubSpotDeals] Tier change completed for ${normalizedEmail}: ${oldTier} -> ${newTier}`);
     }
     
     return {
@@ -974,7 +975,7 @@ export async function handleTierChange(
     };
     
   } catch (error: unknown) {
-    console.error('[HubSpotDeals] Error handling tier change:', error);
+    logger.error('[HubSpotDeals] Error handling tier change:', { error: error });
     return { success: false, error: getErrorMessage(error) || 'Failed to handle tier change' };
   }
 }
@@ -993,7 +994,7 @@ export async function syncTierToHubSpot(params: {
   const hubspotTier = denormalizeTierForHubSpot(newTier);
   
   if (!hubspotTier) {
-    console.log(`[HubSpot TierSync] Unknown tier "${newTier}" for ${normalizedEmail}, skipping HubSpot sync`);
+    logger.info(`[HubSpot TierSync] Unknown tier "${newTier}" for ${normalizedEmail}, skipping HubSpot sync`);
     return;
   }
   
@@ -1003,7 +1004,7 @@ export async function syncTierToHubSpot(params: {
   );
   
   if (userResult.rows.length === 0 || !userResult.rows[0].hubspot_id) {
-    console.log(`[HubSpot TierSync] No HubSpot ID for ${normalizedEmail}, skipping sync`);
+    logger.info(`[HubSpot TierSync] No HubSpot ID for ${normalizedEmail}, skipping sync`);
     return;
   }
   
@@ -1041,7 +1042,7 @@ export async function syncTierToHubSpot(params: {
       hubspot.crm.contacts.basicApi.update(hubspotContactId, { properties })
     );
     
-    console.log(`[HubSpot TierSync] Updated contact ${normalizedEmail}: tier="${hubspotTier}", lifecycle="${lifecyclestage}", billing="${hubspotBillingProvider || 'not set'}"`);
+    logger.info(`[HubSpot TierSync] Updated contact ${normalizedEmail}: tier="${hubspotTier}", lifecycle="${lifecyclestage}", billing="${hubspotBillingProvider || 'not set'}"`);
     
     const dealResult = await db.select()
       .from(hubspotDeals)
@@ -1060,13 +1061,13 @@ export async function syncTierToHubSpot(params: {
             }
           })
         );
-        console.log(`[HubSpot TierSync] Updated deal ${dealResult[0].hubspotDealId} tier to "${hubspotTier}"`);
+        logger.info(`[HubSpot TierSync] Updated deal ${dealResult[0].hubspotDealId} tier to "${hubspotTier}"`);
       } catch (dealError) {
-        console.warn(`[HubSpot TierSync] Failed to update deal tier for ${normalizedEmail}:`, dealError);
+        logger.warn(`[HubSpot TierSync] Failed to update deal tier for ${normalizedEmail}:`, { error: dealError });
       }
     }
   } catch (error) {
-    console.error(`[HubSpot TierSync] Failed to sync tier for ${normalizedEmail}:`, error);
+    logger.error(`[HubSpot TierSync] Failed to sync tier for ${normalizedEmail}:`, { error: error });
     throw error;
   }
 }
@@ -1101,7 +1102,7 @@ export async function handleMembershipCancellation(
         .limit(1);
       
       if (fallbackDeal.length === 0) {
-        console.log(`[HubSpotDeals] No deal found for cancelled member ${normalizedEmail} - skipping HubSpot sync`);
+        logger.info(`[HubSpotDeals] No deal found for cancelled member ${normalizedEmail} - skipping HubSpot sync`);
         return { success: true, lineItemsRemoved: 0, dealMovedToLost: false };
       }
       
@@ -1112,7 +1113,7 @@ export async function handleMembershipCancellation(
     const hubspotDealId = deal.hubspotDealId;
     
     if (!hubspotDealId) {
-      console.log(`[HubSpotDeals] Deal has no HubSpot ID for ${normalizedEmail} - skipping HubSpot sync`);
+      logger.info(`[HubSpotDeals] Deal has no HubSpot ID for ${normalizedEmail} - skipping HubSpot sync`);
       return { success: true, lineItemsRemoved: 0, dealMovedToLost: false };
     }
     
@@ -1136,10 +1137,10 @@ export async function handleMembershipCancellation(
           lineItemsRemoved++;
           
           if (!isProduction) {
-            console.log(`[HubSpotDeals] Removed line item ${lineItem.hubspotLineItemId} for cancelled member ${normalizedEmail}`);
+            logger.info(`[HubSpotDeals] Removed line item ${lineItem.hubspotLineItemId} for cancelled member ${normalizedEmail}`);
           }
         } catch (removeError: unknown) {
-          console.error(`[HubSpotDeals] Failed to remove line item ${lineItem.hubspotLineItemId}:`, removeError);
+          logger.error(`[HubSpotDeals] Failed to remove line item ${lineItem.hubspotLineItemId}:`, { error: removeError });
         }
       }
     }
@@ -1166,9 +1167,9 @@ export async function handleMembershipCancellation(
           .where(eq(hubspotDeals.id, deal.id));
         
         dealMovedToLost = true;
-        console.log(`[HubSpotDeals] Moved deal ${hubspotDealId} to Closed Lost for ${normalizedEmail}`);
+        logger.info(`[HubSpotDeals] Moved deal ${hubspotDealId} to Closed Lost for ${normalizedEmail}`);
       } catch (stageError: unknown) {
-        console.error(`[HubSpotDeals] Failed to move deal to Closed Lost:`, stageError);
+        logger.error(`[HubSpotDeals] Failed to move deal to Closed Lost:`, { error: stageError });
       }
     }
     
@@ -1182,9 +1183,9 @@ export async function handleMembershipCancellation(
             }
           })
         );
-        console.log(`[HubSpotDeals] Updated contact status to cancelled for ${normalizedEmail}`);
+        logger.info(`[HubSpotDeals] Updated contact status to cancelled for ${normalizedEmail}`);
       } catch (contactError: unknown) {
-        console.warn(`[HubSpotDeals] Failed to update contact status:`, contactError);
+        logger.warn(`[HubSpotDeals] Failed to update contact status:`, { error: contactError });
       }
     }
     
@@ -1203,7 +1204,7 @@ export async function handleMembershipCancellation(
       performedByName
     });
     
-    console.log(`[HubSpotDeals] Cancellation processed for ${normalizedEmail}: ${lineItemsRemoved} line items removed, deal moved to lost: ${dealMovedToLost}`);
+    logger.info(`[HubSpotDeals] Cancellation processed for ${normalizedEmail}: ${lineItemsRemoved} line items removed, deal moved to lost: ${dealMovedToLost}`);
     
     return {
       success: true,
@@ -1212,7 +1213,7 @@ export async function handleMembershipCancellation(
     };
     
   } catch (error: unknown) {
-    console.error('[HubSpotDeals] Error handling membership cancellation:', error);
+    logger.error('[HubSpotDeals] Error handling membership cancellation:', { error: error });
     return { success: false, lineItemsRemoved: 0, dealMovedToLost: false, error: getErrorMessage(error) || 'Failed to handle cancellation' };
   }
 }

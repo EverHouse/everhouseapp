@@ -2,6 +2,7 @@ import { pool } from '../db';
 import { PRICING } from './pricingConfig';
 import { getErrorMessage } from '../../utils/errorUtils';
 
+import { logger } from '../logger';
 export interface ParticipantFee {
   participantId: number;
   amountCents: number;
@@ -114,7 +115,7 @@ export async function calculateAndCacheParticipantFees(
     };
   } catch (error: unknown) {
     await client.query('ROLLBACK');
-    console.error('[FeeCalculator] Error calculating fees:', error);
+    logger.error('[FeeCalculator] Error calculating fees:', { error: error });
     return {
       fees: [],
       totalCents: 0,
@@ -135,7 +136,7 @@ export async function clearCachedFees(participantIds: number[]): Promise<void> {
       [participantIds]
     );
   } catch (error) {
-    console.error('[FeeCalculator] Error clearing cached fees:', error);
+    logger.error('[FeeCalculator] Error clearing cached fees:', { error: error });
   }
 }
 

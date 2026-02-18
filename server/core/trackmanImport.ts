@@ -17,6 +17,7 @@ import { cancelPaymentIntent } from './stripe';
 import { alertOnTrackmanImportIssues } from './dataAlerts';
 import { staffUsers } from '../../shared/schema';
 
+import { logger } from './logger';
 /**
  * Fetches email addresses of all active staff members with the 'golf_instructor' role.
  * Used to identify lesson bookings during Trackman import and cleanup.
@@ -34,7 +35,7 @@ export async function getGolfInstructorEmails(): Promise<string[]> {
       .map(i => i.email?.toLowerCase())
       .filter((email): email is string => !!email);
   } catch (err: unknown) {
-    console.error('[Trackman] Error fetching golf instructor emails:', err);
+    logger.error('[Trackman] Error fetching golf instructor emails:', { error: err });
     // Fallback to empty array - caller should handle gracefully
     return [];
   }
@@ -1205,7 +1206,7 @@ async function createTrackmanSessionAndParticipants(input: SessionCreationInput)
           await db.update(bookingRequests)
             .set({ staffNotes: updatedCriticalNotes })
             .where(eq(bookingRequests.id, input.bookingId));
-        } catch (noteErr: unknown) { console.warn('[TrackmanImport] Failed to save session creation failure note:', getErrorMessage(noteErr) || noteErr); }
+        } catch (noteErr: unknown) { logger.warn('[TrackmanImport] Failed to save session creation failure note:', { error: getErrorMessage(noteErr) || noteErr }); }
       }
     }
   } catch (outerError: unknown) {
@@ -4155,7 +4156,7 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
   skipped: number;
 }> {
   const logs: string[] = [];
-  const log = (msg: string) => { console.log(msg); logs.push(msg); };
+  const log = (msg: string) => { logger.info(msg); logs.push(msg); };
 
   log(`[Lesson Cleanup] Starting run (Dry Run: ${dryRun})...`);
 

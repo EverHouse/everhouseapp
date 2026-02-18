@@ -4,6 +4,7 @@ import { CALENDAR_CONFIG } from '../config';
 import { getCalendarIdByName } from '../cache';
 import { getPacificMidnightUTC } from '../../../utils/dateUtils';
 
+import { logger } from '../../logger';
 function stripHtmlTags(html: string): string {
   if (!html) return '';
   return html
@@ -160,7 +161,7 @@ async function getResourceIdsForAffectedAreas(affectedAreas: string): Promise<nu
   }
   
   if (idSet.size === 0) {
-    console.warn(`[getResourceIdsForAffectedAreas] Could not resolve resources for "${affectedAreas}", falling back to entire_facility`);
+    logger.warn(`[getResourceIdsForAffectedAreas] Could not resolve resources for "${affectedAreas}", falling back to entire_facility`);
     return getAllResourceIds();
   }
   
@@ -197,7 +198,7 @@ async function createAvailabilityBlocks(
   
   if (filteredIds.length < resourceIds.length) {
     const skippedIds = resourceIds.filter(id => !validResourceIds.has(id));
-    console.log(`[Calendar Sync] Skipping non-existent resource IDs: ${skippedIds.join(', ')}`);
+    logger.info(`[Calendar Sync] Skipping non-existent resource IDs: ${skippedIds.join(', ')}`);
   }
   
   const valueRows: any[] = [];
@@ -362,9 +363,9 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
             const blockStartTime = startTime || '08:00:00';
             const blockEndTime = endTime || '22:00:00';
             await createAvailabilityBlocks(closureId, resourceIds, dates, blockStartTime, blockEndTime, title);
-            console.log(`[Calendar Sync] Updated availability blocks for closure #${closureId}: ${title}`);
+            logger.info(`[Calendar Sync] Updated availability blocks for closure #${closureId}: ${title}`);
           } else {
-            console.log(`[Calendar Sync] Updated closure #${closureId}: ${title} (no availability blocks - affected_areas='none')`);
+            logger.info(`[Calendar Sync] Updated closure #${closureId}: ${title} (no availability blocks - affected_areas='none')`);
           }
         }
         
@@ -390,9 +391,9 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
           const blockStartTime = startTime || '08:00:00';
           const blockEndTime = endTime || '22:00:00';
           const blocksCreated = await createAvailabilityBlocks(closureId, resourceIds, dates, blockStartTime, blockEndTime, title);
-          console.log(`[Calendar Sync] Created ${blocksCreated} availability blocks for closure #${closureId}: ${title}`);
+          logger.info(`[Calendar Sync] Created ${blocksCreated} availability blocks for closure #${closureId}: ${title}`);
         } else {
-          console.log(`[Calendar Sync] Created closure #${closureId}: ${title} (no availability blocks - affected_areas='none')`);
+          logger.info(`[Calendar Sync] Created closure #${closureId}: ${title} (no availability blocks - affected_areas='none')`);
         }
         
         created++;
@@ -408,14 +409,14 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
       if (cancelledEventIds.has(closure.internal_calendar_id) || !fetchedEventIds.has(closure.internal_calendar_id)) {
         await deleteAvailabilityBlocks(closure.id);
         await pool.query('UPDATE facility_closures SET is_active = false WHERE id = $1', [closure.id]);
-        console.log(`[Calendar Sync] Deactivated closure #${closure.id} and removed availability blocks`);
+        logger.info(`[Calendar Sync] Deactivated closure #${closure.id} and removed availability blocks`);
         deleted++;
       }
     }
     
     return { synced: events.length, created, updated, deleted };
   } catch (error) {
-    console.error('Error syncing Internal Calendar to closures:', error);
+    logger.error('Error syncing Internal Calendar to closures:', { error: error });
     return { synced: 0, created: 0, updated: 0, deleted: 0, error: 'Failed to sync closures' };
   }
 }

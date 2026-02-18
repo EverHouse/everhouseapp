@@ -4,6 +4,7 @@ import { db } from '../../db';
 import { formSubmissions } from '../../../shared/schema';
 import { eq, and, gte, lte } from 'drizzle-orm';
 
+import { logger } from '../logger';
 const HUBSPOT_FORMS: Record<string, string> = {
   'tour-request': process.env.HUBSPOT_FORM_TOUR_REQUEST || '',
   'membership': process.env.HUBSPOT_FORM_MEMBERSHIP || '',
@@ -128,7 +129,7 @@ export async function syncHubSpotFormSubmissions(): Promise<{
         accessToken = await getHubSpotAccessToken();
       } catch (err: unknown) {
         const msg = `Failed to get HubSpot access token: ${getErrorMessage(err)}`;
-        console.error(`[HubSpot FormSync] ${msg}`);
+        logger.error(`[HubSpot FormSync] ${msg}`);
         result.errors.push(msg);
         return result;
       }
@@ -146,7 +147,7 @@ export async function syncHubSpotFormSubmissions(): Promise<{
 
     for (const [formId, formTypes] of formIdToTypes.entries()) {
       const defaultFormType = formTypes[0];
-      console.log(`[HubSpot FormSync] Fetching submissions for form ${formId} (types: ${formTypes.join(', ')})`);
+      logger.info(`[HubSpot FormSync] Fetching submissions for form ${formId} (types: ${formTypes.join(', ')})`);
 
       let submissions: HubSpotSubmission[];
       try {
@@ -155,19 +156,19 @@ export async function syncHubSpotFormSubmissions(): Promise<{
         const errMsg = getErrorMessage(err);
         if (errMsg.includes('HUBSPOT_FORMS_ACCESS_DENIED')) {
           if (!formSyncAccessDeniedLogged) {
-            console.warn('[HubSpot FormSync] Access denied (403) - token may lack "forms" scope. Skipping remaining forms.');
+            logger.warn('[HubSpot FormSync] Access denied (403) - token may lack "forms" scope. Skipping remaining forms.');
             formSyncAccessDeniedLogged = true;
           }
           break;
         }
         const msg = `Failed to fetch form ${formId}: ${errMsg}`;
-        console.error(`[HubSpot FormSync] ${msg}`);
+        logger.error(`[HubSpot FormSync] ${msg}`);
         result.errors.push(msg);
         continue;
       }
 
       result.totalFetched += submissions.length;
-      console.log(`[HubSpot FormSync] Found ${submissions.length} submissions for form ${formId}`);
+      logger.info(`[HubSpot FormSync] Found ${submissions.length} submissions for form ${formId}`);
 
       for (const submission of submissions) {
         try {
@@ -245,15 +246,15 @@ export async function syncHubSpotFormSubmissions(): Promise<{
           result.newInserted++;
         } catch (err: unknown) {
           const msg = `Failed to insert submission ${submission.conversionId}: ${getErrorMessage(err)}`;
-          console.error(`[HubSpot FormSync] ${msg}`);
+          logger.error(`[HubSpot FormSync] ${msg}`);
           result.errors.push(msg);
         }
       }
     }
 
-    console.log(`[HubSpot FormSync] Sync complete: ${result.totalFetched} fetched, ${result.newInserted} inserted, ${result.skippedDuplicate} duplicates skipped, ${result.errors.length} errors`);
+    logger.info(`[HubSpot FormSync] Sync complete: ${result.totalFetched} fetched, ${result.newInserted} inserted, ${result.skippedDuplicate} duplicates skipped, ${result.errors.length} errors`);
   } catch (err: unknown) {
-    console.error(`[HubSpot FormSync] Unexpected error during sync: ${getErrorMessage(err)}`);
+    logger.error(`[HubSpot FormSync] Unexpected error during sync: ${getErrorMessage(err)}`);
     result.errors.push(`Unexpected sync error: ${getErrorMessage(err)}`);
   }
 

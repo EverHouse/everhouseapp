@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import { getStripeClient } from './client';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 
+import { logger } from '../logger';
 export interface CustomerSyncResult {
   success: boolean;
   updated: number;
@@ -28,7 +29,7 @@ export async function syncStripeCustomersForMindBodyMembers(): Promise<CustomerS
   };
 
   try {
-    console.log('[Stripe Customer Sync] Starting metadata sync for existing Stripe customers...');
+    logger.info('[Stripe Customer Sync] Starting metadata sync for existing Stripe customers...');
     
     const membersResult = await db.execute(sql`
       SELECT id, email, first_name, last_name, tier, stripe_customer_id
@@ -43,10 +44,10 @@ export async function syncStripeCustomersForMindBodyMembers(): Promise<CustomerS
     `);
     
     const members = membersResult.rows;
-    console.log(`[Stripe Customer Sync] Found ${members.length} MindBody members with existing Stripe customers to update`);
+    logger.info(`[Stripe Customer Sync] Found ${members.length} MindBody members with existing Stripe customers to update`);
     
     if (members.length === 0) {
-      console.log('[Stripe Customer Sync] No existing Stripe customers to update');
+      logger.info('[Stripe Customer Sync] No existing Stripe customers to update');
       return result;
     }
 
@@ -80,7 +81,7 @@ export async function syncStripeCustomersForMindBodyMembers(): Promise<CustomerS
             reason: 'Customer no longer exists in Stripe',
           });
         } else {
-          console.error(`[Stripe Customer Sync] Error updating ${member.email}:`, getErrorMessage(error));
+          logger.error(`[Stripe Customer Sync] Error updating ${member.email}:`, { extra: { detail: getErrorMessage(error) } });
           result.errors.push(`${member.email}: ${getErrorMessage(error)}`);
           result.details.push({
             email: member.email as string,
@@ -95,10 +96,10 @@ export async function syncStripeCustomersForMindBodyMembers(): Promise<CustomerS
     if (result.cleared > 0) parts.push(`cleared_stale=${result.cleared}`);
     if (result.skipped > 0) parts.push(`skipped=${result.skipped}`);
     if (result.errors.length > 0) parts.push(`errors=${result.errors.length}`);
-    console.log(`[Stripe Customer Sync] Completed: ${parts.join(', ')}`);
+    logger.info(`[Stripe Customer Sync] Completed: ${parts.join(', ')}`);
     
   } catch (error: unknown) {
-    console.error('[Stripe Customer Sync] Fatal error:', error);
+    logger.error('[Stripe Customer Sync] Fatal error:', { error: error });
     result.success = false;
     result.errors.push(`Fatal: ${getErrorMessage(error)}`);
   }

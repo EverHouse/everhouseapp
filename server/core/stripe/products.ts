@@ -8,6 +8,7 @@ import { clearTierCache } from '../tierService';
 import { PRICING, getCorporateVolumeTiers, getCorporateBasePrice, updateCorporateVolumePricing, updateOverageRate, updateGuestFee, VolumeTier } from '../billing/pricingConfig';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 
+import { logger } from '../logger';
 export interface HubSpotProduct {
   id: string;
   name: string;
@@ -86,7 +87,7 @@ async function findExistingStripeProduct(
         limit: 1,
       });
       if (productsByMetadata.data.length > 0) {
-        console.log(`[Stripe Products] Found existing product by metadata: ${productsByMetadata.data[0].id}`);
+        logger.info(`[Stripe Products] Found existing product by metadata: ${productsByMetadata.data[0].id}`);
         return productsByMetadata.data[0];
       }
     }
@@ -97,13 +98,13 @@ async function findExistingStripeProduct(
       limit: 1,
     });
     if (productsByName.data.length > 0) {
-      console.log(`[Stripe Products] Found existing product by name "${productName}": ${productsByName.data[0].id}`);
+      logger.info(`[Stripe Products] Found existing product by name "${productName}": ${productsByName.data[0].id}`);
       return productsByName.data[0];
     }
     
     return null;
   } catch (error) {
-    console.error('[Stripe Products] Error searching for existing product:', error);
+    logger.error('[Stripe Products] Error searching for existing product:', { error: error });
     return null;
   }
 }
@@ -111,7 +112,7 @@ async function findExistingStripeProduct(
 export async function fetchHubSpotProducts(): Promise<HubSpotProduct[]> {
   try {
     const { client: hubspot, source } = await getHubSpotClientWithFallback();
-    console.log(`[Stripe Products] Using HubSpot ${source} for products API`);
+    logger.info(`[Stripe Products] Using HubSpot ${source} for products API`);
     
     const properties = ['name', 'price', 'hs_sku', 'description', 'hs_recurring_billing_period'];
     let allProducts: any[] = [];
@@ -134,10 +135,10 @@ export async function fetchHubSpotProducts(): Promise<HubSpotProduct[]> {
   } catch (error: unknown) {
     const errorBody = error && typeof error === 'object' && 'body' in error ? (error as { body: Record<string, unknown> }).body : undefined;
     if (getErrorCode(error) === '403' && errorBody?.category === 'MISSING_SCOPES') {
-      console.error('[Stripe Products] Missing HubSpot scopes. Add HUBSPOT_PRIVATE_APP_TOKEN secret with a Private App that has crm.objects.products.read scope.');
+      logger.error('[Stripe Products] Missing HubSpot scopes. Add HUBSPOT_PRIVATE_APP_TOKEN secret with a Private App that has crm.objects.products.read scope.');
       throw new Error('HubSpot products access denied. Please add HUBSPOT_PRIVATE_APP_TOKEN secret with your Private App token that has products read permission.');
     }
-    console.error('[Stripe Products] Error fetching HubSpot products:', error);
+    logger.error('[Stripe Products] Error fetching HubSpot products:', { error: error });
     throw error;
   }
 }
@@ -214,7 +215,7 @@ export async function syncHubSpotProductToStripe(hubspotProduct: HubSpotProduct)
         })
         .where(eq(stripeProducts.hubspotProductId, hubspotProduct.id));
       
-      console.log(`[Stripe Products] Updated product ${hubspotProduct.name} (${hubspotProduct.id})`);
+      logger.info(`[Stripe Products] Updated product ${hubspotProduct.name} (${hubspotProduct.id})`);
       
       return {
         success: true,
@@ -242,7 +243,7 @@ export async function syncHubSpotProductToStripe(hubspotProduct: HubSpotProduct)
           hubspot_sku: hubspotProduct.sku || '',
         },
       });
-      console.log(`[Stripe Products] Reusing existing Stripe product ${stripeProduct.id} for ${hubspotProduct.name}`);
+      logger.info(`[Stripe Products] Reusing existing Stripe product ${stripeProduct.id} for ${hubspotProduct.name}`);
     } else {
       stripeProduct = await stripe.products.create({
         name: hubspotProduct.name,
@@ -286,7 +287,7 @@ export async function syncHubSpotProductToStripe(hubspotProduct: HubSpotProduct)
       isActive: true,
     });
     
-    console.log(`[Stripe Products] Created product ${hubspotProduct.name} (${hubspotProduct.id}) -> ${stripeProduct.id}`);
+    logger.info(`[Stripe Products] Created product ${hubspotProduct.name} (${hubspotProduct.id}) -> ${stripeProduct.id}`);
     
     return {
       success: true,
@@ -294,7 +295,7 @@ export async function syncHubSpotProductToStripe(hubspotProduct: HubSpotProduct)
       stripePriceId: stripePrice.id,
     };
   } catch (error: unknown) {
-    console.error('[Stripe Products] Error syncing product:', error);
+    logger.error('[Stripe Products] Error syncing product:', { error: error });
     return {
       success: false,
       error: getErrorMessage(error),
@@ -325,11 +326,11 @@ export async function syncAllHubSpotProductsToStripe(): Promise<{
       }
     }
     
-    console.log(`[Stripe Products] Sync complete: ${synced} synced, ${failed} failed`);
+    logger.info(`[Stripe Products] Sync complete: ${synced} synced, ${failed} failed`);
     
     return { success: true, synced, failed, errors };
   } catch (error: unknown) {
-    console.error('[Stripe Products] Error syncing all products:', error);
+    logger.error('[Stripe Products] Error syncing all products:', { error: error });
     return {
       success: false,
       synced: 0,
@@ -344,7 +345,7 @@ export async function getStripeProducts(): Promise<StripeProductWithPrice[]> {
     const products = await db.select().from(stripeProducts);
     return products;
   } catch (error: unknown) {
-    console.error('[Stripe Products] Error getting products:', error);
+    logger.error('[Stripe Products] Error getting products:', { error: error });
     return [];
   }
 }
@@ -368,7 +369,7 @@ export async function getProductSyncStatus(): Promise<ProductSyncStatus[]> {
       };
     });
   } catch (error: unknown) {
-    console.error('[Stripe Products] Error getting sync status:', error);
+    logger.error('[Stripe Products] Error getting sync status:', { error: error });
     return [];
   }
 }
@@ -460,12 +461,12 @@ export async function syncMembershipTiersToStripe(): Promise<{
     const stripe = await getStripeClient();
     const tiers = await db.select().from(membershipTiers).where(eq(membershipTiers.isActive, true));
 
-    console.log(`[Tier Sync] Starting sync for ${tiers.length} active tiers`);
+    logger.info(`[Tier Sync] Starting sync for ${tiers.length} active tiers`);
 
     for (const tier of tiers) {
       try {
         if (!tier.priceCents || tier.priceCents <= 0) {
-          console.log(`[Tier Sync] Skipping ${tier.name}: No price configured`);
+          logger.info(`[Tier Sync] Skipping ${tier.name}: No price configured`);
           results.push({
             tierId: tier.id,
             tierName: tier.name,
@@ -503,7 +504,7 @@ export async function syncMembershipTiersToStripe(): Promise<{
             updateParams.marketing_features = marketingFeatures;
           }
           await stripe.products.update(stripeProductId, updateParams);
-          console.log(`[Tier Sync] Updated existing product for ${tier.name} with privileges${hasMarketingFeatures ? ' and features' : ''}`);
+          logger.info(`[Tier Sync] Updated existing product for ${tier.name} with privileges${hasMarketingFeatures ? ' and features' : ''}`);
 
           // Price metadata (subset of privilege metadata for reference)
           const priceMetadata = { tier_id: tier.id.toString(), tier_slug: tier.slug, product_type: tier.productType || 'subscription' };
@@ -523,7 +524,7 @@ export async function syncMembershipTiersToStripe(): Promise<{
               }
               const newPrice = await stripe.prices.create(priceParams);
               stripePriceId = newPrice.id;
-              console.log(`[Tier Sync] Created new price for ${tier.name} (price changed)`);
+              logger.info(`[Tier Sync] Created new price for ${tier.name} (price changed)`);
             }
           } else {
             const priceParams: any = {
@@ -575,7 +576,7 @@ export async function syncMembershipTiersToStripe(): Promise<{
           if (existingStripeProduct) {
             // Use existing product, just update it
             stripeProduct = await stripe.products.update(existingStripeProduct.id, createParams);
-            console.log(`[Tier Sync] Reusing existing Stripe product ${stripeProduct.id} for ${tier.name}`);
+            logger.info(`[Tier Sync] Reusing existing Stripe product ${stripeProduct.id} for ${tier.name}`);
           } else {
             stripeProduct = await stripe.products.create(createParams);
           }
@@ -602,7 +603,7 @@ export async function syncMembershipTiersToStripe(): Promise<{
             })
             .where(eq(membershipTiers.id, tier.id));
 
-          console.log(`[Tier Sync] Created product and price for ${tier.name} with privileges`);
+          logger.info(`[Tier Sync] Created product and price for ${tier.name} with privileges`);
           results.push({
             tierId: tier.id,
             tierName: tier.name,
@@ -615,7 +616,7 @@ export async function syncMembershipTiersToStripe(): Promise<{
           synced++;
         }
       } catch (error: unknown) {
-        console.error(`[Tier Sync] Error syncing tier ${tier.name}:`, error);
+        logger.error(`[Tier Sync] Error syncing tier ${tier.name}:`, { error: error });
         results.push({
           tierId: tier.id,
           tierName: tier.name,
@@ -628,10 +629,10 @@ export async function syncMembershipTiersToStripe(): Promise<{
       }
     }
 
-    console.log(`[Tier Sync] Complete: ${synced} synced, ${failed} failed, ${skipped} skipped`);
+    logger.info(`[Tier Sync] Complete: ${synced} synced, ${failed} failed, ${skipped} skipped`);
     return { success: true, results, synced, failed, skipped };
   } catch (error: unknown) {
-    console.error('[Tier Sync] Fatal error:', error);
+    logger.error('[Tier Sync] Fatal error:', { error: error });
     return {
       success: false,
       results,
@@ -666,7 +667,7 @@ export async function getTierSyncStatus(): Promise<Array<{
       stripePriceId: tier.stripePriceId,
     }));
   } catch (error: unknown) {
-    console.error('[Tier Sync] Error getting status:', error);
+    logger.error('[Tier Sync] Error getting status:', { error: error });
     return [];
   }
 }
@@ -702,7 +703,7 @@ export async function cleanupOrphanStripeProducts(): Promise<{
       `${t.name} Membership`,
     ]));
     
-    console.log(`[Stripe Cleanup] Found ${activeTierIds.size} active tiers, ${activeStripeProductIds.size} with Stripe products`);
+    logger.info(`[Stripe Cleanup] Found ${activeTierIds.size} active tiers, ${activeStripeProductIds.size} with Stripe products`);
 
     let hasMore = true;
     let startingAfter: string | undefined;
@@ -729,7 +730,7 @@ export async function cleanupOrphanStripeProducts(): Promise<{
           const tierId = product.metadata?.tier_id;
           
           if (!tierId) {
-            console.log(`[Stripe Cleanup] Skipping ${product.name}: No tier_id metadata`);
+            logger.info(`[Stripe Cleanup] Skipping ${product.name}: No tier_id metadata`);
             results.push({
               productId: product.id,
               productName: product.name,
@@ -752,7 +753,7 @@ export async function cleanupOrphanStripeProducts(): Promise<{
             ? `Duplicate product not linked to app (name matches tier)`
             : `Tier ID ${product.metadata?.tier_id} no longer active in app`;
           
-          console.log(`[Stripe Cleanup] Archived orphan product: ${product.name} (${product.id})`);
+          logger.info(`[Stripe Cleanup] Archived orphan product: ${product.name} (${product.id})`);
           results.push({
             productId: product.id,
             productName: product.name,
@@ -761,7 +762,7 @@ export async function cleanupOrphanStripeProducts(): Promise<{
           });
           archived++;
         } catch (archiveError: unknown) {
-          console.error(`[Stripe Cleanup] Error archiving ${product.name}:`, archiveError);
+          logger.error(`[Stripe Cleanup] Error archiving ${product.name}:`, { error: archiveError });
           results.push({
             productId: product.id,
             productName: product.name,
@@ -778,10 +779,10 @@ export async function cleanupOrphanStripeProducts(): Promise<{
       }
     }
     
-    console.log(`[Stripe Cleanup] Complete: ${archived} archived, ${skipped} skipped, ${errors} errors`);
+    logger.info(`[Stripe Cleanup] Complete: ${archived} archived, ${skipped} skipped, ${errors} errors`);
     return { success: true, archived, skipped, errors, results };
   } catch (error: unknown) {
-    console.error('[Stripe Cleanup] Fatal error:', error);
+    logger.error('[Stripe Cleanup] Fatal error:', { error: error });
     return { success: false, archived, skipped, errors, results };
   }
 }
@@ -845,7 +846,7 @@ export async function ensureSimulatorOverageProduct(): Promise<{
         priceCents: OVERAGE_PRICE_CENTS,
       }).returning();
       tierId = newTier.id;
-      console.log(`[Overage Product] Created database record: ${OVERAGE_NAME}`);
+      logger.info(`[Overage Product] Created database record: ${OVERAGE_NAME}`);
     } else {
       tierId = existing[0].id;
     }
@@ -864,7 +865,7 @@ export async function ensureSimulatorOverageProduct(): Promise<{
         },
       });
       stripeProductId = product.id;
-      console.log(`[Overage Product] Created Stripe product: ${stripeProductId}`);
+      logger.info(`[Overage Product] Created Stripe product: ${stripeProductId}`);
     }
     
     // Create or verify Stripe price
@@ -881,7 +882,7 @@ export async function ensureSimulatorOverageProduct(): Promise<{
         },
       });
       stripePriceId = price.id;
-      console.log(`[Overage Product] Created Stripe price: ${stripePriceId}`);
+      logger.info(`[Overage Product] Created Stripe price: ${stripePriceId}`);
     }
     
     // Update database with Stripe IDs
@@ -892,7 +893,7 @@ export async function ensureSimulatorOverageProduct(): Promise<{
       })
       .where(eq(membershipTiers.id, tierId));
     
-    console.log(`[Overage Product] ${OVERAGE_NAME} ready (${stripePriceId})`);
+    logger.info(`[Overage Product] ${OVERAGE_NAME} ready (${stripePriceId})`);
 
     try {
       const actualPrice = await stripe.prices.retrieve(stripePriceId);
@@ -900,12 +901,12 @@ export async function ensureSimulatorOverageProduct(): Promise<{
         updateOverageRate(actualPrice.unit_amount);
       }
     } catch (priceReadErr) {
-      console.warn('[Overage Product] Failed to read Stripe price, using default:', priceReadErr);
+      logger.warn('[Overage Product] Failed to read Stripe price, using default:', { error: priceReadErr });
     }
 
     return { success: true, stripeProductId, stripePriceId, action: existing.length > 0 && existing[0].stripePriceId ? 'exists' : 'created' };
   } catch (error: unknown) {
-    console.error('[Overage Product] Error:', getErrorMessage(error));
+    logger.error('[Overage Product] Error:', { extra: { detail: getErrorMessage(error) } });
     return { success: false, action: 'error' };
   }
 }
@@ -963,7 +964,7 @@ export async function ensureGuestPassProduct(): Promise<{
         priceCents: GUEST_PASS_PRICE_CENTS,
       }).returning();
       tierId = newTier.id;
-      console.log(`[Guest Pass Product] Created database record: ${GUEST_PASS_NAME}`);
+      logger.info(`[Guest Pass Product] Created database record: ${GUEST_PASS_NAME}`);
     } else {
       tierId = existing[0].id;
     }
@@ -981,7 +982,7 @@ export async function ensureGuestPassProduct(): Promise<{
         },
       });
       stripeProductId = product.id;
-      console.log(`[Guest Pass Product] Created Stripe product: ${stripeProductId}`);
+      logger.info(`[Guest Pass Product] Created Stripe product: ${stripeProductId}`);
     }
     
     if (!stripePriceId) {
@@ -997,7 +998,7 @@ export async function ensureGuestPassProduct(): Promise<{
         },
       });
       stripePriceId = price.id;
-      console.log(`[Guest Pass Product] Created Stripe price: ${stripePriceId}`);
+      logger.info(`[Guest Pass Product] Created Stripe price: ${stripePriceId}`);
     }
     
     await db.update(membershipTiers)
@@ -1007,7 +1008,7 @@ export async function ensureGuestPassProduct(): Promise<{
       })
       .where(eq(membershipTiers.id, tierId));
     
-    console.log(`[Guest Pass Product] ${GUEST_PASS_NAME} ready (${stripePriceId})`);
+    logger.info(`[Guest Pass Product] ${GUEST_PASS_NAME} ready (${stripePriceId})`);
 
     try {
       const actualPrice = await stripe.prices.retrieve(stripePriceId);
@@ -1015,12 +1016,12 @@ export async function ensureGuestPassProduct(): Promise<{
         updateGuestFee(actualPrice.unit_amount);
       }
     } catch (priceReadErr) {
-      console.warn('[Guest Pass Product] Failed to read Stripe price, using default:', priceReadErr);
+      logger.warn('[Guest Pass Product] Failed to read Stripe price, using default:', { error: priceReadErr });
     }
 
     return { success: true, stripeProductId, stripePriceId, action: existing.length > 0 && existing[0].stripePriceId ? 'exists' : 'created' };
   } catch (error: unknown) {
-    console.error('[Guest Pass Product] Error:', getErrorMessage(error));
+    logger.error('[Guest Pass Product] Error:', { extra: { detail: getErrorMessage(error) } });
     return { success: false, action: 'error' };
   }
 }
@@ -1078,7 +1079,7 @@ export async function ensureDayPassCoworkingProduct(): Promise<{
         priceCents: COWORKING_PRICE_CENTS,
       }).returning();
       tierId = newTier.id;
-      console.log(`[Day Pass Coworking Product] Created database record: ${COWORKING_NAME}`);
+      logger.info(`[Day Pass Coworking Product] Created database record: ${COWORKING_NAME}`);
     } else {
       tierId = existing[0].id;
     }
@@ -1096,7 +1097,7 @@ export async function ensureDayPassCoworkingProduct(): Promise<{
         },
       });
       stripeProductId = product.id;
-      console.log(`[Day Pass Coworking Product] Created Stripe product: ${stripeProductId}`);
+      logger.info(`[Day Pass Coworking Product] Created Stripe product: ${stripeProductId}`);
     }
     
     if (!stripePriceId) {
@@ -1112,7 +1113,7 @@ export async function ensureDayPassCoworkingProduct(): Promise<{
         },
       });
       stripePriceId = price.id;
-      console.log(`[Day Pass Coworking Product] Created Stripe price: ${stripePriceId}`);
+      logger.info(`[Day Pass Coworking Product] Created Stripe price: ${stripePriceId}`);
     }
     
     await db.update(membershipTiers)
@@ -1122,10 +1123,10 @@ export async function ensureDayPassCoworkingProduct(): Promise<{
       })
       .where(eq(membershipTiers.id, tierId));
     
-    console.log(`[Day Pass Coworking Product] ${COWORKING_NAME} ready (${stripePriceId})`);
+    logger.info(`[Day Pass Coworking Product] ${COWORKING_NAME} ready (${stripePriceId})`);
     return { success: true, stripeProductId, stripePriceId, action: existing.length > 0 && existing[0].stripePriceId ? 'exists' : 'created' };
   } catch (error: unknown) {
-    console.error('[Day Pass Coworking Product] Error:', getErrorMessage(error));
+    logger.error('[Day Pass Coworking Product] Error:', { extra: { detail: getErrorMessage(error) } });
     return { success: false, action: 'error' };
   }
 }
@@ -1183,7 +1184,7 @@ export async function ensureDayPassGolfSimProduct(): Promise<{
         priceCents: GOLF_SIM_PRICE_CENTS,
       }).returning();
       tierId = newTier.id;
-      console.log(`[Day Pass Golf Sim Product] Created database record: ${GOLF_SIM_NAME}`);
+      logger.info(`[Day Pass Golf Sim Product] Created database record: ${GOLF_SIM_NAME}`);
     } else {
       tierId = existing[0].id;
     }
@@ -1201,7 +1202,7 @@ export async function ensureDayPassGolfSimProduct(): Promise<{
         },
       });
       stripeProductId = product.id;
-      console.log(`[Day Pass Golf Sim Product] Created Stripe product: ${stripeProductId}`);
+      logger.info(`[Day Pass Golf Sim Product] Created Stripe product: ${stripeProductId}`);
     }
     
     if (!stripePriceId) {
@@ -1217,7 +1218,7 @@ export async function ensureDayPassGolfSimProduct(): Promise<{
         },
       });
       stripePriceId = price.id;
-      console.log(`[Day Pass Golf Sim Product] Created Stripe price: ${stripePriceId}`);
+      logger.info(`[Day Pass Golf Sim Product] Created Stripe price: ${stripePriceId}`);
     }
     
     await db.update(membershipTiers)
@@ -1227,10 +1228,10 @@ export async function ensureDayPassGolfSimProduct(): Promise<{
       })
       .where(eq(membershipTiers.id, tierId));
     
-    console.log(`[Day Pass Golf Sim Product] ${GOLF_SIM_NAME} ready (${stripePriceId})`);
+    logger.info(`[Day Pass Golf Sim Product] ${GOLF_SIM_NAME} ready (${stripePriceId})`);
     return { success: true, stripeProductId, stripePriceId, action: existing.length > 0 && existing[0].stripePriceId ? 'exists' : 'created' };
   } catch (error: unknown) {
-    console.error('[Day Pass Golf Sim Product] Error:', getErrorMessage(error));
+    logger.error('[Day Pass Golf Sim Product] Error:', { extra: { detail: getErrorMessage(error) } });
     return { success: false, action: 'error' };
   }
 }
@@ -1284,7 +1285,7 @@ export async function ensureCorporateVolumePricingProduct(): Promise<{
         priceCents: 0,
       }).returning();
       tierId = newTier.id;
-      console.log(`[Corporate Pricing] Created database record: ${CORPORATE_PRICING_NAME}`);
+      logger.info(`[Corporate Pricing] Created database record: ${CORPORATE_PRICING_NAME}`);
     } else {
       tierId = existing[0].id;
     }
@@ -1317,15 +1318,15 @@ export async function ensureCorporateVolumePricingProduct(): Promise<{
         .set({ stripeProductId })
         .where(eq(membershipTiers.id, tierId));
       
-      console.log(`[Corporate Pricing] Created Stripe product: ${stripeProductId}`);
+      logger.info(`[Corporate Pricing] Created Stripe product: ${stripeProductId}`);
     }
     
     updateCorporateVolumePricing(getCorporateVolumeTiers(), getCorporateBasePrice(), stripeProductId);
     
-    console.log(`[Corporate Pricing] ${CORPORATE_PRICING_NAME} ready (${stripeProductId})`);
+    logger.info(`[Corporate Pricing] ${CORPORATE_PRICING_NAME} ready (${stripeProductId})`);
     return { success: true, stripeProductId, action: existing.length > 0 && existing[0].stripeProductId ? 'exists' : 'created' };
   } catch (error: unknown) {
-    console.error('[Corporate Pricing] Error:', getErrorMessage(error));
+    logger.error('[Corporate Pricing] Error:', { extra: { detail: getErrorMessage(error) } });
     return { success: false, action: 'error' };
   }
 }
@@ -1340,7 +1341,7 @@ export async function pullCorporateVolumePricingFromStripe(): Promise<boolean> {
       .limit(1);
     
     if (existing.length === 0 || !existing[0].stripeProductId) {
-      console.log('[Corporate Pricing] No Stripe product linked, using defaults');
+      logger.info('[Corporate Pricing] No Stripe product linked, using defaults');
       return false;
     }
     
@@ -1363,14 +1364,14 @@ export async function pullCorporateVolumePricingFromStripe(): Promise<boolean> {
     
     if (tiers.length > 0) {
       updateCorporateVolumePricing(tiers, basePrice, existing[0].stripeProductId);
-      console.log(`[Corporate Pricing] Pulled ${tiers.length} volume tiers from Stripe`);
+      logger.info(`[Corporate Pricing] Pulled ${tiers.length} volume tiers from Stripe`);
       return true;
     }
     
-    console.log('[Corporate Pricing] No volume tiers found in Stripe metadata, using defaults');
+    logger.info('[Corporate Pricing] No volume tiers found in Stripe metadata, using defaults');
     return false;
   } catch (error: unknown) {
-    console.error('[Corporate Pricing] Pull failed:', getErrorMessage(error));
+    logger.error('[Corporate Pricing] Pull failed:', { extra: { detail: getErrorMessage(error) } });
     return false;
   }
 }
@@ -1465,7 +1466,7 @@ export async function syncTierFeaturesToStripe(): Promise<{
     const stripe = await getStripeClient();
     const tiers = await db.select().from(membershipTiers).where(eq(membershipTiers.isActive, true));
 
-    console.log(`[Feature Sync] Starting feature sync for ${tiers.length} active tiers`);
+    logger.info(`[Feature Sync] Starting feature sync for ${tiers.length} active tiers`);
 
     const existingFeatures = new Map<string, string>();
     let hasMoreFeatures = true;
@@ -1484,11 +1485,11 @@ export async function syncTierFeaturesToStripe(): Promise<{
       }
     }
 
-    console.log(`[Feature Sync] Found ${existingFeatures.size} existing Stripe features`);
+    logger.info(`[Feature Sync] Found ${existingFeatures.size} existing Stripe features`);
 
     for (const tier of tiers) {
       if (!tier.stripeProductId) {
-        console.log(`[Feature Sync] Skipping ${tier.name}: No Stripe product ID`);
+        logger.info(`[Feature Sync] Skipping ${tier.name}: No Stripe product ID`);
         continue;
       }
 
@@ -1505,7 +1506,7 @@ export async function syncTierFeaturesToStripe(): Promise<{
             });
             existingFeatures.set(feature.lookupKey, created.id);
             featuresCreated++;
-            console.log(`[Feature Sync] Created feature: ${feature.name} (${feature.lookupKey})`);
+            logger.info(`[Feature Sync] Created feature: ${feature.name} (${feature.lookupKey})`);
           } catch (err: unknown) {
             if (getErrorCode(err) === 'resource_already_exists') {
               const refetch = await stripe.entitlements.features.list({ lookup_key: feature.lookupKey, limit: 1 });
@@ -1513,7 +1514,7 @@ export async function syncTierFeaturesToStripe(): Promise<{
                 existingFeatures.set(feature.lookupKey, refetch.data[0].id);
               }
             } else {
-              console.error(`[Feature Sync] Error creating feature ${feature.lookupKey}:`, getErrorMessage(err));
+              logger.error(`[Feature Sync] Error creating feature ${feature.lookupKey}:`, { extra: { detail: getErrorMessage(err) } });
             }
           }
         }
@@ -1547,9 +1548,9 @@ export async function syncTierFeaturesToStripe(): Promise<{
                 entitlement_feature: featureId,
               });
               featuresAttached++;
-              console.log(`[Feature Sync] Attached ${feature.lookupKey} to ${tier.name}`);
+              logger.info(`[Feature Sync] Attached ${feature.lookupKey} to ${tier.name}`);
             } catch (err: unknown) {
-              console.error(`[Feature Sync] Error attaching ${feature.lookupKey} to ${tier.name}:`, getErrorMessage(err));
+              logger.error(`[Feature Sync] Error attaching ${feature.lookupKey} to ${tier.name}:`, { extra: { detail: getErrorMessage(err) } });
             }
           }
         }
@@ -1560,18 +1561,18 @@ export async function syncTierFeaturesToStripe(): Promise<{
           try {
             await stripe.products.deleteFeature(tier.stripeProductId, attachmentId);
             featuresRemoved++;
-            console.log(`[Feature Sync] Removed ${attachedKey} from ${tier.name}`);
+            logger.info(`[Feature Sync] Removed ${attachedKey} from ${tier.name}`);
           } catch (err: unknown) {
-            console.error(`[Feature Sync] Error removing ${attachedKey} from ${tier.name}:`, getErrorMessage(err));
+            logger.error(`[Feature Sync] Error removing ${attachedKey} from ${tier.name}:`, { extra: { detail: getErrorMessage(err) } });
           }
         }
       }
     }
 
-    console.log(`[Feature Sync] Complete: ${featuresCreated} created, ${featuresAttached} attached, ${featuresRemoved} removed`);
+    logger.info(`[Feature Sync] Complete: ${featuresCreated} created, ${featuresAttached} attached, ${featuresRemoved} removed`);
     return { success: true, featuresCreated, featuresAttached, featuresRemoved };
   } catch (error: unknown) {
-    console.error('[Feature Sync] Fatal error:', error);
+    logger.error('[Feature Sync] Fatal error:', { error: error });
     return { success: false, featuresCreated, featuresAttached, featuresRemoved };
   }
 }
@@ -1590,13 +1591,13 @@ export async function syncCafeItemsToStripe(): Promise<{
     const stripe = await getStripeClient();
     const { rows: cafeItemRows } = await pool.query('SELECT * FROM cafe_items WHERE is_active = true ORDER BY category, sort_order');
 
-    console.log(`[Cafe Sync] Starting sync for ${cafeItemRows.length} active cafe items`);
+    logger.info(`[Cafe Sync] Starting sync for ${cafeItemRows.length} active cafe items`);
 
     for (const item of cafeItemRows) {
       try {
         const priceCents = Math.round(parseFloat(item.price) * 100);
         if (priceCents <= 0) {
-          console.log(`[Cafe Sync] Skipping ${item.name}: No price`);
+          logger.info(`[Cafe Sync] Skipping ${item.name}: No price`);
           skipped++;
           continue;
         }
@@ -1618,7 +1619,7 @@ export async function syncCafeItemsToStripe(): Promise<{
             description: item.description || undefined,
             metadata,
           });
-          console.log(`[Cafe Sync] Updated product for ${item.name}`);
+          logger.info(`[Cafe Sync] Updated product for ${item.name}`);
         } else {
           const existingProduct = await findExistingStripeProduct(
             stripe,
@@ -1634,7 +1635,7 @@ export async function syncCafeItemsToStripe(): Promise<{
               description: item.description || undefined,
               metadata,
             });
-            console.log(`[Cafe Sync] Reusing existing Stripe product ${stripeProductId} for ${item.name}`);
+            logger.info(`[Cafe Sync] Reusing existing Stripe product ${stripeProductId} for ${item.name}`);
           } else {
             const newProduct = await stripe.products.create({
               name: item.name,
@@ -1642,7 +1643,7 @@ export async function syncCafeItemsToStripe(): Promise<{
               metadata,
             });
             stripeProductId = newProduct.id;
-            console.log(`[Cafe Sync] Created product for ${item.name}: ${stripeProductId}`);
+            logger.info(`[Cafe Sync] Created product for ${item.name}: ${stripeProductId}`);
           }
         }
 
@@ -1653,7 +1654,7 @@ export async function syncCafeItemsToStripe(): Promise<{
             if (existingPrice.unit_amount !== priceCents) {
               await stripe.prices.update(stripePriceId, { active: false });
               needNewPrice = true;
-              console.log(`[Cafe Sync] Price changed for ${item.name}, creating new price`);
+              logger.info(`[Cafe Sync] Price changed for ${item.name}, creating new price`);
             }
           } catch {
             needNewPrice = true;
@@ -1672,7 +1673,7 @@ export async function syncCafeItemsToStripe(): Promise<{
             },
           });
           stripePriceId = newPrice.id;
-          console.log(`[Cafe Sync] Created price for ${item.name}: ${stripePriceId}`);
+          logger.info(`[Cafe Sync] Created price for ${item.name}: ${stripePriceId}`);
         }
 
         await pool.query(
@@ -1682,15 +1683,15 @@ export async function syncCafeItemsToStripe(): Promise<{
 
         synced++;
       } catch (error: unknown) {
-        console.error(`[Cafe Sync] Error syncing ${item.name}:`, getErrorMessage(error));
+        logger.error(`[Cafe Sync] Error syncing ${item.name}:`, { extra: { detail: getErrorMessage(error) } });
         failed++;
       }
     }
 
-    console.log(`[Cafe Sync] Complete: ${synced} synced, ${failed} failed, ${skipped} skipped`);
+    logger.info(`[Cafe Sync] Complete: ${synced} synced, ${failed} failed, ${skipped} skipped`);
     return { success: true, synced, failed, skipped };
   } catch (error: unknown) {
-    console.error('[Cafe Sync] Fatal error:', error);
+    logger.error('[Cafe Sync] Fatal error:', { error: error });
     return { success: false, synced, failed, skipped };
   }
 }
@@ -1707,11 +1708,11 @@ export async function pullTierFeaturesFromStripe(): Promise<{
     const stripe = await getStripeClient();
     const tiers = await db.select().from(membershipTiers).where(eq(membershipTiers.isActive, true));
 
-    console.log(`[Reverse Sync] Starting tier feature pull for ${tiers.length} active tiers`);
+    logger.info(`[Reverse Sync] Starting tier feature pull for ${tiers.length} active tiers`);
 
     const tiersWithStripe = tiers.filter(t => t.stripeProductId);
     if (tiersWithStripe.length === 0) {
-      console.warn('[Reverse Sync] No tiers are linked to Stripe products yet. Run "Sync to Stripe" first. Skipping pull to preserve local data.');
+      logger.warn('[Reverse Sync] No tiers are linked to Stripe products yet. Run "Sync to Stripe" first. Skipping pull to preserve local data.');
       return { success: true, tiersUpdated: 0, errors: ['No tiers linked to Stripe products. Run "Sync to Stripe" first.'] };
     }
 
@@ -1750,22 +1751,22 @@ export async function pullTierFeaturesFromStripe(): Promise<{
             await db.update(membershipTiers)
               .set({ highlightedFeatures: featureNames })
               .where(eq(membershipTiers.id, tier.id));
-            console.log(`[Reverse Sync] Updated highlighted features for "${tier.name}" from ${featureNames.length} Stripe marketing features`);
+            logger.info(`[Reverse Sync] Updated highlighted features for "${tier.name}" from ${featureNames.length} Stripe marketing features`);
           } else {
             await db.update(membershipTiers)
               .set({ highlightedFeatures: [] })
               .where(eq(membershipTiers.id, tier.id));
-            console.log(`[Reverse Sync] Cleared highlighted features for "${tier.name}" (Stripe marketing features empty)`);
+            logger.info(`[Reverse Sync] Cleared highlighted features for "${tier.name}" (Stripe marketing features empty)`);
           }
         } else {
           await db.update(membershipTiers)
             .set({ highlightedFeatures: [] })
             .where(eq(membershipTiers.id, tier.id));
-          console.log(`[Reverse Sync] Cleared highlighted features for "${tier.name}" (no Stripe marketing features)`);
+          logger.info(`[Reverse Sync] Cleared highlighted features for "${tier.name}" (no Stripe marketing features)`);
         }
 
         if (attachedKeys.size === 0) {
-          console.log(`[Reverse Sync] Tier "${tier.name}" has no Stripe entitlement features attached, preserving current DB permission values`);
+          logger.info(`[Reverse Sync] Tier "${tier.name}" has no Stripe entitlement features attached, preserving current DB permission values`);
           tiersUpdated++;
           continue;
         }
@@ -1813,14 +1814,14 @@ export async function pullTierFeaturesFromStripe(): Promise<{
 
         if (tier.dailySimMinutes && tier.dailySimMinutes > 0 && update.dailySimMinutes === 0) {
           const msg = `SAFETY: Skipping tier "${tier.name}" — dailySimMinutes would drop from ${tier.dailySimMinutes} to 0. This likely indicates a missing Stripe entitlement feature key.`;
-          console.warn(`[Reverse Sync] ${msg}`);
+          logger.warn(`[Reverse Sync] ${msg}`);
           errors.push(msg);
           continue;
         }
 
         if (tier.guestPassesPerMonth && tier.guestPassesPerMonth > 0 && update.guestPassesPerMonth === 0) {
           const msg = `SAFETY: Skipping tier "${tier.name}" — guestPassesPerMonth would drop from ${tier.guestPassesPerMonth} to 0. This likely indicates a missing Stripe entitlement feature key.`;
-          console.warn(`[Reverse Sync] ${msg}`);
+          logger.warn(`[Reverse Sync] ${msg}`);
           errors.push(msg);
           continue;
         }
@@ -1832,19 +1833,19 @@ export async function pullTierFeaturesFromStripe(): Promise<{
           .where(eq(membershipTiers.id, tier.id));
 
         tiersUpdated++;
-        console.log(`[Reverse Sync] Updated tier "${tier.name}" from ${attachedKeys.size} Stripe features`);
+        logger.info(`[Reverse Sync] Updated tier "${tier.name}" from ${attachedKeys.size} Stripe features`);
       } catch (err: unknown) {
         const msg = `Error pulling features for tier "${tier.name}": ${getErrorMessage(err)}`;
-        console.error(`[Reverse Sync] ${msg}`);
+        logger.error(`[Reverse Sync] ${msg}`);
         errors.push(msg);
       }
     }
 
-    console.log(`[Reverse Sync] Tier feature pull complete: ${tiersUpdated} updated, ${errors.length} errors`);
+    logger.info(`[Reverse Sync] Tier feature pull complete: ${tiersUpdated} updated, ${errors.length} errors`);
     clearTierCache();
     return { success: errors.length === 0, tiersUpdated, errors };
   } catch (error: unknown) {
-    console.error('[Reverse Sync] Fatal error pulling tier features:', error);
+    logger.error('[Reverse Sync] Fatal error pulling tier features:', { error: error });
     return { success: false, tiersUpdated, errors: [...errors, getErrorMessage(error)] };
   }
 }
@@ -1863,7 +1864,7 @@ export async function pullCafeItemsFromStripe(): Promise<{
 
   try {
     const stripe = await getStripeClient();
-    console.log('[Reverse Sync] Starting cafe items pull from Stripe');
+    logger.info('[Reverse Sync] Starting cafe items pull from Stripe');
 
     const activeStripeProducts: any[] = [];
     const inactiveStripeProductIds: string[] = [];
@@ -1912,13 +1913,13 @@ export async function pullCafeItemsFromStripe(): Promise<{
       }
     }
 
-    console.log(`[Reverse Sync] Found ${activeStripeProducts.length} active and ${inactiveStripeProductIds.length} inactive cafe products in Stripe`);
+    logger.info(`[Reverse Sync] Found ${activeStripeProducts.length} active and ${inactiveStripeProductIds.length} inactive cafe products in Stripe`);
 
     const existingCafeCount = await pool.query('SELECT COUNT(*) FROM cafe_items WHERE is_active = true');
     const localCafeItems = parseInt(existingCafeCount.rows[0].count, 10);
 
     if (activeStripeProducts.length === 0 && localCafeItems > 0) {
-      console.warn(`[Reverse Sync] Stripe has 0 cafe products but local DB has ${localCafeItems} active items. Skipping pull to preserve local data. Run "Sync to Stripe" first to push cafe items.`);
+      logger.warn(`[Reverse Sync] Stripe has 0 cafe products but local DB has ${localCafeItems} active items. Skipping pull to preserve local data. Run "Sync to Stripe" first to push cafe items.`);
       return { success: true, synced: 0, created: 0, deactivated: 0, errors: ['No cafe products found in Stripe. Run "Sync to Stripe" first to push local data.'] };
     }
 
@@ -1965,7 +1966,7 @@ export async function pullCafeItemsFromStripe(): Promise<{
             [product.name, product.description || null, priceDecimal, category, imageUrl, product.id, stripePriceId, existing.rows[0].id]
           );
           synced++;
-          console.log(`[Reverse Sync] Updated cafe item "${product.name}" (id: ${existing.rows[0].id})`);
+          logger.info(`[Reverse Sync] Updated cafe item "${product.name}" (id: ${existing.rows[0].id})`);
         } else {
           await pool.query(
             `INSERT INTO cafe_items (name, description, price, category, image_url, icon, sort_order, is_active, stripe_product_id, stripe_price_id, created_at)
@@ -1973,11 +1974,11 @@ export async function pullCafeItemsFromStripe(): Promise<{
             [product.name, product.description || null, priceDecimal, category, imageUrl, 'restaurant', 0, true, product.id, stripePriceId]
           );
           created++;
-          console.log(`[Reverse Sync] Created cafe item "${product.name}" from Stripe`);
+          logger.info(`[Reverse Sync] Created cafe item "${product.name}" from Stripe`);
         }
       } catch (err: unknown) {
         const msg = `Error syncing cafe product "${product.name}": ${getErrorMessage(err)}`;
-        console.error(`[Reverse Sync] ${msg}`);
+        logger.error(`[Reverse Sync] ${msg}`);
         errors.push(msg);
       }
     }
@@ -1991,20 +1992,20 @@ export async function pullCafeItemsFromStripe(): Promise<{
         if (result.rowCount && result.rowCount > 0) {
           deactivated += result.rowCount;
           for (const row of result.rows) {
-            console.log(`[Reverse Sync] Deactivated cafe item "${row.name}" (Stripe product inactive)`);
+            logger.info(`[Reverse Sync] Deactivated cafe item "${row.name}" (Stripe product inactive)`);
           }
         }
       } catch (err: unknown) {
         const msg = `Error deactivating cafe item for Stripe product ${stripeProductId}: ${getErrorMessage(err)}`;
-        console.error(`[Reverse Sync] ${msg}`);
+        logger.error(`[Reverse Sync] ${msg}`);
         errors.push(msg);
       }
     }
 
-    console.log(`[Reverse Sync] Cafe items pull complete: ${synced} synced, ${created} created, ${deactivated} deactivated, ${errors.length} errors`);
+    logger.info(`[Reverse Sync] Cafe items pull complete: ${synced} synced, ${created} created, ${deactivated} deactivated, ${errors.length} errors`);
     return { success: errors.length === 0, synced, created, deactivated, errors };
   } catch (error: unknown) {
-    console.error('[Reverse Sync] Fatal error pulling cafe items:', error);
+    logger.error('[Reverse Sync] Fatal error pulling cafe items:', { error: error });
     return { success: false, synced, created, deactivated, errors: [...errors, getErrorMessage(error)] };
   }
 }

@@ -2,6 +2,7 @@ import { db } from '../../db';
 import { hubspotProductMappings } from '../../../shared/schema';
 import { eq, and } from 'drizzle-orm';
 
+import { logger } from '../logger';
 export async function getProductMapping(tierName?: string, productType?: string): Promise<any | null> {
   try {
     if (tierName) {
@@ -27,7 +28,7 @@ export async function getProductMapping(tierName?: string, productType?: string)
     
     return null;
   } catch (error) {
-    console.error('[HubSpotDeals] Error getting product mapping:', error);
+    logger.error('[HubSpotDeals] Error getting product mapping:', { error: error });
     return null;
   }
 }
@@ -37,7 +38,7 @@ export async function getAllProductMappings(): Promise<any[]> {
     const products = await db.select().from(hubspotProductMappings).orderBy(hubspotProductMappings.productType);
     return products;
   } catch (error) {
-    console.error('[HubSpotDeals] Error fetching product mappings:', error);
+    logger.error('[HubSpotDeals] Error fetching product mappings:', { error: error });
     return [];
   }
 }

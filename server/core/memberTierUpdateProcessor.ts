@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 import { handleTierChange, queueTierSync } from './hubspot';
 import { notifyMember } from './notificationService';
 
+import { logger } from './logger';
 function getTierRank(tier: string): number {
   const ranks: Record<string, number> = {
     'social': 1, 'core': 2, 'premium': 3, 'vip': 4, 'corporate': 5
@@ -52,9 +53,7 @@ export async function processMemberTierUpdate(payload: MemberTierUpdatePayload):
       .where(sql`LOWER(${users.email}) = ${normalizedEmail}`);
 
     if (userResult.length === 0) {
-      console.warn(
-        `[MemberTierUpdateProcessor] Member not found: ${normalizedEmail}`
-      );
+      logger.warn(`[MemberTierUpdateProcessor] Member not found: ${normalizedEmail}`);
       return;
     }
 
@@ -62,9 +61,7 @@ export async function processMemberTierUpdate(payload: MemberTierUpdatePayload):
 
     // Double-check that the tier actually needs to change
     if (user.tier === newTier) {
-      console.log(
-        `[MemberTierUpdateProcessor] Member ${normalizedEmail} is already on tier ${newTier}, skipping`
-      );
+      logger.info(`[MemberTierUpdateProcessor] Member ${normalizedEmail} is already on tier ${newTier}, skipping`);
       return;
     }
 
@@ -91,9 +88,7 @@ export async function processMemberTierUpdate(payload: MemberTierUpdatePayload):
       );
 
       if (!hubspotResult.success && hubspotResult.error) {
-        console.warn(
-          `[MemberTierUpdateProcessor] HubSpot sync failed for ${normalizedEmail}, queuing for retry: ${hubspotResult.error}`
-        );
+        logger.warn(`[MemberTierUpdateProcessor] HubSpot sync failed for ${normalizedEmail}, queuing for retry: ${hubspotResult.error}`);
         await queueTierSync({
           email: normalizedEmail,
           newTier,
@@ -102,9 +97,7 @@ export async function processMemberTierUpdate(payload: MemberTierUpdatePayload):
           changedByName: performedByName
         });
       } else {
-        console.log(
-          `[MemberTierUpdateProcessor] HubSpot sync successful for ${normalizedEmail}: ${oldTier || 'None'} → ${newTier}`
-        );
+        logger.info(`[MemberTierUpdateProcessor] HubSpot sync successful for ${normalizedEmail}: ${oldTier || 'None'} → ${newTier}`);
       }
     }
 
@@ -139,14 +132,9 @@ export async function processMemberTierUpdate(payload: MemberTierUpdatePayload):
       url: '/member/profile'
     });
 
-    console.log(
-      `[MemberTierUpdateProcessor] Successfully updated ${normalizedEmail}: ${oldTier || 'None'} → ${newTier}`
-    );
+    logger.info(`[MemberTierUpdateProcessor] Successfully updated ${normalizedEmail}: ${oldTier || 'None'} → ${newTier}`);
   } catch (error: unknown) {
-    console.error(
-      `[MemberTierUpdateProcessor] Error updating tier for ${normalizedEmail}:`,
-      error
-    );
+    logger.error(`[MemberTierUpdateProcessor] Error updating tier for ${normalizedEmail}:`, { error: error });
     throw error;
   }
 }

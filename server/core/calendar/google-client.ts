@@ -2,6 +2,7 @@ import { getGoogleCalendarClient } from '../integrations';
 import { getPacificISOString } from '../../utils/dateUtils';
 import { withCalendarRetry } from '../retryUtils';
 
+import { logger } from '../logger';
 export async function createCalendarEvent(booking: any, bayName: string): Promise<string | null> {
   try {
     const calendar = await getGoogleCalendarClient();
@@ -14,7 +15,7 @@ export async function createCalendarEvent(booking: any, bayName: string): Promis
     const durationMinutes = booking.durationMinutes || booking.duration_minutes;
     
     if (!requestDate || !startTime || !endTime) {
-      console.error('Error creating calendar event: Missing required booking fields', { requestDate, startTime, endTime });
+      logger.error('Error creating calendar event: Missing required booking fields', { extra: { detail: { requestDate, startTime, endTime } } });
       return null;
     }
     
@@ -41,7 +42,7 @@ export async function createCalendarEvent(booking: any, bayName: string): Promis
     
     return response.data.id || null;
   } catch (error: unknown) {
-    console.error('Error creating calendar event:', error);
+    logger.error('Error creating calendar event:', { error: error });
     return null;
   }
 }
@@ -56,7 +57,7 @@ export async function createCalendarEventOnCalendar(
 ): Promise<string | null> {
   try {
     if (!date || !startTime) {
-      console.error('Error creating calendar event: Missing date or startTime');
+      logger.error('Error creating calendar event: Missing date or startTime');
       return null;
     }
     
@@ -85,7 +86,7 @@ export async function createCalendarEventOnCalendar(
     
     return response.data.id || null;
   } catch (error: unknown) {
-    console.error('Error creating calendar event:', error);
+    logger.error('Error creating calendar event:', { error: error });
     return null;
   }
 }
@@ -102,7 +103,7 @@ export async function deleteCalendarEvent(eventId: string, calendarId: string = 
     );
     return true;
   } catch (error: unknown) {
-    console.error('Error deleting calendar event:', error);
+    logger.error('Error deleting calendar event:', { error: error });
     return false;
   }
 }
@@ -118,7 +119,7 @@ export async function updateCalendarEvent(
 ): Promise<boolean> {
   try {
     if (!date || !startTime) {
-      console.error('Error updating calendar event: Missing date or startTime');
+      logger.error('Error updating calendar event: Missing date or startTime');
       return false;
     }
     
@@ -146,7 +147,7 @@ export async function updateCalendarEvent(
     
     return true;
   } catch (error: unknown) {
-    console.error('Error updating calendar event:', error);
+    logger.error('Error updating calendar event:', { error: error });
     return false;
   }
 }
