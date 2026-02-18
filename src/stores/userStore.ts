@@ -8,7 +8,6 @@ export interface UserProfile {
   name: string;
   tier: string;
   tags?: string[];
-  isFounding?: boolean;
   status: 'Active' | 'Pending' | 'Expired' | 'Inactive' | 'Terminated' | 'former_member' | string;
   email: string;
   phone: string;

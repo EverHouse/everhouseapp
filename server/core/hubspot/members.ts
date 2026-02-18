@@ -416,10 +416,11 @@ export async function createMemberLocally(input: AddMemberInput): Promise<Create
           membership_status = 'active',
           billing_provider = COALESCE(billing_provider, 'hubspot'),
           join_date = COALESCE(join_date, $6),
+          discount_code = $7,
           updated_at = NOW()
         WHERE id = $1
         RETURNING id`,
-        [existing.id, firstName, lastName, phone || null, tier, startDate || getTodayPacific()]
+        [existing.id, firstName, lastName, phone || null, tier, startDate || getTodayPacific(), discountReason || null]
       );
       
       console.log(`[AddMember] Converted existing visitor ${normalizedEmail} to member with tier ${tier}`);
@@ -430,7 +431,7 @@ export async function createMemberLocally(input: AddMemberInput): Promise<Create
       return { success: true, userId: updateResult.rows[0].id };
     }
     
-    const tags = discountReason ? [discountReason] : [];
+    const tags: string[] = [];
     const result = await pool.query(
       `INSERT INTO users (
         email, first_name, last_name, phone, role, tier, 
@@ -668,13 +669,13 @@ export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMe
     let userId: any;
     
     try {
-      const tags = discountReason ? [discountReason] : [];
+      const tags: string[] = [];
       userId = await pool.query(
         `INSERT INTO users (
           email, first_name, last_name, phone, role, tier, 
           membership_status, billing_provider, hubspot_id, 
-          tags, data_source, join_date, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, 'member', $5, 'active', 'hubspot', $6, $7, 'staff_manual', $8, NOW(), NOW())
+          tags, discount_code, data_source, join_date, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, 'member', $5, 'active', 'hubspot', $6, $7, $9, 'staff_manual', $8, NOW(), NOW())
         RETURNING id`,
         [
           normalizedEmail,
@@ -684,7 +685,8 @@ export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMe
           tier,
           contactId,
           JSON.stringify(tags),
-          startDate || getTodayPacific()
+          startDate || getTodayPacific(),
+          discountReason || null
         ]
       );
     } catch (userError: unknown) {

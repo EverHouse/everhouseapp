@@ -51,7 +51,6 @@ export interface MemberProfile {
   membershipStatus?: string | null;
   gracePeriodStart?: string | null;
   tags?: string[];
-  isFounding?: boolean;
   status: 'Active' | 'Pending' | 'Expired' | 'Inactive' | 'Terminated' | 'former_member' | string;
   email: string;
   phone: string;
