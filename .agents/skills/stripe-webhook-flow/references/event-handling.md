@@ -79,11 +79,21 @@ Complete mapping of every Stripe event type handled by the webhook system, the f
 
 ### `invoice.created` / `invoice.finalized` / `invoice.updated` → `handleInvoiceLifecycle`
 
+- Update `stripe_transaction_cache` with invoice data (amount, status, customer)
 - **Deferred:** upsert transaction cache
 
 ### `invoice.voided` / `invoice.marked_uncollectible` → `handleInvoiceVoided`
 
+- Mark invoice as voided/uncollectible in transaction cache
 - **Deferred:** upsert transaction cache
+
+### Invoice Grace Period System
+
+Subscription renewal failures trigger a 7-day grace period before suspension:
+- `invoice.payment_failed` starts grace period, sends dunning email, notifies staff
+- Member can retry or update payment method during grace period
+- After 7 days or 3 failure emails without retry, membership is suspended
+- `invoice.payment_succeeded` clears grace period and restores full access
 
 ## Subscription Events
 
@@ -107,6 +117,7 @@ Complete mapping of every Stripe event type handled by the webhook system, the f
   - `past_due` → set past_due, cascade to sub-members, notify member + staff
   - `unpaid` → set suspended, cascade to sub-members, notify member + staff
   - `canceled` → logged only (handled by `subscription.deleted`)
+- **Group cascade:** if primary member status is `active`, update all group members' sub-member subscriptions to `active`. Respects sub-member billing provider guard (non-Stripe sub-members unaffected). See `groupBilling.ts::handlePrimarySubscriptionStatusChange()`.
 - **Deferred:** HubSpot tier/status sync, billing broadcast
 
 ### `customer.subscription.paused` → `handleSubscriptionPaused`
@@ -175,11 +186,21 @@ Routing based on `session.metadata`:
 
 ### `coupon.updated` / `coupon.created`
 
-- If `coupon.id === 'FAMILY20'`: call `updateFamilyDiscountPercent(coupon.percent_off)`
+- If `coupon.id === 'FAMILY20'`: call `updateFamilyDiscountPercent(coupon.percent_off)` to keep local config in sync with Stripe
+- Generic coupons created by `discounts.ts` (from `discount_rules` table) are tracked but no handler reaction needed — they are applied by checkout code
 
 ### `coupon.deleted`
 
-- If `coupon.id === 'FAMILY20'`: log that it will be recreated on next use
+- If `coupon.id === 'FAMILY20'`: log that it will be recreated on next use (via `getOrCreateFamilyCoupon()` in `groupBilling.ts`)
+
+### Discount Sync (Manual/Admin)
+
+The webhook system does not auto-sync discount rules to Stripe. Instead:
+- Admins manage discount rules in the `discount_rules` table
+- Staff calls `syncDiscountRulesToStripeCoupons()` from admin routes to push rules to Stripe
+- Each rule becomes a coupon with ID `{DISCOUNT_TAG}_{PERCENT}PCT` (e.g., `EARLY_BIRD_10PCT`)
+- Coupons are then applied to checkouts by code (checkout form or backend Stripe operations)
+- Use `getDiscountSyncStatus()` to verify all rules are synced and up-to-date in Stripe
 
 ## Credit Note Events
 

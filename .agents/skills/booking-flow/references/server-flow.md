@@ -317,6 +317,106 @@ ensureSessionForBooking({ bookingId, resourceId, sessionDate, startTime, endTime
   └── Return { sessionId, created: true/false }
 ```
 
+## Tier Validation Rules
+
+**File**: `server/core/bookingService/tierRules.ts`
+
+This module enforces membership tier restrictions during booking and session creation. It validates daily minute limits, handles overage calculations, and enforces Social tier guest restrictions.
+
+### Key Functions
+
+#### `validateTierWindowAndBalance(memberEmail, bookingDate, duration, resourceType)`
+
+Checks if a booking fits within the member's tier daily limits.
+
+```
+Returns TierValidationResult {
+  allowed: boolean;           // true if booking is allowed
+  reason?: string;            // error message if not allowed
+  remainingMinutes?: number;  // minutes left in daily allowance
+  overageMinutes?: number;    // minutes that would be overage
+  includedMinutes?: number;   // tier's daily included minutes
+  tier?: string;              // member's tier name
+}
+```
+
+Processes:
+1. Fetch member's tier via `getMemberTierByEmail()`
+2. Get tier daily limits (e.g., `daily_sim_minutes` for simulators, `daily_conf_room_minutes` for conference rooms)
+3. Query booked minutes today via `getDailyBookedMinutes(memberEmail, date, resourceType)`
+4. Calculate remaining via `dailyLimit - bookedToday`
+5. If overage would occur, set `overageMinutes = bookingDuration - remainingMinutes`
+
+#### `getRemainingMinutes(memberEmail, tier?, date?, resourceType?)`
+
+Quick lookup of remaining daily minutes for a member. Returns 0 if no tier, 999 if unlimited access. Queries `getDailyBookedMinutes` and subtracts from tier limit.
+
+#### `enforceSocialTierRules(ownerTier, participants)`
+
+Validates Social tier restrictions before session creation.
+
+```
+Returns SocialTierResult {
+  allowed: boolean;   // true if guests allowed
+  reason?: string;    // error message if not allowed
+}
+```
+
+Behavior:
+- **Non-Social tiers**: Always allowed; can have guests.
+- **Social tier with `guest_passes_per_month > 0`**: Allowed; member can use their allocated passes.
+- **Social tier with `guest_passes_per_month = 0`**: Check `participants` array. If any `type: 'guest'` found → **blocked** with error `"Social tier members cannot bring guests to simulator bookings. Your membership includes 0 guest passes per month."`.
+- **Social tier with `guest_passes_per_month > 0` and has guests**: Allowed (pass allocation checked separately during session creation).
+
+Example from session creation:
+```
+enforceSocialTierRules(ownerTier, participants)
+├── If Social tier + 0 guest passes + guests in participants → { allowed: false }
+└── Else → { allowed: true }
+```
+
+#### `getGuestPassesRemaining(memberEmail)`
+
+Counts guest passes used this calendar month and returns remaining balance.
+
+Query:
+1. Find all sessions in current calendar month where:
+   - Member is the owner (participant_type = 'owner')
+   - Booking not cancelled/declined
+   - Participant used a guest pass (`participant_type = 'guest'` AND `used_guest_pass = true`)
+2. Subtract used from tier's `guest_passes_per_month`
+
+### Daily Minute Limits by Tier
+
+Each tier in `membership_tiers` table has:
+
+| Column | Purpose |
+|--------|---------|
+| `daily_sim_minutes` | Daily simulator session limit (e.g., 240 = 4 hours) |
+| `daily_conf_room_minutes` | Daily conference room limit |
+| `unlimited_access` | Boolean flag: if true, no daily limits apply |
+
+Tiers with `unlimited_access = true` or `daily_sim_minutes >= 999` return remaining = 999.
+
+### Overage Minute Calculation
+
+During booking request creation (conference rooms):
+
+```
+bookedMinutes = getDailyBookedMinutes(userEmail, date, 'conference_room')
+remainingToday = tier.daily_conf_room_minutes - bookedMinutes
+
+if (newBookingDuration > remainingToday) {
+  overageMinutes = newBookingDuration - remainingToday
+  overageCents = calculateOverageCents(overageMinutes)
+  if (overageCents > 0) {
+    // Require conference_prepayment_id to proceed
+  }
+}
+```
+
+Overage fees are applied per-block (e.g., 30-minute block = one tier's overage rate) or pro-rated. Calculation done by `feeCalculator` module using tier `overage_rate_cents_per_minute`.
+
 ## Booking Statuses Reference
 
 | Status | Meaning |

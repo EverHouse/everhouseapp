@@ -192,6 +192,8 @@ Contacts are enriched with: lifetime visits (bookings + events + wellness + walk
 | `server/core/hubspot/stages.ts` | Deal stage updates, contact status writes, property provisioning |
 | `server/core/hubspot/constants.ts` | Pipeline IDs, stage IDs, status/tier/billing mappings |
 | `server/core/hubspot/pipeline.ts` | Pipeline validation and stage existence checks |
+| `server/core/hubspot/admin.ts` | Discount rule CRUD and billing audit log queries |
+| `server/core/hubspot/discounts.ts` | Discount calculation (max-wins rule, not additive) |
 | `server/core/hubspot/formSync.ts` | Form submission ingestion from HubSpot |
 | `server/core/memberSync.ts` | Full inbound member sync from HubSpot |
 | `server/core/hubspotQueueMonitor.ts` | Queue stats for admin dashboard |

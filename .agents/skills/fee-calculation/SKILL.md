@@ -186,6 +186,10 @@ Also provides `estimateBookingFees()` for quick estimates without database queri
 
 In-memory rate store with getters/setters. Default: $25 overage per 30-min block, $25 guest fee. Updated at startup from Stripe. Also holds corporate volume tiers and family discount percent.
 
+### Card Expiry Checking (`cardExpiryChecker.ts`)
+
+Monitoring service that runs periodically to detect payment cards expiring within 7 days. For each expiring card, sends email notifications to the member and WebSocket alerts to staff. Prevents failed payments by proactively notifying members to update their payment methods. Implements duplicate-prevention logic to avoid repeatedly notifying for the same card.
+
 ## Reference Files
 
 - `references/fee-breakdown.md` — detailed `computeFeeBreakdown` flow, input parameters, line item rules, guest pass hold/consume logic, usage calculator specifics.
@@ -200,7 +204,9 @@ In-memory rate store with getters/setters. Default: $25 overage per 30-min block
 | `server/core/billing/pricingConfig.ts` | `PRICING` object, `updateOverageRate()`, `updateGuestFee()` |
 | `server/core/billing/prepaymentService.ts` | `createPrepaymentIntent()` |
 | `server/core/billing/guestPassConsumer.ts` | `consumeGuestPassForParticipant()`, `refundGuestPassForParticipant()` |
-| `server/core/billing/guestPassHoldService.ts` | `createGuestPassHold()`, `releaseGuestPassHold()`, `convertHoldToUsage()` |
+| `server/core/billing/guestPassHoldService.ts` | `getAvailableGuestPasses()`, `createGuestPassHold()`, `releaseGuestPassHold()`, `convertHoldToUsage()` — guest pass reservation mechanics |
+| `server/core/billing/PaymentStatusService.ts` | `markPaymentSucceeded()`, `markPaymentRefunded()`, `markPaymentCancelled()` — atomic payment status updates across participants and snapshots |
+| `server/core/billing/cardExpiryChecker.ts` | `checkExpiringCards()` — monitors for cards expiring within 7 days, sends member and staff notifications |
 | `server/core/bookingService/usageCalculator.ts` | `getDailyUsageFromLedger()`, `calculateOverageFee()`, `computeUsageAllocation()` |
 | `server/core/stripe/products.ts` | `ensureSimulatorOverageProduct()`, `ensureGuestPassProduct()`, tier sync |
 | `shared/models/billing.ts` | `FeeBreakdown`, `FeeComputeParams`, `FeeLineItem` type definitions |

@@ -258,3 +258,173 @@ For each contact:
 - Contacts created on or before Nov 12, 2025 were batch-imported; use `membership_start_date` as the real join date.
 - Contacts created after Nov 12, 2025 are real Mindbody syncs; use DB `join_date` if available, otherwise `createdate`.
 - `joined_on` (manually set by staff) always takes highest priority.
+
+## Deal Pipeline & Stages
+
+### Pipeline Architecture
+
+The membership pipeline in HubSpot contains 8 stages defined in `server/core/hubspot/constants.ts`:
+
+| Stage                    | Stage ID        | Usage                                    |
+|--------------------------|-----------------|------------------------------------------|
+| Day Pass / Tour Request  | 2414796536      | Initial inquiry stage for prospects      |
+| Tour Booked              | 2413968103      | Tour has been scheduled                  |
+| Visited / Day Pass       | 2414796537      | Prospect completed a visit or day pass   |
+| Application Submitted    | 2414797498      | Membership application submitted         |
+| Billing Setup            | 2825519819      | Payment method being configured          |
+| Closed Won (Active)      | closedwon       | Active member (terminal stage)           |
+| Payment Declined         | 2825519820      | Payment processing failed                |
+| Closed Lost              | closedlost      | Terminated/cancelled member (terminal)   |
+
+### Pipeline Validation
+
+`validateMembershipPipeline` in `server/core/hubspot/pipeline.ts`:
+
+1. Checks if the Membership Pipeline exists in HubSpot (by ID or label match).
+2. Fetches all stages in the pipeline and caches them for 1 hour.
+3. Validates that all required stage IDs are present in HubSpot.
+4. Returns detailed results: pipeline existence, valid stages, missing stages.
+5. **Note:** Pipeline validation is cached to avoid repeated HubSpot API calls; cache is valid for 1 hour.
+
+### Status-to-Stage Mapping
+
+`MINDBODY_TO_STAGE_MAP` in `server/core/hubspot/constants.ts` maps Mindbody membership statuses to deal stages:
+
+- `active` → Closed Won (active member)
+- `pending`, `declined`, `suspended`, `expired`, `froze`, `frozen`, `past_due`, `pastdue`, `paymentfailed` → Payment Declined (billing issues)
+- `terminated`, `cancelled`, `non-member`, `nonmember` → Closed Lost (churned)
+
+This mapping drives automatic deal stage sync whenever a member's status changes.
+
+### Deal Stage Updates
+
+`updateDealStage` in `server/core/hubspot/stages.ts`:
+
+1. Updates the `dealstage` property in HubSpot.
+2. Records the stage change locally in `hubspot_deals` table.
+3. Logs the previous and new stage in `billing_audit_log` with metadata.
+4. Skips the update if the deal is already at the target stage.
+
+### Deal Stage Sync from Status
+
+`syncDealStageFromMindbodyStatus` in `server/core/hubspot/stages.ts`:
+
+1. Validates the membership pipeline exists (uses cached validation).
+2. Maps the Mindbody status to a target stage using `MINDBODY_TO_STAGE_MAP`.
+3. Updates the deal to the target stage.
+4. Updates the contact's `membership_status` property to match.
+5. **For churned members** (terminated/cancelled): removes all line items from the deal and clears `membership_tier` on the contact.
+6. Creates audit log entries recording status change triggers and categories (recovery, churned, payment issue).
+
+### Contact Membership Status
+
+`updateContactMembershipStatus` in `server/core/hubspot/stages.ts`:
+
+1. Updates the `membership_status` property on a HubSpot contact.
+2. Uses `MINDBODY_TO_CONTACT_STATUS_MAP` to map normalized Mindbody status to valid HubSpot contact status values (e.g., `active` → `Active`, `terminated` → `Terminated`).
+3. Called when deal stage changes or during member sync operations.
+
+## Discount Rules
+
+### Discount Calculation (Max-Wins Rule)
+
+`calculateTotalDiscount` in `server/core/hubspot/discounts.ts`:
+
+1. Takes a list of member tags (e.g., `['referral', 'staff']`).
+2. Queries the `discountRules` table for all active rules matching the member's tags.
+3. **Max-wins approach:** Returns only the highest-percentage discount; discounts do **NOT** stack or accumulate.
+   - Example: A member with both `referral` (10%) and `staff` (20%) gets 20%, not 30%.
+4. Returns the final discount percent (capped at 100%) and the list of applied rule tags.
+
+### Get Applicable Discounts
+
+`getApplicableDiscounts` in `server/core/hubspot/discounts.ts`:
+
+1. Queries all active discount rules for the given member tags.
+2. Returns an array of matching rules with their tags and discount percentages.
+3. Used by `calculateTotalDiscount` to determine the best-fit discount.
+
+### Admin Discount Rule CRUD
+
+`getAllDiscountRules`, `updateDiscountRule` in `server/core/hubspot/admin.ts`:
+
+- **Read:** `getAllDiscountRules()` fetches all discount rules, sorted by discount percent.
+- **Update:** `updateDiscountRule(discountTag, discountPercent, description)` updates an existing rule's percent and description, and sets `updatedAt` timestamp.
+- Rules are stored in the `discountRules` table with fields: `discountTag`, `discountPercent`, `description`, `isActive`, `updatedAt`.
+
+### Billing Audit Log
+
+`getBillingAuditLog` in `server/core/hubspot/admin.ts`:
+
+1. Queries the `billing_audit_log` table by member email.
+2. Returns up to 50 recent entries (configurable limit) sorted by creation date (newest first).
+3. Logs all discount applications, line item changes, deal stage changes, and other billing events.
+4. Used by admin staff to audit member billing history.
+
+## Constants and Mapping
+
+### Key Constants from `server/core/hubspot/constants.ts`
+
+#### DB_STATUS_TO_HUBSPOT_STATUS
+
+Maps app member status values to valid HubSpot contact membership_status property values:
+
+```
+active → Active
+trialing → trialing
+past_due → past_due
+inactive → Suspended
+cancelled → Terminated
+expired → Expired
+terminated → Terminated
+former_member → Terminated
+pending → Pending
+suspended → Suspended
+frozen → Froze
+non-member → Non-Member
+deleted → Terminated
+```
+
+**Usage:** When syncing a member's status to HubSpot, the app normalizes the DB status using this map to ensure it matches HubSpot's expected enum values.
+
+#### DB_BILLING_PROVIDER_TO_HUBSPOT
+
+Maps app billing provider values to HubSpot billing_provider property values:
+
+```
+stripe → stripe
+mindbody → mindbody
+manual → manual
+comped → Comped
+none → None
+family_addon → stripe
+```
+
+**Usage:** When updating a contact's billing provider in HubSpot, the app translates the local DB provider to the HubSpot equivalent.
+
+#### DB_TIER_TO_HUBSPOT
+
+Maps normalized tier slugs to HubSpot membership_tier dropdown labels:
+
+```
+core, core membership → Core Membership
+core-founding, core_founding → Core Membership Founding Members
+premium, premium membership → Premium Membership
+premium-founding, premium_founding → Premium Membership Founding Members
+social, social membership → Social Membership
+social-founding, social_founding → Social Membership Founding Members
+vip, vip membership → VIP Membership
+corporate, corporate membership → Corporate Membership
+group-lessons, group_lessons → Group Lessons Membership
+```
+
+**Usage:** When syncing a member's tier to HubSpot, the app denormalizes the tier slug into a human-readable dropdown label. The reverse mapping (reading from HubSpot) uses `normalizeTierName` in `server/utils/tierUtils.ts`.
+
+### Other Key Constants
+
+- **HUBSPOT_STAGE_IDS:** Enum-like object containing all deal stage IDs.
+- **MINDBODY_TO_STAGE_MAP:** Maps Mindbody membership statuses to deal stages (detailed above).
+- **MINDBODY_TO_CONTACT_STATUS_MAP:** Maps Mindbody statuses to HubSpot contact membership_status values.
+- **ACTIVE_STATUSES:** `['active', 'trialing', 'past_due']` — statuses considered "in good standing".
+- **CHURNED_STATUSES:** `['terminated', 'cancelled', 'non-member']` — statuses indicating member has left.
+- **INACTIVE_STATUSES:** `['pending', 'declined', 'suspended', 'expired', 'froze', 'frozen']` — statuses with billing or account issues.

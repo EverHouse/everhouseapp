@@ -149,34 +149,47 @@ For each empty slot (not conference rooms), generate a line item:
 
 ## Guest Pass Hold/Consume Logic
 
+Guest passes are a monthly allocation that members use to waive fees for guests. The hold/consume flow uses a **two-phase transactional model** to ensure atomicity and prevent overselling.
+
 ### Hold Phase (at booking creation)
 
-`guestPassHoldService.ts` → `createGuestPassHold()`:
+`guestPassHoldService.ts` → `getAvailableGuestPasses()` and `createGuestPassHold()`:
 
-1. Lock the member's `guest_passes` row with `FOR UPDATE`.
-2. Calculate available = `total - used - held` (held = sum of active `guest_pass_holds`).
+**Availability calculation** (`getAvailableGuestPasses()`):
+1. Look up member's tier's `guest_passes_per_month`.
+2. Query `guest_passes` row — track `passes_total` and `passes_used`.
+3. Sum active `guest_pass_holds` (not yet expired; expires_at IS NULL OR expires_at > NOW).
+4. Available = `passes_total - passes_used - passes_held`.
+5. Auto-sync: if tier's monthly allocation increases, bump `passes_total` upward.
+
+**Hold creation** (`createGuestPassHold()`):
+1. Lock member's `guest_passes` row with `FOR UPDATE` to serialize holds.
+2. Calculate available (using above logic).
 3. Hold = `min(passesNeeded, available)`.
-4. Insert into `guest_pass_holds` with 30-day expiry.
-5. Return `holdId`, `passesHeld`, `passesAvailable`.
+4. Insert into `guest_pass_holds(member_email, booking_id, passes_held, expires_at)` with 30-day expiry.
+5. Return `holdId`, `passesHeld`, `passesAvailable` (remaining after hold).
+6. Transaction scoped: entire operation succeeds or rolls back — no partial holds.
+
+This ensures holds are committed before the booking is created, preventing double-booking of limited passes.
 
 ### Consume Phase (at session finalization)
 
 `guestPassConsumer.ts` → `consumeGuestPassForParticipant()`:
 
-1. Reject placeholder guests (`/^Guest \d+$/i`).
-2. Check idempotency — skip if `used_guest_pass` already `TRUE`.
-3. Look up tier's `guest_passes_per_month`.
+1. Reject placeholder guests (`/^Guest \d+$/i`) — they cannot consume passes.
+2. Check idempotency — skip if `used_guest_pass` already `TRUE` on the participant.
+3. Look up tier's `guest_passes_per_month` to verify the member still has entitlement.
 4. Find or create `guest_passes` row, increment `passes_used`.
 5. If no passes remaining, return error.
 6. Zero out `guest_fee` in `usage_ledger` for the session owner.
 7. Set `payment_status = 'waived'`, `cached_fee_cents = 0`, `used_guest_pass = TRUE` on participant.
 8. Insert `legacy_purchases` record (category `guest_pass`, price $0, `is_comp = true`).
 9. Send notification to owner with remaining count.
-10. Clean up corresponding `guest_pass_holds` row.
+10. Clean up corresponding `guest_pass_holds` row by deleting the hold entry.
 
 ### Release Phase (at booking cancellation)
 
-`releaseGuestPassHold()` — delete all `guest_pass_holds` for the booking.
+`releaseGuestPassHold()` — delete all `guest_pass_holds` for the booking by `booking_id`. This frees reserved passes back to the member's available pool.
 
 ### Refund Phase
 
@@ -185,6 +198,49 @@ For each empty slot (not conference rooms), generate a line item:
 2. Decrement `passes_used` in `guest_passes`.
 3. Restore guest fee on participant (`cached_fee_cents` = Stripe guest pass price or default).
 4. Delete the corresponding `legacy_purchases` record.
+
+## Payment Status Service — Atomic Updates
+
+`PaymentStatusService.ts` provides a centralized gateway for all payment status changes to ensure consistency across `booking_participants`, `booking_fee_snapshots`, and `stripe_payment_intents` tables.
+
+### Core Methods
+
+**`markPaymentSucceeded(params)`**:
+1. Retrieve the fee snapshot by `stripe_payment_intent_id` with row lock (`FOR UPDATE`).
+2. Update `stripe_payment_intents` to `status = 'succeeded'`.
+3. If snapshot already marked `completed` or `paid`, exit early (idempotent).
+4. Otherwise, update snapshot to `status = 'completed'`, set `used_at = NOW()`.
+5. Bulk-update all participants in the snapshot to `payment_status = 'paid'`, `paid_at = NOW()`, `stripe_payment_intent_id = <intent>`, `cached_fee_cents = 0`.
+6. Create audit log entries for each participant with action `payment_succeeded`.
+7. Entire operation wrapped in transaction — all-or-nothing.
+
+**`markPaymentRefunded(params)`**:
+1. Retrieve fee snapshot by `stripe_payment_intent_id`.
+2. Update `stripe_payment_intents` to `status = 'refunded'`.
+3. If snapshot exists, update to `status = 'refunded'`.
+4. Bulk-update participants to `payment_status = 'refunded'`.
+5. Create audit log entries with action `payment_refunded`.
+
+**`markPaymentCancelled(params)`**:
+1. Retrieve fee snapshot by `stripe_payment_intent_id`.
+2. Update snapshot to `status = 'cancelled'`.
+3. Update `stripe_payment_intents` to `status = 'canceled'`.
+4. Transactional.
+
+**`syncFromStripe(paymentIntentId, stripeStatus)`**:
+- Utility method that maps Stripe webhook statuses (`succeeded`, `canceled`, etc.) to the appropriate service method.
+- Called by reconciliation jobs to pull Stripe truth back into the database.
+
+### Invariants
+
+- **Atomic writes**: all related tables updated in a single transaction.
+- **Idempotent**: calling the service twice for the same payment intent does not double-update.
+- **Audit trail**: every status change logged in `booking_payment_audit`.
+- **Snapshot state**: fee snapshot `status` transitions: `pending` → `completed` (on payment) or `refunded` or `cancelled`.
+
+### Integration with Fee Calculation
+
+Payment status updates do NOT recalculate fees; they only change the status. Fee calculation is a separate step performed by `computeFeeBreakdown()` at booking approval time. Status updates simply record the result of payment collection.
 
 ## Usage Calculator Details
 

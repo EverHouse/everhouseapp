@@ -200,6 +200,31 @@ Each cascade respects the billing provider guard — sub-members with non-Stripe
 - After 3 failures, sets `requires_card_update = true`
 - Sends escalating notifications to member and staff
 
+## Supporting Stripe Services
+
+The webhook system relies on several supporting services. These are not triggered by webhooks themselves, but are called by webhook handlers or used for data validation:
+
+### `groupBilling.ts` — Family & Corporate Billing Groups
+Manages group subscriptions where a primary account pays for sub-members (family or corporate teams). When a primary subscription status changes, cascades updates to all active group members (respecting their billing provider). Syncs family coupon (`FAMILY20`) and group add-on products to Stripe. Used by `handleSubscriptionUpdated` and `handleSubscriptionDeleted`.
+
+### `discounts.ts` — Discount Rule Sync
+Syncs discount rules from the local `discount_rules` table to Stripe coupons. Each rule becomes a coupon with ID format `{TAG}_{PERCENT}PCT`. Called manually via admin routes but also referenced by `handleCouponUpdated` to detect family discount changes. Enables staff to manage discount codes that apply to checkouts.
+
+### `invoices.ts` — Invoice Creation & Management
+CRUD operations for one-time invoices (outside subscriptions): create draft, add line items, finalize, send, void, charge one-time fees. Automatically applies customer balance credits before charging the card. Used by webhook handlers (`handleInvoicePaymentSucceeded`, `handleInvoicePaymentFailed`) to track invoice state and by `handleCheckoutSessionCompleted` for add_funds and day pass purposes.
+
+### `paymentRepository.ts` — Payment Queries
+Query interfaces for admin dashboards: `getRefundablePayments()` (succeeded in last 30 days), `getFailedPayments()` (failed/requires_action), `getPendingAuthorizations()` (pre-authorized/incomplete). Provides visibility into payment status without hitting Stripe API repeatedly.
+
+### `customerSync.ts` — MindBody Customer Metadata Sync
+Updates Stripe customer metadata for users with `billing_provider = 'mindbody'` to keep tier and billing info synchronized. Detects and clears stale customer IDs if they've been deleted in Stripe. Prevents out-of-date metadata from influencing webhook logic.
+
+### `environmentValidation.ts` — Stripe Environment Validation
+Startup task that validates stored Stripe IDs (products, prices, subscription IDs) actually exist in the current Stripe account. Clears stale IDs if environment changed (e.g., test → production). Warns if subscription tiers or cafe items lost their Stripe links. Prevents webhooks from failing due to invalid resource references.
+
+### `transactionCache.ts` — Transaction Cache
+Lightweight local cache of Stripe transactions (payments, invoices, refunds) for reconciliation reporting and audit logs. Currently a stub; full implementation planned. Deferred actions upsert into this cache after each webhook commit so admins can see transaction history without querying Stripe API.
+
 ## Product Catalog Sync
 
 Product/price webhooks keep the local catalog in sync with Stripe:

@@ -248,6 +248,15 @@ See `references/trackman-sync.md` for reconciliation details.
 
 ## References
 
+**Core Reference Docs:**
 - `references/server-flow.md` — Detailed API route → core service call chains for each booking operation.
 - `references/trackman-sync.md` — Trackman webhook handling, CSV import matching, reconciliation, and delta billing.
+
+**Key Implementation Files:**
+- `server/core/bookingService/tierRules.ts` — Tier validation rules, daily minute limits, Social tier guest restrictions, and `TierValidationResult` interface. See `references/server-flow.md#tier-validation-rules` for detailed documentation.
+- `server/core/bookingService/sessionManager.ts` — Session creation, participant linking, usage ledger recording, and guest pass deduction.
+- `server/core/bookingService/conflictDetection.ts` — Booking conflict detection (owner and participant conflicts).
+- `server/core/bookingService/availabilityGuard.ts` — Availability validation (closures, blocks, session overlaps).
+
+**Related Skills:**
 - Refer to `booking-import-standards` skill for CSV parsing rules, roster protection, and import data integrity rules.

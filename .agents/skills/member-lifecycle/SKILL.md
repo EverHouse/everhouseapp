@@ -52,7 +52,16 @@ The `billing_provider` column controls which system manages a member. Valid valu
 
 ### Member Cache
 
-`MemberService` uses an in-memory cache with 5-minute TTL. Pass `{ bypassCache: true }` to force a database read. The cache is keyed by normalized email and invalidated on member data changes.
+`MemberService` uses an in-memory cache (`server/core/memberService/memberCache.ts`) to reduce database load:
+
+- **TTL**: 5 minutes per entry
+- **Max size**: 1000 entries per cache (total ~3000 across all caches)
+- **Caching strategy**: Caches by normalized email AND by member ID for fast lookups in both directions. All linked emails (from `linked_emails` JSONB and `trackman_email`) are also cached to the same entry.
+- **Staff cache**: Separate from member cache; staff lookup via `getStaffByEmail(email)` queries a dedicated `staffByEmail` map.
+- **Invalidation**: Individual entries are auto-evicted on TTL expiry. Manual invalidation via `invalidateMember(emailOrId)` or `invalidateStaff(email)` when member data is updated.
+- **Bypass**: Pass `{ bypassCache: true }` to `MemberService.findByEmail()` or `MemberService.findById()` to force a database read and update the cache.
+
+The cache is shared globally in memory (`memberCache` singleton) and is not persistent across server restarts.
 
 ## Login-Time Auto-Fix (Stripe Member Auto-Fix)
 
