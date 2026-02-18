@@ -185,23 +185,6 @@ const formatJoinDate = (dateStr: string | null | undefined): string => {
     }
 };
 
-const getStatusColor = (status: string): string => {
-    const s = status.toLowerCase();
-    if (s === 'expired') return 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400';
-    if (s === 'terminated') return 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400';
-    if (s === 'former_member') return 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400';
-    if (s === 'pending') return 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400';
-    if (s === 'suspended') return 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400';
-    if (s === 'frozen' || s === 'froze') return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-400';
-    if (s === 'non-member') return 'bg-slate-100 text-slate-700 dark:bg-slate-500/20 dark:text-slate-400';
-    if (s === 'declined') return 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400';
-    if (s === 'cancelled' || s === 'canceled') return 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400';
-    return 'bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-400';
-};
-
-const formatStatusLabel = (status: string): string => {
-    return status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-};
 
 const DirectoryTab: React.FC = () => {
     const { setPageReady } = usePageReady();
@@ -1107,7 +1090,7 @@ const DirectoryTab: React.FC = () => {
                                         : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
                                 }`}
                             >
-                                {formatStatusLabel(status)}
+                                {getMemberStatusLabel(status)}
                             </button>
                         ))}
                     </div>
@@ -1649,9 +1632,15 @@ const DirectoryTab: React.FC = () => {
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-2">
                                                         <h4 className="font-bold text-lg text-primary dark:text-white">{m.name}</h4>
+                                                        {memberTab === 'former' && m.lastTier && (
+                                                            <span className="flex items-center gap-1">
+                                                                <span className="text-[10px] text-gray-400 dark:text-gray-500 italic">was</span>
+                                                                <TierBadge tier={m.lastTier} size="sm" />
+                                                            </span>
+                                                        )}
                                                         {memberTab === 'former' && m.status && (
-                                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getStatusColor(m.status)}`}>
-                                                                {formatStatusLabel(m.status)}
+                                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getMemberStatusBadgeClass(m.status)}`}>
+                                                                {getMemberStatusLabel(m.status)}
                                                             </span>
                                                         )}
                                                     </div>
@@ -1689,6 +1678,15 @@ const DirectoryTab: React.FC = () => {
                                                         </button>
                                                     )}
                                                 </div>
+                                                {memberTab === 'former' && (
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                        m.stripeCustomerId
+                                                            ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'
+                                                            : 'bg-gray-100 text-gray-500 dark:bg-gray-500/20 dark:text-gray-400'
+                                                    }`}>
+                                                        {m.stripeCustomerId ? 'Send Link' : 'New Signup'}
+                                                    </span>
+                                                )}
                                                 {isAdmin && memberTab === 'active' && (
                                                     <button 
                                                         onClick={(e) => { e.stopPropagation(); handleViewAs(m); }} 
@@ -1708,14 +1706,20 @@ const DirectoryTab: React.FC = () => {
                         <div className="hidden md:block relative">
                             <div className="flex items-center bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/20">
                                 <SortableHeader field="name" label="Name" width="14%" />
-                                <SortableHeader field="tier" label="Tier" width="12%" />
+                                <SortableHeader field="tier" label="Tier" width={memberTab === 'former' ? '10%' : '12%'} />
+                                {memberTab === 'former' && (
+                                    <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '8%' }}>Last Tier</div>
+                                )}
                                 <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '10%' }}>Status</div>
                                 <SortableHeader field="visits" label="Visits" width="7%" className="text-center" />
                                 <SortableHeader field="joinDate" label="Joined" width="9%" />
                                 <SortableHeader field="lastVisit" label="Last Visit" width="9%" />
-                                <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: memberTab === 'former' ? '24%' : '39%' }}>Email</div>
+                                <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: memberTab === 'former' ? '13%' : '39%' }}>Email</div>
                                 {memberTab === 'former' && (
-                                    <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '15%' }}>Former Status</div>
+                                    <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '10%' }}>Former Status</div>
+                                )}
+                                {memberTab === 'former' && (
+                                    <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '10%' }}>Reactivation</div>
                                 )}
                             </div>
                             <div>
@@ -1726,7 +1730,7 @@ const DirectoryTab: React.FC = () => {
                                         className="flex items-center border-b border-gray-200 dark:border-white/20 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer"
                                     >
                                         <div style={{ width: '14%' }} className="p-4 font-medium text-primary dark:text-white truncate">{m.name}</div>
-                                        <div style={{ width: '12%' }} className="p-4">
+                                        <div style={{ width: memberTab === 'former' ? '10%' : '12%' }} className="p-4">
                                             <div className="flex items-center gap-1 flex-wrap">
                                                 <div className="flex items-center gap-1">
                                                     <TierBadge tier={getDisplayTier(m)} size="sm" showNoTier={true} membershipStatus={m.membershipStatus} />
@@ -1748,6 +1752,15 @@ const DirectoryTab: React.FC = () => {
                                                 )}
                                             </div>
                                         </div>
+                                        {memberTab === 'former' && (
+                                            <div style={{ width: '8%' }} className="p-4">
+                                                {m.lastTier ? (
+                                                    <TierBadge tier={m.lastTier} size="sm" />
+                                                ) : (
+                                                    <span className="text-xs text-gray-400 dark:text-gray-500">—</span>
+                                                )}
+                                            </div>
+                                        )}
                                         <div style={{ width: '10%' }} className="p-4">
                                             {m.membershipStatus ? (
                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getMemberStatusBadgeClass(m.membershipStatus)}`}>
@@ -1766,16 +1779,29 @@ const DirectoryTab: React.FC = () => {
                                         <div style={{ width: '9%' }} className="p-4 text-gray-500 dark:text-gray-400 text-sm whitespace-nowrap">
                                             {formatJoinDate(m.lastBookingDate)}
                                         </div>
-                                        <div style={{ width: memberTab === 'former' ? '24%' : '39%' }} className="p-4 text-gray-500 dark:text-gray-400 text-sm truncate" title={m.email}>{m.email}</div>
+                                        <div style={{ width: memberTab === 'former' ? '13%' : '39%' }} className="p-4 text-gray-500 dark:text-gray-400 text-sm truncate" title={m.email}>{m.email}</div>
                                         {memberTab === 'former' && (
-                                            <div style={{ width: '15%' }} className="p-4">
+                                            <div style={{ width: '10%' }} className="p-4">
                                                 {m.status ? (
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold whitespace-nowrap ${getStatusColor(m.status)}`}>
-                                                        {formatStatusLabel(m.status)}
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold whitespace-nowrap ${getMemberStatusBadgeClass(m.status)}`}>
+                                                        {getMemberStatusLabel(m.status)}
                                                     </span>
                                                 ) : (
                                                     <span className="px-2 py-1 rounded-full text-xs font-bold whitespace-nowrap bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
                                                         Unknown
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
+                                        {memberTab === 'former' && (
+                                            <div style={{ width: '10%' }} className="p-4">
+                                                {m.stripeCustomerId ? (
+                                                    <span className="px-2 py-1 rounded-full text-[10px] font-bold whitespace-nowrap bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400">
+                                                        Send Link
+                                                    </span>
+                                                ) : (
+                                                    <span className="px-2 py-1 rounded-full text-[10px] font-bold whitespace-nowrap bg-gray-100 text-gray-500 dark:bg-gray-500/20 dark:text-gray-400">
+                                                        New Signup
                                                     </span>
                                                 )}
                                             </div>

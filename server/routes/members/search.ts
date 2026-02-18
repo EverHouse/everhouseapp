@@ -217,6 +217,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
       hubspotId: users.hubspotId,
       mindbodyClientId: users.mindbodyClientId,
       stripeCustomerId: users.stripeCustomerId,
+      lastTier: users.lastTier,
       manuallyLinkedEmails: users.manuallyLinkedEmails,
       dataSource: users.dataSource,
       billingProvider: users.billingProvider,
@@ -407,6 +408,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
         stripeCustomerId: member.stripeCustomerId,
         manuallyLinkedEmails: member.manuallyLinkedEmails || [],
         dataSource: member.dataSource,
+        lastTier: member.lastTier || null,
         billingProvider: member.billingProvider,
         nextPaymentDate: member.stripeCurrentPeriodEnd || null,
       };
