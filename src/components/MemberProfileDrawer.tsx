@@ -806,17 +806,19 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                 <span className="material-symbols-outlined text-lg">visibility</span>
                 View As This Member
               </button>
-              <button
-                onClick={() => {
-                  setShowMergeModal(true);
-                  setSelectedMergeTarget(null);
-                  setMergePreview(null);
-                }}
-                className="py-2.5 px-4 rounded-xl bg-indigo-600 text-white font-medium flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors"
-                title="Merge with another user"
-              >
-                <span className="material-symbols-outlined text-lg">merge</span>
-              </button>
+              {member.membershipStatus !== 'merged' && (
+                <button
+                  onClick={() => {
+                    setShowMergeModal(true);
+                    setSelectedMergeTarget(null);
+                    setMergePreview(null);
+                  }}
+                  className="py-2.5 px-4 rounded-xl bg-indigo-600 text-white font-medium flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors"
+                  title="Merge with another user"
+                >
+                  <span className="material-symbols-outlined text-lg">merge</span>
+                </button>
+              )}
               <button
                 onClick={() => setShowDeleteModal(true)}
                 className="py-2.5 px-4 rounded-xl bg-red-600 text-white font-medium flex items-center justify-center gap-2 hover:bg-red-700 transition-colors"
