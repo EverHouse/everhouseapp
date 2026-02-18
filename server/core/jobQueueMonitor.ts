@@ -36,10 +36,10 @@ export async function getJobQueueMonitorData(): Promise<JobQueueMonitorData> {
 
   const statsRow = statsResult.rows[0] as Record<string, unknown>;
   const stats: JobQueueStats = {
-    pending: statsRow?.pending || 0,
-    processing: statsRow?.processing || 0,
-    completed: statsRow?.completed || 0,
-    failed: statsRow?.failed || 0,
+    pending: Number(statsRow?.pending || 0),
+    processing: Number(statsRow?.processing || 0),
+    completed: Number(statsRow?.completed || 0),
+    failed: Number(statsRow?.failed || 0),
   };
 
   const failedResult = await db.execute(sql`
@@ -51,12 +51,12 @@ export async function getJobQueueMonitorData(): Promise<JobQueueMonitorData> {
   `);
 
   const recentFailed: FailedJob[] = failedResult.rows.map((r: Record<string, unknown>) => ({
-    id: r.id,
-    jobType: r.job_type,
-    lastError: r.last_error,
-    createdAt: r.created_at?.toISOString?.() || r.created_at,
-    retryCount: r.retry_count,
-    maxRetries: r.max_retries,
+    id: Number(r.id),
+    jobType: String(r.job_type),
+    lastError: String(r.last_error || ''),
+    createdAt: (r.created_at as any)?.toISOString?.() || String(r.created_at),
+    retryCount: Number(r.retry_count),
+    maxRetries: Number(r.max_retries),
   }));
 
   const completedResult = await db.execute(sql`
@@ -68,9 +68,9 @@ export async function getJobQueueMonitorData(): Promise<JobQueueMonitorData> {
   `);
 
   const recentCompleted = completedResult.rows.map((r: Record<string, unknown>) => ({
-    id: r.id,
-    jobType: r.job_type,
-    processedAt: r.processed_at?.toISOString?.() || r.processed_at,
+    id: Number(r.id),
+    jobType: String(r.job_type),
+    processedAt: (r.processed_at as any)?.toISOString?.() || String(r.processed_at),
   }));
 
   const oldestResult = await db.execute(sql`

@@ -126,7 +126,7 @@ export async function syncHubSpotFormSubmissions(): Promise<{
       accessToken = privateAppToken;
     } else {
       try {
-        accessToken = await getHubSpotAccessToken();
+        accessToken = await getHubSpotAccessToken() as string;
       } catch (err: unknown) {
         const msg = `Failed to get HubSpot access token: ${getErrorMessage(err)}`;
         logger.error(`[HubSpot FormSync] ${msg}`);

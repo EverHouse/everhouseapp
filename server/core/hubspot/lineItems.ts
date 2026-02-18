@@ -56,7 +56,7 @@ export async function addLineItemToDeal(
         lineItemId,
         'deals',
         hubspotDealId,
-        [{ associationCategory: 'HUBSPOT_DEFINED' as unknown as 'HUBSPOT_DEFINED', associationTypeId: 20 }]
+        [{ associationCategory: 'HUBSPOT_DEFINED' as any, associationTypeId: 20 }]
       )
     );
     

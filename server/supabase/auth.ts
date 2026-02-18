@@ -26,7 +26,7 @@ export function setupSupabaseAuthRoutes(app: Express) {
   if (!client) {
     logger.info('Supabase auth routes disabled - credentials not configured');
     
-    const supabaseNotConfigured = (_req: Request, res: Response) => {
+    const supabaseNotConfigured: RequestHandler = (_req, res) => {
       res.status(503).json({ error: 'Supabase authentication is not configured' });
     };
     
@@ -217,7 +217,7 @@ export const isSupabaseAuthenticated: RequestHandler = async (req, res, next) =>
       return res.status(401).json({ error: 'Invalid token' });
     }
     
-    (req as Request & { supabaseUser?: unknown }).supabaseUser = user;
+    (req as unknown as Record<string, unknown>).supabaseUser = user;
     next();
   } catch (error) {
     res.status(401).json({ error: 'Authentication failed' });

@@ -60,17 +60,17 @@ export async function getWebhookEvents(params: WebhookQueryParams): Promise<{ ev
   `);
 
   const events: WebhookEvent[] = result.rows.map((row: Record<string, unknown>) => ({
-    id: row.id,
-    eventType: row.event_type,
-    trackmanBookingId: row.trackman_booking_id,
-    trackmanUserId: row.trackman_user_id,
-    processedAt: row.processed_at?.toISOString?.() || row.processed_at,
-    processingError: row.processing_error,
-    matchedBookingId: row.matched_booking_id,
-    matchedUserId: row.matched_user_id,
-    createdAt: row.created_at?.toISOString?.() || row.created_at,
-    retryCount: row.retry_count || 0,
-    lastRetryAt: row.last_retry_at?.toISOString?.() || row.last_retry_at,
+    id: Number(row.id),
+    eventType: String(row.event_type),
+    trackmanBookingId: String(row.trackman_booking_id || ''),
+    trackmanUserId: String(row.trackman_user_id || ''),
+    processedAt: (row.processed_at as any)?.toISOString?.() || (row.processed_at ? String(row.processed_at) : null),
+    processingError: row.processing_error ? String(row.processing_error) : null,
+    matchedBookingId: row.matched_booking_id ? Number(row.matched_booking_id) : null,
+    matchedUserId: row.matched_user_id ? Number(row.matched_user_id) : null,
+    createdAt: (row.created_at as any)?.toISOString?.() || String(row.created_at),
+    retryCount: Number(row.retry_count || 0),
+    lastRetryAt: (row.last_retry_at as any)?.toISOString?.() || (row.last_retry_at ? String(row.last_retry_at) : null),
     status: row.processing_error ? 'failed' : row.processed_at ? 'processed' : 'pending',
   }));
 

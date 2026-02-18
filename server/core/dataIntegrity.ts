@@ -216,11 +216,11 @@ async function checkOrphanBookingParticipants(): Promise<IntegrityCheckResult> {
       category: 'orphan_record',
       severity: 'error',
       table: 'booking_participants',
-      recordId: row.id,
+      recordId: row.id as string | number,
       description: `Participant "${row.display_name}" (session_id: ${row.session_id}) has no valid booking session`,
       suggestion: 'Delete orphan participant record or recreate the booking session',
       context: {
-        memberName: row.display_name || undefined
+        memberName: (row.display_name as string) || undefined
       }
     });
   }
@@ -266,28 +266,28 @@ async function checkUnmatchedTrackmanBookings(): Promise<IntegrityCheckResult> {
         category: 'sync_mismatch',
         severity: 'warning',
         table: 'trackman_unmatched_bookings',
-        recordId: row.id,
+        recordId: row.id as string | number,
         description: `Trackman booking for "${row.user_name || 'Unknown'}" (${row.original_email || 'no email'}) on ${row.booking_date} has no matching member`,
         suggestion: 'Use the Trackman Unmatched Bookings section to link this booking to a member or create a visitor record',
         context: {
-          trackmanBookingId: row.trackman_booking_id || undefined,
-          userName: row.user_name || undefined,
-          userEmail: row.original_email || undefined,
-          bookingDate: row.booking_date || undefined,
-          bayNumber: row.bay_number || undefined,
-          startTime: row.start_time || undefined,
-          endTime: row.end_time || undefined,
-          importedName: row.user_name || undefined,
-          notes: row.notes || undefined,
-          originalEmail: row.original_email || undefined
+          trackmanBookingId: (row.trackman_booking_id as string) || undefined,
+          userName: (row.user_name as string) || undefined,
+          userEmail: (row.original_email as string) || undefined,
+          bookingDate: (row.booking_date as string) || undefined,
+          bayNumber: row.bay_number as string | number || undefined,
+          startTime: (row.start_time as string) || undefined,
+          endTime: (row.end_time as string) || undefined,
+          importedName: (row.user_name as string) || undefined,
+          notes: (row.notes as string) || undefined,
+          originalEmail: (row.original_email as string) || undefined
         }
       });
     }
     
     return {
       checkName: 'Unmatched Trackman Bookings',
-      status: total === 0 ? 'pass' : total > 50 ? 'fail' : 'warning',
-      issueCount: total,
+      status: Number(total) === 0 ? 'pass' : Number(total) > 50 ? 'fail' : 'warning',
+      issueCount: Number(total),
       issues,
       lastRun: new Date()
     };
@@ -325,11 +325,11 @@ async function checkOrphanWellnessEnrollments(): Promise<IntegrityCheckResult> {
       category: 'orphan_record',
       severity: 'error',
       table: 'wellness_enrollments',
-      recordId: row.id,
+      recordId: row.id as string | number,
       description: `Enrollment for ${row.user_email} references non-existent class (class_id: ${row.class_id})`,
       suggestion: 'Delete orphan enrollment record',
       context: {
-        memberEmail: row.user_email || undefined
+        memberEmail: (row.user_email as string) || undefined
       }
     });
   }
@@ -358,12 +358,12 @@ async function checkOrphanEventRsvps(): Promise<IntegrityCheckResult> {
       category: 'orphan_record',
       severity: 'error',
       table: 'event_rsvps',
-      recordId: row.id,
+      recordId: row.id as string | number,
       description: `RSVP for ${row.user_email} references non-existent event (event_id: ${row.event_id})`,
       suggestion: 'Delete orphan RSVP record',
       context: {
-        memberName: row.attendee_name || undefined,
-        memberEmail: row.user_email || undefined
+        memberName: (row.attendee_name as string) || undefined,
+        memberEmail: (row.user_email as string) || undefined
       }
     });
   }
@@ -392,15 +392,15 @@ async function checkBookingResourceRelationships(): Promise<IntegrityCheckResult
       category: 'missing_relationship',
       severity: 'error',
       table: 'booking_requests',
-      recordId: row.id,
+      recordId: row.id as string | number,
       description: `Booking by ${row.user_email} on ${row.request_date} references non-existent resource (resource_id: ${row.resource_id})`,
       suggestion: 'Update booking to use a valid resource or delete the booking',
       context: {
-        memberName: row.user_name || undefined,
-        memberEmail: row.user_email || undefined,
-        bookingDate: row.request_date || undefined,
-        startTime: row.start_time || undefined,
-        endTime: row.end_time || undefined
+        memberName: (row.user_name as string) || undefined,
+        memberEmail: (row.user_email as string) || undefined,
+        bookingDate: (row.request_date as string) || undefined,
+        startTime: (row.start_time as string) || undefined,
+        endTime: (row.end_time as string) || undefined
       }
     });
   }
@@ -433,14 +433,14 @@ async function checkParticipantUserRelationships(): Promise<IntegrityCheckResult
       category: 'missing_relationship',
       severity: 'warning',
       table: 'booking_participants',
-      recordId: row.id,
+      recordId: row.id as string | number,
       description: `Participant "${row.display_name}" references non-existent user (user_id: ${row.user_id})`,
       suggestion: 'Update participant to reference a valid user or mark as guest',
       context: {
-        memberName: row.display_name || undefined,
-        bookingDate: row.session_date || undefined,
-        startTime: row.start_time || undefined,
-        resourceName: row.resource_name || undefined
+        memberName: (row.display_name as string) || undefined,
+        bookingDate: (row.session_date as string) || undefined,
+        startTime: (row.start_time as string) || undefined,
+        resourceName: (row.resource_name as string) || undefined
       }
     });
   }
@@ -498,39 +498,39 @@ async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> {
     
     try {
       const hubspotContact = await hubspot.crm.contacts.basicApi.getById(
-        member.hubspot_id,
+        String(member.hubspot_id),
         ['firstname', 'lastname', 'email', 'membership_tier']
       );
       
       const props = hubspotContact.properties || {};
       const comparisons: SyncComparisonData[] = [];
       
-      const appFirstName = (member.first_name || '').trim().toLowerCase();
+      const appFirstName = String(member.first_name || '').trim().toLowerCase();
       const hsFirstName = (props.firstname || '').trim().toLowerCase();
       if (appFirstName !== hsFirstName) {
         comparisons.push({
           field: 'First Name',
-          appValue: member.first_name || null,
+          appValue: (member.first_name as string) || null,
           externalValue: props.firstname || null
         });
       }
       
-      const appLastName = (member.last_name || '').trim().toLowerCase();
+      const appLastName = String(member.last_name || '').trim().toLowerCase();
       const hsLastName = (props.lastname || '').trim().toLowerCase();
       if (appLastName !== hsLastName) {
         comparisons.push({
           field: 'Last Name',
-          appValue: member.last_name || null,
+          appValue: (member.last_name as string) || null,
           externalValue: props.lastname || null
         });
       }
       
-      const memberStatus = (member.membership_status || '').toLowerCase();
+      const memberStatus = String(member.membership_status || '').toLowerCase();
       const isChurned = CHURNED_STATUSES.includes(memberStatus);
       const isNoTierStatus = NO_TIER_STATUSES.includes(memberStatus);
       const expectedHubSpotTier = (isChurned || isNoTierStatus || !member.tier)
         ? null
-        : denormalizeTierForHubSpot(member.tier);
+        : denormalizeTierForHubSpot(String(member.tier));
       const hsTierRaw = props.membership_tier || null;
       const expectedNorm = (expectedHubSpotTier || '').trim().toLowerCase();
       const hsNorm = (hsTierRaw || '').trim().toLowerCase();
@@ -550,17 +550,17 @@ async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> {
           category: 'sync_mismatch',
           severity: 'warning',
           table: 'users',
-          recordId: member.id,
+          recordId: member.id as string | number,
           description: `Member "${member.first_name} ${member.last_name}" has mismatched data: ${fieldList}`,
           suggestion: 'Sync data between app and HubSpot',
           context: {
             memberName: `${member.first_name || ''} ${member.last_name || ''}`.trim() || undefined,
-            memberEmail: member.email || undefined,
-            memberTier: member.tier || undefined,
+            memberEmail: (member.email as string) || undefined,
+            memberTier: (member.tier as string) || undefined,
             syncType: 'hubspot',
             syncComparison: comparisons,
-            hubspotContactId: member.hubspot_id,
-            userId: member.id
+            hubspotContactId: member.hubspot_id as string,
+            userId: Number(member.id)
           }
         });
       }
@@ -570,15 +570,15 @@ async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> {
           category: 'sync_mismatch',
           severity: 'error',
           table: 'users',
-          recordId: member.id,
+          recordId: member.id as string | number,
           description: `Member "${member.first_name} ${member.last_name}" (hubspot_id: ${member.hubspot_id}) not found in HubSpot`,
           suggestion: 'Remove stale HubSpot ID or re-sync member',
           context: {
             memberName: `${member.first_name || ''} ${member.last_name || ''}`.trim() || undefined,
-            memberEmail: member.email || undefined,
+            memberEmail: (member.email as string) || undefined,
             syncType: 'hubspot',
-            hubspotContactId: member.hubspot_id,
-            userId: member.id
+            hubspotContactId: member.hubspot_id as string,
+            userId: Number(member.id)
           }
         });
       }
@@ -656,13 +656,13 @@ async function checkNeedsReviewItems(): Promise<IntegrityCheckResult> {
       category: 'sync_mismatch',
       severity: 'info',
       table: 'events',
-      recordId: row.id,
+      recordId: row.id as string | number,
       description: `Event "${row.title}" on ${row.event_date} needs review`,
       suggestion: 'Review and approve the event in admin panel',
       context: {
-        eventTitle: row.title || undefined,
-        eventDate: row.event_date || undefined,
-        startTime: row.start_time || undefined
+        eventTitle: (row.title as string) || undefined,
+        eventDate: (row.event_date as string) || undefined,
+        startTime: (row.start_time as string) || undefined
       }
     });
   }
@@ -672,14 +672,14 @@ async function checkNeedsReviewItems(): Promise<IntegrityCheckResult> {
       category: 'sync_mismatch',
       severity: 'info',
       table: 'wellness_classes',
-      recordId: row.id,
+      recordId: row.id as string | number,
       description: `Wellness class "${row.title}" on ${row.date} needs review`,
       suggestion: 'Review and approve the class in admin panel',
       context: {
-        className: row.title || undefined,
-        classDate: row.date || undefined,
-        instructor: row.instructor || undefined,
-        startTime: row.start_time || undefined
+        className: (row.title as string) || undefined,
+        classDate: (row.date as string) || undefined,
+        instructor: (row.instructor as string) || undefined,
+        startTime: (row.start_time as string) || undefined
       }
     });
   }
@@ -710,16 +710,16 @@ async function checkBookingTimeValidity(): Promise<IntegrityCheckResult> {
       category: 'data_quality',
       severity: 'error',
       table: 'booking_requests',
-      recordId: row.id,
+      recordId: row.id as string | number,
       description: `Booking by ${row.user_email} on ${row.request_date} has end_time (${row.end_time}) before start_time (${row.start_time})`,
       suggestion: 'Fix the booking times or delete the invalid booking',
       context: {
-        memberName: row.user_name || undefined,
-        memberEmail: row.user_email || undefined,
-        bookingDate: row.request_date || undefined,
-        startTime: row.start_time || undefined,
-        endTime: row.end_time || undefined,
-        resourceName: row.resource_name || undefined
+        memberName: (row.user_name as string) || undefined,
+        memberEmail: (row.user_email as string) || undefined,
+        bookingDate: (row.request_date as string) || undefined,
+        startTime: (row.start_time as string) || undefined,
+        endTime: (row.end_time as string) || undefined,
+        resourceName: (row.resource_name as string) || undefined
       }
     });
   }
@@ -738,14 +738,14 @@ async function checkBookingTimeValidity(): Promise<IntegrityCheckResult> {
       category: 'data_quality',
       severity: 'error',
       table: 'booking_sessions',
-      recordId: row.id,
+      recordId: row.id as string | number,
       description: `Booking session on ${row.session_date} has end_time (${row.end_time}) before start_time (${row.start_time})`,
       suggestion: 'Fix the session times or delete the invalid session',
       context: {
-        bookingDate: row.session_date || undefined,
-        startTime: row.start_time || undefined,
-        endTime: row.end_time || undefined,
-        resourceName: row.resource_name || undefined
+        bookingDate: (row.session_date as string) || undefined,
+        startTime: (row.start_time as string) || undefined,
+        endTime: (row.end_time as string) || undefined,
+        resourceName: (row.resource_name as string) || undefined
       }
     });
   }
@@ -787,14 +787,14 @@ async function checkStalePastTours(): Promise<IntegrityCheckResult> {
       category: 'data_quality',
       severity: 'warning',
       table: 'tours',
-      recordId: row.id,
+      recordId: row.id as string | number,
       description: `Tour "${row.title}" for ${row.guest_name || 'unknown guest'} on ${row.tour_date} is in the past but still marked as "${row.status}"`,
       suggestion: 'Update tour status to completed, no-show, or cancelled',
       context: {
-        guestName: row.guest_name || undefined,
-        memberEmail: row.guest_email || undefined,
-        tourDate: row.tour_date || undefined,
-        startTime: row.start_time || undefined
+        guestName: (row.guest_name as string) || undefined,
+        memberEmail: (row.guest_email as string) || undefined,
+        tourDate: (row.tour_date as string) || undefined,
+        startTime: (row.start_time as string) || undefined
       }
     });
   }
@@ -823,12 +823,12 @@ async function checkMembersWithoutEmail(): Promise<IntegrityCheckResult> {
       category: 'data_quality',
       severity: 'error',
       table: 'users',
-      recordId: row.id,
+      recordId: row.id as string | number,
       description: `Member "${name}" (id: ${row.id}) has no email address`,
       suggestion: 'Add an email address for this member or merge with existing record',
       context: {
         memberName: name,
-        memberTier: row.membership_tier || undefined
+        memberTier: (row.membership_tier as string) || undefined
       }
     });
   }
@@ -859,11 +859,11 @@ async function checkDealsWithoutLineItems(): Promise<IntegrityCheckResult> {
       category: 'data_quality',
       severity: 'error',
       table: 'hubspot_deals',
-      recordId: row.id,
+      recordId: row.id as string | number,
       description: `Deal "${row.deal_name || 'Unnamed'}" for ${row.member_email} has no product line items`,
       suggestion: 'Add product line items to this deal in the billing section or HubSpot',
       context: {
-        memberEmail: row.member_email || undefined
+        memberEmail: (row.member_email as string) || undefined
       }
     });
   }
@@ -922,29 +922,29 @@ async function checkDealStageDrift(): Promise<IntegrityCheckResult> {
   `);
   
   for (const row of driftingDeals.rows as Record<string, unknown>[]) {
-    const membershipStatus = (row.membership_status || 'non-member').toLowerCase();
+    const membershipStatus = String(row.membership_status || 'non-member').toLowerCase();
     const expectedStage = STAGE_MAPPING[membershipStatus] || 'closedlost';
     const currentStage = row.current_stage;
     
     if (currentStage !== expectedStage) {
       const memberName = [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown';
       const expectedStageName = STAGE_NAMES[expectedStage] || expectedStage;
-      const currentStageName = STAGE_NAMES[currentStage] || currentStage;
+      const currentStageName = STAGE_NAMES[currentStage as string] || currentStage;
       
       issues.push({
         category: 'sync_mismatch',
         severity: 'error',
         table: 'hubspot_deals',
-        recordId: row.id,
+        recordId: row.id as string | number,
         description: `Deal for ${row.member_email} is in "${currentStageName}" but membership status is "${membershipStatus}" (should be in "${expectedStageName}")`,
         suggestion: `Update deal stage to match membership status or correct membership status in HubSpot`,
         context: {
           memberName,
-          memberEmail: row.member_email,
-          memberTier: row.tier || undefined,
+          memberEmail: row.member_email as string,
+          memberTier: (row.tier as string) || undefined,
           syncType: 'hubspot',
           syncComparison: [
-            { field: 'Deal Stage', appValue: currentStageName, externalValue: expectedStageName },
+            { field: 'Deal Stage', appValue: currentStageName as string, externalValue: expectedStageName as string },
             { field: 'Membership Status', appValue: membershipStatus, externalValue: null }
           ]
         }
@@ -1063,7 +1063,7 @@ async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResult> {
               memberTier: member.tier || undefined,
               syncType: 'stripe',
               stripeCustomerId: customerId,
-              userId: member.id,
+              userId: Number(member.id),
               syncComparison: [
                 { field: 'Subscription', appValue: dbStatus, externalValue: 'no subscription' }
               ]
@@ -1108,7 +1108,7 @@ async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResult> {
               memberTier: member.tier || undefined,
               syncType: 'stripe',
               stripeCustomerId: customerId,
-              userId: member.id,
+              userId: Number(member.id),
               syncComparison: comparisons
             }
           });
@@ -1120,9 +1120,10 @@ async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResult> {
       const price = item?.price;
       const product = typeof price?.product === 'object' ? price.product : null;
       
-      if (product && dbTier) {
-        const productTier = (product.metadata?.tier || product.name || '').toLowerCase();
-        const productName = (product.name || '').toLowerCase();
+      const activeProduct = product && !('deleted' in product && product.deleted) ? product as Stripe.Product : null;
+      if (activeProduct && dbTier) {
+        const productTier = (activeProduct.metadata?.tier || activeProduct.name || '').toLowerCase();
+        const productName = (activeProduct.name || '').toLowerCase();
         
         const tierMatches = 
           productTier.includes(dbTier) || 
@@ -1134,7 +1135,7 @@ async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResult> {
           comparisons.push({
             field: 'Membership Tier',
             appValue: member.tier || null,
-            externalValue: product.metadata?.tier || product.name || null
+            externalValue: activeProduct.metadata?.tier || activeProduct.name || null
           });
           
           issues.push({
@@ -1142,7 +1143,7 @@ async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResult> {
             severity: 'warning',
             table: 'users',
             recordId: member.id,
-            description: `Member "${memberName}" has tier mismatch: DB tier is "${member.tier}" but Stripe product is "${product.name}"`,
+            description: `Member "${memberName}" has tier mismatch: DB tier is "${member.tier}" but Stripe product is "${activeProduct.name}"`,
             suggestion: 'Update database tier to match Stripe subscription product',
             context: {
               memberName,
@@ -1150,7 +1151,7 @@ async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResult> {
               memberTier: member.tier || undefined,
               syncType: 'stripe',
               stripeCustomerId: customerId,
-              userId: member.id,
+              userId: Number(member.id),
               syncComparison: comparisons
             }
           });
@@ -1172,7 +1173,7 @@ async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResult> {
             memberName,
             memberEmail: member.email || undefined,
             stripeCustomerId: customerId,
-            userId: member.id,
+            userId: Number(member.id),
             errorType: 'orphaned_stripe_customer'
           }
         });
@@ -1226,21 +1227,21 @@ async function checkStuckTransitionalMembers(): Promise<IntegrityCheckResult> {
   
   for (const member of stuckMembers) {
     const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || 'Unknown';
-    const hoursStuck = Math.round((Date.now() - new Date(member.updated_at).getTime()) / (1000 * 60 * 60));
+    const hoursStuck = Math.round((Date.now() - new Date(member.updated_at as string).getTime()) / (1000 * 60 * 60));
     
     issues.push({
       category: 'sync_mismatch',
       severity: 'error',
       table: 'users',
-      recordId: member.id,
+      recordId: member.id as string | number,
       description: `Member "${memberName}" has Stripe subscription but is stuck in '${member.membership_status}' status for ${hoursStuck} hours`,
       suggestion: 'Check Stripe webhook delivery or manually sync membership status',
       context: {
         memberName,
-        memberEmail: member.email,
-        memberTier: member.tier,
-        stripeCustomerId: member.stripe_subscription_id,
-        userId: member.id
+        memberEmail: member.email as string,
+        memberTier: member.tier as string,
+        stripeCustomerId: member.stripe_subscription_id as string,
+        userId: Number(member.id)
       }
     });
   }
@@ -1317,9 +1318,9 @@ async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
           hubspot.crm.contacts.batchApi.read({
             inputs: hsBatch.map((m: MemberRow) => ({ id: m.hubspot_id as string })),
             properties: ['membership_tier']
-          })
+          } as any)
         );
-        for (const contact of ((readResult as Record<string, unknown>).results as Array<{ id: string; properties?: Record<string, string> }> || [])) {
+        for (const contact of ((readResult as unknown as Record<string, unknown>).results as Array<{ id: string; properties?: Record<string, string> }> || [])) {
           hubspotTierMap.set(contact.id, (contact.properties?.membership_tier || '').toLowerCase().trim());
         }
       } catch (batchErr: unknown) {
@@ -1424,7 +1425,7 @@ async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
             syncType: 'stripe',
             stripeCustomerId: customerId,
             hubspotContactId: member.hubspot_id || undefined,
-            userId: member.id,
+            userId: Number(member.id),
             syncComparison: tierMismatches
           }
         });
@@ -1475,27 +1476,27 @@ async function checkBookingsWithoutSessions(): Promise<IntegrityCheckResult> {
   const ghosts = ghostsResult.rows as Record<string, unknown>[];
   
   for (const row of ghosts) {
-    const dateStr = row.request_date ? new Date(row.request_date).toISOString().split('T')[0] : 'unknown';
+    const dateStr = row.request_date ? new Date(row.request_date as string).toISOString().split('T')[0] : 'unknown';
     const memberName = row.first_name && row.last_name ? `${row.first_name} ${row.last_name}` : undefined;
     issues.push({
       category: 'data_quality',
       severity: 'error',
       table: 'booking_requests',
-      recordId: row.id,
+      recordId: row.id as string | number,
       description: `Active booking #${row.id} (${row.status}) for ${row.user_email} on ${dateStr} has NO SESSION. Billing is not being tracked.`,
       suggestion: 'Run "Backfill Sessions" tool in Admin -> Data Tools, or manually create a session for this booking.',
       context: {
         bookingDate: dateStr,
-        memberEmail: row.user_email,
+        memberEmail: row.user_email as string,
         memberName: memberName,
-        trackmanBookingId: row.trackman_booking_id,
-        resourceId: row.resource_id,
-        resourceName: row.resource_name,
-        startTime: row.start_time,
-        endTime: row.end_time,
-        notes: row.notes,
-        importedName: memberName || row.user_email?.split('@')[0],
-        status: row.status
+        trackmanBookingId: row.trackman_booking_id as string,
+        resourceId: Number(row.resource_id),
+        resourceName: row.resource_name as string,
+        startTime: row.start_time as string,
+        endTime: row.end_time as string,
+        notes: row.notes as string,
+        importedName: memberName || String(row.user_email || '').split('@')[0],
+        status: row.status as string
       }
     });
   }
@@ -1554,13 +1555,13 @@ async function checkDuplicateStripeCustomers(): Promise<IntegrityCheckResult> {
       category: 'data_quality',
       severity: 'warning',
       table: 'users',
-      recordId: dup.normalized_email,
+      recordId: dup.normalized_email as string | number,
       description: `Email "${dup.normalized_email}" has ${dup.customer_count} different Stripe customers: ${(dup.customer_ids as string[]).join(', ')}`,
       suggestion: 'Consolidate to a single Stripe customer to prevent billing issues and duplicate charges.',
       context: {
-        email: dup.normalized_email,
-        stripeCustomerIds: dup.customer_ids,
-        memberEmails: dup.member_emails
+        email: dup.normalized_email as string,
+        stripeCustomerIds: dup.customer_ids as string[],
+        memberEmails: dup.member_emails as string | string[]
       }
     });
   }
@@ -1589,11 +1590,11 @@ async function checkDuplicateStripeCustomers(): Promise<IntegrityCheckResult> {
       category: 'data_quality',
       severity: 'info',
       table: 'users',
-      recordId: shared.stripe_customer_id,
+      recordId: shared.stripe_customer_id as string,
       description: `Stripe customer ${shared.stripe_customer_id} is shared by ${shared.user_count} members: ${emails.slice(0, 5).join(', ')}${emails.length > 5 ? '...' : ''}`,
       suggestion: 'This may be intentional for billing groups. Review if these should be separate customers.',
       context: {
-        stripeCustomerId: shared.stripe_customer_id,
+        stripeCustomerId: shared.stripe_customer_id as string,
         memberEmails: emails
       }
     });
@@ -1628,23 +1629,23 @@ async function checkMindBodyStaleSyncMembers(): Promise<IntegrityCheckResult> {
   for (const member of staleMembers) {
     const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || 'Unknown';
     const lastUpdate = member.updated_at 
-      ? new Date(member.updated_at).toLocaleDateString()
+      ? new Date(member.updated_at as string).toLocaleDateString()
       : 'unknown';
     
     issues.push({
       category: 'sync_mismatch',
       severity: 'warning',
       table: 'users',
-      recordId: member.id,
+      recordId: member.id as string | number,
       description: `MindBody member "${memberName}" shows as active but record unchanged since ${lastUpdate}`,
       suggestion: 'Verify member is still active in MindBody or update their record',
       context: {
         memberName,
-        memberEmail: member.email,
-        memberTier: member.tier,
-        lastUpdate: member.updated_at || undefined,
-        mindbodyClientId: member.mindbody_client_id || undefined,
-        userId: member.id
+        memberEmail: member.email as string,
+        memberTier: member.tier as string,
+        lastUpdate: (member.updated_at as string) || undefined,
+        mindbodyClientId: (member.mindbody_client_id as string) || undefined,
+        userId: Number(member.id)
       }
     });
   }
@@ -1702,16 +1703,16 @@ async function checkMindBodyStatusMismatch(): Promise<IntegrityCheckResult> {
       category: 'data_quality',
       severity: 'warning',
       table: 'users',
-      recordId: member.id,
+      recordId: member.id as string | number,
       description,
       suggestion,
       context: {
         memberName,
-        memberEmail: member.email,
-        memberTier: member.tier || 'none',
-        memberStatus: member.membership_status,
-        mindbodyClientId: member.mindbody_client_id || 'none',
-        userId: member.id
+        memberEmail: member.email as string,
+        memberTier: (member.tier as string) || 'none',
+        memberStatus: member.membership_status as string,
+        mindbodyClientId: (member.mindbody_client_id as string) || 'none',
+        userId: Number(member.id)
       }
     });
   }
@@ -1852,13 +1853,13 @@ async function checkHubSpotIdDuplicates(): Promise<IntegrityCheckResult> {
         category: 'data_quality',
         severity: alreadyLinked ? 'info' : 'warning',
         table: 'users',
-        recordId: dup.hubspot_id,
+        recordId: dup.hubspot_id as string | number,
         description: `HubSpot contact ${dup.hubspot_id} is shared by ${dup.user_count} users: ${userDetails}${alreadyLinked ? ' (emails already linked)' : ''}`,
         suggestion: alreadyLinked 
           ? 'Emails are linked. Consider merging these users if they are the same person.'
           : 'Link these emails or merge users if they represent the same person.',
         context: {
-          hubspotContactId: dup.hubspot_id,
+          hubspotContactId: dup.hubspot_id as string,
           memberEmail: emails[0],
           duplicateUsers: emails.map((email: string, idx: number) => ({
             userId: (dup.user_ids as number[])[idx],
@@ -1898,11 +1899,11 @@ async function checkOrphanedFeeSnapshots(): Promise<IntegrityCheckResult> {
       category: 'orphan_record',
       severity: 'error',
       table: 'booking_fee_snapshots',
-      recordId: row.id,
+      recordId: row.id as string | number,
       description: `Fee snapshot (booking_id: ${row.booking_id}) references a deleted booking — ${row.total_cents} cents, status: ${row.status}`,
       suggestion: 'Delete orphaned fee snapshot or investigate missing booking',
       context: {
-        status: row.status || undefined
+        status: (row.status as string) || undefined
       }
     });
   }
@@ -1935,15 +1936,15 @@ async function checkSessionsWithoutParticipants(): Promise<IntegrityCheckResult>
       category: 'orphan_record',
       severity: 'warning',
       table: 'booking_sessions',
-      recordId: row.id,
+      recordId: row.id as string | number,
       description: `Session on ${row.session_date} at ${row.start_time}–${row.end_time} (${row.resource_name || 'unknown resource'}) has zero participants`,
       suggestion: 'Review session and add participants or remove empty session',
       context: {
-        bookingDate: row.session_date || undefined,
-        startTime: row.start_time || undefined,
-        endTime: row.end_time || undefined,
-        resourceName: row.resource_name || undefined,
-        resourceId: row.resource_id || undefined
+        bookingDate: (row.session_date as string) || undefined,
+        startTime: (row.start_time as string) || undefined,
+        endTime: (row.end_time as string) || undefined,
+        resourceName: (row.resource_name as string) || undefined,
+        resourceId: (row.resource_id as number) || undefined
       }
     });
   }
@@ -1975,12 +1976,12 @@ async function checkOrphanedPaymentIntents(): Promise<IntegrityCheckResult> {
       category: 'data_quality',
       severity: 'error',
       table: 'booking_fee_snapshots',
-      recordId: row.id,
+      recordId: row.id as string | number,
       description: `Payment intent ${row.stripe_payment_intent_id} (${row.total_cents} cents, status: ${row.status}) references a deleted or cancelled booking (booking_id: ${row.booking_id})`,
       suggestion: 'Cancel the Stripe payment intent and clean up the fee snapshot',
       context: {
-        stripeCustomerId: row.stripe_payment_intent_id || undefined,
-        status: row.status || undefined
+        stripeCustomerId: (row.stripe_payment_intent_id as string) || undefined,
+        status: (row.status as string) || undefined
       }
     });
   }
@@ -2010,11 +2011,11 @@ async function checkGuestPassesForNonExistentMembers(): Promise<IntegrityCheckRe
       category: 'orphan_record',
       severity: 'warning',
       table: 'guest_passes',
-      recordId: row.id,
+      recordId: row.id as string | number,
       description: `Guest pass for "${row.member_email}" (${row.passes_used}/${row.passes_total} used) references a non-existent member`,
       suggestion: 'Delete orphaned guest pass record or verify the member email',
       context: {
-        memberEmail: row.member_email || undefined
+        memberEmail: (row.member_email as string) || undefined
       }
     });
   }
@@ -2079,19 +2080,19 @@ async function checkBillingProviderHybridState(): Promise<IntegrityCheckResult> 
       category: 'sync_mismatch',
       severity,
       table: 'users',
-      recordId: member.id,
+      recordId: member.id as string | number,
       description,
       suggestion,
       context: {
         memberName,
-        memberEmail: member.email,
-        memberTier: member.tier || 'none',
-        memberStatus: member.membership_status,
-        billingProvider: member.billing_provider || 'none',
-        stripeSubscriptionId: member.stripe_subscription_id || 'none',
-        stripeCustomerId: member.stripe_customer_id || 'none',
-        mindbodyClientId: member.mindbody_client_id || 'none',
-        userId: member.id
+        memberEmail: member.email as string,
+        memberTier: (member.tier as string) || 'none',
+        memberStatus: member.membership_status as string,
+        billingProvider: (member.billing_provider as string) || 'none',
+        stripeSubscriptionId: (member.stripe_subscription_id as string) || 'none',
+        stripeCustomerId: (member.stripe_customer_id as string) || 'none',
+        mindbodyClientId: (member.mindbody_client_id as string) || 'none',
+        userId: Number(member.id)
       }
     });
   }
@@ -2169,8 +2170,8 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
       status: c.status,
       issueCount: c.issueCount
     }));
-    await alertOnCriticalIntegrityIssues(checkSummaries, severityMap);
-    await alertOnHighIntegrityIssues(checkSummaries, severityMap);
+    await alertOnCriticalIntegrityIssues(checkSummaries as any, severityMap);
+    await alertOnHighIntegrityIssues(checkSummaries as any, severityMap);
   } catch (err) {
     if (!isProduction) logger.error('[DataIntegrity] Failed to store history:', { error: err });
   }
@@ -2260,7 +2261,7 @@ export async function getIntegritySummary(): Promise<IntegritySummary> {
     lastRun: new Date(),
     checks: results.map(r => ({
       checkName: r.checkName,
-      status: r.status,
+      status: r.status as 'pass' | 'warning' | 'fail',
       issueCount: r.issueCount
     }))
   };
@@ -2420,13 +2421,13 @@ export async function syncPush(params: SyncPushParams): Promise<{ success: boole
     
     const hubspot = await getHubSpotClient();
     
-    const isChurned = ['terminated', 'cancelled', 'non-member', 'deleted', 'former_member', 'expired'].includes((user.membership_status || '').toLowerCase());
-    const mappedTier = isChurned ? '' : (denormalizeTierForHubSpot(user.tier) || '');
+    const isChurned = ['terminated', 'cancelled', 'non-member', 'deleted', 'former_member', 'expired'].includes(String(user.membership_status || '').toLowerCase());
+    const mappedTier = isChurned ? '' : (denormalizeTierForHubSpot(String(user.tier)) || '');
     
     await hubspot.crm.contacts.basicApi.update(hubspotContactId, {
       properties: {
-        firstname: user.first_name || '',
-        lastname: user.last_name || '',
+        firstname: (user.first_name as string) || '',
+        lastname: (user.last_name as string) || '',
         membership_tier: mappedTier
       }
     });
@@ -2476,9 +2477,9 @@ export async function bulkPushToHubSpot(dryRun: boolean = true): Promise<{
         properties: ['firstname', 'lastname', 'email', 'membership_tier']
       };
       const readResult = await retryableHubSpotRequest(() =>
-        hubspot.crm.contacts.batchApi.read(readInput)
+        hubspot.crm.contacts.batchApi.read(readInput as any)
       );
-      for (const contact of ((readResult as Record<string, unknown>).results as Array<{ id: string; properties?: Record<string, string> }> || [])) {
+      for (const contact of ((readResult as unknown as Record<string, unknown>).results as Array<{ id: string; properties?: Record<string, string> }> || [])) {
         hsContactMap[contact.id] = contact.properties || {};
       }
     } catch (error: unknown) {
@@ -2487,9 +2488,9 @@ export async function bulkPushToHubSpot(dryRun: boolean = true): Promise<{
         for (const member of batch) {
           try {
             const singleRead = await retryableHubSpotRequest(() =>
-              hubspot.crm.contacts.basicApi.getById(member.hubspot_id, ['firstname', 'lastname', 'email', 'membership_tier'])
+              hubspot.crm.contacts.basicApi.getById(String(member.hubspot_id), ['firstname', 'lastname', 'email', 'membership_tier'])
             );
-            hsContactMap[member.hubspot_id] = singleRead.properties || {};
+            hsContactMap[member.hubspot_id as string] = singleRead.properties || {};
           } catch (singleErr: unknown) {
             if (getErrorStatusCode(singleErr) === 404) {
               continue;
@@ -2506,19 +2507,19 @@ export async function bulkPushToHubSpot(dryRun: boolean = true): Promise<{
     const updateInputs: Array<{ id: string; properties: Record<string, string> }> = [];
 
     for (const member of batch) {
-      const hsProps = hsContactMap[member.hubspot_id];
+      const hsProps = hsContactMap[member.hubspot_id as string];
       if (!hsProps) continue;
 
-      const memberStatus = (member.membership_status || '').toLowerCase();
+      const memberStatus = String(member.membership_status || '').toLowerCase();
       const isChurned = CHURNED_STATUSES.includes(memberStatus);
       const isNoTierStatus = NO_TIER_STATUSES.includes(memberStatus);
       const expectedTier = (isChurned || isNoTierStatus || !member.tier)
         ? ''
-        : (denormalizeTierForHubSpot(member.tier) || '');
+        : (denormalizeTierForHubSpot(String(member.tier)) || '');
 
-      const appFirstName = (member.first_name || '').trim().toLowerCase();
+      const appFirstName = String(member.first_name || '').trim().toLowerCase();
       const hsFirstName = (hsProps.firstname || '').trim().toLowerCase();
-      const appLastName = (member.last_name || '').trim().toLowerCase();
+      const appLastName = String(member.last_name || '').trim().toLowerCase();
       const hsLastName = (hsProps.lastname || '').trim().toLowerCase();
       const expectedNorm = expectedTier.trim().toLowerCase();
       const hsNorm = (hsProps.membership_tier || '').trim().toLowerCase();
@@ -2535,10 +2536,10 @@ export async function bulkPushToHubSpot(dryRun: boolean = true): Promise<{
       if (hasMismatch) {
         totalMismatched++;
         updateInputs.push({
-          id: member.hubspot_id,
+          id: member.hubspot_id as string,
           properties: {
-            firstname: member.first_name || '',
-            lastname: member.last_name || '',
+            firstname: (member.first_name as string) || '',
+            lastname: (member.last_name as string) || '',
             membership_tier: expectedTier
           }
         });
@@ -2630,7 +2631,7 @@ export async function syncPull(params: SyncPullParams): Promise<{ success: boole
     `);
     
     if (userEmail) {
-      syncCustomerMetadataToStripe(userEmail).catch(() => {});
+      syncCustomerMetadataToStripe(String(userEmail)).catch(() => {});
     }
     
     return { 
@@ -2902,7 +2903,7 @@ export async function runDataCleanup(): Promise<{
         (SELECT COUNT(*) FROM wellness_updated) +
         (SELECT COUNT(*) FROM guest_passes_updated) as total
     `);
-    normalizedEmails = (emailResult.rows[0] as Record<string, unknown>)?.total || 0;
+    normalizedEmails = Number((emailResult.rows[0] as Record<string, unknown>)?.total || 0);
 
     const feeSnapshotResult = await db.execute(sql`
       DELETE FROM booking_fee_snapshots bfs

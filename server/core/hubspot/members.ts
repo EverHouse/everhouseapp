@@ -209,7 +209,7 @@ export async function createMembershipDeal(
       dealId,
       'contacts',
       contactId,
-      [{ associationCategory: 'HUBSPOT_DEFINED' as unknown as string, associationTypeId: 3 }]
+      [{ associationCategory: 'HUBSPOT_DEFINED' as any, associationTypeId: 3 }]
     )
   );
   
@@ -744,7 +744,7 @@ export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMe
     
     return {
       success: true,
-      userId: userId.rows[0].id,
+      userId: String(userId.rows[0].id),
       hubspotContactId: contactId,
       hubspotDealId: dealId,
       lineItemId: lineItemResult.lineItemId

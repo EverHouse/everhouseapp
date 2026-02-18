@@ -101,7 +101,7 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
     
     try {
       // Execute the operation
-      await executeHubSpotOperation(job.operation, job.payload);
+      await executeHubSpotOperation(job.operation as string, job.payload as any);
       
       // Mark as completed
       await db.execute(sql`UPDATE hubspot_sync_queue 
@@ -148,7 +148,7 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
         continue;
       }
       
-      const newRetryCount = job.retry_count + 1;
+      const newRetryCount = Number(job.retry_count) + 1;
       const shouldRetry = newRetryCount < job.max_retries;
       
       if (shouldRetry) {
@@ -240,22 +240,22 @@ async function executeHubSpotOperation(operation: string, payload: Record<string
       
     case 'sync_tier':
       // Sync tier change to HubSpot contact and deal
-      await members.syncTierToHubSpot(payload);
+      await members.syncTierToHubSpot(payload as any);
       break;
       
     case 'sync_company':
-      await companies.syncCompanyToHubSpot(payload);
+      await companies.syncCompanyToHubSpot(payload as any);
       break;
       
     case 'sync_day_pass':
       // Use the stripe hubspotSync version which handles line items on deals
       const dayPassSync = await import('../stripe/hubspotSync');
-      await dayPassSync.syncDayPassToHubSpot(payload);
+      await dayPassSync.syncDayPassToHubSpot(payload as any);
       break;
       
     case 'sync_payment':
       const hubspotSync = await import('../stripe/hubspotSync');
-      await hubspotSync.syncPaymentToHubSpot(payload);
+      await hubspotSync.syncPaymentToHubSpot(payload as any);
       break;
       
     default:

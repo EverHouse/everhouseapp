@@ -167,7 +167,7 @@ export async function syncMemberToHubSpot(
         filterGroups: [{
           filters: [{
             propertyName: 'email',
-            operator: 'EQ',
+            operator: 'EQ' as any,
             value: email.toLowerCase()
           }]
         }],
@@ -554,7 +554,7 @@ export async function ensureHubSpotPropertiesExist(): Promise<{ success: boolean
             await retryableHubSpotRequest(() =>
               hubspot.crm.properties.coreApi.update('contacts', prop.name, {
                 options: allOptions,
-              } as Partial<typeof prop>)
+              } as any)
             );
             logger.info(`[HubSpot] Added options to ${prop.name}: ${missingOptions.map((o: { label: string }) => o.label).join(', ')}`);
           }

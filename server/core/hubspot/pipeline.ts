@@ -56,7 +56,7 @@ export async function validateMembershipPipeline(): Promise<{
       };
     }
     
-    const validStages = membershipPipeline.stages?.map((s: Record<string, unknown>) => s.id as string) || [];
+    const validStages = membershipPipeline.stages?.map((s: any) => s.id as string) || [];
     
     const requiredStages = Object.values(HUBSPOT_STAGE_IDS);
     const missingStages = requiredStages.filter(s => !validStages.includes(s));

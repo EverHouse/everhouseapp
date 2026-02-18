@@ -143,7 +143,7 @@ export async function syncCompanyToHubSpot(
             filterGroups: [{
               filters: [{
                 propertyName: 'email',
-                operator: 'EQ',
+                operator: 'EQ' as any,
                 value: normalizedEmail
               }]
             }],
@@ -173,7 +173,7 @@ export async function syncCompanyToHubSpot(
             companyId!,
             'contacts',
             contactId!,
-            [{ associationCategory: 'HUBSPOT_DEFINED' as unknown as 'HUBSPOT_DEFINED', associationTypeId: 280 }]
+            [{ associationCategory: 'HUBSPOT_DEFINED' as any, associationTypeId: 280 }]
           )
         );
 
